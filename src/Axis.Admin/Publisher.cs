@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Data;
@@ -49,6 +50,10 @@ namespace Axis.Admin;
 /// of <c>Scenarios:ServerConnectionString</c> creates, and stores each scenario's outcome on the request. It touches no
 /// tenant database except to store the request's status and results, and writes no audit record and no release id. Without the
 /// setting it fails with <c>AXC0217</c>, and an unknown scenario name fails it with <c>AXC0218</c>.
+/// A <c>test</c> that names a package compiles nothing and runs no scenario. It sends that package's files from the snapshot to
+/// <c>application-package-host</c> as a <c>test</c>, see <see cref="ApplicationPackageBuilds"/>, and stores each test's outcome on the
+/// request. It ends <c>succeeded</c> when every test passed. A refused or unanswered test fails it with <c>AXC0149</c> or <c>AXC0152</c>, and without
+/// <c>Extensions:ApplicationPackages</c> it fails with <c>AXC0148</c> and sends nothing. A stop ends it at once with <c>AXC0220</c>.
 /// An <c>accept</c> applies a person's draft to the application's folder, see <see href="docs/reference/revisions-and-drafts.md#accepting-a-draft">accepting a draft</see>.
 /// Holding the folder's write lock throughout, it fails when the draft is not the requester's or a resource the draft read has changed on
 /// <c>main</c> (<c>AXC0377</c>), then runs the steps of a <c>validate</c> on the applied files, with their contract scenarios, and
@@ -139,7 +144,7 @@ internal sealed class Publisher(
         SET status = 'running', claimed_by = @me, lease_until = clock_timestamp() + @lease,
             claims = p.claims + 1, started_at = coalesce(p.started_at, clock_timestamp())
         FROM next WHERE p.id = next.id
-        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.kind, p.claims, p.label, p.note, p.release_id, p.target, p.scenario_names::text, p.draft_id, p.folder, p.client
+        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.kind, p.claims, p.label, p.note, p.release_id, p.target, p.scenario_names::text, p.draft_id, p.folder, p.client, p.package
         """;
 
     private const string RenewSql =
@@ -161,7 +166,7 @@ internal sealed class Publisher(
     private const string FinishSql =
         """
         UPDATE axis.publish_requests
-        SET status = @status, finished_at = now(), release_id = @release, diagnostics = @diagnostics, scenario_results = @scenarios
+        SET status = @status, finished_at = now(), release_id = @release, diagnostics = @diagnostics, scenario_results = @scenarios, package_tests = @packageTests
         WHERE id = @id AND status = 'running' AND claims = @claims
         """;
 
@@ -423,7 +428,8 @@ internal sealed class Publisher(
                     await reader.IsDBNullAsync(10) ? null : reader.GetString(10),
                     await reader.IsDBNullAsync(11) ? null : reader.GetGuid(11),
                     await reader.IsDBNullAsync(12) ? null : reader.GetString(12),
-                    await reader.IsDBNullAsync(13) ? null : reader.GetString(13));
+                    await reader.IsDBNullAsync(13) ? null : reader.GetString(13),
+                    await reader.IsDBNullAsync(14) ? null : reader.GetString(14));
             }
         }
 
@@ -517,6 +523,15 @@ internal sealed class Publisher(
 
         if (request.Kind == "test")
         {
+            if (request.Package is { } package)
+            {
+                var packageTests = new JsonArray();
+                var passed = await TestPackageAsync(tenant.Id, files, package, diagnostics, packageTests);
+                await StopRenewalAsync(renewing, renewal);
+                await FinishAsync(tenant.Id, connections, request, new ReleaseRun(passed, null), diagnostics, audit: false, scenarioResults: null, packageTests: packageTests.ToJsonString());
+                return;
+            }
+
             var tested = await activation.TestAsync(
                 tenant.Id,
                 tenant.SchemaVersion,
@@ -608,6 +623,51 @@ internal sealed class Publisher(
         // The renewal stops before the final update, so it cannot extend a lease that the update has just ended.
         await StopRenewalAsync(renewing, renewal);
         await FinishAsync(tenant.Id, connections, request, run, diagnostics, audit: !preview, ScenarioResultsJson(scenarioResults));
+    }
+
+    // Sends the one package of a test request to application-package-host to test, see
+    // docs/reference/extension-packages.md#an-applications-packages. It compiles nothing and runs no scenario, so it needs no scenario
+    // server, and it touches no tenant data. The host's wait bounds it, so the test limit never applies. A stop ends it at once.
+    private async Task<bool> TestPackageAsync(string tenantId, IReadOnlyList<ResourceContent>? files, string package, List<Diagnostic> diagnostics, JsonArray tests)
+    {
+        if (packageBuilds is null || !settings.ApplicationPackages)
+        {
+            diagnostics.Add(ApplicationPackageDiagnostics.Off($"{ApplicationLoader.PackagesFolderPrefix}{package}/{PackageCatalog.ManifestFileName}"));
+        }
+        else if (files is null)
+        {
+            _output.WriteLine($"{tenantId} package failed: The snapshot cannot be read.");
+            return false;
+        }
+        else
+        {
+            try
+            {
+                var result = await packageBuilds.TestAsync(files, package, stopping);
+                diagnostics.AddRange(result.Diagnostics);
+                foreach (var outcome in result.Tests)
+                {
+                    tests.Add(new JsonObject { ["name"] = outcome.Name, ["outcome"] = outcome.Outcome, ["message"] = outcome.Message });
+                }
+            }
+            catch (OperationCanceledException) when (stopping.IsCancellationRequested)
+            {
+                diagnostics.Add(new Diagnostic(DiagnosticCodes.ScenarioStopped, "The publisher stopped while the package test ran.", "", ""));
+            }
+        }
+
+        var failed = tests.Count(test => test!["outcome"]!.GetValue<string>() != PackageTestOutcome.Passed);
+        foreach (var diagnostic in diagnostics)
+        {
+            _output.WriteLine($"{tenantId} package failed: {diagnostic.Code} {diagnostic.Message}");
+        }
+
+        if (diagnostics.Count == 0)
+        {
+            _output.WriteLine(failed > 0 ? $"{tenantId} package failed: {failed} of {tests.Count} tests failed." : $"{tenantId} package ok");
+        }
+
+        return diagnostics.Count == 0 && failed == 0;
     }
 
     // Applies a person's draft to the application's folder as one revision. The folder's write lock spans every step, so Studio
@@ -867,7 +927,7 @@ internal sealed class Publisher(
 
     // The final status, the diagnostics and the audit record commit together, so a request never ends without its record. A
     // validate has no release audit record. A publisher that lost its claim changes nothing and writes no record.
-    private async Task FinishAsync(string tenantId, ITenantConnections connections, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit, string? scenarioResults = null)
+    private async Task FinishAsync(string tenantId, ITenantConnections connections, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit, string? scenarioResults = null, string? packageTests = null)
     {
         var connection = await connections.SchemaConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
@@ -878,6 +938,7 @@ internal sealed class Publisher(
             command.Parameters.Add(new NpgsqlParameter("release", NpgsqlDbType.Uuid) { Value = ReleaseOf(request, run) is { } release ? release : DBNull.Value });
             command.Parameters.Add(new NpgsqlParameter("diagnostics", NpgsqlDbType.Jsonb) { Value = DiagnosticsJson(diagnostics) });
             command.Parameters.Add(new NpgsqlParameter("scenarios", NpgsqlDbType.Jsonb) { Value = (object?)scenarioResults ?? DBNull.Value });
+            command.Parameters.Add(new NpgsqlParameter("packageTests", NpgsqlDbType.Jsonb) { Value = (object?)packageTests ?? DBNull.Value });
             command.Parameters.AddWithValue("id", request.Id);
             command.Parameters.AddWithValue("claims", request.Claims);
             changed = await command.ExecuteNonQueryAsync();
@@ -988,5 +1049,5 @@ internal sealed class Publisher(
             ["resourceId"] = diagnostic.ResourceId?.ToString("D"),
         })]).ToJsonString();
 
-    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string Kind, int Claims, string? Label, string? Note, Guid? ReleaseId, string Target, string? ScenarioNames, Guid? DraftId, string? Folder, string? Client);
+    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string Kind, int Claims, string? Label, string? Note, Guid? ReleaseId, string Target, string? ScenarioNames, Guid? DraftId, string? Folder, string? Client, string? Package);
 }

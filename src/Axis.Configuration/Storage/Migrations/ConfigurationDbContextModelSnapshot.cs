@@ -302,6 +302,14 @@ namespace Axis.Configuration.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("note");
 
+                    b.Property<string>("Package")
+                        .HasColumnType("text")
+                        .HasColumnName("package");
+
+                    b.Property<string>("PackageTests")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("package_tests");
+
                     b.Property<Guid?>("ReleaseId")
                         .HasColumnType("uuid")
                         .HasColumnName("release_id");

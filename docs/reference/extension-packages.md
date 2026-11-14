@@ -746,7 +746,7 @@ trusted code, so the platform gives it more limits than an installation's packag
   With `false`, an application's package is a compile error at its `packages/<id>/axis-package.json`, reported
   once for each package, when the server activates a folder at start, `activate` compiles it or the publisher compiles a snapshot. So an installation without gVisor refuses it and runs its own packages as before.
   A stored release that holds one still rebuilds, whatever the setting says.
-  With `true`, the publisher needs the same `Extensions:Runners:Application`, to send it each package to build, and exits
+  With `true`, the publisher needs the same `Extensions:Runners:Application`, to send it each package to build or test, and exits
   with code 2 at start when it is unset or malformed.
 - **A customer-hosted package and the setting.** The tenant's switch and the compile
   check still allow a [customer-hosted](#customer-hosted-runners) package with the setting `false`, which
@@ -755,10 +755,10 @@ trusted code, so the platform gives it more limits than an installation's packag
 - **Its own runners.** The worker sends each attempt of an application's package, in any language, to
   `application-package-host`, with the call's tenant and the built files of the call's release in `start`, see [a built package
   in the release](#versions-and-pinning). The runners are one set for each tenant, package version and build, with the limits of
-  [package runners](#package-runners). A build is a SHA-256 digest of the built files, so changed files never reuse a runner,
-  even with the same version. A runner starts only when that tenant's call needs one, and idle runners stay until the worker
-  stops. A release with the package's source but no built files, such as one `activate` stored, fails the call at once, naming
-  the package and no path. With `Extensions:Runners:Application` unset, a call is retryable and names the setting.
+  [package runners](#package-runners). A build is a SHA-256 digest of the built files, so changed files never reuse a runner.
+  A runner starts when that tenant's call needs one, and idle runners stay until the worker stops. A release with the source
+  but no built files, such as one `activate` stored, fails the call at once, naming the package and no path. Unset
+  `Extensions:Runners:Application` makes a call retryable and names the setting.
 - **Quotas.** A call also holds a `concurrentConnectorCalls` lease, as any package call does.
 - **CPU seconds** _(planned for M37)_. The CPU seconds of its runners count against the tenant's
   [package run time a day](tenant-quotas.md#package-run-time-a-day). A customer-hosted package counts for nothing there.
@@ -787,7 +787,8 @@ trusted code, so the platform gives it more limits than an installation's packag
   closes it without an answer or does not answer within 5 minutes fails it with one `AXC0152` diagnostic at
   `packages/<id>/axis-package.json`, which does not name the host's address. Either way no release is stored,
   and a `publish` to a `tenant` writes `release.publishFailed`. A `built` answer lets the compile go on, and a new release
-  stores the built files, see [a built package in the release](#versions-and-pinning). A `validate`, `accept`, `test`, `activate` and the activation at server start do not build
+  stores the built files, see [a built package in the release](#versions-and-pinning). A `test` that names a package sends that package as a `test`, see [test](authoring.md#test).
+  A `validate`, `accept`, any other `test`, `activate` and the activation at server start do not build
   packages yet. A publish needs the publisher role only.
 - **In the release.** The release holds every file of the package as written, and the content hash covers
   them, see [versions and pinning](#versions-and-pinning) and
@@ -894,7 +895,6 @@ installation, loading, the capability limits, the server's metadata-only load an
   the package's manifest and adapter, and one small dependency. The package build tests zip the
   dependency into a wheel, lock it in `requirements.txt` with its SHA-256 hash, and build the package
   offline, so the repository holds no binary file. Its operations cover each outcome of the Python
-  runner: `greet` maps onto the dependency, `echo` returns all six field types, `probe` uses its declared
-  bindings, asks for an undeclared one or, in the mode `ownOtherHost`, requests an undeclared host with `urllib` through the
-  proxy variables, `pid` returns its process ID, `flaky` raises `RetryableError` and `fail` raises `ValueError`.
-  The package host tests install the package by copying it with its dependency folder, so they need no pip.
+  runner: `greet` maps onto the dependency, `echo` returns all six field types, `probe` uses its declared bindings, asks for an
+  undeclared one or, in the mode `ownOtherHost`, requests one with `urllib`, `pid` returns its process ID, `flaky` raises
+  `RetryableError` and `fail` raises `ValueError`. The package host tests install the package by copying it, so they need no pip.

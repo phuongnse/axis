@@ -83,11 +83,7 @@ internal static class ApplicationPackageChecker
             var customerHosted = manifest is { CustomerHosted: true };
             if (!allowed && !customerHosted)
             {
-                problems.Insert(0, new Diagnostic(
-                    DiagnosticCodes.ApplicationPackagesOff,
-                    "Application packages are off in this installation (Extensions:ApplicationPackages). Remove the package or ask the operator to turn them on.",
-                    file,
-                    ""));
+                problems.Insert(0, ApplicationPackageDiagnostics.Off(file));
             }
 
             if (customerHosted)

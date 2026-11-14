@@ -54,6 +54,15 @@ public sealed class PublishRequest
     /// <summary>For a <c>test</c>, the result of each scenario as a JSON array. Null until the request ends.</summary>
     public string? ScenarioResults { get; init; }
 
+    /// <summary>For a <c>test</c> of one application package, the id of the package. Null for other requests.</summary>
+    public string? Package { get; init; }
+
+    /// <summary>
+    /// For a <c>test</c> of one application package, the outcome of each test as a JSON array of <c>{ name, outcome, message }</c>, empty when
+    /// no test ran. Null until the request ends, and for other requests.
+    /// </summary>
+    public string? PackageTests { get; init; }
+
     /// <summary>For an <c>accept</c>, the id of the draft to apply. Null for other kinds.</summary>
     public Guid? DraftId { get; init; }
 
