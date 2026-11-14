@@ -13,6 +13,9 @@ public sealed class TenantDailyCounterStore(NpgsqlDataSource platform)
     /// <summary>The counter of the emails a worker sends.</summary>
     public const string Emails = "emails";
 
+    /// <summary>The counter of the CPU seconds that the runners of a tenant's application packages use.</summary>
+    public const string PackageCpuSeconds = "packageCpuSeconds";
+
     /// <summary>The counter of the emails-held notice, at most one a day.</summary>
     public const string EmailsHeldNotice = "emailsHeldNotice";
 

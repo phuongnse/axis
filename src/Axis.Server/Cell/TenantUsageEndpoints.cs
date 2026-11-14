@@ -18,8 +18,8 @@ namespace Axis.Server.CellApi;
 /// order, a caller (<c>401</c>), the administrator role (<c>403</c>) and a tenant of a cell with a users client that is not a preview
 /// tenant (<c>404</c>), the checks of the users routes. It answers <c>503</c> when the platform database cannot be read.
 /// <para>
-/// What a tenant uses now is the latest storage sample, the enabled users of the realm, Studio's application count and the emails
-/// sent today. A concurrency quota, <c>workerWeight</c> and <c>authoringRequests</c> have no use to count and answer <c>null</c>. When
+/// What a tenant uses now is the latest storage sample, the enabled users of the realm, Studio's application count, the emails
+/// sent today and the package CPU seconds counted today. A concurrency quota, <c>workerWeight</c> and <c>authoringRequests</c> have no use to count and answer <c>null</c>. When
 /// the identity provider cannot count the users, <c>users</c> answers <c>null</c> and the server logs a warning.
 /// </para>
 /// </summary>
@@ -67,11 +67,13 @@ internal static partial class TenantUsageEndpoints
         var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
         long? storage;
         long emails;
+        long packageCpu;
         IReadOnlyList<TenantUsageRow> rows;
         try
         {
             storage = await usage.LatestStorageBytesAsync(tenantId, cancellationToken);
             emails = await counters.ValueAsync(tenantId, TenantDailyCounterStore.Emails, today, cancellationToken);
+            packageCpu = await counters.ValueAsync(tenantId, TenantDailyCounterStore.PackageCpuSeconds, today, cancellationToken);
             rows = await usage.ListDaysAsync(tenantId, today.AddDays(1 - Days), cancellationToken);
         }
         catch (NpgsqlException exception)
@@ -87,6 +89,7 @@ internal static partial class TenantUsageEndpoints
             [QuotaKeys.Applications] = await StudioApplicationEndpoints.CountApplicationsAsync(
                 database, StudioEndpoints.ForRequest(httpContext, options), cancellationToken),
             [QuotaKeys.EmailsPerDay] = emails,
+            [QuotaKeys.PackageCpuSecondsPerDay] = packageCpu,
         };
         var limits = quotas.For(tenantId);
         return Results.Ok(new TenantUsageResponse(

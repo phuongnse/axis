@@ -193,6 +193,14 @@ public sealed partial class PlanCatalogue
                     problems.Add($"The setting {prefix}:{nameof(PlanOptions.AddOns)}{of} must be empty, because the plan is a trial plan.");
                 }
 
+                // A trial plan runs no package, see docs/reference/plans.md#the-catalogue. An invalid value has its own problem.
+                if (plan.Quotas.TryGetValue(QuotaKeys.PackageCpuSecondsPerDay, out var packageCpu)
+                    && long.TryParse(packageCpu, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds)
+                    && seconds != 0)
+                {
+                    problems.Add($"The setting {prefix}:{nameof(PlanOptions.Quotas)}:{QuotaKeys.PackageCpuSecondsPerDay}{of} must be 0, because the plan is a trial plan.");
+                }
+
                 continue;
             }
 

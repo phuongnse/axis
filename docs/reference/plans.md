@@ -20,6 +20,7 @@ price change needs no decision and no release.
     "storage": 21474836480,
     "applications": 10,
     "emailsPerDay": 2000,
+    "packageCpuSecondsPerDay": 3600,
     "concurrentImports": 2,
     "concurrentConnectorCalls": 10,
     "concurrentQueries": 10,
@@ -62,7 +63,7 @@ The numbers above show the shape only. They are not prices.
   migrations the start reads every pinned version, and it stops when `ControlPlane:Plans` no longer
   lists one, naming each missing plan code and version.
 - **The trial's plan.** A plan marked `"trial": true` has no price and no add-ons.
-- **Package run time** _(planned for M37)_. Each plan sets `packageCpuSecondsPerDay`, see
+- **Package run time**. Each plan sets `packageCpuSecondsPerDay`, see
   [package run time a day](tenant-quotas.md#package-run-time-a-day). The start check refuses a trial
   plan whose value is not 0, so only a paid plan runs an application's packages.
 - **The trial's quotas** _(planned for M33)_. The trial plan sets a trial's quotas: those of a mid

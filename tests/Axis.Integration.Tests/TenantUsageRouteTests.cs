@@ -42,8 +42,10 @@ public sealed class TenantUsageRouteTests(KeycloakFixture keycloak) : IAsyncLife
         await InsertDayAsync(main, "a", today.AddDays(-3), databaseBytes: 90, fileBytes: 10, emailsSent: 2, connectorCalls: 0, workItemsRun: 1);
         await InsertDayAsync(main, "a", today.AddDays(-40), databaseBytes: 1, fileBytes: 1, emailsSent: 0, connectorCalls: 0, workItemsRun: 0);
         await InsertDayAsync(main, "b", today, databaseBytes: 1, fileBytes: 1, emailsSent: 99, connectorCalls: 99, workItemsRun: 99);
-        await InsertCounterAsync(main, "a", today, 7);
-        await InsertCounterAsync(main, "b", today, 99);
+        await InsertCounterAsync(main, "a", today, "emails", 7);
+        await InsertCounterAsync(main, "b", today, "emails", 99);
+        await InsertCounterAsync(main, "a", today, "packageCpuSeconds", 42);
+        await InsertCounterAsync(main, "b", today, "packageCpuSeconds", 99);
 
         using var usage = await StudioPublishTests.GetJsonAsync(author, "/api/tenant/usage", HostA);
 
@@ -55,6 +57,9 @@ public sealed class TenantUsageRouteTests(KeycloakFixture keycloak) : IAsyncLife
         Assert.True(quotas.GetProperty(QuotaKeys.Users).GetProperty("used").GetInt64() > 0);
         Assert.True(quotas.GetProperty(QuotaKeys.Applications).GetProperty("used").GetInt64() > 0);
         Assert.Equal(7, quotas.GetProperty(QuotaKeys.EmailsPerDay).GetProperty("used").GetInt64());
+        var packageCpu = quotas.GetProperty(QuotaKeys.PackageCpuSecondsPerDay);
+        Assert.Equal(0, packageCpu.GetProperty("limit").GetInt64());
+        Assert.Equal(42, packageCpu.GetProperty("used").GetInt64());
         foreach (var key in new[]
         {
             QuotaKeys.ConcurrentImports,
@@ -146,15 +151,16 @@ public sealed class TenantUsageRouteTests(KeycloakFixture keycloak) : IAsyncLife
         await command.ExecuteNonQueryAsync(CancellationToken);
     }
 
-    private static async Task InsertCounterAsync(string connectionString, string tenant, DateOnly day, long value)
+    private static async Task InsertCounterAsync(string connectionString, string tenant, DateOnly day, string counter, long value)
     {
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(CancellationToken);
         await using var command = new NpgsqlCommand(
-            "INSERT INTO platform.tenant_daily_counters (tenant_id, day, counter, value) VALUES (@tenant, @day, 'emails', @value)",
+            "INSERT INTO platform.tenant_daily_counters (tenant_id, day, counter, value) VALUES (@tenant, @day, @counter, @value)",
             connection);
         command.Parameters.AddWithValue("tenant", tenant);
         command.Parameters.AddWithValue("day", day);
+        command.Parameters.AddWithValue("counter", counter);
         command.Parameters.AddWithValue("value", value);
         await command.ExecuteNonQueryAsync(CancellationToken);
     }

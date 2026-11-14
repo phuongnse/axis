@@ -21,6 +21,7 @@ internal static class BillingSeed
                     "storage": 10737418240,
                     "applications": 5,
                     "emailsPerDay": 2000,
+                    "packageCpuSecondsPerDay": 3600,
                     "concurrentImports": 2,
                     "concurrentConnectorCalls": 10,
                     "concurrentQueries": 10,

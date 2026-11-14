@@ -41,6 +41,7 @@ public sealed class SubscriptionQuotaTests : IAsyncLifetime
           "storage": {{storage}},
           "applications": {{applications}},
           "emailsPerDay": 2000,
+          "packageCpuSecondsPerDay": 3600,
           "concurrentImports": 2,
           "concurrentConnectorCalls": 10,
           "concurrentQueries": 10,
@@ -123,6 +124,7 @@ public sealed class SubscriptionQuotaTests : IAsyncLifetime
         Assert.Equal(10_737_418_240, put.Set[QuotaKeys.Storage]);
         Assert.Equal(5, put.Set[QuotaKeys.Applications]);
         Assert.Equal(2000, put.Set[QuotaKeys.EmailsPerDay]);
+        Assert.Equal(3600, put.Set[QuotaKeys.PackageCpuSecondsPerDay]);
         Assert.Equal(200, put.Set[QuotaKeys.AuthoringRequests]);
 
         await Execute($"UPDATE control_plane.subscriptions SET plan_version = 2 WHERE id = '{id}'");
@@ -134,6 +136,7 @@ public sealed class SubscriptionQuotaTests : IAsyncLifetime
         Assert.Equal(40 + (2 * 10), again.Set[QuotaKeys.Users]);
         Assert.Equal(21_474_836_480, again.Set[QuotaKeys.Storage]);
         Assert.Equal(10, again.Set[QuotaKeys.Applications]);
+        Assert.Equal(3600, again.Set[QuotaKeys.PackageCpuSecondsPerDay]);
         Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.audit_records"));
     }
 
