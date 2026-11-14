@@ -8,8 +8,8 @@ namespace Axis.Studio;
 /// <summary>
 /// Records the revisions of one application folder in a bare git repository outside the folder, named
 /// <c>&lt;folder name&gt;.git</c> under <c>Studio:RevisionsPath</c>. A commit is built in memory from the folder's
-/// <c>*.json</c> files, as <see cref="StudioFolder.Files"/> lists them, so git never checks anything out and no
-/// <c>.git</c> appears in the folder. A write calls <see cref="RecordOutside"/> once it holds the write lock and
+/// <c>*.json</c> files and every file under <c>packages/</c>, as <see cref="StudioFolder.Files"/> lists them, so git
+/// never checks anything out and no <c>.git</c> appears in the folder. A write calls <see cref="RecordOutside"/> once it holds the write lock and
 /// <see cref="Record"/> once its files are written. Both log a warning and return when git fails, so a failed
 /// revision never fails a write: the next <see cref="RecordOutside"/> records the missed change as an outside change.
 /// <see cref="List"/>, <see cref="Diff"/> and <see cref="Revert"/> read the history of <c>main</c>, which is linear because

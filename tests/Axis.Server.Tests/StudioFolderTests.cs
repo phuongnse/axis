@@ -82,6 +82,28 @@ public sealed class StudioFolderTests : IDisposable
         Assert.Null(StudioFolder.Find(options, null, name));
     }
 
+    [Fact]
+    public void Files_lists_every_file_under_packages_and_leaves_out_a_hidden_file_and_a_link()
+    {
+        var app = Manifest(Path.Combine(_root, "app"), "app");
+        WriteFile(Path.Combine(app, "packages", "x", "adapter.py"));
+        WriteFile(Path.Combine(app, "packages", "x", ".env"));
+        WriteFile(Path.Combine(app, "notes", "readme.txt"));
+        var outside = WriteFile(Path.Combine(_root, "outside", "secret.py"));
+        File.CreateSymbolicLink(Path.Combine(app, "packages", "x", "link.py"), outside);
+        WriteFile(Path.Combine(_root, "linked", "z.py"));
+        Directory.CreateSymbolicLink(Path.Combine(app, "packages", "y"), Path.Combine(_root, "linked"));
+
+        Assert.Equal(["application.json", "packages/x/adapter.py"], StudioFolder.Files(app).Select(file => file.File));
+    }
+
+    private static string WriteFile(string path)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "content");
+        return path;
+    }
+
     private static string Manifest(string folder, string name)
     {
         Directory.CreateDirectory(folder);

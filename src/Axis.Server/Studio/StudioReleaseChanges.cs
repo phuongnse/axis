@@ -10,7 +10,7 @@ namespace Axis.Server.Studio;
 /// Compares the files of an application folder with the resources of its active release, file by file, as canonical
 /// JSON, without compiling the folder. Scenarios are left out because a release never stores them, and so are the
 /// modules' copies under <c>modules/</c> on both sides, which Studio shows as module rows. An application's package files
-/// under <c>packages/</c> are left out too, because they are not JSON resources and the folder snapshot never holds them.
+/// under <c>packages/</c> are left out too, because they are not resources.
 /// </summary>
 internal static class StudioReleaseChanges
 {

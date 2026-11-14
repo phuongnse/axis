@@ -525,7 +525,7 @@ and module resource saves.
 - **The manifest.** `application.json` at the folder root can be patched. It cannot be created or
   deleted, because `AXC0009` (see the [diagnostic codes](diagnostic-codes.md)) requires it there.
 - **Paths.** A path is resolved and must stay under the application folder, so `..` and links cannot
-  leave it. Only `*.json` files are read or written.
+  leave it. A resource write touches only `*.json` files. An undo and an accept also write `packages/` files.
 - **Patches.** A patch may not change `id` or `kind`, and a change of letter case alone counts as a
   change. Every other change is allowed, including one that breaks the resource: the new content is
   written and the diagnostics report the breakage.
@@ -717,7 +717,7 @@ What each kind does:
 
 - **A snapshot.** `validate`, `publish`, `preview` and `test` store the folder as it is when the
   request is made (a `test` of `run_scenarios`, the draft, see [Test](#test)): every `*.json` file
-  that Studio can reach, with its `version`, as for [Versions](#versions). A file that is not a valid
+  and every file under `packages/` that Studio can reach, with its `version`, as for [Versions](#versions). A file that is not a valid
   resource is kept, so the request fails with the diagnostic that the diagnostics route shows. The
   snapshot is read under the write lock, so it never holds a write half done, and a later edit in
   Studio does not change a queued request: the release is exactly what the author sent.

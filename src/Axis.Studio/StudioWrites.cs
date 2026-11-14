@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Loading;
 using Axis.Configuration.Templates;
 using Json.Patch;
 
@@ -669,14 +670,14 @@ internal static class StudioWrites
 
     internal static byte[] Serialize(JsonObject content) => TemplateApplications.Serialize(content);
 
-    // The full path of the file, or null when it is not a real *.json file inside the folder: it leaves the
-    // folder, or the file or a folder on the way to it is a link.
+    // The full path of the file, or null when it is not a real *.json file or a real file under packages/ inside the
+    // folder: it leaves the folder, or the file or a folder on the way to it is a link.
     private static string? Target(string folder, string file)
     {
         var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
         var target = Path.GetFullPath(Path.Combine(root, file));
         if (!target.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-            || !target.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+            || !IsWritable(root, target)
             || new FileInfo(target).LinkTarget is not null)
         {
             return null;
@@ -692,6 +693,12 @@ internal static class StudioWrites
 
         return target;
     }
+
+    // A *.json file, or a file under packages/.
+    private static bool IsWritable(string root, string target) =>
+        target.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+        || Path.GetRelativePath(root, target).Replace(Path.DirectorySeparatorChar, '/')
+            .StartsWith(ApplicationLoader.PackagesFolderPrefix, StringComparison.Ordinal);
 
     // A hidden temporary name that is not *.json, so neither the list nor the dev script's watcher sees it.
     private static string TemporaryName(string target) =>
