@@ -205,7 +205,7 @@ In a cell the worker counts each email it sends for a tenant, and holds an email
 
 In a cell the worker counts the CPU seconds that the runners of a tenant's
 [application packages](extension-packages.md#an-applications-packages) use, against the tenant's
-`packageCpuSecondsPerDay`. Outside a cell nothing is counted.
+`packageCpuSecondsPerDay`. Outside a cell nothing is counted or held.
 
 - **Counting.** After each call the worker adds the runner's CPU seconds for that call, rounded up, to
   the counter `packageCpuSeconds` in `platform.tenant_daily_counters`, see [emails a day](#emails-a-day).
@@ -215,20 +215,25 @@ In a cell the worker counts the CPU seconds that the runners of a tenant's
   does not count. A call counts whatever its outcome: a result, a failure or a refused request. A call that
   times out, or whose runner exits, or whose `usage` line does not come counts the seconds from the `run`
   to its end instead, rounded up. A worker with no `Cell:Id` counts nothing. A count that fails is logged as
-  one warning for the tenant, and the call goes on. The counter has no limit in the worker, so it counts
-  past the quota.
-- **Held calls** _(planned for M37)_. At or past the quota, a call is held, not failed. Its work item is
-  due at the next 00:00 UTC, as a held email is. Calls in flight finish and count. A quota of 0 holds every
-  call.
+  one warning for the tenant, and the call goes on. The count itself has no limit, so it passes the
+  quota when a call that started under it ends, and a tenant with no limit is counted too.
+- **Held calls.** The worker checks the day's counter before it marks a call to an application's package
+  `sending`. At or past the quota, the call is held, not failed. It stays `pending` and uses no attempt,
+  its instance keeps waiting, and its work item is due at the next 00:00 UTC by the worker's clock, as a
+  held email is. The check reserves nothing, so calls in flight finish and count, even past the quota. A
+  quota of 0 holds every call. A tenant with no limit is never held. When the platform database cannot be
+  read for the check, the call waits one lease, nothing is written, and the worker logs one warning for
+  the tenant.
 - **Customer-hosted packages** _(planned for M37)_. The calls to a
   [customer-hosted](extension-packages.md#customer-hosted-runners) package are neither counted nor held,
   because they use no CPU of Axis.
 - **Refused.** While the quota is 0, turning the tenant's
   [switch](user-administration.md#application-packages) on and a publish of an application that holds an
   application's package answer the quota's `403`, see [refusals](#refusals).
-- **The notice** _(planned for M37)_. The tenant's administrators get one in-app notice a day, the first
-  time a call is held. It uses the counter `packageHeldNotice` and the platform texts
-  `notices.packagesHeld.*`, as the [emails' notice](#emails-a-day) does.
+- **The notice.** The tenant's administrators get one in-app notice a day, the first time a call is held.
+  It uses the counter `packageHeldNotice` with a limit of 1 and the platform texts
+  `notices.packagesHeld.subject` and `notices.packagesHeld.body` with the value `limit`, as the
+  [emails' notice](#emails-a-day) does.
 - **Usage.** `used` in [the usage route](#usage) is the day's count.
 - **The daily row** _(planned for M37)_. The daily row of the tenant's usage holds the day's CPU seconds.
 

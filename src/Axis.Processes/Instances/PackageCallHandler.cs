@@ -62,6 +62,13 @@ namespace Axis.Processes.Instances;
 /// docs/reference/tenant-quotas.md#package-run-time-a-day. The seconds are the runner's <c>usage</c> line, and for a call that times out, whose
 /// runner exits or whose <c>usage</c> line does not come, the seconds from sending the <c>run</c> to its end. A runner whose answer came without
 /// its <c>usage</c> line is dropped. A count that fails is logged once for the tenant and never fails the call.
+/// With an <see cref="IPackageRunTime"/>, the first transaction also checks the tenant's package run time of the UTC day against its
+/// <c>packageCpuSecondsPerDay</c> quota, after it found the files of an application's own package and before it marks the call <c>sending</c>.
+/// At or past the quota the call is held: the transaction rolls back, so the call stays <c>pending</c> with no attempt and its instance keeps
+/// waiting, and <see cref="QuotaHold"/> makes the item due at the next 00:00 UTC and stores the day's first notice for the tenant's administrators.
+/// A call that started finishes and counts, even past the quota. When the platform database cannot be reached for the check, the transaction rolls back,
+/// the item is due again after one lease, and the first such item of a tenant logs one warning. Outside a cell nothing is checked or held, see
+/// docs/reference/tenant-quotas.md#package-run-time-a-day.
 /// The retry policy and the <c>idempotent</c> flag are stored with the call, so a worker that cannot load the pinned
 /// version can still decide. Each transaction checks the claim token, and the outcome needs the
 /// instance still waiting on the step at the revision the attempt saw. Each outcome transaction
@@ -82,6 +89,8 @@ internal sealed partial class PackageCallHandler(
     IPackageRunTime? runTime = null) : IExternalWorkItemHandler
 {
     private readonly ConcurrentDictionary<string, byte> _warnedRunTime = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte> _warnedQuota = new(StringComparer.Ordinal);
+    private readonly QuotaHold? _hold = runTime is null ? null : new(runTime, TenantNotices.PackagesHeldSubjectKey, TenantNotices.PackagesHeldBodyKey, logger);
 
     /// <summary>The error of a call that a worker finds still <c>sending</c> from an earlier attempt.</summary>
     internal const string UnknownOutcome = "The earlier attempt of the call has an unknown outcome.";
@@ -113,6 +122,8 @@ internal sealed partial class PackageCallHandler(
         string? error = null;
         var errorClass = ErrorClass.Failed;
         var counted = true;
+        PackageRunTimeCheck? held = null;
+        var quotaUnreadable = false;
         await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             var call = item.PackageCallId is { } callId ? await PackageCalls.LoadAsync(transaction, callId, cancellationToken) : null;
@@ -193,7 +204,22 @@ internal sealed partial class PackageCallHandler(
                         }
                     }
 
-                    if (target is not null)
+                    if (target is not null && target.Files is not null && runTime is not null)
+                    {
+                        // Only here is it known that the call goes to an application's package. A hold or an unreadable check
+                        // rolls back, so the call stays pending with its attempts unchanged.
+                        try
+                        {
+                            var check = await runTime.CheckAsync(item.TenantId, cancellationToken);
+                            held = check.Held ? check : null;
+                        }
+                        catch (NpgsqlException)
+                        {
+                            quotaUnreadable = true;
+                        }
+                    }
+
+                    if (target is not null && held is null && !quotaUnreadable)
                     {
                         var attempts = await PackageCalls.MarkSendingAsync(transaction, call.Id, cancellationToken)
                             ?? throw new InvalidOperationException($"The package call '{call.Id}' is no longer pending.");
@@ -216,6 +242,24 @@ internal sealed partial class PackageCallHandler(
                     }
                 }
             }
+        }
+
+        if (quotaUnreadable)
+        {
+            // Running without counting would break the quota, so the call waits for the platform database.
+            if (_warnedQuota.TryAdd(item.TenantId, 0))
+            {
+                LogQuotaUnavailable(item.TenantId);
+            }
+
+            return await RescheduleAsync(item, connection, item.Lease, cancellationToken)
+                ? WorkItemOutcome.Rescheduled
+                : WorkItemOutcome.LostClaim;
+        }
+
+        if (held is { } heldCheck)
+        {
+            return await _hold!.HoldAsync(item, connection, heldCheck.Day, heldCheck.Limit ?? 0, cancellationToken);
         }
 
         if (target is null)
@@ -1152,6 +1196,27 @@ internal sealed partial class PackageCallHandler(
             }
         }
     }
+
+    /// <summary>
+    /// Makes the item due after <paramref name="delay"/> in a transaction of its own. Returns <see langword="false"/>
+    /// when another worker holds the item now, so nothing was written.
+    /// </summary>
+    private async Task<bool> RescheduleAsync(ClaimedWorkItem item, NpgsqlConnection connection, TimeSpan delay, CancellationToken cancellationToken)
+    {
+        await using var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken);
+        if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            LogLostClaim(item.Id, item.PackageCallId);
+            return false;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    [LoggerMessage(LogLevel.Warning, "The platform database could not be reached to check the package run time quota of tenant {TenantId}, so its package calls wait. This is logged once for the tenant.")]
+    private partial void LogQuotaUnavailable(string tenantId);
 
     [LoggerMessage(LogLevel.Warning, "The platform database could not be reached to count the package run time of tenant {TenantId}. This is logged once for the tenant.")]
     private partial void LogRunTimeUnavailable(string tenantId);

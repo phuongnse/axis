@@ -2440,5 +2440,7 @@
   "shell.studio.newApplication.failed": "Không tạo được ứng dụng.",
   "shell.studio.newApplication.templatesFailed": "Không tải được các mẫu. Bạn vẫn có thể bắt đầu từ ứng dụng trống.",
   "notices.emailsHeld.subject": "Email còn lại sẽ gửi vào ngày mai",
-  "notices.emailsHeld.body": "Đã gửi đủ {limit} email, mức tối đa của hôm nay. Các email còn lại sẽ gửi sau 00:00 UTC."
+  "notices.emailsHeld.body": "Đã gửi đủ {limit} email, mức tối đa của hôm nay. Các email còn lại sẽ gửi sau 00:00 UTC.",
+  "notices.packagesHeld.subject": "Các lệnh gọi gói mở rộng còn lại sẽ chạy vào ngày mai",
+  "notices.packagesHeld.body": "Đã dùng đủ {limit} giây chạy gói mở rộng, mức tối đa của hôm nay. Các lệnh gọi còn lại sẽ chạy sau 00:00 UTC."
 }
