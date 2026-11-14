@@ -2172,7 +2172,7 @@
   "shell.studio.aiRequest.step.work": "Made the change in a draft",
   "shell.studio.aiRequest.step.check": "Compiled the draft and ran the scenarios",
   "shell.studio.aiRequest.step.fix": "Fixed what the checks and the review found",
-  "shell.studio.aiRequest.step.review": "A second AI reviewed the draft",
+  "shell.studio.aiRequest.step.review": "Reviewed the draft against the request and the plan",
   "shell.studio.aiRequest.step.accept": "Accepted the draft",
   "shell.studio.aiRequest.step.proposePlan": "Proposed a plan",
   "shell.studio.aiRequest.step.write": "Wrote {resource}",
