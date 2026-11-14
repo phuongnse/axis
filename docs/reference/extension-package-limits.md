@@ -35,8 +35,6 @@ A C# package that loads in the host's process and uses .NET APIs directly can do
 
 ### In package runners
 
-_(planned for M21)_
-
 Outside Development, an installation's packages run in [package runners](extension-packages.md#package-runners). There, the
 runner's network route, empty environment, read-only file system, resource limits and kill at the
 timeout stop the items in the list above, and the runner holds nothing of the host to reach by

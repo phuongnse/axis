@@ -1,0 +1,7 @@
+{
+  "id": "8285a524-8867-41ef-afc2-509af8da9e63",
+  "kind": "application",
+  "name": "PackageProbeApp",
+  "formatVersion": 1,
+  "packages": [{ "id": "test-package", "version": "1.0.0" }]
+}

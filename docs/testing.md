@@ -1,6 +1,6 @@
 # Testing
 
-This page says how Axis is tested: the test levels, the rules that tests follow, the shared test services, the E2E stack and the purchasing system stub.
+This page says how Axis is tested: the test levels, the rules that tests follow, the shared test services, the E2E stack, the purchasing system stub and the smoke test fixtures.
 
 Every acceptance criterion maps to at least one of these levels. The commands that run them are in
 [AGENTS.md](../AGENTS.md#commands), and how the runs are split and reported is in
@@ -428,3 +428,12 @@ the worker sends the call again under the same key and it succeeds. Only a `2xx`
 fit the output goes straight to reconciliation, which is why `unknown-request` answers one.
 
 `GET /health` answers `200`.
+
+## Smoke test fixtures
+
+The smoke tests of `scripts/smoke.sh` keep their fixtures in `tests/smoke/`. A fixture is an application
+that one smoke test activates, and nothing else uses it.
+
+| Fixture                       | Smoke test                          | What it checks                                                                                                                                                                                                                  |
+| ----------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/smoke/package-probe-app` | `scripts/onprem.test.mjs`         | A package runner's own HTTP client that calls an undeclared host fails its step. The process's one step runs `test-package/probe` in the `ownOtherHost` mode, and the `operator` role may start and inspect the process. |

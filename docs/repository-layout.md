@@ -53,6 +53,7 @@ tests/
                           when it runs, a Node.js package with a local dependency, and a Python test
                           package of plain files
   load/                   the k6 scenarios of the load tests
+  smoke/                  fixture applications that the smoke tests activate
   e2e/                    Playwright journeys against the running server, and their fixtures
 controlplane/
   src/Axis.ControlPlane/  the control plane service: its settings, its own schema and migrations,

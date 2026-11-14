@@ -1,0 +1,7 @@
+{
+  "id": "5a4bd886-8bab-4b61-bd59-fb3e5f8dc462",
+  "kind": "role",
+  "name": "operator",
+  "formatVersion": 1,
+  "label": { "textKey": "role.operator" }
+}
