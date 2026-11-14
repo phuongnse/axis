@@ -546,12 +546,13 @@ describe('a plan and its review, as a pull request has them', () => {
 
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Show the technical details' }))
-    // The details list as the review's findings do, each resource once, and one only the draft adds by its name, new.
+    // The details list as the review's findings do, each resource once, and one only the draft adds by its name, as text.
     const details = screen.getByTestId('studio-ai-plan-details')
     const [page, added] = within(details).getAllByTestId('studio-problem-group')
     expect(within(page).getByRole('button', { name: 'Requests' })).toBeInTheDocument()
     expect(page).toHaveTextContent('A Cost centre column.')
-    expect(added).toHaveTextContent(/^Cost centre\s*Entity, new\s*A new entity\.$/)
+    expect(added).toHaveTextContent(/^Cost centre\s*Entity\s*A new entity\.$/)
+    expect(within(added).queryByRole('button', { name: 'Cost centre' })).toBeNull()
     expect(within(added).queryByText('entities/cost-centre.json')).toBeNull()
     expect(screen.getByRole('button', { name: 'Approve plan' })).toBeInTheDocument()
   })

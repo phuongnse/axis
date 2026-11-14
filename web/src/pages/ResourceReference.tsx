@@ -10,8 +10,8 @@ import { PlatformContext } from './context'
 /**
  * Proposed: a pointer to a resource, see the review on #3263: the resource's title in the reader's language as the only
  * link, opening it at `path`, and its kind after it, muted, as the changes of a draft name a resource. A resource only
- * the draft adds is its name, as text, and its kind with "new", muted; any other pointer no one can open is its file,
- * muted.
+ * the draft adds is its name and its kind, as text, not a link, as no one opens it yet; any other pointer no one can
+ * open is its file, muted.
  */
 export function ResourceReference({
   resourceId,
@@ -24,7 +24,7 @@ export function ResourceReference({
 }: {
   resourceId: string | null
   file: string | null
-  /** The name and kind of a resource only the draft adds, shown as text with "new", as no one opens it yet. */
+  /** The name and kind of a resource only the draft adds, shown as text, as no one opens it yet. */
   name?: string | null
   kind?: string | null
   path: string
@@ -39,9 +39,7 @@ export function ResourceReference({
       return (
         <Flex component="span" align="baseline" gap={spacing.xs} wrap style={{ display: 'inline-flex' }}>
           <Typography.Text>{name}</Typography.Text>
-          <Typography.Text style={{ color: colour.textMuted }}>
-            {t('shell.studio.reference.new').replace('{kind}', kindSingular(kind, t))}
-          </Typography.Text>
+          <Typography.Text style={{ color: colour.textMuted }}>{kindSingular(kind, t)}</Typography.Text>
         </Flex>
       )
     }

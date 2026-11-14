@@ -2199,7 +2199,6 @@
   "shell.studio.aiRequest.checks.failed": "Không đạt",
   "shell.studio.aiRequest.checks.passed": "Đạt",
   "shell.studio.problems.show": "Xem",
-  "shell.studio.reference.new": "{kind}, mới",
   "shell.studio.problems.warningLead": "Cảnh báo",
   "shell.studio.problems.errorLead": "Lỗi",
   "shell.studio.aiRequest.checks.allScenarios": "Cả {total} kịch bản kiểm thử đều đạt.",

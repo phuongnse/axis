@@ -2199,7 +2199,6 @@
   "shell.studio.aiRequest.checks.failed": "Failed",
   "shell.studio.aiRequest.checks.passed": "Passed",
   "shell.studio.problems.show": "Show",
-  "shell.studio.reference.new": "{kind}, new",
   "shell.studio.problems.warningLead": "Warning",
   "shell.studio.problems.errorLead": "Error",
   "shell.studio.aiRequest.checks.allScenarios": "All {total} scenarios pass.",
