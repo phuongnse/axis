@@ -6,8 +6,8 @@
 # here and runs the server, the worker, the publisher and the SPA with hot reload.
 # The development settings are in src/Axis.Server/appsettings.Development.json.
 # The Node.js package host holds the sample extension packages and runs the runners of the `node` packages that the worker
-# sends it. It sits on the internal network runners, which only the worker shares, and publishes no port. No sample calls a
-# `node` package yet.
+# sends it. It sits on the internal network runners, which only the worker shares, and publishes no port. The purchase request
+# approval calls `payment-terms` in its `assignPaymentDueDate` step.
 # Mailpit, a local mail server, keeps every email the worker sends. Its web page is at http://localhost:8025.
 # All six ports are published on 127.0.0.1 only. AXIS_SERVER_PORT (default 5206),
 # AXIS_POSTGRES_PORT (default 5432), AXIS_KEYCLOAK_PORT (default 8080), AXIS_PURCHASING_PORT

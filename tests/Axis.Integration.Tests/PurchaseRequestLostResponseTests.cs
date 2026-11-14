@@ -137,14 +137,14 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
         // The connector step writes a row when it stages the call and another when the call settles.
         // The retry writes neither a history row nor an audit record.
         Assert.Equal(
-            "submit,managerApproval,managerApproval,financeCheck,markApproved,announceApproved,createPurchaseOrder,createPurchaseOrder,assignPaymentReference,assignPaymentReference,done",
+            "submit,managerApproval,managerApproval,financeCheck,markApproved,announceApproved,createPurchaseOrder,createPurchaseOrder,assignPaymentReference,assignPaymentReference,assignPaymentDueDate,assignPaymentDueDate,done",
             (string?)await fixture.ScalarAsync(
                 "SELECT string_agg(step, ',' ORDER BY revision) FROM axis.process_step_history WHERE process_instance_id = @instance",
                 ("instance", instance)));
         Assert.Equal(1L, await SettledRowsAsync(instance));
-        // The payment reference step then writes the record once more, so the purchase order step settled one version earlier.
+        // The payment reference and payment due date steps then write the record once each, so the purchase order step settled two versions earlier.
         Assert.True(JsonNode.DeepEquals(
-            new JsonObject { ["operationId"] = call, ["outcome"] = "succeeded", ["next"] = "assignPaymentReference", ["subjectVersion"] = version - 1 },
+            new JsonObject { ["operationId"] = call, ["outcome"] = "succeeded", ["next"] = "assignPaymentReference", ["subjectVersion"] = version - 2 },
             JsonNode.Parse((string)(await fixture.ScalarAsync(
                 """
                 SELECT output::text FROM axis.process_step_history

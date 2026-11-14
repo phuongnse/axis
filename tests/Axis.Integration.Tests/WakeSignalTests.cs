@@ -55,7 +55,7 @@ public sealed class WakeSignalTests(AdminBackupFixture fixture) : IClassFixture<
         var instance = await StartAsync(requester, subject);
 
         // The server has applied the platform grants that the worker needs.
-        var worker = await RestoredTenantWorkTests.BuildWorkerAsync(fixture.Scenario.Platform);
+        var worker = await RestoredTenantWorkTests.BuildWorkerAsync(fixture.Scenario.Platform, fixture.NodeRunner);
         try
         {
             await Polling.WaitUntilAsync(async () => await StateAsync(instance) == "waiting:managerApproval", "The instance did not wait for its manager.");
@@ -220,7 +220,7 @@ public sealed class WakeSignalTests(AdminBackupFixture fixture) : IClassFixture<
     // Starts a worker on the directory with a long poll interval unless it gets one, waits until it listens, and lets it run one instance, so its tenant is ready.
     private async Task<WebApplication> StartListeningWorkerAsync(HttpClient requester, TimeSpan? pollInterval = null, TimeSpan? idlePollCeiling = null)
     {
-        var worker = await RestoredTenantWorkTests.BuildWorkerAsync(fixture.Scenario.Platform, pollInterval ?? _longPoll, idlePollCeiling);
+        var worker = await RestoredTenantWorkTests.BuildWorkerAsync(fixture.Scenario.Platform, fixture.NodeRunner, pollInterval ?? _longPoll, idlePollCeiling);
         try
         {
             Assert.NotNull(await ListenerPidAsync(_received));

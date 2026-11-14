@@ -217,8 +217,9 @@ operations. The purchase request sample holds the purchasing system connector in
   the secret never goes to another host.
 
 The sample's `PurchaseRequest` entity has a `purchaseOrderNumber` `text` field, which the call
-writes, and a `paymentReference` `text` field, which the sample extension package writes after the
-purchase order is created. No policy lets a user update either, so the request form shows them
+writes, a `paymentReference` `text` field, which the sample extension package writes after the
+purchase order is created, and a `paymentDueDate` `date` field, which the TypeScript sample package
+writes after that. No policy lets a user update any of them, so the request form shows them
 read-only. The sample activates only for a tenant that holds the `PurchasingSystemUrl`,
 `PurchasingSystemTokenUrl`, `PurchasingSystemClientId` and `PurchasingSystemClientSecret` bindings.
 Its `PurchaseRequestApprovedWebhook` also needs the `PurchaseRequestApprovedWebhookUrl` and

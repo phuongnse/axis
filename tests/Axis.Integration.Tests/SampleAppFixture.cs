@@ -1,9 +1,11 @@
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
+using Axis.PackageHost;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
 using Axis.PurchasingStub;
@@ -39,6 +41,9 @@ namespace Axis.Integration.Tests;
 /// point at the stub. The server runs as Testing, so it would not load the development settings,
 /// and its bindings hold an <c>https</c> placeholder: it only checks them when it activates the
 /// sample, and never calls the stub.
+/// Every worker sends its <c>node</c> calls to a package host in this process, over a copy of the sample packages with
+/// <c>payment-terms</c> installed, see docs/reference/extension-packages.md#sample-and-test-packages. The fixture needs
+/// Node.js and npm on the path. The server's <c>Extensions:Path</c> stays the metadata-only <see cref="SamplePackages.Path"/>.
 /// </summary>
 public sealed class SampleAppFixture : IAsyncLifetime
 {
@@ -65,6 +70,8 @@ public sealed class SampleAppFixture : IAsyncLifetime
     private NpgsqlDataSource? _dataSource;
     private WebApplicationFactory<Program>? _factory;
     private ServiceProvider? _services;
+    private TemporaryFolder? _extensions;
+    private TestPackageHost? _packageHost;
 
     /// <summary>A new client of the server with its own cookies. The caller disposes it.</summary>
     public HttpClient CreateClient() =>
@@ -73,8 +80,14 @@ public sealed class SampleAppFixture : IAsyncLifetime
     /// <summary>The address of the purchasing system stub, such as <c>http://127.0.0.1:41234</c>.</summary>
     public string PurchasingUrl => _purchasingUrl ?? throw new InvalidOperationException("The fixture is not initialized.");
 
+    /// <summary>The copy of the sample packages with <c>payment-terms</c> installed, which the fixture's package host runs.</summary>
+    internal string InstalledPackagesPath => _extensions?.Path ?? throw new InvalidOperationException("The fixture is not initialized.");
+
     public async ValueTask InitializeAsync()
     {
+        _extensions = new TemporaryFolder();
+        _packageHost = await TestPackageHost.StartOnSamplesAsync(_extensions.Path, CancellationToken);
+
         _purchasing = PurchasingStubApp.Create(["--urls", "http://127.0.0.1:0"]);
         await _purchasing.StartAsync(CancellationToken);
         _purchasingUrl = _purchasing.Services.GetRequiredService<IServer>().Features.GetRequiredFeature<IServerAddressesFeature>().Addresses.Single();
@@ -138,6 +151,13 @@ public sealed class SampleAppFixture : IAsyncLifetime
         {
             await _dataSource.DisposeAsync();
         }
+
+        if (_packageHost is not null)
+        {
+            await _packageHost.DisposeAsync();
+        }
+
+        _extensions?.Dispose();
 
         await _database.DisposeAsync();
 
@@ -251,6 +271,8 @@ public sealed class SampleAppFixture : IAsyncLifetime
         {
             ["Extensions:Path"] = SamplePackages.Path,
             ["Extensions:Isolation"] = "inProcess",
+            [PackageIsolation.NodeRunnerSetting] = (_packageHost ?? throw new InvalidOperationException("The fixture is not initialized.")).Address,
+            [PackageIsolation.ProxySetting] = "0",
             [$"Tenants:{Tenant}:Hosts:0"] = Host,
             [$"Tenants:{Tenant}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(ConnectionString),
             [$"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind"] = "url",

@@ -8,25 +8,26 @@ describe('buildProcessGraph', () => {
   it('builds the purchase request process graph in the compiler order', () => {
     const graph = buildProcessGraph(approvalContent, [])
 
-    expect(graph.steps).toHaveLength(11)
+    expect(graph.steps).toHaveLength(12)
     expect(graph.start).toBe(0)
     expect(graph.steps.some((step) => step.marked)).toBe(false)
     expect(graph.transitions.map((t) => [t.source, t.target, t.kind, t.label])).toEqual([
       [0, 1, 'next', null],
       [1, 2, 'outcome', 'approve'],
-      [1, 8, 'outcome', 'return'],
-      [1, 9, 'outcome', 'reject'],
+      [1, 9, 'outcome', 'return'],
+      [1, 10, 'outcome', 'reject'],
       [2, 3, 'branch', 'totalAmount >= FinanceThreshold()'],
       [2, 4, 'otherwise', null],
       [3, 4, 'outcome', 'approve'],
-      [3, 8, 'outcome', 'return'],
-      [3, 9, 'outcome', 'reject'],
+      [3, 9, 'outcome', 'return'],
+      [3, 10, 'outcome', 'reject'],
       [4, 5, 'next', null],
       [5, 6, 'next', null],
       [6, 7, 'next', null],
-      [7, 10, 'next', null],
-      [8, 10, 'next', null],
-      [9, 10, 'next', null],
+      [7, 8, 'next', null],
+      [8, 11, 'next', null],
+      [9, 11, 'next', null],
+      [10, 11, 'next', null],
     ])
   })
 
@@ -49,6 +50,7 @@ describe('buildProcessGraph', () => {
       '/steps/7/next',
       '/steps/8/next',
       '/steps/9/next',
+      '/steps/10/next',
     ])
   })
 

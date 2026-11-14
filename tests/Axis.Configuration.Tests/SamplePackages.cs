@@ -4,7 +4,8 @@ namespace Axis.Configuration.Tests;
 
 /// <summary>
 /// The sample extension packages that <c>samples/packages/SamplePackages.targets</c> copies to the test
-/// output: <c>payment-references</c>, which the purchase request sample declares, and the metadata of <c>payment-terms</c>.
+/// output: <c>payment-references</c> and <c>payment-terms</c>, which the purchase request sample declares. <c>payment-terms</c>
+/// is copied as metadata only, with no library to run.
 /// </summary>
 internal static class SamplePackages
 {

@@ -20,18 +20,18 @@ test.describe('Studio redraws a large process after a panel edit', () => {
   test.beforeAll(async () => {
     copy = await mkdtemp(path.join(os.tmpdir(), 'axis-studio-process-redraw-'))
     await cp(purchaseRequests, copy, { recursive: true })
-    // The approval process grows to 40 steps: 29 chained updateRecord steps follow markRejected, before done.
+    // The approval process grows to 40 steps: 28 chained updateRecord steps follow markRejected, before done.
     const processFile = path.join(copy, file)
     const process = JSON.parse(await readFile(processFile, 'utf8')) as { steps: Record<string, unknown>[] }
     const steps = process.steps
     const markRejected = steps.find((step) => step.name === 'markRejected')!
     const done = steps.findIndex((step) => step.name === 'done')
-    const fillers = Array.from({ length: 29 }, (_, index) => ({
+    const fillers = Array.from({ length: 28 }, (_, index) => ({
       name: `filler${index + 1}`,
       type: 'operation',
       operation: 'updateRecord',
       set: { status: "'rejected'" },
-      next: index < 28 ? `filler${index + 2}` : 'done',
+      next: index < 27 ? `filler${index + 2}` : 'done',
     }))
     markRejected.next = 'filler1'
     steps.splice(done, 0, ...fillers)

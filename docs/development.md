@@ -579,8 +579,8 @@ All six ports are published on `127.0.0.1` only. The Keycloak admin console logi
   `payment-terms` with its library, and the Node.js runner. The host listens on port 5310 of its container.
   The runner protocol has no authentication, so the host sits only on the internal network `runners`, which
   the worker shares, and publishes no port. The worker sets `Extensions__Runners__Node` to
-  `package-host-node:5310`, see [package runners](reference/extension-packages.md#package-runners). No sample
-  calls a `node` package yet.
+  `package-host-node:5310`, see [package runners](reference/extension-packages.md#package-runners). The
+  purchase request approval calls `payment-terms` in its `assignPaymentDueDate` step.
 - **Health.** `docker compose ps` shows the worker healthy once its `/health/ready` passes, and
   `docker compose up --wait` waits for that. The server has 5 minutes and the worker 6 minutes to
   become healthy before `docker compose up --wait` fails. The worker's health address

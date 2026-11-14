@@ -50,13 +50,14 @@ public sealed class PackageResolveTests(SampleAppFixture fixture) : IClassFixtur
 
         Assert.Equal("completed", await StateAsync(instance));
         Assert.Equal("RF18PR0001", await PaymentReferenceAsync(requester, subject));
+        Assert.NotNull(await PaymentDueDateAsync(requester, subject));
         Assert.Equal(0L, await DueWorkItemsAsync(instance));
         Assert.Equal(
             1L,
             await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND action = 'operation.callResolved'", ("id", instance)));
         Assert.Equal(
             0L,
-            await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND action = 'operation.called'", ("id", instance)));
+            await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND action = 'operation.called' AND details->>'package' = 'payment-references'", ("id", instance)));
         Assert.Equal(
             1L,
             await fixture.CountAsync(
@@ -215,14 +216,18 @@ public sealed class PackageResolveTests(SampleAppFixture fixture) : IClassFixtur
         return (subject, instance, call);
     }
 
-    private static async Task<string?> PaymentReferenceAsync(HttpClient client, Guid subject)
+    private static Task<string?> PaymentReferenceAsync(HttpClient client, Guid subject) => FieldAsync(client, subject, "paymentReference");
+
+    private static Task<string?> PaymentDueDateAsync(HttpClient client, Guid subject) => FieldAsync(client, subject, "paymentDueDate");
+
+    private static async Task<string?> FieldAsync(HttpClient client, Guid subject, string field)
     {
         using var request = RecordApiFixture.Request(HttpMethod.Get, $"{Records}/{subject:D}", Host);
         using var response = await client.SendAsync(request, CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         var values = body.RootElement.GetProperty("values");
-        return values.TryGetProperty("paymentReference", out var reference) ? reference.GetString() : null;
+        return values.TryGetProperty(field, out var value) ? value.GetString() : null;
     }
 
     private async Task<string?> StateAsync(Guid instance) =>

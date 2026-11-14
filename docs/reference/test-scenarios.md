@@ -41,6 +41,10 @@ finance reviewer takes the finance decision and the request ends `approved`:
     {
       "operation": "payment-references/creditorReference",
       "output": { "creditorReference": "RF18PR0001" }
+    },
+    {
+      "operation": "payment-terms/dueDate",
+      "output": { "dueDate": "2026-10-31" }
     }
   ],
   "steps": [
@@ -79,7 +83,7 @@ finance reviewer takes the finance decision and the request ends `approved`:
     {
       "type": "expectRecord",
       "record": "request",
-      "values": { "status": "approved", "purchaseOrderNumber": "PO-1001", "paymentReference": "RF18PR0001" }
+      "values": { "status": "approved", "purchaseOrderNumber": "PO-1001", "paymentReference": "RF18PR0001", "paymentDueDate": "2026-10-31" }
     }
   ]
 }

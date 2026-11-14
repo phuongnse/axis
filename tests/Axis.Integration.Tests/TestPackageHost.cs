@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using Axis.Configuration.Tests;
 using Axis.PackageHost;
 using Axis.PackageHost.Tests;
 using Microsoft.Extensions.Logging;
@@ -41,6 +42,25 @@ internal sealed partial class TestPackageHost : IAsyncDisposable
         var loggers = LoggerFactory.Create(builder => builder.AddProvider(logs));
         var host = new RunnerHost(extensionsRoot, TestRunnerCommand.Create(), loggers.CreateLogger<RunnerHost>());
         return new TestPackageHost(host, loggers, await host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None), logs);
+    }
+
+    /// <summary>
+    /// Copies the sample packages into <paramref name="folder"/>, installs <c>payment-terms</c> from npm's offline cache, and starts a
+    /// host on the copy, see docs/reference/extension-packages.md#sample-and-test-packages.
+    /// </summary>
+    public static async Task<TestPackageHost> StartOnSamplesAsync(string folder, CancellationToken cancellationToken)
+    {
+        PackageBuildCommand.Copy(SamplePackages.Path, folder, skipTopLevel: "payment-terms");
+        var install = await NodeInstall.InstallAsync(
+            Path.Combine(AppContext.BaseDirectory, "SamplePaymentTerms"),
+            Path.Combine(folder, "payment-terms", "1.0.0"),
+            cancellationToken);
+        if (install.Failure is not null)
+        {
+            throw new InvalidOperationException(install.Failure);
+        }
+
+        return await StartAsync(folder);
     }
 
     /// <summary>The process ids of the runners the host started for <paramref name="package"/> <paramref name="version"/>.</summary>
