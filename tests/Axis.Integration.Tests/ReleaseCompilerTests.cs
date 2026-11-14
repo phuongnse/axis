@@ -62,7 +62,8 @@ public sealed class ReleaseCompilerTests(ConfigurationDatabaseFixture database) 
             migration => Assert.EndsWith("_CreateResourceWrites", migration, StringComparison.Ordinal),
             migration => Assert.EndsWith("_AddAuthoringRequestRefreshToken", migration, StringComparison.Ordinal),
             migration => Assert.EndsWith("_AddAuthoringRequestStepChecks", migration, StringComparison.Ordinal),
-            migration => Assert.EndsWith("_CreateReleasePackageFiles", migration, StringComparison.Ordinal));
+            migration => Assert.EndsWith("_CreateReleasePackageFiles", migration, StringComparison.Ordinal),
+            migration => Assert.EndsWith("_AddPublishRequestPackageTests", migration, StringComparison.Ordinal));
     }
 
     [Fact]

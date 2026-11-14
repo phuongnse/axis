@@ -30,7 +30,7 @@ public sealed record ApplicationPackageSettings(bool On, string? RunnerHost, int
     /// <summary>
     /// Reads the setting and <c>Extensions:Runners:Application</c>, a <c>host:port</c> or <c>[ipv6]:port</c> with a port from 1 to 65535,
     /// for the worker, which asks <c>application-package-host</c> whether it runs under gVisor, and for the publisher, which
-    /// sends it each package to build.
+    /// sends it each package to build or test.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// <c>Extensions:ApplicationPackages</c> is not <c>true</c> or <c>false</c>, <c>Extensions:Runners:Application</c> is not a

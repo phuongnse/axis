@@ -88,6 +88,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
 
         // A test has no release id and writes no audit record.
         Assert.Null(await ScalarAsync(scenario, tenant, $"SELECT release_id FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Null(await ScalarAsync(scenario, tenant, $"SELECT package_tests FROM axis.publish_requests WHERE id = '{request}'"));
         Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records"));
         await scenario.AssertNoSecretsAsync();
     }

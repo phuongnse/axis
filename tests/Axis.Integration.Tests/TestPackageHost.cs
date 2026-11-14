@@ -90,6 +90,13 @@ internal sealed partial class TestPackageHost : IAsyncDisposable
             .Where(match => match.Success)
             .Select(match => (match.Groups["package"].Value, match.Groups["version"].Value))];
 
+    /// <summary>The package and version of each package the host ran the tests of and answered <c>tested</c> to.</summary>
+    public IReadOnlyList<(string Package, string Version)> Tests() =>
+        [.. Logs.Entries
+            .Select(entry => PackageTested().Match(entry))
+            .Where(match => match.Success)
+            .Select(match => (match.Groups["package"].Value, match.Groups["version"].Value))];
+
     /// <summary>A loopback port where nothing listens, as <c>host:port</c>.</summary>
     public static string ClosedAddress()
     {
@@ -123,6 +130,9 @@ internal sealed partial class TestPackageHost : IAsyncDisposable
 
     [GeneratedRegex(@"Built package (?<package>\S+) (?<version>\S+)\.")]
     private static partial Regex PackageBuilt();
+
+    [GeneratedRegex(@"Tested package (?<package>\S+) (?<version>\S+)\.")]
+    private static partial Regex PackageTested();
 
     [GeneratedRegex(@"Runner (?<id>\d+) started for package (?<package>\S+) (?<version>\S+)\.")]
     private static partial Regex RunnerStarted();

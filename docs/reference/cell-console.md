@@ -36,7 +36,7 @@ session.
   provider. A new operator account is created by an existing operator in the realm's admin console,
   or by `Axis.Admin cell operator invite <email>` for the first one. That command makes the realm, or
   brings it up to date, and removes any brokered provider that it finds, see
-  [cell operator invite](administration.md#cell-operator-invite).
+  [cell operator invite](cell-operator-commands.md#cell-operator-invite).
 - **Second factor.** Every sign-in needs a password and a code from an authenticator app. The realm's
   required action sets one up at the first sign-in, and an account without one
   cannot finish signing in.
@@ -73,7 +73,7 @@ session.
 - **Machine callers.** A client of the operator realm with the role in its service account, such as
   the control plane, calls the API with a bearer token, see
   [provisioning API](tenant-lifecycle.md#provisioning-api). `Axis.Admin cell operator client add <name>`
-  makes such a client, see [cell operator client add](administration.md#cell-operator-client-add).
+  makes such a client, see [cell operator client add](cell-operator-commands.md#cell-operator-client-add).
 
 ## Views
 

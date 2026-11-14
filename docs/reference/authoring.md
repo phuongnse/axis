@@ -791,6 +791,14 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
   outcomes, and the one that was cut is stored as `failed` with no `step` and no `path`.
 - **Order.** At most one `test` request per application runs at a time, oldest first. Its queue is
   separate from `validate`, `publish` and `activate`, so a `test` never waits behind a `publish`.
+- **A package's tests.** A `test` whose request names a `package` tests that one application package, see
+  [an application's packages](extension-packages.md#an-applications-packages). The publisher compiles
+  nothing and runs no scenario. It sends the package's files from the snapshot to `application-package-host`
+  as a `test` and stores each test's outcome in `package_tests`, so it needs no scenario server. The request
+  ends `succeeded` when every test passed and `failed` otherwise. A refused build is `AXC0149` at the problem's
+  file, a host that gives no answer within 5 minutes is one `AXC0152` at the manifest, and the setting off is
+  one `AXC0148` at the manifest, with nothing sent. A stop ends it with `AXC0220`. In each case `package_tests`
+  is empty.
 - **Audit.** A `test` writes no audit record.
 - **A request that runs again.** A request claimed again after a lost lease runs every scenario again.
 
