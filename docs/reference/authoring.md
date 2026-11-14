@@ -212,10 +212,10 @@ a caller without the roles cannot find out which applications, resources, reques
     `409`; a patch that does not apply or that changes `id` or `kind`, `400`; a stale version, `409`;
     and a create whose `id` or target file already exists, `409`.
 
-In a cell, the routes that write, publish included, are also refused with the storage quota's `403`
-when the tenant is over it, before the body is read, see [refusals](tenant-quotas.md#refusals). The
-publishing routes count in the Publishing rate limit, see
-[rate limits](headers-and-rate-limits.md#rate-limits).
+In a cell, a write is refused with the storage quota's `403` when the tenant is over it. A `publish`
+or `preview` of a folder with a file under `packages/` is refused with the package run time quota's
+`403` while `packageCpuSecondsPerDay` is 0, right after check 7. Neither stores a request, see
+[refusals](tenant-quotas.md#refusals). The Publishing [rate limit](headers-and-rate-limits.md#rate-limits) counts them.
 
 ### Routes with their own order
 

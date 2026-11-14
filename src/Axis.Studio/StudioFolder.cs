@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Axis.Configuration.Loading;
 using Axis.Configuration.Releases;
 
 namespace Axis.Studio;
@@ -123,6 +124,31 @@ internal static class StudioFolder
     }
 
     private static string? ReadName(string folder) => ReadManifest(folder)?.Name;
+
+    /// <summary>
+    /// True when <paramref name="folder"/> holds a file under <c>packages/</c>, which is an application's own package, see
+    /// <see cref="ApplicationLoader.PackagesFolderPrefix"/>. A hidden file, a link and a file whose resolved path leaves
+    /// the folder do not count, as in <see cref="List"/>. Any file counts, not only <c>*.json</c>.
+    /// </summary>
+    public static bool HasPackageFiles(string folder)
+    {
+        var packages = Path.Combine(folder, ApplicationLoader.PackagesFolderPrefix.TrimEnd('/'));
+        if (!Directory.Exists(packages) || IsLink(packages))
+        {
+            return false;
+        }
+
+        var root = Path.TrimEndingDirectorySeparator(folder) + Path.DirectorySeparatorChar;
+        try
+        {
+            return Directory.EnumerateFiles(packages, "*", _enumeration)
+                .Any(path => Path.GetFullPath(path).StartsWith(root, StringComparison.Ordinal));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// The manifest <c>id</c> and <c>name</c> of <paramref name="folder"/>, or null when the manifest cannot be
