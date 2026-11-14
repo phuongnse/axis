@@ -43,7 +43,8 @@ import { kindSingular } from '../platform/studioKinds'
 import { SectionPart, SectionParts } from './ResourceFormSection'
 import { ActionBar } from './SaveBar'
 import { StudioPageHeading } from './StudioPageHeading'
-import { StudioDiagnosticRow } from './StudioProblems'
+import { StudioProblemList } from './StudioProblems'
+import { useDiagnosticItems } from './useDiagnosticItems'
 import { StudioRequestStatus } from './StudioRequestStatus'
 import { StudioTestResults } from './StudioTestResults'
 
@@ -202,6 +203,7 @@ export function StudioAuthoringRequestPage({
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { colour, size, spacing } = useDesignTokens()
+  const diagnosticItems = useDiagnosticItems()
   const sentTime = useSentTime()
   const stateWords = useRequestStateWords()
   const { generation, lost } = useStudioConnection()
@@ -514,12 +516,13 @@ export function StudioAuthoringRequestPage({
           <Flex vertical gap="small" data-testid="studio-ai-checks">
             {checksLine !== null && (
               <Flex align="center" gap={spacing.sm} wrap>
-                <span>
-                  <Typography.Text strong>{t('shell.studio.aiRequest.tab.checks')}</Typography.Text>{' '}
-                  <Typography.Text style={{ color: checksLine.passed ? colour.successText : colour.dangerText }}>
-                    {checksLine.text}
-                  </Typography.Text>
-                </span>
+                <Typography.Text strong>{t('shell.studio.aiRequest.tab.checks')}</Typography.Text>
+                <StatusTag tone={checksLine.passed ? 'success' : 'danger'}>
+                  {t(
+                    checksLine.passed ? 'shell.studio.aiRequest.checks.passed' : 'shell.studio.aiRequest.checks.failed',
+                  )}
+                </StatusTag>
+                <Typography.Text style={{ color: colour.textMuted }}>{checksLine.text}</Typography.Text>
                 <AxisButton role="link" onClick={() => setTab({ id: requestId, key: 'checks' })}>
                   {t('shell.studio.aiRequest.seeChecks')}
                 </AxisButton>
@@ -527,18 +530,17 @@ export function StudioAuthoringRequestPage({
             )}
             {/* Proposed: an outside app's ready request has no review when its author has no AI of their own. */}
             {request.review === null && request.app !== null && request.state === 'ready' && (
-              <Typography.Text style={{ color: colour.textMuted }} data-testid="studio-ai-not-reviewed">
-                {t(mine ? 'shell.studio.aiRequest.notReviewedMine' : 'shell.studio.aiRequest.notReviewed')}
-              </Typography.Text>
+              <Flex align="center" gap={spacing.sm} wrap data-testid="studio-ai-not-reviewed">
+                <Typography.Text strong>{t('shell.studio.aiRequest.review')}</Typography.Text>
+                <StatusTag tone="muted">{t('shell.studio.aiRequest.review.notReviewed')}</StatusTag>
+                <Typography.Text style={{ color: colour.textMuted }}>
+                  {t(mine ? 'shell.studio.aiRequest.notReviewedMine' : 'shell.studio.aiRequest.notReviewed')}
+                </Typography.Text>
+              </Flex>
             )}
             {/* The review runs only once the checks pass, so a request that failed before it has no findings. */}
             {request.review !== null && (
-              <ReviewFindings
-                findings={request.review}
-                ready={request.state === 'ready'}
-                resources={resources}
-                onOpen={onOpen}
-              />
+              <ReviewFindings findings={request.review} resources={resources} onOpen={onOpen} />
             )}
           </Flex>,
         )}
@@ -609,13 +611,7 @@ export function StudioAuthoringRequestPage({
   const checksView = (
     <Flex vertical gap="small" data-testid="studio-ai-check-details">
       {problems.length > 0 && (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {problems.map((diagnostic, index) => (
-            <li key={index}>
-              <StudioDiagnosticRow diagnostic={diagnostic} resources={resources} onSelect={onOpen} />
-            </li>
-          ))}
-        </ul>
+        <StudioProblemList items={diagnosticItems(problems)} resources={resources} onSelect={onOpen} />
       )}
       {request.checks !== null && <StudioTestResults request={request.checks} onSelect={onOpen} nested />}
     </Flex>
@@ -802,19 +798,17 @@ export function StudioAuthoringRequestPage({
 }
 
 /**
- * Proposed: a request's review, see the review on #3263: "Review" in bold leads one line that sums it up, what must
- * change and the notes, that AI did not resolve what must change when its fix rounds are spent, or that it found nothing
- * and that a review is no guarantee. Its findings follow in one list, each led by "Must change" or "Note", its words as
- * text and the resource it is about as the only link.
+ * Proposed: a request's review, see the review on #3263: "Review" in bold and its verdict as a `StatusTag`, "Changes
+ * requested" while a finding must change and "No changes requested" otherwise, never "Approved", as only its author
+ * approves, by accepting. Its findings follow in a `StudioProblemList`, grouped by the resource they are about, what
+ * must change first, each led by "Must change" or "Note".
  */
 function ReviewFindings({
   findings,
-  ready,
   resources,
   onOpen,
 }: {
   findings: StudioReviewFinding[]
-  ready: boolean
   resources: readonly StudioResourceItem[]
   onOpen: (resourceId: string, path: string) => void
 }) {
@@ -822,65 +816,38 @@ function ReviewFindings({
   const { colour, spacing } = useDesignTokens()
   const blocking = findings.filter((finding) => finding.blocking)
   const notes = findings.filter((finding) => !finding.blocking)
-  const count = (one: string, many: string, n: number) => t(n === 1 ? one : many).replace('{count}', String(n))
-  const parts = [
-    blocking.length > 0
-      ? count(
-          'shell.studio.aiRequest.review.oneMustChange',
-          'shell.studio.aiRequest.review.mustChange',
-          blocking.length,
-        )
-      : t('shell.studio.aiRequest.review.nothing'),
-    ...(notes.length > 0
-      ? [count('shell.studio.aiRequest.review.oneNote', 'shell.studio.aiRequest.review.notes', notes.length)]
-      : []),
-  ]
-  const after =
-    blocking.length > 0 && ready
-      ? t(
-          blocking.length === 1
-            ? 'shell.studio.aiRequest.review.oneUnresolved'
-            : 'shell.studio.aiRequest.review.unresolved',
-        )
-      : blocking.length === 0 && ready
-        ? t('shell.studio.aiRequest.review.noGuarantee')
-        : ''
   return (
     <Flex vertical gap={spacing.xs} data-testid="studio-ai-review">
-      <span>
-        <Typography.Text strong>{t('shell.studio.aiRequest.review')}</Typography.Text>{' '}
-        <Typography.Text style={{ color: blocking.length > 0 ? colour.warningText : colour.text }}>
-          {`${parts.join(', ')}.${after === '' ? '' : ` ${after}`}`}
-        </Typography.Text>
-      </span>
+      <Flex align="center" gap={spacing.sm} wrap>
+        <Typography.Text strong>{t('shell.studio.aiRequest.review')}</Typography.Text>
+        <StatusTag tone={blocking.length > 0 ? 'attention' : 'success'}>
+          {t(
+            blocking.length > 0
+              ? 'shell.studio.aiRequest.review.changesRequested'
+              : 'shell.studio.aiRequest.review.noChangesRequested',
+          )}
+        </StatusTag>
+      </Flex>
       {findings.length > 0 && (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {[...blocking, ...notes].map((finding, index) => (
-            <li key={index}>
-              <StudioDiagnosticRow
-                diagnostic={{
-                  code: '',
-                  severity: finding.blocking ? 'error' : 'warning',
-                  message: finding.text,
-                  file: finding.file,
-                  path: finding.path,
-                  resourceId: finding.resourceId,
-                }}
-                resources={resources}
-                onSelect={onOpen}
-                lead={
-                  <Typography.Text style={{ color: finding.blocking ? colour.dangerText : colour.textMuted }}>
-                    {t(
-                      finding.blocking
-                        ? 'shell.studio.aiRequest.review.mustChangeLead'
-                        : 'shell.studio.aiRequest.review.noteLead',
-                    )}
-                  </Typography.Text>
-                }
-              />
-            </li>
-          ))}
-        </ul>
+        <StudioProblemList
+          items={[...blocking, ...notes].map((finding) => ({
+            lead: (
+              <Typography.Text style={{ color: finding.blocking ? colour.dangerText : colour.textMuted }}>
+                {t(
+                  finding.blocking
+                    ? 'shell.studio.aiRequest.review.mustChangeLead'
+                    : 'shell.studio.aiRequest.review.noteLead',
+                )}
+              </Typography.Text>
+            ),
+            message: finding.text,
+            resourceId: finding.resourceId,
+            file: finding.file,
+            path: finding.path,
+          }))}
+          resources={resources}
+          onSelect={onOpen}
+        />
       )}
     </Flex>
   )

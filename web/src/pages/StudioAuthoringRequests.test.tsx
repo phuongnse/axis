@@ -112,9 +112,9 @@ describe('an outside AI app’s request', () => {
     expect(within(asked).getByText(/^Sent by you on .*, co-authored with Claude Code$/)).toBeInTheDocument()
     expect(screen.getByTestId('studio-ai-plan')).toHaveTextContent('Add a Cost centre field')
     expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument()
-    expect(screen.getByTestId('studio-ai-not-reviewed')).toHaveTextContent(
-      'No second AI reviewed this change, as you have not connected your AI.',
-    )
+    const notReviewed = screen.getByTestId('studio-ai-not-reviewed')
+    expect(within(notReviewed).getByText('Not reviewed')).toHaveAttribute('data-tone', 'muted')
+    expect(notReviewed).toHaveTextContent('Connect your AI to have a second AI review changes.')
   })
 })
 
@@ -218,43 +218,20 @@ describe('a ready request’s review', () => {
     )
   }
 
-  it('sums the review up in one line, then lists each finding led by what it is, its words as text', async () => {
+  it('gives its verdict as a tag, then its findings grouped by the resource they are about', async () => {
     stub({
       ...fromApp,
       aiConnected: true,
       review: [
+        { blocking: false, text: 'Could say why.', file: 'pages/list.json', path: '/widgets/1', resourceId: 'r-1' },
         {
           blocking: true,
           text: 'Mails the approver too.',
-          file: 'processes/p.json',
-          path: '/steps/4/to/1',
-          resourceId: null,
+          file: 'pages/list.json',
+          path: '/widgets/0',
+          resourceId: 'r-1',
         },
-        { blocking: false, text: 'Could say why.', file: 'processes/p.json', path: '/steps/5', resourceId: null },
-      ],
-    })
-    renderPage()
-
-    const review = await screen.findByTestId('studio-ai-review')
-    expect(
-      within(review).getByText(
-        '1 finding must change, 1 note. AI did not resolve it in its fix rounds, so you decide.',
-      ),
-    ).toBeInTheDocument()
-    expect(within(review).queryByRole('alert')).toBeNull()
-    expect(within(review).getByText('Must change:')).toBeInTheDocument()
-    expect(within(review).getByText('Note:')).toBeInTheDocument()
-    expect(within(review).getByText('Mails the approver too.', { exact: false })).toBeInTheDocument()
-    // A finding with no resource names its file as text, and nothing in it is a link.
-    expect(within(review).queryByRole('button')).toBeNull()
-  })
-
-  it('links only the resource a finding is about, named as people read it, and opens it at its path', async () => {
-    stub({
-      ...fromApp,
-      aiConnected: true,
-      review: [
-        { blocking: false, text: 'Could say why.', file: 'pages/list.json', path: '/widgets/0', resourceId: 'r-1' },
+        { blocking: false, text: 'A loose end.', file: 'misc.json', path: '', resourceId: null },
       ],
     })
     const onOpen = vi.fn()
@@ -278,21 +255,35 @@ describe('a ready request’s review', () => {
       />,
     )
 
-    const link = await screen.findByRole('button', { name: 'Requests (page)' })
-    expect(screen.queryByRole('button', { name: /Could say why/ })).toBeNull()
-    await userEvent.setup().click(link)
+    const review = await screen.findByTestId('studio-ai-review')
+    expect(within(review).getByText('Changes requested')).toHaveAttribute('data-tone', 'attention')
+    expect(within(review).queryByText(/Approved/)).toBeNull()
+    const groups = within(review).getAllByTestId('studio-problem-group')
+    expect(groups).toHaveLength(2)
+    // The resource shows once, its name the only link and its kind muted after it; what must change comes first.
+    const [page, loose] = groups
+    expect(within(page).getAllByRole('button', { name: 'Requests' })).toHaveLength(1)
+    expect(within(page).getByText('Page')).toBeInTheDocument()
+    const problems = within(page).getAllByTestId('studio-problem')
+    expect(problems[0]).toHaveTextContent('Must change Mails the approver too.')
+    expect(problems[1]).toHaveTextContent('Note Could say why.')
+    expect(within(loose).getByText('misc.json')).toBeInTheDocument()
+    expect(within(loose).queryByRole('button')).toBeNull()
 
-    expect(onOpen).toHaveBeenCalledWith('r-1', '/widgets/0')
+    const user = userEvent.setup()
+    await user.click(within(page).getByRole('button', { name: 'Requests' }))
+    expect(onOpen).toHaveBeenLastCalledWith('r-1', '/widgets/0')
+    await user.click(within(problems[1]).getByRole('button', { name: 'Show' }))
+    expect(onOpen).toHaveBeenLastCalledWith('r-1', '/widgets/1')
   })
 
-  it('says it found nothing that must change, and that a review is no guarantee', async () => {
+  it('says no changes are requested when nothing must change', async () => {
     stub({ ...fromApp, aiConnected: true, review: [] })
     renderPage()
 
     const review = await screen.findByTestId('studio-ai-review')
-    expect(
-      within(review).getByText('Nothing must change. A review is no guarantee: read the changes before you accept.'),
-    ).toBeInTheDocument()
+    expect(within(review).getByText('No changes requested')).toHaveAttribute('data-tone', 'success')
+    expect(within(review).queryByTestId('studio-problem-group')).toBeNull()
   })
 })
 
@@ -355,7 +346,8 @@ describe('a ready request’s page', () => {
     )
 
     const checks = await screen.findByTestId('studio-ai-checks')
-    expect(within(checks).getByText('It compiles, and all 1 scenarios pass.')).toBeInTheDocument()
+    expect(within(checks).getByText('Passed')).toHaveAttribute('data-tone', 'success')
+    expect(within(checks).getByText('All 1 scenarios pass.')).toBeInTheDocument()
     expect(screen.getByText('Checks and review passed')).toBeInTheDocument()
     const changeList = await screen.findByTestId('studio-ai-what-changes')
     expect(within(changeList).getByText('A cost centre with a name and a code.')).toBeInTheDocument()
