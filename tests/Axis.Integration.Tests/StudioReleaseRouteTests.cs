@@ -53,10 +53,13 @@ public sealed class StudioReleaseRouteTests : IAsyncLifetime
             Assert.NotNull(module.GetProperty("version").GetString());
             Assert.Equal(module.GetProperty("version").GetString(), module.GetProperty("previousVersion").GetString());
         });
-        var package = Assert.Single(live.GetProperty("packages").EnumerateArray());
-        Assert.Equal("payment-references", package.GetProperty("id").GetString());
-        Assert.False(string.IsNullOrEmpty(package.GetProperty("label").GetString()));
-        Assert.Equal(package.GetProperty("version").GetString(), package.GetProperty("previousVersion").GetString());
+        var packages = live.GetProperty("packages").EnumerateArray().ToList();
+        Assert.Equal(["payment-references", "payment-terms"], packages.Select(package => package.GetProperty("id").GetString()));
+        Assert.All(packages, package =>
+        {
+            Assert.False(string.IsNullOrEmpty(package.GetProperty("label").GetString()));
+            Assert.Equal(package.GetProperty("version").GetString(), package.GetProperty("previousVersion").GetString());
+        });
 
         var older = await StudioReleaseHistoryTests.GetAsync(author, $"{ReleasesUrl}/1");
 

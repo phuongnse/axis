@@ -386,6 +386,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
             extra: new Dictionary<string, string?> { ["Extensions:Path"] = folder.Path });
         Assert.Equal(2, noPackages.Exit);
         Assert.Contains("payment-references", noPackages.Output.Single(), StringComparison.Ordinal);
+        Assert.Contains("payment-terms", noPackages.Output.Single(), StringComparison.Ordinal);
         await AssertNothingCreatedAsync(noSecretId, entriesBefore);
 
         string[][] usages =

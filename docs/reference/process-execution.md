@@ -476,7 +476,8 @@ ends with exactly one purchase order.
    order.
 9. The outcome transaction settles C as succeeded. It writes `purchaseOrderNumber = PO-2026-0001`,
    `record.updated`, and one `connector.called` with `attempts` 2. The instance moves on to
-   `assignPaymentReference`, which runs the sample package and then moves on to `done`.
+   `assignPaymentReference`, which runs the sample package, then `assignPaymentDueDate`, which runs the
+   TypeScript sample package, and then moves on to `done`.
 10. `done` completes the instance.
 
 The purchasing system holds one order, and the request records its number. Two variants end the same
@@ -503,8 +504,8 @@ all of them.
 
 The examples use an illustrative package, `purchasing-tools`, with the operation
 `normalizeSupplierCode` from the [manifest example](extension-packages.md#manifest), and an
-illustrative `supplierCode` text field on the subject. The sample package, `payment-references`, is
-used the same way by the `assignPaymentReference` step of the
+illustrative `supplierCode` text field on the subject. The sample packages, `payment-references` and
+`payment-terms`, are used the same way by the `assignPaymentReference` and `assignPaymentDueDate` steps of the
 [purchase request sample](processes.md#resource-shape).
 
 ```json

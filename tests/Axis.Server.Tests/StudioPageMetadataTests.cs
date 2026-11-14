@@ -145,7 +145,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
         var entity = widget.GetProperty("entity");
         Assert.Equal("PurchaseRequest", entity.GetProperty("name").GetString());
         var fieldNames = entity.GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("name").GetString()).ToArray();
-        Assert.Equal(13, fieldNames.Length);
+        Assert.Equal(14, fieldNames.Length);
         Assert.Contains("purchaseOrderNumber", fieldNames);
         var access = widget.GetProperty("access");
         Assert.Equal(

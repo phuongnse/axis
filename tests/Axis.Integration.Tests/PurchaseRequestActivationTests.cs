@@ -90,7 +90,7 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
     }
 
     [Fact]
-    public async Task The_sample_does_not_compile_without_its_package()
+    public async Task The_sample_does_not_compile_without_its_packages()
     {
         // The tests of this class share one database, so the sample may already be active.
         var activeBefore = await FindActiveAsync();
@@ -102,10 +102,12 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
 
         Assert.Null(compiled.Release);
         Assert.Null(compiled.Model);
-        var diagnostic = Assert.Single(compiled.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.UnknownPackage);
-        Assert.Equal("application.json", diagnostic.File);
-        Assert.Equal("/packages/0/id", diagnostic.Path);
-        Assert.Contains("payment-references", diagnostic.Message, StringComparison.Ordinal);
+        var diagnostics = compiled.Diagnostics.Where(diagnostic => diagnostic.Code == DiagnosticCodes.UnknownPackage).ToList();
+        Assert.Equal(2, diagnostics.Count);
+        Assert.All(diagnostics, diagnostic => Assert.Equal("application.json", diagnostic.File));
+        Assert.Equal(["/packages/0/id", "/packages/1/id"], diagnostics.Select(diagnostic => diagnostic.Path));
+        Assert.Contains("payment-references", diagnostics[0].Message, StringComparison.Ordinal);
+        Assert.Contains("payment-terms", diagnostics[1].Message, StringComparison.Ordinal);
         Assert.Equal(activeBefore, await FindActiveAsync());
     }
 

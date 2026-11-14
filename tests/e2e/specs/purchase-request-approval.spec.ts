@@ -35,15 +35,38 @@ async function restartWorker() {
 }
 
 /**
- * Waits up to `timeout` milliseconds for the form of the request `id` to show a Payment reference that
- * matches `pattern`. The sample's extension package writes it after the purchase order is created.
+ * Waits up to `timeout` milliseconds for the form of the request `id` to show the field `field` with the value
+ * `expected`. The sample's extension packages write the Payment reference after the purchase order is created,
+ * and the Payment due date after that.
  */
-async function expectPaymentReference(page: Page, id: string, pattern: RegExp, timeout = 30_000) {
-  const field = fieldValue(page, 'paymentReference')
+async function expectWritten(page: Page, id: string, field: string, expected: string | RegExp, timeout = 30_000) {
+  const value = fieldValue(page, field)
   await expect(async () => {
     await page.goto(`/purchasing/purchaserequestform/${id}`)
-    await expectShown(field, pattern, { timeout: 1_000 })
+    await expectShown(value, expected, { timeout: 1_000 })
   }).toPass({ timeout })
+}
+
+/** Waits for the Payment reference of the request `id`: ISO 11649, RF, two check digits, then the number without its hyphens. */
+async function expectPaymentReference(page: Page, id: string) {
+  const number = await requestNumber(page, id)
+  await expectWritten(page, id, 'paymentReference', new RegExp(`^RF\\d{2}${number.replaceAll('-', '')}$`))
+}
+
+/**
+ * Waits for the Payment due date of the request `id`: the last day of the month 30 days after its submission
+ * in UTC, as the form shows a date.
+ */
+async function expectPaymentDueDate(page: Page, id: string) {
+  const read = await page.request.get(`${recordsPath}/${id}`)
+  expect(read.ok()).toBe(true)
+  const { submittedAt } = ((await read.json()) as { values: { submittedAt: string } }).values
+  const later = new Date(Date.parse(submittedAt) + 30 * 86_400_000)
+  const lastDay = new Date(Date.UTC(later.getUTCFullYear(), later.getUTCMonth() + 1, 0))
+  const expected = new Intl.DateTimeFormat('en', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }).format(
+    lastDay,
+  )
+  await expectWritten(page, id, 'paymentDueDate', expected)
 }
 
 /**
@@ -107,11 +130,11 @@ test('a request below the threshold is approved by the department manager from M
 
   await expectStatus(page, id, 'approved')
   await expectShown(fieldValue(page, 'decisionComments'), comment)
-  await expectHistory(page, ['Manager 2 User'])
   await expectOnePurchaseOrder(page, id)
-  // ISO 11649: RF, two check digits, then the request number without its hyphens.
-  const number = await requestNumber(page, id)
-  await expectPaymentReference(page, id, new RegExp(`^RF\\d{2}${number.replaceAll('-', '')}$`))
+  await expectPaymentReference(page, id)
+  await expectPaymentDueDate(page, id)
+  // The worker adds history entries until the payment due date is written, so the count waits for it.
+  await expectHistory(page, ['Manager 2 User'])
 })
 
 test('a request whose purchase order response is lost still gets exactly one purchase order', async ({ page }) => {
@@ -149,6 +172,7 @@ test('a request at the threshold needs the finance reviewer after the manager be
   await decide(page, title, 'Finance approval', 'Approve')
 
   await expectStatus(page, id, 'approved')
+  await expectPaymentDueDate(page, id)
   await expectHistory(page, ['Manager 2 User', 'Finance Reviewer User'])
   await expectOnePurchaseOrder(page, id)
 })
@@ -179,10 +203,10 @@ test('a returned request is edited and submitted again, and the manager then app
   expect(read.ok()).toBe(true)
   const record = (await read.json()) as { values: { lineItems: { quantity: number }[] } }
   expect(record.values.lineItems.map((item) => item.quantity)).toEqual([2])
-  // The worker adds history entries until the extension package has written the Payment reference. A
-  // new entry between two pages of the panel would show one entry twice.
-  const number = await requestNumber(page, id)
-  await expectPaymentReference(page, id, new RegExp(`^RF\\d{2}${number.replaceAll('-', '')}$`))
+  // The worker adds history entries until the extension packages have written the Payment reference and then the
+  // Payment due date. A new entry between two pages of the panel would show one entry twice.
+  await expectPaymentReference(page, id)
+  await expectPaymentDueDate(page, id)
   expect(await countHistory(page, 'Process started', 'Requester User')).toBe(2)
 })
 

@@ -818,8 +818,8 @@ Suppose the `PurchasingSystem` connector declares neither `idempotency` nor a
    `succeeded`. The instance becomes `running` on `assignPaymentReference`. It
    writes the history row, and one `connector.callResolved` with the operator
    as its actor and their reason. It queues the next step.
-8. The worker runs `assignPaymentReference` and then `done`, which completes
-   the instance.
+8. The worker runs `assignPaymentReference`, `assignPaymentDueDate` and then
+   `done`, which completes the instance.
 
 The purchasing system holds one order, and the request records its number. No
 `connector.called` was written, because C settled by hand, and the audit trail

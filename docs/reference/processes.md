@@ -142,6 +142,15 @@ payment reference from the sample extension package, see
       "input": { "reference": "number" },
       "output": { "creditorReference": "paymentReference" },
       "retry": { "attempts": 3, "backoff": "PT10S" },
+      "next": "assignPaymentDueDate"
+    },
+    {
+      "name": "assignPaymentDueDate",
+      "type": "operation",
+      "operation": "payment-terms/dueDate",
+      "input": { "from": "submittedAt" },
+      "output": { "dueDate": "paymentDueDate" },
+      "retry": { "attempts": 3, "backoff": "PT10S" },
       "next": "done"
     },
     {

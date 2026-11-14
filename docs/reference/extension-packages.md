@@ -776,8 +776,11 @@ installation, loading, the capability limits, the server's metadata-only load an
   scan that the build runs, and `scripts/build.sh` fails unless the folder holds `axis-package.json`, `index.js`
   and `node_modules/dayjs/package.json`. `scripts/test.sh` runs the package's `node --test` unit test in the
   installed copy, and an integration test starts a Node.js runner of the package host for it. The test
-  projects copy only its manifest, adapter and lock files, so a server lists it as metadata. No sample
-  application declares it. `scripts/dev.sh`, `scripts/e2e.sh` and the root `compose.yaml` each run a Node.js package
+  projects copy only its manifest, adapter and lock files, so a server lists it as metadata. The purchase
+  request sample declares it and calls `dueDate` in its approval process, in the `assignPaymentDueDate` step after
+  `assignPaymentReference`, on the request's `submittedAt`. The integration tests that use the sample fixture run
+  that step through a Node.js runner of a package host over an installed copy of the sample packages.
+  `scripts/dev.sh`, `scripts/e2e.sh` and the root `compose.yaml` each run a Node.js package
   host that holds it, and point their worker at it, see [development](../development.md).
 - **Test package.** A test-only package, `test-package`, lives under
   `tests/packages/`. One source is built as versions 1.0.0, 1.1.0 and 2.0.0, and the
@@ -827,8 +830,9 @@ entry names a package id and a version range:
 
 `purchasing-tools` is an illustrative package. The purchase request sample
 declares the real sample package the same way, with
-`{ "id": "payment-references", "version": "^1.0.0" }`. Without that package
-installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
+`{ "id": "payment-references", "version": "^1.0.0" }`, and also declares
+`payment-terms` the same way. Without a package installed, the sample does not compile:
+`AXC0139` at `/packages/0/id` or `/packages/1/id` names it.
 
 - `packages` is optional. Each entry has an `id`, lower-case letters, digits
   and `-`, starting with a letter, and a `version`. The schema checks this
