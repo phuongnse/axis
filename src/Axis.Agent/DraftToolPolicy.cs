@@ -20,6 +20,11 @@ internal static class DraftToolPolicy
         "check_expression",
         "validate_draft",
         "diff_draft",
+        "list_package_files",
+        "read_package_file",
+        "write_package_file",
+        "delete_package_file",
+        "test_package",
     };
 
     // A tool that is not offered, a call that names another application or another draft never reaches the MCP server. A call without a draft gets the request's.

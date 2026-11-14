@@ -38,8 +38,10 @@ when the author approves, changes the plan or drops it. The publisher moves a `r
   array of `{ role, content }`, where `content` is a list of `text`, `toolCall` and `toolResult` parts.
   A `check` step has the `outcome` `passed`, `failed` or `unfinished`, see
   [checking](authoring-requests.md#states) and [checking time](authoring-requests.md#budgets), and its `checks` holds
-  `{ compile, scenarios }`: each has an `outcome` of `passed` or `failed`, and `scenarios` can also be `notRun`. `compile` has its
-  `diagnostics`, and `scenarios` has its `request` id, its `diagnostics` and its `items`, the scenario results of the run.
+  `{ compile, packages, scenarios }`: `compile` has an `outcome` of `passed` or `failed`, and `packages` and `scenarios` also
+  have `notRun`. `compile` has its `diagnostics`, and `scenarios` has its `request` id, its `diagnostics` and its `items`, the scenario
+  results of the run. `packages` has its `items`, one for each package that the draft changed and still holds, each with its `package`,
+  its `request` id, its `status`, its `diagnostics` and its `tests`, the test results of the package.
   A `review` step has the `outcome` `passed`, `findings` or `unfinished`, see [reviewing](authoring-requests.md#states) and
   [review calls](authoring-requests.md#budgets), and its `checks` holds `{ review: { outcome, findings } }`: the `outcome` is `passed` or
   `findings`, and `findings` is the text of the review, null when it passed. A review that is `unfinished` stores no `checks`.

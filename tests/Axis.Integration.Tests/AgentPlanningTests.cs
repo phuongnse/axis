@@ -12,7 +12,7 @@ using static Axis.Integration.Tests.Polling;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The planning step of the agent host writes a plan from the five read tools of the MCP server, see
+/// The planning step of the agent host writes a plan from the seven read tools of the MCP server, see
 /// <c>docs/reference/authoring-requests.md#states</c>. The model is the scripted adapter, so no test calls a paid model, and the step reaches the
 /// server of <see cref="AuthoringRealm"/> as the author. A call to any other tool, or to another application, gets a tool error and never reaches the server.
 /// A step that gets no plan within 25 model calls stops the request as <c>failed</c> with the outcome <c>noPlan</c>.
@@ -48,9 +48,9 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
         Assert.Contains("list_resources", messages, StringComparison.Ordinal);
         Assert.Contains("toolResult", messages, StringComparison.Ordinal);
         Assert.Equal(["list_applications", "list_resources"], server.ToolCalls);
-        // The model is offered the five read tools and no other.
+        // The model is offered the five read tools and the two package read tools, and no other.
         Assert.Equal(
-            ["list_resources", "read_module_resource", "read_names", "read_reference", "read_resource"],
+            ["list_package_files", "list_resources", "read_module_resource", "read_names", "read_package_file", "read_reference", "read_resource"],
             script.Calls[0].Tools.Select(tool => tool.Name).Order(StringComparer.Ordinal));
     }
 
@@ -90,6 +90,8 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
             new ModelAnswer(
                 [
                     new ModelToolCall("write-1", "write_resource", Json("""{"application":"PurchaseRequests","draft":"d","content":{}}""")),
+                    new ModelToolCall("package-1", "write_package_file", Json("""{"application":"PurchaseRequests","draft":"d","package":"tools","path":"adapter.py","content":""}""")),
+                    new ModelToolCall("test-1", "test_package", Json("""{"application":"PurchaseRequests","draft":"d","package":"tools"}""")),
                     new ModelToolCall("other-1", "list_resources", Json("""{"application":"LeaveRequests"}""")),
                     new ModelToolCall("own-1", "read_names", Json("""{"application":"purchaserequests"}""")),
                 ],
@@ -104,11 +106,11 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
         await host.StopAsync(CancellationToken);
 
         var results = script.Calls[1].Messages[^1].Content.OfType<ModelToolResult>().ToList();
-        Assert.Equal(["write-1", "other-1", "own-1"], results.Select(result => result.CallId));
-        Assert.True(results[0].IsError);
-        Assert.True(results[1].IsError);
+        Assert.Equal(["write-1", "package-1", "test-1", "other-1", "own-1"], results.Select(result => result.CallId));
+        Assert.All(results.Take(3), result => Assert.Equal("The tool is not offered in planning.", result.Content));
+        Assert.All(results.Take(4), result => Assert.True(result.IsError));
         // The name of the application is matched ignoring letter case, as the server matches it.
-        Assert.False(results[2].IsError);
+        Assert.False(results[4].IsError);
         Assert.Equal(["list_applications", "read_names"], server.ToolCalls);
         Assert.Equal("0", await ScalarAsync("SELECT count(*) FROM axis.audit_records WHERE action = 'mcp.toolCalled'"));
     }

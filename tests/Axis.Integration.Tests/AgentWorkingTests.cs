@@ -75,11 +75,12 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
         Assert.Equal(["layer-1", "scenario-1"], results.Select(result => result.CallId));
         Assert.All(results, result => Assert.False(result.IsError, result.Content));
         Assert.Contains("customizations/department-budgets/", results[0].Content, StringComparison.Ordinal);
-        // The model is offered the five read tools and the six tools that write or check the draft, and no other.
+        // The model is offered the seven read tools, the six tools that write or check the draft and the three package tools that write or test it, and no other.
         Assert.Equal(
             [
-                "check_expression", "delete_resource", "diff_draft", "list_resources", "read_module_resource", "read_names", "read_reference",
-                "read_resource", "validate_draft", "write_layer", "write_resource",
+                "check_expression", "delete_package_file", "delete_resource", "diff_draft", "list_package_files", "list_resources", "read_module_resource",
+                "read_names", "read_package_file", "read_reference", "read_resource", "test_package", "validate_draft", "write_layer", "write_package_file",
+                "write_resource",
             ],
             script.Calls[1].Tools.Select(tool => tool.Name).Order(StringComparer.Ordinal));
         Assert.Contains(draft, script.Calls[1].System, StringComparison.Ordinal);

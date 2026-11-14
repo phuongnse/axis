@@ -5,7 +5,7 @@ namespace Axis.Agent;
 
 /// <summary>
 /// The work of the <c>planning</c> state, see <c>docs/reference/authoring-requests.md#states</c>. It asks the model for a plan in plain words,
-/// lets the model read the request's application through the five read tools of the MCP server and nothing else, stores the plan and moves
+/// lets the model read the request's application and its packages through the seven read tools of the MCP server and nothing else, stores the plan and moves
 /// the request to <c>awaitingApproval</c>. A step that gets no plan within <see cref="MaxModelCalls"/> model calls, or whose application the author
 /// can no longer list, stops the request as <c>failed</c> with the outcome <c>noPlan</c>. After a change of plan the step also sees the earlier
 /// plan and every comment, and its plan replaces the old one.
@@ -24,6 +24,8 @@ internal sealed class PlanningStep(TenantModelAdapters adapters, AiSettings sett
         "read_resource",
         "read_module_resource",
         "read_names",
+        "list_package_files",
+        "read_package_file",
     };
 
     public string State => "planning";
@@ -59,7 +61,7 @@ internal sealed class PlanningStep(TenantModelAdapters adapters, AiSettings sett
             : new AuthoringStepResult("failed", "noPlan", Messages: loop.Messages);
     }
 
-    // A tool outside the five, or a call that names another application, never reaches the MCP server.
+    // A tool outside the seven, or a call that names another application, never reaches the MCP server.
     private static async Task<ModelToolResult> AnswerToolCallAsync(
         AuthoringStepContext context, string application, ModelToolCall call, CancellationToken cancellationToken)
     {
@@ -88,6 +90,8 @@ internal sealed class PlanningStep(TenantModelAdapters adapters, AiSettings sett
         Read the application first, with the tools you have. Use them to see its resources, its names and the reference of the configuration language. Name the application '{application}' when a tool asks for one.
 
         When the application pins a built-in module that does the job, plan to use the module and to change it through its customization layer. Do not plan new resources for what the module already does.
+
+        When the request names a library, plan a package over it in packages/<id>/ with its manifest, its adapter, its lock file and its tests. Read a package with list_package_files and read_package_file.
 
         Write the plan in plain words for the person, who may not know how Axis works inside. Say what will change and which scenarios you will add to check it.
 

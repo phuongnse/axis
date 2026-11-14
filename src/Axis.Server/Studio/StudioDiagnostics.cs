@@ -22,10 +22,13 @@ internal static class StudioDiagnostics
     public static IReadOnlyList<StudioDiagnostic> Compile(string folder, PackageCatalog packages, ModuleCatalog modules) =>
         [.. ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules).Diagnostics.Select(Map)];
 
-    /// <summary>Compiles application files held in memory, as <see cref="Compile"/> compiles a folder.</summary>
+    /// <summary>
+    /// Compiles application files held in memory, as <see cref="Compile"/> compiles a folder. The application's own packages are
+    /// compile errors unless <paramref name="applicationPackages"/> is true.
+    /// </summary>
     public static IReadOnlyList<StudioDiagnostic> CompileFiles(
-        IReadOnlyList<ResourceContent> files, PackageCatalog packages, ModuleCatalog modules) =>
-        [.. ApplicationCompiler.CompileFiles(files, packages.Versions, modules.Modules).Diagnostics.Select(Map)];
+        IReadOnlyList<ResourceContent> files, PackageCatalog packages, ModuleCatalog modules, bool applicationPackages = false) =>
+        [.. ApplicationCompiler.CompileFiles(files, packages.Versions, modules.Modules, applicationPackages: applicationPackages).Diagnostics.Select(Map)];
 
     internal static StudioDiagnostic Map(Diagnostic diagnostic) => new(
         diagnostic.Code,

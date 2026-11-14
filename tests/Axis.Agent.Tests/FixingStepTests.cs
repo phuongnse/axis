@@ -45,4 +45,31 @@ public sealed class FixingStepTests
         Assert.DoesNotContain("The review findings", message, StringComparison.Ordinal);
         Assert.Contains("What failed in the last check:\nnone", message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void A_failed_package_test_names_its_package_and_failing_test_and_leaves_out_a_test_that_passed()
+    {
+        var checks = """
+            {
+              "compile": { "outcome": "passed", "diagnostics": [] },
+              "packages": {
+                "outcome": "failed",
+                "items": [
+                  { "package": "tools", "request": "r", "status": "failed", "diagnostics": [],
+                    "tests": [{ "name": "test_tools.A.test_broken", "outcome": "failed", "message": "boom" }, { "name": "test_tools.A.test_fine", "outcome": "passed", "message": "" }] },
+                  { "package": "fine-package", "request": "r2", "status": "succeeded", "diagnostics": [], "tests": [] }
+                ]
+              },
+              "scenarios": { "outcome": "passed", "items": [] }
+            }
+            """;
+
+        var message = FixingStep.FirstMessage(Request(checks, null));
+
+        Assert.Contains("Package tests that did not pass", message, StringComparison.Ordinal);
+        Assert.Contains("tools", message, StringComparison.Ordinal);
+        Assert.Contains("test_tools.A.test_broken", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("test_tools.A.test_fine", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("fine-package", message, StringComparison.Ordinal);
+    }
 }

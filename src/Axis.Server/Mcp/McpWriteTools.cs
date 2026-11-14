@@ -535,14 +535,15 @@ internal static class McpWriteTools
 
     internal static JsonElement EmptyList() => JsonDocument.Parse("[]").RootElement.Clone();
 
-    // The compile diagnostics of the draft as its branch now holds it.
+    // The compile diagnostics of the draft as its branch now holds it. The draft's own packages compile when the tenant's application
+    // packages switch is on, see docs/reference/extension-packages.md#an-applications-packages.
     internal static async Task<(IReadOnlyList<StudioDiagnostic>? Diagnostics, string? Error)> DiagnosticsAsync(
         McpToolContext context, string folder, string draft, CancellationToken ct)
     {
         var (files, error) = await McpReadTools.DraftFilesAsync(context, folder, draft, ct);
         return files is null
             ? (null, error)
-            : (StudioDiagnostics.CompileFiles(McpReadTools.Contents(files), context.Packages, context.Modules), null);
+            : (StudioDiagnostics.CompileFiles(McpReadTools.Contents(files), context.Packages, context.Modules, context.ApplicationPackages), null);
     }
 
     // Appends the one audit record of a successful write call, in its own transaction right after the draft's commit. It takes

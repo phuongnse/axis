@@ -37,14 +37,14 @@ public sealed class McpTestPackageTests(KeycloakFixture keycloak, PostgreSqlFixt
     private const string NoDeveloper = "You do not hold the developer role.";
     private const string SwitchOff = "Application packages are off in this tenant.";
 
-    private const string Manifest = """
+    internal const string Manifest = """
         { "id": "tools", "version": "1.0.0", "label": "Tools", "language": "python", "adapter": "adapter.py", "lock": "requirements.txt",
           "operations": [ { "name": "sum", "type": "adapter.sum", "idempotent": true, "input": [], "output": [] } ] }
         """;
 
-    private const string NoDependencies = "# No dependencies.\n";
+    internal const string NoDependencies = "# No dependencies.\n";
 
-    private const string ToolsTests = """
+    internal const string ToolsTests = """
         import unittest
 
 
