@@ -283,23 +283,21 @@ command routes do.
 
 ### Package runners
 
-_(planned for M37)_
-
 An administrator creates a [customer-hosted runner](extension-packages.md#customer-hosted-runners), sees the
 runners of the tenant and revokes one. The routes answer to an administrator with a browser session only, as the
 command routes do.
 
 | Route | Body | Answer |
 | --- | --- | --- |
-| `GET /api/tenant/package-runners` _(planned for M37)_ | None | `200` with `{ "items": [{ "id", "name", "clientId", "packages": [{ "id", "version" }], "lastCallAt", "createdAt" }] }`. A revoked runner is not listed |
-| `POST /api/tenant/package-runners` _(planned for M37)_ | `{ "name": "..." }` | `201` with `{ "id", "clientId", "clientSecret" }` |
-| `POST /api/tenant/package-runners/{id}/revoke` _(planned for M37)_ | None | `204` |
+| `GET /api/tenant/package-runners` | None | `200` with `{ "items": [{ "id", "name", "clientId", "packages": [{ "id", "version" }], "lastCallAt", "createdAt" }] }`. A revoked runner is not listed |
+| `POST /api/tenant/package-runners` | `{ "name": "..." }` | `201` with `{ "id", "clientId", "clientSecret" }` |
+| `POST /api/tenant/package-runners/{id}/revoke` | None | `204` |
 
 - **The order of the checks.** A request is checked in this order: a signed-in user (`401`),
   `Users:AdministratorRole` (`403`), then a tenant with a row in the tenant directory that is not a preview tenant
   and has a users client (`404`), and for `POST` the body (`400`). A create also needs a sign-in at the identity
   provider in the last 5 minutes (`403`), as giving a platform role does.
-- **The name.** A name is 1 to 100 characters. A blank name answers `400`.
+- **The name.** The server trims the name, which must then be 1 to 100 characters. A blank name answers `400`.
 - **Create.** The server creates the runner's client through the realm's activation client, `axis-activation`, which
   has rights over the realm's clients, then stores the runner and its audit record in one transaction. A tenant whose
   realm Axis does not keep answers `404`. When the identity provider fails, the route answers `502` and stores
@@ -308,7 +306,8 @@ command routes do.
   again.
 - **Revoke.** The server stores `revoked_at` and the audit record, then deletes the client. An unknown id answers
   `404`. When the identity provider fails, the route answers `502`, the stored revoke stays, and repeating the
-  revoke deletes the client. From the stored revoke on, the runner's requests answer `401`, see
+  revoke deletes the client. A repeat keeps the first revoke time and writes no second record.
+- **The runner's requests.** _(planned for M37)_ From the stored revoke on, the runner's requests answer `401`, see
   [customer-hosted runners](extension-packages.md#customer-hosted-runners).
 - **Last call.** `lastCallAt` is the time of the runner's last take of a call. It is `null` before the first.
 - **Audit.** A create and a revoke each write an audit record, see [audit](#audit).
@@ -434,8 +433,8 @@ Each command writes one audit record in the tenant database, with the administra
 | `user.roleGiven`          | Give a role, each role given at invite time, and `tenant create --administrator` |
 | `user.roleRemoved`        | Remove a role                                                                    |
 | `mcp.consentRevoked`      | Revoke an outside MCP client's consent, see [outside MCP clients](#outside-mcp-clients) |
-| `packageRunner.created` _(planned for M37)_ | Create a package runner, see [package runners](#package-runners) |
-| `packageRunner.revoked` _(planned for M37)_ | Revoke a package runner |
+| `packageRunner.created` | Create a package runner, see [package runners](#package-runners) |
+| `packageRunner.revoked` | Revoke a package runner |
 
 - **Details.** `details` holds `userId` and, for an invitation, `email`. A resend writes the new user id in `userId`
   and the old one in `previousUserId`, because the id changes.

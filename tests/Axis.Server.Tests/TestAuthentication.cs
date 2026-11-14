@@ -14,11 +14,14 @@ namespace Axis.Server.Tests;
 
 /// <summary>
 /// A person a test host can sign in through the test authentication scheme. <c>Roles</c> hold in every
-/// application. <c>ApplicationRoles</c> are the roles held in one application only, by application id.
+/// application. <c>ApplicationRoles</c> are the roles held in one application only, by application id. <c>SignedInAgo</c> is how long
+/// ago the person logged in at the identity provider, and it is null when the session holds no login time.
 /// </summary>
 internal sealed record TestIdentity(string Id, string DisplayName, params string[] Roles)
 {
     public IReadOnlyDictionary<Guid, IReadOnlyList<string>>? ApplicationRoles { get; init; }
+
+    public TimeSpan? SignedInAgo { get; init; }
 }
 
 /// <summary>
@@ -71,7 +74,8 @@ internal sealed class TestAuthenticationHandler(
     IOptionsMonitor<TestAuthenticationOptions> options,
     ILoggerFactory logger,
     UrlEncoder encoder,
-    ITenantContextAccessor tenants)
+    ITenantContextAccessor tenants,
+    TimeProvider clock)
     : AuthenticationHandler<TestAuthenticationOptions>(options, logger, encoder)
 {
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -92,7 +96,12 @@ internal sealed class TestAuthenticationHandler(
         }
 
         var principal = Session.CreatePrincipal(
-            tenant.TenantId, identity.Id, identity.DisplayName, identity.Roles, applicationRoles: identity.ApplicationRoles);
+            tenant.TenantId,
+            identity.Id,
+            identity.DisplayName,
+            identity.Roles,
+            authenticatedAt: clock.GetUtcNow() - identity.SignedInAgo,
+            applicationRoles: identity.ApplicationRoles);
         return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name)));
     }
 }

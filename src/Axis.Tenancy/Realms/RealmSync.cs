@@ -305,6 +305,59 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         return await ReadOutsideClientsAsync(token, $"admin/realms/{Uri.EscapeDataString(realm)}/clients", cancellationToken);
     }
 
+    /// <summary>
+    /// Creates the confidential client of a package runner with <see cref="RealmPackageRunnerClient.Representation"/>, whose secret is
+    /// <paramref name="secret"/>, see <c>docs/reference/user-administration.md#package-runners</c>. It signs in as <c>axis-activation</c>.
+    /// An error names the step and the status code, never a response body or the secret.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task CreatePackageRunnerClientAsync(
+        string realm, string activationSecret, string clientId, string secret, CancellationToken cancellationToken)
+    {
+        var token = await ActivationTokenAsync(realm, activationSecret, cancellationToken);
+        using var created = await SendAsync(
+            token,
+            HttpMethod.Post,
+            $"admin/realms/{Uri.EscapeDataString(realm)}/clients",
+            RealmPackageRunnerClient.Representation(clientId, secret),
+            cancellationToken);
+        EnsureSuccess(created, $"create the client '{clientId}'");
+    }
+
+    /// <summary>
+    /// Deletes the client of a package runner, see <c>docs/reference/user-administration.md#package-runners</c>. It does nothing when the
+    /// realm has no such client, so a repeat after a failed delete is safe. It signs in as <c>axis-activation</c>. An error names the
+    /// step and the status code, never a response body or a secret.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task DeletePackageRunnerClientAsync(string realm, string activationSecret, string clientId, CancellationToken cancellationToken)
+    {
+        var token = await ActivationTokenAsync(realm, activationSecret, cancellationToken);
+        var clientsPath = $"admin/realms/{Uri.EscapeDataString(realm)}/clients";
+        using var listed = await SendAsync(token, HttpMethod.Get, $"{clientsPath}?clientId={Uri.EscapeDataString(clientId)}", null, cancellationToken);
+        EnsureSuccess(listed, $"find the client '{clientId}'");
+        string? uuid = null;
+        foreach (var found in (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray())
+        {
+            if (found.GetProperty("clientId").GetString() == clientId)
+            {
+                uuid = found.GetProperty("id").GetString();
+                break;
+            }
+        }
+
+        if (uuid is null)
+        {
+            return;
+        }
+
+        using var deleted = await SendAsync(token, HttpMethod.Delete, $"{clientsPath}/{uuid}", null, cancellationToken);
+        if (deleted.StatusCode != HttpStatusCode.NotFound)
+        {
+            EnsureSuccess(deleted, $"delete the client '{clientId}'");
+        }
+    }
+
     private async Task<List<RealmOutsideClient>> ReadOutsideClientsAsync(string token, string clientsPath, CancellationToken cancellationToken)
     {
         var outside = new List<RealmOutsideClient>();
