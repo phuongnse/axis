@@ -465,8 +465,8 @@ package reaches nothing of the host and no binding of another call.
 - **The runners.** Each runtime has its own container, whose host,
   `Axis.PackageHost`, starts a runner process when the worker asks and stops
   it when told. The images and containers are in [images](installation.md#images).
-- **The hosts in Compose.** The Compose example runs `package-host-dotnet`, `package-host-python` and `package-host-node` on an internal network `runners` that only they and
-  the worker share. Each gets no settings or secrets and no published port, a read-only root file system apart from `/tmp`, and
+- **The hosts in Compose.** The Compose example runs `package-host-dotnet`, `package-host-python` and `package-host-node` on an internal network `runners` that only they, the worker and
+  the publisher share, and the publisher calls only `application-package-host` there. Each gets no settings or secrets and no published port, a read-only root file system apart from `/tmp`, and
   CPU and memory limits, see [on premises](installation.md#on-premises).
 - **The C#, Node.js and Python hosts in the Helm chart.** The chart runs `<release>-package-host-dotnet`, `<release>-package-host-node` and `<release>-package-host-python`, each as a Deployment, a Service on port 5310 and a
   NetworkPolicy, with the command `host` and a read-only root file system apart from `/tmp`. It has no env entry, no secret and no
@@ -525,8 +525,8 @@ package reaches nothing of the host and no binding of another call.
   known token gets `407`. The proxy refuses any other request, and a refused
   request fails the attempt at once, even if the package catches the error. The
   error names the operation and the package. It follows no redirects, so a
-  redirect to another host is a new request that the proxy checks again. Compose puts the worker and the three
-  hosts on an `internal` network of their own. The Helm chart gives a
+  redirect to another host is a new request that the proxy checks again. Compose puts the worker, the publisher and the hosts
+  on an `internal` network of their own. The Helm chart gives a
   NetworkPolicy that admits traffic to the hosts only from the worker and lets
   them reach only the proxy port. Every other route is closed, DNS included,
   because the proxy resolves hosts. A library that ignores the proxy variables
@@ -706,8 +706,9 @@ trusted code, so the platform gives it more limits than an installation's packag
   service sits behind the `application-packages` profile, so an installation without gVisor runs the rest.
   In the chart, `applicationPackageHost.enabled`, off by default, runs `<release>-application-package-host`
   from `axis-package-host-node` with the templates of the package hosts. It sets `runtimeClassName` from
-  `applicationPackageHost.runtimeClassName`, `gvisor` by default, and points the worker at it with
-  `Extensions__Runners__Application`. The chart does not set `Extensions__ApplicationPackages`.
+  `applicationPackageHost.runtimeClassName`, `gvisor` by default, and points the worker and the publisher at it with
+  `Extensions__Runners__Application`. Its NetworkPolicy admits publisher pods on TCP 5310 as well as worker pods, and the
+  policies of the other hosts admit worker pods only. The chart does not set `Extensions__ApplicationPackages`.
   gVisor runs on an ordinary Kubernetes node, while a microVM needs nodes that allow nested
   virtualization.
 - **`Extensions:ApplicationPackages`.** A server, worker, `activate` and publisher setting, `false` by default.

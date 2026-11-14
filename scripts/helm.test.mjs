@@ -343,7 +343,9 @@ describe('the Axis Helm chart', () => {
     })
 
     test(`the ${label} package host admits only worker pods on TCP 5310 and sends only to worker pods`, () => {
-      const policy = find(renderOk(), 'NetworkPolicy', name)
+      // The application package host is on too, and no publisher pod may reach a package host of a runtime.
+      const policy = find(renderOk('--set', 'applicationPackageHost.enabled=true'), 'NetworkPolicy', name)
+      assert.doesNotMatch(policy, /component: publisher/)
       const host = `app\\.kubernetes\\.io\\/component: package-host-${runtime}`
       assert.match(policy, new RegExp(`podSelector:\\n\\s+matchLabels:\\n\\s+app\\.kubernetes\\.io/name: axis\\n\\s+app\\.kubernetes\\.io/instance: axis\\n\\s+${host}\\n`))
       assert.match(policy, /policyTypes:\n\s+- Ingress\n\s+- Egress\n/)
@@ -415,22 +417,28 @@ describe('the Axis Helm chart', () => {
       }
     })
 
-    test('renders no object and gives the worker no address while it is off', () => {
+    test('renders no object and gives the worker and the publisher no address while it is off', () => {
       const output = renderOk()
+      assert.doesNotMatch(find(output, 'Deployment', 'axis-publisher'), /Extensions__Runners__Application/)
       for (const document of documents(output)) {
         assert.doesNotMatch(document, /^  name: axis-application-package-host$/m)
         assert.doesNotMatch(document, /application-package-host|Extensions__Runners__Application|runtimeClassName/)
       }
     })
 
-    test('points only the worker at the host while it is on', () => {
-      const output = renderOk(...on)
-      const worker = find(output, 'Deployment', 'axis-worker')
-      assert.match(worker, /- name: Extensions__Runners__Application\n\s+value: "axis-application-package-host:5310"\n/)
-      assert.equal(worker.match(/Extensions__Runners__Application/g).length, 1)
-      assert.doesNotMatch(worker, /- name: Extensions__ApplicationPackages/)
-      for (const document of documents(output).filter((d) => !/^  name: axis-worker$/m.test(d))) {
-        assert.doesNotMatch(document, /Extensions__Runners__Application/)
+    test('points the worker and the publisher at the host and no other pod while it is on', () => {
+      const nonCell = ['--set', 'cell.id=', '--set', 'cell.certificate.enabled=false', '--set', 'cell.pgbouncer.enabled=false', '--set', 'secrets.scenarioServerConnection.name=']
+      // The publisher renders in a cell and outside one, and both get the address.
+      for (const output of [renderOk(...on), renderOk(...on, ...nonCell)]) {
+        for (const pod of ['axis-worker', 'axis-publisher']) {
+          const deployment = find(output, 'Deployment', pod)
+          assert.match(deployment, /- name: Extensions__Runners__Application\n\s+value: "axis-application-package-host:5310"\n/)
+          assert.equal(deployment.match(/Extensions__Runners__Application/g).length, 1)
+          assert.doesNotMatch(deployment, /- name: Extensions__ApplicationPackages/)
+        }
+        for (const document of documents(output).filter((d) => !/^  name: axis-(worker|publisher)$/m.test(d))) {
+          assert.doesNotMatch(document, /Extensions__Runners__Application/)
+        }
       }
     })
 
@@ -466,17 +474,20 @@ describe('the Axis Helm chart', () => {
       assert.match(node, /memory: 1Gi\n/)
     })
 
-    test('admits only worker pods on TCP 5310 and sends only to worker pods', () => {
+    test('admits worker and publisher pods on TCP 5310 and sends only to worker pods', () => {
       const policy = find(renderOk(...on), 'NetworkPolicy', name)
       assert.match(policy, /podSelector:\n\s+matchLabels:\n\s+app\.kubernetes\.io\/name: axis\n\s+app\.kubernetes\.io\/instance: axis\n\s+app\.kubernetes\.io\/component: application-package-host\n/)
       assert.match(policy, /policyTypes:\n\s+- Ingress\n\s+- Egress\n/)
-      for (const direction of ['from', 'to']) {
-        assert.equal(policy.match(new RegExp(`- ${direction}:`, 'g'))?.length, 1)
-        assert.match(
-          policy,
-          new RegExp(`- ${direction}:\\n\\s+- podSelector:\\n\\s+matchLabels:\\n\\s+app\\.kubernetes\\.io/name: axis\\n\\s+app\\.kubernetes\\.io/instance: axis\\n\\s+app\\.kubernetes\\.io/component: worker\\n`),
-        )
-      }
+      const selector = (component) => `- podSelector:\\n\\s+matchLabels:\\n\\s+app\\.kubernetes\\.io/name: axis\\n\\s+app\\.kubernetes\\.io/instance: axis\\n\\s+app\\.kubernetes\\.io/component: ${component}\\n`
+      const [ingress, egress] = policy.split(/^  egress:$/m)
+      assert.equal(policy.match(/- from:/g)?.length, 1)
+      assert.equal(policy.match(/- to:/g)?.length, 1)
+      assert.equal(ingress.match(/- podSelector:/g)?.length, 2)
+      assert.match(ingress, new RegExp(`- from:\\n\\s+${selector('worker')}\\s+${selector('publisher')}`))
+      // The egress rule names the worker only. A reply to a publisher call needs no rule.
+      assert.equal(egress.match(/- podSelector:/g)?.length, 1)
+      assert.match(egress, new RegExp(`- to:\\n\\s+${selector('worker')}`))
+      assert.doesNotMatch(egress, /component: publisher/)
       assert.equal(policy.match(/port: /g)?.length, 1)
       assert.match(policy, /ports:\n\s+- protocol: TCP\n\s+port: 5310\n/)
       assert.doesNotMatch(policy, /ipBlock|namespaceSelector|port: 53\b/)

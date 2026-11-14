@@ -72,7 +72,7 @@ x-host: &host
 
 # The package hosts, the containers that run the package operations of the worker. Each sets its own image and
 # limits. The rules are the same for all, so they cannot drift apart. Port 5310 has no authentication, so a host
-# sits only on the internal network `runners`, which only the worker and the hosts share. It gets no environment,
+# sits only on the internal network `runners`, which only the worker, the publisher and the hosts share. It gets no environment,
 # secret, port or module folder, only the packages, read-only. See docs/reference/extension-packages.md#package-runners
 # and the threats P151 and P152 in
 # docs/reference/threat-model-product.md.
@@ -277,7 +277,8 @@ services:
       - ConnectionStrings__Platform
       - Platform__SecretKey
 
-  # Runs the publish requests that Studio stores. It listens on no port.
+  # Runs the publish requests that Studio stores. It listens on no port. It builds the packages of an application on
+  # the application package host, on the internal network `runners`.
   publisher:
     <<: *host
     image: ${AXIS_IMAGE_PREFIX:-}axis-admin:${AXIS_VERSION:?Set AXIS_VERSION}
@@ -289,11 +290,17 @@ services:
       <<: *host-environment
       # No value: this passes through from the shell, as on the servers.
       Studio__Folders__0:
+      # The application package host, which the publisher only asks when Extensions__ApplicationPackages is on.
+      Extensions__Runners__Application: application-package-host:5310
     volumes:
       - ${AXIS_EXTENSIONS_DIR:-./extensions}:/extensions:ro
       - ${AXIS_MODULES_DIR:-./modules}:/modules:ro
       # Read-write, and the same folder as the servers, because the write lock is keyed by the folder path.
       - ${AXIS_STUDIO_DIR:-./studio}:/studio
+    # The default network reaches PostgreSQL and the identity provider, and listing a network drops the implicit default.
+    networks:
+      - default
+      - runners
     secrets:
       # The platform connection holds the Studio write lock.
       - ConnectionStrings__Platform
@@ -334,7 +341,7 @@ networks:
       config:
         - subnet: ${AXIS_NETWORK_SUBNET:-172.31.250.0/24}
           ip_range: ${AXIS_NETWORK_IP_RANGE:-172.31.250.128/25}
-  # No route out and no other service: only the worker and the four package hosts are on it.
+  # No route out and no other service: only the worker, the publisher and the four package hosts are on it.
   runners:
     internal: true
 

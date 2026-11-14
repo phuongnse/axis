@@ -124,21 +124,22 @@ The file holds no password, client secret or key.
 - **The publisher** runs the `axis-admin` image with the command `publisher`. It gets the
   `ConnectionStrings__PlatformSchema` and `Platform__SecretKey` files and not
   `Admin__ConnectionString`, and it publishes no port. Its `stop_grace_period` is six minutes, longer
-  than the five-minute lease, so a stop lets the running request finish.
+  than the five-minute lease, so a stop lets the running request finish. It sits on the default network and on the internal network `runners`,
+  and sets `Extensions__Runners__Application` to `application-package-host:5310`, so a publish can build the packages of an application, see [an application's packages](extension-packages.md#an-applications-packages).
 - **The agent host** runs the `axis-agent` image. It mounts the `ConnectionStrings__Platform` and
   `Platform__SecretKey` files and no folder, and it publishes only its health port on `127.0.0.1`.
 - **The package hosts** are `package-host-dotnet`, `package-host-python` and `package-host-node`. They run the `axis-package-host-dotnet`, `axis-package-host-python` and `axis-package-host-node`
   images with the command `host`, and run the C#, the `python` and the `node` package operations of the worker, see [package runners](extension-packages.md#package-runners).
   Each has a read-only root file system apart from a `/tmp` tmpfs, no environment, secret or published port, and `/extensions` read-only and
   nothing else. Its limits are 1 CPU and 1g of memory. `AXIS_PACKAGE_HOST_CPUS` and `AXIS_PACKAGE_HOST_MEMORY` change those of the C# host, `AXIS_PACKAGE_HOST_PYTHON_CPUS` and `AXIS_PACKAGE_HOST_PYTHON_MEMORY` those of the Python host, and `AXIS_PACKAGE_HOST_NODE_CPUS` and `AXIS_PACKAGE_HOST_NODE_MEMORY` those of the Node.js host.
-  A host sits only on the internal network `runners`, which no other service but the worker and the other package hosts share, so only the worker reaches its port 5310, which
+  A host sits only on the internal network `runners`, which no other service but the worker, the publisher and the other package hosts share, so only they reach its port 5310, which
   does not authenticate a connection, and it reaches nothing outside that network. The worker sets `Extensions__Runners__Dotnet` to
   `package-host-dotnet:5310`, `Extensions__Runners__Python` to `package-host-python:5310` and `Extensions__Runners__Node` to `package-host-node:5310`.
 - **The application package host** is `application-package-host`, behind the `application-packages` profile. `docker compose --profile application-packages up -d application-package-host` starts it and `docker compose up` does not.
   It runs the `axis-package-host-node` image under the `runsc` runtime, which is gVisor, and runs the code of [an application's packages](extension-packages.md#an-applications-packages).
   gVisor installed and registered with Docker as `runsc` is a prerequisite of that profile only, and `scripts/setup.sh` does it on Linux, see [development](../development.md#setup).
   It has the rules of a package host for its root, environment, secret, port, mount and network, and its own limits, 1 CPU and 1g, which `AXIS_APPLICATION_PACKAGE_HOST_CPUS` and
-  `AXIS_APPLICATION_PACKAGE_HOST_MEMORY` change. The worker sets `Extensions__Runners__Application` to `application-package-host:5310` and asks it only when `Extensions__ApplicationPackages` is `true`.
+  `AXIS_APPLICATION_PACKAGE_HOST_MEMORY` change. The worker and the publisher set `Extensions__Runners__Application` to `application-package-host:5310` and ask it only when `Extensions__ApplicationPackages` is `true`.
 - **The images.** Set `AXIS_VERSION` to the tag of the seven images. `AXIS_IMAGE_PREFIX` adds a
   registry prefix. The comment at the top of `compose.yaml` lists every variable.
 
@@ -411,8 +412,8 @@ configured like `server`.
   headers from that address only. The proxy replaces any `X-Forwarded-For`, `X-Forwarded-Proto` and
   `X-Forwarded-Host` that a client sends. Behind it, sign-in returns to
   `https://<tenant host>/api/auth/callback` and the session cookie is `Secure`.
-- **The runners network.** The `runners` network is `internal`: it has no route out. Only the worker and the four package hosts
-  join it, and the worker also stays on the default network. It has no fixed subnet.
+- **The runners network.** The `runners` network is `internal`: it has no route out. Only the worker, the publisher and the four package hosts
+  join it, and the worker and the publisher also stay on the default network. It has no fixed subnet.
 - **The address range.** Docker hands out addresses without a fixed one only from
   `AXIS_NETWORK_IP_RANGE`, 172.31.250.128/25 by default, so a short-lived `admin` container cannot take
   the proxy's address. If the default subnet overlaps a network of the machine, `docker compose up`
@@ -457,7 +458,7 @@ Two kinds of test keep the example as this section describes it.
   `secrets:` files, that each service mounts only the secrets, certificates and folders listed here,
   that the scenario secret and `Studio__Tests` appear only with `compose.scenarios.yaml`, that every
   published port of both servers is on `127.0.0.1`, that each package host has a read-only root, its limits, no environment,
-  secret or port, and only the packages, read-only, and sits only on the internal `runners` network with the worker and the other package hosts, that the worker mounts the same packages folder read-only, and that the Caddyfile and the Kestrel settings
+  secret or port, and only the packages, read-only, and sits only on the internal `runners` network with the worker, the publisher and the other package hosts, that the worker mounts the same packages folder read-only, and that the Caddyfile and the Kestrel settings
   match [what the Compose example sets](#tls).
 
 ## In the cloud
@@ -483,7 +484,7 @@ The chart has these objects:
   termination grace period is 360 seconds, longer than the five-minute lease. Outside a cell it mounts
   the same secrets as the migrate Job. When `studio.folders` is set, it also mounts the Studio volume
   and gets the folders and `platformConnection`, as the server does.
-- **The package hosts.** For each of the C#, the Node.js and the Python hosts, a Deployment, a Service on port 5310 and a NetworkPolicy, all named `<release>-package-host-dotnet`, `<release>-package-host-node` or `<release>-package-host-python`, see [package runners](extension-packages.md#package-runners). The worker gets `Extensions__Runners__Dotnet`, `Extensions__Runners__Node` and `Extensions__Runners__Python`, one for each Service. **The application package host** is the exception: only with `applicationPackageHost.enabled`, which is off by default, so a cluster without a gVisor RuntimeClass still installs. A Deployment, a Service on port 5310 and a NetworkPolicy, all named `<release>-application-package-host`, rendered by the templates of the package hosts from the `axis-package-host-node` image. Its pod sets `runtimeClassName` from `applicationPackageHost.runtimeClassName`, `gvisor` by default, and the pods of the other package hosts set none, see [an application's packages](extension-packages.md#an-applications-packages). The worker gets `Extensions__Runners__Application` for its Service. The chart does not set `Extensions__ApplicationPackages`.
+- **The package hosts.** For each of the C#, the Node.js and the Python hosts, a Deployment, a Service on port 5310 and a NetworkPolicy, all named `<release>-package-host-dotnet`, `<release>-package-host-node` or `<release>-package-host-python`, see [package runners](extension-packages.md#package-runners). The worker gets `Extensions__Runners__Dotnet`, `Extensions__Runners__Node` and `Extensions__Runners__Python`, one for each Service. **The application package host** is the exception: only with `applicationPackageHost.enabled`, which is off by default, so a cluster without a gVisor RuntimeClass still installs. A Deployment, a Service on port 5310 and a NetworkPolicy, all named `<release>-application-package-host`, rendered by the templates of the package hosts from the `axis-package-host-node` image. Its pod sets `runtimeClassName` from `applicationPackageHost.runtimeClassName`, `gvisor` by default, and the pods of the other package hosts set none, see [an application's packages](extension-packages.md#an-applications-packages). The worker and the publisher get `Extensions__Runners__Application` for its Service, and its NetworkPolicy admits publisher pods on port 5310 as well as worker pods. The chart does not set `Extensions__ApplicationPackages`.
 - **The identity provider**, see [below](#the-identity-provider-in-the-chart).
 - **PgBouncer**, in a cell that turns it on, see [PgBouncer](#pgbouncer).
 - **The migrate Job and the CronJobs** of a cell, see [jobs](#jobs).
@@ -703,7 +704,7 @@ The values of the chart, with their defaults:
 | `worker.replicas` | 1 | Worker replicas. |
 | `agent.replicas` | 1 | Agent host replicas. |
 | `packageHost.dotnet.replicas`, `packageHost.dotnet.resources`, `packageHost.node.replicas`, `packageHost.node.resources`, `packageHost.python.replicas`, `packageHost.python.resources`, `applicationPackageHost.replicas`, `applicationPackageHost.resources` | 1, limits of 1 CPU and `1Gi` | Replicas and resources of the C#, the Node.js, the Python and, when it is on, the application package host. Rendering fails, naming the value, without `limits.cpu` or `limits.memory`. |
-| `applicationPackageHost.enabled`, `applicationPackageHost.runtimeClassName` | `false`, `gvisor` | Runs the application package host and gives the worker `Extensions__Runners__Application`, see [an application's packages](extension-packages.md#an-applications-packages). The RuntimeClass of gVisor that its pod runs under must exist in the cluster. With the host on, an empty `runtimeClassName` fails rendering and names the value. |
+| `applicationPackageHost.enabled`, `applicationPackageHost.runtimeClassName` | `false`, `gvisor` | Runs the application package host and gives the worker and the publisher `Extensions__Runners__Application`, see [an application's packages](extension-packages.md#an-applications-packages). The RuntimeClass of gVisor that its pod runs under must exist in the cluster. With the host on, an empty `runtimeClassName` fails rendering and names the value. |
 | `studio.folders` | none | The Studio folders, as paths relative to `/studio`. Each renders as `Studio__Folders__N` with the value `/studio/<path>` on the server and on the publisher. Setting it turns Studio on. |
 | `studio.authorRole`, `studio.publisherRole` | empty | Server only. `Studio__AuthorRole` and `Studio__PublisherRole`. Rendered only when set. Without one, nobody may author or publish. |
 | `studio.persistence` | none | A Kubernetes volume source for the Studio folders, mounted read-write at `/studio` on every server replica and on the publisher. In a cell the server and the publisher use `/studio` as `Studio:ApplicationsPath`. It is required when `studio.folders` is set and in a cell, and rendering fails with a message that names it when it is missing. Outside a cell, on its own it does nothing. The chart creates no claim. With several replicas, and in a cell, it needs a `ReadWriteMany` storage class. |

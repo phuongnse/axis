@@ -7,7 +7,8 @@
 // test authority for the name servers, and the proxy trusts that authority only. With Studio on, it saves a resource through one replica,
 // reads it back through the other, and checks that a stale save answers 409. It checks each package host's (C#, Python and Node.js) read-only root, limits, environment
 // and network: it reaches the worker only, and the worker reaches it on 5310. It then starts application-package-host with the
-// application-packages profile and checks that Docker runs it under runsc, gVisor, and no package-host-* container. It recreates the worker with
+// application-packages profile and checks that Docker runs it under runsc, gVisor, and no package-host-* container, and that the
+// worker and the publisher reach it on 5310. It recreates the worker with
 // Extensions__ApplicationPackages on, and the worker becomes ready only because that host answers that it runs under gVisor, see
 // docs/reference/extension-packages.md#an-applications-packages. Each start of a service that publishes a port picks that
 // port right before it, and Docker's bind error starts it again on new ports. Before any start it builds the sample packages
@@ -510,6 +511,7 @@ describe('the package hosts', () => {
     assert.equal(mount.read_only, true)
     assert.equal(mount.source, services.worker.volumes.find((volume) => volume.target === '/extensions').source)
     assert.equal(services.worker.environment.Extensions__Runners__Application, `${applicationPackageHost}:5310`)
+    assert.equal(services.publisher.environment.Extensions__Runners__Application, `${applicationPackageHost}:5310`)
     for (const name of Object.keys(packageHosts)) assert.equal(services[name].runtime, undefined, `${name} runtime`)
   })
 
@@ -517,6 +519,7 @@ describe('the package hosts', () => {
     const { services } = render([], ['admin', 'replicas'])
     assert.equal(services[applicationPackageHost], undefined)
     assert.equal(services.worker.environment.Extensions__Runners__Application, `${applicationPackageHost}:5310`)
+    assert.equal(services.publisher.environment.Extensions__Runners__Application, `${applicationPackageHost}:5310`)
     const env = { ...process.env, AXIS_VERSION: 'x', AXIS_IDENTITY_HOST: identityHost }
     for (const name of Object.keys(env)) if (name.startsWith('COMPOSE_')) delete env[name]
     const listed = spawnSync('docker', ['compose', '-f', composeFile, 'config', '--services'], { cwd: root, encoding: 'utf8', env })
@@ -524,7 +527,7 @@ describe('the package hosts', () => {
     assert.equal(listed.stdout.split('\n').includes(applicationPackageHost), false, 'docker compose up starts application-package-host')
   })
 
-  test('are only on the internal network runners, which only they and the worker share, and the worker calls each there', () => {
+  test('are only on the internal network runners, which only they, the worker and the publisher share, and the worker calls each there', () => {
     const config = render()
     const { services } = config
     assert.equal(config.networks.runners.internal, true)
@@ -534,8 +537,10 @@ describe('the package hosts', () => {
       assert.equal(services.worker.environment[host.setting], `${name}:5310`, `${host.setting}`)
     }
     const members = Object.keys(services).filter((name) => Object.hasOwn(services[name].networks ?? {}, 'runners'))
-    assert.deepEqual(members.sort(), ['application-package-host', 'package-host-dotnet', 'package-host-node', 'package-host-python', 'worker'])
+    assert.deepEqual(members.sort(), ['application-package-host', 'package-host-dotnet', 'package-host-node', 'package-host-python', 'publisher', 'worker'])
     assert.ok(Object.hasOwn(services.worker.networks, 'default'), 'the worker left the default network')
+    // The publisher keeps the default network for PostgreSQL and the identity provider.
+    assert.deepEqual(Object.keys(services.publisher.networks).sort(), ['default', 'runners'])
   })
 })
 
@@ -1275,6 +1280,7 @@ describe('the on-premises installation', () => {
         applicationHostReached = reach('worker', applicationPackageHost, 5310)
       }
       assert.equal(applicationHostReached, true, `the worker does not reach ${applicationPackageHost} on 5310`)
+      assert.equal(reach('publisher', applicationPackageHost, 5310), true, `the publisher does not reach ${applicationPackageHost} on 5310`)
       env.AXIS_TEST_APPLICATION_PACKAGES = 'true'
       await up(['worker'], async () => {
         workerPort = await freePort()

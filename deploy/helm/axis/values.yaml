@@ -64,8 +64,8 @@ packageHost:
 
 # The application package host runs the packages of an application under gVisor, see
 # docs/reference/extension-packages.md#an-applications-packages. It is off by default, so a cluster without a gVisor
-# RuntimeClass still installs. When it is on, the cluster needs a RuntimeClass named runtimeClassName, the worker is
-# pointed at the host, and rendering fails without the RuntimeClass name or either limit. The chart does not set
+# RuntimeClass still installs. When it is on, the cluster needs a RuntimeClass named runtimeClassName, the worker and the
+# publisher are pointed at the host, and rendering fails without the RuntimeClass name or either limit. The chart does not set
 # Extensions__ApplicationPackages.
 applicationPackageHost:
   enabled: false
