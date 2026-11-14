@@ -288,6 +288,12 @@ public static class ReleaseActivator
 
         foreach (var resource in stored.Resources)
         {
+            // An application package's files are text of any kind, never resources.
+            if (resource.Path.StartsWith(ApplicationLoader.PackagesFolderPrefix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             using var document = JsonDocument.Parse(resource.Content);
             var root = document.RootElement;
             if (root.TryGetProperty("kind", out var kind) && kind.GetString() == "entity"

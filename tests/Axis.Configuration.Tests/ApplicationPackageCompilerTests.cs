@@ -2,6 +2,7 @@ using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Realms;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 
@@ -267,6 +268,28 @@ public sealed class ApplicationPackageCompilerTests
         ModelAssert.Equal(compiled.Model!, model);
         var step = Assert.IsType<PackageOperationStepModel>(Assert.Single(model.Processes).Steps[0]);
         Assert.Equal(("tools", "2.3.4"), (step.Package, step.Version));
+    }
+
+    [Fact]
+    public void A_release_that_holds_an_application_package_reads_as_a_realm_application_without_reading_the_package_files()
+    {
+        using var folder = Folder(SumStep).With("packages/tools/tests/site.json", """{ "kind": "site", "path": "/fixture" }""");
+        var compiled = ApplicationCompiler.Compile(folder.Path, applicationPackages: true);
+        Assert.Empty(compiled.Diagnostics);
+        var id = Guid.NewGuid();
+        var release = new Release
+        {
+            Id = id,
+            ApplicationId = Guid.Parse(ApplicationId),
+            ContentHash = compiled.ContentHash!,
+            CreatedAt = DateTimeOffset.UtcNow,
+            Resources = [.. compiled.Resources.Select(resource => new ReleaseResource { ReleaseId = id, Path = resource.Path, Content = resource.Content })],
+        };
+        Assert.Contains(release.Resources, resource => resource.Path == "packages/tools/adapter.py");
+
+        var application = RealmApplication.FromRelease("Sample", release);
+
+        Assert.Empty(application.Sites);
     }
 
     /// <summary>An application with an <c>Order</c> entity, the package <c>tools</c> and, when given, a process whose first step is <paramref name="step"/>.</summary>
