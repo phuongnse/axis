@@ -264,11 +264,11 @@ public sealed class MinioFixtureTests
     }
 
     [Fact]
-    public async Task A_bucket_already_owned_on_the_first_try_fails_at_once()
+    public async Task A_bucket_already_owned_on_the_first_try_counts_as_created()
     {
         var calls = 0;
 
-        await Assert.ThrowsAsync<AmazonS3Exception>(() => MinioFixture.CreateBucketAsync(
+        await MinioFixture.CreateBucketAsync(
             (_, _) =>
             {
                 calls++;
@@ -276,7 +276,7 @@ public sealed class MinioFixtureTests
             },
             "bucket",
             CancellationToken,
-            wait: _noWait));
+            wait: _noWait);
 
         Assert.Equal(1, calls);
     }
