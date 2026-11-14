@@ -185,7 +185,7 @@
   "shell.users.applicationPackages.turnOnConfirm": "Bật gói mở rộng?",
   "shell.users.applicationPackages.turnOnEffect": "Tác giả có vai trò nhà phát triển sẽ thêm được gói mở rộng vào ứng dụng.",
   "shell.users.applicationPackages.turnOffConfirm": "Tắt gói mở rộng?",
-  "shell.users.applicationPackages.turnOffEffect": "Tác giả không còn đổi được gói mở rộng hay phát hành ứng dụng có gói mở rộng. Các bản phát hành đang hoạt động vẫn chạy gói của chúng.",
+  "shell.users.applicationPackages.turnOffEffect": "Tác giả không còn đổi được gói mở rộng hay phát hành ứng dụng có gói mở rộng. Các phiên bản đang chạy vẫn chạy gói mở rộng của chúng.",
   "shell.users.applicationPackages.turnOn.ok": "Bật",
   "shell.users.applicationPackages.turnOff.ok": "Tắt",
   "shell.users.applicationPackages.changeFailed": "Không lưu được thay đổi.",
