@@ -29,7 +29,7 @@ from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` 
 | `scripts/load.sh`               | The load test against the reference stack                                                                                                                         | Docker                 |
 | `scripts/load-cell.sh`          | The cell load test against a staging cell                                                                                                                         | Docker, network        |
 | `scripts/ai-eval.sh`            | On demand only: the authoring eval against one model binding, see [the authoring eval](reference/model-bindings.md#the-authoring-eval)                            | Docker, network        |
-| `scripts/dev.sh`                | The local stack with hot reload, see [hot reload](#hot-reload-with-scriptsdevsh)                                                                                  | Docker                 |
+| `scripts/dev.sh`                | The local stack with hot reload, see [hot reload](dev-script.md#hot-reload-with-scriptsdevsh)                                                                                  | Docker                 |
 
 ### Setup
 
@@ -171,6 +171,11 @@ runs Playwright in Chromium. It:
 
 - starts PostgreSQL, Keycloak, the built purchasing system stub, the server, the worker and the
   publisher;
+- starts a Node.js package host, `Axis.PackageHost host`, from the build output on a free loopback port, with
+  `PackageHost__Address` set to `127.0.0.1` and `Extensions__Path` set to `artifacts/extensions`, and points
+  the worker's `Extensions__Runners__Node` at it. The worker's egress proxy listens on a free port too, so
+  it does not clash with a worker under `scripts/dev.sh`. The run fails if the host exits before Playwright
+  finishes;
 - adds the `axis first login` flow to the `axis` realm before the server starts, see
   [the axis realm](#the-axis-realm);
 - gives Keycloak the `axis-admin` client and the breached-password list, and creates the PostgreSQL
@@ -211,8 +216,8 @@ in [Testing](testing.md).
 | `ai-eval`    | Carries an authoring request to its plan on the eval stack with scripted answers, and runs `scripts/ai-eval.sh` against a stand-in model                 |
 
 `dev-script` starts the Compose services of `scripts/dev.sh` once, on ports it picks before its first case, and
-its cases reuse them. Each start of `scripts/dev.sh` gets fresh ports for the server, the SPA, the worker and the
-agent host. The test removes the Compose project at the end. `compose` and `onprem` pick each host port right before the start that binds it, and start again on new ports, up to three times, when Docker finds one taken.
+its cases reuse them. Each start of `scripts/dev.sh` gets fresh ports for the server, the SPA, the worker, the
+agent host and the Node.js package host. The test removes the Compose project at the end. `compose` and `onprem` pick each host port right before the start that binds it, and start again on new ports, up to three times, when Docker finds one taken.
 
 `scripts/smoke.sh` builds the [production images](production-images.md) once, before `images` and `onprem`, which both use them,
 and removes them when it exits. A change that skips both tests builds nothing. `ai-eval` needs no production image: it builds the server, the publisher and the agent host in Release,
@@ -478,14 +483,15 @@ jobs may wait.
 Each suite writes a JUnit file to `artifacts/test-results/`, and the E2E run writes its logs to
 `artifacts/logs/`:
 
-| Log                      | Output of                  |
-| ------------------------ | -------------------------- |
-| `e2e-server.log`         | The E2E server             |
-| `e2e-worker.log`         | The E2E worker             |
-| `e2e-journey-server.log` | The E2E journey server     |
-| `e2e-publisher.log`      | The E2E publisher          |
-| `e2e-purchasing.log`     | The purchasing system stub |
-| `e2e-controlplane.log`   | The E2E control plane      |
+| Log                      | Output of                    |
+| ------------------------ | ---------------------------- |
+| `e2e-server.log`         | The E2E server               |
+| `e2e-worker.log`         | The E2E worker               |
+| `e2e-journey-server.log` | The E2E journey server       |
+| `e2e-publisher.log`      | The E2E publisher            |
+| `e2e-package-host.log`   | The E2E Node.js package host |
+| `e2e-purchasing.log`     | The purchasing system stub   |
+| `e2e-controlplane.log`   | The E2E control plane        |
 
 `scripts/test-report.mjs` then writes the test summary for the job. When every suite passed, the summary
 starts with one line. It gives the tests passed, the total time and the suites skipped as not affected by
@@ -547,6 +553,7 @@ Docker Compose runs the whole stack from source, with nothing but Docker install
 | The worker                                                            | none                  |                          |
 | The agent host                                                        | none                  |                          |
 | The publisher                                                         | none                  |                          |
+| The Node.js package host                                              | none                  |                          |
 
 All six ports are published on `127.0.0.1` only. The Keycloak admin console login is `admin` /
 `admin`.
@@ -567,12 +574,20 @@ All six ports are published on `127.0.0.1` only. The Keycloak admin console logi
   [publisher](reference/administration.md#publisher). It serves the tenants `default` and
   `default-preview`, so it runs preview requests too. It has no port and no health check, and writes
   `default ready` and `default-preview ready` once the server has migrated each tenant database.
+- **The Node.js package host,** `package-host-node`, runs host mode of `Axis.PackageHost` from the `package-host-node-dev`
+  stage of the `Dockerfile`. The image holds the sample extension packages in `/extensions`, including
+  `payment-terms` with its library, and the Node.js runner. The host listens on port 5310 of its container.
+  The runner protocol has no authentication, so the host sits only on the internal network `runners`, which
+  the worker shares, and publishes no port. The worker sets `Extensions__Runners__Node` to
+  `package-host-node:5310`, see [package runners](reference/extension-packages.md#package-runners). No sample
+  calls a `node` package yet.
 - **Health.** `docker compose ps` shows the worker healthy once its `/health/ready` passes, and
   `docker compose up --wait` waits for that. The server has 5 minutes and the worker 6 minutes to
   become healthy before `docker compose up --wait` fails. The worker's health address
   `http://127.0.0.1:5208` stays inside its container.
 - **Logs.** `docker compose logs server` shows the activation diagnostics, `docker compose logs worker`
-  the worker output and `docker compose logs publisher` the publisher output.
+  the worker output, `docker compose logs publisher` the publisher output and
+  `docker compose logs package-host-node` the package host output.
 - **Studio's new applications** go to `artifacts/studio-apps`, which the checkout mounts at
   `/studio-apps`. Set `AXIS_STUDIO_APPS_DIR` to move that folder. On Linux the server runs as UID 1654,
   so create the folder first and make it writable by that UID, because Docker creates a missing folder
@@ -774,114 +789,6 @@ The run's shared publisher reads the `Tenants` section, so it runs no provisioni
 jobs, such as the cell console spec and the cell quota journey, starts its own publisher with `startPublisher` of the
 same file, which reads the tenant directory with a cell's settings and runs the jobs. Both start it, with their server
 and browser, through `startCell` of `tests/e2e/cell.ts`, see [the E2E stack](testing.md#the-e2e-stack).
-
-## Hot reload with `scripts/dev.sh`
-
-`scripts/dev.sh` runs the local stack with hot reload, the way to work on Axis day to day. It needs
-Docker, .NET and Node, and works on a fresh clone.
-
-### What it starts
-
-1. It installs the SPA packages when `web/node_modules` is missing or `web/package-lock.json` changed
-   since the last install. It installs no Playwright browser.
-2. It builds the Keycloak theme into `artifacts/keycloak-theme`, which the Compose `keycloak` service
-   mounts, and copies the email theme with it. It fails when one of the theme's files is missing.
-3. **Sample themes and licences** _(planned for M33)_. It copies the sample themes of
-   `samples/keycloak/themes` beside the Axis theme, and writes the list of
-   [open source licences](reference/legal.md#open-source-licences) that `/licences` shows.
-4. It starts PostgreSQL, Keycloak, Mailpit and the purchasing system stub with Docker Compose, and
-   waits until PostgreSQL accepts connections and Keycloak's `axis` realm, Mailpit and the stub
-   answer. The first run builds the stub's image.
-5. It installs the TypeScript sample extension package, `samples/packages/payment-terms`, offline, and builds the sample extension package, `samples/packages/PaymentReferences`, into
-   `artifacts/extensions`, where the Development settings of the server and the worker point
-   `Extensions:Path`. The purchase request sample declares the package, so it does not activate
-   without it. The worker runs with `Extensions:Isolation` `inProcess`, so it loads the package itself.
-6. It installs the built-in modules, `modules/*`, and the sample modules, `samples/modules/*`, into
-   `artifacts/modules/<id>/<version>/`, where the Development settings of the server and the worker
-   point `Modules:Path`.
-7. It installs the built-in applications, `applications/*`, and any sample template under
-   `samples/templates/*`, into `artifacts/templates/<id>/<version>/`, and creates that folder even when
-   there are none. The Development and E2E settings of the server point `Templates:Path` there. The
-   production images, the Compose example and the Helm chart's server set no `Templates:Path`,
-   so Studio lists no template there. In a cell the chart sets it on the publisher for the create job,
-   see [the publisher in a cell](reference/installation.md#the-publisher-in-a-cell).
-8. It builds the agent host, `src/Axis.Agent`, before the server starts, and runs the built `Axis.Agent.dll`
-   at once, not under `dotnet watch`. With no `Ai` settings it runs idle, and it serves its health
-   endpoints at `http://127.0.0.1:5209`, see [health checks](reference/health-checks.md#agent-host).
-9. It runs the server and the worker under `dotnet watch` and the SPA on Vite, in one terminal. It
-   starts the worker once the server has migrated the tenant databases. The SPA proxies `/api` and
-   `/health` to the server.
-10. It runs one publisher, `axis-admin publisher`, once the server has migrated the tenant databases.
-    The publisher runs from the built `Axis.Admin.dll`, not under `dotnet watch`. The script sets its
-    tenant settings as environment variables of that process only, because `Axis.Admin` reads no
-    `appsettings` file. They cover `default` and `default-preview`, so it runs preview requests too, see
-    [publisher](reference/administration.md#publisher).
-
-Each output line starts with `[server]`, `[worker]`, `[web]`, `[publisher]` or `[agent]`, and the script's own
-messages start with `[dev]`.
-
-### Settings it sets
-
-- **Studio's new applications.** `scripts/dev.sh` and the Compose server set `Studio:ApplicationsPath`
-  to `artifacts/studio-apps`, which `artifacts/` keeps out of git. An exported
-  `Studio__ApplicationsPath` replaces that folder. E2E's journey server sets it to a temporary folder.
-- **Email.** The worker sends the emails of `notify` steps to Mailpit, as under
-  [Docker Compose](#docker-compose). The script sets `Email__Smtp__Host` to `localhost`,
-  `Email__Smtp__Port` to Mailpit's SMTP port, `Email__Smtp__UseTls` to `false` and `Email__From` to
-  `axis@localhost` for the worker's process only. An exported `Email__*` setting replaces each one, so
-  a developer can try a real mail server. The script gives the publisher `Email__*` settings for
-  `mailpit:1025`, the address that Keycloak sees, because the publisher writes the realm's mail server
-  when it publishes.
-- **The preview tenant.** Development, Compose and E2E configure one preview tenant,
-  `default-preview`, with `PreviewOf: default`, see
-  [preview tenants](architecture.md#preview-tenants). It has its own database `axis_preview` and its
-  own roles, `axis_preview_schema` and `axis_preview_runtime`. It has no deployment bindings, so the
-  purchase request sample logs `AXC0100` warnings on it, and a connector call there fails. It signs
-  people in through the same realm as `default`. The server activates the four samples on it at start,
-  and the worker runs it with only its runtime connection string. Its host is `preview.localhost`:
-  Compose and `scripts/dev.sh` serve it at `http://preview.localhost:5206`, and `scripts/dev.sh` also
-  serves it through the SPA at `http://preview.localhost:5173`. The E2E server and worker serve it on
-  `localhost`, while `default` stays on `127.0.0.1`. The realm accepts sign-in and sign-out redirects
-  to those addresses.
-- **Ports.** `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT`, `AXIS_PURCHASING_PORT`,
-  `AXIS_MAILPIT_SMTP_PORT`, `AXIS_MAILPIT_WEB_PORT`, `AXIS_SERVER_PORT`, `AXIS_WEB_PORT` and
-  `AXIS_AGENT_HEALTH_PORT` move the eight ports, whose defaults are 5432, 8080, 5207, 1025, 8025, 5206,
-  5173 and 5209. When
-  `AXIS_POSTGRES_PORT` is set, the script points the server's connection strings and the worker's
-  `Tenants__default__ConnectionString` at that port. When `AXIS_KEYCLOAK_PORT` is set, it points the
-  server's `Tenants__default__Oidc__Authority` at Keycloak on that port, and its
-  `Tenants__default__Bindings__CompanyIssuer__Value` at the `company` realm there. When
-  `AXIS_PURCHASING_PORT` is set, it points the server's and the worker's
-  `Tenants__default__Bindings__PurchasingSystemUrl__Value`,
-  `Tenants__default__Bindings__PurchasingSystemTokenUrl__Value` and
-  `Tenants__default__Bindings__PurchaseRequestApprovedWebhookUrl__Value` at the stub on that port.
-- **Worker health.** The worker serves `/health/live` and `/health/ready` at `http://127.0.0.1:5208`
-  and answers `404` elsewhere. `Health__Urls` moves that address, and two workers on one machine need
-  different addresses. An exported `Health__Urls` moves only the worker's address: the script sets the
-  agent host's address from `AXIS_AGENT_HEALTH_PORT`.
-- **Telemetry.** Neither Docker Compose nor `scripts/dev.sh` starts a telemetry collector, so logs go
-  to the console only. Set `OTEL_EXPORTER_OTLP_ENDPOINT` for the server and the worker to export
-  traces, metrics and logs, see [telemetry export](reference/host-settings.md#telemetry-export).
-
-### What reloads
-
-- `dotnet watch` applies C# changes, or restarts the server or the worker without a prompt when it
-  cannot. Vite applies SPA changes.
-- A change to any `*.json` file under an activated application folder restarts the server once, and
-  the server activates the edited configuration again. The script watches the `ActivateOnStartup`
-  folders itself, and prints a `[dev]` line when it restarts the server. The worker and the SPA keep
-  running. If the edited configuration does not activate, the server exits on its own and the script
-  stops with a non-zero code.
-- A change to the sample extension package's C# code, to the publisher's code, to the agent host's
-  code, or to a module or a template needs a restart of the script, because the server reads the module and template catalogs
-  only when it starts.
-
-### Stopping
-
-Ctrl+C stops the server, the worker, the publisher, the agent host and the SPA. PostgreSQL keeps running with its
-data, and Keycloak, Mailpit and the purchasing system stub keep running: run `docker compose down` to
-stop them. If any of the five processes exits on its own, the others stop too and the script exits
-non-zero.
 
 ## Widget previews
 

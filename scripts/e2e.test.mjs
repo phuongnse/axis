@@ -30,7 +30,12 @@ ${log('curl')}exit 0
   dotnet: `#!/usr/bin/env bash
 ${log('dotnet')}case "$*" in
   *Axis.ControlPlane.dll*) echo "control-plane-env ControlPlane__Mail__Port=$ControlPlane__Mail__Port ControlPlane__PublicUrl=$ControlPlane__PublicUrl" >> "$STUB_LOG" ;;
-  *Axis.Worker.dll*) echo 'Tenant default is ready for work'; echo 'Tenant journey is ready for work' ;;
+  *Axis.Worker.dll*)
+    echo "worker-env Extensions__Runners__Node=$Extensions__Runners__Node Extensions__Runners__ProxyPort=$Extensions__Runners__ProxyPort" >> "$STUB_LOG"
+    echo 'Tenant default is ready for work'; echo 'Tenant journey is ready for work' ;;
+  *Axis.PackageHost.dll*)
+    echo "package-host-env PackageHost__Port=$PackageHost__Port PackageHost__Address=$PackageHost__Address Extensions__Path=$Extensions__Path" >> "$STUB_LOG"
+    [ -z "$STUB_PACKAGE_HOST_EXIT" ] || exit 1 ;;
   *Axis.Admin.dll*) echo 'default ready'; echo 'journey ready' ;;
 esac
 exec sleep 60
@@ -59,6 +64,7 @@ function runE2e(shard, args = [], extraEnv = {}) {
       '.nexkit/config.json',
       'scripts/lib/e2e-shard.mjs',
       'scripts/lib/shards.mjs',
+      'scripts/lib/free-ports.mjs',
       'scripts/test-report.mjs',
       'scripts/lib/docker-images.mjs',
       'scripts/lib/docker-build.mjs',
@@ -298,6 +304,32 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
     const name = /--name (\S+)/.exec(run.calls[minio])?.[1]
     assert.ok(name, run.calls[minio])
     assert.ok(run.calls.includes(`docker rm -f ${name}`), run.calls.join('\n'))
+  })
+
+  test('the Node.js package host listens on a free loopback port, reads the extensions, and the worker is pointed at the same port', () => {
+    const run = runE2e()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const host = run.calls.filter((call) => call.startsWith('package-host-env '))
+    assert.equal(host.length, 1, run.calls.join('\n'))
+    const [, port, address, extensions] = /^package-host-env PackageHost__Port=(\d+) PackageHost__Address=(\S+) Extensions__Path=(\S+)$/.exec(host[0]) ?? []
+    assert.ok(port, host[0])
+    assert.ok(Number(port) >= 1 && Number(port) <= 65535, host[0])
+    assert.equal(address, '127.0.0.1')
+    assert.match(extensions, /\/artifacts\/extensions$/)
+    const worker = run.calls.filter((call) => call.startsWith('worker-env '))
+    assert.deepEqual(worker, [`worker-env Extensions__Runners__Node=127.0.0.1:${port} Extensions__Runners__ProxyPort=0`])
+    const call = run.calls.findIndex((c) => c.startsWith('dotnet ') && c.includes('Axis.PackageHost.dll host'))
+    const playwright = run.calls.findIndex((c) => c.startsWith('npm test '))
+    assert.ok(call >= 0 && call < playwright, run.calls.join('\n'))
+  })
+
+  test('a Node.js package host that exits early fails the run and its log is printed', () => {
+    const run = runE2e(undefined, [], { STUB_PACKAGE_HOST_EXIT: '1' })
+
+    assert.notEqual(run.status, 0, run.stdout + run.stderr)
+    assert.match(run.stderr, /The Node\.js package host exited before Playwright finished\./)
+    assert.match(run.stdout, /Node\.js package host log \(last 100 lines of artifacts\/logs\/e2e-package-host\.log\)/)
   })
 
   test('the axis first login flow is added through the Keycloak address before Playwright starts', () => {

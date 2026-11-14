@@ -1,10 +1,13 @@
 # Runs the whole Axis stack from source: PostgreSQL, Keycloak with the development realm at
 # http://localhost:8080, the server with the purchase request and leave request samples, at http://localhost:5206,
-# the worker, the agent host, the publisher and the purchasing system stub at http://localhost:5207. Sign-in is not wired here
+# the worker, the agent host, the publisher, the Node.js package host and the purchasing system stub at http://localhost:5207. Sign-in is not wired here
 # yet: the server in its container cannot reach Keycloak at the address the browser uses. For
 # development, scripts/dev.sh starts only PostgreSQL, Keycloak, Mailpit and the purchasing system stub from
 # here and runs the server, the worker, the publisher and the SPA with hot reload.
 # The development settings are in src/Axis.Server/appsettings.Development.json.
+# The Node.js package host holds the sample extension packages and runs the runners of the `node` packages that the worker
+# sends it. It sits on the internal network runners, which only the worker shares, and publishes no port. No sample calls a
+# `node` package yet.
 # Mailpit, a local mail server, keeps every email the worker sends. Its web page is at http://localhost:8025.
 # All six ports are published on 127.0.0.1 only. AXIS_SERVER_PORT (default 5206),
 # AXIS_POSTGRES_PORT (default 5432), AXIS_KEYCLOAK_PORT (default 8080), AXIS_PURCHASING_PORT
@@ -127,12 +130,16 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_healthy
+    networks:
+      - default
+      - runners
     environment:
       DOTNET_ENVIRONMENT: Development
-      # The sample extension package payment-references, which the image holds. This worker loads it itself,
-      # because no package host runs in this stack.
+      # The sample extension package payment-references, which the image holds. This worker loads it itself, and
+      # sends each attempt of a `node` package to the Node.js package host on the runners network.
       Extensions__Path: /extensions
       Extensions__Isolation: inProcess
+      Extensions__Runners__Node: package-host-node:5310
       # The built-in and sample modules, which the image holds.
       Modules__Path: /modules
       # The worker sends its emails to Mailpit. Development is the only environment that sends without TLS.
@@ -155,6 +162,26 @@ services:
       retries: 3
       start_period: 360s
       start_interval: 2s
+
+  # The development Node.js package host, which holds the sample extension packages in /extensions and listens on port 5310 of
+  # its container. It runs host mode, which accepts the runner protocol without authentication, so it sits only on the internal
+  # network runners that the worker shares, and publishes no port. The image has bash but no curl.
+  package-host-node:
+    build:
+      context: .
+      target: package-host-node-dev
+    command: ["host"]
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks:
+      - runners
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5310"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
 
   # The agent host. It does no database work while AI authoring is off, which is how it starts here. The health
   # address http://127.0.0.1:5209 stays inside the container, so no port is published. The image has bash but no curl.
@@ -251,6 +278,11 @@ services:
       timeout: 5s
       retries: 30
       start_period: 5s
+
+# Internal, so the package host has no route out and nothing outside the stack reaches it.
+networks:
+  runners:
+    internal: true
 
 volumes:
   axis-postgres:

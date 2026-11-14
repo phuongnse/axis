@@ -9,7 +9,7 @@ tenant, so they stay true to what Studio does. Each step is one test with the sa
 
 ## Before you start
 
-Start Axis with `scripts/dev.sh`, as [hot reload with scripts/dev.sh](../development.md#hot-reload-with-scriptsdevsh)
+Start Axis with `scripts/dev.sh`, as [hot reload with scripts/dev.sh](../dev-script.md#hot-reload-with-scriptsdevsh)
 describes. Studio then runs at http://localhost:5173/studio.
 
 Sign in as a user who holds the **author** role, which builds the application. Publishing also needs the

@@ -10,6 +10,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The scripts run host mode from the build output, and the Node.js runner sits beside the dll. The published output leaves it out, see docs/reference/extension-packages.md#the-runner-protocol. -->
+    <None Include="..\..\sdk\node\**\*" LinkBase="sdk/node" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Axis.PackageHost.Tests" />
     <InternalsVisibleTo Include="Axis.Integration.Tests" />
   </ItemGroup>

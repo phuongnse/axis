@@ -99,7 +99,7 @@ test('the stack runs from source', { timeout }, async () => {
       const log = inspect.status === 0 ? (JSON.parse(inspect.stdout).Log ?? []) : []
       lastChecks[service] = log.at(-1)?.Output ?? ''
     }
-    for (const service of ['server', 'worker', 'agent', 'publisher', 'keycloak', 'purchasing', 'mailpit', 'postgres']) {
+    for (const service of ['server', 'worker', 'agent', 'publisher', 'package-host-node', 'keycloak', 'purchasing', 'mailpit', 'postgres']) {
       compose(['logs', service], { stdio: 'inherit' })
     }
     assert.fail(`docker compose up exited with ${up.status}\n${tail(up.stderr ?? '', 2000)}\n${describeNotReady(containers, lastChecks)}`)
@@ -181,6 +181,7 @@ test('the stack runs from source', { timeout }, async () => {
 
   const services = compose(['ps', '--status', 'running', '--services'])
   assert.match(services.stdout, /^worker$/m, `${services.stdout}${services.stderr}`)
+  assert.match(services.stdout, /^package-host-node$/m, `${services.stdout}${services.stderr}`)
   assert.match(services.stdout, /^agent$/m, `${services.stdout}${services.stderr}`)
   assert.match(services.stdout, /^publisher$/m, `${services.stdout}${services.stderr}`)
   // The worker polls once a second, so it finds the migrated database soon after the server is up.
@@ -206,6 +207,28 @@ test('the stack runs from source', { timeout }, async () => {
     ['healthy'],
     ps.stdout,
   )
+  // The worker's container reaches the Node.js package host by its service name and opens a runner of the sample package
+  // payment-terms 1.0.0. The runner answers `ready` once it has loaded the package and its library.
+  const start = JSON.stringify({
+    type: 'start',
+    package: 'payment-terms',
+    version: '1.0.0',
+    proxy: '127.0.0.1:5311',
+    proxyToken: 'smoke',
+  })
+  const runner = compose([
+    'exec',
+    '-T',
+    'worker',
+    'timeout',
+    '60',
+    'bash',
+    '-c',
+    'exec 3<>/dev/tcp/package-host-node/5310 && printf "%s\\n" "$0" >&3 && head -n1 <&3',
+    start,
+  ])
+  assert.equal(runner.status, 0, `${runner.stdout}${runner.stderr}`)
+  assert.equal(JSON.parse(runner.stdout.trim()).type, 'ready', runner.stdout)
   const agent = compose(['ps', '--format', 'json', 'agent'])
   assert.equal(agent.status, 0, agent.stderr)
   assert.deepEqual(
@@ -345,6 +368,17 @@ test('the worker checks /health/ready and publishes no port', () => {
   const { services } = JSON.parse(config.stdout)
   assert.equal(services.worker.ports, undefined)
   assert.match(services.worker.healthcheck.test.join(' '), /\/health\/ready/)
+})
+
+test('the worker sends node calls to the package host, which only the runners network reaches', () => {
+  const config = compose(['config', '--format', 'json'])
+  assert.equal(config.status, 0, config.stderr)
+  const { services, networks } = JSON.parse(config.stdout)
+  assert.equal(services.worker.environment.Extensions__Runners__Node, 'package-host-node:5310')
+  assert.deepEqual(Object.keys(services.worker.networks).sort(), ['default', 'runners'])
+  assert.deepEqual(Object.keys(services['package-host-node'].networks), ['runners'])
+  assert.equal(networks.runners.internal, true)
+  assert.equal(services['package-host-node'].ports, undefined)
 })
 
 test('the agent host checks /health/ready and publishes no port', () => {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs Axis locally: PostgreSQL, Keycloak, Mailpit and the purchasing system stub in Docker, the server
-# and the worker under dotnet watch, the publisher, the agent host and the SPA on Vite, in one terminal. The server starts once
+# and the worker under dotnet watch, the publisher, the agent host, the Node.js package host and the SPA on Vite, in one terminal. The server starts once
 # PostgreSQL accepts connections, Keycloak's development realm answers and the stub answers. The
 # server signs people in through that realm at /api/auth/sign-in. Before the server starts, this script adds the axis first
 # login flow to the realm through the admin API. The SPA does not offer it yet. The realm signs
@@ -8,8 +8,8 @@
 # The worker and the publisher start once the server has migrated the tenant databases. The
 # publisher runs the publish requests of Studio. A change to a JSON file
 # in an application folder that the server activates at startup restarts the server, so that it
-# activates the edited configuration. The worker, the publisher, the agent host and the SPA keep running. Ctrl+C
-# stops the server, the worker, the publisher, the agent host and the SPA. PostgreSQL, Keycloak, Mailpit and the purchasing
+# activates the edited configuration. The worker, the publisher, the agent host, the Node.js package host and the SPA keep running. Ctrl+C
+# stops the server, the worker, the publisher, the agent host, the Node.js package host and the SPA. PostgreSQL, Keycloak, Mailpit and the purchasing
 # system stub keep running.
 # Mailpit is a local mail server that keeps every email. The worker sends its emails to it, and they can be read on
 # its web page. This script sets Email__Smtp__Host, Email__Smtp__Port, Email__Smtp__UseTls and Email__From for the
@@ -27,6 +27,10 @@
 # restart of this script. It starts at once and waits for nothing, because it does no database work yet. With
 # no Ai settings it runs idle. It serves its health endpoints on http://127.0.0.1:5209, and
 # AXIS_AGENT_HEALTH_PORT moves that port. An exported Health__Urls moves only the worker's address.
+# The Node.js package host runs from the built Axis.PackageHost.dll, whose build output holds the Node.js runner, and reads
+# the packages in artifacts/extensions. It listens on 127.0.0.1:5310 only, because the runner protocol has no
+# authentication, and AXIS_PACKAGE_HOST_NODE_PORT moves that port. The worker sends its `node` calls to it through
+# Extensions__Runners__Node, see docs/reference/extension-packages.md#package-runners.
 # The server creates Studio's new applications in artifacts/studio-apps, which git ignores. An exported
 # Studio__ApplicationsPath replaces that folder.
 # The publisher runs from the built Axis.Admin.dll, not under dotnet watch, so a change to its code
@@ -45,8 +49,8 @@
 # applications under applications are installed into artifacts/templates, which the server reads through
 # Templates:Path, and a template change needs a restart too.
 # AXIS_POSTGRES_PORT, AXIS_KEYCLOAK_PORT, AXIS_PURCHASING_PORT, AXIS_MAILPIT_SMTP_PORT,
-# AXIS_MAILPIT_WEB_PORT, AXIS_SERVER_PORT, AXIS_WEB_PORT and AXIS_AGENT_HEALTH_PORT move the ports (5432,
-# 8080, 5207, 1025, 8025, 5206, 5173, 5209).
+# AXIS_MAILPIT_WEB_PORT, AXIS_SERVER_PORT, AXIS_WEB_PORT, AXIS_AGENT_HEALTH_PORT and AXIS_PACKAGE_HOST_NODE_PORT
+# move the ports (5432, 8080, 5207, 1025, 8025, 5206, 5173, 5209, 5310).
 # Works with the bash 3.2 that ships with macOS.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -59,6 +63,7 @@ mailpit_web_port="${AXIS_MAILPIT_WEB_PORT:-8025}"
 server_port="${AXIS_SERVER_PORT:-5206}"
 web_port="${AXIS_WEB_PORT:-5173}"
 agent_health_port="${AXIS_AGENT_HEALTH_PORT:-5209}"
+package_host_port="${AXIS_PACKAGE_HOST_NODE_PORT:-5310}"
 studio_apps="${Studio__ApplicationsPath:-$PWD/artifacts/studio-apps}"
 
 log() { printf '[dev] %s\n' "$*"; }
@@ -150,6 +155,7 @@ server=""
 worker=""
 publisher=""
 agent=""
+package_host=""
 web=""
 
 # Prefixes each line with the process name. It ignores SIGINT so it keeps draining output
@@ -180,12 +186,12 @@ prefix() {
 
 source scripts/lib/dev-stop.sh
 
-# Stops the server, the worker, the publisher, the agent host and the SPA. Safe to call twice.
+# Stops the server, the worker, the publisher, the agent host, the Node.js package host and the SPA. Safe to call twice.
 stopped=0
 stop() {
   [ "$stopped" -eq 0 ] || return 0
   stopped=1
-  stop_processes $server $worker $publisher $agent $web
+  stop_processes $server $worker $publisher $agent $package_host $web
 }
 
 cleanup() {
@@ -221,6 +227,10 @@ dotnet build src/Axis.Admin/Axis.Admin.csproj --nologo -v quiet
 # The agent host runs from this build too, for the same reason.
 log "Building the agent host"
 dotnet build src/Axis.Agent/Axis.Agent.csproj --nologo -v quiet
+
+# The Node.js package host runs from this build, whose output holds the Node.js runner.
+log "Building the Node.js package host"
+dotnet build src/Axis.PackageHost/Axis.PackageHost.csproj --nologo -v quiet
 
 # A stop signal only sets a flag. The main loop stops everything, so a signal cannot arrive
 # between starting a process and saving its pid.
@@ -262,7 +272,14 @@ disown "$web" 2>/dev/null || true
 agent=$!
 disown "$agent" 2>/dev/null || true
 
-log "Server on http://localhost:$server_port, preview on http://preview.localhost:$server_port, SPA on http://localhost:$web_port (preview on http://preview.localhost:$web_port), Keycloak on http://localhost:$keycloak_port, purchasing system stub on http://localhost:$purchasing_port, Mailpit on http://localhost:$mailpit_web_port, agent host health on http://127.0.0.1:$agent_health_port. Press Ctrl+C to stop."
+# The Node.js package host listens on loopback only, and it reads the packages that were installed into artifacts/extensions.
+(exec env DOTNET_ENVIRONMENT=Development Extensions__Path="$PWD/artifacts/extensions" PackageHost__Address=127.0.0.1 \
+  PackageHost__Port="$package_host_port" dotnet "$PWD/src/Axis.PackageHost/bin/Debug/net10.0/Axis.PackageHost.dll" host) \
+  </dev/null > >(prefix package-host) 2>&1 &
+package_host=$!
+disown "$package_host" 2>/dev/null || true
+
+log "Server on http://localhost:$server_port, preview on http://preview.localhost:$server_port, SPA on http://localhost:$web_port (preview on http://preview.localhost:$web_port), Keycloak on http://localhost:$keycloak_port, purchasing system stub on http://localhost:$purchasing_port, Mailpit on http://localhost:$mailpit_web_port, agent host health on http://127.0.0.1:$agent_health_port, Node.js package host on 127.0.0.1:$package_host_port. Press Ctrl+C to stop."
 
 code=0
 while :; do
@@ -272,27 +289,32 @@ while :; do
     break
   fi
   if [ -e "$state/server-exited-$generation" ] || ! kill -0 "$server" 2>/dev/null; then
-    log "The server exited. Stopping the worker, the publisher, the agent host and the SPA."
+    log "The server exited. Stopping the worker, the publisher, the agent host, the Node.js package host and the SPA."
     code=1
     break
   fi
   if ! kill -0 "$web" 2>/dev/null; then
-    log "The SPA dev server exited. Stopping the server, the worker, the publisher and the agent host."
+    log "The SPA dev server exited. Stopping the server, the worker, the publisher, the agent host and the Node.js package host."
     code=1
     break
   fi
   if [ -n "$worker" ] && { [ -e "$state/worker-exited" ] || ! kill -0 "$worker" 2>/dev/null; }; then
-    log "The worker exited. Stopping the server, the publisher, the agent host and the SPA."
+    log "The worker exited. Stopping the server, the publisher, the agent host, the Node.js package host and the SPA."
     code=1
     break
   fi
   if [ -n "$publisher" ] && ! kill -0 "$publisher" 2>/dev/null; then
-    log "The publisher exited. Stopping the server, the worker, the agent host and the SPA."
+    log "The publisher exited. Stopping the server, the worker, the agent host, the Node.js package host and the SPA."
     code=1
     break
   fi
   if ! kill -0 "$agent" 2>/dev/null; then
-    log "The agent host exited. Stopping the server, the worker, the publisher and the SPA."
+    log "The agent host exited. Stopping the server, the worker, the publisher, the Node.js package host and the SPA."
+    code=1
+    break
+  fi
+  if ! kill -0 "$package_host" 2>/dev/null; then
+    log "The Node.js package host exited. Stopping the server, the worker, the publisher, the agent host and the SPA."
     code=1
     break
   fi
@@ -319,9 +341,10 @@ while :; do
   if [ -z "$worker" ] && [ -e "$state/server-listening" ]; then
     log "The server has migrated the tenant databases. Starting the worker."
     # The mail settings are for this process only. An exported Email__* setting wins. The worker loads the
-    # sample packages itself, because no package host runs here.
+    # C# sample packages itself, and sends each attempt of a node package to the Node.js package host.
     (cd src/Axis.Worker && DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true \
       exec env ${worker_env[@]+"${worker_env[@]}"} Extensions__Isolation=inProcess \
+      Extensions__Runners__Node="127.0.0.1:$package_host_port" \
       Email__Smtp__Host="${Email__Smtp__Host:-localhost}" Email__Smtp__Port="${Email__Smtp__Port:-$mailpit_smtp_port}" \
       Email__Smtp__UseTls="${Email__Smtp__UseTls:-false}" Email__From="${Email__From:-axis@localhost}" \
       dotnet watch --non-interactive) \
