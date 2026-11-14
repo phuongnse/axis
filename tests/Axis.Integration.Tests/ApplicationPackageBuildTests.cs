@@ -18,8 +18,6 @@ namespace Axis.Integration.Tests;
 [UnsupportedOSPlatform("windows")]
 public sealed class ApplicationPackageBuildTests
 {
-    private const string Wheel = "phonenumbers-9.0.43-";
-
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -84,7 +82,7 @@ public sealed class ApplicationPackageBuildTests
         /// <summary>The manifest and adapter of the sample package, the wheel of <c>phonenumbers</c> and a <c>requirements.txt</c> that locks it by hash.</summary>
         public static Dictionary<string, byte[]> Files()
         {
-            var wheel = WheelPath();
+            var wheel = PhoneNumbersWheel.Path();
             var name = Path.GetFileName(wheel);
             var content = File.ReadAllBytes(wheel);
             var sample = Path.Combine(AppContext.BaseDirectory, "SamplePythonPackage");
@@ -126,14 +124,5 @@ public sealed class ApplicationPackageBuildTests
 
         private static string[] BuildFolders() =>
             [.. Directory.GetDirectories(Path.GetTempPath(), "axis-package-build-*").Order(StringComparer.Ordinal)];
-
-        private static string WheelPath()
-        {
-            var cache = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cache", "axis-tools", "wheels");
-            var wheels = Directory.Exists(cache) ? Directory.GetFiles(cache, $"{Wheel}*.whl") : [];
-            return wheels.Length > 0
-                ? wheels[0]
-                : throw new InvalidOperationException($"The wheel '{Wheel}*.whl' is not in '{cache}'. Run scripts/setup.sh to fill the wheel cache.");
-        }
     }
 }

@@ -5,8 +5,8 @@ namespace Axis.Configuration.Storage;
 /// <summary>
 /// The configuration module's tables in a tenant database. The caller supplies the connection to
 /// the tenant database. Releases are immutable: saving fails when a stored release, resource,
-/// package pin or computed fingerprint is modified or deleted, or when a resource, pin or
-/// fingerprint is added to a release that is not added in the same save.
+/// package pin, built package file or computed fingerprint is modified or deleted, or when a
+/// resource, pin, built file or fingerprint is added to a release that is not added in the same save.
 /// This guard covers change tracking only; bulk operations and raw SQL bypass it.
 /// </summary>
 public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbContext> options) : DbContext(options)
@@ -35,6 +35,8 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
     public DbSet<ReleaseResource> ReleaseResources => Set<ReleaseResource>();
 
     public DbSet<ReleasePackage> ReleasePackages => Set<ReleasePackage>();
+
+    public DbSet<ReleasePackageFile> ReleasePackageFiles => Set<ReleasePackageFile>();
 
     public DbSet<ReleaseComputedFingerprint> ReleaseComputedFingerprints => Set<ReleaseComputedFingerprint>();
 
@@ -92,6 +94,11 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
                 .HasForeignKey(package => package.ReleaseId)
                 .HasConstraintName("fk_release_packages_releases_release_id")
                 .OnDelete(DeleteBehavior.Cascade);
+            release.HasMany(r => r.PackageFiles)
+                .WithOne()
+                .HasForeignKey(file => file.ReleaseId)
+                .HasConstraintName("fk_release_package_files_releases_release_id")
+                .OnDelete(DeleteBehavior.Cascade);
             release.HasMany(r => r.ComputedFingerprints)
                 .WithOne()
                 .HasForeignKey(fingerprint => fingerprint.ReleaseId)
@@ -115,6 +122,15 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             package.Property(p => p.ReleaseId).HasColumnName("release_id");
             package.Property(p => p.PackageId).HasColumnName("package_id").HasMaxLength(100);
             package.Property(p => p.Version).HasColumnName("version").HasMaxLength(50);
+        });
+
+        modelBuilder.Entity<ReleasePackageFile>(file =>
+        {
+            file.ToTable("release_package_files");
+            file.HasKey(f => new { f.ReleaseId, f.Path }).HasName("pk_release_package_files");
+            file.Property(f => f.ReleaseId).HasColumnName("release_id");
+            file.Property(f => f.Path).HasColumnName("path").HasColumnType("text");
+            file.Property(f => f.Content).HasColumnName("content").HasColumnType("bytea");
         });
 
         modelBuilder.Entity<ReleaseComputedFingerprint>(fingerprint =>
@@ -290,7 +306,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
     {
         // Entries() detects changes first, so property changes on tracked entities are seen here.
         var entries = ChangeTracker.Entries()
-            .Where(entry => entry.Entity is Release or ReleaseResource or ReleasePackage or ReleaseComputedFingerprint)
+            .Where(entry => entry.Entity is Release or ReleaseResource or ReleasePackage or ReleasePackageFile or ReleaseComputedFingerprint)
             .ToList();
         var addedReleaseIds = entries
             .Where(entry => entry is { Entity: Release, State: EntityState.Added })
@@ -315,6 +331,12 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             {
                 throw new InvalidOperationException(
                     $"A stored release is immutable; the package '{package.PackageId}' can only be added together with its release.");
+            }
+
+            if (entry is { Entity: ReleasePackageFile packageFile, State: EntityState.Added } && !addedReleaseIds.Contains(packageFile.ReleaseId))
+            {
+                throw new InvalidOperationException(
+                    $"A stored release is immutable; the built file '{packageFile.Path}' can only be added together with its release.");
             }
 
             if (entry is { Entity: ReleaseComputedFingerprint fingerprint, State: EntityState.Added } && !addedReleaseIds.Contains(fingerprint.ReleaseId))

@@ -14,7 +14,9 @@ namespace Axis.Configuration.Releases;
 /// errors produces no release. An unchanged folder returns the release already stored for its
 /// application id and content hash. The release stores the extension package versions it pins, so
 /// installing a newer version never changes it. It also stores the files of the module versions it
-/// pins, under <c>modules/&lt;id&gt;/</c>, so removing a module version never changes it. A stored release can be compiled back into its model.
+/// pins, under <c>modules/&lt;id&gt;/</c>, so removing a module version never changes it. A release that a
+/// publish stores also holds the built files of its own packages, beside its resources and outside its content
+/// hash. A stored release can be compiled back into its model.
 /// </summary>
 public static class ReleaseCompiler
 {
@@ -72,7 +74,7 @@ public static class ReleaseCompiler
 
         var loaded = ApplicationLoader.Load(folderPath);
         var previous = await ActiveModuleCopiesAsync(loaded, context, cancellationToken);
-        return await StoreAsync(ApplicationCompiler.Compile(loaded, installedPackages, installedModules, previous, maxFileSize, applicationPackages), context, cancellationToken);
+        return await StoreAsync(ApplicationCompiler.Compile(loaded, installedPackages, installedModules, previous, maxFileSize, applicationPackages), new Dictionary<string, byte[]>(), context, cancellationToken);
     }
 
     /// <summary>
@@ -92,7 +94,8 @@ public static class ReleaseCompiler
     /// <summary>
     /// Compiles the files as the overload for files does. A <c>file</c> field's <c>maxSize</c> may be at most
     /// <paramref name="maxFileSize"/> bytes. The files' own packages under <c>packages/</c> are compile errors unless
-    /// <paramref name="applicationPackages"/> is true, see <c>Extensions:ApplicationPackages</c>.
+    /// <paramref name="applicationPackages"/> is true, see <c>Extensions:ApplicationPackages</c>. The release holds
+    /// no built package file.
     /// </summary>
     /// <exception cref="ArgumentException">A path appears more than once.</exception>
     public static async Task<ReleaseCompilationResult> CompileAsync(
@@ -102,16 +105,34 @@ public static class ReleaseCompiler
         IReadOnlyCollection<InstalledModule> installedModules,
         long maxFileSize,
         bool applicationPackages = false,
+        CancellationToken cancellationToken = default) =>
+        await CompileAsync(files, context, installedPackages, installedModules, maxFileSize, applicationPackages, new Dictionary<string, byte[]>(), cancellationToken);
+
+    /// <summary>
+    /// Compiles the files as the overload without built files does. When the compile stores a new release,
+    /// <paramref name="builtPackageFiles"/> are stored with it, keyed by path such as <c>packages/&lt;id&gt;/&lt;file&gt;</c>.
+    /// The content hash leaves them out. A release that is already stored keeps the files it has, and gets none.
+    /// </summary>
+    /// <exception cref="ArgumentException">A path appears more than once.</exception>
+    public static async Task<ReleaseCompilationResult> CompileAsync(
+        IReadOnlyList<ResourceContent> files,
+        ConfigurationDbContext context,
+        IReadOnlyCollection<PackageVersion> installedPackages,
+        IReadOnlyCollection<InstalledModule> installedModules,
+        long maxFileSize,
+        bool applicationPackages,
+        IReadOnlyDictionary<string, byte[]> builtPackageFiles,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(files);
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(installedPackages);
         ArgumentNullException.ThrowIfNull(installedModules);
+        ArgumentNullException.ThrowIfNull(builtPackageFiles);
 
         var loaded = ApplicationLoader.Load(files);
         var previous = await ActiveModuleCopiesAsync(loaded, context, cancellationToken);
-        return await StoreAsync(ApplicationCompiler.Compile(loaded, installedPackages, installedModules, previous, maxFileSize, applicationPackages), context, cancellationToken);
+        return await StoreAsync(ApplicationCompiler.Compile(loaded, installedPackages, installedModules, previous, maxFileSize, applicationPackages), builtPackageFiles, context, cancellationToken);
     }
 
     /// <summary>
@@ -145,6 +166,7 @@ public static class ReleaseCompiler
 
     private static async Task<ReleaseCompilationResult> StoreAsync(
         CompilationResult compiled,
+        IReadOnlyDictionary<string, byte[]> builtPackageFiles,
         ConfigurationDbContext context,
         CancellationToken cancellationToken)
     {
@@ -173,6 +195,10 @@ public static class ReleaseCompiler
                 .ToList(),
             Packages = compiled.Model.Packages
                 .Select(package => new ReleasePackage { ReleaseId = releaseId, PackageId = package.Id, Version = package.Version })
+                .ToList(),
+            PackageFiles = builtPackageFiles
+                .OrderBy(file => file.Key, StringComparer.Ordinal)
+                .Select(file => new ReleasePackageFile { ReleaseId = releaseId, Path = file.Key, Content = file.Value })
                 .ToList(),
             ComputedFingerprints = ComputedFingerprints.Compute(compiled.Model)
                 .Select(pair => new ReleaseComputedFingerprint { ReleaseId = releaseId, EntityId = pair.Key, Fingerprint = pair.Value })

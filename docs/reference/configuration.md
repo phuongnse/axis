@@ -633,7 +633,7 @@ The Release step stores the compiled application as a release, which is immutabl
   contributes `path`, a newline, its length in UTF-8 bytes, a newline, its text as written and a
   newline, in the order of its path among the resources. The text is raw, not canonical JSON, so the
   length keeps one file from running into the next. An application without such files has the same
-  hash as before.
+  hash as before. The built files of the packages are left out of the hash.
 - **Modules and scenarios in the hash.** Module files are hashed as ordinary resource paths under
   `modules/<id>/`, see [modules](modules-and-templates.md#modules).
   [Scenario](test-scenarios.md) files under `scenarios/` are left out of the release and its content
@@ -646,6 +646,8 @@ The Release step stores the compiled application as a release, which is immutabl
   under `packages/<id>/` as written, and the exact version of every package it
   pins, so it can be read back without the folder. Reading it back resolves each range against the
   release's own pins only, never against the packages installed at that time.
+  A release that a `publish` stores also holds the built files of its own packages, see
+  [a built package in the release](extension-packages.md#versions-and-pinning).
 - **Errors.** A folder with any error diagnostic produces no release, and compile returns the
   diagnostics only.
 

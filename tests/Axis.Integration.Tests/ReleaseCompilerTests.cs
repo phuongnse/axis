@@ -61,7 +61,8 @@ public sealed class ReleaseCompilerTests(ConfigurationDatabaseFixture database) 
             migration => Assert.EndsWith("_AddPublishRequestAccept", migration, StringComparison.Ordinal),
             migration => Assert.EndsWith("_CreateResourceWrites", migration, StringComparison.Ordinal),
             migration => Assert.EndsWith("_AddAuthoringRequestRefreshToken", migration, StringComparison.Ordinal),
-            migration => Assert.EndsWith("_AddAuthoringRequestStepChecks", migration, StringComparison.Ordinal));
+            migration => Assert.EndsWith("_AddAuthoringRequestStepChecks", migration, StringComparison.Ordinal),
+            migration => Assert.EndsWith("_CreateReleasePackageFiles", migration, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -146,7 +147,7 @@ public sealed class ReleaseCompilerTests(ConfigurationDatabaseFixture database) 
         Assert.Equal(ContentHash.Compute([.. stored.Resources.Select(resource => new ResourceContent(resource.Path, resource.Content))]), stored.ContentHash);
     }
 
-    public static TheoryData<string> UpdateAttempts => ["modify release", "remove release", "modify resource", "add resource"];
+    public static TheoryData<string> UpdateAttempts => ["modify release", "remove release", "modify resource", "add resource", "add package file"];
 
     [Theory]
     [MemberData(nameof(UpdateAttempts))]
@@ -172,6 +173,9 @@ public sealed class ReleaseCompilerTests(ConfigurationDatabaseFixture database) 
                 break;
             case "add resource":
                 release.Resources.Add(new ReleaseResource { ReleaseId = release.Id, Path = "entities/extra.json", Content = "{}" });
+                break;
+            case "add package file":
+                release.PackageFiles.Add(new ReleasePackageFile { ReleaseId = release.Id, Path = "packages/x/a.py", Content = [1] });
                 break;
         }
 

@@ -75,7 +75,7 @@ namespace Axis.Admin;
 /// <c>Cell:HostCheckInterval</c>, see <see cref="TenantHostVerification"/>. In a fifth loop it deletes the stored tenant exports that are older
 /// than 7 days every hour, see <see cref="TenantExportSweep"/>, and only with the export storage settings. With a Studio setting it also holds the Studio folders and their write lock, see <see cref="PublisherStudio"/>. A failed round writes one line, and the next round tries again.
 /// With <c>Extensions:ApplicationPackages</c> on, the <c>compile</c> step of a <c>publish</c> first sends each application package to
-/// <c>application-package-host</c> to build, see <see cref="ApplicationPackageBuilds"/>, and a refused or unanswered build fails it.
+/// <c>application-package-host</c> to build, see <see cref="ApplicationPackageBuilds"/>, and a refused or unanswered build fails it. The built files go into the release it stores.
 /// </summary>
 internal sealed class Publisher(
     ReleaseSettings settings,
@@ -479,16 +479,19 @@ internal sealed class Publisher(
     // docs/reference/extension-packages.md#an-applications-packages. Only a publish builds them.
     private async Task<ReleaseCompilationResult> CompilePublishAsync(IReadOnlyList<ResourceContent> files, ConfigurationDbContext configuration)
     {
+        IReadOnlyDictionary<string, byte[]> builtFiles = new Dictionary<string, byte[]>();
         if (packageBuilds is not null && settings.ApplicationPackages)
         {
-            var refused = await packageBuilds.BuildAsync(files, CancellationToken.None);
-            if (refused.Count > 0)
+            var built = await packageBuilds.BuildAsync(files, CancellationToken.None);
+            if (built.Diagnostics.Count > 0)
             {
-                return new ReleaseCompilationResult(null, null, refused);
+                return new ReleaseCompilationResult(null, null, built.Diagnostics);
             }
+
+            builtFiles = built.Files;
         }
 
-        return await ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, ApplicationCompiler.DefaultMaxFileSize, settings.ApplicationPackages, CancellationToken.None);
+        return await ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, ApplicationCompiler.DefaultMaxFileSize, settings.ApplicationPackages, builtFiles, CancellationToken.None);
     }
 
     private async Task RunRequestCoreAsync(
