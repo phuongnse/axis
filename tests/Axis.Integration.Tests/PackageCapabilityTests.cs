@@ -226,6 +226,14 @@ public sealed class PackageCapabilityTests(PackageCapabilityFixture fixture) : I
     }
 
     [Fact]
+    public async Task Activating_a_release_with_a_customer_hosted_package_for_a_tenant_without_its_bindings_reports_no_binding_diagnostic()
+    {
+        var result = await fixture.TryActivateCustomerHostedAsync("c", ProcessStepFixture.StepAppBindings("c"));
+
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
     public async Task Activating_a_release_with_an_http_url_binding_outside_development_is_refused()
     {
         var result = await fixture.TryActivateAsync(

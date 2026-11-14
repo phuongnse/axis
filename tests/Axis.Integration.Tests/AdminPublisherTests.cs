@@ -53,6 +53,35 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     [Fact]
+    public async Task With_application_packages_off_a_publish_of_a_manifest_only_customer_hosted_package_runs_only_the_usual_steps()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var ids = await CreateTenantsAsync(scenario);
+        var request = await QueueAsync(
+            scenario,
+            ids[0],
+            await SnapshotAsync(
+                null,
+                ("packages/tools/axis-package.json", """
+                { "id": "tools", "version": "1.0.0", "label": "Tools", "language": "python", "runner": "customer",
+                  "adapter": "adapter.py", "lock": "requirements.txt",
+                  "operations": [ { "name": "sum", "type": "adapter.sum", "idempotent": true } ] }
+                """)));
+
+        var result = await RunPublisherAsync(scenario, ids[0], request);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Empty(result.Error);
+        Assert.Equal($"{ids[0]} claim ok", result.Output[0]);
+        Assert.Equal(_steps.Select(step => $"{ids[0]} {step} ok"), WithoutScenarioLines(result.Output, ids[0]).Skip(1));
+        Assert.Equal("succeeded", await ScalarAsync(scenario, ids[0], $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        var release = await ScalarAsync(scenario, ids[0], "SELECT release_id FROM axis.active_releases");
+        Assert.Equal(
+            "packages/tools/axis-package.json",
+            await ScalarAsync(scenario, ids[0], $"SELECT string_agg(path, ',' ORDER BY path) FROM axis.release_resources WHERE release_id = '{release}' AND path LIKE 'packages/%'"));
+    }
+
+    [Fact]
     public async Task A_publish_sends_the_wake_signal_only_when_a_schedule_trigger_is_already_past_due()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);

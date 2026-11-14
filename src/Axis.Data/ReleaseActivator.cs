@@ -365,7 +365,7 @@ public static class ReleaseActivator
     /// <summary>
     /// Reports every binding the tenant lacks or holds with another kind: the file storage binding of the
     /// application, those of the connectors (an <c>oauth2</c> auth adds its <c>tokenUrl</c> as <c>url</c> and its client id as <c>secret</c>), the <c>url</c> and <c>secret</c> bindings of the webhooks, those of the <c>oidc</c> identity providers (<c>issuer</c> as <c>url</c>, the
-    /// client bindings as <c>secret</c>), the <c>metadata</c> binding of the <c>saml</c> identity providers (as <c>url</c>), and the <c>url</c> and <c>secret</c> bindings that a package operation step uses declares. Also
+    /// client bindings as <c>secret</c>), the <c>metadata</c> binding of the <c>saml</c> identity providers (as <c>url</c>), and the <c>url</c> and <c>secret</c> bindings that a package operation step uses declares, unless the package is customer-hosted. Also
     /// reports every base URL, token URL and webhook URL that is not <c>https</c> when <c>http</c> is not allowed. A missing binding is a warning
     /// on a preview tenant. A message names the tenant and the binding, never its value.
     /// </summary>
@@ -453,7 +453,8 @@ public static class ReleaseActivator
         {
             for (var index = 0; index < process.Steps.Count; index++)
             {
-                if (process.Steps[index] is not PackageOperationStepModel step)
+                // A customer-hosted package's bindings stay with the customer, see docs/reference/extension-packages.md#capabilities.
+                if (process.Steps[index] is not PackageOperationStepModel { CustomerHosted: false } step)
                 {
                     continue;
                 }

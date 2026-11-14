@@ -228,7 +228,8 @@ public sealed record RetryPolicyModel(int Attempts, TimeSpan Backoff);
 /// declared name. <see cref="Retry"/> says how often and how soon a failed attempt is tried again.
 /// <see cref="Idempotent"/>, <see cref="Timeout"/> and <see cref="Capabilities"/> come from the
 /// manifest of that version. <see cref="Capabilities"/> names the <c>url</c> and <c>secret</c>
-/// deployment bindings the operation declares.
+/// deployment bindings the operation declares. <see cref="CustomerHosted"/> is true when the package runs in a
+/// customer-hosted runner, see <c>docs/reference/extension-packages.md#customer-hosted-runners</c>.
 /// </summary>
 public sealed record PackageOperationStepModel(
     string Name,
@@ -241,7 +242,8 @@ public sealed record PackageOperationStepModel(
     bool Idempotent,
     TimeSpan Timeout,
     string Next,
-    PackageCapabilities Capabilities) : ProcessStepModel(Name);
+    PackageCapabilities Capabilities,
+    bool CustomerHosted = false) : ProcessStepModel(Name);
 
 /// <summary>
 /// A <c>raiseEvent</c> operation step: it raises <see cref="Event"/>, by its declared name, about

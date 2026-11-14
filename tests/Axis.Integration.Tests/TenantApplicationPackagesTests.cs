@@ -112,6 +112,18 @@ public sealed class TenantApplicationPackagesTests(PostgreSqlFixture database, K
         Assert.False((await DirectoryTenantCatalog.LoadAsync(_platform, cipher, CancellationToken)).Find("a")!.ApplicationPackages);
     }
 
+    [Fact]
+    public async Task With_the_setting_off_turning_packages_on_is_accepted_and_read_back()
+    {
+        await using var factory = await StartAsync(packageCpu: 3600, applicationPackages: "false");
+        using var client = factory.CreateClient().SignedInAs("admin");
+
+        using var on = await SendAsync(client, HttpMethod.Put, """{"on":true}""");
+
+        Assert.Equal(HttpStatusCode.NoContent, on.StatusCode);
+        Assert.True((await ReadAsync(client)).GetProperty("on").GetBoolean());
+    }
+
     private static async Task<JsonElement> ReadAsync(HttpClient client)
     {
         using var response = await SendAsync(client, HttpMethod.Get);
@@ -168,8 +180,8 @@ public sealed class TenantApplicationPackagesTests(PostgreSqlFixture database, K
         return (long)(await command.ExecuteScalarAsync(CancellationToken))!;
     }
 
-    // The built-in default of packageCpuSecondsPerDay is 0.
-    private async Task<WebApplicationFactory<Program>> StartAsync(long? packageCpu)
+    // The built-in default of packageCpuSecondsPerDay is 0. The setting Extensions:ApplicationPackages is unset unless given.
+    private async Task<WebApplicationFactory<Program>> StartAsync(long? packageCpu, string? applicationPackages = null)
     {
         var authority = await keycloak.StartAsync();
         _platform = await CellTestPlatform.CreateAsync(database, authority, CancellationToken);
@@ -201,6 +213,11 @@ public sealed class TenantApplicationPackagesTests(PostgreSqlFixture database, K
             if (packageCpu is { } seconds)
             {
                 builder.UseSetting("Quotas:Defaults:packageCpuSecondsPerDay", seconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+
+            if (applicationPackages is not null)
+            {
+                builder.UseSetting("Extensions:ApplicationPackages", applicationPackages);
             }
 
             builder.UseTestAuthentication(new TestIdentity("admin", "Admin", AdministratorRole), new TestIdentity("member", "Member"));

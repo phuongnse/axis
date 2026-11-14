@@ -192,6 +192,69 @@ public sealed class ApplicationPackageCompilerTests
     }
 
     [Fact]
+    public void A_manifest_only_customer_hosted_package_compiles_while_the_setting_is_off_and_marks_its_steps()
+    {
+        using var folder = CustomerHostedFolder();
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var step = Assert.IsType<PackageOperationStepModel>(Assert.Single(result.Model!.Processes).Steps[0]);
+        Assert.Equal(("tools", "2.3.4", true), (step.Package, step.Version, step.CustomerHosted));
+        Assert.Equal([ManifestPath], result.Resources.Where(resource => resource.Path.StartsWith("packages/", StringComparison.Ordinal)).Select(resource => resource.Path));
+    }
+
+    [Fact]
+    public void A_file_next_to_the_manifest_of_a_customer_hosted_package_is_reported_at_that_file()
+    {
+        using var folder = CustomerHostedFolder().With("packages/tools/adapter.py", Adapter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.PackageManifestInvalid, "packages/tools/adapter.py", ""), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal("Package 'tools': A customer-hosted package holds only its manifest. Remove 'adapter.py'.", diagnostic.Message);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_package_that_axis_runs_is_still_refused_while_the_setting_is_off_beside_a_customer_hosted_one()
+    {
+        using var folder = CustomerHostedFolder()
+            .With("packages/other/axis-package.json", ToolsManifest.Replace("\"tools\"", "\"other\"", StringComparison.Ordinal))
+            .With("packages/other/adapter.py", Adapter)
+            .With("packages/other/requirements.txt", Lock);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.ApplicationPackagesOff, "packages/other/axis-package.json"), (diagnostic.Code, diagnostic.File));
+    }
+
+    [Fact]
+    public void A_release_that_holds_a_customer_hosted_package_rebuilds_with_the_flag()
+    {
+        using var folder = CustomerHostedFolder();
+        var compiled = ApplicationCompiler.Compile(folder.Path);
+        Assert.Empty(compiled.Diagnostics);
+        var id = Guid.NewGuid();
+        var release = new Release
+        {
+            Id = id,
+            ApplicationId = Guid.Parse(ApplicationId),
+            ContentHash = compiled.ContentHash!,
+            CreatedAt = DateTimeOffset.UtcNow,
+            Resources = [.. compiled.Resources.Select(resource => new ReleaseResource { ReleaseId = id, Path = resource.Path, Content = resource.Content })],
+        };
+
+        var model = ReleaseCompiler.BuildModel(release);
+
+        ModelAssert.Equal(compiled.Model!, model);
+        var step = Assert.IsType<PackageOperationStepModel>(Assert.Single(model.Processes).Steps[0]);
+        Assert.True(step.CustomerHosted);
+    }
+
+    [Fact]
     public void A_file_of_a_package_is_no_resource_and_the_release_holds_every_package_file_as_written()
     {
         const string Fixture = """
@@ -291,6 +354,13 @@ public sealed class ApplicationPackageCompilerTests
 
         Assert.Empty(application.Sites);
     }
+
+    /// <summary>The application of <see cref="Folder"/> whose package <c>tools</c> is customer-hosted, so it holds only its manifest.</summary>
+    private static TemporaryFolder CustomerHostedFolder() =>
+        Folder(SumStep)
+            .With(ManifestPath, ToolsManifest.Replace("\"label\": \"Tools\",", "\"label\": \"Tools\", \"runner\": \"customer\",", StringComparison.Ordinal))
+            .Without("packages/tools/adapter.py")
+            .Without("packages/tools/requirements.txt");
 
     /// <summary>An application with an <c>Order</c> entity, the package <c>tools</c> and, when given, a process whose first step is <paramref name="step"/>.</summary>
     private static TemporaryFolder Folder(string? step)
