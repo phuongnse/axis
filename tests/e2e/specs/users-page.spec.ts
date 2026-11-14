@@ -150,6 +150,8 @@ test.describe("roles of a user", () => {
       .getByRole("searchbox", { name: "Search by name or email", exact: true })
       .fill("auditor@axis.local");
     await page.keyboard.press("Enter");
+    // The list is replaced by the search result, so wait for the header and the one row.
+    await expect(main.getByRole("row")).toHaveCount(2);
     await main.getByRole("link", { name: "Auditor User", exact: true }).click();
     await expect(page).toHaveURL(/\/users\/auditor$/);
 
