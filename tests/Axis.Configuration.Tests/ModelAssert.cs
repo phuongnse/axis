@@ -139,8 +139,8 @@ internal static class ModelAssert
     /// </summary>
     private static string DescribeInput(ConnectorInputModel input) =>
         input.Value is { } value
-            ? $"{input.Input} = {value.Expression}"
-            : $"{input.Input} {(input.From is null ? "" : $"from {input.From} ")}{{ {string.Join(", ", input.Fields.Select(DescribeInput))} }}";
+            ? $"{input.Input}{(input.Required ? "*" : "")} = {value.Expression}"
+            : $"{input.Input}{(input.Required ? "*" : "")} {(input.From is null ? "" : $"from {input.From} ")}{{ {string.Join(", ", input.Fields.Select(DescribeInput))} }}";
 
     private static string Describe(ProcessStepModel step) =>
         step switch

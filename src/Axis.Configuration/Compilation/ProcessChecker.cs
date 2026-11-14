@@ -842,7 +842,7 @@ internal static class ProcessChecker
                 var mapping = given[input.Name];
                 if (mapping.Expression is { } expression)
                 {
-                    models.Add(new ConnectorInputModel(input.Name, ExpressionModel.Compile(expression, inputScope, ExpressionScopes.TypeOf(input.Type))));
+                    models.Add(new ConnectorInputModel(input.Name, ExpressionModel.Compile(expression, inputScope, ExpressionScopes.TypeOf(input.Type))) { Required = input.Required });
                 }
                 else if (mapping.From is { } from)
                 {
@@ -852,11 +852,16 @@ internal static class ProcessChecker
                     {
                         From = collection.Name,
                         Fields = BuildInputs(input.Fields, mapping.Fields!, child, ExpressionScopes.ForProcess(child.Name, child.Fields, rules, findEntity, modules)),
+                        Required = input.Required,
                     });
                 }
                 else
                 {
-                    models.Add(new ConnectorInputModel(input.Name, null) { Fields = BuildInputs(input.Fields, mapping.Fields!, subject, inputScope) });
+                    models.Add(new ConnectorInputModel(input.Name, null)
+                    {
+                        Fields = BuildInputs(input.Fields, mapping.Fields!, subject, inputScope),
+                        Required = input.Required,
+                    });
                 }
             }
 

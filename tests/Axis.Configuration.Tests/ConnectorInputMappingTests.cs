@@ -37,6 +37,8 @@ public sealed class ConnectorInputMappingTests
         Assert.Null(lines.Value);
         Assert.Equal("lines", lines.From);
         Assert.Equal([("sku", "code"), ("quantity", "count")], lines.Fields.Select(field => (field.Input, field.Value!.Expression)));
+        Assert.Equal([("city", true), ("zip", false)], address.Fields.Select(field => (field.Input, field.Required)));
+        Assert.Equal([("sku", true), ("quantity", false)], lines.Fields.Select(field => (field.Input, field.Required)));
     }
 
     [Fact]

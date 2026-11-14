@@ -41,7 +41,10 @@ declares the real sample package the same way, with
   operations, see [capabilities](extension-packages.md#capabilities). A module's entry has no `runner`, and the
   application's entry decides for every process of the release, because the release holds one pin per
   package id. A wrong value is `AXC0004`. An application's own package says it in its manifest instead.
-- **A customer-hosted package's calls** _(planned for M37)_. They start no Axis runner and go to a
+- **A customer-hosted package's calls.** Staging queues no work item for them, so the worker runs no
+  attempt, resolves no binding and starts no Axis runner, see
+  [staging a package call](process-execution.md#staging-a-package-call).
+- **Where a customer-hosted package's calls run** _(planned for M37)_. They go to a
   [customer-hosted runner](extension-packages.md#customer-hosted-runners).
 - **Pinning.** Compilation picks the highest installed version in each range and pins it in the
   release, in the Release step of the [pipeline](configuration.md#configuration-pipeline), as
