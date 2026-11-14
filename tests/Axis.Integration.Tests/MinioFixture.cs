@@ -104,30 +104,26 @@ public sealed class MinioFixture : IAsyncLifetime
             wait,
             cancellationToken);
 
-    /// <summary>Creates the bucket, with object lock when asked. When MinIO drops a connection or answers that the client disconnected, the create starts again, up to five tries; a retry that finds the bucket already owned counts as created.</summary>
+    /// <summary>Creates the bucket, with object lock when asked. When MinIO drops a connection or answers that the client disconnected, the create starts again, up to five tries; a create that finds the bucket already owned counts as created, because the SDK may already have sent it once.</summary>
     public static Task CreateBucketAsync(IAmazonS3 s3, string bucket, CancellationToken cancellationToken, bool objectLock = false) =>
         CreateBucketAsync((request, token) => s3.PutBucketAsync(request, token), bucket, cancellationToken, objectLock);
 
-    internal static Task CreateBucketAsync(Func<PutBucketRequest, CancellationToken, Task> put, string bucket, CancellationToken cancellationToken, bool objectLock = false, Func<TimeSpan, CancellationToken, Task>? wait = null)
-    {
-        var tried = false;
-        return RetryDroppedAsync(
+    internal static Task CreateBucketAsync(Func<PutBucketRequest, CancellationToken, Task> put, string bucket, CancellationToken cancellationToken, bool objectLock = false, Func<TimeSpan, CancellationToken, Task>? wait = null) =>
+        RetryDroppedAsync(
             async token =>
             {
-                var retry = tried;
-                tried = true;
                 try
                 {
                     await put(new PutBucketRequest { BucketName = bucket, ObjectLockEnabledForBucket = objectLock }, token);
                 }
-                catch (AmazonS3Exception exception) when (retry && exception.ErrorCode == "BucketAlreadyOwnedByYou")
+                catch (AmazonS3Exception exception) when (exception.ErrorCode == "BucketAlreadyOwnedByYou")
                 {
-                    // An earlier try created the bucket, and only the answer to it was lost.
+                    // The SDK or an earlier try may already have created the bucket, and only the answer was lost.
+                    // Every caller uses a fresh random name, so a bucket owned by this key is the one the test asked for.
                 }
             },
             wait,
             cancellationToken);
-    }
 
     private static async Task RetryDroppedAsync(Func<CancellationToken, Task> attempt, Func<TimeSpan, CancellationToken, Task>? wait, CancellationToken cancellationToken)
     {
