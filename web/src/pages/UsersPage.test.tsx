@@ -62,7 +62,7 @@ const roles: UserRoles = {
     { applicationId, role: 'dropped', declared: false },
   ],
   applications: [{ id: applicationId, name: 'Purchasing', roles: ['approver', 'buyer'] }],
-  platformRoles: ['author', 'publisher', 'operator', 'administrator'],
+  platformRoles: ['author', 'publisher', 'developer', 'operator', 'administrator'],
 }
 
 function json(body: unknown, status = 200) {

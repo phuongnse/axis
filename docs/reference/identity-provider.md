@@ -246,7 +246,7 @@ providers they accept.
 - **A new tenant.** `tenant create` and `tenant restore` set accounts on, so a new tenant can sign in
   its first administrator before any application is published, see
   [the first administrator](user-administration.md#the-first-administrator).
-- **Platform roles.** The author, publisher, operator and administrator roles are roles claim values of
+- **Platform roles.** The author, publisher, developer, operator and administrator roles are roles claim values of
   the platform sign-in, mapped as `roles` maps them, or roles that the users page gives.
 - **The callback's check.** The sign-in callback of a platform page reads the stored platform sign-in.
   It refuses a provider that the platform sign-in does not accept, and an account sign-in when accounts
@@ -265,9 +265,9 @@ providers they accept.
   provider the person used.
 - **Mapped roles.** For an accepted provider, the callback reads the values of the ID token claim
   `axis_roles_<roles claim>`, the user attribute that the realm sync writes for each roles claim. It
-  maps each value to author, publisher, operator or administrator, and gives the role names that
-  `Studio:AuthorRole`, `Studio:PublisherRole`, `Console:OperatorRole` and `Users:AdministratorRole`
-  set. The session keeps the roles that the tenant's roles claim gives, which include the roles of the
+  maps each value to author, publisher, developer, operator or administrator, and gives the role names that
+  `Studio:AuthorRole`, `Studio:PublisherRole`, `Studio:DeveloperRole`, `Console:OperatorRole` and
+  `Users:AdministratorRole` set. The session keeps the roles that the tenant's roles claim gives, which include the roles of the
   users page, and the mapped roles are added. The claims come from the `axis` client's token, which the
   realm sync sets up.
 - **No platform sign-in.** A tenant with accounts off and no provider stored has no platform sign-in.

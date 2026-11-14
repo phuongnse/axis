@@ -90,9 +90,9 @@ Four routes read users, their roles and the tenant's usage. When the identity pr
   - `given` holds the person's given roles, each as `{ applicationId, role, declared }`, with a `null` `applicationId`
     for a platform role. `declared` is `false` for an application role that the application's active release does not
     declare, and for a role of an application that has no active release. A platform role is declared when it is one
-    of the four kinds.
+    of the five kinds.
   - `applications` holds every active application as `{ id, name, roles }`, with the role names its active release
-    declares. `platformRoles` holds the four kinds, even when a host setting has no value.
+    declares. `platformRoles` holds the five kinds, even when a host setting has no value.
   - The route checks in the order of the list route (`401`, `403`, `404` for a preview tenant or a tenant without a
     users client), then answers `404` for a user that the realm does not have and for a service account. It only
     reads, so it accepts any signed-in caller who holds `Users:AdministratorRole`, not only a browser session.
@@ -126,7 +126,7 @@ token gets `401`.
 | `POST /api/users/{id}/give-role`           | `{ "applicationId": "<uuid>", "role": "<name>" }`, or `{ "role": "<kind>" }` for a platform role       | `204`                                    |
 | `POST /api/users/{id}/remove-role`         | As for give-role                                                                                       | `204`                                    |
 
-A platform role's kind is `author`, `publisher`, `operator` or `administrator`.
+A platform role's kind is `author`, `publisher`, `developer`, `operator` or `administrator`.
 
 - **The order of the checks.** A request is checked in this order: a signed-in user (`401`),
   `Users:AdministratorRole` (`403`), a tenant with a users client (`404`, as for the list), for disable a login at the
@@ -135,7 +135,7 @@ A platform role's kind is `author`, `publisher`, `operator` or `administrator`.
   caller learns nothing about which ids exist.
 - **Give and remove a role.** These check in that order up to the realm user (`401`, `403`, `404`), and only then read
   the body, so a refused caller learns nothing about the body. They answer `400` with a fixed title for a body that is
-  missing or malformed, a blank role, a body without `applicationId` whose role is not one of the four kinds, an
+  missing or malformed, a blank role, a body without `applicationId` whose role is not one of the five kinds, an
   application with no active release, and, for give, a role that the active release does not declare. Remove needs no
   declaration, so an administrator can clear a row for a role that a later release dropped. For a platform role, the
   checks after the body are a login at the identity provider in the last 5 minutes (`403`) and, for removing the
@@ -372,14 +372,13 @@ stores both and applies them at the person's next request.
 
 - **Application roles.** An administrator gives a person a role that an application's active release declares. Given
   roles add to the roles that the provider's `roles` mapping gives, see [users](identity-provider.md#users).
-- **Platform roles.** An administrator gives the author, publisher, operator and administrator roles. A row holds the
-  kind, such as `operator`. Each request maps the kind to the value of `Studio:AuthorRole`, `Studio:PublisherRole`,
-  `Console:OperatorRole` or `Users:AdministratorRole`, and the name joins the roles from sign-in. A kind whose setting
+- **Platform roles.** An administrator gives the author, publisher, developer, operator and administrator roles. A row
+  holds the kind, such as `operator`. Each request maps the kind to the value of `Studio:AuthorRole`,
+  `Studio:PublisherRole`, `Studio:DeveloperRole`, `Console:OperatorRole` or `Users:AdministratorRole`, and the name joins the roles from sign-in. A kind whose setting
   has no value gives nothing.
-- **The developer role** _(planned for M37)_. A fifth platform role kind, `developer`, named by
-  `Studio:DeveloperRole`, given and removed as the others are and mapped by the platform sign-in. With the
-  author role it allows writing an application's packages in a tenant that turned them on, see
-  [application packages](#application-packages). A publisher needs no developer role.
+- **Developers write packages** _(planned for M37)_. With the author role, the developer role allows writing an
+  application's packages in a tenant that turned them on, see [application packages](#application-packages). A
+  publisher needs no developer role.
 - **Stored by Axis.** Given roles are rows of the tenant database, each with the user, the application or the platform,
   and the role, so the realm holds no Axis role. A row for a role that the active release does not declare stays and
   gives nothing, and the page marks it.

@@ -558,7 +558,7 @@ internal static partial class UserCommandEndpoints
 
         return PlatformRoles.IsKind(role)
             ? null
-            : Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A platform role is author, publisher, operator or administrator.");
+            : Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A platform role is author, publisher, developer, operator or administrator.");
     }
 
     private sealed record Opening(ClaimsPrincipal Principal, CurrentUserResponse Caller, TenantContext Tenant, TenantRealmUsers Access);

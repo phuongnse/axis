@@ -12,7 +12,7 @@ namespace Axis.Server.Tests;
 /// </summary>
 public sealed class PlatformRolesTests
 {
-    private static readonly StudioOptions _studio = new([], "studio-author", "studio-publisher");
+    private static readonly StudioOptions _studio = new([], "studio-author", "studio-publisher", DeveloperRole: "studio-developer");
     private static readonly ConsoleSettings _console = new("console-operator");
     private static readonly UsersSettings _users = new("users-administrator");
 
@@ -24,6 +24,7 @@ public sealed class PlatformRolesTests
         {
             ["axis-authors"] = "author",
             ["axis-publishers"] = "publisher",
+            ["axis-developers"] = "developer",
             ["axis-operators"] = "operator",
             ["axis-admins"] = "administrator",
             ["axis-unknown"] = "owner",
@@ -84,18 +85,19 @@ public sealed class PlatformRolesTests
     }
 
     [Fact]
-    public void Each_of_the_four_platform_roles_becomes_the_role_name_of_its_host_setting()
+    public void Each_of_the_five_platform_roles_becomes_the_role_name_of_its_host_setting()
     {
         var roles = Resolve(
             new PlatformSignIn(false, [_company]),
             "oidc-companyissuer",
             "axis-admins",
             "axis-operators",
+            "axis-developers",
             "axis-publishers",
             "axis-authors",
             "axis-authors");
 
-        Assert.Equal(["users-administrator", "console-operator", "studio-publisher", "studio-author"], roles);
+        Assert.Equal(["users-administrator", "console-operator", "studio-developer", "studio-publisher", "studio-author"], roles);
     }
 
     [Fact]
@@ -115,6 +117,7 @@ public sealed class PlatformRolesTests
     [Theory]
     [InlineData("author", "studio-author")]
     [InlineData("publisher", "studio-publisher")]
+    [InlineData("developer", "studio-developer")]
     [InlineData("operator", "console-operator")]
     [InlineData("administrator", "users-administrator")]
     public void Each_kind_of_platform_role_maps_to_its_host_setting(string kind, string expected)
@@ -136,6 +139,7 @@ public sealed class PlatformRolesTests
     [Theory]
     [InlineData("author")]
     [InlineData("publisher")]
+    [InlineData("developer")]
     [InlineData("operator")]
     [InlineData("administrator")]
     public void A_kind_whose_setting_has_no_value_maps_to_nothing(string kind)

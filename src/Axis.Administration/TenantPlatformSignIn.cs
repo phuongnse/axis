@@ -42,7 +42,7 @@ public static class TenantPlatformSignIn
 
     private static readonly string[] _claimNames = ["displayName", "email", "locale"];
 
-    private static readonly string[] _roles = ["author", "publisher", "operator", "administrator"];
+    private static readonly string[] _roles = ["author", "publisher", "developer", "operator", "administrator"];
 
     /// <summary>Returns why the change is refused without reading the directory, or <see langword="null"/> when it is well formed.</summary>
     public static string? Problem(TenantPlatformSignInChange change)
@@ -302,7 +302,7 @@ public static class TenantPlatformSignIn
 
             if (!_roles.Contains(role, StringComparer.Ordinal))
             {
-                return "--role must map to author, publisher, operator or administrator.";
+                return "--role must map to author, publisher, developer, operator or administrator.";
             }
         }
 
