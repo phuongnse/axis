@@ -47,7 +47,7 @@ internal sealed class ScenarioWork : IDisposable
         var settings = new ConnectorCallSettings(false);
         _client = new ConnectorClient(stubs.HttpHandler);
         _transport = new PackageHttpTransport();
-        var handler = new ProcessStepHandler(models, packages, null, sensitive, loggerFactory.CreateLogger<ProcessStepHandler>());
+        var handler = new ProcessStepHandler(models, null, sensitive, loggerFactory.CreateLogger<ProcessStepHandler>());
         var timerHandler = new ProcessTimerHandler(models, loggerFactory.CreateLogger<ProcessTimerHandler>());
         IExternalWorkItemHandler[] externalHandlers =
         [

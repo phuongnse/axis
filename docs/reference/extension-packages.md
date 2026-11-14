@@ -453,8 +453,10 @@ see [Contracts](#contracts).
   [Deployment bindings](integration-resources.md#deployment-bindings).
 - **A customer-hosted package and the activation check.** The check skips the bindings that a customer-hosted
   package's operations declare, so a tenant without them activates the release.
-- **A customer-hosted package and the binding resolution** _(planned for M37)_. The worker resolves no binding
-  for its calls, because the [runner](#customer-hosted-runners) keeps its own bindings.
+- **A customer-hosted package and the binding resolution.** The worker resolves no binding for its calls,
+  because it runs no attempt of them, see
+  [staging a package call](process-execution.md#staging-a-package-call). The [runner](#customer-hosted-runners)
+  keeps its own bindings.
 - **Secret values stay hidden.** A secret value never appears in history,
   audit records or logs. History and audit records hold only the type of an
   exception, never its message, because a message can hold input values or

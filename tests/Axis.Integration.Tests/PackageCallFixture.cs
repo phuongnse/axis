@@ -24,7 +24,7 @@ namespace Axis.Integration.Tests;
 /// One tenant database with a copy of the StepApp fixture that pins <c>test-package</c> 1.0.0. The
 /// copy adds a <c>total</c> field to <c>Request</c> and these processes: <c>PackageSum</c>, which runs
 /// <c>test-package/sum</c> on the divisor and the divisor plus one and writes the result to
-/// <c>total</c>, <c>PackageFail</c>, which runs <c>test-package/fail</c>, <c>PackageFlaky</c> and
+/// <c>total</c>, <c>PackageSumUnset</c>, which runs it with <c>total</c>, which a new request leaves null, as <c>a</c>, <c>PackageFail</c>, which runs <c>test-package/fail</c>, <c>PackageFlaky</c> and
 /// <c>PackageFlakyShort</c>, which run <c>test-package/flaky</c> with the divisor as the number of
 /// failures and 3 or 2 attempts, <c>PackageSlow</c>, which runs <c>test-package/slow</c>,
 /// <c>PackageSlowIdempotent</c>, <c>PackageExit</c> and <c>PackageExitIdempotent</c>, which run the
@@ -67,6 +67,28 @@ public sealed class PackageCallFixture : IAsyncLifetime
               "type": "operation",
               "operation": "test-package/sum",
               "input": { "a": "divisor", "b": "divisor + 1" },
+              "output": { "total": "total" },
+              "next": "done"
+            },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
+
+    private const string SumUnsetProcess = """
+        {
+          "id": "6e2a8d63-9b4f-4c7e-8a31-2d5f9b8c4e72",
+          "kind": "process",
+          "name": "PackageSumUnset",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "sum",
+          "steps": [
+            {
+              "name": "sum",
+              "type": "operation",
+              "operation": "test-package/sum",
+              "input": { "a": "total", "b": "divisor" },
               "output": { "total": "total" },
               "next": "done"
             },
@@ -372,6 +394,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         });
         _application
             .With("processes/package-sum.json", SumProcess)
+            .With("processes/package-sum-unset.json", SumUnsetProcess)
             .With("processes/package-fail.json", FailProcess)
             .With("processes/package-flaky.json", Flaky("PackageFlaky", "b3f8a2c1-7d46-4e09-8a15-6c0d9e2f4b78", 3))
             .With("processes/package-flaky-short.json", Flaky("PackageFlakyShort", "a91c4e7d-2b58-4f36-9d80-5e3a7b1c6f24", 2))
@@ -492,13 +515,18 @@ public sealed class PackageCallFixture : IAsyncLifetime
     /// <summary>
     /// Starts <paramref name="process"/> for a new request with the divisor <paramref name="divisor"/> and runs its step,
     /// which stages the package call. Work items that earlier tests left queued are deleted first,
-    /// so the test runs only its own. The tests of a class run one after the other.
+    /// so the test runs only its own. The tests of a class run one after the other. The instance starts on
+    /// <paramref name="release"/> when it is given, and on <see cref="ReleaseId"/> otherwise.
     /// </summary>
-    public async Task<(Guid SubjectId, Guid InstanceId)> StageAsync(string process, CancellationToken cancellationToken, int divisor = 2)
+    public async Task<(Guid SubjectId, Guid InstanceId)> StageAsync(
+        string process,
+        CancellationToken cancellationToken,
+        int divisor = 2,
+        (Guid ReleaseId, ApplicationModel Model)? release = null)
     {
         await _tenant.ScalarAsync("DELETE FROM axis.process_work_items");
         var subjectId = await _tenant.InsertRequestAsync(500m, divisor);
-        var instanceId = await _tenant.StartAsync(process, subjectId, ReleaseId, _model);
+        var instanceId = await _tenant.StartAsync(process, subjectId, release?.ReleaseId ?? ReleaseId, release?.Model ?? _model);
         Assert.Equal(WorkItemOutcome.Completed, await RunStepAsync(cancellationToken));
         Assert.Equal(ProcessStarts.Waiting, (await _tenant.InstanceAsync(instanceId)).State);
         return (subjectId, instanceId);
@@ -525,11 +553,12 @@ public sealed class PackageCallFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// Compiles and activates a copy of the StepApp copy that pins <c>test-package</c> exactly at
-    /// <paramref name="version"/>, against the installed packages. The new release becomes the active one.
-    /// Returns its id and model.
+    /// Compiles and activates a copy of the StepApp copy, against the installed packages, after
+    /// <paramref name="editApplication"/> edits its <c>application.json</c> and with the extra
+    /// <paramref name="files"/>, each a relative path and its content. The new release becomes the
+    /// active one. Returns its id and model.
     /// </summary>
-    public async Task<(Guid ReleaseId, ApplicationModel Model)> ActivatePinnedAsync(string version)
+    internal async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateCopyAsync(Action<JsonObject> editApplication, params (string Path, string Content)[] files)
     {
         var catalog = _catalog ?? throw new InvalidOperationException("The fixture is not initialized.");
         using var folder = new TemporaryFolder();
@@ -540,13 +569,25 @@ public sealed class PackageCallFixture : IAsyncLifetime
 
         var path = Path.Combine(folder.Path, "application.json");
         var application = JsonNode.Parse(await File.ReadAllTextAsync(path))!.AsObject();
-        application["packages"]!.AsArray()[0]!["version"] = version;
+        editApplication(application);
         await File.WriteAllTextAsync(path, application.ToJsonString());
+        foreach (var (relativePath, content) in files)
+        {
+            folder.With(relativePath, content);
+        }
 
         var activated = await _tenant.ActivateAsync(folder.Path, catalog.Versions, _bindings);
         Assert.NotEqual(ReleaseId, activated.ReleaseId);
         return activated;
     }
+
+    /// <summary>
+    /// Compiles and activates a copy of the StepApp copy that pins <c>test-package</c> exactly at
+    /// <paramref name="version"/>, against the installed packages. The new release becomes the active one.
+    /// Returns its id and model.
+    /// </summary>
+    public Task<(Guid ReleaseId, ApplicationModel Model)> ActivatePinnedAsync(string version) =>
+        ActivateCopyAsync(application => application["packages"]!.AsArray()[0]!["version"] = version);
 
     /// <summary>
     /// Retries the failed instance <paramref name="instanceId"/> of <paramref name="process"/> as an operator
