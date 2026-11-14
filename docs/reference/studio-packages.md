@@ -98,5 +98,9 @@ path names one as `packages/<package>/<path>`.
 - **Publishing.** _(planned for M37)_ A publish of an application that holds a package needs the publisher
   role only, and builds and scans each package that Axis runs, see
   [an application's packages](extension-packages.md#an-applications-packages).
-- **The tools.** _(planned for M37)_ The MCP server's tools read, write and test package files, see
+- **The tools.** The MCP server's `list_package_files`, `read_package_file`, `write_package_file` and
+  `delete_package_file` list, read, write and delete package files, in the person's own draft for a write, see
+  [tools](mcp-server.md#tools). A write or a delete needs the developer role and the switch, as the routes do, takes
+  no version and does not check the storage quota, as `write_resource` does not.
+- **Testing a package.** _(planned for M37)_ The MCP server's `test_package` tests a package's files in a draft, see
   [tools](mcp-server.md#tools).

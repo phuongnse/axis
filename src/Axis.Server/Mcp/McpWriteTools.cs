@@ -534,7 +534,7 @@ internal static class McpWriteTools
     private static JsonElement EmptyList() => JsonDocument.Parse("[]").RootElement.Clone();
 
     // The compile diagnostics of the draft as its branch now holds it.
-    private static async Task<(IReadOnlyList<StudioDiagnostic>? Diagnostics, string? Error)> DiagnosticsAsync(
+    internal static async Task<(IReadOnlyList<StudioDiagnostic>? Diagnostics, string? Error)> DiagnosticsAsync(
         McpToolContext context, string folder, string draft, CancellationToken ct)
     {
         var (files, error) = await McpReadTools.DraftFilesAsync(context, folder, draft, ct);
@@ -546,7 +546,7 @@ internal static class McpWriteTools
     // Appends the one audit record of a successful write call, in its own transaction right after the draft's commit. It takes
     // no cancellation token, so a request that is cancelled after the commit still leaves its record. It holds ids only: never
     // content, a name or a path.
-    private static async Task AuditAsync(McpToolContext context, string folder, string tool, string draft, Guid? resource)
+    internal static async Task AuditAsync(McpToolContext context, string folder, string tool, string draft, Guid? resource)
     {
         var ct = CancellationToken.None;
         var connection = await context.Database.GetConnectionAsync(ct);

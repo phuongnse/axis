@@ -8,7 +8,9 @@ using Axis.Server.Mcp;
 using Axis.Server.Studio;
 using Axis.Server.Tests;
 using Axis.Studio;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -49,6 +51,10 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
             builder.UseSetting("Tenants:a:Bindings:GuardUrl:Kind", "url");
             builder.UseSetting("Tenants:a:Bindings:GuardUrl:Value", url);
             builder.UseSetting("Studio:AuthorRole", "author");
+
+            // The Keycloak author holds the publisher role, which stands in for the developer role the shared realm has no user for.
+            builder.UseSetting("Studio:DeveloperRole", "publisher");
+            builder.ConfigureTestServices(PackagesOnCatalog.Switch);
             builder.UseSetting("Studio:ApplicationsPath", _applications);
             builder.UseSetting("Studio:RevisionsPath", _revisions);
             builder.UseSetting("Modules:Path", SampleModules.Path);
@@ -78,6 +84,10 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
         var drafts = StudioDrafts.For(_revisions, stepApp, subject, subject, factory.Services.GetRequiredService<IStudioWriteLock>())!;
         var draft = (await drafts.CreateAsync(
             StudioRevisions.For(_revisions, stepApp, subject, subject, NullLogger<StudioRevisions>.Instance)!, CancellationToken)).Value!.Id;
+
+        // Two package files of the draft, for the tools that read, write and delete one.
+        Assert.Null((await drafts.WritePackageFileAsync(draft, "packages/guard/notes.txt", "guard notes"u8.ToArray(), null, false, CancellationToken)).Refusal);
+        Assert.Null((await drafts.WritePackageFileAsync(draft, "packages/guard/old.txt", "guard old"u8.ToArray(), null, false, CancellationToken)).Refusal);
 
         // The draft's authoring request is ready and asked for auto-accept, the application allows it, and its last check and review passed,
         // so accept_draft queues an accept instead of refusing.
@@ -150,6 +160,10 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
                 ["diff_draft"] = $$"""{"application":"StepApp","draft":"{{draft}}"}""",
                 ["run_scenarios"] = $$"""{"application":"StepApp","draft":"{{draft}}"}""",
                 ["accept_draft"] = $$"""{"application":"StepApp","draft":"{{draft}}"}""",
+                ["list_package_files"] = $$"""{"application":"StepApp","draft":"{{draft}}"}""",
+                ["read_package_file"] = $$"""{"application":"StepApp","draft":"{{draft}}","package":"guard","path":"notes.txt"}""",
+                ["write_package_file"] = $$"""{"application":"StepApp","draft":"{{draft}}","package":"guard","path":"notes.txt","content":"guard notes, written"}""",
+                ["delete_package_file"] = $$"""{"application":"StepApp","draft":"{{draft}}","package":"guard","path":"old.txt"}""",
             },
             (tool, arguments) => SendAsync(McpTestCalls.ToolCall(tool, arguments)),
             [TaskApiFixture.RequestTitle(record), secret, url, KeycloakFixture.ClientSecret],

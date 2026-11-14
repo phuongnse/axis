@@ -316,10 +316,10 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
 
     /// <summary>
     /// Commits the removal of the package file <paramref name="file"/> to the draft when <paramref name="ifMatch"/> is the version
-    /// the draft holds, as "Delete package file" and the path. A draft without the file answers
-    /// <see cref="StudioWriteRefusal.FileMissing"/>. The draft records the version the file has on <c>main</c> on its first use.
+    /// the draft holds, or whatever the draft holds when <paramref name="ifMatch"/> is null, as "Delete package file" and the path.
+    /// A draft without the file answers <see cref="StudioWriteRefusal.FileMissing"/>. The draft records the version the file has on <c>main</c> on its first use.
     /// </summary>
-    public Task<StudioDraftOutcome<bool>> DeletePackageFileAsync(string id, string file, string ifMatch, CancellationToken ct) =>
+    public Task<StudioDraftOutcome<bool>> DeletePackageFileAsync(string id, string file, string? ifMatch, CancellationToken ct) =>
         InDraftAsync(id, (git, draft, tip) =>
         {
             if (tip.Tree[file]?.Target is not Blob blob)
@@ -327,7 +327,7 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
                 return StudioDraftOutcome<bool>.Refused(StudioWriteRefusal.FileMissing);
             }
 
-            if (!string.Equals(StudioWrites.Unquote(ifMatch), Version(Content(blob)), StringComparison.Ordinal))
+            if (ifMatch is not null && !string.Equals(StudioWrites.Unquote(ifMatch), Version(Content(blob)), StringComparison.Ordinal))
             {
                 return StudioDraftOutcome<bool>.Refused(StudioWriteRefusal.Stale);
             }
