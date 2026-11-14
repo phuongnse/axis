@@ -26,6 +26,8 @@ namespace Axis.Server.Studio;
 /// <c>note</c> of up to 2000 (400). A <c>validate</c> ignores its body. The status route answers 404 for a request
 /// of another application or tenant, because it reads this tenant's database for this application only.
 /// In a cell, <c>publish</c> checks the tenant's storage quota (403 <c>quota-exceeded</c>) right after the session.
+/// In a cell, <c>publish</c> and <c>preview</c> of a folder with a file under <c>packages/</c> answer the quota 403 while the
+/// tenant's <c>packageCpuSecondsPerDay</c> is 0, after the manifest check and before the body, see <c>docs/reference/tenant-quotas.md#refusals</c>.
 /// <c>POST /api/studio/apps/{application}/releases/{id}/activate</c> stores an <c>activate</c> request that names a release of
 /// the application's history in this tenant, with no snapshot, and answers as <c>publish</c> does. It runs the same checks
 /// as <c>publish</c>, and then answers 404 for an <c>id</c> that is not a UUID or is not in the history. It ignores its body.
@@ -100,9 +102,23 @@ internal static class StudioPublishEndpoints
             return refusal!;
         }
 
-        return StudioPreview.Find(catalog, tenants.Current!.TenantId) is null
-            ? StudioEndpoints.Problem(StatusCodes.Status409Conflict, "This tenant has no preview tenant.")
-            : await StoreAsync("publish", application, folder, label: null, note: null, httpContext, database, writeLock, target: "preview");
+        if (StudioPreview.Find(catalog, tenants.Current!.TenantId) is null)
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status409Conflict, "This tenant has no preview tenant.");
+        }
+
+        if (StudioFolder.ReadManifest(folder) is not { Id: not null })
+        {
+            return NoManifestIdProblem();
+        }
+
+        if (StudioFolder.HasPackageFiles(folder)
+            && await PackageQuota.RefusalAsync(httpContext.RequestServices, tenants.Current.TenantId, httpContext.RequestAborted) is { } refused)
+        {
+            return refused;
+        }
+
+        return await StoreAsync("publish", application, folder, label: null, note: null, httpContext, database, writeLock, target: "preview");
     }
 
     private static async Task<IResult> PublishAsync(
@@ -117,6 +133,13 @@ internal static class StudioPublishEndpoints
         if (StudioFolder.ReadManifest(folder) is not { Id: not null })
         {
             return NoManifestIdProblem();
+        }
+
+        if (StudioFolder.HasPackageFiles(folder)
+            && await PackageQuota.RefusalAsync(
+                httpContext.RequestServices, httpContext.RequestServices.GetRequiredService<ITenantContextAccessor>().Current!.TenantId, httpContext.RequestAborted) is { } refused)
+        {
+            return refused;
         }
 
         var request = httpContext.Request;

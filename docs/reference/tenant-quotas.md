@@ -119,6 +119,9 @@ nothing:
   tenant's [switch](user-administration.md#application-packages) on is refused, and `used` is the day's
   `packageCpuSeconds` counter. A `PUT` that turns it off is never refused. The check comes after the body check, not
   before it, because only a body that turns packages on is refused, so the body must be read first.
+  A Studio `publish` or `preview` of a folder that holds a file under `packages/` is refused the same way. Its
+  check comes after the publisher role, the application and the manifest check, and before the body. An application
+  without `packages/` is not refused.
 - **The provisioning API.** The platform operator's `PUT /api/cell/tenants/{id}/quotas` is never
   refused over the `storage` quota. It writes platform rows and no tenant data, so the operator can
   raise a quota that a tenant has reached.

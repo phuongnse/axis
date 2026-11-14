@@ -60,10 +60,6 @@ internal static class TenantApplicationPackagesEndpoints
     private static async Task<IResult> SetAsync(
         HttpContext httpContext,
         CellPlatformWriter writer,
-        TenantQuotas quotas,
-        TenantDailyCounterStore counters,
-        TimeProvider time,
-        ILoggerFactory loggers,
         CancellationToken cancellationToken)
     {
         var (opening, refusal) = await OpenAsync(httpContext);
@@ -90,12 +86,9 @@ internal static class TenantApplicationPackagesEndpoints
         }
 
         // Only a body that turns packages on is refused, so the quota check follows the body check.
-        if (on && quotas.Limit(open.TenantId, QuotaKeys.PackageCpuSecondsPerDay) is 0)
+        if (on && await PackageQuota.RefusalAsync(httpContext.RequestServices, open.TenantId, cancellationToken) is { } refused)
         {
-            var today = DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
-            var used = await counters.ValueAsync(open.TenantId, TenantDailyCounterStore.PackageCpuSeconds, today, cancellationToken);
-            QuotaRefusal.Log(loggers, open.TenantId, QuotaKeys.PackageCpuSecondsPerDay);
-            return QuotaRefusal.Problem(QuotaKeys.PackageCpuSecondsPerDay, 0, used);
+            return refused;
         }
 
         await using var platform = writer.Open();
