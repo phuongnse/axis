@@ -31,8 +31,9 @@ This decision replaces D7, D28 and D90, and restates what still holds from them.
 - **A package reuses the code a business already has.** Its dependencies may be the business's own
   libraries, from a public or private registry, as built files or as a commit of a git repository. The
   adapter maps an operation to a function of the library, and the library's code does not change.
-- **A package is built once, when it is installed or published.** Its dependencies are installed from
-  the lock file and scanned for known vulnerabilities, and a runner downloads nothing at run time.
+- **A package is built once, when it is installed or published,** or, for a customer-hosted package,
+  by the customer with the same `build`. Its dependencies are installed from the lock file and scanned
+  for known vulnerabilities, and a runner downloads nothing at run time.
 - **Every package operation runs like a connector call,** as D28 said: staged outside the step's
   transaction, with its operation identity as idempotency key, under the step's retry policy, and an
   unknown outcome is retried only when the operation declares `idempotent: true`.

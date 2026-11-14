@@ -36,9 +36,9 @@ and installed apart from any application, see [Installation](#installation).
   operation to a function of the library, and the library's code does not
   change.
 - **Built once** _(planned for M21)_. A package is built once, when it is
-  installed or published, see [Building a package](#building-a-package). Its
-  dependencies are installed from the lock file and scanned for known
-  vulnerabilities. A runner downloads nothing at run time.
+  installed or published or, for a customer-hosted package, by the customer with the same `build`, see
+  [Building a package](#building-a-package). Its dependencies are installed from the lock file and
+  scanned for known vulnerabilities. A runner downloads nothing at run time.
 - **No data access.** A package cannot read or write entities.
 - **Widgets** _(planned for M22)_. A package may also hold custom widgets,
   React components that a page names, which build on Axis widgets and Axis tokens, never on Ant
