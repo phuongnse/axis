@@ -997,6 +997,8 @@
   "shell.studio.field.application.packages.id.help": "The installed package that the application uses.",
   "shell.studio.field.application.packages.version": "Version",
   "shell.studio.field.application.packages.version.help": "The installed version to use, and which later versions the application also takes.",
+  "shell.studio.field.application.packages.runner": "Package runner",
+  "shell.studio.field.application.packages.runner.help": "Where the package runs: on Axis, or in a package runner that the customer hosts.",
   "shell.studio.field.application.modules": "Modules",
   "shell.studio.field.application.modules.help": "The modules the application installs, each with its version.",
   "shell.studio.field.application.modules.id": "Module",

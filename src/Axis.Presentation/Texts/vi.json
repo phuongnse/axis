@@ -997,6 +997,8 @@
   "shell.studio.field.application.packages.id.help": "Gói mở rộng đã cài mà ứng dụng dùng.",
   "shell.studio.field.application.packages.version": "Bản",
   "shell.studio.field.application.packages.version.help": "Bản đã cài để dùng, và những bản mới hơn mà ứng dụng cũng nhận.",
+  "shell.studio.field.application.packages.runner": "Trình chạy gói mở rộng",
+  "shell.studio.field.application.packages.runner.help": "Nơi gói mở rộng chạy: trên Axis, hoặc trong trình chạy gói mở rộng do khách hàng tự lưu trữ.",
   "shell.studio.field.application.modules": "Mô-đun",
   "shell.studio.field.application.modules.help": "Các mô-đun ứng dụng cài, mỗi mô-đun kèm bản.",
   "shell.studio.field.application.modules.id": "Mô-đun",
