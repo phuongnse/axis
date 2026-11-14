@@ -1126,9 +1126,9 @@ const draftChanges: Record<string, (StudioRevisionChange & { summary: string })[
 function genericChanges(request: StudioAuthoringRequest): (StudioRevisionChange & { summary: string })[] {
   return [
     change(
-      'entities/purchase-request.json',
+      'entities/Request.json',
       'entity',
-      'PurchaseRequest',
+      'Request',
       requestEntity,
       { ...requestEntity, changed: true },
       `Changed as asked: "${request.text}"`,

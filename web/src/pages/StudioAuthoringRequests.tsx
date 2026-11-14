@@ -362,6 +362,8 @@ export function StudioAuthoringRequestPage({
   // reader's language. A change of plan, and an ask for changes to a ready draft, keep the author's comment, and a write
   // names its resource as a link.
   const stepWords = (step: StudioAuthoringRequestStep): ReactNode => {
+    // A step that runs reads as what it does now, "Checking the draft", and a finished one as what it did.
+    const words = step.finishedAt === null ? 'stepNow' : 'step'
     switch (step.kind) {
       case 'planChange':
       case 'changeRequest':
@@ -371,7 +373,7 @@ export function StudioAuthoringRequestPage({
       case 'delete_resource':
         return (
           <FilledText
-            text={t(`shell.studio.aiRequest.step.${step.kind === 'delete_resource' ? 'delete' : 'write'}`)}
+            text={t(`shell.studio.aiRequest.${words}.${step.kind === 'delete_resource' ? 'delete' : 'write'}`)}
             parts={{
               resource:
                 step.resource == null ? null : (
@@ -389,7 +391,7 @@ export function StudioAuthoringRequestPage({
           />
         )
       default:
-        return t(stepKeys[step.kind])
+        return t(`shell.studio.aiRequest.${words}.${stepKeys[step.kind]}`)
     }
   }
   const runningWords = <span style={{ color: colour.textMuted }}>{t('shell.studio.aiRequest.stepRunning')}</span>
@@ -607,13 +609,7 @@ export function StudioAuthoringRequestPage({
         (waitsForApp
           ? appWorks
           : following &&
-            nowLine(
-              running === undefined ? (
-                t('shell.studio.aiRequest.feed.starting')
-              ) : (
-                <FilledText text={t('shell.studio.aiRequest.now')} parts={{ step: stepWords(running) }} />
-              ),
-            ))}
+            nowLine(running === undefined ? t('shell.studio.aiRequest.feed.starting') : stepWords(running)))}
       {failed && approved && failure}
       {request.steps.length > 0 &&
         fold(
@@ -1220,7 +1216,10 @@ function checksSummary(
   }
 }
 
-/** The text key of each step kind whose words name nothing else. */
+/**
+ * The name of the text of each step kind whose words name nothing else: under `step.` what it did, and, proposed, under
+ * `stepNow.` what it does while it runs, see the review on #3263.
+ */
 const stepKeys: Record<
   Exclude<
     StudioAuthoringStepKind,
@@ -1228,15 +1227,15 @@ const stepKeys: Record<
   >,
   string
 > = {
-  plan: 'shell.studio.aiRequest.step.plan',
-  work: 'shell.studio.aiRequest.step.work',
-  check: 'shell.studio.aiRequest.step.check',
-  fix: 'shell.studio.aiRequest.step.fix',
-  review: 'shell.studio.aiRequest.step.review',
-  accept: 'shell.studio.aiRequest.step.accept',
-  propose_plan: 'shell.studio.aiRequest.step.proposePlan',
-  validate_draft: 'shell.studio.aiRequest.step.validateDraft',
-  run_scenarios: 'shell.studio.aiRequest.step.runScenarios',
+  plan: 'plan',
+  work: 'work',
+  check: 'check',
+  fix: 'fix',
+  review: 'review',
+  accept: 'accept',
+  propose_plan: 'proposePlan',
+  validate_draft: 'validateDraft',
+  run_scenarios: 'runScenarios',
 }
 
 /**

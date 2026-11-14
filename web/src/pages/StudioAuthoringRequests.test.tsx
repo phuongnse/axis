@@ -796,7 +796,8 @@ describe("a request's history", () => {
     expect(rows).toHaveLength(3)
     expect(rows[0]).toHaveTextContent(/Proposed a plan\s*Plan written.*40 s/)
     expect(rows[1]).toHaveTextContent(/Wrote 3 resources\s*Saved.*3 min/)
-    expect(rows[2]).toHaveTextContent(/Compiled the draft\s*Running…/)
+    // A step that runs reads as what it does now.
+    expect(rows[2]).toHaveTextContent(/Compiling the draft\s*Running…/)
 
     // The table opens the group row to a row for each write, its resource named as people read it.
     await user.click(within(rows[1]).getByRole('button', { name: 'Show the rows in it' }))
