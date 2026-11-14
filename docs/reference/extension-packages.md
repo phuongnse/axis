@@ -25,18 +25,18 @@ and installed apart from any application, see [Installation](#installation).
   contracts assembly described in [Contracts](#contracts).
 - **Build artifact.** A C# package's build gives a folder with its assemblies
   and a manifest, `axis-package.json`.
-- **Three languages** _(planned for M21)_. A package is written in C#,
+- **Three languages.** A package is written in C#,
   TypeScript or JavaScript on Node.js, or Python.
-- **A folder with a lock file** _(planned for M21)_. A package of any of
+- **A folder with a lock file.** A package of any of
   these languages is a folder with a manifest, a thin adapter in that
   language and a lock file of its dependencies.
-- **Reuses a library** _(planned for M21)_. The dependencies of a package may
-  be the business's own libraries, from a public or private registry, as
-  built files or as a commit of a git repository. The adapter maps an
-  operation to a function of the library, and the library's code does not
-  change.
-- **Built once** _(planned for M21)_. A package is built once, when it is
-  installed or published or, for a customer-hosted package, by the customer with the same `build`, see
+- **Reuses a library.** The dependencies of a package may
+  be the business's own libraries, from a public registry or as
+  built files. The adapter maps an operation to a function of the library,
+  and the library's code does not change.
+- **Private registries and git commits** _(planned for M37)_. The dependencies
+  may also come from a private registry, or as a commit of a git repository.
+- **Built once.** A package is built once, when it is installed, see
   [Building a package](#building-a-package). Its dependencies are installed from the lock file and
   scanned for known vulnerabilities. A runner downloads nothing at run time.
 - **No data access.** A package cannot read or write entities.
@@ -207,7 +207,7 @@ public class RetryableException : Exception { }
 The operator installs an installation's packages once for the whole installation, in a folder that
 every host reads. An installation's package is trusted code that the operator reviews.
 
-- **Inside a module** _(planned for M21)_. A module installed for the installation can ship a package,
+- **Inside a module** _(planned for M37)_. A module installed for the installation can ship a package,
   such as a built-in module or a partner's module, and the operator reviews that package too.
 - **Per installation.** Packages are installed once for the installation,
   not per tenant. Every tenant sees the same installed packages. An
@@ -299,7 +299,7 @@ that `Extensions:Path` names and compiles nothing.
   pip reads it: a comment and a blank line are skipped and a line that ends in a backslash continues on the
   next line. An option line such as `--index-url` needs no hash. A line that starts with `-r`, `-c` or `-e`,
   or their long forms, is refused, because it brings in requirements that the check never sees.
-- **Registry credentials** _(planned for M21)_. They are mounted for the build alone, and the runners
+- **Registry credentials** _(planned for M37)_. They are mounted for the build alone, and the runners
   never see them.
 
 The build reads these settings:
@@ -459,7 +459,7 @@ see [Contracts](#contracts).
 Outside Development, package operations run outside the worker, in package runners, so that a
 package reaches nothing of the host and no binding of another call.
 
-- **The runners** _(planned for M21)_. Each runtime has its own container, whose host,
+- **The runners.** Each runtime has its own container, whose host,
   `Axis.PackageHost`, starts a runner process when the worker asks and stops
   it when told. The images and containers are in [images](installation.md#images).
 - **The hosts in Compose.** The Compose example runs `package-host-dotnet`, `package-host-python` and `package-host-node` on an internal network `runners` that only they and
@@ -501,13 +501,13 @@ package reaches nothing of the host and no binding of another call.
   that runs in the worker, see [package call outcomes](process-execution.md#package-call-outcomes).
   A `failure` that names a binding fails the call at once, and its error names the operation, the
   package and the binding.
-- **Environment, for a runner that Axis hosts.** _(planned for M21)_ The environment is empty
+- **Environment, for a runner that Axis hosts.** The environment is empty
   apart from `HTTP_PROXY` and `HTTPS_PROXY`, their lower-case forms, and
   `NODE_USE_ENV_PROXY=1` for Node.js. The container gets no tenant or
   installation settings, a read-only root file system apart from a temporary
   folder, and CPU and memory limits. It sees no tenant's secrets except the
   bindings of the call it runs.
-- **Network, for a runner that Axis hosts.** _(planned for M21)_ The proxy variables name the
+- **Network, for a runner that Axis hosts.** The proxy variables name the
   egress proxy in the worker, with a token for each runner that the worker
   sends in `start`, together with the address of the proxy as the host reaches
   it. The proxy listens on `Extensions:Runners:ProxyPort` and starts with the
@@ -534,7 +534,7 @@ package reaches nothing of the host and no binding of another call.
 - **No host.** A host that cannot be reached, that starts no runner, or that is not set makes the
   attempt retryable, because the operation never ran. The error names the setting of the call's runtime.
 
-The server reads `Extensions:Isolation`, and the worker reads all five settings:
+The server reads `Extensions:Isolation`, and the worker reads all seven settings:
 
 | Setting | Environment variable | Default | Meaning |
 | --- | --- | --- | --- |
@@ -542,6 +542,8 @@ The server reads `Extensions:Isolation`, and the worker reads all five settings:
 | `Extensions:Runners:Dotnet` | `Extensions__Runners__Dotnet` | none | The `host:port` of the C# package host, with a port from 1 to 65535, or `[address]:port` for an IPv6 address. Unset, every C# attempt is retryable. A value that is not a `host:port` stops the worker at start |
 | `Extensions:Runners:Node` | `Extensions__Runners__Node` | none | The `host:port` of the Node.js package host, with the same forms. Unset, every `node` attempt is retryable, with `inProcess` too. A value that is not a `host:port` stops the worker at start |
 | `Extensions:Runners:Python` | `Extensions__Runners__Python` | none | The `host:port` of the Python package host, with the same forms. Unset, every `python` attempt is retryable, with `inProcess` too. A value that is not a `host:port` stops the worker at start |
+| `Extensions:Runners:Application` | `Extensions__Runners__Application` | none | The `host:port` of `application-package-host`, with the same forms. With `Extensions:ApplicationPackages` on, the worker needs it, see [an application's packages](#an-applications-packages). Unset with the setting off, the worker never contacts the host. A value that is not a `host:port` stops the worker at start, with the setting on or off |
+| `Extensions:ApplicationPackages` | `Extensions__ApplicationPackages` | `false` | `true` makes the worker ask `application-package-host` at start whether it runs under gVisor, and stop with exit code 1 when it does not, see [an application's packages](#an-applications-packages). `false` never asks. Any other value stops the worker at start |
 | `Extensions:Runners:ProxyPort` | `Extensions__Runners__ProxyPort` | `5311` | The port of the worker's egress proxy for the runners, a whole number from 0 to 65535. `0` picks a free port. Any other value stops the worker at start |
 
 The package host in host mode reads two settings of its own:
@@ -565,6 +567,7 @@ implements the operation context over it.
 | `retryable` | The runner | `error`, the name of the error's type |
 | `failure` | The runner | `error`, the name of the error's type, or `binding`, the undeclared binding it asked for |
 | `stop` | The worker | None |
+| `sandbox` | The worker, to the host, and the host's answer | None in the question. `gvisor`, a boolean, in the answer |
 
 - **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network. The connection
   is neither encrypted nor authenticated, and a `run` carries binding secrets, so only the operator's
@@ -581,6 +584,10 @@ implements the operation context over it.
   well formed, closes the connection and starts no runner. So does a `start` for a version whose runtime
   is missing from the host's image. The runner answers `ready` once it has
   loaded the version.
+- **Sandbox.** A `sandbox` may be the first line of a connection instead of a `start`. The host answers `sandbox`
+  with `gvisor` set, `true` only when its kernel log, as `dmesg` reads it, begins with gVisor's `Starting gVisor` line. A kernel
+  log that begins otherwise, or a read that is refused, answers `false`. Then the host closes the connection and starts no runner.
+  A `sandbox` that already holds `gvisor` closes the connection without an answer.
 - **Standard output.** The runner's standard output holds only protocol lines. What a package writes to
   the console goes to standard error.
 - **Runner errors.** An operation that is not in the manifest, an input that does not fit its field
@@ -686,12 +693,15 @@ trusted code, so the platform gives it more limits than an installation's packag
   Compose sets that service's `runtime`, so the `package-host-*` containers keep the plain runtime.
   gVisor runs on an ordinary Kubernetes node, while a microVM needs nodes that allow nested
   virtualization.
-- **`Extensions:ApplicationPackages`.** A server, worker and publisher setting, `false` by default. With
-  `false`, an application's package is a compile error at its `packages/<id>/axis-package.json`, reported
+- **`Extensions:ApplicationPackages`.** A server, worker and publisher setting, `false` by default.
+  With `true`, the worker sends `sandbox` to `application-package-host` at `Extensions:Runners:Application`
+  before it reads any tenant or claims any work, and does not start otherwise. It exits with code 1 when the
+  answer is no, or when none comes within 10 seconds, and a refused connection counts as no answer. An unset or malformed
+  `Extensions:Runners:Application` stops it at start too, naming the setting. A value other than `true` or `false` stops
+  it as well. The check makes one attempt, and the orchestrator's restart tries again. With `false`, the worker never asks.
+  An application's package is then a compile error at its `packages/<id>/axis-package.json`, reported
   once for each package. So an installation without gVisor refuses it and runs its own packages as before.
   A stored release that holds one still rebuilds, whatever the setting says.
-- **The setting's gVisor check** _(planned for M37)_. With `true`, the worker checks at start that
-  `application-package-host` runs under gVisor, and does not start otherwise.
 - **A customer-hosted package and the setting** _(planned for M37)_. The tenant's switch and the compile
   check still allow a [customer-hosted](#customer-hosted-runners) package with the setting `false`, which
   needs no gVisor because gVisor guards only code on Axis's machines.
@@ -769,8 +779,8 @@ installation, loading, the capability limits, the server's metadata-only load an
   `artifacts/extensions/phone-numbers/1.0.0/` with the library beside the adapter, using the pip flags of the
   [build](#building-a-package). They skip the scan that the build runs, as the project build of the C#
   sample does, and `scripts/build.sh` fails unless the folder holds `axis-package.json`, `adapter.py` and
-  `phonenumbers/__init__.py`. No sample application calls it, and Compose and `scripts/dev.sh` run no Python host
-  yet. The integration tests run it from a process step through a Python package host.
+  `phonenumbers/__init__.py`. No sample application calls it, and Compose and `scripts/dev.sh` run no Python host.
+  The integration tests run it from a process step through a Python package host.
 - **TypeScript sample package.** `samples/packages/payment-terms/` holds `payment-terms` 1.0.0, a `node`
   package whose adapter, `index.ts`, wraps the npm library dayjs 1.11.23 and leaves it unchanged. The compiled
   `index.js` is committed beside it. dayjs is committed as `vendor/dayjs-1.11.23.tgz` and locked in
@@ -800,7 +810,9 @@ installation, loading, the capability limits, the server's metadata-only load an
   tests install it to cover installation and loading. Its `probe` operation
   in version 1.0.0 covers the capability limits: it uses its declared `url`
   and `secret` bindings, and in the other modes it asks for a host or a secret
-  it does not declare. Its `ExitOperation` type ends its own process only when it runs in a
+  it does not declare. The on-premises smoke test builds 1.0.0 with the `build` command of the C# package host
+  image and runs `probe` in the `ownOtherHost` mode in a runner, see
+  [tests of the example](installation.md#tests-of-the-example). Its `ExitOperation` type ends its own process only when it runs in a
   package runner and throws anywhere else, so tests can stand in for a runner that crashes.
 - **Initializer package.** A test-only package, `initializer-package` 1.0.0, lives under
   `tests/packages/`. Its module initializer and its operation's static constructor each write a

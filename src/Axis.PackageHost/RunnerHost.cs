@@ -24,13 +24,15 @@ namespace Axis.PackageHost;
 /// <c>NODE_USE_ENV_PROXY=1</c> for a Node.js runner, so that its own HTTP calls use them. Its
 /// standard input is fed from the connection and its standard output goes to the connection. Closing the connection
 /// kills the runner and its child processes, and a runner that exits closes the connection. The host logs the
-/// runner's process id, package and version, and no message.
+/// runner's process id, package and version, and no message. The first line may instead be a <c>sandbox</c> question with no
+/// <c>gvisor</c>. The host answers it from <paramref name="sandbox"/>, closes the connection and starts no runner.
 /// </summary>
-internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands commands, ILogger<RunnerHost> logger) : IAsyncDisposable
+internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands commands, ILogger<RunnerHost> logger, Sandbox? sandbox = null) : IAsyncDisposable
 {
     /// <summary>The longest <c>start</c> line the host reads, in bytes.</summary>
     private const int MaxStartLine = 4096;
 
+    private readonly Sandbox _sandbox = sandbox ?? Sandbox.ForThisMachine();
     private readonly CancellationTokenSource _stopping = new();
     private readonly ConcurrentDictionary<int, Task> _connections = new();
     private TcpListener? _listener;
@@ -109,8 +111,14 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands c
             var reader = PipeReader.Create(client.GetStream());
             try
             {
-                if (await ReadStartAsync(reader) is not { } started)
+                if (await ReadFirstAsync(reader) is not { } started)
                 {
+                    return;
+                }
+
+                if (started.Start is null)
+                {
+                    await AnswerSandboxAsync(client.GetStream());
                     return;
                 }
 
@@ -130,12 +138,23 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands c
         }
     }
 
+    /// <summary>Answers a <c>sandbox</c> question with whether this machine runs under gVisor.</summary>
+    private async Task AnswerSandboxAsync(Stream socket)
+    {
+        var gvisor = _sandbox.IsGvisor();
+        var answer = Encoding.UTF8.GetBytes(RunnerProtocol.Write(new SandboxMessage(gvisor)) + "\n");
+        await socket.WriteAsync(answer, _stopping.Token);
+        await socket.FlushAsync(_stopping.Token);
+        LogSandboxAnswered(gvisor);
+    }
+
     /// <summary>
-    /// Reads the first line. Returns the <c>start</c> it holds, or <see langword="null"/> when the connection ends
-    /// first or the line is too long, is not a <c>start</c>, names an id or version that is not well formed, or names a
-    /// version that is not installed, with the language of its manifest. Bytes after the line stay in the reader.
+    /// Reads the first line. Returns the <c>start</c> it holds with the language of its manifest, or a <see langword="null"/>
+    /// <c>Start</c> for a <c>sandbox</c> question. Returns <see langword="null"/> when the connection ends
+    /// first or the line is too long, is neither, names an id or version that is not well formed, or names a
+    /// version that is not installed. Bytes after the line stay in the reader.
     /// </summary>
-    private async Task<(StartMessage Start, PackageLanguage Language)?> ReadStartAsync(PipeReader reader)
+    private async Task<(StartMessage? Start, PackageLanguage Language)?> ReadFirstAsync(PipeReader reader)
     {
         while (true)
         {
@@ -159,11 +178,17 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands c
         }
     }
 
-    private (StartMessage Start, PackageLanguage Language)? Parse(string line)
+    private (StartMessage? Start, PackageLanguage Language)? Parse(string line)
     {
         try
         {
-            return RunnerProtocol.Read(line) is StartMessage start
+            var message = RunnerProtocol.Read(line);
+            if (message is SandboxMessage { Gvisor: null })
+            {
+                return (null, default);
+            }
+
+            return message is StartMessage start
                 && IdPattern().IsMatch(start.Package)
                 && VersionPattern().IsMatch(start.Version)
                 && PackageIsolation.TryParseHostPort(start.Proxy, out _, out _)
@@ -304,6 +329,9 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands c
 
     [GeneratedRegex(@"\A(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z")]
     private static partial Regex VersionPattern();
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Answered a sandbox question: gVisor {Gvisor}.")]
+    private partial void LogSandboxAnswered(bool gvisor);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Runner {ProcessId} started for package {Package} {Version}.")]
     private partial void LogStarted(int processId, string package, string version);

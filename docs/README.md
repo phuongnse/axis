@@ -91,7 +91,7 @@ Read by people who connect Axis to another system or write a package of custom c
 | [Connectors, events and endpoints](reference/integration-resources.md) | Connectors and deployment bindings, the `event`, `trigger` and `endpoint` resources  | You add a connector, an event, a trigger or an endpoint        |
 | [Outbound webhooks](reference/outbound-webhooks.md)                    | The `webhook` resource, its compile checks, and the signed delivery of an event      | You add or change a webhook or its signed delivery             |
 | [Inbound endpoint calls](reference/inbound-endpoints.md)               | How another system calls an inbound endpoint: checks, responses, idempotency         | You change how an inbound endpoint call is checked or answered |
-| [Extension packages](reference/extension-packages.md)                  | Custom code: manifest, contracts, installation, runners, capabilities                | You write or load a package of custom code                     |
+| [Extension packages](reference/extension-packages.md)                  | Custom code: manifest, contracts, installation, building, runners, capabilities      | You write or load a package of custom code                     |
 | [Extension package limits](reference/extension-package-limits.md)      | What the limits on a package's operations do not protect against                     | You judge how far a package's code is trusted                  |
 | [Custom widgets](reference/custom-widgets.md)                          | Widgets from extension packages: manifest, page shape, loading, the SDK, the palette | You write a widget for an extension package                    |
 
@@ -226,6 +226,6 @@ Read by people who change how Axis stores data.
 | [The local stack](dev-script.md)          | What `scripts/dev.sh` starts, the settings it sets, what reloads and how it stops                                  | You run or change `scripts/dev.sh`             |
 | [Running a host](running-a-host.md)       | Running the worker or the server alone, and activating another application folder                                  | You run one host outside `scripts/dev.sh`      |
 | [Production images](production-images.md) | The production images and the admin tool, built the same in development as in an install                           | You build or change a production image         |
-| [Testing](testing.md)                     | The test levels, rules for tests, shared test services, the E2E stack and its journeys, the purchasing system stub | You write or change a test                     |
+| [Testing](testing.md)                     | The test levels, rules for tests, shared test services, the E2E stack and its journeys, the purchasing system stub, the smoke test fixtures | You write or change a test                     |
 | [Delivery](delivery.md)                   | How work flows through NexKit                                                                                      | You file an issue, plan or open a pull request |
 | [Writing the docs](writing-docs.md)       | What goes in which doc, how to write it, and how the docs stay correct                                             | You add or change a doc                        |

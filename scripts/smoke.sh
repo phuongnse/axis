@@ -17,7 +17,10 @@
 #   purchase request sample's bindings, every url binding over https, and activates the sample there. It then runs
 #   the purchasing system stub over https, with a certificate of the test authority, and carries a purchase request
 #   through its approval by the department's manager. It checks the purchase order in the stub, and the payment
-#   reference and the payment due date that runners of the two package hosts give, not the worker.
+#   reference and the payment due date that runners of the two package hosts give, not the worker. It also builds the test
+#   package test-package 1.0.0 and activates the fixture tests/smoke/package-probe-app on tenant one, whose operator
+#   starts a process that makes the package's own HTTP client call an undeclared host. The instance fails, its step error
+#   names the operation and the package and not the host, and a user without the fixture's role is refused.
 #   It reads the sample modules, which this script installs in artifacts/modules.
 # - ai-eval: scripts/ai-eval-stack.test.mjs builds the server, the publisher and the agent host and starts them with
 #   PostgreSQL and Keycloak in Docker, as the authoring eval's stack, see docs/reference/model-bindings.md#the-authoring-eval.
