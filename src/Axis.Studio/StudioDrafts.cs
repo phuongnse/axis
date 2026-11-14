@@ -1,7 +1,9 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Loading;
 using LibGit2Sharp;
 
 namespace Axis.Studio;
@@ -10,7 +12,8 @@ namespace Axis.Studio;
 /// The drafts of one person on one application folder. A draft is the branch <c>refs/heads/drafts/&lt;id&gt;</c> in the
 /// repository <see cref="StudioRevisions"/> keeps, and its record is a JSON blob under <c>refs/axis/drafts/&lt;id&gt;</c> in
 /// the same repository: the owner, the commit it started at, its creation time and, for each resource it first read or
-/// changed, the version that resource had on <c>main</c>, or null when <c>main</c> lacked it. A write or delete commits
+/// changed, the version that resource had on <c>main</c>, or null when <c>main</c> lacked it, and the same for each package
+/// file under <c>packages/</c>, by path. A write or delete commits
 /// to the branch from memory, so the working folder, <c>main</c> and other drafts never change. Every operation holds
 /// the folder's write lock, except <see cref="Conflicts"/>, <see cref="Apply"/> and <see cref="CommitAccept"/>, which
 /// expect the caller to hold it. A draft that is not this person's answers <see cref="StudioWriteRefusal.NotFound"/>, as an
@@ -55,7 +58,7 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
 
             var id = Guid.NewGuid().ToString("D");
             git.Refs.Add(BranchName(id), tip.Id);
-            var draft = new StudioDraft(id, userId, tip.Sha, DateTimeOffset.UtcNow, new Dictionary<Guid, string?>());
+            var draft = new StudioDraft(id, userId, tip.Sha, DateTimeOffset.UtcNow, new Dictionary<Guid, string?>(), new Dictionary<string, string?>());
             Save(git, draft);
             return StudioDraftOutcome<StudioDraft>.Of(draft);
         }, ct);
@@ -69,8 +72,8 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
         InDraftAsync(id, (_, _, tip) => StudioDraftOutcome<IReadOnlyList<StudioFile>>.Of(Resources(tip)), ct);
 
     /// <summary>
-    /// The path and bytes of every <c>*.json</c> file of the draft's branch, as its tree holds them, so a compile reads the draft
-    /// as it reads a folder. Records no version.
+    /// The path and bytes of every <c>*.json</c> file and every file under <c>packages/</c> of the draft's branch, as its tree
+    /// holds them, so a compile reads the draft as it reads a folder. Records no version.
     /// </summary>
     public Task<StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>> FilesAsync(string id, CancellationToken ct) =>
         InDraftAsync(id, (_, _, tip) =>
@@ -252,6 +255,90 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
             return StudioDraftOutcome<bool>.Of(true);
         }, ct);
 
+    /// <summary>The package files of the draft as its branch holds them, sorted by file. Records no version.</summary>
+    public Task<StudioDraftOutcome<IReadOnlyList<(string Package, string Path, string Version)>>> ListPackageFilesAsync(
+        string id, CancellationToken ct) =>
+        InDraftAsync(id, (_, _, tip) =>
+        {
+            var files = new List<(string File, byte[] Bytes)>();
+            Walk(tip.Tree, "", files);
+            files.Sort((left, right) => string.CompareOrdinal(left.File, right.File));
+            return StudioDraftOutcome<IReadOnlyList<(string Package, string Path, string Version)>>.Of(StudioPackageFiles.List(files));
+        }, ct);
+
+    /// <summary>
+    /// The bytes of the package file <paramref name="file"/>, a path that <see cref="StudioPackageFiles.File"/> made, as the draft
+    /// holds it, or <see cref="StudioWriteRefusal.FileMissing"/> when it has none. The draft records the version the file has on
+    /// <c>main</c> on its first use.
+    /// </summary>
+    public Task<StudioDraftOutcome<byte[]>> ReadPackageFileAsync(string id, string file, CancellationToken ct) =>
+        InDraftAsync(id, (git, draft, tip) =>
+        {
+            if (tip.Tree[file]?.Target is not Blob blob)
+            {
+                return StudioDraftOutcome<byte[]>.Refused(StudioWriteRefusal.FileMissing);
+            }
+
+            RememberFile(git, draft, file);
+            return StudioDraftOutcome<byte[]>.Of(Content(blob));
+        }, ct);
+
+    /// <summary>
+    /// Commits the package file <paramref name="file"/> to the draft with <paramref name="bytes"/> exactly as given, as "Create
+    /// package file" or "Change package file" and the path, and answers its new version. It refuses as
+    /// <see cref="StudioWriteRefusal.Stale"/> when <paramref name="ifMatch"/> is not the version the draft holds or the draft has
+    /// no such file, and as <see cref="StudioWriteRefusal.Exists"/> when <paramref name="ifNoneMatch"/> is set and the draft has
+    /// the file, or when a folder or a file is in the way. The draft records the version the file has on <c>main</c> on its first use.
+    /// </summary>
+    public Task<StudioDraftOutcome<string>> WritePackageFileAsync(
+        string id, string file, byte[] bytes, string? ifMatch, bool ifNoneMatch, CancellationToken ct) =>
+        InDraftAsync(id, (git, draft, tip) =>
+        {
+            var current = tip.Tree[file];
+            var existing = current?.Target as Blob;
+            if (ifMatch is not null
+                && (existing is null || !string.Equals(StudioWrites.Unquote(ifMatch), Version(Content(existing)), StringComparison.Ordinal)))
+            {
+                return StudioDraftOutcome<string>.Refused(StudioWriteRefusal.Stale);
+            }
+
+            if ((ifNoneMatch && current is not null) || current?.Target is Tree || FileInTheWay(tip.Tree, file))
+            {
+                return StudioDraftOutcome<string>.Refused(StudioWriteRefusal.Exists);
+            }
+
+            RememberFile(git, draft, file);
+            var definition = TreeDefinition.From(tip.Tree);
+            definition.Add(file, CreateBlob(git, bytes), Mode.NonExecutableFile);
+            Commit(git, draft, tip, definition, $"{(existing is null ? "Create" : "Change")} package file {file}");
+            return StudioDraftOutcome<string>.Of(Version(bytes));
+        }, ct);
+
+    /// <summary>
+    /// Commits the removal of the package file <paramref name="file"/> to the draft when <paramref name="ifMatch"/> is the version
+    /// the draft holds, as "Delete package file" and the path. A draft without the file answers
+    /// <see cref="StudioWriteRefusal.FileMissing"/>. The draft records the version the file has on <c>main</c> on its first use.
+    /// </summary>
+    public Task<StudioDraftOutcome<bool>> DeletePackageFileAsync(string id, string file, string ifMatch, CancellationToken ct) =>
+        InDraftAsync(id, (git, draft, tip) =>
+        {
+            if (tip.Tree[file]?.Target is not Blob blob)
+            {
+                return StudioDraftOutcome<bool>.Refused(StudioWriteRefusal.FileMissing);
+            }
+
+            if (!string.Equals(StudioWrites.Unquote(ifMatch), Version(Content(blob)), StringComparison.Ordinal))
+            {
+                return StudioDraftOutcome<bool>.Refused(StudioWriteRefusal.Stale);
+            }
+
+            RememberFile(git, draft, file);
+            var definition = TreeDefinition.From(tip.Tree);
+            definition.Remove(file);
+            Commit(git, draft, tip, definition, $"Delete package file {file}");
+            return StudioDraftOutcome<bool>.Of(true);
+        }, ct);
+
     /// <summary>Deletes the draft's branch and its record.</summary>
     public Task<StudioDraftOutcome<bool>> DropAsync(string id, CancellationToken ct) =>
         InDraftAsync(id, (git, draft, _) =>
@@ -263,8 +350,9 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
 
     /// <summary>
     /// The resources the draft read or changed whose version on <c>main</c> now differs from the one it recorded, sorted by
-    /// resource id. Each comes with its version on <c>main</c>, or null when <c>main</c> no longer has it. A resource
-    /// recorded as absent that now exists is one too. The caller holds the folder's write lock. Records no version.
+    /// resource id, then the package files it used that differ the same way, sorted by path. Each comes with its version on
+    /// <c>main</c>, or null when <c>main</c> no longer has it. A resource or a file recorded as absent that now exists is one
+    /// too. The caller holds the folder's write lock. Records no version.
     /// </summary>
     public StudioDraftOutcome<IReadOnlyList<StudioDraftConflict>> Conflicts(string id) =>
         InDraft(id, (git, draft, _) =>
@@ -281,7 +369,16 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
                 }
             }
 
-            conflicts.Sort((left, right) => left.Id.CompareTo(right.Id));
+            conflicts.Sort((left, right) => left.Id!.Value.CompareTo(right.Id!.Value));
+            foreach (var (file, recorded) in draft.PackageFiles.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+            {
+                var version = PackageFileVersion(main, file);
+                if (!string.Equals(version, recorded, StringComparison.Ordinal))
+                {
+                    conflicts.Add(new StudioDraftConflict(null, version, file));
+                }
+            }
+
             return StudioDraftOutcome<IReadOnlyList<StudioDraftConflict>>.Of(conflicts);
         });
 
@@ -308,10 +405,7 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
                 }
                 else if (tip.Tree[change.Path]?.Target is Blob blob)
                 {
-                    using var stream = blob.GetContentStream();
-                    using var buffer = new MemoryStream();
-                    stream.CopyTo(buffer);
-                    files[change.Path] = buffer.ToArray();
+                    files[change.Path] = Content(blob);
                 }
             }
 
@@ -454,6 +548,7 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
             }
 
             var read = new Dictionary<Guid, string?>();
+            var packageFiles = new Dictionary<string, string?>(StringComparer.Ordinal);
             foreach (var (key, value) in versions)
             {
                 if (!Guid.TryParseExact(key, "D", out var resource))
@@ -464,7 +559,16 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
                 read[resource] = value is JsonValue version && version.TryGetValue<string>(out var hex) ? hex : null;
             }
 
-            return new StudioDraft(id, user, start, time, read);
+            // A record made before package files were recorded has no packageFiles, which reads as empty.
+            if (record["packageFiles"] is JsonObject files)
+            {
+                foreach (var (path, value) in files)
+                {
+                    packageFiles[path] = value is JsonValue version && version.TryGetValue<string>(out var hex) ? hex : null;
+                }
+            }
+
+            return new StudioDraft(id, user, start, time, read, packageFiles);
         }
         catch (System.Text.Json.JsonException)
         {
@@ -480,6 +584,12 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
             versions[resource.ToString("D")] = version;
         }
 
+        var packageFiles = new JsonObject();
+        foreach (var (file, version) in draft.PackageFiles.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+        {
+            packageFiles[file] = version;
+        }
+
         var record = new JsonObject
         {
             ["id"] = draft.Id,
@@ -487,6 +597,7 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
             ["start"] = draft.Start,
             ["created"] = draft.Created.ToString("O", CultureInfo.InvariantCulture),
             ["versions"] = versions,
+            ["packageFiles"] = packageFiles,
         };
         git.Refs.Add(RecordName(draft.Id), CreateBlob(git, Encoding.UTF8.GetBytes(record.ToJsonString())).Id, allowOverwrite: true);
     }
@@ -502,6 +613,46 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
         var main = git.Refs[Main]?.ResolveToDirectReference().Target as Commit;
         var version = main is null ? null : Resources(main).FirstOrDefault(file => file.Id == resource)?.Version;
         Save(git, draft with { Versions = new Dictionary<Guid, string?>(draft.Versions) { [resource] = version } });
+    }
+
+    // As Remember, for a package file by its path.
+    private static void RememberFile(Repository git, StudioDraft draft, string file)
+    {
+        if (draft.PackageFiles.ContainsKey(file))
+        {
+            return;
+        }
+
+        var main = git.Refs[Main]?.ResolveToDirectReference().Target as Commit;
+        Save(git, draft with { PackageFiles = new Dictionary<string, string?>(draft.PackageFiles, StringComparer.Ordinal) { [file] = PackageFileVersion(main, file) } });
+    }
+
+    // The version of the package file on the commit, or null when the commit or the file is missing.
+    private static string? PackageFileVersion(Commit? commit, string file) =>
+        commit?.Tree[file]?.Target is Blob blob ? Version(Content(blob)) : null;
+
+    private static string Version(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
+
+    private static byte[] Content(Blob blob)
+    {
+        using var stream = blob.GetContentStream();
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        return buffer.ToArray();
+    }
+
+    // True when a folder on the way to the file, in the tree, is a file, so no folder can be made there.
+    private static bool FileInTheWay(Tree tree, string file)
+    {
+        for (var slash = file.IndexOf('/', StringComparison.Ordinal); slash >= 0; slash = file.IndexOf('/', slash + 1))
+        {
+            if (tree[file[..slash]]?.Target is Blob)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Adds a commit to the branch, unless the tree is the tip's.
@@ -529,10 +680,10 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
     {
         var files = new List<(string File, byte[] Bytes)>();
         Walk(commit.Tree, "", files);
-        return StudioFolder.Resources(files);
+        return StudioFolder.Resources([.. files.Where(file => file.File.EndsWith(".json", StringComparison.Ordinal))]);
     }
 
-    // The *.json files of a tree, as a folder lists them.
+    // The *.json files and the files under packages/ of a tree, as StudioFolder.Files lists them for a folder.
     private static void Walk(Tree tree, string prefix, List<(string File, byte[] Bytes)> files)
     {
         foreach (var entry in tree)
@@ -543,14 +694,9 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
                 case Tree subtree:
                     Walk(subtree, path + "/", files);
                     break;
-                case Blob blob when path.EndsWith(".json", StringComparison.Ordinal):
-                    using (var stream = blob.GetContentStream())
-                    using (var buffer = new MemoryStream())
-                    {
-                        stream.CopyTo(buffer);
-                        files.Add((path, buffer.ToArray()));
-                    }
-
+                case Blob blob when path.EndsWith(".json", StringComparison.Ordinal)
+                    || path.StartsWith(ApplicationLoader.PackagesFolderPrefix, StringComparison.Ordinal):
+                    files.Add((path, Content(blob)));
                     break;
             }
         }
@@ -578,9 +724,16 @@ internal sealed record StudioDraftOutcome<T>(StudioWriteRefusal? Refusal, T? Val
 
 /// <summary>
 /// A draft's record: its id, the user id of its owner, the commit of <c>main</c> it started at, its creation time and the
-/// version each resource it used had on <c>main</c> at first use, null for a resource <c>main</c> lacked.
+/// version each resource it used had on <c>main</c> at first use, null for a resource <c>main</c> lacked, and the same for each
+/// package file it used, by path.
 /// </summary>
-internal sealed record StudioDraft(string Id, string UserId, string Start, DateTimeOffset Created, IReadOnlyDictionary<Guid, string?> Versions);
+internal sealed record StudioDraft(
+    string Id,
+    string UserId,
+    string Start,
+    DateTimeOffset Created,
+    IReadOnlyDictionary<Guid, string?> Versions,
+    IReadOnlyDictionary<string, string?> PackageFiles);
 
 /// <summary>
 /// One page of a draft's diff: the commit it started at, the commit the page was read at, the files in this page sorted by
@@ -588,8 +741,11 @@ internal sealed record StudioDraft(string Id, string UserId, string Start, DateT
 /// </summary>
 internal sealed record StudioDraftDiff(string Start, string Tip, IReadOnlyList<StudioRevisionChange> Resources, string? Cursor);
 
-/// <summary>A resource a draft used whose version on <c>main</c> has changed: its id and the new version, null when <c>main</c> lacks it.</summary>
-internal sealed record StudioDraftConflict(Guid Id, string? Version);
+/// <summary>
+/// A resource or a package file a draft used whose version on <c>main</c> has changed: the id of the resource, or the path of the
+/// package file with no id, and the new version, null when <c>main</c> lacks it.
+/// </summary>
+internal sealed record StudioDraftConflict(Guid? Id, string? Version, string? File = null);
 
 /// <summary>The layer file a draft write left: its path and version, both null when the write left no layer.</summary>
 internal sealed record StudioDraftLayer(string? File, string? Version);

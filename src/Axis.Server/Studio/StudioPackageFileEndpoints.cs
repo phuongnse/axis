@@ -4,7 +4,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Server.Mcp;
 using Axis.Server.Tenancy;
+using Axis.Server.Users;
 using Axis.Studio;
 using Microsoft.Net.Http.Headers;
 
@@ -24,6 +26,13 @@ namespace Axis.Server.Studio;
 /// write lock (503) and the version (409) come last. A read answers 404 for a path that names no file. In a cell the <c>PUT</c> checks the tenant's storage
 /// quota (403 <c>quota-exceeded</c>) right after the session, and the <c>DELETE</c> never does, see
 /// <c>docs/reference/tenant-quotas.md#refusals</c>. Each write is one revision.
+/// <para>
+/// With <c>?draft=&lt;id&gt;</c> every route lists, reads, writes or deletes the files of the signed-in author's draft instead
+/// and leaves the working folder alone, with the same answers. The checks run in the same order up to the body. Then come the
+/// write lock (503), the draft (404, also for another person's draft), the missing file of a read or a <c>DELETE</c> (404) and
+/// the version (409), which is the version in the draft. A write is one commit on the draft's branch, and its diagnostics are
+/// the draft's own.
+/// </para>
 /// </summary>
 internal static class StudioPackageFileEndpoints
 {
@@ -41,12 +50,25 @@ internal static class StudioPackageFileEndpoints
         endpoints.MapDelete("/api/studio/apps/{application}/packages/{package}/files/{**path}", DeleteAsync);
     }
 
-    private static async Task<IResult> ListAsync(string application, HttpContext httpContext, StudioOptions options)
+    private static async Task<IResult> ListAsync(
+        string application, string? draft, HttpContext httpContext, StudioOptions options, IStudioWriteLock writeLock)
     {
         var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
         if (folder is null)
         {
             return refusal!;
+        }
+
+        if (draft is not null)
+        {
+            if (await DraftsAsync(httpContext, options, folder, writeLock) is not { } drafts)
+            {
+                return StudioEndpoints.NotFound(StudioRevisionEndpoints.NoDraft);
+            }
+
+            var listed = await drafts.ListPackageFilesAsync(draft, httpContext.RequestAborted);
+            return Refused(listed.Refusal) ?? Results.Ok(new StudioPackageFileListResponse(
+                [.. listed.Value!.Select(item => new StudioPackageFileItem(item.Package, item.Path, item.Version))]));
         }
 
         return Results.Ok(new StudioPackageFileListResponse(
@@ -54,7 +76,7 @@ internal static class StudioPackageFileEndpoints
     }
 
     private static async Task<IResult> GetAsync(
-        string application, string package, string path, HttpContext httpContext, StudioOptions options)
+        string application, string package, string path, string? draft, HttpContext httpContext, StudioOptions options, IStudioWriteLock writeLock)
     {
         var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
         if (folder is null)
@@ -62,7 +84,32 @@ internal static class StudioPackageFileEndpoints
             return refusal!;
         }
 
-        if (StudioPackageFiles.File(package, path) is not { } file || StudioPackageFiles.Read(folder, file) is not { } bytes)
+        if (StudioPackageFiles.File(package, path) is not { } file)
+        {
+            return StudioEndpoints.NotFound(NoPackageFile);
+        }
+
+        byte[] bytes;
+        if (draft is not null)
+        {
+            if (await DraftsAsync(httpContext, options, folder, writeLock) is not { } drafts)
+            {
+                return StudioEndpoints.NotFound(StudioRevisionEndpoints.NoDraft);
+            }
+
+            var read = await drafts.ReadPackageFileAsync(draft, file, httpContext.RequestAborted);
+            if (Refused(read.Refusal) is { } refused)
+            {
+                return refused;
+            }
+
+            bytes = read.Value!;
+        }
+        else if (StudioPackageFiles.Read(folder, file) is { } found)
+        {
+            bytes = found;
+        }
+        else
         {
             return StudioEndpoints.NotFound(NoPackageFile);
         }
@@ -76,6 +123,7 @@ internal static class StudioPackageFileEndpoints
         string application,
         string package,
         string path,
+        string? draft,
         HttpContext httpContext,
         StudioOptions options,
         PackageCatalog packages,
@@ -134,6 +182,12 @@ internal static class StudioPackageFileEndpoints
             return StudioEndpoints.Problem(StatusCodes.Status409Conflict, StalePackageFile);
         }
 
+        if (draft is not null)
+        {
+            return await PutDraftAsync(
+                httpContext, options, packages, modules, writeLock, folder, draft, file, Encoding.UTF8.GetBytes(content), hasIfMatch, hasIfNoneMatch);
+        }
+
         var outcome = await StudioWrites.WritePackageFileAsync(
             writeLock,
             await StudioEndpoints.RevisionsAsync(httpContext, options, folder),
@@ -143,7 +197,7 @@ internal static class StudioPackageFileEndpoints
             hasIfMatch ? request.Headers.IfMatch.ToString() : null,
             hasIfNoneMatch,
             httpContext.RequestAborted);
-        if (Refused(outcome) is { } refused)
+        if (Refused(outcome.Refusal, StudioEndpoints.Problem(StatusCodes.Status400BadRequest, BadPath)) is { } refused)
         {
             return refused;
         }
@@ -156,6 +210,7 @@ internal static class StudioPackageFileEndpoints
         string application,
         string package,
         string path,
+        string? draft,
         HttpContext httpContext,
         StudioOptions options,
         PackageCatalog packages,
@@ -168,7 +223,7 @@ internal static class StudioPackageFileEndpoints
             return refusal!;
         }
 
-        if (StudioPackageFiles.File(package, path) is not { } file || StudioPackageFiles.Read(folder, file) is null)
+        if (StudioPackageFiles.File(package, path) is not { } file || (draft is null && StudioPackageFiles.Read(folder, file) is null))
         {
             return StudioEndpoints.NotFound(NoPackageFile);
         }
@@ -179,6 +234,23 @@ internal static class StudioPackageFileEndpoints
             return StudioEndpoints.Problem(StatusCodes.Status428PreconditionRequired, "The delete needs the file's version in If-Match.");
         }
 
+        if (draft is not null)
+        {
+            if (await DraftsAsync(httpContext, options, folder, writeLock) is not { } drafts)
+            {
+                return StudioEndpoints.NotFound(StudioRevisionEndpoints.NoDraft);
+            }
+
+            var deleted = await drafts.DeletePackageFileAsync(draft, file, request.Headers.IfMatch.ToString(), httpContext.RequestAborted);
+            if (Refused(deleted.Refusal) is { } notDeleted)
+            {
+                return notDeleted;
+            }
+
+            var (draftDiagnostics, error) = await DraftDiagnosticsAsync(httpContext, drafts, draft, packages, modules);
+            return error ?? Results.Ok(new StudioDeleteResponse(draftDiagnostics!));
+        }
+
         var outcome = await StudioWrites.DeletePackageFileAsync(
             writeLock,
             await StudioEndpoints.RevisionsAsync(httpContext, options, folder),
@@ -186,7 +258,7 @@ internal static class StudioPackageFileEndpoints
             file,
             request.Headers.IfMatch.ToString(),
             httpContext.RequestAborted);
-        if (Refused(outcome) is { } refused)
+        if (Refused(outcome.Refusal, StudioEndpoints.Problem(StatusCodes.Status400BadRequest, BadPath)) is { } refused)
         {
             return refused;
         }
@@ -194,13 +266,74 @@ internal static class StudioPackageFileEndpoints
         return Results.Ok(new StudioDeleteResponse(StudioDiagnostics.Compile(folder, packages, modules)));
     }
 
-    // The problem that a refused write answers, or null when the write was made.
-    private static IResult? Refused(StudioWriteOutcome outcome) => outcome.Refusal switch
+    // The draft's package file write, after the checks it shares with the working folder's. The answer is the working folder's, with
+    // the draft's version and diagnostics.
+    private static async Task<IResult> PutDraftAsync(
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        IStudioWriteLock writeLock,
+        string folder,
+        string draft,
+        string file,
+        byte[] bytes,
+        bool hasIfMatch,
+        bool hasIfNoneMatch)
+    {
+        if (await DraftsAsync(httpContext, options, folder, writeLock) is not { } drafts)
+        {
+            return StudioEndpoints.NotFound(StudioRevisionEndpoints.NoDraft);
+        }
+
+        var written = await drafts.WritePackageFileAsync(
+            draft,
+            file,
+            bytes,
+            hasIfMatch ? httpContext.Request.Headers.IfMatch.ToString() : null,
+            hasIfNoneMatch,
+            httpContext.RequestAborted);
+        if (Refused(written.Refusal) is { } refused)
+        {
+            return refused;
+        }
+
+        var (diagnostics, error) = await DraftDiagnosticsAsync(httpContext, drafts, draft, packages, modules);
+        if (error is not null)
+        {
+            return error;
+        }
+
+        httpContext.Response.Headers.ETag = $"\"{written.Value}\"";
+        return Results.Ok(new StudioPatchResponse(written.Value!, diagnostics!));
+    }
+
+    // The signed-in author's drafts on the folder, or null when the server keeps no revisions.
+    private static async Task<StudioDrafts?> DraftsAsync(HttpContext httpContext, StudioOptions options, string folder, IStudioWriteLock writeLock)
+    {
+        var user = (await CurrentUsers.FindAsync(httpContext))!;
+        return StudioDrafts.For(StudioEndpoints.ForRequest(httpContext, options).RevisionsPath, folder, user.Id, user.DisplayName, writeLock);
+    }
+
+    // The compile diagnostics of the draft as its branch now holds it, as an MCP draft write answers them, or the refusal.
+    private static async Task<(IReadOnlyList<StudioDiagnostic>? Diagnostics, IResult? Error)> DraftDiagnosticsAsync(
+        HttpContext httpContext, StudioDrafts drafts, string draft, PackageCatalog packages, ModuleCatalog modules)
+    {
+        var files = await drafts.FilesAsync(draft, httpContext.RequestAborted);
+        return Refused(files.Refusal) is { } refused
+            ? (null, refused)
+            : (StudioDiagnostics.CompileFiles(McpReadTools.Contents(files.Value!), packages, modules), null);
+    }
+
+    // The problem that a refused write answers, or null when the write was made. A refusal that no case names answers
+    // otherwise: a draft that is not found, unless the working folder's write gives another.
+    private static IResult? Refused(StudioWriteRefusal? refusal, IResult? otherwise = null) => refusal switch
     {
         null => null,
         StudioWriteRefusal.Unavailable => StudioEndpoints.Problem(StatusCodes.Status503ServiceUnavailable, StudioEndpoints.WriteLockUnavailable),
         StudioWriteRefusal.Stale or StudioWriteRefusal.Exists => StudioEndpoints.Problem(StatusCodes.Status409Conflict, StalePackageFile),
-        _ => StudioEndpoints.Problem(StatusCodes.Status400BadRequest, BadPath),
+        StudioWriteRefusal.FileMissing => StudioEndpoints.NotFound(NoPackageFile),
+        _ => otherwise ?? StudioEndpoints.NotFound(StudioRevisionEndpoints.NoDraft),
     };
 }
 

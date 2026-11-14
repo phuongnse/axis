@@ -639,11 +639,14 @@ internal sealed class Publisher(
             var resources = StudioFolder.List(folder);
             foreach (var conflict in conflicts)
             {
-                var file = resources.FirstOrDefault(resource => resource.Id == conflict.Id)?.File ?? "";
+                // A package file conflict names the file's path and has no resource id.
+                var subject = conflict.File is null ? $"resource {conflict.Id:D}" : $"package file {conflict.File}";
                 var message = conflict.Version is null
-                    ? $"The resource {conflict.Id:D} changed on main since the draft read it: main no longer has it."
-                    : $"The resource {conflict.Id:D} changed on main since the draft read it: its version is now {conflict.Version}.";
-                diagnostics.Add(new Diagnostic(DiagnosticCodes.AcceptConflict, message, file, "", conflict.Id));
+                    ? $"The {subject} changed on main since the draft read it: main no longer has it."
+                    : $"The {subject} changed on main since the draft read it: its version is now {conflict.Version}.";
+                diagnostics.Add(conflict.File is null
+                    ? new Diagnostic(DiagnosticCodes.AcceptConflict, message, resources.FirstOrDefault(resource => resource.Id == conflict.Id)?.File ?? "", "", conflict.Id)
+                    : new Diagnostic(DiagnosticCodes.AcceptConflict, message, conflict.File, ""));
                 _output.WriteLine($"{tenant.Id} draft failed: {DiagnosticCodes.AcceptConflict} {message}");
             }
 

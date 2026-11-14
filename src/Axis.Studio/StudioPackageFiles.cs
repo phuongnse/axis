@@ -25,10 +25,17 @@ internal static class StudioPackageFiles
     /// Every file of <paramref name="folder"/> under <c>packages/</c>, sorted by file, with the SHA-256 of its bytes as lower-case hex.
     /// A file directly under <c>packages/</c>, which is in no package, is left out.
     /// </summary>
-    public static IReadOnlyList<(string Package, string Path, string Version)> List(string folder)
+    public static IReadOnlyList<(string Package, string Path, string Version)> List(string folder) => List(StudioFolder.Files(folder));
+
+    /// <summary>
+    /// The files of <paramref name="files"/>, as <see cref="StudioFolder.Files"/> or a draft's branch lists them, that are under
+    /// <c>packages/</c>, in their order, split into package and path, with the SHA-256 of their bytes as lower-case hex.
+    /// A file directly under <c>packages/</c>, which is in no package, is left out.
+    /// </summary>
+    public static IReadOnlyList<(string Package, string Path, string Version)> List(IEnumerable<(string File, byte[] Bytes)> files)
     {
         var items = new List<(string Package, string Path, string Version)>();
-        foreach (var (file, bytes) in StudioFolder.Files(folder))
+        foreach (var (file, bytes) in files)
         {
             if (!file.StartsWith(ApplicationLoader.PackagesFolderPrefix, StringComparison.Ordinal))
             {

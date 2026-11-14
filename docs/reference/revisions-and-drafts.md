@@ -71,12 +71,15 @@ from every other draft.
   a resource. It replaces the file of the resource the draft has, and a new resource goes where a
   create puts it. A write may not change the kind of a resource the draft has. A layer write holds only
   the difference of a module resource, as the [save](module-resource-saves.md#the-save) writes it, and
-  removes the draft's layer when nothing differs. The manifest cannot be deleted.
+  removes the draft's layer when nothing differs. The manifest cannot be deleted. A package file
+  is written at its path as the bytes it is given, by the
+  [package file routes](studio-packages.md#the-authoring-api) of the authoring API.
 - **What it records.** For each resource it reads or changes, the version that resource had on `main`
-  when the draft first used it. A resource `main` lacks is recorded as absent. Listing resources
+  when the draft first used it, and for each package file it reads, writes or deletes, the version of
+  that file on `main` by its path. A resource or a file `main` lacks is recorded as absent. Listing
   records nothing, so an unrelated change on `main` is not a conflict.
 - **The record.** A draft's record holds its owner, the commit it started at, its creation time and
-  the recorded versions. It is kept in the same repository as the branch, under `refs/axis/drafts/<draft id>`.
+  the recorded versions of its resources and of its package files. It is kept in the same repository as the branch, under `refs/axis/drafts/<draft id>`.
 - **The owner.** A draft belongs to the person who made it. For anyone else it does not exist and
   answers "not found", as an unknown id does.
 - **Diff.** The diff of a draft is the difference between its branch and the `main` commit it started
@@ -104,7 +107,8 @@ lock from the first step to the last, so Studio writes to that folder wait.
    found, and the request fails.
 4. It compares each version the draft recorded with the version on `main` now. Each resource that
    differs is a conflict, answered as one `AXC0377` diagnostic with the resource id, its file and its
-   new version, and nothing is written.
+   new version, and nothing is written. A package file that differs, or that `main` gained or lost
+   since, is answered the same way, with its path as the file and no resource id.
 5. It applies the draft's changes to the folder's files in memory and runs the steps of a validate on
    the result: the compiler, the contract scenarios and every activation check, rolled back. After the
    validate passes, the application's own test scenarios run on the result as for a

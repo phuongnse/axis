@@ -53,6 +53,7 @@ internal enum StudioWriteRefusal
     LocalesChanged,
     TextsNotObject,
     Blocked,
+    FileMissing,
 }
 
 /// <summary>

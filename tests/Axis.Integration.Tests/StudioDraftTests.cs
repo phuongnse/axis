@@ -131,6 +131,42 @@ public sealed class StudioDraftTests(PostgreSqlFixture database) : IClassFixture
     }
 
     [Fact]
+    public async Task A_draft_records_the_version_a_package_file_had_on_main_by_path_and_a_record_without_package_files_still_loads()
+    {
+        const string file = "packages/x/adapter.py";
+        using var folder = StudioPublishTests.NewFolder().With(file, "print('v1')\n");
+        using var revisions = new TemporaryFolder();
+        var author = await NewAuthorAsync(folder.Path, revisions.Path, "author");
+        var draft = Created(await author.Drafts.CreateAsync(author.Revisions, CancellationToken));
+        var absent = "packages/x/new.py";
+
+        Assert.Single((await author.Drafts.ListPackageFilesAsync(draft.Id, CancellationToken)).Value!);
+        Assert.Empty(author.Drafts.Conflicts(draft.Id).Value!);
+        Assert.Null((await author.Drafts.WritePackageFileAsync(draft.Id, absent, "x"u8.ToArray(), null, ifNoneMatch: true, CancellationToken)).Refusal);
+        Assert.Null((await author.Drafts.ReadPackageFileAsync(draft.Id, file, CancellationToken)).Refusal);
+        Assert.Empty(author.Drafts.Conflicts(draft.Id).Value!);
+
+        File.WriteAllText(Path.Combine(folder.Path, file), "print('v2')\n");
+        File.WriteAllText(Path.Combine(folder.Path, absent), "y");
+        author.Revisions.RecordOutside();
+        Assert.Equal(
+            [new StudioDraftConflict(null, Version("print('v2')\n"), file), new StudioDraftConflict(null, Version("y"), absent)],
+            author.Drafts.Conflicts(draft.Id).Value!);
+
+        // A record that the code of an earlier release saved has no packageFiles, which reads as none.
+        var path = Path.Combine(revisions.Path, Path.GetFileName(folder.Path) + ".git");
+        using (var repository = new Repository(path))
+        {
+            var record = JsonNode.Parse(((Blob)repository.Refs["refs/axis/drafts/" + draft.Id].ResolveToDirectReference().Target).GetContentText())!.AsObject();
+            record.Remove("packageFiles");
+            using var content = new MemoryStream(Encoding.UTF8.GetBytes(record.ToJsonString()));
+            repository.Refs.Add("refs/axis/drafts/" + draft.Id, repository.ObjectDatabase.CreateBlob(content).Id, allowOverwrite: true);
+        }
+
+        Assert.Empty(author.Drafts.Conflicts(draft.Id).Value!);
+    }
+
+    [Fact]
     public async Task The_files_of_a_draft_hold_an_added_resource_and_record_no_version()
     {
         using var folder = StudioPublishTests.NewFolder();
@@ -465,6 +501,8 @@ public sealed class StudioDraftTests(PostgreSqlFixture database) : IClassFixture
 
     private static string Cursor(string sha, int index) =>
         Convert.ToBase64String(Encoding.UTF8.GetBytes($"{sha}:{index}")).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private static string Version(string text) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
 
     private static string Layer(string threshold) => $$"""
         {
