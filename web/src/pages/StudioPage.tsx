@@ -593,6 +593,7 @@ function StudioWorkspace() {
                 sidePanel === 'problems' && (
                   <StudioProblems
                     diagnostics={loaded.diagnostics}
+                    resources={resources}
                     onSelect={selectDiagnostic}
                     onClose={() => setSidePanel(null)}
                   />

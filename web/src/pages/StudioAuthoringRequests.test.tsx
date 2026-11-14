@@ -218,7 +218,7 @@ describe('a ready request’s review', () => {
     )
   }
 
-  it('warns of blocking findings its fix rounds left open, then lists its notes, each at its file and path', async () => {
+  it('sums the review up in one line, then lists each finding led by what it is, its words as text', async () => {
     stub({
       ...fromApp,
       aiConnected: true,
@@ -236,18 +236,20 @@ describe('a ready request’s review', () => {
     renderPage()
 
     const review = await screen.findByTestId('studio-ai-review')
-    expect(within(review).getByRole('alert')).toHaveTextContent('so it will not accept the change by itself')
-    expect(within(review).getByText('Must change')).toBeInTheDocument()
-    expect(within(review).getByText('Mails the approver too.')).toBeInTheDocument()
-    expect(within(review).queryByText('error')).toBeNull()
-    expect(within(review).getByText('Notes')).toBeInTheDocument()
-    expect(within(review).getByText(/processes\/p\.json, .*\/steps\/5/)).toBeInTheDocument()
     expect(
-      within(review).getByText('A review is no guarantee. Read the changes before you accept.'),
+      within(review).getByText(
+        '1 finding must change, 1 note. AI did not resolve it in its fix rounds, so you decide.',
+      ),
     ).toBeInTheDocument()
+    expect(within(review).queryByRole('alert')).toBeNull()
+    expect(within(review).getByText('Must change:')).toBeInTheDocument()
+    expect(within(review).getByText('Note:')).toBeInTheDocument()
+    expect(within(review).getByText('Mails the approver too.', { exact: false })).toBeInTheDocument()
+    // A finding with no resource names its file as text, and nothing in it is a link.
+    expect(within(review).queryByRole('button')).toBeNull()
   })
 
-  it('opens the resource of a finding at its path', async () => {
+  it('links only the resource a finding is about, named as people read it, and opens it at its path', async () => {
     stub({
       ...fromApp,
       aiConnected: true,
@@ -261,12 +263,24 @@ describe('a ready request’s review', () => {
         application={application}
         requestId={fromApp.id}
         userId={userId}
-        resources={[]}
+        resources={[
+          {
+            id: 'r-1',
+            kind: 'page',
+            name: 'RequestList',
+            file: 'pages/list.json',
+            version: 'v',
+            usedBy: 0,
+            titles: { en: 'Requests' },
+          },
+        ]}
         onOpen={onOpen}
       />,
     )
 
-    await userEvent.setup().click(await screen.findByRole('button', { name: /Could say why\./ }))
+    const link = await screen.findByRole('button', { name: 'Requests (page)' })
+    expect(screen.queryByRole('button', { name: /Could say why/ })).toBeNull()
+    await userEvent.setup().click(link)
 
     expect(onOpen).toHaveBeenCalledWith('r-1', '/widgets/0')
   })
@@ -276,15 +290,12 @@ describe('a ready request’s review', () => {
     renderPage()
 
     const review = await screen.findByTestId('studio-ai-review')
-    expect(within(review).getByText('The review found nothing that must change.')).toBeInTheDocument()
-    expect(within(review).queryByRole('alert')).toBeNull()
     expect(
-      within(review).getByText('A review is no guarantee. Read the changes before you accept.'),
+      within(review).getByText('Nothing must change. A review is no guarantee: read the changes before you accept.'),
     ).toBeInTheDocument()
   })
 })
 
-// Proposed: a ready request's page puts what its author decides on first, and the detail in tabs, see the review on #3263.
 describe('a ready request’s page', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -344,7 +355,7 @@ describe('a ready request’s page', () => {
     )
 
     const checks = await screen.findByTestId('studio-ai-checks')
-    expect(within(checks).getByText('It compiles, and 1 of 1 scenarios pass.')).toBeInTheDocument()
+    expect(within(checks).getByText('It compiles, and all 1 scenarios pass.')).toBeInTheDocument()
     expect(screen.getByText('Checks and review passed')).toBeInTheDocument()
     const changeList = await screen.findByTestId('studio-ai-what-changes')
     expect(within(changeList).getByText('A cost centre with a name and a code.')).toBeInTheDocument()
