@@ -41,14 +41,14 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task A_package_is_built_in_the_host_and_the_publish_succeeds_while_the_publisher_has_no_python()
+    public async Task A_package_is_built_in_the_host_and_the_publish_succeeds_and_stores_its_built_files_while_the_publisher_has_no_python()
     {
         using var trivy = new StubTrivy(StubTrivy.NoFindings);
         using var extensions = new TemporaryFolder();
         await using var host = await StartHostAsync(extensions.Path, trivy);
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var tenant = await CreateTenantAsync(scenario);
-        var request = await QueueAsync(scenario, tenant, NoDependencies);
+        var request = await QueueAsync(scenario, tenant, PhoneNumbersWheel.Requirement());
 
         var result = await RunPublisherAsync(scenario, tenant, request, host.Address);
 
@@ -57,7 +57,38 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
         Assert.Equal(1L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.active_releases"));
         Assert.Equal([("tools", "1.0.0")], host.Builds());
         Assert.True(trivy.Ran);
+        Assert.Equal(1L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.release_package_files WHERE path = 'packages/tools/phonenumbers/__init__.py'"));
+        Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.release_resources WHERE path LIKE 'packages/tools/phonenumbers/%'"));
         Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records WHERE action = 'release.publishFailed'"));
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task A_changed_package_gets_a_new_release_and_the_first_release_keeps_its_built_files()
+    {
+        using var trivy = new StubTrivy(StubTrivy.NoFindings);
+        using var extensions = new TemporaryFolder();
+        await using var host = await StartHostAsync(extensions.Path, trivy);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        const string firstFiles =
+            "SELECT string_agg(path || ' ' || encode(sha256(content), 'hex'), E'\n' ORDER BY path) FROM axis.release_package_files " +
+            "WHERE release_id = (SELECT id FROM axis.releases ORDER BY created_at, id LIMIT 1)";
+        var first = await QueueAsync(scenario, tenant, NoDependencies);
+        Assert.Equal(0, (await RunPublisherAsync(scenario, tenant, first, host.Address)).Exit);
+        Assert.Equal("succeeded", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{first}'"));
+        var before = (string)(await ScalarAsync(scenario, tenant, firstFiles))!;
+        Assert.Contains("packages/tools/adapter.py ", before, StringComparison.Ordinal);
+
+        var second = await QueueAsync(scenario, tenant, NoDependencies, adapter: "import os\n");
+        Assert.Equal(0, (await RunPublisherAsync(scenario, tenant, second, host.Address)).Exit);
+
+        Assert.Equal("succeeded", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{second}'"));
+        Assert.Equal(2L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.releases"));
+        Assert.Equal(before, await ScalarAsync(scenario, tenant, firstFiles));
+        Assert.Equal(
+            2L,
+            await ScalarAsync(scenario, tenant, "SELECT count(DISTINCT content) FROM axis.release_package_files WHERE path = 'packages/tools/adapter.py'"));
         await scenario.AssertNoSecretsAsync();
     }
 
@@ -168,7 +199,7 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
     }
 
     // Stores a publish of a minimal application with the package 'tools' over the runtime role, as the server does.
-    private async Task<Guid> QueueAsync(AdminScenario scenario, string tenant, string requirements, bool customerHosted = false)
+    private async Task<Guid> QueueAsync(AdminScenario scenario, string tenant, string requirements, bool customerHosted = false, string adapter = "import sys\n")
     {
         var row = await scenario.RowAsync(tenant);
         var password = AdminScenario.Cipher.Decrypt(tenant, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
@@ -183,19 +214,19 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
             connection);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("application", _applicationId);
-        command.Parameters.Add(new NpgsqlParameter("snapshot", NpgsqlTypes.NpgsqlDbType.Jsonb) { Value = Snapshot(requirements, customerHosted) });
+        command.Parameters.Add(new NpgsqlParameter("snapshot", NpgsqlTypes.NpgsqlDbType.Jsonb) { Value = Snapshot(requirements, customerHosted, adapter) });
         await command.ExecuteNonQueryAsync(CancellationToken);
         return id;
     }
 
-    private string Snapshot(string requirements, bool customerHosted)
+    private string Snapshot(string requirements, bool customerHosted, string adapter)
     {
         var package = customerHosted
             ? new (string, string)[] { ("packages/tools/axis-package.json", CustomerManifest) }
             :
             [
                 ("packages/tools/axis-package.json", Manifest),
-                ("packages/tools/adapter.py", "import sys\n"),
+                ("packages/tools/adapter.py", adapter),
                 ("packages/tools/requirements.txt", requirements),
             ];
         (string File, string Content)[] files =

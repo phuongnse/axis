@@ -801,11 +801,12 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
         using var folder = ApplicationFolder(TitleField);
         var active = await StartAsync(a, b, folder);
 
-        // A release without packages leaves release_packages empty, and a row trigger needs a row to fire on.
+        // A release without packages leaves release_packages and release_package_files empty, and a row trigger needs a row to fire on.
         await ScalarAsync(a, $"INSERT INTO axis.release_packages (release_id, package_id, version) VALUES ('{active[0]}', 'Example', '1.0.0')");
+        await ScalarAsync(a, $"INSERT INTO axis.release_package_files (release_id, path, content) VALUES ('{active[0]}', 'packages/x/a.py', '\\x00'::bytea)");
         var runtime = PostgreSqlServer.RuntimeConnectionString(a);
 
-        foreach (var table in new[] { "releases", "release_resources", "release_packages" })
+        foreach (var table in new[] { "releases", "release_resources", "release_packages", "release_package_files" })
         {
             var column = table == "releases" ? "id" : "release_id";
             foreach (var sql in new[] { $"UPDATE axis.{table} SET {column} = {column}", $"DELETE FROM axis.{table}" })

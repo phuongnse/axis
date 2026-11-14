@@ -356,8 +356,11 @@ that its release was compiled against.
   `packages/<id>/`, and the manifest alone for a customer-hosted one, so running work keeps the contract it
   started with, see [An application's packages](#an-applications-packages). Their versions are not
   pins: the compiled step holds the version in the package's manifest.
-- **A built package in the release** _(planned for M37)_. The release holds the built package, so running
-  work keeps the code it started with.
+- **A built package in the release.** A release that a `publish` stores also holds every file of each built
+  package of the application, the installed dependencies included, in `axis.release_package_files`, see
+  [storage](storage.md#system-tables). The content hash leaves them out, so a changed package gives a new
+  release and the older release keeps its built files. A release that `activate` or the server's start stores
+  holds none, and a release that is already stored gets none from a later `publish` of the same content.
 
 ## Loading
 
@@ -756,8 +759,8 @@ trusted code, so the platform gives it more limits than an installation's packag
   `packages/<id>/requirements.txt` for a scan finding or a failed install. A host that refuses the connection,
   closes it without an answer or does not answer within 5 minutes fails it with one `AXC0152` diagnostic at
   `packages/<id>/axis-package.json`, which does not name the host's address. Either way no release is stored,
-  and a `publish` to a `tenant` writes `release.publishFailed`. A `built` answer lets the compile go on, and the release
-  still holds the files as written. A `validate`, `accept`, `test`, `activate` and the activation at server start do not build
+  and a `publish` to a `tenant` writes `release.publishFailed`. A `built` answer lets the compile go on, and a new release
+  stores the built files, see [a built package in the release](#versions-and-pinning). A `validate`, `accept`, `test`, `activate` and the activation at server start do not build
   packages yet. A publish needs the publisher role only.
 - **In the release.** The release holds every file of the package as written, and the content hash covers
   them, see [versions and pinning](#versions-and-pinning) and

@@ -20,6 +20,7 @@ Core migrations shipped with Axis.
 | `axis.releases`                      | `Axis.Configuration` | A stored release                                                                                                                                                            |
 | `axis.release_resources`             | `Axis.Configuration` | A file of a release. A module's files keep their `modules/<id>/` path, see [modules](modules-and-templates.md#modules)                                                      |
 | `axis.release_packages`              | `Axis.Configuration` | An extension package version that a release pins, as release id, package id and version, unique per release and package                                                     |
+| `axis.release_package_files`         | `Axis.Configuration` | A built file of one of a release's own packages, keyed by release and path, see [versions and pinning](extension-packages.md#versions-and-pinning)                          |
 | `axis.active_releases`               | `Axis.Configuration` | The active release of an application `id`, with the application's name, unique ignoring letter case                                                                         |
 | `axis.active_sites`                  | `Axis.Configuration` | A site path of an active release, as application `id` and path, unique on path                                                                                              |
 | `axis.release_computed_fingerprints` | `Axis.Configuration` | The hash of an entity's computed definitions in a release, see [recomputing](migrations.md#recompute-tables)                                                                |
@@ -66,15 +67,17 @@ foreign key.
 erDiagram
     releases ||--o{ release_resources : holds
     releases ||--o{ release_packages : pins
+    releases ||--o{ release_package_files : "holds built"
     releases ||--o{ release_computed_fingerprints : has
     releases ||--o{ active_releases : "is active as"
     releases ||--o{ release_activations : "is recorded in"
     active_releases ||--o{ active_sites : serves
 ```
 
-- **Releases are immutable.** A release and its resources are only inserted together, and the
-  configuration context's change tracking makes a save fail when a stored release or resource is
-  modified or deleted, or when a resource is added to a stored release. Bulk operations
+- **Releases are immutable.** A release, its resources and the built files of its own packages are
+  only inserted together, and the configuration context's change tracking makes a save fail when a
+  stored release, resource or built file is modified or deleted, or when a resource or built file is
+  added to a stored release. Bulk operations
   (`ExecuteUpdate`, `ExecuteDelete`) and raw SQL bypass this guard, so the
   [release trigger](#database-roles) backs it. The guard still fails first, before any SQL runs.
 - **The active release store.** Other modules read and set the active release and its site paths
@@ -383,7 +386,7 @@ What each database role may do:
 | `entities` tables                                                                                                                                                                                                                                                                                                                                                                                                                                     | Owns them                                                        | Read and write rows                                               |
 | `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, `notifications`, `notification_reads`, `email_outbox`, `webhook_deliveries`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `mcp_clients`, `package_runners`, `given_roles`, `application_settings`, `resource_writes`, `record_imports`, `files`, `file_contents`, `authoring_requests`, `authoring_request_steps` | Owns them                                                        | Read and write rows                                               |
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                                                                                                                                                                                                                               | Owns them                                                        | Read only                                                         |
-| Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                                                                                                                                                                                                                                   | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
+| Release tables: `releases`, `release_resources`, `release_packages`, `release_package_files`                                                                                                                                                                                                                                                                                                                                                               | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | `publish_requests`                                                                                                                                                                                                                                                                                                                                                                                                                                    | Owns it. The publisher changes the status and the lease          | `SELECT` and `INSERT` only. It never updates or deletes a request |
 | `release_activations`                                                                                                                                                                                                                                                                                                                                                                                                                                 | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | Sequences in `axis` and `entities`                                                                                                                                                                                                                                                                                                                                                                                                                    | Owns them                                                        | `USAGE`, `SELECT`                                                 |
@@ -405,7 +408,7 @@ What each database role may do:
   privileges for the tables the migrations create, and the second grants the tables that now exist.
   The step refuses a runtime database role that is the schema database role. It holds an advisory
   lock until it ends, so servers that start together run their grant steps one after the other.
-- **Release trigger.** A trigger refuses every `UPDATE`, `DELETE` and `TRUNCATE` on the three
+- **Release trigger.** A trigger refuses every `UPDATE`, `DELETE` and `TRUNCATE` on the four
   release tables, for every database role, with SQLSTATE `23001`, so a stored release cannot be
   deleted. An `Axis.Configuration` migration creates it. It backs the change-tracking guard of
   [immutable releases](#system-tables), which fails first. A superuser or the table owner can still

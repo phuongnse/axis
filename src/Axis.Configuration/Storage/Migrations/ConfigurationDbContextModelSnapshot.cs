@@ -497,6 +497,27 @@ namespace Axis.Configuration.Storage.Migrations
                     b.ToTable("release_packages", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Configuration.Storage.ReleasePackageFile", b =>
+                {
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.Property<string>("Path")
+                        .HasColumnType("text")
+                        .HasColumnName("path");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("content");
+
+                    b.HasKey("ReleaseId", "Path")
+                        .HasName("pk_release_package_files");
+
+                    b.ToTable("release_package_files", "axis");
+                });
+
             modelBuilder.Entity("Axis.Configuration.Storage.ReleaseResource", b =>
                 {
                     b.Property<Guid>("ReleaseId")
@@ -613,6 +634,16 @@ namespace Axis.Configuration.Storage.Migrations
                         .HasConstraintName("fk_release_packages_releases_release_id");
                 });
 
+            modelBuilder.Entity("Axis.Configuration.Storage.ReleasePackageFile", b =>
+                {
+                    b.HasOne("Axis.Configuration.Storage.Release", null)
+                        .WithMany("PackageFiles")
+                        .HasForeignKey("ReleaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_release_package_files_releases_release_id");
+                });
+
             modelBuilder.Entity("Axis.Configuration.Storage.ReleaseResource", b =>
                 {
                     b.HasOne("Axis.Configuration.Storage.Release", null)
@@ -626,6 +657,8 @@ namespace Axis.Configuration.Storage.Migrations
             modelBuilder.Entity("Axis.Configuration.Storage.Release", b =>
                 {
                     b.Navigation("ComputedFingerprints");
+
+                    b.Navigation("PackageFiles");
 
                     b.Navigation("Packages");
 

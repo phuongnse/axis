@@ -22,6 +22,9 @@ public sealed class Release
     /// <summary>The extension package versions the release pins.</summary>
     public List<ReleasePackage> Packages { get; init; } = [];
 
+    /// <summary>The built files of the release's own application packages; a release that a publish stores holds them.</summary>
+    public List<ReleasePackageFile> PackageFiles { get; init; } = [];
+
     /// <summary>The fingerprint of the computed fields of each entity that is not a child entity.</summary>
     public List<ReleaseComputedFingerprint> ComputedFingerprints { get; init; } = [];
 }
