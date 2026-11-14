@@ -1700,7 +1700,8 @@ export interface StudioAuthoringRequest {
    */
   coAuthors: string[]
   state: StudioAuthoringRequestState
-  plan: string | null
+  /** Proposed: the request's plan, or `null` before AI has written it, see {@link StudioPlan}. */
+  plan: StudioPlan | null
   round: number
   tokens: number
   autoAccept: boolean
@@ -1790,12 +1791,6 @@ export interface StudioAuthoringRequestDetail extends StudioAuthoringRequest {
   steps: StudioAuthoringRequestStep[]
   draft: string | null
   checks: StudioRequest | null
-  /**
-   * Proposed: the plan's summary in one or two sentences, and the choices AI made that the request did not say, which
-   * its author agrees to by approving the plan, see the review on #3263. `null` and empty before the plan is written.
-   */
-  planSummary: string | null
-  planDecisions: string[]
   /** Proposed: the latest review, or `null` before one ran, see {@link StudioReview}. */
   review: StudioReview | null
   changes: { file: string; summary: string }[]
@@ -1814,6 +1809,21 @@ export interface StudioReviewFinding {
   file: string
   path: string
   resourceId: string | null
+}
+
+/**
+ * Proposed: a request's plan, as a pull request's plan is written, see the review on #3263: its summary, what changes
+ * in words, the choices AI made that the request did not say and why, which its author agrees to by approving, its
+ * effects on the data and the people already there and its limits, how it will be checked, and, resource by resource,
+ * the edits it will make.
+ */
+export interface StudioPlan {
+  summary: string
+  changes: string[]
+  decisions: { decision: string; reason: string }[]
+  risks: string[]
+  checks: string[]
+  details: { resourceId: string | null; file: string; edits: string[] }[]
 }
 
 /**

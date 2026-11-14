@@ -19,6 +19,7 @@ import {
   type StudioAuthoringRequestDetail,
   type StudioAuthoringRequestState,
   type StudioAuthoringRequestStep,
+  type StudioPlan,
   type StudioReview,
   type StudioRequest,
   type StudioResourceItem,
@@ -504,36 +505,10 @@ export function StudioAuthoringRequestPage({
         )}
     </SectionParts>
   )
-  const planView = (
-    <Flex vertical gap="middle">
-      {request.plan !== null && (
-        <Flex vertical gap="small">
-          {request.planSummary !== null && <Typography.Text>{request.planSummary}</Typography.Text>}
-          <ul style={{ margin: 0, paddingInlineStart: spacing.lg }} data-testid="studio-ai-plan">
-            {request.plan
-              .split('\n')
-              .filter((step) => step.trim() !== '')
-              .map((step, index) => (
-                <li key={index}>{step}</li>
-              ))}
-          </ul>
-          {/* Proposed: the choices AI made that the request did not say, agreed to by approving, see the review on #3263. */}
-          {request.planDecisions.length > 0 && (
-            <Flex vertical gap={spacing.xs} data-testid="studio-ai-plan-decisions">
-              <Typography.Text strong>{t('shell.studio.aiRequest.decisions')}</Typography.Text>
-              <ul style={{ margin: 0, paddingInlineStart: spacing.lg }}>
-                {request.planDecisions.map((decision, index) => (
-                  <li key={index}>{decision}</li>
-                ))}
-              </ul>
-            </Flex>
-          )}
-          {awaiting && !mine && (
-            <Typography.Text style={{ color: colour.textMuted }}>
-              {t('shell.studio.aiRequest.notYours')}
-            </Typography.Text>
-          )}
-        </Flex>
+  const planView = request.plan !== null && (
+    <PlanView plan={request.plan} resources={resources} onOpen={onOpen}>
+      {awaiting && !mine && (
+        <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.aiRequest.notYours')}</Typography.Text>
       )}
       {awaiting && mine && (
         <AxisActionRow>
@@ -548,7 +523,7 @@ export function StudioAuthoringRequestPage({
           </AxisButton>
         </AxisActionRow>
       )}
-    </Flex>
+    </PlanView>
   )
   const changesView =
     changes === undefined ? (
@@ -742,6 +717,85 @@ export function StudioAuthoringRequestPage({
 }
 
 /**
+ * Proposed: a request's plan, written as a pull request's plan is, see the review on #3263: its summary, then, each a
+ * group named in bold, What changes, Decisions to check, each choice in bold with its reason, Effects and risks, and How
+ * it will be checked, then its details, resource by resource, folded until asked for, and last `children`, such as the
+ * approval's actions.
+ */
+function PlanView({
+  plan,
+  resources,
+  onOpen,
+  children,
+}: {
+  plan: StudioPlan
+  resources: readonly StudioResourceItem[]
+  onOpen: (resourceId: string, path: string) => void
+  children: ReactNode
+}) {
+  const t = useText()
+  const { spacing } = useDesignTokens()
+  const [details, setDetails] = useState(false)
+  const bullets = (items: readonly ReactNode[]) => (
+    <ul style={{ margin: 0, paddingInlineStart: spacing.lg }}>
+      {items.map((item, index) => (
+        <li key={index}>{item}</li>
+      ))}
+    </ul>
+  )
+  const group = (key: string, testId: string, items: readonly ReactNode[]) =>
+    items.length > 0 && (
+      <Flex vertical gap={spacing.xs} data-testid={testId}>
+        <Typography.Text strong>{t(key)}</Typography.Text>
+        {bullets(items)}
+      </Flex>
+    )
+  return (
+    <Flex vertical gap="middle" data-testid="studio-ai-plan">
+      <Typography.Text>{plan.summary}</Typography.Text>
+      {group('shell.studio.aiRequest.plan.changes', 'studio-ai-plan-changes', plan.changes)}
+      {group(
+        'shell.studio.aiRequest.decisions',
+        'studio-ai-plan-decisions',
+        plan.decisions.map(({ decision, reason }) => (
+          <>
+            <Typography.Text strong>{decision}</Typography.Text> {reason}
+          </>
+        )),
+      )}
+      {group('shell.studio.aiRequest.plan.risks', 'studio-ai-plan-risks', plan.risks)}
+      {group('shell.studio.aiRequest.plan.checks', 'studio-ai-plan-checks', plan.checks)}
+      {plan.details.length > 0 && (
+        <Flex vertical gap={spacing.xs} data-testid="studio-ai-plan-details">
+          <span>
+            <AxisButton role="link" aria-expanded={details} onClick={() => setDetails((open) => !open)}>
+              {t(details ? 'shell.studio.aiRequest.plan.hideDetails' : 'shell.studio.aiRequest.plan.showDetails')}
+            </AxisButton>
+          </span>
+          {details && (
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              {plan.details.map((detail) => (
+                <li key={detail.file} style={{ paddingBlock: spacing.xs / 2 }}>
+                  <ResourceReference
+                    resourceId={detail.resourceId}
+                    file={detail.file}
+                    path=""
+                    resources={resources}
+                    onSelect={onOpen}
+                  />
+                  {bullets(detail.edits)}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Flex>
+      )}
+      {children}
+    </Flex>
+  )
+}
+
+/**
  * Proposed: a request's review, see the review on #3263: "Review" in bold and its verdict as a `StatusTag`, "Changes
  * requested" while a finding must change and "No changes requested" otherwise, never "Approved", as only its author
  * approves, by accepting. Its summary follows in words, then "Plan" in bold and each step of the approved plan, a check
@@ -777,7 +831,7 @@ function ReviewFindings({
       <Typography.Text>{review.summary}</Typography.Text>
       {review.steps.length > 0 && (
         <Flex vertical gap={spacing.xs} data-testid="studio-ai-review-steps">
-          <Typography.Text strong>{t('shell.studio.aiRequest.tab.plan')}</Typography.Text>
+          <Typography.Text strong>{t('shell.studio.aiRequest.plan.changes')}</Typography.Text>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {review.steps.map((step, index) => (
               <li key={index} data-testid="studio-ai-review-step" data-done={step.done}>

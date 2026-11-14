@@ -22,9 +22,14 @@ const fromApp: StudioAuthoringRequestDetail = {
   app: 'Claude Code',
   coAuthors: ['Claude Code'],
   state: 'ready',
-  plan: 'Add a Cost centre field to the purchase request.',
-  planSummary: 'Adds a Cost centre field.',
-  planDecisions: [],
+  plan: {
+    summary: 'Add a Cost centre field to the purchase request.',
+    changes: ['A Cost centre field on each purchase request.'],
+    decisions: [],
+    risks: [],
+    checks: [],
+    details: [],
+  },
   aiConnected: false,
   round: 1,
   tokens: 0,
@@ -502,22 +507,41 @@ describe('a plan and its review, as a pull request has them', () => {
     return onOpen
   }
 
-  it('shows the plan in a sentence, its steps and the decisions its author agrees to by approving', async () => {
+  it("shows the whole plan, as a pull request's plan, with its details folded until asked for", async () => {
     stub({
       ...fromApp,
       state: 'awaitingApproval',
       checks: null,
       review: null,
       aiConnected: true,
-      planSummary: 'Adds a Cost centre field.',
-      planDecisions: ['The field is optional, as the request did not say.'],
+      plan: {
+        summary: 'Adds a Cost centre field.',
+        changes: ['A Cost centre field on each request.'],
+        decisions: [{ decision: 'The field is optional.', reason: 'The request did not say.' }],
+        risks: ['Saved requests have no cost centre.'],
+        checks: ['A request saves with a cost centre.'],
+        details: [{ resourceId: 'r-1', file: 'pages/list.json', edits: ['A Cost centre column.'] }],
+      },
     })
     renderPage()
 
-    expect(await screen.findByText('Adds a Cost centre field.')).toBeInTheDocument()
+    const plan = await screen.findByTestId('studio-ai-plan')
+    expect(within(plan).getByText('Adds a Cost centre field.')).toBeInTheDocument()
+    expect(within(screen.getByTestId('studio-ai-plan-changes')).getByText('What changes')).toBeInTheDocument()
     const decisions = screen.getByTestId('studio-ai-plan-decisions')
     expect(within(decisions).getByText('Decisions to check')).toBeInTheDocument()
-    expect(within(decisions).getByText('The field is optional, as the request did not say.')).toBeInTheDocument()
+    expect(within(decisions).getByText('The field is optional.').tagName).toBe('STRONG')
+    expect(decisions).toHaveTextContent('The field is optional. The request did not say.')
+    expect(screen.getByTestId('studio-ai-plan-risks')).toHaveTextContent('Saved requests have no cost centre.')
+    expect(screen.getByTestId('studio-ai-plan-checks')).toHaveTextContent('A request saves with a cost centre.')
+    expect(screen.queryByText('A Cost centre column.')).toBeNull()
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Show the details' }))
+    expect(screen.getByText('A Cost centre column.')).toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('studio-ai-plan-details')).getByRole('button', { name: 'Requests' }),
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Approve plan' })).toBeInTheDocument()
   })
 

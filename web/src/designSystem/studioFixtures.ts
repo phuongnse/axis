@@ -16,6 +16,7 @@ import type {
   StudioReleases,
   StudioResource,
   StudioResourceItem,
+  StudioPlan,
   StudioReview,
 } from '../platform/studio'
 import type {
@@ -552,59 +553,114 @@ const aiRequests: StudioAuthoringRequest[] = [
   authoringRequest(1, 'dropped', 'Add a dashboard of spending by month.', '2026-11-05T09:10:00Z', true),
 ]
 
-// Proposed: the plan of a request that waits for its author, in plain words: what will change, the modules and layers
-// it uses, and the scenarios it adds, see docs/reference/ai-authoring-in-studio.md#the-plan.
-const supplierPlan = [
-  'Add a Supplier entity with a name, a tax code and an email address.',
-  'Add a required Supplier field to the purchase request, chosen from the active suppliers.',
-  'Show the supplier on the request form, on the request detail and as a column of the request list.',
-  'Use no module: nothing built in keeps suppliers.',
-  'Add two scenarios: a request saves with its supplier, and a request without one is refused.',
-].join('\n')
-
-// Proposed: the plan an outside AI app proposed from its conversation with its person, see the review on #3263.
-const appPlan = [
-  'Add a Cost centre entity with a name and a code.',
-  'Add a Cost centre field to the purchase request, chosen from the cost centres.',
-  'Show the cost centre as a column of the request list.',
-].join('\n')
-
-const plans: Record<string, string> = { [aiRequests[0].id]: supplierPlan, [appRequest.id]: appPlan }
-
-// Proposed: a plan's summary and the choices AI made that the request did not say, see the review on #3263.
-const planNotes: Record<string, { summary: string; decisions: string[] }> = {
-  [aiRequests[0].id]: {
-    summary:
-      'Adds a Supplier entity and a required Supplier field on purchase requests, shown on the form, the detail and the list.',
-    decisions: [
-      'The Supplier field is required, as a purchase needs a supplier. The request did not say.',
-      'Only active suppliers can be chosen, so a supplier that stopped trading cannot be picked again.',
-    ],
-  },
-  [appRequest.id]: {
-    summary:
-      'Adds a Cost centre entity and a Cost centre field on purchase requests, shown as a column of the request list.',
-    decisions: ['The Cost centre field is optional, as the request did not say it is required.'],
-  },
+// Proposed: the plans AI wrote for the preview's requests, as a pull request's plan is written, see the review on #3263.
+const supplierPlan: StudioPlan = {
+  summary:
+    'Adds a Supplier entity and a required Supplier field on purchase requests, shown on the form, the detail and the list.',
+  changes: [
+    "A new Supplier entity keeps each supplier's name, tax code and email address, and whether it is active.",
+    'Each purchase request gets a required Supplier field, chosen from the active suppliers.',
+    'The request form, the request detail and the request list show the supplier.',
+  ],
+  decisions: [
+    {
+      decision: 'The Supplier field is required.',
+      reason: 'A purchase needs a supplier, and the request did not say the field may be left empty.',
+    },
+    {
+      decision: 'Only active suppliers can be chosen.',
+      reason: 'A supplier that stopped trading should not be picked for a new purchase. Old requests keep theirs.',
+    },
+    {
+      decision: 'The application gets its own Supplier entity, with no module.',
+      reason: 'Nothing built into Axis keeps suppliers.',
+    },
+  ],
+  risks: [
+    'The 124 purchase requests already saved have no supplier. They stay as they are, and the field asks for one when a request is next saved.',
+    'Someone must add the suppliers before people send new requests, or the form cannot be completed.',
+    'The request list gets one more column, so it may scroll sideways on a narrow screen.',
+  ],
+  checks: [
+    'A purchase request saves with its supplier.',
+    'A purchase request without a supplier is refused, with a message on the Supplier field.',
+    'Only active suppliers appear in the Supplier list.',
+  ],
+  details: [
+    {
+      resourceId: null,
+      file: 'entities/supplier.json',
+      edits: [
+        'A new entity Supplier: name (text, required), tax code (text), email address (email), active (yes or no).',
+      ],
+    },
+    {
+      resourceId: id(firstEntityId),
+      file: 'entities/Request.json',
+      edits: ['A new field supplier: a reference to Supplier, required, limited to active suppliers.'],
+    },
+    { resourceId: formId, file: 'forms/request-form.json', edits: ['The Supplier field after Title.'] },
+    { resourceId: pageId, file: 'pages/request-list.json', edits: ['A Supplier column after Title.'] },
+    {
+      resourceId: null,
+      file: 'scenarios/request-supplier.json',
+      edits: ['Two new scenarios: a request with a supplier saves, and one without is refused.'],
+    },
+  ],
 }
 
-/** A plan's notes, or ones that say the plan follows the request's words, for a plan the preview has none for. */
-function planNotesOf(request: StudioAuthoringRequest): { summary: string; decisions: string[] } {
-  return planNotes[request.id] ?? { summary: `Changes the application as asked: "${request.text}"`, decisions: [] }
+// Proposed: the plan an outside AI app proposed from its conversation with its person, see the review on #3263.
+const appPlan: StudioPlan = {
+  summary:
+    'Adds a Cost centre entity and a Cost centre field on purchase requests, shown as a column of the request list.',
+  changes: [
+    'Add a Cost centre entity with a name and a code.',
+    'Add a Cost centre field to the purchase request, chosen from the cost centres.',
+    'Show the cost centre as a column of the request list.',
+  ],
+  decisions: [{ decision: 'The Cost centre field is optional.', reason: 'The request did not say it is required.' }],
+  risks: ['Requests already saved have no cost centre and keep none until someone sets one.'],
+  checks: ['A purchase request saves with a cost centre, and without one.'],
+  details: [
+    {
+      resourceId: null,
+      file: 'entities/cost-centre.json',
+      edits: ['A new entity CostCentre: name and code, both required.'],
+    },
+    {
+      resourceId: id(firstEntityId),
+      file: 'entities/Request.json',
+      edits: ['A new field costCentre: a reference to CostCentre.'],
+    },
+    { resourceId: pageId, file: 'pages/request-list.json', edits: ['A Cost centre column after Title.'] },
+  ],
+}
+
+const plans: Record<string, StudioPlan> = { [aiRequests[0].id]: supplierPlan, [appRequest.id]: appPlan }
+
+/** A request's plan, or one that follows its words, for a request the preview writes no plan of its own for. */
+function planOf(request: StudioAuthoringRequest): StudioPlan {
+  return (
+    plans[request.id] ?? {
+      summary: `Changes the application as asked: "${request.text}"`,
+      changes: [request.text],
+      decisions: [],
+      risks: [],
+      checks: ['One new scenario checks the change.'],
+      details: [],
+    }
+  )
 }
 
 /**
  * Proposed: the review of a ready request: each plan step done, at the resource that does it, and no finding, unless
  * the preview gives the request a review of its own, see the review on #3263.
  */
-function reviewOf(request: StudioAuthoringRequest, plan: string | null): StudioReview {
+function reviewOf(request: StudioAuthoringRequest, plan: StudioPlan | null): StudioReview {
   return (
     reviews[request.id] ?? {
       summary: 'The draft does what the request and the plan ask.',
-      steps: (plan ?? '')
-        .split('\n')
-        .filter((step) => step.trim() !== '')
-        .map((step) => ({ step, done: true, resourceId: null, file: null, path: '' })),
+      steps: (plan?.changes ?? []).map((step) => ({ step, done: true, resourceId: null, file: null, path: '' })),
       findings: [],
     }
   )
@@ -720,15 +776,7 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
       ;[count, running] = progress[state]
     }
   }
-  const plan =
-    state === 'planning'
-      ? null
-      : (plans[request.id] ??
-        [
-          `Change the application as asked: "${request.text}"`,
-          'Use no module: nothing built in does this.',
-          'Add one scenario that checks the change.',
-        ].join('\n'))
+  const plan = state === 'planning' ? null : planOf(request)
   // Each change of plan is a `planChange` step whose summary is the comment, then the plan is written again.
   const comments = planComments.get(request.id) ?? []
   const steps =
@@ -775,8 +823,6 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
       draft: appState === 'accepted' ? null : draftOf(request.id),
       checks: checksOf(request, appState),
       // Its author has their own AI here, so a second AI reviewed it.
-      planSummary: planNotesOf(request).summary,
-      planDecisions: planNotesOf(request).decisions,
       review: appState === 'ready' ? reviewOf(request, appPlan) : null,
       changes: appDiff.map(({ file, summary }) => ({ file, summary })),
       failure: null,
@@ -804,8 +850,6 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
     aiConnected: true,
     draft: hasDraft ? draftOf(request.id) : null,
     checks: checksOf(request, state),
-    planSummary: plan === null ? null : planNotesOf(request).summary,
-    planDecisions: plan === null ? [] : planNotesOf(request).decisions,
     review: state === 'ready' ? reviewOf(request, plan) : null,
     changes: diff.map(({ file, summary }) => ({ file, summary })),
     failure: state === 'failed' ? (failures[request.id] ?? null) : null,
