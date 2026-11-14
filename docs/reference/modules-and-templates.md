@@ -51,7 +51,7 @@ letter, a SemVer `version` and a `label`. Four properties are optional:
 
 | Property     | What it holds                                                                                                                                                |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `packages`   | The extension packages that the module's process steps call, in the shape of [an application's](extension-packages.md#declaring-packages-in-an-application) |
+| `packages`   | The extension packages that the module's process steps call, in the shape of [an application's](declaring-packages.md#declaring-packages-in-an-application) |
 | `roles`      | The [role slots](#role-slots)                                                                                                                                |
 | `connectors` | The [connector slots](#connector-slots)                                                                                                                      |
 | `modules`    | The modules it depends on, see [dependencies](#dependencies)                                                                                                 |
@@ -408,7 +408,7 @@ A module process is a `process` file in the module, which works on an entity of 
 - **Packages.** A package operation step calls an operation of a package in the module's `packages`,
   checked against the pinned version. A package that the module does not list is `AXC0150` in the
   module file. The pins follow the
-  [pinning rule](extension-packages.md#declaring-packages-in-an-application) of the release.
+  [pinning rule](declaring-packages.md#declaring-packages-in-an-application) of the release.
 - **Assignees and calls.** A task assignee names a [role slot](#role-slots), which the compiled task
   replaces with the role the application maps it to, and a `callConnector` step names a
   [connector slot](#connector-slots).

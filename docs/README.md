@@ -92,6 +92,7 @@ Read by people who connect Axis to another system or write a package of custom c
 | [Outbound webhooks](reference/outbound-webhooks.md)                    | The `webhook` resource, its compile checks, and the signed delivery of an event      | You add or change a webhook or its signed delivery             |
 | [Inbound endpoint calls](reference/inbound-endpoints.md)               | How another system calls an inbound endpoint: checks, responses, idempotency         | You change how an inbound endpoint call is checked or answered |
 | [Extension packages](reference/extension-packages.md)                  | Custom code: manifest, contracts, installation, building, runners, capabilities      | You write or load a package of custom code                     |
+| [Declaring packages](reference/declaring-packages.md)                  | How an application declares its packages and how a release pins their versions       | You declare a package in an application or change its pinning  |
 | [Extension package limits](reference/extension-package-limits.md)      | What the limits on a package's operations do not protect against                     | You judge how far a package's code is trusted                  |
 | [Custom widgets](reference/custom-widgets.md)                          | Widgets from extension packages: manifest, page shape, loading, the SDK, the palette | You write a widget for an extension package                    |
 

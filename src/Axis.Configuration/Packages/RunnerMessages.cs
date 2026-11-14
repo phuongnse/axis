@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -18,6 +19,9 @@ namespace Axis.Configuration.Packages;
 [JsonDerivedType(typeof(FailureMessage), "failure")]
 [JsonDerivedType(typeof(StopMessage), "stop")]
 [JsonDerivedType(typeof(SandboxMessage), "sandbox")]
+[JsonDerivedType(typeof(BuildMessage), "build")]
+[JsonDerivedType(typeof(BuiltMessage), "built")]
+[JsonDerivedType(typeof(RefusedMessage), "refused")]
 public abstract record RunnerMessage;
 
 /// <summary>
@@ -56,6 +60,21 @@ public sealed record StopMessage : RunnerMessage;
 /// </summary>
 public sealed record SandboxMessage(bool? Gvisor = null) : RunnerMessage;
 
+/// <summary>
+/// A caller asks the package host to build the package whose files are in <paramref name="Files"/>, each mapping a
+/// relative path that uses <c>/</c> to its content. The content is base64 on the wire.
+/// </summary>
+public sealed record BuildMessage(Dictionary<string, byte[]> Files) : RunnerMessage;
+
+/// <summary>The host built the package. <paramref name="Files"/> holds every file of the built package, as in <see cref="BuildMessage"/>.</summary>
+public sealed record BuiltMessage(Dictionary<string, byte[]> Files) : RunnerMessage;
+
+/// <summary>The host refused the package. Each of <paramref name="Problems"/> names a file and says what is wrong.</summary>
+public sealed record RefusedMessage(IReadOnlyList<BuildProblem> Problems) : RunnerMessage;
+
+/// <summary>One problem of a refused build: the <paramref name="File"/> it is about and its <paramref name="Message"/>.</summary>
+public sealed record BuildProblem(string File, string Message);
+
 /// <summary>Writes and reads the lines of the runner protocol.</summary>
 public static class RunnerProtocol
 {
@@ -82,6 +101,17 @@ public static class RunnerProtocol
         return JsonSerializer.Serialize(message, _options);
     }
 
+    /// <summary>Writes the message and a line break to <paramref name="stream"/> without building the line as a string, so a large message stays cheap.</summary>
+    public static async Task WriteAsync(Stream stream, RunnerMessage message, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentNullException.ThrowIfNull(message);
+
+        await JsonSerializer.SerializeAsync(stream, message, _options, cancellationToken);
+        await stream.WriteAsync("\n"u8.ToArray(), cancellationToken);
+        await stream.FlushAsync(cancellationToken);
+    }
+
     /// <summary>Reads one line.</summary>
     /// <exception cref="JsonException">The line is not a message of the protocol.</exception>
     public static RunnerMessage Read(string line)
@@ -91,6 +121,22 @@ public static class RunnerProtocol
         try
         {
             return JsonSerializer.Deserialize<RunnerMessage>(line, _options) ?? throw new JsonException("The line is not a message.");
+        }
+        catch (NotSupportedException exception)
+        {
+            // An unknown type discriminator is reported as an unsupported type.
+            throw new JsonException("The line is not a message of the protocol.", exception);
+        }
+    }
+
+    /// <summary>Reads one line from its UTF-8 bytes, without the line break.</summary>
+    /// <exception cref="JsonException">The line is not a message of the protocol.</exception>
+    public static RunnerMessage Read(ReadOnlySequence<byte> utf8)
+    {
+        try
+        {
+            var reader = new Utf8JsonReader(utf8);
+            return JsonSerializer.Deserialize<RunnerMessage>(ref reader, _options) ?? throw new JsonException("The line is not a message.");
         }
         catch (NotSupportedException exception)
         {

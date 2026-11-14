@@ -8,7 +8,7 @@ pinned and loaded, and what its operations may reach. What those limits do not p
 application's own packages are in [An application's packages](#an-applications-packages). How a
 process calls a package operation is in [package operations](process-execution.md#package-operations),
 and how an application declares its packages is in
-[declaring packages](#declaring-packages-in-an-application). The reason for keeping custom code out of
+[declaring packages](declaring-packages.md#declaring-packages-in-an-application). The reason for keeping custom code out of
 configuration is in [knowledge](../domain/knowledge.md#logic-in-configuration).
 
 ## What a package is
@@ -239,6 +239,7 @@ The operator builds a C#, Node.js or Python package once, with `Axis.PackageHost
 folder that the developer published in locked mode. For `node` it holds the compiled adapter, `package.json` and
 `package-lock.json`. For Python it is the folder of the adapter and `requirements.txt`. The build writes the folder
 that `Extensions:Path` names and compiles nothing.
+A [`build` message](#the-runner-protocol) runs the same checks in a package host, on files that a caller sends.
 
 - **In the host image.** The build runs in the package's own host image,
   `axis-package-host-<language>`, because dependencies, native modules included, install with the runtime
@@ -302,7 +303,7 @@ that `Extensions:Path` names and compiles nothing.
 - **Registry credentials** _(planned for M37)_. They are mounted for the build alone, and the runners
   never see them.
 
-The build reads these settings:
+The build reads these settings, and a package host reads `PackageBuild:Trivy` and `PackageBuild:Python` too, for a `build` message:
 
 | Setting | Environment variable | Default | Meaning |
 | --- | --- | --- | --- |
@@ -316,7 +317,7 @@ A release pins one exact version of each package it uses, so a running instance 
 that its release was compiled against.
 
 - **Ranges.** An application's `packages` entry gives a version range: an exact version, a `^`
-  range or a `~` range, as [declaring packages](#declaring-packages-in-an-application) says.
+  range or a `~` range, as [declaring packages](declaring-packages.md#declaring-packages-in-an-application) says.
 - **Pinning.** Compilation picks the highest installed version in each range
   and pins that exact version in the release. The pin is part of the
   release's content hash. So once a newer version in range is installed,
@@ -570,6 +571,9 @@ implements the operation context over it.
 | `failure` | The runner | `error`, the name of the error's type, or `binding`, the undeclared binding it asked for |
 | `stop` | The worker | None |
 | `sandbox` | The worker, to the host, and the host's answer | None in the question. `gvisor`, a boolean, in the answer |
+| `build` | A caller, to the host | `files`, mapping each relative path of the package, written with `/`, to its content in base64 |
+| `built` | The host | `files`, as in `build`, for every file of the built package |
+| `refused` | The host | `problems`, each with the `file` it is about and a `message` |
 
 - **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network. The connection
   is neither encrypted nor authenticated, and a `run` carries binding secrets, so only the operator's
@@ -590,6 +594,17 @@ implements the operation context over it.
   with `gvisor` set, `true` only when its kernel log, as `dmesg` reads it, begins with gVisor's `Starting gVisor` line. A kernel
   log that begins otherwise, or a read that is refused, answers `false`. Then the host closes the connection and starts no runner.
   A `sandbox` that already holds `gvisor` closes the connection without an answer.
+- **Build.** A `build` may be the first line of a connection instead of a `start`. It may be longer than the other
+  first lines, up to the limit in `RunnerHost`, because a package with a wheel needs megabytes, and a longer line closes
+  the connection. The host writes the files into a temporary copy and runs steps 1, 2, 4 and 5 of
+  [building a package](#building-a-package) on it, reading the manifest as metadata only, so no package code runs in the
+  host. It answers `built` with every file of the built copy, or `refused` with each problem. Then it closes the connection.
+  The `message` of a problem is the line that the `build` command prints for it. Its `file` is `axis-package.json` for a
+  manifest problem and the manifest's lock file for a lock file, install or scan problem. A path that is empty, absolute,
+  holds `\` or an empty, `.` or `..` segment is refused, naming the path, before the host writes anything. The `built` answer
+  leaves out symbolic links, because one could point outside the copy. The host writes nothing to `Extensions:Path` and deletes
+  its copy whatever the answer. A build that cannot run, such as a pip or Trivy that cannot start, is the operator's problem and
+  not the author's, so the host logs why and closes the connection with no answer.
 - **Standard output.** The runner's standard output holds only protocol lines. What a package writes to
   the console goes to standard error.
 - **Runner errors.** An operation that is not in the manifest, an input that does not fit its field
@@ -627,7 +642,7 @@ never leave the customer, see [D148](../decisions/d148-packages-in-c-typescript-
 - **Two sources.** An application's own package is customer-hosted when its folder is
   `packages/<id>/axis-package.json` alone, with `"runner": "customer"`. An installation's package is
   customer-hosted when the application's `packages` entry says `runner: customer`, see
-  [declaring packages in an application](#declaring-packages-in-an-application). Both use this one
+  [declaring packages in an application](declaring-packages.md#declaring-packages-in-an-application). Both use this one
   mechanism and differ only in where the manifest comes from.
 - **The contract stays with Axis.** Compilation types the steps against the manifest, the worker reads
   `idempotent` and `timeout` from it, and a posted result is checked against its `output`. The release holds
@@ -844,63 +859,3 @@ installation, loading, the capability limits, the server's metadata-only load an
   runner: `greet` maps onto the dependency, `echo` returns all six field types, `probe` uses its declared
   bindings or asks for an undeclared one, `flaky` raises `RetryableError` and `fail` raises `ValueError`.
   The package host tests install the package by copying it with its dependency folder, so they need no pip.
-
-## Declaring packages in an application
-
-An application declares the extension packages it uses in its manifest, `application.json`. Each
-entry names a package id and a version range:
-
-```json
-{
-  "id": "219102bc-864f-42ed-874a-c19eaee0d1ba",
-  "kind": "application",
-  "name": "PurchaseRequests",
-  "formatVersion": 1,
-  "packages": [{ "id": "purchasing-tools", "version": "^1.0.0" }]
-}
-```
-
-`purchasing-tools` is an illustrative package. The purchase request sample
-declares the real sample package the same way, with
-`{ "id": "payment-references", "version": "^1.0.0" }`, and also declares
-`payment-terms` the same way. Without a package installed, the sample does not compile:
-`AXC0139` at `/packages/0/id` or `/packages/1/id` names it.
-
-- `packages` is optional. Each entry has an `id`, lower-case letters, digits
-  and `-`, starting with a letter, and a `version`. The schema checks this
-  shape, so breaking it is `AXC0004`. Each package id appears at most once:
-  `AXC0142`.
-- `version` is a version range in one of three forms. Versions are plain
-  `major.minor.patch` without leading zeros. Any other form is `AXC0140`.
-  - `1.0.0` is that exact version.
-  - `^1.0.0` is any version from `1.0.0` with the same major version, so
-    `1.4.2` but not `2.0.0`. `^0.2.0` also means the same major version, so
-    `0.9.0` but not `1.0.0`.
-  - `~1.0.0` is any version from `1.0.0` with the same minor version, so
-    `1.0.3` but not `1.1.0`.
-- **`runner`** _(planned for M37)_. An entry of `application.json`'s `packages` may say where the package
-  runs: `axis`, the default, or `customer`. With `customer`, the release still pins the version, but it
-  resolves no bindings for the package's operations and starts no Axis runner for it, see
-  [customer-hosted runners](#customer-hosted-runners). A module's entry has no `runner`, and the
-  application's entry decides for every process of the release, because the release holds one pin per
-  package id. A wrong value is `AXC0004`. An application's own package says it in its manifest instead.
-- **Pinning.** Compilation picks the highest installed version in each range and pins it in the
-  release, in the Release step of the [pipeline](configuration.md#configuration-pipeline), as
-  [versions and pinning](#versions-and-pinning) says. A module's `packages` share
-  the release's pins, which hold one version of each package id. A module
-  uses the application's pin when the application lists the package too, and
-  its entry is `AXC0141` in `module.json` when that pin is outside its range.
-  Otherwise the release pins the highest installed version that meets the
-  range of every module that lists the package, and a package with no such
-  version is `AXC0141` in each of those modules' `module.json`. An application
-  process sees only the application's own packages.
-- **Diagnostics.** `AXC0139`, a package id with no installed version, and `AXC0141`, a range that
-  no installed version meets, are compile errors in `application.json`. Compilation sees only the
-  versions that loaded at host startup. A manifest that does not match its package is reported at
-  startup, as `AXC0132` to `AXC0138`, see [Loading](#loading), and a pinned version missing at
-  startup is `AXC0146`, see [versions and pinning](#versions-and-pinning).
-- An application uses only the packages it declares, even though every
-  tenant sees the same installed packages. Installation is in
-  [Installation](#installation).
-- How a process calls a package operation is in
-  [Package operations](process-execution.md#package-operations).
