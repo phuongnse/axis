@@ -112,6 +112,10 @@ nothing:
   application and the body, and the server counts again under a lock just before it stores the
   request, so sends at the same time cannot pass it. Requests already sent go on, and the author can
   still change their plans and drop them.
+- **`packageCpuSecondsPerDay`.** While the quota is 0, a `PUT /api/tenant/application-packages` that turns the
+  tenant's [switch](user-administration.md#application-packages) on is refused, and `used` is the day's
+  `packageCpuSeconds` counter. A `PUT` that turns it off is never refused. The check comes after the body check, not
+  before it, because only a body that turns packages on is refused, so the body must be read first.
 - **The provisioning API.** The platform operator's `PUT /api/cell/tenants/{id}/quotas` is never
   refused over the `storage` quota. It writes platform rows and no tenant data, so the operator can
   raise a quota that a tenant has reached.

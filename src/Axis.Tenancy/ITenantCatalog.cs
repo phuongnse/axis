@@ -46,6 +46,7 @@ public interface ITenantCatalog
 /// <param name="Legal">The tenant's privacy and terms links, or <c>null</c> when it sets none. Both sources have it, and a preview tenant has its main tenant's.</param>
 /// <param name="ReadOnly">Whether the tenant is read-only: its hosts are served, and each request learns it. Only the <c>directory</c> source has read-only tenants.</param>
 /// <param name="RealmAgent">What the server needs to exchange an author's token for the agent host, or <c>null</c> when the source holds none for this tenant. Both sources have it, and a preview tenant has none.</param>
+/// <param name="ApplicationPackages">Whether the tenant's application packages are on (<c>docs/reference/user-administration.md#application-packages</c>). Only the <c>directory</c> source has it, and a preview tenant has its main tenant's.</param>
 public sealed record TenantEntry(
     string Id,
     IReadOnlyList<string> Hosts,
@@ -63,7 +64,8 @@ public sealed record TenantEntry(
     IReadOnlyDictionary<string, long?>? Quotas = null,
     TenantLegal? Legal = null,
     bool ReadOnly = false,
-    TenantRealmAgent? RealmAgent = null);
+    TenantRealmAgent? RealmAgent = null,
+    bool ApplicationPackages = false);
 
 /// <summary>A tenant's privacy and terms links, and the links its sites set for themselves.</summary>
 /// <param name="PrivacyUrl">The tenant's privacy address, or <c>null</c> for none.</param>

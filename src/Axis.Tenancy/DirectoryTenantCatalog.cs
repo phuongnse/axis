@@ -403,7 +403,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             Quotas(quotaRows),
             legal,
             row.Status == "readOnly",
-            RealmAgent(row, cipher));
+            RealmAgent(row, cipher),
+            signIn.ApplicationPackages);
     }
 
     // The privacy and terms links of a tenant row with the rows of its sites, or null when the tenant sets none. Legal

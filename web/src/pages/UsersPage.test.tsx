@@ -70,10 +70,11 @@ function json(body: unknown, status = 200) {
 }
 
 const outsideClientsPath = '/api/tenant/outside-clients'
+const applicationPackagesPath = '/api/tenant/application-packages'
 
 function stubServer(answer: (input: string, init?: RequestInit) => Response) {
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
-    input === '/api/tenant/usage' || input === outsideClientsPath
+    input === '/api/tenant/usage' || input === outsideClientsPath || input === applicationPackagesPath
       ? new Response(null, { status: 404 })
       : answer(input, init),
   )

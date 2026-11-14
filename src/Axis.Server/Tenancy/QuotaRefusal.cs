@@ -12,7 +12,7 @@ internal static partial class QuotaRefusal
     /// The <c>403</c> problem details with the <c>reason</c> <c>quota-exceeded</c>, the <paramref name="quota"/> key, the
     /// <paramref name="limit"/> and what the tenant has <paramref name="used"/>. The title never names the tenant.
     /// </summary>
-    /// <exception cref="ArgumentException"><paramref name="quota"/> is not <c>storage</c>, <c>users</c>, <c>applications</c> or <c>authoringRequests</c>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="quota"/> is not <c>storage</c>, <c>users</c>, <c>applications</c>, <c>authoringRequests</c> or <c>packageCpuSecondsPerDay</c>.</exception>
     public static IResult Problem(string quota, long limit, long used)
     {
         var words = quota switch
@@ -21,6 +21,7 @@ internal static partial class QuotaRefusal
             QuotaKeys.Users => "users",
             QuotaKeys.Applications => "applications",
             QuotaKeys.AuthoringRequests => "authoring requests",
+            QuotaKeys.PackageCpuSecondsPerDay => "package run time",
             _ => throw new ArgumentException($"'{quota}' is not a quota that refuses.", nameof(quota)),
         };
         return Results.Problem(
