@@ -256,7 +256,8 @@ switch routes, and lists and revokes the consents through the connected apps rou
 _(planned for M37)_
 
 An administrator turns on the tenant's [application packages](extension-packages.md#an-applications-packages)
-and reads whether they are on. The routes answer to an administrator with a browser session only, as the
+and reads whether they are on. The one switch governs both kinds of package, those that Axis runs and the
+[customer-hosted](extension-packages.md#customer-hosted-runners) ones. The routes answer to an administrator with a browser session only, as the
 command routes do.
 
 | Route                                              | Body              | Answer                    |
@@ -265,9 +266,9 @@ command routes do.
 | `PUT /api/tenant/application-packages` _(planned for M37)_ | `{ "on": true }`  | `204`                     |
 
 - **The order of the checks.** A request is checked in this order: a signed-in user (`401`),
-  `Users:AdministratorRole` (`403`), `Extensions:ApplicationPackages` (`403`), then a tenant with a row in
-  the tenant directory that is not a preview tenant (`404`), and for `PUT` the body (`400`). With the
-  setting off, the routes answer `403` to every caller who has the role.
+  `Users:AdministratorRole` (`403`), then a tenant with a row in the tenant directory that is not a preview
+  tenant (`404`), and for `PUT` the body (`400`). With `Extensions:ApplicationPackages` off, the switch
+  allows only customer-hosted packages, see [an application's packages](extension-packages.md#an-applications-packages).
 - **The quota.** While `packageCpuSecondsPerDay` is 0, a `PUT` that turns packages on answers the quota's
   `403`, see [package run time a day](tenant-quotas.md#package-run-time-a-day).
 - **Off by default.** A tenant has packages off until an administrator turns them on.

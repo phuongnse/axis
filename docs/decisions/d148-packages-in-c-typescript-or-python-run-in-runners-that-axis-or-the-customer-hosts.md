@@ -50,8 +50,13 @@ This decision replaces D7, D28 and D90, and restates what still holds from them.
     It is not trusted. Its runners serve only its tenant, run in a sandbox stronger than a container,
     and their use counts against the tenant's quotas. In Axis SaaS only a paid plan allows it, and the
     tenant's administrator turns it on and gives the permission to write a package to each author. An
-    installation without that sandbox refuses an application's package, and runs its own packages as
-    before.
+    installation without that sandbox refuses an application's package that Axis runs, and runs its own
+    packages as before.
+  - **Either kind may be customer-hosted.** An application's package is then its manifest alone,
+    `packages/<id>/axis-package.json` with `"runner": "customer"`, with no adapter and no lock file, and the
+    code stays with the customer. An installation's package is chosen by `runner: customer` on the
+    application's `packages` entry, for example a partner module's package that must reach a system inside
+    the customer's network. Both use one runner mechanism and differ only in where the manifest comes from.
 - **Axis or the customer hosts a runner.** A runner that Axis hosts starts with an empty environment, a
   read-only file system apart from a temporary folder, CPU and memory limits, and one network route,
   through a proxy that admits only the hosts of the declared `url` bindings, and it is killed at the
@@ -61,9 +66,25 @@ This decision replaces D7, D28 and D90, and restates what still holds from them.
   revoke, and takes only that tenant's calls to the packages it registers. It keeps its own secrets,
   and the worker sends it no binding value, so the code, its secrets and the systems it reaches never
   leave the customer.
+  - **The program is Axis's own runner image.** The customer runs `axis-package-host-<language>` with a
+    `connect` command, and builds its package with the same `build` command, which scans its dependencies.
+    Environment settings give the tenant's address, the client id and secret, the folder of built packages
+    and the value of each binding by the name the manifest declares. Several instances may share one
+    credential, because each take is its own lease.
+  - **Registering checks the contract.** The server compares the manifest that the runner registers with the
+    one the release pins, and refuses a package that differs, so a mismatch shows at registration and not at
+    a call. During an upgrade the customer runs both versions until the old instances end.
 - **A release pins the code it runs.** It pins the exact version of each installation's package, the
   highest installed one in each declared range, as D28 said, and it holds the built application's
-  packages, so running work keeps the code it started with.
+  packages, or the manifest of a customer-hosted package, so running work keeps the code or the contract it
+  started with. Compilation types the steps against a customer-hosted package's manifest, the worker reads
+  `idempotent` and `timeout` from it, and a posted result is checked against its output.
+- **One switch, one role.** The tenant's application packages switch governs both kinds of package, so in
+  Axis SaaS only a paid plan allows a customer-hosted one too. Writing its manifest needs the `developer`
+  role, and creating a runner needs an administrator. A customer-hosted package does not count against
+  `packageCpuSecondsPerDay`, because it uses no CPU of Axis. It needs no gVisor, because gVisor protects only
+  code that runs on Axis's machines, so the switch and the compile check allow it where
+  `Extensions:ApplicationPackages` is off.
 - **An author writes a package by hand or asks an agent for it.** By hand, the author edits its files
   in Studio, or in their own tools through the authoring API. An agent writes a package's adapter,
   manifest and tests over a library the author names only through an authoring request, the one place
@@ -81,7 +102,8 @@ This decision replaces D7, D28 and D90, and restates what still holds from them.
 - An application's packages close that gap with runners per tenant, but cost more to run, and a cell
   needs a sandbox stronger than a container, which on-premises installations may leave out when they
   hold no tenant's code.
-- Publishing an application with a package takes longer, because it builds and scans the package.
+- Publishing an application with a package that Axis runs takes longer, because it builds and scans the
+  package. A customer-hosted package is not built on publish.
 - A customization layer cannot change a module's code. An application that needs other code adds a
   package of its own and calls it, or ejects the module.
 - A customer-hosted runner keeps the engine's guarantees of staging, retries and history, but none of
