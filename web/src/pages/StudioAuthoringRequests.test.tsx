@@ -697,7 +697,7 @@ describe("a request's history", () => {
     await user.click(await screen.findByRole('tab', { name: 'History' }))
 
     const rows = screen.getAllByRole('row').slice(1)
-    expect(rows[0]).toHaveTextContent(/Compiled the draft and ran the scenarios\s*1 of 2 scenarios pass/)
-    expect(rows[1]).toHaveTextContent(/Fixed what the checks and the review found\s*Ran out of time.*30 min/)
+    expect(rows[0]).toHaveTextContent(/Checked the draft\s*1 of 2 scenarios pass/)
+    expect(rows[1]).toHaveTextContent(/Fixed the draft\s*Ran out of time.*30 min/)
   })
 })
