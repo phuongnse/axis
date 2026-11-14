@@ -626,24 +626,22 @@ export function StudioAuthoringRequestPage({
 
   return (
     <Flex vertical gap="middle" data-testid="studio-ai-request">
-      {/* Proposed: the request's name as the heading, then its state at the start of the line that says who sent it and
-          the AIs that made it, as a pull request's page does, then its words, see the review on #3263. */}
-      <StudioPageHeading
-        title={requestTitle(request)}
-        actions={
-          canDrop && !awaiting && !ready ? (
-            <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
-              {t('shell.studio.aiRequest.drop')}
-            </AxisButton>
-          ) : undefined
-        }
-      />
-      <Flex vertical gap={spacing.sm} data-testid="studio-ai-asked">
-        <Flex align="center" gap={spacing.sm} wrap>
-          <StatusTag tone={requestStateTone(request.state)}>{stateWords(request)}</StatusTag>
-          <Typography.Text style={{ color: colour.textMuted }}>{line}</Typography.Text>
-        </Flex>
+      {/* Proposed: the request's name as the heading with its state beside it, then, close under it, its words and who
+          sent it with the AIs that made it, see the review on #3263. */}
+      <Flex vertical gap={spacing.xs} data-testid="studio-ai-asked">
+        <StudioPageHeading
+          title={requestTitle(request)}
+          tags={<StatusTag tone={requestStateTone(request.state)}>{stateWords(request)}</StatusTag>}
+          actions={
+            canDrop && !awaiting && !ready ? (
+              <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
+                {t('shell.studio.aiRequest.drop')}
+              </AxisButton>
+            ) : undefined
+          }
+        />
         {quoted(request.text)}
+        <Typography.Text style={{ color: colour.textMuted }}>{line}</Typography.Text>
       </Flex>
       {/* Proposed: while AI works, its stages, the fix round and what it does now, see the review on #3263. */}
       <Flex vertical gap="small" data-testid="studio-ai-progress">
