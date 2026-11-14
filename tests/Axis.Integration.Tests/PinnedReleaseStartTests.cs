@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Tests;
@@ -135,121 +134,22 @@ public sealed class PinnedReleaseStartTests(PostgreSqlFixture database) : IClass
         Assert.DoesNotContain(DiagnosticCodes.PinnedPackageVersionMissing, text, StringComparison.Ordinal);
     }
 
-    /// <summary>
-    /// Runs the built worker as its own process. With <paramref name="stopWhenStarted"/> it sends
-    /// SIGTERM once the host reports it started, for a normal shutdown. Otherwise it waits for the
-    /// worker to exit on its own.
-    /// </summary>
-    private static async Task<(int ExitCode, string Output)> RunWorkerAsync(string connectionString, string packages, bool stopWhenStarted)
-    {
-        var directory = WorkerDirectory();
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo("dotnet", "Axis.Worker.dll")
+    private static Task<(int ExitCode, string Output)> RunWorkerAsync(string connectionString, string packages, bool stopWhenStarted) =>
+        WorkerProcess.RunAsync(
+            new Dictionary<string, string>
             {
-                WorkingDirectory = directory,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
+                ["DOTNET_ENVIRONMENT"] = "Testing",
+                ["Tenants__a__Hosts__0"] = TenantHost,
+                ["Tenants__a__ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString),
+                ["Extensions__Path"] = packages,
+                ["Worker__PollInterval"] = "00:00:00.05",
+                ["Worker__IdlePollCeiling"] = "00:00:00.05",
+
+                // Any free port, so a worker that runs under scripts/dev.sh does not hold the address.
+                ["Health__Urls"] = "http://127.0.0.1:0",
             },
-        };
-        foreach (var (key, value) in new Dictionary<string, string>
-        {
-            ["DOTNET_ENVIRONMENT"] = "Testing",
-            ["Tenants__a__Hosts__0"] = TenantHost,
-            ["Tenants__a__ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString),
-            ["Extensions__Path"] = packages,
-            ["Worker__PollInterval"] = "00:00:00.05",
-            ["Worker__IdlePollCeiling"] = "00:00:00.05",
-
-            // Any free port, so a worker that runs under scripts/dev.sh does not hold the address.
-            ["Health__Urls"] = "http://127.0.0.1:0",
-        })
-        {
-            process.StartInfo.Environment[key] = value;
-        }
-
-        var output = new System.Text.StringBuilder();
-        var started = new TaskCompletionSource();
-        void Receive(string? line)
-        {
-            lock (output)
-            {
-                output.AppendLine(line);
-            }
-
-            if (line is not null && line.Contains("Application started", StringComparison.Ordinal))
-            {
-                started.TrySetResult();
-            }
-        }
-
-        process.OutputDataReceived += (_, e) => Receive(e.Data);
-        process.ErrorDataReceived += (_, e) => Receive(e.Data);
-        Assert.True(process.Start());
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-        try
-        {
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
-            timeout.CancelAfter(TimeSpan.FromSeconds(60));
-            if (stopWhenStarted)
-            {
-                await started.Task.WaitAsync(timeout.Token);
-                // Give the start check time to run before the shutdown.
-                await Task.Delay(TimeSpan.FromSeconds(2), timeout.Token);
-                using var signal = Process.Start("kill", $"-TERM {process.Id}")!;
-                await signal.WaitForExitAsync(timeout.Token);
-            }
-
-            await process.WaitForExitAsync(timeout.Token);
-        }
-        catch (OperationCanceledException) when (!CancellationToken.IsCancellationRequested)
-        {
-            process.Kill(entireProcessTree: true);
-            string partial;
-            lock (output)
-            {
-                partial = output.ToString();
-            }
-
-            Assert.Fail($"The worker did not finish within 60 seconds. Output:{Environment.NewLine}{partial}");
-        }
-
-        process.WaitForExit();
-        lock (output)
-        {
-            return (process.ExitCode, output.ToString());
-        }
-    }
-
-    /// <summary>
-    /// The folder with the built worker. The worker project's own build output is complete. The
-    /// test output holds a copy that lacks the shared ASP.NET Core assemblies the test host
-    /// brings, so it is used only when the project output cannot be found.
-    /// </summary>
-    private static string WorkerDirectory()
-    {
-        var repository = new DirectoryInfo(AppContext.BaseDirectory);
-        while (repository is not null && !File.Exists(Path.Combine(repository.FullName, "Axis.slnx")))
-        {
-            repository = repository.Parent;
-        }
-
-        if (repository is not null)
-        {
-            var framework = new DirectoryInfo(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar));
-            var own = Path.Combine(repository.FullName, "src", "Axis.Worker", "bin", framework.Parent!.Name, framework.Name);
-            if (File.Exists(Path.Combine(own, "Axis.Worker.runtimeconfig.json")))
-            {
-                return own;
-            }
-        }
-
-        Assert.True(
-            File.Exists(Path.Combine(AppContext.BaseDirectory, "Axis.Worker.runtimeconfig.json")),
-            "The built worker was not found in the worker project's output or the test output.");
-        return AppContext.BaseDirectory;
-    }
+            stopWhenStarted,
+            CancellationToken);
 
     /// <summary>Activates a release pinning <c>1.0.0</c> in a new tenant database and returns its id.</summary>
     private async Task<(string ConnectionString, Guid ReleaseId)> ActivateFirstReleaseAsync(TemporaryFolder folder, string packages)

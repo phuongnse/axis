@@ -80,7 +80,7 @@ public sealed class WorkerHealthTests(PostgreSqlFixture database) : IClassFixtur
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    private static WebApplication BuildWorker(
+    internal static WebApplication BuildWorker(
         LogCollector logs,
         string connectionString,
         BlockingHandler? handler = null,
@@ -114,9 +114,9 @@ public sealed class WorkerHealthTests(PostgreSqlFixture database) : IClassFixtur
         return app;
     }
 
-    private static HttpClient ClientOf(WebApplication app) => new() { BaseAddress = new Uri(app.Urls.Single()) };
+    internal static HttpClient ClientOf(WebApplication app) => new() { BaseAddress = new Uri(app.Urls.Single()) };
 
-    private static async Task<(HttpStatusCode Status, string? Health)> GetAsync(HttpClient client, string path)
+    internal static async Task<(HttpStatusCode Status, string? Health)> GetAsync(HttpClient client, string path)
     {
         using var response = await client.GetAsync(path, CancellationToken);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
@@ -126,7 +126,7 @@ public sealed class WorkerHealthTests(PostgreSqlFixture database) : IClassFixtur
         return (response.StatusCode, body.RootElement.GetProperty("status").GetString());
     }
 
-    private static async Task MigrateAsync(string connectionString)
+    internal static async Task MigrateAsync(string connectionString)
     {
         await using var context = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connectionString).Options);
         await context.Database.MigrateAsync(CancellationToken);
@@ -143,7 +143,7 @@ public sealed class WorkerHealthTests(PostgreSqlFixture database) : IClassFixtur
     }
 
     /// <summary>Starts and then waits until the worker stops, so the loop never returns to polling.</summary>
-    private sealed class BlockingHandler : IWorkItemHandler
+    internal sealed class BlockingHandler : IWorkItemHandler
     {
         public string Kind => BlockKind;
 

@@ -161,6 +161,12 @@ public sealed class WorkerOptionsTests
     [InlineData("Extensions:Runners:Python", "localhost:0")]
     [InlineData("Extensions:Runners:Python", "localhost:65536")]
     [InlineData("Extensions:Runners:Python", ":5310")]
+    [InlineData("Extensions:Runners:Application", "localhost")]
+    [InlineData("Extensions:Runners:Application", "localhost:0")]
+    [InlineData("Extensions:Runners:Application", "localhost:65536")]
+    [InlineData("Extensions:Runners:Application", ":5310")]
+    [InlineData("Extensions:ApplicationPackages", "maybe")]
+    [InlineData("Extensions:ApplicationPackages", "1")]
     [InlineData("Extensions:Runners:ProxyPort", "-1")]
     [InlineData("Extensions:Runners:ProxyPort", "65536")]
     [InlineData("Extensions:Runners:ProxyPort", "1.5")]
@@ -180,6 +186,45 @@ public sealed class WorkerOptionsTests
         var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
 
         Assert.Contains(setting, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("localhost")]
+    [InlineData("localhost:0")]
+    [InlineData(":5310")]
+    public void Application_packages_on_stop_the_worker_at_startup_when_the_application_package_host_is_not_set_or_malformed(string? runner)
+    {
+        var builder = ApplicationPackagesBuilder(runner);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains("Extensions:Runners:Application", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("localhost:5310", "localhost", 5310)]
+    [InlineData("[::1]:5310", "::1", 5310)]
+    public void Application_packages_on_with_an_application_package_host_build_the_worker(string runner, string host, int port)
+    {
+        var builder = ApplicationPackagesBuilder(runner);
+
+        builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
+        using var built = builder.Build();
+
+        Assert.Equal(new ApplicationPackageSettings(true, host, port), built.Services.GetRequiredService<ApplicationPackageSettings>());
+    }
+
+    [Fact]
+    public void Application_packages_off_build_the_worker_without_an_application_package_host()
+    {
+        var builder = ApplicationPackagesBuilder(runner: null, setting: "false");
+
+        builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
+        using var built = builder.Build();
+
+        Assert.False(built.Services.GetRequiredService<ApplicationPackageSettings>().On);
     }
 
     [Theory]
@@ -416,6 +461,21 @@ public sealed class WorkerOptionsTests
             environment: environment);
 
         builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
+    }
+
+    private static HostApplicationBuilder ApplicationPackagesBuilder(string? runner, string setting = "true")
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Extensions:ApplicationPackages"] = setting,
+            ["Extensions:Runners:Application"] = runner,
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+
+            // No database is opened: the worker is built, never started.
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+        return builder;
     }
 
     private static HostApplicationBuilder EmailBuilder(params (string Key, string? Value)[] settings)

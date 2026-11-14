@@ -17,6 +17,7 @@ namespace Axis.Configuration.Packages;
 [JsonDerivedType(typeof(RetryableMessage), "retryable")]
 [JsonDerivedType(typeof(FailureMessage), "failure")]
 [JsonDerivedType(typeof(StopMessage), "stop")]
+[JsonDerivedType(typeof(SandboxMessage), "sandbox")]
 public abstract record RunnerMessage;
 
 /// <summary>
@@ -48,6 +49,12 @@ public sealed record FailureMessage(string? Error = null, string? Binding = null
 
 /// <summary>The worker is done with the runner.</summary>
 public sealed record StopMessage : RunnerMessage;
+
+/// <summary>
+/// The worker asks the package host whether it runs under gVisor, with no <paramref name="Gvisor"/>. The host answers
+/// with <paramref name="Gvisor"/> set, closes the connection and starts no runner.
+/// </summary>
+public sealed record SandboxMessage(bool? Gvisor = null) : RunnerMessage;
 
 /// <summary>Writes and reads the lines of the runner protocol.</summary>
 public static class RunnerProtocol

@@ -531,7 +531,7 @@ package reaches nothing of the host and no binding of another call.
 - **No host.** A host that cannot be reached, that starts no runner, or that is not set makes the
   attempt retryable, because the operation never ran. The error names the setting of the call's runtime.
 
-The server reads `Extensions:Isolation`, and the worker reads all five settings:
+The server reads `Extensions:Isolation`, and the worker reads all six settings:
 
 | Setting | Environment variable | Default | Meaning |
 | --- | --- | --- | --- |
@@ -539,6 +539,7 @@ The server reads `Extensions:Isolation`, and the worker reads all five settings:
 | `Extensions:Runners:Dotnet` | `Extensions__Runners__Dotnet` | none | The `host:port` of the C# package host, with a port from 1 to 65535, or `[address]:port` for an IPv6 address. Unset, every C# attempt is retryable. A value that is not a `host:port` stops the worker at start |
 | `Extensions:Runners:Node` | `Extensions__Runners__Node` | none | The `host:port` of the Node.js package host, with the same forms. Unset, every `node` attempt is retryable, with `inProcess` too. A value that is not a `host:port` stops the worker at start |
 | `Extensions:Runners:Python` | `Extensions__Runners__Python` | none | The `host:port` of the Python package host, with the same forms. Unset, every `python` attempt is retryable, with `inProcess` too. A value that is not a `host:port` stops the worker at start |
+| `Extensions:Runners:Application` | `Extensions__Runners__Application` | none | The `host:port` of `application-package-host`, with the same forms. The worker reads it only with `Extensions:ApplicationPackages` on, and then needs it, see [an application's packages](#an-applications-packages). A value that is not a `host:port` stops the worker at start |
 | `Extensions:Runners:ProxyPort` | `Extensions__Runners__ProxyPort` | `5311` | The port of the worker's egress proxy for the runners, a whole number from 0 to 65535. `0` picks a free port. Any other value stops the worker at start |
 
 The package host in host mode reads two settings of its own:
@@ -562,6 +563,7 @@ implements the operation context over it.
 | `retryable` | The runner | `error`, the name of the error's type |
 | `failure` | The runner | `error`, the name of the error's type, or `binding`, the undeclared binding it asked for |
 | `stop` | The worker | None |
+| `sandbox` | The worker, to the host, and the host's answer | None in the question. `gvisor`, a boolean, in the answer |
 
 - **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network. The connection
   is neither encrypted nor authenticated, and a `run` carries binding secrets, so only the operator's
@@ -578,6 +580,10 @@ implements the operation context over it.
   well formed, closes the connection and starts no runner. So does a `start` for a version whose runtime
   is missing from the host's image. The runner answers `ready` once it has
   loaded the version.
+- **Sandbox.** A `sandbox` may be the first line of a connection instead of a `start`. The host answers `sandbox`
+  with `gvisor` set, `true` only when its kernel log, as `dmesg` reads it, begins with gVisor's `Starting gVisor` line. A kernel
+  log that begins otherwise, or a read that is refused, answers `false`. Then the host closes the connection and starts no runner.
+  A `sandbox` that already holds `gvisor` closes the connection without an answer.
 - **Standard output.** The runner's standard output holds only protocol lines. What a package writes to
   the console goes to standard error.
 - **Runner errors.** An operation that is not in the manifest, an input that does not fit its field
@@ -686,8 +692,12 @@ trusted code, so the platform gives it more limits than an installation's packag
   gVisor runs on an ordinary Kubernetes node, while a microVM needs nodes that allow nested
   virtualization.
 - **`Extensions:ApplicationPackages`.** A server, worker and publisher setting, `false` by default.
-  With `true`, the worker checks at start that `application-package-host` runs under gVisor, and does
-  not start otherwise. With `false`, an application's package that Axis runs is a compile error at its
+  With `true`, the worker sends `sandbox` to `application-package-host` at `Extensions:Runners:Application`
+  before it reads any tenant or claims any work, and does not start otherwise. It exits with code 1 when the
+  answer is no, or when none comes within 10 seconds, and a refused connection counts as no answer. An unset or malformed
+  `Extensions:Runners:Application` stops it at start too, naming the setting. A value other than `true` or `false` stops
+  it as well. The check makes one attempt, and the orchestrator's restart tries again. With `false`, the worker never asks.
+  An application's package that Axis runs is then a compile error at its
   `packages/<id>/axis-package.json`. So an installation without gVisor refuses it and runs its own packages
   as before. The tenant's switch and the compile check still allow a
   [customer-hosted](#customer-hosted-runners) package, which needs no gVisor because gVisor guards only code
