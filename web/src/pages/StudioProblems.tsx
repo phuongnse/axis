@@ -1,9 +1,8 @@
-import { Flex, Typography } from 'antd'
-import { useContext, type ReactNode } from 'react'
+import { Typography } from 'antd'
+import type { ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
-import { resourceTitle, type StudioDiagnostic, type StudioResourceItem } from '../platform/studio'
-import { kindSingular } from '../platform/studioKinds'
-import { PlatformContext } from './context'
+import type { StudioDiagnostic, StudioResourceItem } from '../platform/studio'
+import { ResourceReference } from './ResourceReference'
 import { useDiagnosticItems } from './useDiagnosticItems'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -84,8 +83,7 @@ export function StudioProblemList({
   testId?: string
 }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const { spacing } = useDesignTokens()
   const groups: { key: string; resourceId: string | null; file: string; items: StudioProblemItem[] }[] = []
   for (const item of items) {
     const key = item.resourceId ?? `file:${item.file}`
@@ -99,27 +97,18 @@ export function StudioProblemList({
   return (
     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }} data-testid={testId}>
       {groups.map((group) => {
-        const resource =
-          group.resourceId === null ? undefined : resources.find((entry) => entry.id === group.resourceId)
         const first = group.items[0]
         return (
           <li key={group.key} style={{ paddingBlock: spacing.xs / 2 }} data-testid="studio-problem-group">
-            <Flex align="baseline" gap={spacing.xs} wrap>
-              {group.resourceId === null ? (
-                <Typography.Text style={{ color: colour.textMuted }}>{group.file}</Typography.Text>
-              ) : (
-                <>
-                  <AxisButton role="link" onClick={() => onSelect(group.resourceId!, first.path)}>
-                    {resource === undefined ? group.file : resourceTitle(resource, locale, t)}
-                  </AxisButton>
-                  {resource !== undefined && (
-                    <Typography.Text style={{ color: colour.textMuted }}>
-                      {kindSingular(resource.kind, t)}
-                    </Typography.Text>
-                  )}
-                </>
-              )}
-            </Flex>
+            <div>
+              <ResourceReference
+                resourceId={group.resourceId}
+                file={group.file}
+                path={first.path}
+                resources={resources}
+                onSelect={onSelect}
+              />
+            </div>
             <ul style={{ listStyle: 'none', margin: 0, paddingInlineStart: spacing.md }}>
               {group.items.map((item, index) => (
                 <li key={index} data-testid="studio-problem">

@@ -16,7 +16,7 @@ import type {
   StudioReleases,
   StudioResource,
   StudioResourceItem,
-  StudioReviewFinding,
+  StudioReview,
 } from '../platform/studio'
 import type {
   NotificationFilter,
@@ -571,6 +571,45 @@ const appPlan = [
 
 const plans: Record<string, string> = { [aiRequests[0].id]: supplierPlan, [appRequest.id]: appPlan }
 
+// Proposed: a plan's summary and the choices AI made that the request did not say, see the review on #3263.
+const planNotes: Record<string, { summary: string; decisions: string[] }> = {
+  [aiRequests[0].id]: {
+    summary:
+      'Adds a Supplier entity and a required Supplier field on purchase requests, shown on the form, the detail and the list.',
+    decisions: [
+      'The Supplier field is required, as a purchase needs a supplier. The request did not say.',
+      'Only active suppliers can be chosen, so a supplier that stopped trading cannot be picked again.',
+    ],
+  },
+  [appRequest.id]: {
+    summary:
+      'Adds a Cost centre entity and a Cost centre field on purchase requests, shown as a column of the request list.',
+    decisions: ['The Cost centre field is optional, as the request did not say it is required.'],
+  },
+}
+
+/** A plan's notes, or ones that say the plan follows the request's words, for a plan the preview has none for. */
+function planNotesOf(request: StudioAuthoringRequest): { summary: string; decisions: string[] } {
+  return planNotes[request.id] ?? { summary: `Changes the application as asked: "${request.text}"`, decisions: [] }
+}
+
+/**
+ * Proposed: the review of a ready request: each plan step done, at the resource that does it, and no finding, unless
+ * the preview gives the request a review of its own, see the review on #3263.
+ */
+function reviewOf(request: StudioAuthoringRequest, plan: string | null): StudioReview {
+  return (
+    reviews[request.id] ?? {
+      summary: 'The draft does what the request and the plan ask.',
+      steps: (plan ?? '')
+        .split('\n')
+        .filter((step) => step.trim() !== '')
+        .map((step) => ({ step, done: true, resourceId: null, file: null, path: '' })),
+      findings: [],
+    }
+  )
+}
+
 // What the preview's own sends and actions changed, so the list and each request's page follow them.
 const sentRequests: { request: StudioAuthoringRequest; at: number }[] = []
 const actedOn = new Map<string, { state: StudioAuthoringRequest['state']; at: number }>()
@@ -736,7 +775,9 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
       draft: appState === 'accepted' ? null : draftOf(request.id),
       checks: checksOf(request, appState),
       // Its author has their own AI here, so a second AI reviewed it.
-      review: appState === 'ready' ? (reviews[request.id] ?? []) : null,
+      planSummary: planNotesOf(request).summary,
+      planDecisions: planNotesOf(request).decisions,
+      review: appState === 'ready' ? reviewOf(request, appPlan) : null,
       changes: appDiff.map(({ file, summary }) => ({ file, summary })),
       failure: null,
       accept: appAccept,
@@ -763,7 +804,9 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
     aiConnected: true,
     draft: hasDraft ? draftOf(request.id) : null,
     checks: checksOf(request, state),
-    review: state === 'ready' ? (reviews[request.id] ?? []) : null,
+    planSummary: plan === null ? null : planNotesOf(request).summary,
+    planDecisions: plan === null ? [] : planNotesOf(request).decisions,
+    review: state === 'ready' ? reviewOf(request, plan) : null,
     changes: diff.map(({ file, summary }) => ({ file, summary })),
     failure: state === 'failed' ? (failures[request.id] ?? null) : null,
     accept,
@@ -979,23 +1022,50 @@ function checksOf(request: StudioAuthoringRequest, state: StudioAuthoringRequest
 
 // Proposed: a review's findings, see the review on #3263. The fix rounds of the request from an outside app left one
 // blocking finding open, and each finding opens the resource it is about.
-const reviews: Record<string, StudioReviewFinding[]> = {
-  [appRequest.id]: [
-    {
-      blocking: true,
-      text: 'The request list shows no Cost centre column, while the request asked for one: the table lists no costCentre column.',
-      file: 'pages/request-list.json',
-      path: '/widgets/0/columns',
-      resourceId: pageId,
-    },
-    {
-      blocking: false,
-      text: 'The Cost centre field could be required. The request did not say, so the draft leaves it optional.',
-      file: 'entities/Request.json',
-      path: '/fields/2',
-      resourceId: id(firstEntityId),
-    },
-  ],
+const reviews: Record<string, StudioReview> = {
+  [appRequest.id]: {
+    summary:
+      'The draft adds the Cost centre entity and field as planned, but the request list shows no Cost centre column.',
+    steps: [
+      {
+        step: 'Add a Cost centre entity with a name and a code.',
+        done: true,
+        resourceId: null,
+        file: 'entities/cost-centre.json',
+        path: '',
+      },
+      {
+        step: 'Add a Cost centre field to the purchase request, chosen from the cost centres.',
+        done: true,
+        resourceId: id(firstEntityId),
+        file: 'entities/Request.json',
+        path: '/fields/2',
+      },
+      {
+        step: 'Show the cost centre as a column of the request list.',
+        done: false,
+        resourceId: pageId,
+        file: 'pages/request-list.json',
+        path: '/widgets/0/columns',
+      },
+    ],
+    findings: [
+      {
+        blocking: true,
+        text: 'The request list shows no Cost centre column, while the request asked for one: the table lists no costCentre column.',
+        file: 'pages/request-list.json',
+        path: '/widgets/0/columns',
+        resourceId: pageId,
+      },
+      {
+        blocking: false,
+        text: 'The Cost centre field could be required. The request did not say, so the draft leaves it optional.',
+        file: 'entities/Request.json',
+        path: '/fields/2',
+        resourceId: id(firstEntityId),
+      },
+    ],
+  },
 }
 
 const failures: Record<string, string> = {

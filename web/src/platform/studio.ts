@@ -1790,8 +1790,14 @@ export interface StudioAuthoringRequestDetail extends StudioAuthoringRequest {
   steps: StudioAuthoringRequestStep[]
   draft: string | null
   checks: StudioRequest | null
-  /** Proposed: the findings of the latest review, or `null` before one ran, see {@link StudioReviewFinding}. */
-  review: StudioReviewFinding[] | null
+  /**
+   * Proposed: the plan's summary in one or two sentences, and the choices AI made that the request did not say, which
+   * its author agrees to by approving the plan, see the review on #3263. `null` and empty before the plan is written.
+   */
+  planSummary: string | null
+  planDecisions: string[]
+  /** Proposed: the latest review, or `null` before one ran, see {@link StudioReview}. */
+  review: StudioReview | null
   changes: { file: string; summary: string }[]
   failure: string | null
   accept: StudioRequest | null
@@ -1808,6 +1814,28 @@ export interface StudioReviewFinding {
   file: string
   path: string
   resourceId: string | null
+}
+
+/**
+ * Proposed: one step of the approved plan as the review found it, see the review on #3263: whether the draft does it,
+ * and the resource where it does, or where it falls short.
+ */
+export interface StudioReviewStep {
+  step: string
+  done: boolean
+  resourceId: string | null
+  file: string | null
+  path: string
+}
+
+/**
+ * Proposed: a request's review, see the review on #3263: its summary in one or two sentences, each step of the plan
+ * checked against the draft, and its findings.
+ */
+export interface StudioReview {
+  summary: string
+  steps: StudioReviewStep[]
+  findings: StudioReviewFinding[]
 }
 
 /** Reads the whole diff of the signed-in user's draft, page after page, see docs/reference/authoring-revisions.md#draft-diff. */

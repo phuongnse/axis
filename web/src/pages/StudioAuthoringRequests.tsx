@@ -19,7 +19,7 @@ import {
   type StudioAuthoringRequestDetail,
   type StudioAuthoringRequestState,
   type StudioAuthoringRequestStep,
-  type StudioReviewFinding,
+  type StudioReview,
   type StudioRequest,
   type StudioResourceItem,
   type StudioRevisionChange,
@@ -43,6 +43,9 @@ import { SectionPart, SectionParts } from './ResourceFormSection'
 import { ActionBar } from './SaveBar'
 import { StudioPageHeading } from './StudioPageHeading'
 import { StudioProblemList } from './StudioProblems'
+import { ResourceReference } from './ResourceReference'
+import { visuallyHidden } from '../platform/visuallyHidden'
+import { CheckOutlined, CloseOutlined } from '@ant-design/icons'
 import { useDiagnosticItems } from './useDiagnosticItems'
 import { StudioRequestStatus } from './StudioRequestStatus'
 import { StudioTestResults } from './StudioTestResults'
@@ -495,7 +498,7 @@ export function StudioAuthoringRequestPage({
             )}
             {/* The review runs only once the checks pass, so a request that failed before it has no findings. */}
             {request.review !== null && (
-              <ReviewFindings findings={request.review} resources={resources} onOpen={onOpen} />
+              <ReviewFindings review={request.review} resources={resources} onOpen={onOpen} />
             )}
           </Flex>,
         )}
@@ -505,6 +508,7 @@ export function StudioAuthoringRequestPage({
     <Flex vertical gap="middle">
       {request.plan !== null && (
         <Flex vertical gap="small">
+          {request.planSummary !== null && <Typography.Text>{request.planSummary}</Typography.Text>}
           <ul style={{ margin: 0, paddingInlineStart: spacing.lg }} data-testid="studio-ai-plan">
             {request.plan
               .split('\n')
@@ -513,6 +517,17 @@ export function StudioAuthoringRequestPage({
                 <li key={index}>{step}</li>
               ))}
           </ul>
+          {/* Proposed: the choices AI made that the request did not say, agreed to by approving, see the review on #3263. */}
+          {request.planDecisions.length > 0 && (
+            <Flex vertical gap={spacing.xs} data-testid="studio-ai-plan-decisions">
+              <Typography.Text strong>{t('shell.studio.aiRequest.decisions')}</Typography.Text>
+              <ul style={{ margin: 0, paddingInlineStart: spacing.lg }}>
+                {request.planDecisions.map((decision, index) => (
+                  <li key={index}>{decision}</li>
+                ))}
+              </ul>
+            </Flex>
+          )}
           {awaiting && !mine && (
             <Typography.Text style={{ color: colour.textMuted }}>
               {t('shell.studio.aiRequest.notYours')}
@@ -563,7 +578,7 @@ export function StudioAuthoringRequestPage({
       emptyText=""
     />
   )
-  const openBlocking = (request.review ?? []).filter((finding) => finding.blocking).length
+  const openBlocking = (request.review?.findings ?? []).filter((finding) => finding.blocking).length
 
   return (
     <Flex vertical gap="middle" data-testid="studio-ai-request">
@@ -729,22 +744,24 @@ export function StudioAuthoringRequestPage({
 /**
  * Proposed: a request's review, see the review on #3263: "Review" in bold and its verdict as a `StatusTag`, "Changes
  * requested" while a finding must change and "No changes requested" otherwise, never "Approved", as only its author
- * approves, by accepting. Its findings follow in a `StudioProblemList`, grouped by the resource they are about, what
- * must change first, each led by "Must change" or "Note".
+ * approves, by accepting. Its summary follows in words, then "Plan" in bold and each step of the approved plan, a check
+ * mark when the draft does it and a cross when it does not, with the resource where, as a pull request's review checks
+ * each of its criteria. Its findings follow in a `StudioProblemList`, grouped by the resource they are about, what must
+ * change first, each led by "Must change" or "Note".
  */
 function ReviewFindings({
-  findings,
+  review,
   resources,
   onOpen,
 }: {
-  findings: StudioReviewFinding[]
+  review: StudioReview
   resources: readonly StudioResourceItem[]
   onOpen: (resourceId: string, path: string) => void
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
-  const blocking = findings.filter((finding) => finding.blocking)
-  const notes = findings.filter((finding) => !finding.blocking)
+  const blocking = review.findings.filter((finding) => finding.blocking)
+  const notes = review.findings.filter((finding) => !finding.blocking)
   return (
     <Flex vertical gap={spacing.xs} data-testid="studio-ai-review">
       <Flex align="center" gap={spacing.sm} wrap>
@@ -757,7 +774,39 @@ function ReviewFindings({
           )}
         </StatusTag>
       </Flex>
-      {findings.length > 0 && (
+      <Typography.Text>{review.summary}</Typography.Text>
+      {review.steps.length > 0 && (
+        <Flex vertical gap={spacing.xs} data-testid="studio-ai-review-steps">
+          <Typography.Text strong>{t('shell.studio.aiRequest.tab.plan')}</Typography.Text>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {review.steps.map((step, index) => (
+              <li key={index} data-testid="studio-ai-review-step" data-done={step.done}>
+                <Flex gap={spacing.xs} align="baseline" wrap>
+                  <span style={{ color: step.done ? colour.successText : colour.dangerText }}>
+                    {step.done ? <CheckOutlined aria-hidden /> : <CloseOutlined aria-hidden />}
+                    <span style={visuallyHidden}>
+                      {t(
+                        step.done
+                          ? 'shell.studio.aiRequest.review.stepDone'
+                          : 'shell.studio.aiRequest.review.stepNotDone',
+                      )}
+                    </span>
+                  </span>
+                  <Typography.Text>{step.step}</Typography.Text>
+                  <ResourceReference
+                    resourceId={step.resourceId}
+                    file={step.file}
+                    path={step.path}
+                    resources={resources}
+                    onSelect={onOpen}
+                  />
+                </Flex>
+              </li>
+            ))}
+          </ul>
+        </Flex>
+      )}
+      {review.findings.length > 0 && (
         <StudioProblemList
           items={[...blocking, ...notes].map((finding) => ({
             lead: (

@@ -23,6 +23,8 @@ const fromApp: StudioAuthoringRequestDetail = {
   coAuthors: ['Claude Code'],
   state: 'ready',
   plan: 'Add a Cost centre field to the purchase request.',
+  planSummary: 'Adds a Cost centre field.',
+  planDecisions: [],
   aiConnected: false,
   round: 1,
   tokens: 0,
@@ -223,17 +225,21 @@ describe('a ready request’s review', () => {
     stub({
       ...fromApp,
       aiConnected: true,
-      review: [
-        { blocking: false, text: 'Could say why.', file: 'pages/list.json', path: '/widgets/1', resourceId: 'r-1' },
-        {
-          blocking: true,
-          text: 'Mails the approver too.',
-          file: 'pages/list.json',
-          path: '/widgets/0',
-          resourceId: 'r-1',
-        },
-        { blocking: false, text: 'A loose end.', file: 'misc.json', path: '', resourceId: null },
-      ],
+      review: {
+        summary: 'Mails the approver too.',
+        steps: [],
+        findings: [
+          { blocking: false, text: 'Could say why.', file: 'pages/list.json', path: '/widgets/1', resourceId: 'r-1' },
+          {
+            blocking: true,
+            text: 'Mails the approver too.',
+            file: 'pages/list.json',
+            path: '/widgets/0',
+            resourceId: 'r-1',
+          },
+          { blocking: false, text: 'A loose end.', file: 'misc.json', path: '', resourceId: null },
+        ],
+      },
     })
     const onOpen = vi.fn()
     renderIn(
@@ -279,7 +285,7 @@ describe('a ready request’s review', () => {
   })
 
   it('says no changes are requested when nothing must change', async () => {
-    stub({ ...fromApp, aiConnected: true, review: [] })
+    stub({ ...fromApp, aiConnected: true, review: { summary: 'All done.', steps: [], findings: [] } })
     renderPage()
 
     const review = await screen.findByTestId('studio-ai-review')
@@ -316,7 +322,7 @@ describe('a ready request’s page', () => {
             ...fromApp,
             aiConnected: true,
             draft: 'd-1',
-            review: [],
+            review: { summary: 'All done.', steps: [], findings: [] },
             changes: [{ file: 'entities/cost-centre.json', summary: 'A cost centre with a name and a code.' }],
             checks: {
               ...fromApp.checks!,
@@ -464,5 +470,79 @@ describe('a request’s name', () => {
     expect(requestTitle({ ...fromApp, title: null, text: 'Rename a field. Then show it.' })).toBe('Rename a field')
     expect(requestTitle({ ...fromApp, title: null, text: 'x'.repeat(100) })).toBe(`${'x'.repeat(79)}…`)
     expect(requestTitle(fromApp)).toBe('Add a Cost centre field')
+  })
+})
+
+// Proposed: a plan's summary and the choices it made, and the review's summary and plan steps, see the review on #3263.
+describe('a plan and its review, as a pull request has them', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function renderPage(onOpen = vi.fn()) {
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[
+          {
+            id: 'r-1',
+            kind: 'page',
+            name: 'List',
+            file: 'pages/list.json',
+            version: 'v',
+            usedBy: 0,
+            titles: { en: 'Requests' },
+          },
+        ]}
+        onOpen={onOpen}
+      />,
+    )
+    return onOpen
+  }
+
+  it('shows the plan in a sentence, its steps and the decisions its author agrees to by approving', async () => {
+    stub({
+      ...fromApp,
+      state: 'awaitingApproval',
+      checks: null,
+      review: null,
+      aiConnected: true,
+      planSummary: 'Adds a Cost centre field.',
+      planDecisions: ['The field is optional, as the request did not say.'],
+    })
+    renderPage()
+
+    expect(await screen.findByText('Adds a Cost centre field.')).toBeInTheDocument()
+    const decisions = screen.getByTestId('studio-ai-plan-decisions')
+    expect(within(decisions).getByText('Decisions to check')).toBeInTheDocument()
+    expect(within(decisions).getByText('The field is optional, as the request did not say.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Approve plan' })).toBeInTheDocument()
+  })
+
+  it('sums the review up and checks each plan step, with the resource where it falls short', async () => {
+    stub({
+      ...fromApp,
+      aiConnected: true,
+      review: {
+        summary: 'The field is added, but the list shows no column.',
+        steps: [
+          { step: 'Add the field.', done: true, resourceId: null, file: null, path: '' },
+          { step: 'Show it in the list.', done: false, resourceId: 'r-1', file: 'pages/list.json', path: '/widgets/0' },
+        ],
+        findings: [],
+      },
+    })
+    const onOpen = renderPage()
+
+    const review = await screen.findByTestId('studio-ai-review')
+    expect(within(review).getByText('The field is added, but the list shows no column.')).toBeInTheDocument()
+    const [done, notDone] = within(review).getAllByTestId('studio-ai-review-step')
+    expect(done).toHaveAttribute('data-done', 'true')
+    expect(done).toHaveTextContent(/^Done:\s*Add the field\.$/)
+    expect(notDone).toHaveTextContent(/^Not done:\s*Show it in the list\.\s*Requests\s*Page$/)
+    await userEvent.setup().click(within(notDone).getByRole('button', { name: 'Requests' }))
+    expect(onOpen).toHaveBeenCalledWith('r-1', '/widgets/0')
   })
 })
