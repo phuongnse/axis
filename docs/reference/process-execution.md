@@ -36,7 +36,8 @@ never leaves an instance half moved.
 - **Restarts.** An instance that waits on a task has no work item, so it needs no running worker. One
   that waits on a connector call has the call's `connector.call` item, one that waits on a package
   call its `package.call` item, and one that waits on a timer, or on a `waitEvent` step with a
-  `timeout`, its `process.timer` item. A task decision is accepted while no worker runs: it queues the
+  `timeout`, its `process.timer` item. One that waits on a call to a customer-hosted package has no
+  item, so a worker restart leaves it as it is. A task decision is accepted while no worker runs: it queues the
   next step's work item, and the next worker to start runs that step. A step that a worker never
   committed leaves no trace, and the worker that claims it after the lease runs it once.
 - **History.** Every step occurrence records its input, its output, the decision taken and any error.
@@ -557,8 +558,10 @@ operation in place of the HTTP request:
 
 - **Staging.** The step's transaction evaluates the input, stores the call as `pending` with a stable
   operation identity and the evaluated input, sets the instance to `waiting` on the step, and queues a
-  work item. A required input that gives `null` fails the step. The table is `axis.package_calls` and
-  the work item kind is `package.call`. A unique index on instance, step and `staged_revision` lets a
+  work item, except for a call to a customer-hosted package, which waits `pending` with no work item, so
+  the worker runs no attempt of it. The compiled step says which inputs the operation requires, so
+  staging reads no installed package. A required input that gives `null` fails the step. The table is
+  `axis.package_calls` and the work item kind is `package.call`. A unique index on instance, step and `staged_revision` lets a
   step stage one call per pass of a [loop](process-flow.md#loops). The step writes the history row
   `{ "state": "waiting", "operationId" }` and the audit record `operation.staged`. The call also
   stores the step's retry policy and the operation's `idempotent` flag, because a worker that lacks
@@ -578,10 +581,10 @@ operation in place of the HTTP request:
   [package runner](extension-packages.md#package-runners) instead. The worker sends the stored input and the
   resolved bindings in a `run`, and closes the connection at the `timeout`, which kills the runner. A `node` or
   `python` attempt always goes to a package runner, with `inProcess` too.
-- **Run in a customer-hosted runner** _(planned for M37)_. The worker runs no attempt of a call to a
-  customer-hosted package, whether the application's own package or an installation's package that the
-  application [declares](declaring-packages.md#declaring-packages-in-an-application) with
-  `runner: customer`, see [customer-hosted runners](extension-packages.md#customer-hosted-runners). The call waits `pending`, its retry due, until a
+- **Run in a customer-hosted runner** _(planned for M37)_. A call to a customer-hosted package, whether
+  the application's own package or an installation's package that the application
+  [declares](declaring-packages.md#declaring-packages-in-an-application) with `runner: customer`, see
+  [customer-hosted runners](extension-packages.md#customer-hosted-runners), waits `pending`, its retry due, until a
   [customer-hosted runner](extension-packages.md#customer-hosted-runners) that registers the package and
   version takes it, and the runner receives no binding value.
   - **The take is the Mark step.** It marks the call `sending`, counts the attempt and gives a lease that

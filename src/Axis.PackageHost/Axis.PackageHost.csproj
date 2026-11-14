@@ -17,6 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="axis_test_runner.py" LogicalName="Axis.PackageHost.axis_test_runner.py" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Axis.PackageHost.Tests" />
     <InternalsVisibleTo Include="Axis.Integration.Tests" />
   </ItemGroup>

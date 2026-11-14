@@ -41,6 +41,21 @@ public sealed class PackageStepCompilerTests
     }
 
     [Fact]
+    public void A_package_step_carries_each_input_as_the_operation_declares_it_required()
+    {
+        using var packages = new TemporaryFolder().Install("1.0.0");
+        using var folder = Folder(
+            Process("""{ "name": "add", "type": "operation", "operation": "test-package/sum", "input": { "a": "1", "b": "2" }, "next": "done" }"""),
+            packages: Packages);
+
+        var result = ApplicationCompiler.Compile(folder.Path, PackageCatalog.Load(packages.Path).Versions);
+
+        Assert.Empty(result.Diagnostics);
+        var step = Assert.IsType<PackageOperationStepModel>(Assert.Single(result.Model!.Processes).Steps[0]);
+        Assert.Equal([("a", true), ("b", true)], step.Input.Select(input => (input.Input, input.Required)));
+    }
+
+    [Fact]
     public void A_package_step_keeps_its_retry_policy_and_the_manifest_idempotency()
     {
         using var packages = new TemporaryFolder().Install("1.0.0");

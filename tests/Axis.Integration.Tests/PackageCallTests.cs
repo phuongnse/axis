@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Axis.Configuration.Model;
 using Axis.Data.Audit;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
@@ -8,6 +9,52 @@ namespace Axis.Integration.Tests;
 public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture<PackageCallFixture>
 {
     private const string Secret = "The input 2 is not valid.";
+
+    private const string ToolsManifest = """
+        {
+          "id": "tools",
+          "version": "2.3.4",
+          "label": "Tools",
+          "language": "python",
+          "runner": "customer",
+          "adapter": "adapter.py",
+          "lock": "requirements.txt",
+          "operations": [
+            {
+              "name": "sum",
+              "type": "adapter.sum",
+              "idempotent": true,
+              "input": [
+                { "name": "a", "type": "integer", "required": true },
+                { "name": "b", "type": "integer", "required": true }
+              ],
+              "output": [{ "name": "total", "type": "integer" }]
+            }
+          ]
+        }
+        """;
+
+    private const string ToolsSumProcess = """
+        {
+          "id": "4b9d6e21-7c58-4a03-b1f4-8e2a5d70c963",
+          "kind": "process",
+          "name": "ToolsSum",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "sum",
+          "steps": [
+            {
+              "name": "sum",
+              "type": "operation",
+              "operation": "tools/sum",
+              "input": { "a": "divisor", "b": "divisor + 1" },
+              "output": { "total": "total" },
+              "next": "done"
+            },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -67,6 +114,51 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
                 ["operationId"] = callId,
             },
             JsonNode.Parse(await AuditDetailsAsync(instanceId, AuditActions.OperationStaged))));
+    }
+
+    [Fact]
+    public async Task Staging_a_call_to_an_installed_package_marked_customer_queues_no_work_item_and_the_worker_runs_no_attempt()
+    {
+        var copy = await fixture.ActivateCopyAsync(application => application["packages"]!.AsArray()[0]!["runner"] = "customer");
+        var step = Assert.IsType<PackageOperationStepModel>(Assert.Single(copy.Model.Processes, process => process.Name == "PackageSum").Steps.Single(candidate => candidate.Name == "sum"));
+        Assert.True(step.CustomerHosted);
+
+        var (_, instanceId) = await fixture.StageAsync("PackageSum", CancellationToken, release: copy);
+
+        await AssertStagedWithoutWorkItemAsync(instanceId, "test-package", "1.0.0");
+    }
+
+    [Fact]
+    public async Task Staging_a_call_to_the_applications_own_customer_hosted_package_queues_no_work_item_and_the_worker_runs_no_attempt()
+    {
+        var copy = await fixture.ActivateCopyAsync(
+            _ => { },
+            ("packages/tools/axis-package.json", ToolsManifest),
+            ("processes/tools-sum.json", ToolsSumProcess));
+        var step = Assert.IsType<PackageOperationStepModel>(Assert.Single(copy.Model.Processes, process => process.Name == "ToolsSum").Steps.Single(candidate => candidate.Name == "sum"));
+        Assert.True(step.CustomerHosted);
+
+        var (_, instanceId) = await fixture.StageAsync("ToolsSum", CancellationToken, release: copy);
+
+        await AssertStagedWithoutWorkItemAsync(instanceId, "tools", "2.3.4");
+    }
+
+    [Fact]
+    public async Task A_required_package_input_that_gives_null_fails_the_instance_and_stages_no_call()
+    {
+        var tenant = fixture.Tenant;
+        await tenant.ScalarAsync("DELETE FROM axis.process_work_items");
+        var subjectId = await tenant.InsertRequestAsync(500m, 2);
+        var instanceId = await tenant.StartAsync("PackageSumUnset", subjectId, fixture.ReleaseId, fixture.Model);
+
+        await fixture.RunStepAsync(CancellationToken);
+
+        Assert.Equal((ProcessStarts.Failed, 2L, "sum", true), await tenant.InstanceAsync(instanceId));
+        var row = Assert.Single(await tenant.HistoryAsync(instanceId));
+        Assert.Equal(("sum", "The required input 'a' of the step 'sum' gave no value.", (string?)null), (row.Step, row.Error, row.Output));
+        Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.package_calls WHERE process_instance_id = @id", ("id", instanceId)));
+        Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE process_instance_id = @id", ("id", instanceId)));
+        Assert.Equal([AuditActions.ProcessFailed], await tenant.SystemAuditActionsAsync(instanceId));
     }
 
     [Fact]
@@ -425,6 +517,39 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         var dueAt = await fixture.DueAtAsync(callId);
         Assert.NotNull(dueAt);
         Assert.InRange(dueAt.Value, before + delay, after + delay);
+    }
+
+    /// <summary>
+    /// Asserts the call of the instance's step <c>sum</c> to a customer-hosted package is staged and waits: the call is
+    /// <c>pending</c> with no attempt, no work item and no attempt row exist, and the worker finds nothing to run.
+    /// </summary>
+    private async Task AssertStagedWithoutWorkItemAsync(Guid instanceId, string package, string version)
+    {
+        var tenant = fixture.Tenant;
+        var callId = await CallIdAsync(instanceId);
+
+        Assert.Equal((ProcessStarts.Waiting, 2L, "sum", false), await tenant.InstanceAsync(instanceId));
+        Assert.Equal((PackageCalls.Pending, 0, (string?)null, "{\"a\": 2, \"b\": 3}"), await CallAsync(callId));
+        Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE package_call_id = @id", ("id", callId)));
+        Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.process_call_attempts WHERE call_id = @id", ("id", callId)));
+        Assert.Null(await fixture.RunCallAsync(CancellationToken));
+
+        var row = Assert.Single(await tenant.HistoryAsync(instanceId));
+        Assert.Equal(("sum", 1L, (string?)null), (row.Step, row.Revision, row.Error));
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject { ["state"] = "waiting", ["operationId"] = callId },
+            JsonNode.Parse(row.Output!)));
+        Assert.Equal(AuditActions.OperationStaged, Assert.Single(await tenant.SystemAuditActionsAsync(instanceId)));
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject
+            {
+                ["step"] = "sum",
+                ["package"] = package,
+                ["version"] = version,
+                ["operation"] = "sum",
+                ["operationId"] = callId,
+            },
+            JsonNode.Parse(await AuditDetailsAsync(instanceId, AuditActions.OperationStaged))));
     }
 
     private async Task<Guid> CallIdAsync(Guid instanceId) =>

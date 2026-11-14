@@ -38,9 +38,12 @@ namespace Axis.PackageHost;
 /// writes nothing under the extensions folder, starts no runner and deletes its copies whatever the answer. A path that is not
 /// a relative path inside the package is refused before anything is written. A build that cannot run is logged, and the
 /// connection closes with no answer.
+/// The first line may also be a <c>test</c>, which is as long as a <c>build</c> may be. The host builds the package as for a <c>build</c>,
+/// then runs the tests of a Python package in the built copy with <see cref="PackageTests"/>, and answers <c>tested</c> with the outcome of each test,
+/// or <c>refused</c> when the build fails, the package is not a Python package, or the tests do not finish in time. It deletes its copies whatever the answer.
 /// </summary>
 internal sealed partial class RunnerHost(
-    string extensionsRoot, RunnerCommands commands, ILogger<RunnerHost> logger, Sandbox? sandbox = null, IConfiguration? configuration = null) : IAsyncDisposable
+    string extensionsRoot, RunnerCommands commands, ILogger<RunnerHost> logger, Sandbox? sandbox = null, IConfiguration? configuration = null, TimeSpan? testLimit = null) : IAsyncDisposable
 {
     /// <summary>The longest line the host reads as the first line of a connection, other than a <c>build</c> or a <c>start</c> with files, in bytes.</summary>
     private const int MaxStartLine = 4096;
@@ -50,6 +53,7 @@ internal sealed partial class RunnerHost(
 
     private readonly Sandbox _sandbox = sandbox ?? Sandbox.ForThisMachine();
     private readonly IConfiguration _configuration = configuration ?? new ConfigurationBuilder().Build();
+    private readonly TimeSpan _testLimit = testLimit ?? TimeSpan.FromMinutes(2);
     private readonly CancellationTokenSource _stopping = new();
     private readonly ConcurrentDictionary<int, Task> _connections = new();
     private TcpListener? _listener;
@@ -139,6 +143,12 @@ internal sealed partial class RunnerHost(
                     return;
                 }
 
+                if (started.Test is not null)
+                {
+                    await TestAsync(started.Test, client.GetStream());
+                    return;
+                }
+
                 if (started.Start is null)
                 {
                     await AnswerSandboxAsync(client.GetStream());
@@ -222,16 +232,16 @@ internal sealed partial class RunnerHost(
     }
 
     /// <summary>
-    /// What the first line asked for: a <see cref="Start"/> with the language of its installed manifest, or <c>default</c> for a start with files, a <see cref="Build"/>, or, with neither, a
-    /// <c>sandbox</c> question.
+    /// What the first line asked for: a <see cref="Start"/> with the language of its installed manifest, or <c>default</c> for a start with files, a <see cref="Build"/>, a <see cref="Test"/>, or, with none of
+    /// them, a <c>sandbox</c> question.
     /// </summary>
-    private sealed record FirstLine(StartMessage? Start, PackageLanguage Language, BuildMessage? Build);
+    private sealed record FirstLine(StartMessage? Start, PackageLanguage Language, BuildMessage? Build, TestMessage? Test = null);
 
     /// <summary>
-    /// Reads the first line. Returns the <c>start</c> it holds with the language of its manifest, the <c>build</c> it holds, or a
-    /// <c>FirstLine</c> with neither for a <c>sandbox</c> question. Returns <see langword="null"/> when the connection ends
+    /// Reads the first line. Returns the <c>start</c> it holds with the language of its manifest, the <c>build</c> or <c>test</c> it holds, or a
+    /// <c>FirstLine</c> with none of them for a <c>sandbox</c> question. Returns <see langword="null"/> when the connection ends
     /// first or the line is too long, is none of these, names an id or version that is not well formed, or names a
-    /// version that is not installed. A <c>start</c> with files is not looked up and needs a tenant. Only a <c>build</c> and a <c>start</c> with files may be longer than <see cref="MaxStartLine"/>. Bytes after the line stay in the reader.
+    /// version that is not installed. A <c>start</c> with files is not looked up and needs a tenant. Only a <c>build</c>, a <c>test</c> and a <c>start</c> with files may be longer than <see cref="MaxStartLine"/>. Bytes after the line stay in the reader.
     /// </summary>
     private async Task<FirstLine?> ReadFirstAsync(PipeReader reader)
     {
@@ -281,6 +291,11 @@ internal sealed partial class RunnerHost(
                         : null;
             }
 
+            if (message is TestMessage test)
+            {
+                return new FirstLine(null, default, null, test);
+            }
+
             if (line.Length > MaxStartLine)
             {
                 return null;
@@ -309,9 +324,56 @@ internal sealed partial class RunnerHost(
     /// Builds the package in <paramref name="build"/> as <see cref="PackageChecks"/> builds one, in a temporary copy that is deleted
     /// afterwards, and answers <c>built</c> or <c>refused</c>. A build that cannot run is logged and gets no answer.
     /// </summary>
-    private async Task BuildAsync(BuildMessage build, Stream socket)
+    private Task BuildAsync(BuildMessage build, Stream socket) =>
+        BuildCopyAsync(build.Files, socket, async outcome =>
+        {
+            var built = await ReadFilesAsync(outcome.Folder!);
+            await RunnerProtocol.WriteAsync(socket, new BuiltMessage(built), _stopping.Token);
+            LogBuilt(outcome.Manifest!.Id, outcome.Manifest.Version);
+        });
+
+    /// <summary>
+    /// Builds the package in <paramref name="test"/> as for a <c>build</c>, then runs the tests of a Python package in the built copy
+    /// and answers <c>tested</c>. A package of another language, and tests that run too long, are refused at the manifest. A run that
+    /// cannot start is logged and gets no answer.
+    /// </summary>
+    private Task TestAsync(TestMessage test, Stream socket) =>
+        BuildCopyAsync(test.Files, socket, async outcome =>
+        {
+            var manifest = outcome.Manifest!;
+            if (manifest.Language != PackageLanguage.Python)
+            {
+                var language = manifest.Language == PackageLanguage.Node ? "node" : "csharp";
+                await AnswerRefusedAsync(socket, [new BuildProblem(PackageCatalog.ManifestFileName, $"The tests of a '{language}' package do not run yet. Only a Python package's tests run.")]);
+                return;
+            }
+
+            var testFiles = test.Files.Keys.Where(path => TestFilePattern().IsMatch(path.Split('/')[^1]));
+            var run = await PackageTests.RunAsync(_configuration, outcome.Folder!, testFiles, _testLimit, _stopping.Token);
+            if (run.SetupError is not null)
+            {
+                LogBuildNotRun(run.SetupError);
+                return;
+            }
+
+            if (run.Refusal is not null)
+            {
+                await AnswerRefusedAsync(socket, [new BuildProblem(PackageCatalog.ManifestFileName, run.Refusal)]);
+                return;
+            }
+
+            await RunnerProtocol.WriteAsync(socket, new TestedMessage(run.Tests!), _stopping.Token);
+            LogTested(manifest.Id, manifest.Version);
+        });
+
+    /// <summary>
+    /// Writes <paramref name="files"/> into a temporary copy, runs the checks of <see cref="PackageChecks"/> on it and, when they pass, calls
+    /// <paramref name="answerBuilt"/> with the outcome, whose folder holds the built package. Answers <c>refused</c> for a path that is not
+    /// inside the package or a problem of the checks, and logs a setup error with no answer. It deletes its copies whatever happens.
+    /// </summary>
+    private async Task BuildCopyAsync(Dictionary<string, byte[]> files, Stream socket, Func<PackageChecks.Outcome, Task> answerBuilt)
     {
-        if (BadPaths(build.Files.Keys) is { Count: > 0 } badPaths)
+        if (BadPaths(files.Keys) is { Count: > 0 } badPaths)
         {
             await AnswerRefusedAsync(socket, badPaths);
             return;
@@ -320,7 +382,7 @@ internal sealed partial class RunnerHost(
         var copy = Directory.CreateTempSubdirectory("axis-package-build-").FullName;
         try
         {
-            if (!Write(build.Files, copy, out var unwritable))
+            if (!Write(files, copy, out var unwritable))
             {
                 await AnswerRefusedAsync(socket, unwritable);
                 return;
@@ -339,9 +401,7 @@ internal sealed partial class RunnerHost(
                 return;
             }
 
-            var built = await ReadFilesAsync(outcome.Folder!);
-            await RunnerProtocol.WriteAsync(socket, new BuiltMessage(built), _stopping.Token);
-            LogBuilt(outcome.Manifest!.Id, outcome.Manifest.Version);
+            await answerBuilt(outcome);
         }
         finally
         {
@@ -546,6 +606,9 @@ internal sealed partial class RunnerHost(
     [GeneratedRegex(@"\A[a-z][a-z0-9-]*\z")]
     private static partial Regex IdPattern();
 
+    [GeneratedRegex(@"\Atest_.*\.py\z")]
+    private static partial Regex TestFilePattern();
+
     [GeneratedRegex(@"\A(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z")]
     private static partial Regex VersionPattern();
 
@@ -554,6 +617,9 @@ internal sealed partial class RunnerHost(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Built package {Package} {Version}.")]
     private partial void LogBuilt(string package, string version);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Tested package {Package} {Version}.")]
+    private partial void LogTested(string package, string version);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Refused a package build with {Count} problems.")]
     private partial void LogBuildRefused(int count);

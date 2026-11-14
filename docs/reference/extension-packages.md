@@ -240,7 +240,7 @@ The operator builds a C#, Node.js or Python package once, with `Axis.PackageHost
 folder that the developer published in locked mode. For `node` it holds the compiled adapter, `package.json` and
 `package-lock.json`. For Python it is the folder of the adapter and `requirements.txt`. The build writes the folder
 that `Extensions:Path` names and compiles nothing.
-A [`build` message](#the-runner-protocol) runs the same checks in a package host, on files that a caller sends.
+A [`build` message](#the-runner-protocol) runs the same checks in a package host, on files that a caller sends. A `test` message runs them too, before the tests.
 
 - **In the host image.** The build runs in the package's own host image,
   `axis-package-host-<language>`, because dependencies, native modules included, install with the runtime
@@ -304,13 +304,13 @@ A [`build` message](#the-runner-protocol) runs the same checks in a package host
 - **Registry credentials** _(planned for M37)_. They are mounted for the build alone, and the runners
   never see them.
 
-The build reads these settings, and a package host reads `PackageBuild:Trivy` and `PackageBuild:Python` too, for a `build` message:
+The build reads these settings, and a package host reads `PackageBuild:Trivy` and `PackageBuild:Python` too, for a `build` or `test` message:
 
 | Setting | Environment variable | Default | Meaning |
 | --- | --- | --- | --- |
 | `Extensions:Path` | `Extensions__Path` | none | The existing folder that the build writes the package to |
 | `PackageBuild:Trivy` | `PackageBuild__Trivy` | `trivy` | The Trivy command that scans the dependencies |
-| `PackageBuild:Python` | `PackageBuild__Python` | `python3` | The Python command that runs pip for a Python package |
+| `PackageBuild:Python` | `PackageBuild__Python` | `python3` | The Python command that runs pip for a Python package, and that runs its tests |
 
 ## Versions and pinning
 
@@ -453,8 +453,10 @@ see [Contracts](#contracts).
   [Deployment bindings](integration-resources.md#deployment-bindings).
 - **A customer-hosted package and the activation check.** The check skips the bindings that a customer-hosted
   package's operations declare, so a tenant without them activates the release.
-- **A customer-hosted package and the binding resolution** _(planned for M37)_. The worker resolves no binding
-  for its calls, because the [runner](#customer-hosted-runners) keeps its own bindings.
+- **A customer-hosted package and the binding resolution.** The worker resolves no binding for its calls,
+  because it runs no attempt of them, see
+  [staging a package call](process-execution.md#staging-a-package-call). The [runner](#customer-hosted-runners)
+  keeps its own bindings.
 - **Secret values stay hidden.** A secret value never appears in history,
   audit records or logs. History and audit records hold only the type of an
   exception, never its message, because a message can hold input values or
@@ -579,6 +581,8 @@ implements the operation context over it.
 | `sandbox` | The worker, to the host, and the host's answer | None in the question. `gvisor`, a boolean, in the answer |
 | `build` | A caller, to the host | `files`, mapping each relative path of the package, written with `/`, to its content in base64 |
 | `built` | The host | `files`, as in `build`, for every file of the built package |
+| `test` | A caller, to the host | `files`, as in `build` |
+| `tested` | The host | `tests`, each with the `name` of the test, its `outcome`, `passed` or `failed`, and its `message`, the last line of a failed test's traceback cut at 1000 characters, or null |
 | `refused` | The host | `problems`, each with the `file` it is about and a `message` |
 
 - **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network. The connection
@@ -614,6 +618,21 @@ implements the operation context over it.
   leaves out symbolic links, because one could point outside the copy. The host writes nothing to `Extensions:Path` and deletes
   its copy whatever the answer. A build that cannot run, such as a pip or Trivy that cannot start, is the operator's problem and
   not the author's, so the host logs why and closes the connection with no answer.
+- **Test.** A `test` may be the first line of a connection instead of a `start`. Its line limit and its path rules are
+  those of `build`. The host builds the package exactly as for a `build`, and a build that fails answers `refused` and runs no
+  test. Then it runs the tests of a `python` package in the built copy. A `csharp` or `node` package answers `refused` with one
+  problem at `axis-package.json`, saying that its tests do not run yet. The tests are the files that the caller sent whose name
+  matches `test_*.py`, in any folder, and the standard library's `unittest` loads and runs them. The host runs them with the
+  `PackageBuild:Python` command, `-I -B` and a runner script embedded in `Axis.PackageHost`. The script puts the built copy and then
+  `sdk/python` beside the host on `sys.path`, so that a test can import the adapter and the SDK. The process runs in the built copy
+  with an empty environment, so it has no proxy and no outbound network. The host stops it after 2 minutes and kills its process
+  tree, and a stopped run answers `refused` with one problem at `axis-package.json`. A package with no test files answers `tested`
+  with no tests. The answer is `tested`, whose `name` is the `unittest` id of the test, such as `test_sample.SampleTests.test_fails`.
+  A skipped test is left out, an expected failure is `passed` and an unexpected success is `failed`. A run that ends with no valid
+  result, such as a test that exits the process, answers `refused` at `axis-package.json`. A run that cannot start is the
+  operator's problem and gets no answer, as for a `build`. The host logs `Tested package <id> <version>.` and deletes its copies
+  whatever the answer. The tests run the author's code in the host's own container, so a caller sends `test` only to a host that
+  runs under gVisor, such as `application-package-host`.
 - **Standard output.** The runner's standard output holds only protocol lines. What a package writes to
   the console goes to standard error.
 - **Runner errors.** An operation that is not in the manifest, an input that does not fit its field

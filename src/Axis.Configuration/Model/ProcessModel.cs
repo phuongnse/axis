@@ -205,6 +205,9 @@ public sealed record ConnectorInputModel(string Input, ExpressionModel? Value)
 
     /// <summary>The nested inputs of an object or list input, or empty for an input with a <see cref="Value"/>.</summary>
     public IReadOnlyList<ConnectorInputModel> Fields { get; init; } = [];
+
+    /// <summary>Whether the operation declares the input <c>required</c>, so staging fails the step when its value is null.</summary>
+    public bool Required { get; init; }
 }
 
 /// <summary>

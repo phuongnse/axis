@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
-using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Core.Telemetry;
 using Axis.Data.Audit;
@@ -28,7 +27,8 @@ namespace Axis.Processes.Instances;
 /// instance <c>waiting</c>, with no next work item. A <c>callConnector</c> step leaves it
 /// <c>waiting</c> too, and queues the <c>connector.call</c> item of its call, so no request is sent
 /// inside the transaction. A package operation step does the same with a <c>package.call</c> item,
-/// so no operation runs inside the transaction. A <c>timer</c> step leaves the instance <c>waiting</c>
+/// so no operation runs inside the transaction, unless the package is customer-hosted: its call
+/// waits <c>pending</c> with no item, for the runner of the customer to take. A <c>timer</c> step leaves the instance <c>waiting</c>
 /// too and queues a <c>process.timer</c> item due at the time the timer waits for, with the revision the
 /// step left, and writes no audit record while it waits. A <c>waitEvent</c> step takes the record's event lock,
 /// then goes on at once with the earliest occurrence of its event that names the subject record, was raised at or after the
@@ -50,7 +50,7 @@ namespace Axis.Processes.Instances;
 /// <c>process.resume</c> item that moves the parent on. A step that throws is rolled back, and the
 /// failure callback then records the error in the history and marks the instance <c>failed</c>.
 /// </summary>
-internal sealed partial class ProcessStepHandler(ReleaseModelCache models, PackageCatalog packages, ITenantCatalog? tenants, SensitiveValues? sensitive, ILogger<ProcessStepHandler> logger) : IWorkItemHandler
+internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITenantCatalog? tenants, SensitiveValues? sensitive, ILogger<ProcessStepHandler> logger) : IWorkItemHandler
 {
     private RecordCipher? Cipher(WorkItemContext context) => sensitive is null ? null : new(sensitive, context.Item.TenantId);
 
@@ -257,6 +257,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         IReadOnlyList<TaskEscalationModel> taskEscalations = [];
         NewConnectorCall? call = null;
         NewPackageCall? packageCall = null;
+        var packageCallQueued = false;
         var restagesCall = false;
         var restagesPackageCall = false;
         NewEvent? occurrence = null;
@@ -366,7 +367,6 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                         evaluate,
                         callStep,
                         callStep.Input,
-                        names => IsRequired(operation.Input, names),
                         rowSource,
                         instance,
                         input));
@@ -435,15 +435,9 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     throw Failure($"The process '{process.Name}' has no step '{packageStep.Next}'.", instance, input);
                 }
 
-                // The compiled step does not say which inputs are required, so the manifest does.
-                var packageOperation = packages.Find(packageStep.Package, packageStep.Version)?.Manifest.Operations
-                    .FirstOrDefault(candidate => string.Equals(candidate.Name, packageStep.Operation, StringComparison.OrdinalIgnoreCase))
-                    ?? throw Failure(
-                        $"The package '{packageStep.Package}' {packageStep.Version} has no operation '{packageStep.Operation}' installed.",
-                        instance,
-                        input);
                 var failedPackageCallId = await PackageCalls.FindFailedAsync(context.Transaction, instance.Id, step.Name, cancellationToken);
                 restagesPackageCall = failedPackageCallId is not null;
+                packageCallQueued = !packageStep.CustomerHosted;
                 packageCall = new NewPackageCall(
                     failedPackageCallId ?? Guid.CreateVersion7(),
                     instance.Id,
@@ -452,14 +446,13 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     instance.ReleaseId,
                     packageStep.Package,
                     packageStep.Version,
-                    packageOperation.Name,
+                    packageStep.Operation,
                     packageStep.Retry,
                     packageStep.Idempotent,
                     await StageAsync(
                         evaluate,
                         packageStep,
                         packageStep.Input,
-                        names => names.Count == 1 && packageOperation.Input.Any(field => field.Required && string.Equals(field.Name, names[0], StringComparison.OrdinalIgnoreCase)),
                         null,
                         instance,
                         input));
@@ -472,7 +465,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     ["step"] = step.Name,
                     ["package"] = packageStep.Package,
                     ["version"] = packageStep.Version,
-                    ["operation"] = packageOperation.Name,
+                    ["operation"] = packageStep.Operation,
                     ["operationId"] = packageCall.Id,
                 };
                 action = AuditActions.OperationStaged;
@@ -854,7 +847,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 connectorCallId: call.Id);
         }
 
-        if (packageCall is not null)
+        // A customer-hosted runner takes the call, so no item is queued, see docs/reference/process-execution.md#staging-a-package-call.
+        if (packageCall is not null && packageCallQueued)
         {
             await WorkItemQueue.EnqueueAsync(
                 context.Connection,
@@ -1155,8 +1149,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
 
     /// <summary>
     /// Evaluates each input of a <c>callConnector</c> or package operation step, in the step's
-    /// order, into the body the call stores. <paramref name="isRequired"/> says whether an input of
-    /// the operation is required, given the declared names from the top-level input down. Dates and date-times take the record API's text forms, and an optional input
+    /// order, into the body the call stores. Each input says whether the operation requires it. Dates and date-times take the record API's text forms, and an optional input
     /// that gives null is stored as null. An <c>object</c> input becomes a JSON object of its nested inputs.
     /// A <c>list</c> input becomes an array with one object for each stored row of its child collection, in position order,
     /// each evaluated over that row, which <paramref name="rows"/> reads. An input that fails at run time, or a required input that
@@ -1166,27 +1159,23 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate,
         ProcessStepModel step,
         IReadOnlyList<ConnectorInputModel> inputs,
-        Func<IReadOnlyList<string>, bool> isRequired,
         RowSource? rows,
         LoadedInstance instance,
         JsonObject input) =>
-        StageAsync(evaluate, step, inputs, isRequired, rows, instance, input, [], null);
+        StageAsync(evaluate, step, inputs, rows, instance, input, null);
 
     private static async Task<JsonObject> StageAsync(
         Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate,
         ProcessStepModel step,
         IReadOnlyList<ConnectorInputModel> inputs,
-        Func<IReadOnlyList<string>, bool> isRequired,
         RowSource? rows,
         LoadedInstance instance,
         JsonObject input,
-        IReadOnlyList<string> names,
         string? pointer)
     {
         var body = new JsonObject();
         foreach (var mapping in inputs)
         {
-            var declared = new List<string>(names) { mapping.Input };
             var path = pointer is null ? mapping.Input : $"{pointer}/{mapping.Input}";
             if (mapping.Value is { } value)
             {
@@ -1196,7 +1185,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     throw ExpressionFailure($"input '{path}'", step, error, instance, input);
                 }
 
-                if (result.Value is null && isRequired(declared))
+                if (result.Value is null && mapping.Required)
                 {
                     throw Failure($"The required input '{path}' of the step '{step.Name}' gave no value.", instance, input);
                 }
@@ -1214,36 +1203,18 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 var evaluators = await rows(collection);
                 for (var index = 0; index < evaluators.Count; index++)
                 {
-                    items.Add(await StageAsync(evaluators[index], step, mapping.Fields, isRequired, rows, instance, input, declared, $"{path}/{index}"));
+                    items.Add(await StageAsync(evaluators[index], step, mapping.Fields, rows, instance, input, $"{path}/{index}"));
                 }
 
                 body[mapping.Input] = items;
             }
             else
             {
-                body[mapping.Input] = await StageAsync(evaluate, step, mapping.Fields, isRequired, rows, instance, input, declared, path);
+                body[mapping.Input] = await StageAsync(evaluate, step, mapping.Fields, rows, instance, input, path);
             }
         }
 
         return body;
-    }
-
-    /// <summary>Whether the operation input at the declared <paramref name="names"/>, from the top-level input down, is required. Names ignore letter case.</summary>
-    private static bool IsRequired(IReadOnlyList<ConnectorFieldModel> fields, IReadOnlyList<string> names)
-    {
-        ConnectorFieldModel? field = null;
-        foreach (var name in names)
-        {
-            field = fields.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
-            if (field is null)
-            {
-                return false;
-            }
-
-            fields = field.Fields ?? [];
-        }
-
-        return field?.Required ?? false;
     }
 
     /// <summary>
