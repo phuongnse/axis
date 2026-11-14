@@ -14,7 +14,10 @@
 #   creates two tenants, activates the leave request sample, checks each tenant's site and sign-in, suspend
 #   and resume, and an unknown host. It checks each package host's read-only root, limits, environment and network. It builds
 #   the sample packages payment-references and payment-terms in their package host images, and gives tenant one the
-#   purchase request sample's bindings, every url binding over https, and activates the sample there.
+#   purchase request sample's bindings, every url binding over https, and activates the sample there. It then runs
+#   the purchasing system stub over https, with a certificate of the test authority, and carries a purchase request
+#   through its approval by the department's manager. It checks the purchase order in the stub, and the payment
+#   reference and the payment due date that runners of the two package hosts give, not the worker.
 #   It reads the sample modules, which this script installs in artifacts/modules.
 # - ai-eval: scripts/ai-eval-stack.test.mjs builds the server, the publisher and the agent host and starts them with
 #   PostgreSQL and Keycloak in Docker, as the authoring eval's stack, see docs/reference/model-bindings.md#the-authoring-eval.

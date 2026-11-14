@@ -92,6 +92,33 @@ describe('the realm account setup', () => {
     assert.deepEqual(mapping.body, [{ name: 'author' }])
   })
 
+  test('an account with an id is added by a partial import that keeps the id', async () => {
+    const { calls, admin } = recorder()
+    const credential = otpCredential('GEZDGNBVGY3TQOJQ')
+    const id = await addAccount({
+      admin,
+      realm: 'r',
+      client: { id: 'c1', path: '/admin/realms/r/clients/c1' },
+      username: 'manager-2',
+      id: 'manager-2',
+      password: 'pw',
+      credential,
+      roles: ['department-manager'],
+    })
+    assert.equal(id, 'manager-2')
+    assert.equal(calls.some((call) => call.method === 'POST' && call.path.endsWith('/users')), false)
+    const imported = calls.find((call) => call.path === '/admin/realms/r/partialImport')
+    assert.deepEqual(imported.statuses, [200])
+    assert.equal(imported.body.ifResourceExists, 'FAIL')
+    assert.equal(imported.body.users.length, 1)
+    const [user] = imported.body.users
+    assert.equal(user.id, 'manager-2')
+    assert.equal(user.username, 'manager-2')
+    assert.deepEqual(user.credentials, [{ type: 'password', value: 'pw', temporary: false }, credential])
+    const mapping = calls.find((call) => call.path === '/admin/realms/r/users/manager-2/role-mappings/clients/c1')
+    assert.deepEqual(mapping.body, [{ name: 'department-manager' }])
+  })
+
   test('the email and the first name default from the username', async () => {
     const { calls, admin } = recorder()
     await addAccount({ admin, realm: 'r', client: { id: 'c1', path: '/p' }, username: 'author', password: 'pw', credential: {}, roles: [] })
