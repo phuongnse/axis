@@ -115,8 +115,8 @@ on that PostgreSQL server.
 
 The example's `compose.yaml` has the server, the worker, the agent host, the publisher, the identity provider,
 the TLS proxy, the C#, the Python and the Node.js package host and the admin host, and `docker compose up` starts all of them but the admin host. A second server replica sits
-under the `replicas` profile, see [TLS proxy and a second replica](#tls-proxy-and-a-second-replica). The file holds no password,
-client secret or key.
+under the `replicas` profile, see [TLS proxy and a second replica](#tls-proxy-and-a-second-replica), and the application package host under the `application-packages` profile.
+The file holds no password, client secret or key.
 
 - **The server, the worker and the agent host** run the production images with a read-only root file system. The
   identity provider cannot, because Keycloak rebuilds itself at start and writes into its image.
@@ -134,6 +134,11 @@ client secret or key.
   A host sits only on the internal network `runners`, which no other service but the worker and the other package hosts share, so only the worker reaches its port 5310, which
   does not authenticate a connection, and it reaches nothing outside that network. The worker sets `Extensions__Runners__Dotnet` to
   `package-host-dotnet:5310`, `Extensions__Runners__Python` to `package-host-python:5310` and `Extensions__Runners__Node` to `package-host-node:5310`.
+- **The application package host** is `application-package-host`, behind the `application-packages` profile. `docker compose --profile application-packages up -d application-package-host` starts it and `docker compose up` does not.
+  It runs the `axis-package-host-node` image under the `runsc` runtime, which is gVisor, and runs the code of [an application's packages](extension-packages.md#an-applications-packages).
+  gVisor installed and registered with Docker as `runsc` is a prerequisite of that profile only, and `scripts/setup.sh` does it on Linux, see [development](../development.md#setup).
+  It has the rules of a package host for its root, environment, secret, port, mount and network, and its own limits, 1 CPU and 1g, which `AXIS_APPLICATION_PACKAGE_HOST_CPUS` and
+  `AXIS_APPLICATION_PACKAGE_HOST_MEMORY` change. The worker sets `Extensions__Runners__Application` to `application-package-host:5310` and asks it only when `Extensions__ApplicationPackages` is `true`.
 - **The images.** Set `AXIS_VERSION` to the tag of the seven images. `AXIS_IMAGE_PREFIX` adds a
   registry prefix. The comment at the top of `compose.yaml` lists every variable.
 
@@ -153,7 +158,7 @@ flowchart LR
         worker["worker"]
         agent["agent"]
         publisher["publisher"]
-        packagehost["package-host-dotnet, package-host-python, package-host-node"]
+        packagehost["package-host-dotnet, package-host-python, package-host-node, application-package-host (application-packages profile)"]
         admin["admin, only when asked"]
     end
     subgraph pg ["PostgreSQL, runs elsewhere"]
@@ -406,7 +411,7 @@ configured like `server`.
   headers from that address only. The proxy replaces any `X-Forwarded-For`, `X-Forwarded-Proto` and
   `X-Forwarded-Host` that a client sends. Behind it, sign-in returns to
   `https://<tenant host>/api/auth/callback` and the session cookie is `Secure`.
-- **The runners network.** The `runners` network is `internal`: it has no route out. Only the worker and the three package hosts
+- **The runners network.** The `runners` network is `internal`: it has no route out. Only the worker and the four package hosts
   join it, and the worker also stays on the default network. It has no fixed subnet.
 - **The address range.** Docker hands out addresses without a fixed one only from
   `AXIS_NETWORK_IP_RANGE`, 172.31.250.128/25 by default, so a short-lived `admin` container cannot take
@@ -762,7 +767,7 @@ restore check. It has no Job for tenants and releases.
   before the Deployments roll out. A failed migration fails the upgrade, and the Deployments stay as
   they are. The Job never retries. Helm keeps a failed Job for its logs and deletes a successful one.
   The Job does not run on the first install, because a first install has no tenants, see
-  [the first install](#open-points). Helm waits 5 minutes for a hook, so an installation with many
+  [the first install](installation-open-points.md#open-points). Helm waits 5 minutes for a hook, so an installation with many
   tenants needs a longer wait, such as `helm upgrade --install --timeout 30m`.
 - **The cell backup CronJob.** In a cell with `backup.bucket` set, the chart renders a CronJob named
   `<release>-cell-backup` that runs `axis-admin cell backup` with the admin image every day at 01:00
@@ -891,12 +896,3 @@ The checklist lists every control that the [ASVS](asvs.md) tracking or the
 [threat model](threat-model.md) delegates to the operator, such as disk encryption, malware scanning
 of uploads and access to the logs, with how to meet each one and how to check it. Outside
 Development, the server and the worker warn at start about each item they can see is missing.
-
-## Open points
-
-The first install differs from an upgrade in one way: the `platform` tables do not exist yet. The
-server applies the platform migrations at start, see [platform database](storage.md#platform-database).
-`tenant create` does not create the `platform` tables and exits with code 2 without them, so start the
-server once first. `migrate` before the `platform` schema exists does nothing, because there is no
-tenant to migrate. It writes a note to standard error and exits with code 0, so running it first, as
-[the order](#the-order) does, is safe on a first install.

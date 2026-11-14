@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -29,11 +30,42 @@ exit 0
 `
 
 // Stands in for docker and logs to DOCKER_LOG, so STUB_LOG keeps the lines of the tools only. Its images are all
-// missing when DOCKER_EMPTY is set.
+// missing when DOCKER_EMPTY is set. Its runtimes are the contents of DOCKER_RUNTIMES_FILE.
 const dockerStub = `#!/usr/bin/env bash
 echo "$*" >> "$DOCKER_LOG"
 if [ "$1 $2" = "image inspect" ] && [ -n "$DOCKER_EMPTY" ]; then exit 1; fi
+if [ "$1" = "info" ]; then cat "$DOCKER_RUNTIMES_FILE"; fi
 exit 0
+`
+
+// Stands in for id, so setup runs as a user that needs sudo.
+const idStub = `#!/usr/bin/env bash
+echo 1000
+`
+
+// Stands in for sudo. It logs its arguments to SUDO_LOG and runs nothing. Where gVisor registers its
+// runtime, it adds runsc to DOCKER_RUNTIMES_FILE.
+const sudoStub = `#!/usr/bin/env bash
+echo "$*" >> "$SUDO_LOG"
+if [ "$*" = "/usr/local/bin/runsc install" ]; then echo '{"runc":{},"runsc":{}}' > "$DOCKER_RUNTIMES_FILE"; fi
+exit 0
+`
+
+// Stands in for curl when setup installs gVisor. It writes the bytes GVISOR_BYTES to the -o path for
+// the runsc URL, and prints the SHA-512 sum in GVISOR_SUM for the .sha512 URL.
+const gvisorCurlStub = `#!/usr/bin/env bash
+url="\${@: -1}"
+echo "$url" >> "$STUB_LOG"
+out=""
+while [ $# -gt 0 ]; do
+  if [ "$1" = "-o" ]; then out="$2"; fi
+  shift
+done
+case "$url" in
+  *.sha512) echo "$GVISOR_SUM  runsc" ;;
+  */runsc) printf '%s' "$GVISOR_BYTES" > "$out" ;;
+  *) exit 22 ;;
+esac
 `
 
 // Stands in for curl. The first three requests for each URL fail with the 403 seen on CI, and the
@@ -90,30 +122,55 @@ function cacheTools(home, { schemas = true, missing = [] } = {}) {
   }
 }
 
-function runSetup({ failTimes = 0, failStatus = 1, ci = false, savedImages = false, hang = '' } = {}) {
+const defaultRuntimes = '{"runc":{},"runsc":{}}'
+
+// Stands in for uname -s, so the gVisor step runs as on Linux whatever the machine.
+const unameStub = `#!/usr/bin/env bash
+if [ "$1" = "-s" ]; then echo Linux; else exec /usr/bin/uname "$@"; fi
+`
+
+// A folder that holds the stubs, the home cache and Docker's runtimes, so two runs share them. The runtimes
+// default to a Docker that already lists runsc, so setup installs no gVisor.
+function newSession({ savedImages = false, runtimes = defaultRuntimes } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'axis-setup-'))
+  const bin = join(dir, 'bin')
+  const home = join(dir, 'home')
+  // The folder that holds the images setup saves: complete when savedImages is set, empty otherwise.
+  const images = join(dir, 'images')
+  mkdirSync(bin)
+  mkdirSync(images)
+  for (const name of ['dotnet', 'npm', 'npx', 'python3']) {
+    writeFileSync(join(bin, name), stub, { mode: 0o755 })
+  }
+  writeFileSync(join(bin, 'docker'), dockerStub, { mode: 0o755 })
+  writeFileSync(join(bin, 'id'), idStub, { mode: 0o755 })
+  writeFileSync(join(bin, 'sudo'), sudoStub, { mode: 0o755 })
+  writeFileSync(join(bin, 'uname'), unameStub, { mode: 0o755 })
+  if (savedImages) {
+    writeFileSync(join(images, 'images.tar'), 'archive')
+    writeFileSync(join(images, 'images.json'), JSON.stringify(listedImages(root)))
+  }
+  cacheTools(home)
+  const runtimesFile = join(dir, 'runtimes.json')
+  writeFileSync(runtimesFile, `${runtimes}\n`)
+  return { dir, bin, home, images, runtimesFile, savedImages, tools: join(home, '.cache', 'axis-tools') }
+}
+
+function runSetup(
+  { failTimes = 0, failStatus = 1, ci = false, savedImages = false, hang = '', gvisor = null, session = null } = {},
+) {
+  const own = session === null
+  const { dir, bin, home, images, runtimesFile } = own ? newSession({ savedImages }) : session
   try {
-    const bin = join(dir, 'bin')
+    // Each run starts with empty logs and counters, as a new run of the script does.
     const counts = join(dir, 'counts')
     const log = join(dir, 'log')
-    const home = join(dir, 'home')
-    mkdirSync(bin)
-    mkdirSync(counts)
-    for (const name of ['dotnet', 'npm', 'npx', 'python3']) {
-      writeFileSync(join(bin, name), stub, { mode: 0o755 })
-    }
-
-    writeFileSync(join(bin, 'docker'), dockerStub, { mode: 0o755 })
     const dockerLog = join(dir, 'docker-log')
-    // The folder that holds the images setup saves: complete when savedImages is set, empty otherwise.
-    const images = join(dir, 'images')
-    mkdirSync(images)
-    if (savedImages) {
-      writeFileSync(join(images, 'images.tar'), 'archive')
-      writeFileSync(join(images, 'images.json'), JSON.stringify(listedImages(root)))
-    }
-
-    cacheTools(home)
+    const sudoLog = join(dir, 'sudo-log')
+    for (const path of [log, dockerLog, sudoLog]) rmSync(path, { force: true })
+    rmSync(counts, { recursive: true, force: true })
+    mkdirSync(counts)
+    if (gvisor !== null) writeFileSync(join(bin, 'curl'), gvisorCurlStub, { mode: 0o755 })
 
     const result = spawnSync('bash', ['scripts/setup.sh'], {
       cwd: root,
@@ -126,7 +183,11 @@ function runSetup({ failTimes = 0, failStatus = 1, ci = false, savedImages = fal
         AXIS_RETRY_DELAY_SECONDS: '0',
         AXIS_DOCKER_CACHE_DIR: images,
         DOCKER_LOG: dockerLog,
-        DOCKER_EMPTY: savedImages ? '' : '1',
+        DOCKER_EMPTY: (session?.savedImages ?? savedImages) ? '' : '1',
+        DOCKER_RUNTIMES_FILE: runtimesFile,
+        SUDO_LOG: sudoLog,
+        GVISOR_BYTES: gvisor?.bytes ?? '',
+        GVISOR_SUM: gvisor?.sum ?? '',
         AXIS_STEP_TIME_LIMIT_SECONDS: hang ? '1' : '',
         STUB_LOG: log,
         STUB_COUNTS: counts,
@@ -135,14 +196,16 @@ function runSetup({ failTimes = 0, failStatus = 1, ci = false, savedImages = fal
         STUB_HANG: hang,
       },
     })
-    const all = existsSync(log) ? readFileSync(log, 'utf8').trimEnd().split('\n') : []
-    // The wheel downloads have tests of their own, so ran keeps the other tools' lines.
-    const ran = all.filter((line) => !line.startsWith('python3 '))
+    const lines = (path) => (existsSync(path) ? readFileSync(path, 'utf8').trimEnd().split('\n') : [])
+    const all = lines(log)
+    // The wheel downloads have tests of their own, so ran keeps the other tools' lines. The gVisor
+    // downloads are the curl lines.
+    const ran = all.filter((line) => !line.startsWith('python3 ') && !line.startsWith('https://'))
     const wheels = all.filter((line) => line.startsWith('python3 '))
-    const docker = existsSync(dockerLog) ? readFileSync(dockerLog, 'utf8').trimEnd().split('\n') : []
-    return { ...result, ran, wheels, docker }
+    const downloads = all.filter((line) => line.startsWith('https://'))
+    return { ...result, ran, wheels, downloads, docker: lines(dockerLog), sudo: lines(sudoLog) }
   } finally {
-    rmSync(dir, { recursive: true, force: true })
+    if (own) rmSync(dir, { recursive: true, force: true })
   }
 }
 
@@ -230,7 +293,7 @@ describe('scripts/lib/tools.sh limits every download', () => {
     const downloads = ['scripts/lib/tools.sh', 'scripts/lib/trivy.sh'].map((file) => readFileSync(join(root, file), 'utf8'))
     const lines = downloads.join('\n').replace(/\\\n\s*/g, ' ').split('\n')
     const curls = lines.filter((line) => /(^|\$\()retry 4 curl /.test(line.trim()))
-    assert.equal(curls.length, 7)
+    assert.equal(curls.length, 9)
     for (const line of curls) {
       assert.match(line, /--connect-timeout \d+/, line)
       assert.match(line, /--max-time \d+/, line)
@@ -239,11 +302,14 @@ describe('scripts/lib/tools.sh limits every download', () => {
   })
 })
 
+// The one Docker call that setup makes when it has no image to save: the runtimes the gVisor step reads.
+const runtimesQuery = 'info --format {{json .Runtimes}}'
+
 describe('scripts/setup.sh keeps the container images of the checks', () => {
-  test('on CI with every listed image saved it makes no Docker call', () => {
+  test('on CI with every listed image saved it only asks Docker for its runtimes', () => {
     const result = runSetup({ ci: true, savedImages: true })
     assert.equal(result.status, 0, result.stderr)
-    assert.deepEqual(result.docker, [])
+    assert.deepEqual(result.docker, [runtimesQuery])
   })
 
   test('on CI it pulls the listed images that neither Docker nor the saved archive holds', () => {
@@ -255,10 +321,99 @@ describe('scripts/setup.sh keeps the container images of the checks', () => {
     )
   })
 
-  test('off CI it makes no Docker call', () => {
+  test('off CI it only asks Docker for its runtimes', () => {
     const result = runSetup({ savedImages: false })
     assert.equal(result.status, 0, result.stderr)
-    assert.deepEqual(result.docker, [])
+    assert.deepEqual(result.docker, [runtimesQuery])
+  })
+})
+
+describe('scripts/setup.sh installs gVisor once', () => {
+  const bytes = 'runsc binary of the test'
+  const sum = createHash('sha512').update(bytes).digest('hex')
+  const baseUrl = `https://storage.googleapis.com/gvisor/releases/release/${version('GVISOR_VERSION')}`
+  const sudoLines = (result) => result.sudo.map((line) => line.replace(/ \S+\/\.cache\/axis-tools\/\S+/, ' <cache>'))
+
+  test('the first run downloads, checks and registers runsc, and the second run does nothing', () => {
+    const session = newSession({ runtimes: '{"runc":{}}' })
+    try {
+      const first = runSetup({ gvisor: { bytes, sum }, session })
+      assert.equal(first.status, 0, first.stderr)
+      assert.match(first.downloads[0], /\/(x86_64|aarch64)\/runsc$/)
+      assert.deepEqual(
+        first.downloads.map((url) => url.replace(/\/(x86_64|aarch64)\//, '/<arch>/')),
+        [`${baseUrl}/<arch>/runsc`, `${baseUrl}/<arch>/runsc.sha512`],
+      )
+      assert.equal(readFileSync(join(session.tools, `gvisor-${version('GVISOR_VERSION')}`, 'runsc'), 'utf8'), bytes)
+      assert.deepEqual(sudoLines(first), [
+        'install -m 0755 <cache> /usr/local/bin/runsc',
+        '/usr/local/bin/runsc install',
+        'systemctl reload docker',
+      ])
+      const runtimes = readFileSync(session.runtimesFile, 'utf8')
+      assert.match(runtimes, /"runsc"/)
+
+      const second = runSetup({ gvisor: { bytes, sum }, session })
+      assert.equal(second.status, 0, second.stderr)
+      assert.deepEqual(second.downloads, [])
+      assert.deepEqual(second.sudo, [])
+      assert.equal(readFileSync(session.runtimesFile, 'utf8'), runtimes)
+    } finally {
+      rmSync(session.dir, { recursive: true, force: true })
+    }
+  })
+
+  test('a download that does not match its published SHA-512 stops setup and installs nothing', () => {
+    const session = newSession({ runtimes: '{"runc":{}}' })
+    try {
+      const result = runSetup({ gvisor: { bytes, sum: createHash('sha512').update('other bytes').digest('hex') }, session })
+      assert.notEqual(result.status, 0)
+      assert.match(result.stderr, /Checksum mismatch/)
+      assert.deepEqual(result.sudo, [])
+      assert.deepEqual(
+        readdirSync(session.tools).filter((name) => name.startsWith('gvisor-') || name.startsWith('.install.')),
+        [],
+      )
+      assert.equal(readFileSync(session.runtimesFile, 'utf8').includes('runsc'), false)
+    } finally {
+      rmSync(session.dir, { recursive: true, force: true })
+    }
+  })
+
+  test('a Docker that does not reload leaves setup with a warning that runsc is missing', () => {
+    const session = newSession({ runtimes: '{"runc":{}}' })
+    try {
+      writeFileSync(
+        join(session.bin, 'sudo'),
+        '#!/usr/bin/env bash\necho "$*" >> "$SUDO_LOG"\nif [ "$1 $2" = "systemctl reload" ]; then exit 5; fi\nexit 0\n',
+        { mode: 0o755 },
+      )
+      const result = runSetup({ gvisor: { bytes, sum }, session })
+      assert.equal(result.status, 0, result.stderr)
+      assert.deepEqual(sudoLines(result), [
+        'install -m 0755 <cache> /usr/local/bin/runsc',
+        '/usr/local/bin/runsc install',
+        'systemctl reload docker',
+      ])
+      assert.match(result.stderr, /Docker did not reload/)
+      assert.match(result.stderr, /Docker does not list the runsc runtime/)
+    } finally {
+      rmSync(session.dir, { recursive: true, force: true })
+    }
+  })
+
+  test('a Docker that is not reachable skips gVisor with a note', () => {
+    const session = newSession()
+    try {
+      writeFileSync(join(session.bin, 'docker'), '#!/usr/bin/env bash\nexit 1\n', { mode: 0o755 })
+      const result = runSetup({ gvisor: { bytes, sum }, session })
+      assert.equal(result.status, 0, result.stderr)
+      assert.match(result.stderr, /Skipping gVisor: Docker is not reachable/)
+      assert.deepEqual(result.downloads, [])
+      assert.deepEqual(result.sudo, [])
+    } finally {
+      rmSync(session.dir, { recursive: true, force: true })
+    }
   })
 })
 

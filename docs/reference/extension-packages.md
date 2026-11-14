@@ -691,7 +691,8 @@ trusted code, so the platform gives it more limits than an installation's packag
 
 - **The sandbox.** The runners run under gVisor (`runsc`), in their own container,
   `application-package-host`, beside the worker. The Helm chart sets that pod's `runtimeClassName` and
-  Compose sets that service's `runtime`, so the `package-host-*` containers keep the plain runtime.
+  Compose sets that service's `runtime`, so the `package-host-*` containers keep the plain runtime. Compose's
+  service sits behind the `application-packages` profile, so an installation without gVisor runs the rest.
   In the chart, `applicationPackageHost.enabled`, off by default, runs `<release>-application-package-host`
   from `axis-package-host-node` with the templates of the package hosts. It sets `runtimeClassName` from
   `applicationPackageHost.runtimeClassName`, `gvisor` by default, and points the worker at it with
