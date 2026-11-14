@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
@@ -297,26 +298,48 @@ public sealed class PackageCatalog
 
     private static PackageManifest? ReadManifest(string manifestPath, string file, string label, List<Diagnostic> problems)
     {
-        void Report(string message, string path) =>
-            problems.Add(new Diagnostic(DiagnosticCodes.PackageManifestInvalid, $"{label}: {message}", file, path));
-
         if (!File.Exists(manifestPath))
         {
-            Report($"The manifest '{ManifestFileName}' is missing.", "");
+            problems.Add(new Diagnostic(DiagnosticCodes.PackageManifestInvalid, $"{label}: The manifest '{ManifestFileName}' is missing.", file, ""));
             return null;
         }
 
-        JsonDocument document;
         try
         {
             using var stream = File.OpenRead(manifestPath);
-            document = JsonDocument.Parse(stream, _documentOptions);
+            return ReadManifest(stream, file, label, problems);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             // The exception message names the absolute path, so it is never passed on.
-            Report("The manifest could not be read.", "");
+            problems.Add(new Diagnostic(DiagnosticCodes.PackageManifestInvalid, $"{label}: The manifest could not be read.", file, ""));
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Reads the manifest of an application's package from its text in a release or a folder, with the checks of
+    /// <see cref="ReadInstalledManifest"/>. The manifest is null, with its problems in <paramref name="problems"/>, when it is not valid JSON or does not match the schema.
+    /// </summary>
+    internal static PackageManifest? ReadManifestContent(string content, string file, string label, List<Diagnostic> problems)
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        return ReadManifest(stream, file, label, problems);
+    }
+
+    /// <summary>Checks what the schema cannot, as <see cref="Load"/> does for an installed package: unique names and the timeout.</summary>
+    internal static void CheckManifestRules(PackageManifest manifest, string file, string label, List<Diagnostic> problems) =>
+        CheckManifest(manifest, (code, message, path) => problems.Add(new Diagnostic(code, $"{label}: {message}", file, path)));
+
+    private static PackageManifest? ReadManifest(Stream stream, string file, string label, List<Diagnostic> problems)
+    {
+        void Report(string message, string path) =>
+            problems.Add(new Diagnostic(DiagnosticCodes.PackageManifestInvalid, $"{label}: {message}", file, path));
+
+        JsonDocument document;
+        try
+        {
+            document = JsonDocument.Parse(stream, _documentOptions);
         }
         catch (JsonException exception)
         {

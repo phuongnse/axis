@@ -327,7 +327,7 @@ that its release was compiled against.
 - **No version in range.** A range that no installed version meets is
   `AXC0141`. Its message lists the installed versions.
 - **Steps.** A package operation step is checked against the pinned
-  version's manifest, see
+  version's manifest, or the manifest of an application's own package, see
   [Package step shape](process-execution.md#package-step-shape), and the compiled
   step holds that version. A running instance keeps the version its release
   pins, even after a newer version is installed. A host rebuilds a stored
@@ -350,9 +350,12 @@ that its release was compiled against.
   policy, and the instance fails when attempts run out. The call stores the
   policy when it is staged, because the worker cannot rebuild the release
   without the version.
-- **An application's packages** _(planned for M37)_. The release holds the
-  built packages of the application, or the manifest of a customer-hosted one, so running work keeps the code
-  or the contract it started with, see [An application's packages](#an-applications-packages).
+- **An application's packages.** The release holds every file of the application's own packages under
+  `packages/<id>/`, see [An application's packages](#an-applications-packages). Their versions are not
+  pins: the compiled step holds the version in the package's manifest.
+- **A built or customer-hosted package in the release** _(planned for M37)_. The release holds the built
+  package, or the manifest of a customer-hosted one, so running work keeps the code or the contract it
+  started with, see [An application's packages](#an-applications-packages).
 
 ## Loading
 
@@ -675,53 +678,59 @@ _(planned for M37)_
 
 ## An application's packages
 
-_(planned for M37)_
-
 An application's package sits in the application's folder, and the tenant's author brings it. It is not
 trusted code, so the platform gives it more limits than an installation's package gets.
 
-- **The sandbox.** The runners run under gVisor (`runsc`), in their own container,
+- **The sandbox** _(planned for M37)_. The runners run under gVisor (`runsc`), in their own container,
   `application-package-host`, beside the worker. The Helm chart sets that pod's `runtimeClassName` and
   Compose sets that service's `runtime`, so the `package-host-*` containers keep the plain runtime.
   gVisor runs on an ordinary Kubernetes node, while a microVM needs nodes that allow nested
   virtualization.
-- **`Extensions:ApplicationPackages`.** A server, worker and publisher setting, `false` by default.
-  With `true`, the worker checks at start that `application-package-host` runs under gVisor, and does
-  not start otherwise. With `false`, an application's package that Axis runs is a compile error at its
-  `packages/<id>/axis-package.json`. So an installation without gVisor refuses it and runs its own packages
-  as before. The tenant's switch and the compile check still allow a
-  [customer-hosted](#customer-hosted-runners) package, which needs no gVisor because gVisor guards only code
-  on Axis's machines.
-- **Its own runners.** One set for each tenant and package version, with the limits of
+- **`Extensions:ApplicationPackages`.** A server, worker and publisher setting, `false` by default. With
+  `false`, an application's package is a compile error at its `packages/<id>/axis-package.json`, reported
+  once for each package. So an installation without gVisor refuses it and runs its own packages as before.
+  A stored release that holds one still rebuilds, whatever the setting says.
+- **The setting's gVisor check** _(planned for M37)_. With `true`, the worker checks at start that
+  `application-package-host` runs under gVisor, and does not start otherwise.
+- **A customer-hosted package and the setting** _(planned for M37)_. The tenant's switch and the compile
+  check still allow a [customer-hosted](#customer-hosted-runners) package with the setting `false`, which
+  needs no gVisor because gVisor guards only code on Axis's machines.
+- **Its own runners** _(planned for M37)_. One set for each tenant and package version, with the limits of
   [package runners](#package-runners). The package host starts a set when a call comes and stops it
   once it is idle, so a tenant that calls nothing holds no runner.
-- **Quotas.** The CPU seconds of its runners count against the tenant's
+- **Quotas** _(planned for M37)_. The CPU seconds of its runners count against the tenant's
   [package run time a day](tenant-quotas.md#package-run-time-a-day). A call also holds a
   `concurrentConnectorCalls` lease, as any package call does. A customer-hosted package counts for nothing
   there, see [package run time a day](tenant-quotas.md#package-run-time-a-day).
-- **Plans.** In Axis SaaS only a paid plan allows an application's packages, see
+- **Plans** _(planned for M37)_. In Axis SaaS only a paid plan allows an application's packages, see
   [the catalogue](plans.md#the-catalogue).
-- **Switched on by the tenant.** The tenant's administrator turns them on, see
+- **Switched on by the tenant** _(planned for M37)_. The tenant's administrator turns them on, see
   [application packages](user-administration.md#application-packages), and gives each author the
   `developer` role, see [roles](user-administration.md#roles).
-- **In the folder.** `packages/<id>/` holds the package's manifest, adapter, lock file and tests. `<id>`
-  is the folder's name, and an id that an installation's package also uses is a compile error. The
-  application's `packages` list does not name it. Steps call it as `<id>/<operation>`. A customer-hosted
-  package's folder holds the manifest alone, and another file in it is a compile error at that file, because
-  Axis neither builds nor scans it.
-- **Built and scanned on publish.** The publisher builds and scans each package that Axis runs as
+- **In the folder.** `packages/<id>/` holds the package's manifest, adapter, lock file and tests. No file
+  in it is a [resource](configuration.md#load). `<id>` is the folder's name, and compilation checks the
+  manifest as it checks an installation's, see [the manifest](#manifest), at `packages/<id>/axis-package.json`.
+  An id that an installation's package also uses is `AXC0147`. The application's `packages` list does not
+  name it. Steps call it as `<id>/<operation>`, see
+  [Package step shape](process-execution.md#package-step-shape).
+- **A customer-hosted package's folder** _(planned for M37)_. It holds the manifest alone, and another file
+  in it is a compile error at that file, because Axis neither builds nor scans it.
+- **Built and scanned on publish** _(planned for M37)_. The publisher builds and scans each package that Axis runs as
   [built once](#what-a-package-is) says, but in the tenant's sandbox, because a dependency's install
   script is the tenant's code. A failed build or scan fails the publish with diagnostics. A publish
   needs the publisher role only.
-- **In the release.** The release holds the built package, or the manifest of a customer-hosted one, see
-  [versions and pinning](#versions-and-pinning).
-- **Writing.** A write to a package's files needs the author role, the developer role and the tenant's
+- **In the release.** The release holds every file of the package as written, and the content hash covers
+  them, see [versions and pinning](#versions-and-pinning) and
+  [the release](configuration.md#release).
+- **Writing** _(planned for M37)_. A write to a package's files needs the author role, the developer role and the tenant's
   switch on, see [packages in Studio](studio-packages.md).
 - **No change to a module's code.** A customization layer cannot change a module's code. An
   application that needs other code adds a package of its own and calls it, or
   [ejects](modules-and-templates.md#upgrades-with-module-migrations) the module.
 
 ### How a package is written
+
+_(planned for M37)_
 
 - **By hand.** An author edits the package's files in Studio, or in their own tools through the
   authoring API.

@@ -530,20 +530,23 @@ illustrative `supplierCode` text field on the subject. The sample packages, `pay
 The compiler reports these as compile errors.
 
 - The package is one of the application's
-  [`packages`](extension-packages.md#declaring-packages-in-an-application), with the package id
+  [`packages`](extension-packages.md#declaring-packages-in-an-application), or an application's own
+  package in `packages/<id>/`, see
+  [an application's packages](extension-packages.md#an-applications-packages), with the package id
   matched exactly. Otherwise it is `AXC0150` at `/steps/{i}/operation`. A listed package that failed
-  pinning (`AXC0139` to `AXC0142`) is not reported again, and neither is any package when
-  `application.json` was not loaded. A module process is checked against the module's own `packages`
-  in `module.json` instead.
-- The operation is in the manifest of the version the release pins, matched ignoring letter case.
-  Otherwise it is `AXC0151` at `/steps/{i}/operation`. The compiled step holds the manifest's
-  declared name.
+  pinning (`AXC0139` to `AXC0142`) is not reported again, and neither is a package folder that has
+  its own problem, nor any package when `application.json` was not loaded. A module process is
+  checked against the module's own `packages` in `module.json` instead.
+- The operation is in the manifest of the version the release pins, or in the manifest of the
+  application's own package, matched ignoring letter case. Otherwise it is `AXC0151` at
+  `/steps/{i}/operation`. The compiled step holds the manifest's declared name.
 - `input`, `output` and `retry` are checked as for a `callConnector` step (`AXC0104` to `AXC0109`),
   see [Step shape](#step-shape), against the operation's fields in the manifest.
 - A package operation step has `input` and `next`, and no `set`, `connector`, `event` or `fields`
   (`AXC0004`).
 
-The compiled step holds the package id, the pinned version, the operation, the inputs and outputs in
+The compiled step holds the package id, the pinned version, or the version in the manifest of the
+application's own package, the operation, the inputs and outputs in
 manifest order, the retry policy with the defaults filled in, `next`, and the manifest's `idempotent`
 and `timeout`.
 

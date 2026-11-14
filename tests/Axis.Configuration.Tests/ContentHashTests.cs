@@ -48,6 +48,31 @@ public sealed class ContentHashTests
     }
 
     [Fact]
+    public void A_package_file_is_hashed_with_its_length_and_the_other_resources_keep_their_form()
+    {
+        // "é" is two bytes in UTF-8, so the length counts bytes, and the line break stays as written.
+        ResourceContent[] resources = [new("a.json", """{"x":1}"""), new("packages/tools/adapter.py", "print('é')\r\n")];
+
+        var hash = ContentHash.Compute(resources);
+
+        Assert.Equal(
+            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes("a.json\n{\"x\":1}\npackages/tools/adapter.py\n13\nprint('é')\r\n\n"))),
+            hash);
+        Assert.Equal(
+            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes("a.json\n{\"x\":1}\n"))),
+            ContentHash.Compute([resources[0]]));
+    }
+
+    [Fact]
+    public void A_package_file_cannot_be_confused_with_the_next_entry()
+    {
+        var one = ContentHash.Compute([new("packages/a/x.txt", "1\npackages/a/y.txt\n0\n\n")]);
+        var two = ContentHash.Compute([new("packages/a/x.txt", "1"), new("packages/a/y.txt", "")]);
+
+        Assert.NotEqual(one, two);
+    }
+
+    [Fact]
     public void An_application_without_packages_keeps_the_hash_of_its_resources()
     {
         using var folder = SampleFolder();
