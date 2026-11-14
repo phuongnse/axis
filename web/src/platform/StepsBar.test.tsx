@@ -37,6 +37,33 @@ describe('StepsBar', () => {
     expect(items[1]).toHaveAttribute('aria-current', 'step')
   })
 
+  // Proposed: a run that stopped marks the step where it stopped, see the review on #3263.
+  it('marks the current step where a run stopped with a cross in danger, and says so after its title', () => {
+    render(<StepsBar titles={['Plan', 'Checks', 'Ready']} current={1} stopped={{ words: 'Failed', tone: 'danger' }} />)
+
+    const items = screen.getAllByRole('listitem')
+    expect(items[0].querySelector('.anticon-check')).toBeInTheDocument()
+    const circle = items[1].querySelector<HTMLElement>('.anticon-close')!.parentElement!
+    const danger = document.createElement('span')
+    danger.style.background = designTokensFor('light').colour.danger
+    expect(circle.style.background).toBe(danger.style.background)
+    expect(items[1]).toHaveTextContent('Checks Failed')
+    expect(within(items[1]).queryByText('2')).toBeNull()
+  })
+
+  it('marks the current step where someone stopped a run with a muted dash, not as the step in progress', () => {
+    render(
+      <StepsBar titles={['Plan', 'Approval', 'Ready']} current={1} stopped={{ words: 'Dropped', tone: 'muted' }} />,
+    )
+
+    const items = screen.getAllByRole('listitem')
+    expect(items[1]).toHaveAttribute('aria-current', 'step')
+    expect(items[1].querySelector('.anticon-minus')).toBeInTheDocument()
+    const circle = items[1].querySelector<HTMLElement>('.anticon-minus')!.parentElement!
+    expect(circle.style.background).toBe('transparent')
+    expect(items[1]).toHaveTextContent('Approval Dropped')
+  })
+
   it('shows a check mark in place of the number for a finished step below seven steps', () => {
     render(<StepsBar titles={['Basics', 'Extras', 'Review']} current={1} />)
 

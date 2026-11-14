@@ -1,4 +1,4 @@
-import { CheckOutlined } from '@ant-design/icons'
+import { CheckOutlined, CloseOutlined, MinusOutlined } from '@ant-design/icons'
 import { Tooltip, Typography } from 'antd'
 import type { CSSProperties } from 'react'
 import { useDesignTokens } from './themeMode'
@@ -13,16 +13,22 @@ const circleSize = 24
  * the next. A finished step shows a check mark in place of its number. From seven steps, only the current title shows,
  * and the other steps show their number, or a check mark when finished, with the title on hover, on focus and to
  * assistive technology. The current step is marked with `aria-current`, and a row wraps when it does not fit. The bar
- * keeps no space around itself, see docs/reference/shared-widgets.md#the-rule.
+ * keeps no space around itself, see docs/reference/shared-widgets.md#the-rule. Proposed, see the review on #3263: with
+ * `stopped`, the current step is where the run stopped, and its words say so to assistive technology after its title:
+ * with the `danger` tone, as a failure, a cross in `danger` and its title in `dangerText`; with the `muted` tone, as
+ * when someone stops it, a dash and its title in `textMuted`.
  */
 export function StepsBar({
   titles,
   current,
   vertical = false,
+  stopped,
 }: {
   titles: string[]
   current: number
   vertical?: boolean
+  /** The current step is where the run stopped: its words, such as "Failed", and its tone. */
+  stopped?: { words: string; tone: 'danger' | 'muted' }
 }) {
   const { colour, spacing } = useDesignTokens()
   const numbered = titles.length >= numbersFrom
@@ -60,9 +66,21 @@ export function StepsBar({
     >
       {titles.map((title, index) => {
         const isCurrent = index === current
+        const halted = isCurrent ? stopped : undefined
+        const failed = halted?.tone === 'danger'
+        const muted = halted?.tone === 'muted'
+        const active = isCurrent && !muted
         const finished = index < current
         const outline = finished ? colour.primaryText : colour.textMuted
-        const mark = finished ? <CheckOutlined aria-hidden /> : index + 1
+        const mark = finished ? (
+          <CheckOutlined aria-hidden />
+        ) : failed ? (
+          <CloseOutlined aria-hidden />
+        ) : muted ? (
+          <MinusOutlined aria-hidden />
+        ) : (
+          index + 1
+        )
         const circle: CSSProperties = {
           position: 'relative',
           display: 'inline-flex',
@@ -72,9 +90,9 @@ export function StepsBar({
           width: circleSize,
           height: circleSize,
           borderRadius: '50%',
-          border: isCurrent ? 'none' : `1px solid ${outline}`,
-          background: isCurrent ? colour.primary : 'transparent',
-          color: isCurrent ? colour.onPrimary : outline,
+          border: active ? 'none' : `1px solid ${outline}`,
+          background: failed ? colour.danger : active ? colour.primary : 'transparent',
+          color: active ? colour.onPrimary : outline,
           fontSize: 12,
           lineHeight: 1,
         }
@@ -108,11 +126,12 @@ export function StepsBar({
                   style={{
                     maxWidth: titleWidth,
                     marginInlineStart: spacing.xs,
-                    color: isCurrent ? colour.primaryText : colour.textMuted,
+                    color: failed ? colour.dangerText : active ? colour.primaryText : colour.textMuted,
                     fontWeight: isCurrent ? 500 : 400,
                   }}
                 >
                   {title}
+                  {halted !== undefined && <span style={visuallyHidden}>{` ${halted.words}`}</span>}
                 </Typography.Text>
               )}
             </span>

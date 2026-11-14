@@ -798,7 +798,7 @@ const progress: Record<StudioAuthoringRequest['state'], [number, boolean]> = {
   ready: [6, false],
   accepted: [6, false],
   dropped: [1, false],
-  failed: [3, false],
+  failed: [4, false],
 }
 
 /** After an approval the preview's request moves on every four seconds, through one fix round, to `ready`. */
@@ -883,6 +883,10 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
             ...loopSteps(count, running, start, gap).slice(1),
           ]
         : loopSteps(count, running, start, gap)
+  // A failed request's last step is the one that stopped it, here a fix the provider refused.
+  if (state === 'failed' && steps.length > 0) {
+    steps.push({ ...steps.pop()!, outcome: 'unfinished' })
+  }
   // An outside app's request records its tool calls as its steps, from the plan it proposed to the review.
   // The app, not Axis, works on: after an ask for changes it waits for the app, and a drop ends it.
   if (request.app !== null && sent === undefined && acted === undefined) {

@@ -106,9 +106,9 @@ const diffTheme = sharedTheme((tokens, mode) => {
     // The diff's own look comes first, so it wins over the shared editor's frame, which an earlier extension sets.
     Prec.high(
       EditorView.theme({
-        // Proposed: the diff fills its file's block flush, as GitHub draws a file's diff, with no frame of its own inside the
-        // block's, see the review on #3263; keyboard focus stays visible inside the block's edge.
-        '&': { border: 'none', borderRadius: 0 },
+        // Proposed: the diff fills the block of its file flush, as GitHub draws a diff, with no frame or corners of its
+        // own, see the review on #3263. Keyboard focus stays visible inside the edge of the block.
+        '&': { border: 'none', borderRadius: 'unset' },
         '&.cm-focused': { outlineOffset: '-2px' },
         '.cm-content': { padding: `${spacing.xs}px 0` },
         '.cm-line': { paddingInline: `${spacing.sm}px` },

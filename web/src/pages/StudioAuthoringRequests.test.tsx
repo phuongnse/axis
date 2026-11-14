@@ -113,9 +113,9 @@ describe('an outside AI app’s request', () => {
     )
 
     expect(await screen.findByText(/^Sent by you on .*, co-authored with Claude Code$/)).toBeInTheDocument()
-    expect(screen.getByText('Ready')).toHaveAttribute('data-tone', 'attention')
     // The request's words, signed by who sent it, come right under the heading.
     const asked = screen.getByTestId('studio-ai-asked')
+    expect(within(asked).getByText('Ready')).toHaveAttribute('data-tone', 'attention')
     expect(within(asked).getByText('Add a Cost centre field to the purchase request.')).toBeInTheDocument()
     expect(within(asked).getByText(/^Sent by you on .*, co-authored with Claude Code$/)).toBeInTheDocument()
     await userEvent.setup().click(screen.getByRole('tab', { name: 'Plan' }))
@@ -376,7 +376,7 @@ describe('a ready request’s page', () => {
     expect(screen.getByRole('tab', { name: 'Overview', selected: true })).toBeInTheDocument()
   })
 
-  it('opens on its plan, with Approve plan, while the plan waits for its author', async () => {
+  it('opens on its plan while the plan waits for its author, with Approve plan in the bar at the foot', async () => {
     stub({ ...fromApp, state: 'awaitingApproval', checks: null, review: null, aiConnected: true })
     renderIn(
       <StudioAuthoringRequestPage
@@ -389,8 +389,68 @@ describe('a ready request’s page', () => {
     )
 
     expect(await screen.findByRole('tab', { name: 'Plan', selected: true })).toBeInTheDocument()
-    expect(screen.queryByRole('tab', { name: 'Overview' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Approve plan' })).toBeInTheDocument()
+    const bar = screen.getByTestId('studio-ai-plan-bar')
+    expect(bar).toHaveTextContent('Nothing changes until you approve the plan')
+    expect(within(bar).getByRole('button', { name: 'Approve plan' })).toBeInTheDocument()
+    expect(within(bar).getByRole('button', { name: 'Change plan…' })).toBeInTheDocument()
+
+    // The overview says the plan waits, and leads to it.
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('tab', { name: 'Overview' }))
+    const awaiting = await screen.findByTestId('studio-ai-awaiting')
+    expect(awaiting).toHaveTextContent('The plan waits for your approval.')
+    await user.click(within(awaiting).getByRole('button', { name: 'See the plan' }))
+    expect(screen.getByRole('tab', { name: 'Plan', selected: true })).toBeInTheDocument()
+  })
+})
+
+// Proposed: the overview is always the first tab and leads with the request's stages in every state, see the review on
+// #3263.
+describe("a request's progress", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const progressOf = async (request: Partial<StudioAuthoringRequestDetail>) => {
+    stub({ ...fromApp, ...request })
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
+    expect(await screen.findByRole('tab', { name: 'Overview', selected: true })).toBeInTheDocument()
+    return within(screen.getByTestId('studio-ai-progress')).getAllByRole('listitem')
+  }
+
+  it('keeps the stages on a ready request, every stage before Ready done', async () => {
+    const stages = await progressOf({ state: 'ready' })
+    expect(stages).toHaveLength(6)
+    expect(stages[5]).toHaveAttribute('aria-current', 'step')
+    expect(stages[5]).toHaveTextContent('Ready')
+  })
+
+  it('marks the stage where a failed request stopped', async () => {
+    const stages = await progressOf({
+      state: 'failed',
+      checks: null,
+      review: null,
+      steps: [
+        {
+          kind: 'check',
+          summary: null,
+          outcome: 'unfinished',
+          tokens: 0,
+          startedAt: '2026-11-10T09:00:00Z',
+          finishedAt: '2026-11-10T09:15:00Z',
+        },
+      ],
+    })
+    expect(stages[3]).toHaveAttribute('aria-current', 'step')
+    expect(stages[3]).toHaveTextContent('Checks Failed')
   })
 })
 

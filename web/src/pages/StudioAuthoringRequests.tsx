@@ -18,7 +18,6 @@ import {
   ServerUnreachableError,
   type StudioAuthoringRequest,
   type StudioAuthoringRequestDetail,
-  type StudioAuthoringRequestState,
   type StudioAuthoringRequestStep,
   type StudioAuthoringStepKind,
   type StudioDiagnostic,
@@ -57,12 +56,31 @@ import { StudioTestResults } from './StudioTestResults'
 /** Proposed: the stages of a request's loop, which a `StepsBar` shows on its page. */
 const stageKeys = ['plan', 'approval', 'change', 'checks', 'review', 'ready'] as const
 
+/** The stage each kind of step belongs to. */
+const stepStages: Record<StudioAuthoringStepKind, number> = {
+  plan: 0,
+  planChange: 0,
+  propose_plan: 0,
+  work: 2,
+  fix: 2,
+  changeRequest: 2,
+  write_resource: 2,
+  write_layer: 2,
+  delete_resource: 2,
+  check: 3,
+  validate_draft: 3,
+  run_scenarios: 3,
+  review: 4,
+  accept: 5,
+}
+
 /**
- * The stage a state is in: fixing is AI working again, and an accepted request has finished every stage. A dropped
- * or failed request shows no stages.
+ * Proposed: the stage a request is at, in every state, see the review on #3263: fixing is AI working again, and an
+ * accepted request has finished every stage. A failed request stopped at the stage of its last step; a dropped one at
+ * the stage its last step was in, or after it once that step had finished.
  */
-function stageOf(state: StudioAuthoringRequestState): number | null {
-  switch (state) {
+function stageOf(request: StudioAuthoringRequestDetail): number {
+  switch (request.state) {
     case 'planning':
       return 0
     case 'awaitingApproval':
@@ -78,8 +96,14 @@ function stageOf(state: StudioAuthoringRequestState): number | null {
       return 5
     case 'accepted':
       return stageKeys.length
-    default:
-      return null
+    default: {
+      const last = request.steps.at(-1)
+      if (last === undefined) {
+        return 0
+      }
+      const at = stepStages[last.kind]
+      return request.state === 'dropped' && last.finishedAt !== null ? Math.min(at + 1, stageKeys.length - 1) : at
+    }
   }
 }
 
@@ -362,7 +386,7 @@ export function StudioAuthoringRequestPage({
   )
   const quoted = (text: string) => <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
   // Proposed: one frame for every request, sent from Studio or made by an outside AI app, see the review on #3263.
-  const stage = stageOf(request.state)
+  const stage = stageOf(request)
   // Axis does the AI's part of any request whose author has connected their AI, whichever way it began.
   const waitsForApp =
     request.app !== null && !request.aiConnected && ['planning', 'working', 'fixing'].includes(request.state)
@@ -482,10 +506,9 @@ export function StudioAuthoringRequestPage({
   const hasChecks = showsDiff && request.checks !== null
   const working = !['ready', 'accepted', 'failed', 'dropped'].includes(request.state)
   const fixRound = request.round > 1 && working && request.state !== 'planning'
-  // The overview shows only what an author decides on, the checks and the review or an alert, so it may have nothing.
-  const hasOverview = hasChecks || request.state === 'failed' || conflicts.length > 0 || accept !== null
+  // Proposed: the overview is always the first tab, as a pull request's conversation is, see the review on #3263.
   const shown: RequestTab[] = [
-    ...(hasOverview ? (['overview'] as const) : []),
+    'overview',
     ...(hasDiff ? (['changes'] as const) : []),
     ...(hasChecks ? (['checks'] as const) : []),
     ...(request.plan !== null ? (['plan'] as const) : []),
@@ -504,8 +527,64 @@ export function StudioAuthoringRequestPage({
           t,
         )
       : null
+  // Proposed: the request's stages in every state, where a failed one stopped, then, while AI works, what it does now and
+  // the fix round, see the review on #3263.
+  const progress = (
+    <Flex vertical gap="small" data-testid="studio-ai-progress">
+      <StepsBar
+        titles={stageTitles}
+        current={stage}
+        stopped={
+          request.state === 'failed'
+            ? { words: stateWords(request), tone: 'danger' }
+            : request.state === 'dropped'
+              ? { words: stateWords(request), tone: 'muted' }
+              : undefined
+        }
+      />
+      {/* One line while AI works: the spinner, what it does now, or that it writes the plan, and the fix round. */}
+      {(fixRound || (following && !waitsForApp)) && (
+        <Flex align="center" gap={spacing.sm} wrap>
+          {following && !waitsForApp && <Spin size="small" />}
+          {following && !waitsForApp && (running !== undefined || request.state === 'planning') && (
+            <Typography.Text style={{ color: colour.textMuted }}>
+              {request.state === 'planning' || running === undefined ? (
+                t('shell.studio.aiRequest.planning')
+              ) : (
+                <FilledText text={t('shell.studio.aiRequest.now')} parts={{ step: stepWords(running) }} />
+              )}
+            </Typography.Text>
+          )}
+          {fixRound && (
+            <Typography.Text style={{ color: colour.textMuted }}>
+              {t('shell.studio.aiRequest.round').replace('{round}', String(request.round))}
+            </Typography.Text>
+          )}
+        </Flex>
+      )}
+      {/* Proposed: with no AI of its author's here, only an outside app goes on with it, see the review on #3263. */}
+      {waitsForApp && (
+        <Typography.Text style={{ color: colour.textMuted }} data-testid="studio-ai-app-works">
+          {t(mine ? 'shell.studio.aiRequest.appWorksMine' : 'shell.studio.aiRequest.appWorks').replaceAll(
+            '{app}',
+            request.app ?? '',
+          )}
+        </Typography.Text>
+      )}
+    </Flex>
+  )
   const overview = (
     <SectionParts>
+      {progress}
+      {/* Proposed: while the plan waits, the overview says so and leads to it, see the review on #3263. */}
+      {awaiting && (
+        <Typography.Text data-testid="studio-ai-awaiting">
+          {mine ? t('shell.studio.aiRequest.waitsForApproval') : t('shell.studio.aiRequest.notYours')}{' '}
+          <AxisButton role="link" size="small" onClick={() => setTab({ id: requestId, key: 'plan' })}>
+            {t('shell.studio.aiRequest.seePlan')}
+          </AxisButton>
+        </Typography.Text>
+      )}
       {request.state === 'failed' && (
         <AxisAlert
           kind="error"
@@ -587,24 +666,7 @@ export function StudioAuthoringRequestPage({
     </SectionParts>
   )
   const planView = request.plan !== null && (
-    <PlanView plan={request.plan} review={request.review} resources={resources} onOpen={onOpen}>
-      {awaiting && !mine && (
-        <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.aiRequest.notYours')}</Typography.Text>
-      )}
-      {awaiting && mine && (
-        <AxisActionRow>
-          <AxisButton role="finish" disabled={acting} onClick={() => void act('approve')}>
-            {t('shell.studio.aiRequest.approve')}
-          </AxisButton>
-          <AxisButton role="secondary" disabled={acting} onClick={() => setChangeOpen('change-plan')}>
-            {t('shell.studio.aiRequest.changePlan')}
-          </AxisButton>
-          <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
-            {t('shell.studio.aiRequest.drop')}
-          </AxisButton>
-        </AxisActionRow>
-      )}
-    </PlanView>
+    <PlanView plan={request.plan} review={request.review} resources={resources} onOpen={onOpen} />
   )
   const changesView =
     changes === undefined ? (
@@ -657,39 +719,6 @@ export function StudioAuthoringRequestPage({
         {quoted(request.text)}
         <Typography.Text style={{ color: colour.textMuted }}>{line}</Typography.Text>
       </Flex>
-      {/* Proposed: while AI works, its stages, the fix round and what it does now, see the review on #3263. */}
-      <Flex vertical gap="small" data-testid="studio-ai-progress">
-        {stage !== null && working && <StepsBar titles={stageTitles} current={stage} />}
-        {/* One line while AI works: the spinner, what it does now, or that it writes the plan, and the fix round. */}
-        {(fixRound || (following && !waitsForApp)) && (
-          <Flex align="center" gap={spacing.sm} wrap>
-            {following && !waitsForApp && <Spin size="small" />}
-            {following && !waitsForApp && (running !== undefined || request.state === 'planning') && (
-              <Typography.Text style={{ color: colour.textMuted }}>
-                {request.state === 'planning' || running === undefined ? (
-                  t('shell.studio.aiRequest.planning')
-                ) : (
-                  <FilledText text={t('shell.studio.aiRequest.now')} parts={{ step: stepWords(running) }} />
-                )}
-              </Typography.Text>
-            )}
-            {fixRound && (
-              <Typography.Text style={{ color: colour.textMuted }}>
-                {t('shell.studio.aiRequest.round').replace('{round}', String(request.round))}
-              </Typography.Text>
-            )}
-          </Flex>
-        )}
-        {/* Proposed: with no AI of its author's here, only an outside app goes on with it, see the review on #3263. */}
-        {waitsForApp && (
-          <Typography.Text style={{ color: colour.textMuted }} data-testid="studio-ai-app-works">
-            {t(mine ? 'shell.studio.aiRequest.appWorksMine' : 'shell.studio.aiRequest.appWorks').replaceAll(
-              '{app}',
-              request.app ?? '',
-            )}
-          </Typography.Text>
-        )}
-      </Flex>
       {/* A failed action shows above the tabs, as it may come from any of them. */}
       {actionError && <AxisAlert kind="error" message={t('shell.studio.aiRequest.actionFailed')} />}
       <Tabs
@@ -702,6 +731,24 @@ export function StudioAuthoringRequestPage({
           children: { overview, changes: changesView, checks: checksView, plan: planView, history: historyView }[key],
         }))}
       />
+      {/* Proposed: approving the plan sits in the bar at the foot of the window, as accepting does, so it shows on every
+          tab, see the review on #3263. */}
+      {awaiting && mine && (
+        <ActionBar testId="studio-ai-plan-bar">
+          <span>{t('shell.studio.aiRequest.bar.awaiting')}</span>
+          <AxisActionRow align="center">
+            <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
+              {t('shell.studio.aiRequest.drop')}
+            </AxisButton>
+            <AxisButton role="secondary" disabled={acting} onClick={() => setChangeOpen('change-plan')}>
+              {t('shell.studio.aiRequest.changePlan')}
+            </AxisButton>
+            <AxisButton role="finish" disabled={acting} onClick={() => void act('approve')}>
+              {t('shell.studio.aiRequest.approve')}
+            </AxisButton>
+          </AxisActionRow>
+        </ActionBar>
+      )}
       {/* What finishes the page's task, accepting the draft, sits in the bar at the foot of the window. */}
       {ready && mine && !acceptPending && (
         <ActionBar testId="studio-ai-request-bar">
@@ -799,7 +846,7 @@ export function StudioAuthoringRequestPage({
 /**
  * Proposed: a request's plan, written as a pull request's plan is, see the review on #3263: each a group named in bold,
  * What changes, Decisions to check, each choice with its reason, muted, Effects and risks, and How it will be checked,
- * then its details, resource by resource, folded until asked for, and last `children`, such as the approval's actions.
+ * then its details, resource by resource, folded until asked for. Its approval's actions sit in the page's bar.
  * Once a review ran, each step of What changes is its checklist item, a check mark when the draft does it and a cross
  * when it does not, with the resource where, as a pull request's description ticks its own list.
  */
@@ -808,13 +855,11 @@ function PlanView({
   review,
   resources,
   onOpen,
-  children,
 }: {
   plan: StudioPlan
   review: StudioReview | null
   resources: readonly StudioResourceItem[]
   onOpen: (resourceId: string, path: string) => void
-  children: ReactNode
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
@@ -909,13 +954,12 @@ function PlanView({
           )}
         </Flex>
       )}
-      {children}
     </Flex>
   )
 }
 
 /**
- * Proposed: a request's review, see the review on #3263, as cells of the overview's columns: "Review" in bold, its
+ * Proposed: the review of a request, see the review on #3263, as cells of the columns of the overview: "Review" in bold, its
  * verdict as a `StatusTag`, "Changes requested" while a finding must change and "No changes requested" otherwise, never
  * "Approved", as only its author approves, by accepting; its summary, a sentence or two, reads under them across the
  * columns. Its findings follow across the columns in a `StudioProblemList`, grouped by the resource they are about, what must change first,
@@ -1015,6 +1059,9 @@ function checksSummary(
           ? 'shell.studio.aiRequest.checks.bothScenarios'
           : 'shell.studio.aiRequest.checks.allScenarios'
     return { text: t(key).replace('{total}', String(passed)), passed: true }
+  }
+  if (scenarios.length === 1) {
+    return { text: t('shell.studio.aiRequest.checks.oneScenarioFails'), passed: false }
   }
   return {
     text: t('shell.studio.aiRequest.checks.scenarios')
