@@ -404,7 +404,9 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
 /// <see cref="Host"/>. The tenant has a <c>url</c> binding and a <c>secret</c> binding for the purchasing system, and the
 /// Company sign-in bindings. The server holds the tenant's data and lookup keys of the directory, so it can save a sensitive value, and the
 /// archive of the tenant carries the keys that encrypted it. The server activates the purchase request and leave request samples in it, so releases pin the
-/// payment references package and the departments, department-budgets and organization modules.
+/// payment references package and the departments, department-budgets and organization modules. The workers that tests build send their
+/// <c>node</c> calls to <see cref="NodeRunner"/>, a package host over a copy of the sample packages with <c>payment-terms</c> installed,
+/// see docs/reference/extension-packages.md#sample-and-test-packages.
 /// </summary>
 public sealed class AdminBackupFixture : IAsyncLifetime
 {
@@ -415,6 +417,8 @@ public sealed class AdminBackupFixture : IAsyncLifetime
     private readonly PostgreSqlFixture _database = new();
     private WebApplicationFactory<Program>? _factory;
     private string _schemaConnection = "";
+    private TemporaryFolder? _extensions;
+    private TestPackageHost? _packageHost;
 
     public string TenantId { get; private set; } = "";
 
@@ -422,10 +426,15 @@ public sealed class AdminBackupFixture : IAsyncLifetime
 
     internal PostgresClientTools Tools { get; private set; } = null!;
 
+    /// <summary>The address of the package host that runs <c>node</c> packages, the value of <c>Extensions:Runners:Node</c>.</summary>
+    internal string NodeRunner => (_packageHost ?? throw new InvalidOperationException("The fixture is not initialized.")).Address;
+
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     public async ValueTask InitializeAsync()
     {
+        _extensions = new TemporaryFolder();
+        _packageHost = await TestPackageHost.StartOnSamplesAsync(_extensions.Path, CancellationToken);
         await _database.InitializeAsync();
         Scenario = await AdminScenario.NewAsync(_database, migrate: true, CancellationToken);
         Tools = await PostgresClientTools.CreateAsync();
@@ -499,6 +508,13 @@ public sealed class AdminBackupFixture : IAsyncLifetime
         {
             await Scenario.DisposeAsync();
         }
+
+        if (_packageHost is not null)
+        {
+            await _packageHost.DisposeAsync();
+        }
+
+        _extensions?.Dispose();
 
         await _database.DisposeAsync();
     }

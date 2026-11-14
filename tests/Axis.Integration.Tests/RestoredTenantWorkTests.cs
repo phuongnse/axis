@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Tests;
 using Axis.Hosting;
 using Axis.PurchasingStub;
@@ -57,7 +58,7 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
             await PlatformRoleGrants.ApplyAsync(connection, PostgreSqlServer.RuntimeRole, CancellationToken);
         }
 
-        var first = await BuildWorkerAsync(scenario.Platform);
+        var first = await BuildWorkerAsync(scenario.Platform, fixture.NodeRunner);
         try
         {
             await Polling.WaitUntilAsync(async () => await StateAsync(original, instanceA) == Waiting, "The original instance did not wait.");
@@ -105,7 +106,7 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
 
         await using var server = CreateDirectoryServer(scenario.Platform);
         await RefreshAsync(server);
-        var second = await BuildWorkerAsync(scenario.Platform);
+        var second = await BuildWorkerAsync(scenario.Platform, fixture.NodeRunner);
         try
         {
             // B was due at backup time: it only reaches the manager if the worker of the new tenant claims its work item.
@@ -174,7 +175,8 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
         new NpgsqlConnectionStringBuilder(fixture.Scenario.Platform) { Database = row.DatabaseName }.ConnectionString;
 
     // A worker on the tenant directory. It runs as Development, the only environment that lets a connector call an http URL.
-    internal static async Task<WebApplication> BuildWorkerAsync(string platform, TimeSpan? pollInterval = null, TimeSpan? idlePollCeiling = null)
+    // It sends node calls to the package host at nodeRunner, and its egress proxy takes a free port.
+    internal static async Task<WebApplication> BuildWorkerAsync(string platform, string nodeRunner, TimeSpan? pollInterval = null, TimeSpan? idlePollCeiling = null)
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -184,6 +186,8 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
             ["Platform:SecretKey"] = AdminScenario.TestSecretKey,
             ["Extensions:Path"] = SamplePackages.Path,
             ["Extensions:Isolation"] = "inProcess",
+            [PackageIsolation.NodeRunnerSetting] = nodeRunner,
+            [PackageIsolation.ProxySetting] = "0",
             ["Modules:Path"] = SampleModules.Path,
             ["Health:Urls"] = "http://127.0.0.1:0",
             ["Worker:PollInterval"] = (pollInterval ?? TimeSpan.FromMilliseconds(50)).ToString("c", CultureInfo.InvariantCulture),

@@ -226,11 +226,14 @@ COPY scripts/lib/retry.sh scripts/lib/trivy.sh scripts/lib/
 RUN bash -c 'source scripts/lib/trivy.sh && install_trivy && cp "$trivy" /trivy'
 
 # The Node.js 24 runtime and npm of the package host image, copied from the Node.js image onto the .NET runtime base. The
-# stage takes no build argument, so its layer is the same for every Axis version.
+# image carries npm 11.21.2, because the npm of the Node.js image bundles brace-expansion and undici releases with known
+# vulnerabilities. The stage takes no build argument, so its layer is the same for every Axis version.
 FROM mcr.microsoft.com/dotnet/runtime:10.0 AS package-host-node
 COPY --from=node:24-slim /usr/local/bin/node /usr/local/bin/
 COPY --from=node:24-slim /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && npm install -g npm@11.21.2 \
+    && rm -rf /root/.npm \
     && node --version \
     && npm --version
 

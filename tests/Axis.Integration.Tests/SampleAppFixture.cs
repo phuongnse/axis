@@ -86,17 +86,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         _extensions = new TemporaryFolder();
-        PackageBuildCommand.Copy(SamplePackages.Path, _extensions.Path, skipTopLevel: "payment-terms");
-        var install = await NodeInstall.InstallAsync(
-            Path.Combine(AppContext.BaseDirectory, "SamplePaymentTerms"),
-            Path.Combine(_extensions.Path, "payment-terms", "1.0.0"),
-            CancellationToken);
-        if (install.Failure is not null)
-        {
-            throw new InvalidOperationException(install.Failure);
-        }
-
-        _packageHost = await TestPackageHost.StartAsync(_extensions.Path);
+        _packageHost = await TestPackageHost.StartOnSamplesAsync(_extensions.Path, CancellationToken);
 
         _purchasing = PurchasingStubApp.Create(["--urls", "http://127.0.0.1:0"]);
         await _purchasing.StartAsync(CancellationToken);
