@@ -19,6 +19,7 @@ namespace Axis.Configuration.Packages;
 [JsonDerivedType(typeof(ResultMessage), "result")]
 [JsonDerivedType(typeof(RetryableMessage), "retryable")]
 [JsonDerivedType(typeof(FailureMessage), "failure")]
+[JsonDerivedType(typeof(UsageMessage), "usage")]
 [JsonDerivedType(typeof(StopMessage), "stop")]
 [JsonDerivedType(typeof(SandboxMessage), "sandbox")]
 [JsonDerivedType(typeof(BuildMessage), "build")]
@@ -57,6 +58,12 @@ public sealed record RetryableMessage(string Error) : RunnerMessage;
 /// <paramref name="Binding"/> the undeclared binding that the operation asked for, and never both.
 /// </summary>
 public sealed record FailureMessage(string? Error = null, string? Binding = null) : RunnerMessage;
+
+/// <summary>
+/// The package host sends it after each answer of a runner that it started from files: <paramref name="CpuMilliseconds"/> is the CPU time that
+/// the runner process used from the <c>run</c> to the answer. Only the host writes it, and it drops one that the runner writes.
+/// </summary>
+public sealed record UsageMessage(long CpuMilliseconds) : RunnerMessage;
 
 /// <summary>The worker is done with the runner.</summary>
 public sealed record StopMessage : RunnerMessage;

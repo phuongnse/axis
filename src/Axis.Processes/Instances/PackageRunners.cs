@@ -343,22 +343,33 @@ internal sealed class RunnerConnection : IDisposable
     }
 
     /// <summary>
-    /// Sends <paramref name="run"/> and reads the answer. Returns <see langword="null"/> when the runner exited,
+    /// Sends <paramref name="run"/> and reads the answer. The answer is <see langword="null"/> when the runner exited,
     /// which is a closed connection, a failed write or read, or a line that is not <c>result</c>,
-    /// <c>retryable</c> or <c>failure</c>.
+    /// <c>retryable</c> or <c>failure</c>. A runner started from files, which has a <see cref="Build"/>, sends <c>usage</c> after
+    /// each answer, and the reply holds its <c>cpuMilliseconds</c>. The reply has none when that line is missing or is something else, and the
+    /// connection is then out of step and must not serve another call.
     /// </summary>
-    public async Task<RunnerMessage?> RunAsync(RunMessage run, CancellationToken cancellationToken)
+    public async Task<RunnerReply> RunAsync(RunMessage run, CancellationToken cancellationToken)
     {
         try
         {
             await _writer.WriteLineAsync(RunnerProtocol.Write(run).AsMemory(), cancellationToken);
-            return await ReadAsync(cancellationToken) is { } answer and (ResultMessage or RetryableMessage or FailureMessage)
-                ? answer
-                : null;
+            var answer = await ReadAsync(cancellationToken);
+            if (answer is not (ResultMessage or RetryableMessage or FailureMessage))
+            {
+                return new RunnerReply(null, null);
+            }
+
+            if (Build is null)
+            {
+                return new RunnerReply(answer, null);
+            }
+
+            return new RunnerReply(answer, await ReadAsync(cancellationToken) is UsageMessage usage ? usage.CpuMilliseconds : null);
         }
         catch (Exception exception) when ((exception is IOException or ObjectDisposedException or SocketException) && !cancellationToken.IsCancellationRequested)
         {
-            return null;
+            return new RunnerReply(null, null);
         }
     }
 
@@ -406,3 +417,9 @@ internal sealed class RunnerConnection : IDisposable
         }
     }
 }
+
+/// <summary>
+/// What <see cref="RunnerConnection.RunAsync"/> got: the <paramref name="Answer"/>, or <see langword="null"/> when the runner exited, and for a
+/// runner started from files the <paramref name="CpuMilliseconds"/> of its <c>usage</c> line, or <see langword="null"/> when the line did not come.
+/// </summary>
+internal readonly record struct RunnerReply(RunnerMessage? Answer, long? CpuMilliseconds);

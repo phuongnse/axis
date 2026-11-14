@@ -9,6 +9,7 @@
     { "$ref": "#/$defs/result" },
     { "$ref": "#/$defs/retryable" },
     { "$ref": "#/$defs/failure" },
+    { "$ref": "#/$defs/usage" },
     { "$ref": "#/$defs/stop" },
     { "$ref": "#/$defs/sandbox" },
     { "$ref": "#/$defs/build" },
@@ -102,6 +103,15 @@
         "binding": { "type": "string" }
       },
       "oneOf": [{ "required": ["error"] }, { "required": ["binding"] }]
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "cpuMilliseconds"],
+      "properties": {
+        "type": { "const": "usage" },
+        "cpuMilliseconds": { "type": "integer", "minimum": 0 }
+      }
     },
     "stop": {
       "type": "object",

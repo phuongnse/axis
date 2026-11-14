@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
@@ -56,6 +57,11 @@ namespace Axis.Processes.Instances;
 /// is not set. A release that holds the package's source but no usable built files, such as one that <c>activate</c> stored, fails the call at
 /// once: the error names the package and no path, no runner starts and no attempt is counted. A release that holds neither keeps the retryable
 /// "not installed" error.
+/// When an <see cref="IPackageRunTime"/> is given, which only a cell's worker has, every call to an application's own package adds its CPU seconds,
+/// rounded up, to the tenant's package run time of the day, whatever the outcome, see
+/// docs/reference/tenant-quotas.md#package-run-time-a-day. The seconds are the runner's <c>usage</c> line, and for a call that times out, whose
+/// runner exits or whose <c>usage</c> line does not come, the seconds from sending the <c>run</c> to its end. A runner whose answer came without
+/// its <c>usage</c> line is dropped. A count that fails is logged once for the tenant and never fails the call.
 /// The retry policy and the <c>idempotent</c> flag are stored with the call, so a worker that cannot load the pinned
 /// version can still decide. Each transaction checks the claim token, and the outcome needs the
 /// instance still waiting on the step at the revision the attempt saw. Each outcome transaction
@@ -72,8 +78,11 @@ internal sealed partial class PackageCallHandler(
     SensitiveValues? sensitive,
     ILogger<PackageCallHandler> logger,
     Func<InstalledPackage, string, IOperation>? createOperation = null,
-    PackageRunnerPools? runners = null) : IExternalWorkItemHandler
+    PackageRunnerPools? runners = null,
+    IPackageRunTime? runTime = null) : IExternalWorkItemHandler
 {
+    private readonly ConcurrentDictionary<string, byte> _warnedRunTime = new(StringComparer.Ordinal);
+
     /// <summary>The error of a call that a worker finds still <c>sending</c> from an earlier attempt.</summary>
     internal const string UnknownOutcome = "The earlier attempt of the call has an unknown outcome.";
 
@@ -545,11 +554,12 @@ internal sealed partial class PackageCallHandler(
         runner.Admit(urls.Values);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(target.Step.Timeout);
-        RunnerMessage? answer = null;
+        RunnerReply reply = default;
         var timedOut = false;
+        var sent = Stopwatch.GetTimestamp();
         try
         {
-            answer = await runner.RunAsync(message, timeout.Token);
+            reply = await runner.RunAsync(message, timeout.Token);
         }
         catch (Exception)
         {
@@ -563,10 +573,18 @@ internal sealed partial class PackageCallHandler(
             timedOut = true;
         }
 
+        var answer = reply.Answer;
+        if (target.Files is not null && runTime is not null)
+        {
+            await CountRunTimeAsync(runTime, tenant, reply.CpuMilliseconds, sent, cancellationToken);
+        }
+
+        var outOfStep = answer is not null && target.Files is not null && reply.CpuMilliseconds is null;
+
         // A request that the proxy refused fails the call at once, even if the package caught the error. Such a
-        // runner is closed, so it never serves another call.
+        // runner is closed, so it never serves another call. So is one that answered without a usage line, because its connection is out of step.
         var refused = runner.EndCall();
-        if (refused || timedOut || answer is null)
+        if (refused || timedOut || answer is null || outOfStep)
         {
             runner.Dispose();
         }
@@ -588,7 +606,11 @@ internal sealed partial class PackageCallHandler(
             return new Run(null, null, Exited: true);
         }
 
-        pool.Return(runner);
+        if (!outOfStep)
+        {
+            pool.Return(runner);
+        }
+
         switch (answer)
         {
             case ResultMessage result:
@@ -1107,6 +1129,32 @@ internal sealed partial class PackageCallHandler(
                 ["attempts"] = attempt.Attempts,
                 ["outcome"] = outcome,
             });
+
+    /// <summary>
+    /// Adds the CPU seconds of one call to the tenant's package run time. The seconds are <paramref name="cpuMilliseconds"/> rounded up, or without
+    /// them the time since <paramref name="sent"/>, rounded up too.
+    /// </summary>
+    private async Task CountRunTimeAsync(IPackageRunTime runTime, string tenant, long? cpuMilliseconds, long sent, CancellationToken cancellationToken)
+    {
+        var seconds = cpuMilliseconds is { } milliseconds
+            ? (milliseconds + 999) / 1000
+            : (long)Math.Ceiling(Stopwatch.GetElapsedTime(sent).TotalSeconds);
+        try
+        {
+            await runTime.AddAsync(tenant, seconds, cancellationToken);
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
+        {
+            // Counting is not part of the call, so a platform database that cannot be reached does not fail it.
+            if (_warnedRunTime.TryAdd(tenant, 0))
+            {
+                LogRunTimeUnavailable(tenant);
+            }
+        }
+    }
+
+    [LoggerMessage(LogLevel.Warning, "The platform database could not be reached to count the package run time of tenant {TenantId}. This is logged once for the tenant.")]
+    private partial void LogRunTimeUnavailable(string tenantId);
 
     [LoggerMessage(LogLevel.Warning, "Package call work item {ItemId} for call {CallId} was discarded: the call is {CallState} and its instance is {InstanceState}.")]
     private partial void LogDiscarded(Guid itemId, Guid? callId, string? callState, string? instanceState);

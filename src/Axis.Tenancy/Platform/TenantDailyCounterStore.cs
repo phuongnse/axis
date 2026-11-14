@@ -48,6 +48,32 @@ public sealed class TenantDailyCounterStore(NpgsqlDataSource platform)
         return await command.ExecuteScalarAsync(cancellationToken) is not null;
     }
 
+    /// <summary>
+    /// Adds <paramref name="amount"/> to the counter of the tenant on <paramref name="day"/>, with no limit, and creates the day's row when it
+    /// does not exist yet. An amount of 0 or less writes nothing.
+    /// </summary>
+    public async Task AddAsync(string tenantId, string counter, DateOnly day, long amount, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(counter);
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        await using var command = platform.CreateCommand(
+            """
+            INSERT INTO platform.tenant_daily_counters AS c (tenant_id, day, counter, value)
+            VALUES (@tenant, @day, @counter, @amount)
+            ON CONFLICT (tenant_id, day, counter) DO UPDATE SET value = c.value + @amount
+            """);
+        command.Parameters.AddWithValue("tenant", tenantId);
+        command.Parameters.AddWithValue("day", day);
+        command.Parameters.AddWithValue("counter", counter);
+        command.Parameters.AddWithValue("amount", amount);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     /// <summary>The counter of the tenant on <paramref name="day"/>, or 0 when it has no row.</summary>
     public async Task<long> ValueAsync(string tenantId, string counter, DateOnly day, CancellationToken cancellationToken)
     {

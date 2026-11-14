@@ -7,6 +7,7 @@ using Axis.Data;
 using Axis.Data.Records;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
+using Axis.Tenancy;
 using Axis.Worker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,11 +23,13 @@ namespace Axis.Integration.Tests;
 /// docs/reference/extension-packages.md#an-applications-packages. The copy adds an integer field <c>runnerPid</c> and a text field <c>runnerFolder</c> to <c>Request</c> and these
 /// processes: <c>ApplicationPid</c>, which runs <c>python-test-package/pid</c> and writes the process id of its runner to <c>runnerPid</c> and the folder it runs from to <c>runnerFolder</c>,
 /// and <c>ApplicationProbeOwnOtherHost</c>, which runs <c>python-test-package/probe</c> in the mode <c>ownOtherHost</c>, whose request to a
-/// host that no <c>url</c> binding declares goes through the worker's egress proxy. Each release stores the package's built files, which are
+/// host that no <c>url</c> binding declares goes through the worker's egress proxy, <c>ApplicationSpin</c>, which runs <c>python-test-package/spin</c> for
+/// <see cref="SpinMilliseconds"/> CPU milliseconds, and <c>ApplicationSpinPastTimeout</c>, which spins for far longer than the operation's timeout. Each release stores the package's built files, which are
 /// the Python test package and its dependency laid out as a build leaves them. Tenant <c>a</c> holds two more releases. The first,
 /// <see cref="NoBuiltFilesReleaseA"/>, stores the source and no built file, as <c>activate</c> does. The second, <see cref="ChangedBuildReleaseA"/>,
 /// stores built files that differ by one file while the package's version stays the same. The workers have no installed package, run the
 /// packages of the two tenants and send an application's package to the host that the test sets in <c>Extensions:Runners:Application</c>.
+/// A worker for the tenant directory, see <see cref="DirectoryWorker"/>, reads both tenants from a platform database and, as part of a cell, counts the CPU seconds of the runners.
 /// The fixture starts no worker host, so a test runs the work items itself.
 /// </summary>
 public sealed class ApplicationPackageCallFixture : IAsyncLifetime
@@ -77,6 +80,32 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
               "type": "operation",
               "operation": "python-test-package/probe",
               "input": { "mode": "'ownOtherHost'" },
+              "next": "done"
+            },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
+
+    /// <summary>The CPU milliseconds that <c>ApplicationSpin</c> uses, which count as 2 seconds.</summary>
+    public const int SpinMilliseconds = 1200;
+
+    private const string SpinPastTimeoutMilliseconds = "30000";
+
+    private static string SpinProcess(string id, string name, string milliseconds) => $$"""
+        {
+          "id": "{{id}}",
+          "kind": "process",
+          "name": "{{name}}",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "spin",
+          "steps": [
+            {
+              "name": "spin",
+              "type": "operation",
+              "operation": "python-test-package/spin",
+              "input": { "milliseconds": "{{milliseconds}}" },
               "next": "done"
             },
             { "name": "done", "type": "end" }
@@ -135,7 +164,7 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
     /// calls on one worker. Its idle runners of an application's package stay until <paramref name="applicationIdleTime"/> has passed, or
     /// the default idle time when it is <see langword="null"/>.
     /// </summary>
-    internal ServiceProvider BuildWorker(string? applicationHost, TimeSpan? applicationIdleTime = null)
+    internal ServiceProvider BuildWorker(string? applicationHost, TimeSpan? applicationIdleTime = null, DirectoryWorker? directory = null)
     {
         var values = new Dictionary<string, string?>
         {
@@ -144,7 +173,8 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
             [PackageIsolation.ProxySetting] = "0",
             [ApplicationPackageSettings.RunnerSetting] = applicationHost,
         };
-        foreach (var tenant in new[] { TenantA, TenantB })
+        directory?.AddSettings(values);
+        foreach (var tenant in directory is null ? new[] { TenantA, TenantB } : [])
         {
             values[$"Tenants:{tenant}:Hosts:0"] = $"{tenant}.example.test";
             values[$"Tenants:{tenant}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(Tenant(tenant).ConnectionString);
@@ -156,8 +186,19 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
 
         var settings = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         var services = new ServiceCollection()
-            .AddLogging(logging => logging.AddProvider(Logs).SetMinimumLevel(LogLevel.Trace))
-            .AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Development", ContentRootPath = AppContext.BaseDirectory });
+            .AddLogging(logging => logging.AddProvider(Logs).SetMinimumLevel(LogLevel.Trace));
+        if (directory is not null)
+        {
+            services.AddSingleton(directory.Clock);
+        }
+
+        services.AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Development", ContentRootPath = AppContext.BaseDirectory });
+        if (directory is not null)
+        {
+            // The last registration wins, so the worker finds the tenants in the catalog that the test loaded.
+            services.AddSingleton<ITenantCatalog>(directory.Catalog);
+        }
+
         if (applicationIdleTime is not null)
         {
             services.AddSingleton(provider => new PackageRunnerPools(
@@ -168,6 +209,28 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
         }
 
         return services.BuildServiceProvider();
+    }
+
+    /// <summary>
+    /// Makes <see cref="BuildWorker"/> read the tenants from the platform database <paramref name="Platform"/> through <paramref name="Catalog"/>, as a worker of
+    /// a cell does, and count time with <paramref name="Clock"/>. The worker is part of a cell when <paramref name="Cell"/> is set. Its quota
+    /// <c>packageCpuSecondsPerDay</c> is <paramref name="PackageCpuSecondsPerDay"/>.
+    /// </summary>
+    internal sealed record DirectoryWorker(string Platform, DirectoryTenantCatalog Catalog, TimeProvider Clock, bool Cell, int PackageCpuSecondsPerDay = 3600)
+    {
+        internal void AddSettings(Dictionary<string, string?> values)
+        {
+            values["Tenancy:Source"] = "directory";
+            values["ConnectionStrings:Platform"] = PostgreSqlServer.RuntimeConnectionString(Platform);
+            values["Platform:SecretKey"] = TestPlatform.SecretKey;
+            values["Quotas:Defaults:packageCpuSecondsPerDay"] = PackageCpuSecondsPerDay.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (Cell)
+            {
+                values["Cell:Id"] = "vn-1";
+                values["Cell:Region"] = "vn";
+                values["Cell:TenantDomain"] = "vn.example.test";
+            }
+        }
     }
 
     /// <summary>
@@ -241,6 +304,12 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
 
         files.Add(new ResourceContent("processes/application-pid.json", PidProcess));
         files.Add(new ResourceContent("processes/application-probe-own-other-host.json", ProbeProcess));
+        files.Add(new ResourceContent(
+            "processes/application-spin.json",
+            SpinProcess("b6d03e84-5a17-4c2f-8e91-0f3a7d4c9b25", "ApplicationSpin", SpinMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture))));
+        files.Add(new ResourceContent(
+            "processes/application-spin-past-timeout.json",
+            SpinProcess("d1f58a07-9c3e-4b62-a470-2e8b6c1d3f94", "ApplicationSpinPastTimeout", SpinPastTimeoutMilliseconds)));
         var package = Path.Combine(AppContext.BaseDirectory, "PythonPackage", "package");
         foreach (var name in new[] { "axis-package.json", "adapter.py" })
         {
