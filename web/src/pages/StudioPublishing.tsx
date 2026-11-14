@@ -117,6 +117,7 @@ export function StudioPublishing({
   canTest,
   previewHost,
   sites,
+  resources = [],
   folderRevision,
   diagnostics,
   problemsOpen,
@@ -136,6 +137,8 @@ export function StudioPublishing({
   canTest: boolean
   previewHost: string | null
   sites: StudioResourceItem[]
+  /** The application's resources, which name the scenarios of a test run. */
+  resources?: readonly StudioResourceItem[]
   folderRevision: number
   diagnostics: StudioDiagnostic[]
   problemsOpen: boolean
@@ -319,7 +322,7 @@ export function StudioPublishing({
           {sendError !== null && <AxisAlert data-testid="studio-request-error" kind="error" message={sendError} />}
           {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
           {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (
-            <StudioTestResults request={request} onSelect={onOpenScenario} />
+            <StudioTestResults request={request} resources={resources} onSelect={onOpenScenario} />
           )}
           {previewLinks.length > 0 && (
             <Flex vertical gap={4}>

@@ -47,6 +47,8 @@ const pageId = id(3)
 const formId = id(4)
 const roleId = id(5)
 const policyId = id(6)
+/** The application's scenarios, which a request's checks run. */
+const scenarioIds: Record<string, string> = { RequestSavesWithSupplier: id(7), RequestIsApproved: id(8) }
 const firstEntityId = 100
 
 /** What a state's folder holds: its applications, resources and names. */
@@ -90,6 +92,9 @@ function items(folder: Folder): StudioResourceItem[] {
     resource(formId, 'form', 'RequestForm', 'forms/request-form.json', { [locale]: 'Request' }, 1),
     resource(roleId, 'role', 'Requester', 'roles/requester.json', { [locale]: 'Requester' }, 1),
     resource(policyId, 'policy', 'RequesterPolicy', 'policies/requester.json', { [locale]: 'Requester' }),
+    ...Object.entries(scenarioIds).map(([name, scenarioId]) =>
+      resource(scenarioId, 'scenario', name, `scenarios/${name}.json`, {}),
+    ),
   ]
 }
 
@@ -1097,7 +1102,7 @@ function checksOf(request: StudioAuthoringRequest, state: StudioAuthoringRequest
   }
   const scenario = (name: string, outcome: 'passed' | 'failed', message: string | null = null) => ({
     name,
-    resourceId: 'a5e00000-0000-4000-8000-000000000001',
+    resourceId: scenarioIds[name] ?? 'a5e00000-0000-4000-8000-000000000001',
     file: `scenarios/${name}.json`,
     outcome,
     durationMs: 140,

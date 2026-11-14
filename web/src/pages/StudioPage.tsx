@@ -573,6 +573,7 @@ function StudioWorkspace() {
             canTest={canTest}
             previewHost={previewHost}
             sites={resources.filter((item) => item.kind === 'site')}
+            resources={resources}
             folderRevision={folderRevision}
             diagnostics={loaded.diagnostics}
             problemsOpen={sidePanel === 'problems'}

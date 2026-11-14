@@ -602,7 +602,9 @@ export function StudioAuthoringRequestPage({
       {problems.length > 0 && (
         <StudioProblemList items={diagnosticItems(problems)} resources={resources} onSelect={onOpen} />
       )}
-      {request.checks !== null && <StudioTestResults request={request.checks} onSelect={onOpen} nested />}
+      {request.checks !== null && (
+        <StudioTestResults request={request.checks} resources={resources} onSelect={onOpen} nested />
+      )}
     </Flex>
   )
   const historyView = (

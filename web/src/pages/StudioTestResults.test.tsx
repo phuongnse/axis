@@ -3,7 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
-import type { StudioRequest, StudioScenarioResult, StudioSkippedScenarioResult } from '../platform/studio'
+import type {
+  StudioRequest,
+  StudioResourceItem,
+  StudioScenarioResult,
+  StudioSkippedScenarioResult,
+} from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioTestResults } from './StudioTestResults'
 
@@ -45,11 +50,21 @@ function request(overrides: Partial<StudioRequest>): StudioRequest {
   }
 }
 
+// The application's scenarios, which name each result.
+const resources: StudioResourceItem[] = [finance, approval].map((scenario) => ({
+  id: scenario.resourceId,
+  kind: 'scenario',
+  name: scenario.name,
+  file: scenario.file,
+  version: 'v1',
+  usedBy: 0,
+}))
+
 function renderResults(value: StudioRequest, onSelect = vi.fn()) {
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioTestResults request={value} onSelect={onSelect} />
+        <StudioTestResults request={value} resources={resources} onSelect={onSelect} />
       </TextProvider>
     </ThemeModeProvider>,
   )
@@ -69,30 +84,33 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     expect(screen.queryAllByTestId('studio-test-result')).toHaveLength(0)
   })
 
-  it('shows every scenario of a succeeded run as passed, with no button', () => {
-    const { section } = renderResults(request({ status: 'succeeded', scenarios: [finance] }))
+  // Proposed: a result's outcome is a status tag, and its scenario a link to its resource, see the review on #3263.
+  it('shows every scenario of a succeeded run as passed, its name a link that opens it', async () => {
+    const { section, onSelect } = renderResults(request({ status: 'succeeded', scenarios: [finance] }))
 
     expect(section).toHaveAttribute('data-status', 'succeeded')
     const rows = screen.getAllByTestId('studio-test-result')
     expect(rows).toHaveLength(1)
     expect(rows[0]).toHaveAttribute('data-outcome', 'passed')
-    expect(rows[0]).toHaveTextContent('FinanceApproval')
-    expect(rows[0]).toHaveTextContent('1234 ms')
-    expect(within(rows[0]).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(rows[0]).getByText('Passed')).toHaveAttribute('data-tone', 'success')
+    expect(rows[0]).toHaveTextContent(/FinanceApproval\s*Test scenario\s*1234 ms/)
+
+    await userEvent.click(within(rows[0]).getByRole('button', { name: 'FinanceApproval' }))
+    expect(onSelect).toHaveBeenCalledWith('7f1c2d3e-4a5b-4c6d-8e7f-9a0b1c2d3e4f', '')
   })
 
-  it('shows a failed scenario with its step and message, and opens it at the step when selected', async () => {
+  it('shows a failed scenario with its step and message, and its name opens it at the step', async () => {
     const { onSelect } = renderResults(request({ status: 'failed', scenarios: [finance, approval] }))
 
     const rows = screen.getAllByTestId('studio-test-result')
     expect(rows).toHaveLength(2)
     const failed = rows[1]
     expect(failed).toHaveAttribute('data-outcome', 'failed')
-    expect(failed).toHaveTextContent('ApprovalBelowThreshold')
+    expect(within(failed).getByText('Failed')).toHaveAttribute('data-tone', 'danger')
     expect(failed).toHaveTextContent('Step 6')
     expect(failed).toHaveTextContent('The record status is approved, not rejected.')
 
-    await userEvent.click(within(failed).getByRole('button'))
+    await userEvent.click(within(failed).getByRole('button', { name: 'ApprovalBelowThreshold' }))
     expect(onSelect).toHaveBeenCalledWith('09d75317-fd9e-411e-8322-317778fc1b2b', '/steps/5')
   })
 
@@ -112,7 +130,7 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     const rows = screen.getAllByTestId('studio-test-result')
     expect(rows).toHaveLength(2)
     expect(rows[0]).toHaveAttribute('data-outcome', 'skipped')
-    expect(rows[0]).toHaveTextContent('skipped')
+    expect(within(rows[0]).getByText('Skipped')).toHaveAttribute('data-tone', 'muted')
     expect(rows[0]).toHaveTextContent('department-budgets/ApprovalRecordsDecision')
     expect(rows[0]).toHaveTextContent('Relaxed point Budget/effects/decisionRecorded')
     expect(within(rows[0]).queryByRole('button')).not.toBeInTheDocument()
