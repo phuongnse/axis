@@ -24,6 +24,8 @@ namespace Axis.Configuration.Packages;
 [JsonDerivedType(typeof(BuildMessage), "build")]
 [JsonDerivedType(typeof(BuiltMessage), "built")]
 [JsonDerivedType(typeof(RefusedMessage), "refused")]
+[JsonDerivedType(typeof(TestMessage), "test")]
+[JsonDerivedType(typeof(TestedMessage), "tested")]
 public abstract record RunnerMessage;
 
 /// <summary>
@@ -76,6 +78,26 @@ public sealed record RefusedMessage(IReadOnlyList<BuildProblem> Problems) : Runn
 
 /// <summary>One problem of a refused build: the <paramref name="File"/> it is about and its <paramref name="Message"/>.</summary>
 public sealed record BuildProblem(string File, string Message);
+
+/// <summary>
+/// A caller asks the package host to build the package whose files are in <paramref name="Files"/>, as for <see cref="BuildMessage"/>,
+/// and then to run the package's own tests in the built copy.
+/// </summary>
+public sealed record TestMessage(Dictionary<string, byte[]> Files) : RunnerMessage;
+
+/// <summary>The host ran the package's tests. <paramref name="Tests"/> holds the outcome of each test that ran.</summary>
+public sealed record TestedMessage(IReadOnlyList<PackageTestOutcome> Tests) : RunnerMessage;
+
+/// <summary>
+/// The outcome of one test: its <paramref name="Name"/>, its <paramref name="Outcome"/>, <see cref="Passed"/> or <see cref="Failed"/>, and
+/// for a failed test the last line of its traceback in <paramref name="Message"/>, or <see langword="null"/>, which the line writes out.
+/// </summary>
+public sealed record PackageTestOutcome(string Name, string Outcome, [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)] string? Message)
+{
+    public const string Passed = "passed";
+
+    public const string Failed = "failed";
+}
 
 /// <summary>Writes and reads the lines of the runner protocol.</summary>
 public static class RunnerProtocol

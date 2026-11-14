@@ -13,7 +13,9 @@
     { "$ref": "#/$defs/sandbox" },
     { "$ref": "#/$defs/build" },
     { "$ref": "#/$defs/built" },
-    { "$ref": "#/$defs/refused" }
+    { "$ref": "#/$defs/refused" },
+    { "$ref": "#/$defs/test" },
+    { "$ref": "#/$defs/tested" }
   ],
   "$defs": {
     "values": {
@@ -129,6 +131,36 @@
       "properties": {
         "type": { "const": "built" },
         "files": { "$ref": "#/$defs/files" }
+      }
+    },
+    "test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "files"],
+      "properties": {
+        "type": { "const": "test" },
+        "files": { "$ref": "#/$defs/files" }
+      }
+    },
+    "tested": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "tests"],
+      "properties": {
+        "type": { "const": "tested" },
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "outcome", "message"],
+            "properties": {
+              "name": { "type": "string" },
+              "outcome": { "enum": ["passed", "failed"] },
+              "message": { "type": ["string", "null"], "maxLength": 1000 }
+            }
+          }
+        }
       }
     },
     "refused": {

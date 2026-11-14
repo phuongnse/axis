@@ -82,7 +82,7 @@ scripts/                  the scripts of AGENTS.md and the checks that lint runs
 - **`src/Axis.PackageHost/`**. The package host. Its `build` command checks, scans and writes a C#, Node.js or
   Python package, see [building a package](reference/extension-packages.md#building-a-package). Its `host`
   mode listens for runner protocol connections, starts a runner process for each and also builds a package that a
-  `build` message sends, and its `runner` mode
+  `build` message sends, and builds and tests one that a `test` message sends, and its `runner` mode
   runs one installed C# package version over [the runner protocol](reference/extension-packages.md#the-runner-protocol).
   For a Node.js package the host starts the runner in `sdk/node/` instead, and for a Python package the runner in
   `sdk/python/`.

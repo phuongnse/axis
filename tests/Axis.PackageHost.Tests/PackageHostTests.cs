@@ -10,6 +10,7 @@ using Axis.Configuration.Tests;
 using Json.Schema;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using PackageTestMessage = Axis.Configuration.Packages.TestMessage;
 
 namespace Axis.PackageHost.Tests;
 
@@ -29,6 +30,7 @@ public sealed class PackageHostTests : IAsyncLifetime
 {
     private const string PythonOnWindows = "The Python runner tests need python3 on the path.";
     private const string NodeProbe = "node-probe-package";
+    private const string NoFindings = """{ "Results": [] }""";
 
     private static readonly TimeSpan _deadline = TimeSpan.FromSeconds(90);
 
@@ -647,17 +649,147 @@ public sealed class PackageHostTests : IAsyncLifetime
         Assert.Null(await connection.ReceiveAsync());
     }
 
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task A_test_of_a_Python_package_answers_the_outcome_of_each_test_and_logs_it()
+    {
+        SkipOnWindows();
+        using var package = BuildTest.Python(NoFindings);
+        await using var host = await StartBuildHostAsync(package.Scripts);
+        var files = SourceFiles(package, new()
+        {
+            ["test_sample.py"] = Encoding.UTF8.GetBytes("""
+                import unittest
+
+                from adapter import greet
+
+
+                class SampleTests(unittest.TestCase):
+                    def test_greets(self):
+                        self.assertEqual(greet({'name': 'Axis'}, None), {'greeting': 'Hello, Axis'})
+
+                    def test_fails(self):
+                        self.assertEqual(1, 2)
+                """),
+        });
+        using var connection = Connect(host.Endpoint);
+
+        await connection.SendAsync(new PackageTestMessage(files));
+
+        var tested = Assert.IsType<TestedMessage>(await connection.ReceiveAsync());
+        Assert.Equal(2, tested.Tests.Count);
+        var passed = Assert.Single(tested.Tests, test => test.Name == "test_sample.SampleTests.test_greets");
+        Assert.Equal(PackageTestOutcome.Passed, passed.Outcome);
+        Assert.Null(passed.Message);
+        var failed = Assert.Single(tested.Tests, test => test.Name == "test_sample.SampleTests.test_fails");
+        Assert.Equal(PackageTestOutcome.Failed, failed.Outcome);
+        Assert.StartsWith("AssertionError", failed.Message, StringComparison.Ordinal);
+        Assert.Contains("Tested package python-test-package 1.0.0.", _log.Messages);
+        Assert.Null(await connection.ReceiveAsync());
+    }
+
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task A_test_of_a_Python_package_whose_requirements_do_not_install_is_refused_and_runs_no_test()
+    {
+        SkipOnWindows();
+        using var package = BuildTest.Python(NoFindings, _ => $"./wheels/{BuildTest.WheelName} --hash=sha256:{new string('0', 64)}\n");
+        using var markers = new TemporaryFolder();
+        var marker = Path.Combine(markers.Path, "imported");
+        await using var host = await StartBuildHostAsync(package.Scripts);
+        var files = SourceFiles(package, new()
+        {
+            ["test_marker.py"] = Encoding.UTF8.GetBytes($"open({JsonSerializer.Serialize(marker)}, 'w').close()\n"),
+        });
+        using var connection = Connect(host.Endpoint);
+
+        await connection.SendAsync(new PackageTestMessage(files));
+
+        var refused = Assert.IsType<RefusedMessage>(await connection.ReceiveAsync());
+        Assert.Equal("requirements.txt", Assert.Single(refused.Problems).File);
+        Assert.False(File.Exists(marker));
+        Assert.DoesNotContain(_log.Messages, message => message.StartsWith("Tested package", StringComparison.Ordinal));
+        Assert.Null(await connection.ReceiveAsync());
+    }
+
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task A_test_that_runs_past_the_limit_is_stopped_and_refused_at_the_manifest_and_its_copy_is_deleted()
+    {
+        SkipOnWindows();
+        using var package = BuildTest.Python(NoFindings);
+        using var markers = new TemporaryFolder();
+        var marker = Path.Combine(markers.Path, "folder");
+        await using var host = await StartBuildHostAsync(package.Scripts, testLimit: TimeSpan.FromSeconds(3));
+        var files = SourceFiles(package, new()
+        {
+            ["test_sleep.py"] = Encoding.UTF8.GetBytes($"""
+                import os
+                import time
+                import unittest
+
+
+                class SleepTests(unittest.TestCase):
+                    def test_sleeps(self):
+                        with open({JsonSerializer.Serialize(marker)}, 'w') as file:
+                            file.write(os.path.dirname(os.path.abspath(__file__)))
+                        time.sleep(600)
+                """),
+        });
+        using var connection = Connect(host.Endpoint);
+
+        await connection.SendAsync(new PackageTestMessage(files));
+
+        var refused = Assert.IsType<RefusedMessage>(await connection.ReceiveAsync());
+        Assert.Equal(PackageCatalog.ManifestFileName, Assert.Single(refused.Problems).File);
+        Assert.Null(await connection.ReceiveAsync());
+        Assert.False(Directory.Exists(await File.ReadAllTextAsync(marker, TestContext.Current.CancellationToken)));
+    }
+
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task A_test_of_a_Node_package_is_refused_with_one_problem_at_the_manifest()
+    {
+        SkipOnWindows();
+        using var scripts = new TemporaryFolder();
+        await using var host = await StartBuildHostAsync(scripts);
+        var folder = Path.Combine(AppContext.BaseDirectory, "NodeProbePackage");
+        var files = Directory.GetFiles(folder, "*", SearchOption.AllDirectories)
+            .ToDictionary(file => Path.GetRelativePath(folder, file).Replace('\\', '/'), File.ReadAllBytes);
+        using var connection = Connect(host.Endpoint);
+
+        await connection.SendAsync(new PackageTestMessage(files));
+
+        var refused = Assert.IsType<RefusedMessage>(await connection.ReceiveAsync());
+        Assert.Equal(PackageCatalog.ManifestFileName, Assert.Single(refused.Problems).File);
+        Assert.Null(await connection.ReceiveAsync());
+    }
+
+    /// <summary>Every file of the Python test package of <paramref name="package"/>, with its path that uses <c>/</c>, and the <paramref name="extra"/> files.</summary>
+    [UnsupportedOSPlatform("windows")]
+    private static Dictionary<string, byte[]> SourceFiles(BuildTest package, Dictionary<string, byte[]> extra)
+    {
+        var files = Directory.GetFiles(package.Source, "*", SearchOption.AllDirectories)
+            .ToDictionary(file => Path.GetRelativePath(package.Source, file).Replace('\\', '/'), File.ReadAllBytes);
+        foreach (var (path, content) in extra)
+        {
+            files[path] = content;
+        }
+
+        return files;
+    }
+
     private static string InitializerFolder => Path.Combine(AppContext.BaseDirectory, "TestPackages", TestPackages.InitializerBuild, "initializer-package", "1.0.0");
 
     /// <summary>A host whose Trivy is a stub that reports no vulnerabilities.</summary>
     [UnsupportedOSPlatform("windows")]
-    private async Task<BuildHost> StartBuildHostAsync(TemporaryFolder scripts)
+    private async Task<BuildHost> StartBuildHostAsync(TemporaryFolder scripts, TimeSpan? testLimit = null)
     {
         var trivy = Path.Combine(scripts.Path, "trivy");
         File.WriteAllText(trivy, "#!/bin/sh\necho '{}'\n");
         File.SetUnixFileMode(trivy, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["PackageBuild:Trivy"] = trivy }).Build();
-        var host = new RunnerHost(_extensions.Path, TestRunnerCommand.Create(), _log, configuration: configuration);
+        var host = new RunnerHost(_extensions.Path, TestRunnerCommand.Create(), _log, configuration: configuration, testLimit: testLimit);
         return new BuildHost(host, await host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None));
     }
 
@@ -870,6 +1002,7 @@ public sealed class PackageHostTests : IAsyncLifetime
     private sealed class CapturingLogger : ILogger<RunnerHost>
     {
         private readonly List<int> _started = [];
+        private readonly List<string> _messages = [];
 
         public IReadOnlyList<int> StartedRunners
         {
@@ -882,6 +1015,18 @@ public sealed class PackageHostTests : IAsyncLifetime
             }
         }
 
+        /// <summary>Every message that the host logged, as formatted.</summary>
+        public IReadOnlyList<string> Messages
+        {
+            get
+            {
+                lock (_started)
+                {
+                    return [.. _messages];
+                }
+            }
+        }
+
         public IDisposable? BeginScope<TState>(TState state)
             where TState : notnull => null;
 
@@ -889,6 +1034,11 @@ public sealed class PackageHostTests : IAsyncLifetime
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
+            lock (_started)
+            {
+                _messages.Add(formatter(state, exception));
+            }
+
             if (state is IReadOnlyList<KeyValuePair<string, object?>> values
                 && values.FirstOrDefault(pair => pair.Key == "ProcessId").Value is int processId)
             {

@@ -12,8 +12,11 @@ internal static class ExternalCommand
     /// <summary>The exit code and the text that the command wrote to its standard output and error.</summary>
     public sealed record Result(int ExitCode, string Output, string Error);
 
-    /// <summary>Runs the command and waits for it. Returns <c>null</c> when it cannot start, because the exception message would name the command.</summary>
-    public static async Task<Result?> RunAsync(string command, IEnumerable<string> arguments, string? workingDirectory, CancellationToken cancellationToken)
+    /// <summary>
+    /// Runs the command and waits for it. Returns <c>null</c> when it cannot start, because the exception message would name the command.
+    /// With <paramref name="emptyEnvironment"/> the command gets no environment variable, and is still found on the PATH of this program.
+    /// </summary>
+    public static async Task<Result?> RunAsync(string command, IEnumerable<string> arguments, string? workingDirectory, CancellationToken cancellationToken, bool emptyEnvironment = false)
     {
         var start = new ProcessStartInfo(command)
         {
@@ -24,6 +27,11 @@ internal static class ExternalCommand
         if (workingDirectory is not null)
         {
             start.WorkingDirectory = workingDirectory;
+        }
+
+        if (emptyEnvironment)
+        {
+            start.Environment.Clear();
         }
 
         foreach (var argument in arguments)
