@@ -455,6 +455,7 @@ export function StudioAuthoringRequestPage({
   const hasDiff = showsDiff && draft !== null
   const hasChecks = showsDiff && request.checks !== null
   const working = !['ready', 'accepted', 'failed', 'dropped'].includes(request.state)
+  const fixRound = request.round > 1 && working && request.state !== 'planning'
   const activeTab: RequestTab =
     tab?.id === requestId &&
     ((tab.key === 'changes' && hasDiff) ||
@@ -546,7 +547,6 @@ export function StudioAuthoringRequestPage({
             ))}
           </ul>,
         )}
-      {section('ai-request', t('shell.studio.aiRequest.asked'), quoted(request.text))}
       {request.plan !== null &&
         section(
           'ai-plan',
@@ -620,9 +620,11 @@ export function StudioAuthoringRequestPage({
 
   return (
     <Flex vertical gap="middle" data-testid="studio-ai-request">
+      {/* Proposed: the request's state beside the heading, and its words, signed by who sent it and the AIs that made it,
+          right under it, as what the page is about, see the review on #3263. */}
       <StudioPageHeading
         title={t('shell.studio.aiRequest.title')}
-        line={line}
+        tags={<StatusTag tone={requestStateTone(request.state)}>{stateWords(request)}</StatusTag>}
         actions={
           canDrop && !awaiting && !ready ? (
             <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
@@ -631,25 +633,30 @@ export function StudioAuthoringRequestPage({
           ) : undefined
         }
       />
-      {/* Proposed: where the request is, in one line under the heading, and its stages only while AI works. */}
+      <Flex vertical gap={spacing.xs} data-testid="studio-ai-asked">
+        {quoted(request.text)}
+        <Typography.Text style={{ color: colour.textMuted }}>{line}</Typography.Text>
+      </Flex>
+      {/* Proposed: while AI works, its stages, the fix round and what it does now, see the review on #3263. */}
       <Flex vertical gap="small" data-testid="studio-ai-progress">
         {stage !== null && working && <StepsBar titles={stageTitles} current={stage} />}
-        <Flex align="center" gap={spacing.sm}>
-          {following && !waitsForApp && <Spin size="small" />}
-          <StatusTag tone={requestStateTone(request.state)}>{stateWords(request)}</StatusTag>
-          {request.round > 1 && request.state !== 'planning' && (
-            <Typography.Text style={{ color: colour.textMuted }}>
-              {t('shell.studio.aiRequest.round').replace('{round}', String(request.round))}
-            </Typography.Text>
-          )}
-        </Flex>
-        {running !== undefined && following && !waitsForApp && (
-          <Typography.Text style={{ color: colour.textMuted }}>
-            {t('shell.studio.aiRequest.now').replace('{step}', running.summary)}
-          </Typography.Text>
-        )}
-        {request.state === 'planning' && !waitsForApp && (
-          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.aiRequest.planning')}</Typography.Text>
+        {/* One line while AI works: the spinner, what it does now, or that it writes the plan, and the fix round. */}
+        {(fixRound || (following && !waitsForApp)) && (
+          <Flex align="center" gap={spacing.sm} wrap>
+            {following && !waitsForApp && <Spin size="small" />}
+            {following && !waitsForApp && (running !== undefined || request.state === 'planning') && (
+              <Typography.Text style={{ color: colour.textMuted }}>
+                {request.state === 'planning' || running === undefined
+                  ? t('shell.studio.aiRequest.planning')
+                  : t('shell.studio.aiRequest.now').replace('{step}', running.summary)}
+              </Typography.Text>
+            )}
+            {fixRound && (
+              <Typography.Text style={{ color: colour.textMuted }}>
+                {t('shell.studio.aiRequest.round').replace('{round}', String(request.round))}
+              </Typography.Text>
+            )}
+          </Flex>
         )}
         {/* Proposed: with no AI of its author's here, only an outside app goes on with it, see the review on #3263. */}
         {waitsForApp && (

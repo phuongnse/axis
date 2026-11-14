@@ -103,7 +103,11 @@ describe('an outside AI app’s request', () => {
     )
 
     expect(await screen.findByText(/^Sent by you on .*, co-authored with Claude Code$/)).toBeInTheDocument()
-    expect(within(screen.getByTestId('studio-ai-progress')).getByText('Ready')).toBeInTheDocument()
+    expect(screen.getByText('Ready')).toHaveAttribute('data-tone', 'attention')
+    // The request's words, signed by who sent it, come right under the heading.
+    const asked = screen.getByTestId('studio-ai-asked')
+    expect(within(asked).getByText('Add a Cost centre field to the purchase request.')).toBeInTheDocument()
+    expect(within(asked).getByText(/^Sent by you on .*, co-authored with Claude Code$/)).toBeInTheDocument()
     expect(screen.getByTestId('studio-ai-plan')).toHaveTextContent('Add a Cost centre field')
     expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument()
     expect(screen.getByTestId('studio-ai-not-reviewed')).toHaveTextContent(
@@ -395,8 +399,8 @@ describe('a request in a fix round', () => {
       />,
     )
 
-    const progress = await screen.findByTestId('studio-ai-progress')
-    expect(await within(progress).findByText('Working')).toBeInTheDocument()
-    expect(within(progress).queryByText('Fixing')).toBeNull()
+    expect(await screen.findByText('Working')).toHaveAttribute('data-tone', 'neutral')
+    expect(screen.queryByText('Fixing')).toBeNull()
+    expect(within(screen.getByTestId('studio-ai-progress')).getByText('Fix round 2')).toBeInTheDocument()
   })
 })

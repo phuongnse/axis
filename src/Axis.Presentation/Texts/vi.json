@@ -2131,7 +2131,6 @@
   "shell.studio.aiRequest.appWorks": "Người gửi tiếp tục với nó trong {app}.",
   "shell.studio.aiRequest.notReviewedMine": "Chưa có AI thứ hai xem lại thay đổi này, vì bạn chưa kết nối AI của mình.",
   "shell.studio.aiRequest.notReviewed": "Chưa có AI thứ hai xem lại thay đổi này, vì người gửi chưa kết nối AI của họ.",
-  "shell.studio.aiRequest.asked": "Nội dung yêu cầu",
   "shell.studio.aiRequest.planning": "AI đang đọc ứng dụng và lập kế hoạch. Chưa có gì thay đổi cho đến khi kế hoạch được duyệt.",
   "shell.studio.aiRequest.plan": "Kế hoạch",
   "shell.studio.aiRequest.notYours": "Chỉ người gửi yêu cầu mới duyệt được kế hoạch.",

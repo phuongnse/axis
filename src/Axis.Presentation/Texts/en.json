@@ -2131,7 +2131,6 @@
   "shell.studio.aiRequest.appWorks": "Its author goes on with it in {app}.",
   "shell.studio.aiRequest.notReviewedMine": "No second AI reviewed this change, as you have not connected your AI.",
   "shell.studio.aiRequest.notReviewed": "No second AI reviewed this change, as its author has not connected their AI.",
-  "shell.studio.aiRequest.asked": "Request",
   "shell.studio.aiRequest.planning": "AI is reading the application and writing a plan. Nothing changes until the plan is approved.",
   "shell.studio.aiRequest.plan": "Plan",
   "shell.studio.aiRequest.notYours": "Only the person who sent the request approves its plan.",
