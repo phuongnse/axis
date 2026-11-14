@@ -1,6 +1,6 @@
 import { Flex, Form, Input, Modal, Spin, Typography } from 'antd'
 import { createContext, useContext, useEffect, useState, type HTMLAttributes, type ReactNode } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
@@ -17,6 +17,7 @@ import {
   fetchStudioRequest,
   findPreviewLinks,
   previewAuthoringDraft,
+  sendAuthoringRequest,
   ServerUnreachableError,
   type StudioAuthoringRequest,
   type StudioAuthoringRequestDetail,
@@ -180,6 +181,7 @@ export function StudioAuthoringRequestPage({
   previewHost?: string | null
 }) {
   const t = useText()
+  const navigate = useNavigate()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { colour, size, spacing } = useDesignTokens()
   const diagnosticItems = useDiagnosticItems()
@@ -192,6 +194,7 @@ export function StudioAuthoringRequestPage({
   const [actionError, setActionError] = useState(false)
   // Proposed: what the feed has unfolded, see the review on #3263.
   const [planOpen, setPlanOpen] = useState(false)
+  const [replyOpen, setReplyOpen] = useState(false)
   const [stepsOpen, setStepsOpen] = useState(false)
   const [checksOpen, setChecksOpen] = useState(false)
   const [changesOpen, setChangesOpen] = useState(false)
@@ -334,6 +337,7 @@ export function StudioAuthoringRequestPage({
       setAccepting(undefined)
       setFollow((value) => value + 1)
       setDropOpen(false)
+      setReplyOpen(false)
       replyForm.resetFields()
     } catch (error) {
       if (error instanceof ServerUnreachableError) {
@@ -456,6 +460,23 @@ export function StudioAuthoringRequestPage({
       setActing(false)
     }
   }
+  // Proposed: a failed request's author sends its words again as a new request and goes to it, see the review on #3263.
+  const sendAgain = async () => {
+    setActing(true)
+    setActionError(false)
+    try {
+      const next = await sendAuthoringRequest(application, request.text, request.autoAccept)
+      navigate(authoringRequestAddress(application, next.id))
+    } catch (error) {
+      if (error instanceof ServerUnreachableError) {
+        lost()
+      } else {
+        setActionError(true)
+      }
+    } finally {
+      setActing(false)
+    }
+  }
   const startPreview = async () => {
     setActionError(false)
     try {
@@ -500,7 +521,6 @@ export function StudioAuthoringRequestPage({
           t,
         )
       : null
-  const openBlocking = (request.review?.findings ?? []).filter((finding) => finding.blocking).length
 
   // Proposed: the request as one feed read from the top, as an AI agent's task is, see the review on #3263: its plan,
   // then AI's work, then the result, each an item with its mark, and the author's reply at the foot.
@@ -528,14 +548,6 @@ export function StudioAuthoringRequestPage({
       description={request.failure ?? undefined}
       data-testid="studio-ai-failure"
     />
-  )
-  const appWorks = waitsForApp && (
-    <Typography.Text style={{ color: colour.textMuted }} data-testid="studio-ai-app-works">
-      {t(mine ? 'shell.studio.aiRequest.appWorksMine' : 'shell.studio.aiRequest.appWorks').replaceAll(
-        '{app}',
-        request.app ?? '',
-      )}
-    </Typography.Text>
   )
   const nowLine = (words: ReactNode) => (
     <Flex align="center" gap={spacing.sm} wrap data-testid="studio-ai-now">
@@ -566,7 +578,7 @@ export function StudioAuthoringRequestPage({
           {t('shell.studio.aiRequest.planChange').replace('{comment}', step.summary ?? '')}
         </Typography.Text>
       ))}
-      {request.state === 'planning' && (waitsForApp ? appWorks : nowLine(t('shell.studio.aiRequest.planning')))}
+      {request.state === 'planning' && !waitsForApp && nowLine(t('shell.studio.aiRequest.planning'))}
       {failed && !approved && failure}
       {request.plan !== null &&
         (awaiting ? (
@@ -606,10 +618,9 @@ export function StudioAuthoringRequestPage({
       }
     >
       {working &&
-        (waitsForApp
-          ? appWorks
-          : following &&
-            nowLine(running === undefined ? t('shell.studio.aiRequest.feed.starting') : stepWords(running)))}
+        !waitsForApp &&
+        following &&
+        nowLine(running === undefined ? t('shell.studio.aiRequest.feed.starting') : stepWords(running))}
       {failed && approved && failure}
       {request.steps.length > 0 &&
         fold(
@@ -799,10 +810,121 @@ export function StudioAuthoringRequestPage({
       aside={request.finishedAt === null ? undefined : sentTime(request.finishedAt)}
     />
   )
-  // Proposed: the author replies to the plan or to the ready draft at the foot of the feed, as a comment on a pull
-  // request asks its agent for more, see the review on #3263.
-  const replyKind = mine && awaiting ? 'change-plan' : mine && ready && !acceptPending ? 'request-changes' : null
+  // Proposed: the author replies to the plan or to the ready draft under the feed, as a comment on a pull request asks
+  // its agent for more, see the review on #3263; it opens from its link, so the bar keeps the one main action.
+  const replyKind =
+    mine && awaiting
+      ? 'change-plan'
+      : mine && ready && !acceptPending && conflicts.length === 0
+        ? 'request-changes'
+        : null
   const asksChanges = replyKind === 'request-changes'
+  const blockingTexts = (request.review?.findings ?? [])
+    .filter((finding) => finding.blocking)
+    .map((finding) => finding.text)
+  const button = (key: string, role: 'secondary' | 'finish', words: string, onClick: () => void) => (
+    <AxisButton key={key} role={role} disabled={acting} onClick={onClick} data-testid={`studio-ai-bar-${key}`}>
+      {words}
+    </AxisButton>
+  )
+  const dropButton = canDrop
+    ? button('drop', 'secondary', t('shell.studio.aiRequest.drop'), () => setDropOpen(true))
+    : null
+  // Proposed: the bar at the foot of the window guides in every state, see the review on #3263: one sentence of what
+  // comes next in plain words, then at most one main action for it, so no one needs to read how the page works.
+  const guide = ((): { words: string; actions: ReactNode[] } => {
+    if (acceptPending) {
+      return { words: t('shell.studio.aiRequest.stepNow.accept'), actions: [] }
+    }
+    switch (request.state) {
+      case 'planning':
+      case 'working':
+      case 'checking':
+      case 'fixing':
+      case 'reviewing':
+        return {
+          words: waitsForApp
+            ? t(mine ? 'shell.studio.aiRequest.appWorksMine' : 'shell.studio.aiRequest.appWorks').replaceAll(
+                '{app}',
+                request.app ?? '',
+              )
+            : t(
+                request.state === 'planning'
+                  ? 'shell.studio.aiRequest.guide.planning'
+                  : 'shell.studio.aiRequest.guide.working',
+              ),
+          actions: [dropButton],
+        }
+      case 'awaitingApproval':
+        return mine
+          ? {
+              words: t('shell.studio.aiRequest.guide.awaiting'),
+              actions: [
+                dropButton,
+                button('approve', 'finish', t('shell.studio.aiRequest.approve'), () => void act('approve')),
+              ],
+            }
+          : { words: t('shell.studio.aiRequest.guide.awaitingOther'), actions: [] }
+      case 'ready':
+        if (!mine) {
+          return { words: t('shell.studio.aiRequest.guide.readyOther'), actions: [] }
+        }
+        if (conflicts.length > 0) {
+          return {
+            words: t('shell.studio.aiRequest.guide.conflict'),
+            actions: [
+              dropButton,
+              button('retry', 'finish', t('shell.studio.aiRequest.retry'), () => void act('retry')),
+            ],
+          }
+        }
+        if (blockingTexts.length > 0) {
+          return {
+            words: t(
+              blockingTexts.length === 1
+                ? 'shell.studio.aiRequest.guide.mustChangeOne'
+                : 'shell.studio.aiRequest.guide.mustChange',
+            ).replace('{count}', String(blockingTexts.length)),
+            actions: [
+              dropButton,
+              button('accept', 'secondary', t('shell.studio.aiRequest.accept'), () => void startAccept()),
+              // The review's must-change findings become the comment that asks AI for changes.
+              button(
+                'fix',
+                'finish',
+                t('shell.studio.aiRequest.fixIt'),
+                () =>
+                  void act(
+                    'request-changes',
+                    [t('shell.studio.aiRequest.fixComment'), ...blockingTexts.map((text) => `- ${text}`)].join('\n'),
+                  ),
+              ),
+            ],
+          }
+        }
+        return {
+          words: t('shell.studio.aiRequest.guide.passed'),
+          actions: [
+            dropButton,
+            button('accept', 'finish', t('shell.studio.aiRequest.accept'), () => void startAccept()),
+          ],
+        }
+      case 'failed':
+        return mine
+          ? {
+              words: t('shell.studio.aiRequest.guide.failed'),
+              actions: [
+                dropButton,
+                button('send-again', 'finish', t('shell.studio.aiRequest.sendAgain'), () => void sendAgain()),
+              ],
+            }
+          : { words: t('shell.studio.aiRequest.failed'), actions: [] }
+      case 'accepted':
+        return { words: t('shell.studio.aiRequest.guide.accepted'), actions: [] }
+      case 'dropped':
+        return { words: t('shell.studio.aiRequest.guide.dropped'), actions: [] }
+    }
+  })()
 
   return (
     <Flex vertical gap="middle" data-testid="studio-ai-request">
@@ -812,13 +934,6 @@ export function StudioAuthoringRequestPage({
         <StudioPageHeading
           title={requestTitle(request)}
           tags={<StatusTag tone={requestStateTone(request.state)}>{stateWords(request)}</StatusTag>}
-          actions={
-            canDrop && !awaiting && !ready ? (
-              <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
-                {t('shell.studio.aiRequest.drop')}
-              </AxisButton>
-            ) : undefined
-          }
         />
         {quoted(request.text)}
         <Typography.Text style={{ color: colour.textMuted }}>{line}</Typography.Text>
@@ -833,76 +948,56 @@ export function StudioAuthoringRequestPage({
             </FeedLast.Provider>
           ))}
       </ol>
-      {replyKind !== null && (
-        <Form
-          form={replyForm}
-          layout="vertical"
-          requiredMark={requiredMark}
-          onFinish={(values) => void act(replyKind, values.comment.trim())}
-          data-testid="studio-ai-reply"
-        >
-          <AxisField
-            name="comment"
-            label={t(asksChanges ? 'shell.studio.aiRequest.changesComment' : 'shell.studio.aiRequest.comment')}
-            help={t(asksChanges ? 'shell.studio.aiRequest.changesComment.help' : 'shell.studio.aiRequest.comment.help')}
-            requiredMessage={t(
-              asksChanges ? 'shell.studio.aiRequest.changesCommentRequired' : 'shell.studio.aiRequest.commentRequired',
-            )}
+      {replyKind !== null &&
+        (replyOpen ? (
+          <Form
+            form={replyForm}
+            layout="vertical"
+            requiredMark={requiredMark}
+            onFinish={(values) => void act(replyKind, values.comment.trim())}
+            data-testid="studio-ai-reply"
           >
-            <Input.TextArea
-              aria-label={t(asksChanges ? 'shell.studio.aiRequest.changesComment' : 'shell.studio.aiRequest.comment')}
-              autoSize={{ minRows: 2, maxRows: 8 }}
-              maxLength={2000}
-            />
-          </AxisField>
-          <AxisButton role="secondary" htmlType="submit" disabled={acting}>
-            {t(asksChanges ? 'shell.studio.aiRequest.requestChanges.ok' : 'shell.studio.aiRequest.changePlan.ok')}
-          </AxisButton>
-        </Form>
-      )}
-      {/* Proposed: approving the plan sits in the bar at the foot of the window, as accepting does, see the review on
-          #3263. */}
-      {awaiting && mine && (
-        <ActionBar testId="studio-ai-plan-bar">
-          <span>{t('shell.studio.aiRequest.bar.awaiting')}</span>
-          <AxisActionRow align="center">
-            <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
-              {t('shell.studio.aiRequest.drop')}
-            </AxisButton>
-            <AxisButton role="finish" disabled={acting} onClick={() => void act('approve')}>
-              {t('shell.studio.aiRequest.approve')}
-            </AxisButton>
-          </AxisActionRow>
-        </ActionBar>
-      )}
-      {/* What finishes the page's task, accepting the draft, sits in the bar at the foot of the window. */}
-      {ready && mine && !acceptPending && (
-        <ActionBar testId="studio-ai-request-bar">
+            <AxisField
+              name="comment"
+              label={t(asksChanges ? 'shell.studio.aiRequest.changesComment' : 'shell.studio.aiRequest.comment')}
+              help={t(
+                asksChanges ? 'shell.studio.aiRequest.changesComment.help' : 'shell.studio.aiRequest.comment.help',
+              )}
+              requiredMessage={t(
+                asksChanges
+                  ? 'shell.studio.aiRequest.changesCommentRequired'
+                  : 'shell.studio.aiRequest.commentRequired',
+              )}
+            >
+              <Input.TextArea
+                aria-label={t(asksChanges ? 'shell.studio.aiRequest.changesComment' : 'shell.studio.aiRequest.comment')}
+                autoSize={{ minRows: 2, maxRows: 8 }}
+                maxLength={2000}
+                autoFocus
+              />
+            </AxisField>
+            <AxisActionRow>
+              <AxisButton role="secondary" htmlType="submit" disabled={acting}>
+                {t(asksChanges ? 'shell.studio.aiRequest.requestChanges.ok' : 'shell.studio.aiRequest.changePlan.ok')}
+              </AxisButton>
+              <AxisButton role="secondary" onClick={() => setReplyOpen(false)}>
+                {t('shell.studio.cancel')}
+              </AxisButton>
+            </AxisActionRow>
+          </Form>
+        ) : (
           <span>
-            {openBlocking > 0
-              ? t(
-                  openBlocking === 1
-                    ? 'shell.studio.aiRequest.bar.oneMustChange'
-                    : 'shell.studio.aiRequest.bar.mustChange',
-                ).replace('{count}', String(openBlocking))
-              : t('shell.studio.aiRequest.bar.passed')}
-          </span>
-          <AxisActionRow align="center">
-            <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
-              {t('shell.studio.aiRequest.drop')}
+            <AxisButton role="link" onClick={() => setReplyOpen(true)} data-testid="studio-ai-reply-open">
+              {t(asksChanges ? 'shell.studio.aiRequest.askOther' : 'shell.studio.aiRequest.changePlan')}
             </AxisButton>
-            {conflicts.length > 0 ? (
-              <AxisButton role="finish" disabled={acting} onClick={() => void act('retry')}>
-                {t('shell.studio.aiRequest.retry')}
-              </AxisButton>
-            ) : (
-              <AxisButton role="finish" disabled={acting} onClick={() => void startAccept()}>
-                {t('shell.studio.aiRequest.accept')}
-              </AxisButton>
-            )}
-          </AxisActionRow>
-        </ActionBar>
-      )}
+          </span>
+        ))}
+      <ActionBar testId="studio-ai-bar">
+        <span data-testid="studio-ai-guide">{guide.words}</span>
+        {guide.actions.some((action) => action !== null) && (
+          <AxisActionRow align="center">{guide.actions}</AxisActionRow>
+        )}
+      </ActionBar>
       <Modal
         open={dropOpen}
         width={size.dialog.small}
