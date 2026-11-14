@@ -2172,7 +2172,7 @@
   "shell.studio.aiRequest.step.work": "Thực hiện thay đổi trên bản nháp",
   "shell.studio.aiRequest.step.check": "Biên dịch bản nháp và chạy các kịch bản kiểm thử",
   "shell.studio.aiRequest.step.fix": "Sửa những gì kiểm tra và rà soát phát hiện",
-  "shell.studio.aiRequest.step.review": "Rà soát bản nháp theo yêu cầu và kế hoạch",
+  "shell.studio.aiRequest.step.review": "Rà soát bản nháp",
   "shell.studio.aiRequest.step.accept": "Chấp nhận bản nháp",
   "shell.studio.aiRequest.step.proposePlan": "Đề xuất kế hoạch",
   "shell.studio.aiRequest.step.write": "Ghi {resource}",
