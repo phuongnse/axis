@@ -537,6 +537,13 @@ The server reads `Extensions:Isolation`, and the worker reads all five settings:
 | `Extensions:Runners:Python` | `Extensions__Runners__Python` | none | The `host:port` of the Python package host, with the same forms. Unset, every `python` attempt is retryable, with `inProcess` too. A value that is not a `host:port` stops the worker at start |
 | `Extensions:Runners:ProxyPort` | `Extensions__Runners__ProxyPort` | `5311` | The port of the worker's egress proxy for the runners, a whole number from 0 to 65535. `0` picks a free port. Any other value stops the worker at start |
 
+The package host in host mode reads two settings of its own:
+
+| Setting | Environment variable | Default | Meaning |
+| --- | --- | --- | --- |
+| `PackageHost:Port` | `PackageHost__Port` | `5310` | The port the host listens on, a whole number from 1 to 65535. Any other value stops the host at start with exit code 2 |
+| `PackageHost:Address` | `PackageHost__Address` | every interface | The IP address the host listens on. A value that is not an IP address stops the host at start with exit code 2 |
+
 ### The runner protocol
 
 The worker and every runner speak one protocol that no language owns. A small SDK for each language
