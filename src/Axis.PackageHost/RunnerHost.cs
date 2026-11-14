@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Axis.Configuration.Packages;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Axis.PackageHost;
@@ -26,13 +27,25 @@ namespace Axis.PackageHost;
 /// kills the runner and its child processes, and a runner that exits closes the connection. The host logs the
 /// runner's process id, package and version, and no message. The first line may instead be a <c>sandbox</c> question with no
 /// <c>gvisor</c>. The host answers it from <paramref name="sandbox"/>, closes the connection and starts no runner.
+/// The first line may also be a <c>build</c>, which may be longer than the other first lines, up to <see cref="MaxBuildLine"/> bytes.
+/// The host writes its files into a temporary copy and runs the checks of <see cref="PackageChecks"/> on it, with the manifest read
+/// as metadata only and with <paramref name="configuration"/> for the settings of pip and Trivy. It answers <c>built</c> with
+/// the files of the built copy, without symbolic links, or <c>refused</c> with each problem, then closes the connection. It
+/// writes nothing under the extensions folder, starts no runner and deletes its copies whatever the answer. A path that is not
+/// a relative path inside the package is refused before anything is written. A build that cannot run is logged, and the
+/// connection closes with no answer.
 /// </summary>
-internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands commands, ILogger<RunnerHost> logger, Sandbox? sandbox = null) : IAsyncDisposable
+internal sealed partial class RunnerHost(
+    string extensionsRoot, RunnerCommands commands, ILogger<RunnerHost> logger, Sandbox? sandbox = null, IConfiguration? configuration = null) : IAsyncDisposable
 {
-    /// <summary>The longest <c>start</c> line the host reads, in bytes.</summary>
+    /// <summary>The longest line the host reads as the first line of a connection, other than a <c>build</c>, in bytes.</summary>
     private const int MaxStartLine = 4096;
 
+    /// <summary>The longest <c>build</c> line the host reads, in bytes.</summary>
+    private const int MaxBuildLine = 64 * 1024 * 1024;
+
     private readonly Sandbox _sandbox = sandbox ?? Sandbox.ForThisMachine();
+    private readonly IConfiguration _configuration = configuration ?? new ConfigurationBuilder().Build();
     private readonly CancellationTokenSource _stopping = new();
     private readonly ConcurrentDictionary<int, Task> _connections = new();
     private TcpListener? _listener;
@@ -116,6 +129,12 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands c
                     return;
                 }
 
+                if (started.Build is not null)
+                {
+                    await BuildAsync(started.Build, client.GetStream());
+                    return;
+                }
+
                 if (started.Start is null)
                 {
                     await AnswerSandboxAsync(client.GetStream());
@@ -149,43 +168,63 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands c
     }
 
     /// <summary>
-    /// Reads the first line. Returns the <c>start</c> it holds with the language of its manifest, or a <see langword="null"/>
-    /// <c>Start</c> for a <c>sandbox</c> question. Returns <see langword="null"/> when the connection ends
-    /// first or the line is too long, is neither, names an id or version that is not well formed, or names a
-    /// version that is not installed. Bytes after the line stay in the reader.
+    /// What the first line asked for: a <see cref="Start"/> with the language of its manifest, a <see cref="Build"/>, or, with neither, a
+    /// <c>sandbox</c> question.
     /// </summary>
-    private async Task<(StartMessage? Start, PackageLanguage Language)?> ReadFirstAsync(PipeReader reader)
+    private sealed record FirstLine(StartMessage? Start, PackageLanguage Language, BuildMessage? Build);
+
+    /// <summary>
+    /// Reads the first line. Returns the <c>start</c> it holds with the language of its manifest, the <c>build</c> it holds, or a
+    /// <c>FirstLine</c> with neither for a <c>sandbox</c> question. Returns <see langword="null"/> when the connection ends
+    /// first or the line is too long, is none of these, names an id or version that is not well formed, or names a
+    /// version that is not installed. Only a <c>build</c> may be longer than <see cref="MaxStartLine"/>. Bytes after the line stay in the reader.
+    /// </summary>
+    private async Task<FirstLine?> ReadFirstAsync(PipeReader reader)
     {
+        // The bytes that hold no line break yet are not searched again, so a long line costs one pass.
+        long searched = 0;
         while (true)
         {
             var result = await reader.ReadAsync(_stopping.Token);
             var buffer = result.Buffer;
-            var end = buffer.PositionOf((byte)'\n');
+            var end = buffer.Slice(searched).PositionOf((byte)'\n');
             if (end is { } position)
             {
-                var line = Encoding.UTF8.GetString(buffer.Slice(0, position));
+                var line = buffer.Slice(0, position);
+                var first = Parse(line);
                 reader.AdvanceTo(buffer.GetPosition(1, position));
-                return Parse(line);
+                return first;
             }
 
-            if (result.IsCompleted || buffer.Length > MaxStartLine)
+            if (result.IsCompleted || buffer.Length > MaxBuildLine)
             {
                 reader.AdvanceTo(buffer.End);
                 return null;
             }
 
+            searched = buffer.Length;
             reader.AdvanceTo(buffer.Start, buffer.End);
         }
     }
 
-    private (StartMessage? Start, PackageLanguage Language)? Parse(string line)
+    private FirstLine? Parse(ReadOnlySequence<byte> line)
     {
         try
         {
             var message = RunnerProtocol.Read(line);
+            if (message is BuildMessage build)
+            {
+                return new FirstLine(null, default, build);
+            }
+
+            if (line.Length > MaxStartLine)
+            {
+                return null;
+            }
+
             if (message is SandboxMessage { Gvisor: null })
             {
-                return (null, default);
+                return new FirstLine(null, default, null);
             }
 
             return message is StartMessage start
@@ -193,13 +232,124 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands c
                 && VersionPattern().IsMatch(start.Version)
                 && PackageIsolation.TryParseHostPort(start.Proxy, out _, out _)
                 && PackageCatalog.ReadInstalledManifest(extensionsRoot, start.Package, start.Version) is { } manifest
-                    ? (start, manifest.Language)
+                    ? new FirstLine(start, manifest.Language, null)
                     : null;
         }
         catch (JsonException)
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Builds the package in <paramref name="build"/> as <see cref="PackageChecks"/> builds one, in a temporary copy that is deleted
+    /// afterwards, and answers <c>built</c> or <c>refused</c>. A build that cannot run is logged and gets no answer.
+    /// </summary>
+    private async Task BuildAsync(BuildMessage build, Stream socket)
+    {
+        if (BadPaths(build.Files.Keys) is { Count: > 0 } badPaths)
+        {
+            await AnswerRefusedAsync(socket, badPaths);
+            return;
+        }
+
+        var copy = Directory.CreateTempSubdirectory("axis-package-build-").FullName;
+        try
+        {
+            if (!Write(build.Files, copy, out var unwritable))
+            {
+                await AnswerRefusedAsync(socket, unwritable);
+                return;
+            }
+
+            using var outcome = await PackageChecks.RunAsync(_configuration, copy, PackageLoadMode.MetadataOnly, extensions: null, _stopping.Token);
+            if (outcome.SetupError is not null)
+            {
+                LogBuildNotRun(outcome.SetupError);
+                return;
+            }
+
+            if (outcome.Problems.Count > 0)
+            {
+                await AnswerRefusedAsync(socket, [.. outcome.Problems.Select(problem => new BuildProblem(problem.File, problem.Message))]);
+                return;
+            }
+
+            var built = await ReadFilesAsync(outcome.Folder!);
+            await RunnerProtocol.WriteAsync(socket, new BuiltMessage(built), _stopping.Token);
+            LogBuilt(outcome.Manifest!.Id, outcome.Manifest.Version);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(copy, recursive: true);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // A temporary folder that stays is left to the operating system.
+            }
+        }
+    }
+
+    private async Task AnswerRefusedAsync(Stream socket, List<BuildProblem> problems)
+    {
+        await RunnerProtocol.WriteAsync(socket, new RefusedMessage(problems), _stopping.Token);
+        LogBuildRefused(problems.Count);
+    }
+
+    /// <summary>One problem for each path that is not a relative path inside the package.</summary>
+    private static List<BuildProblem> BadPaths(IEnumerable<string> paths) =>
+        [.. paths
+            .Where(path => path.Length == 0
+                || Path.IsPathRooted(path)
+                || path.Contains('\\')
+                || path.Contains('\0')
+                || path.Split('/').Any(segment => segment is "" or "." or ".."))
+            .Select(path => new BuildProblem(path, $"The path '{path}' is not a relative path inside the package."))];
+
+    /// <summary>Writes the files into <paramref name="folder"/>. Returns <see langword="false"/> with a problem for the path that cannot be written.</summary>
+    private static bool Write(Dictionary<string, byte[]> files, string folder, out List<BuildProblem> problems)
+    {
+        problems = [];
+        var root = Path.GetFullPath(folder) + Path.DirectorySeparatorChar;
+        foreach (var (path, content) in files)
+        {
+            var destination = Path.GetFullPath(Path.Combine(folder, path));
+            if (!destination.StartsWith(root, StringComparison.Ordinal))
+            {
+                problems.Add(new BuildProblem(path, $"The path '{path}' is not a relative path inside the package."));
+                return false;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.WriteAllBytes(destination, content);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                // The exception message names the absolute path, so it is never passed on.
+                problems.Add(new BuildProblem(path, $"The file '{path}' cannot be written, for example because another file uses its name as a folder."));
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Every file under <paramref name="folder"/>, with its path relative to it that uses <c>/</c>. Symbolic links are left out, because one could point outside the folder.</summary>
+    private async Task<Dictionary<string, byte[]>> ReadFilesAsync(string folder)
+    {
+        var options = new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint };
+        var files = new Dictionary<string, byte[]>();
+        foreach (var file in Directory.EnumerateFiles(folder, "*", options))
+        {
+            var relative = Path.GetRelativePath(folder, file).Replace(Path.DirectorySeparatorChar, '/');
+            files[relative] = await File.ReadAllBytesAsync(file, _stopping.Token);
+        }
+
+        return files;
     }
 
     /// <summary>
@@ -332,6 +482,15 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands c
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Answered a sandbox question: gVisor {Gvisor}.")]
     private partial void LogSandboxAnswered(bool gvisor);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Built package {Package} {Version}.")]
+    private partial void LogBuilt(string package, string version);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Refused a package build with {Count} problems.")]
+    private partial void LogBuildRefused(int count);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "A package build could not run: {Reason}")]
+    private partial void LogBuildNotRun(string reason);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Runner {ProcessId} started for package {Package} {Version}.")]
     private partial void LogStarted(int processId, string package, string version);

@@ -8,6 +8,7 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Tests;
 using Json.Schema;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Axis.PackageHost.Tests;
@@ -598,6 +599,73 @@ public sealed class PackageHostTests : IAsyncLifetime
 
         Assert.Null(await connection.ReceiveAsync());
         Assert.Empty(_log.StartedRunners);
+    }
+
+    [Theory]
+    [InlineData("../evil.py")]
+    [InlineData("/abs.py")]
+    [UnsupportedOSPlatform("windows")]
+    public async Task A_build_with_a_path_outside_the_package_is_refused_naming_the_path_and_writes_no_file(string path)
+    {
+        SkipOnWindows();
+        using var scripts = new TemporaryFolder();
+        await using var host = await StartBuildHostAsync(scripts);
+        var outside = Path.GetFullPath(path, Path.Combine(Path.GetTempPath(), "axis-copy"));
+        using var connection = Connect(host.Endpoint);
+
+        await connection.SendAsync(new BuildMessage(new()
+        {
+            ["axis-package.json"] = File.ReadAllBytes(Path.Combine(InitializerFolder, "axis-package.json")),
+            [path] = "print('evil')"u8.ToArray(),
+        }));
+
+        var refused = Assert.IsType<RefusedMessage>(await connection.ReceiveAsync());
+        var problem = Assert.Single(refused.Problems);
+        Assert.Equal(path, problem.File);
+        Assert.Contains(path, problem.Message, StringComparison.Ordinal);
+        Assert.False(File.Exists(outside));
+        Assert.Null(await connection.ReceiveAsync());
+    }
+
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task A_build_of_a_C_sharp_package_answers_its_files_and_runs_none_of_its_code_in_the_host()
+    {
+        SkipOnWindows();
+        using var scripts = new TemporaryFolder();
+        await using var host = await StartBuildHostAsync(scripts);
+        var files = Directory.GetFiles(InitializerFolder, "*", SearchOption.AllDirectories)
+            .ToDictionary(file => Path.GetRelativePath(InitializerFolder, file).Replace('\\', '/'), File.ReadAllBytes);
+        using var connection = Connect(host.Endpoint);
+
+        await connection.SendAsync(new BuildMessage(files));
+
+        var built = Assert.IsType<BuiltMessage>(await connection.ReceiveAsync());
+        Assert.Contains("axis-package.json", built.Files.Keys);
+        Assert.DoesNotContain(built.Files.Keys, name => name.EndsWith(".marker", StringComparison.Ordinal));
+        Assert.False(Directory.Exists(Path.Combine(_extensions.Path, "initializer-package")));
+        Assert.Null(await connection.ReceiveAsync());
+    }
+
+    private static string InitializerFolder => Path.Combine(AppContext.BaseDirectory, "TestPackages", TestPackages.InitializerBuild, "initializer-package", "1.0.0");
+
+    /// <summary>A host whose Trivy is a stub that reports no vulnerabilities.</summary>
+    [UnsupportedOSPlatform("windows")]
+    private async Task<BuildHost> StartBuildHostAsync(TemporaryFolder scripts)
+    {
+        var trivy = Path.Combine(scripts.Path, "trivy");
+        File.WriteAllText(trivy, "#!/bin/sh\necho '{}'\n");
+        File.SetUnixFileMode(trivy, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["PackageBuild:Trivy"] = trivy }).Build();
+        var host = new RunnerHost(_extensions.Path, TestRunnerCommand.Create(), _log, configuration: configuration);
+        return new BuildHost(host, await host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None));
+    }
+
+    private sealed class BuildHost(RunnerHost host, IPEndPoint endpoint) : IAsyncDisposable
+    {
+        public IPEndPoint Endpoint { get; } = endpoint;
+
+        public ValueTask DisposeAsync() => host.DisposeAsync();
     }
 
     /// <summary>

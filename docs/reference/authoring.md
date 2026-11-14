@@ -635,7 +635,7 @@ references is saved, and the diagnostics list the broken references.
 
 - **Compiled in memory.** The folder is compiled in memory against the extension packages installed
   under `Extensions:Path` and the modules installed under `Modules:Path`, see
-  [extension packages](extension-packages.md#declaring-packages-in-an-application) and
+  [extension packages](declaring-packages.md#declaring-packages-in-an-application) and
   [modules](modules-and-templates.md#modules). No database is touched.
 - **Shape.** The codes, severities and fields are those of
   [startup activation](host-settings.md#startup-activation). Each diagnostic is

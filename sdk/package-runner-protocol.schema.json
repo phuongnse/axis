@@ -10,7 +10,10 @@
     { "$ref": "#/$defs/retryable" },
     { "$ref": "#/$defs/failure" },
     { "$ref": "#/$defs/stop" },
-    { "$ref": "#/$defs/sandbox" }
+    { "$ref": "#/$defs/sandbox" },
+    { "$ref": "#/$defs/build" },
+    { "$ref": "#/$defs/built" },
+    { "$ref": "#/$defs/refused" }
   ],
   "$defs": {
     "values": {
@@ -20,6 +23,10 @@
     "bindingValues": {
       "type": "object",
       "additionalProperties": { "type": "string" }
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "contentEncoding": "base64" }
     },
     "start": {
       "type": "object",
@@ -104,6 +111,45 @@
       "properties": {
         "type": { "const": "sandbox" },
         "gvisor": { "type": "boolean" }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "files"],
+      "properties": {
+        "type": { "const": "build" },
+        "files": { "$ref": "#/$defs/files" }
+      }
+    },
+    "built": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "files"],
+      "properties": {
+        "type": { "const": "built" },
+        "files": { "$ref": "#/$defs/files" }
+      }
+    },
+    "refused": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "problems"],
+      "properties": {
+        "type": { "const": "refused" },
+        "problems": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["file", "message"],
+            "properties": {
+              "file": { "type": "string" },
+              "message": { "type": "string" }
+            }
+          }
+        }
       }
     }
   }

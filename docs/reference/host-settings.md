@@ -33,7 +33,7 @@ goes live through [`Axis.Admin activate`](administration.md#activate) or the
   migrations either, see [tenancy settings](#tenancy-settings).
 - **Packages and modules.** Each folder compiles against the extension packages installed under
   `Extensions:Path` and the modules installed under `Modules:Path`, see
-  [extension packages](extension-packages.md#declaring-packages-in-an-application) and
+  [extension packages](declaring-packages.md#declaring-packages-in-an-application) and
   [modules](modules-and-templates.md#modules). When a newer version in a range was installed since
   the last start, the folder compiles to a new release pinned to it, and that release is activated.
   A release that pins a module also holds the module's files.

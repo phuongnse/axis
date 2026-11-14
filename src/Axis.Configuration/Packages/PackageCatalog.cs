@@ -109,12 +109,13 @@ public sealed class PackageCatalog
     /// <summary>
     /// Checks one package folder as <see cref="Load"/> checks each version folder, but without the folder name
     /// check, because the folder is not yet named by the package's id and version. The diagnostics' file is
-    /// <c>axis-package.json</c>. The assembly of a C# package is loaded to check it.
+    /// <c>axis-package.json</c>. With <see cref="PackageLoadMode.Run"/> the assembly of a C# package is loaded to check it. With
+    /// <see cref="PackageLoadMode.MetadataOnly"/> it is read as metadata and no package code runs.
     /// </summary>
-    public static PackageFolderCheck CheckFolder(string folder)
+    public static PackageFolderCheck CheckFolder(string folder, PackageLoadMode mode = PackageLoadMode.Run)
     {
         var diagnostics = new List<Diagnostic>();
-        var package = LoadPackage(folder, null, null, ManifestFileName, "Package source", PackageLoadMode.Run, diagnostics);
+        var package = LoadPackage(folder, null, null, ManifestFileName, "Package source", mode, diagnostics);
         return new PackageFolderCheck(package, DiagnosticOrder.Sort(diagnostics));
     }
 
