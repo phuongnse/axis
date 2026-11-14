@@ -643,6 +643,7 @@ function StudioWorkspace() {
                     userId={userId}
                     resources={resources}
                     onOpen={selectDiagnostic}
+                    previewHost={previewHost}
                   />
                 ) : (
                   <StudioAuthoringRequests application={application!} userId={userId} />

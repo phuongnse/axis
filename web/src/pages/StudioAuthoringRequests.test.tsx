@@ -6,6 +6,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { StudioAuthoringRequestDetail, StudioAuthoringRequestStep } from '../platform/studio'
 import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
+import { ThemeModeProvider } from '../platform/theme'
 import { requestTitle } from './authoringRequests'
 import { StudioAuthoringRequestPage, StudioAuthoringRequests } from './StudioAuthoringRequests'
 
@@ -80,9 +81,11 @@ function stub(answer: unknown) {
 function renderIn(children: React.ReactNode) {
   render(
     <MemoryRouter>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        {children}
-      </TextProvider>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          {children}
+        </TextProvider>
+      </ThemeModeProvider>
     </MemoryRouter>,
   )
 }
@@ -118,7 +121,7 @@ describe('an outside AI app’s request', () => {
     expect(within(asked).getByText('Ready')).toHaveAttribute('data-tone', 'attention')
     expect(within(asked).getByText('Add a Cost centre field to the purchase request.')).toBeInTheDocument()
     expect(within(asked).getByText(/^Sent by you on .*, co-authored with Claude Code$/)).toBeInTheDocument()
-    await userEvent.setup().click(screen.getByRole('tab', { name: 'Plan' }))
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Show the plan' }))
     expect(await screen.findByTestId('studio-ai-plan')).toHaveTextContent(
       'A Cost centre field on each purchase request.',
     )
@@ -144,11 +147,9 @@ describe('an outside AI app’s request while it works', () => {
 
     expect(await screen.findByText('Working')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-ai-app-works')).toBeNull()
-    // Every request goes through the same frame, whichever way it began.
-    const progress = screen.getByTestId('studio-ai-progress')
-    for (const stage of ['Plan', 'Approval', 'Change', 'Checks', 'Review', 'Ready']) {
-      expect(within(progress).getByText(stage)).toBeInTheDocument()
-    }
+    // Every request reads as the same feed, whichever way it began: its plan done, AI's work going on.
+    expect(screen.getByTestId('studio-ai-feed-plan')).toHaveAttribute('data-mark', 'done')
+    expect(screen.getByTestId('studio-ai-feed-work')).toHaveAttribute('data-mark', 'now')
     vi.unstubAllGlobals()
   })
 
@@ -171,7 +172,7 @@ describe('an outside AI app’s request while it works', () => {
     expect(await screen.findByTestId('studio-ai-app-works')).toHaveTextContent(
       'Connect your AI to have AI go on here, or go on in Claude Code, and it reads what you asked here.',
     )
-    expect(screen.getByTestId('studio-ai-progress').querySelector('.ant-spin')).toBeNull()
+    expect(screen.getByTestId('studio-ai-feed-work').querySelector('.ant-spin')).toBeNull()
   })
 })
 
@@ -194,13 +195,13 @@ describe('a ready request', () => {
     )
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'Ask for changes…' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Ask for changes' })
+    // Proposed: the author replies under the feed, as a comment on a pull request asks its agent for more.
+    const reply = await screen.findByTestId('studio-ai-reply')
     await user.type(
-      within(dialog).getByRole('textbox', { name: 'What should AI change?' }),
+      within(reply).getByRole('textbox', { name: 'What should AI change?' }),
       'Make the cost centre optional.',
     )
-    await user.click(within(dialog).getByRole('button', { name: 'Ask AI to change it' }))
+    await user.click(within(reply).getByRole('button', { name: 'Ask AI to change it' }))
 
     await waitFor(() => {
       const post = fetchMock.mock.calls.find(
@@ -307,7 +308,7 @@ describe('a ready request’s page', () => {
     vi.unstubAllGlobals()
   })
 
-  it('leads with its checks and review, and keeps the changes, the checks, the plan and the history in tabs', async () => {
+  it("reads as one feed, its plan and AI's work done, then its result, with the changes and the checks unfolded on asking", async () => {
     const fetchMock = vi.fn(async (input: string) =>
       input.includes('/drafts/')
         ? json({
@@ -323,6 +324,7 @@ describe('a ready request’s page', () => {
                 name: 'CostCentre',
                 before: null,
                 after: '{}',
+                titles: { en: 'Cost centre' },
               },
             ],
           })
@@ -364,20 +366,58 @@ describe('a ready request’s page', () => {
     expect(within(checks).getByText('Passed')).toHaveAttribute('data-tone', 'success')
     expect(within(checks).getByText('The scenario passes')).toBeInTheDocument()
     expect(screen.getByText('Checks and review passed')).toBeInTheDocument()
-    expect(screen.queryByText('What changes')).toBeNull()
-    // The overview first, then the changes, the checks' detail, the plan and the history.
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      'Overview',
-      'Changes',
-      'Checks',
-      'Plan',
-      'History',
-    ])
-    expect(screen.getByRole('tab', { name: 'Overview', selected: true })).toBeInTheDocument()
+    expect(screen.queryByRole('tab')).toBeNull()
+    expect(screen.getByTestId('studio-ai-feed-plan')).toHaveAttribute('data-mark', 'done')
+    const result = screen.getByTestId('studio-ai-feed-result')
+    expect(result).toHaveAttribute('data-mark', 'waiting')
+    // What the draft changes, each resource as people read it, with the summary its request wrote.
+    expect(within(result).getByTestId('studio-ai-changed')).toHaveTextContent(
+      /Cost centre\s*Entity\s*A cost centre with a name and a code\./,
+    )
+
+    const user = userEvent.setup()
+    expect(screen.queryByTestId('studio-ai-changes')).toBeNull()
+    await user.click(within(result).getByRole('button', { name: 'Show the changes' }))
+    expect(await screen.findByTestId('studio-ai-changes')).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-ai-check-details')).toBeNull()
+    await user.click(within(result).getByRole('button', { name: 'Show the checks' }))
+    expect(screen.getByTestId('studio-ai-check-details')).toBeInTheDocument()
   })
 
-  it('opens on its plan while the plan waits for its author, with Approve plan in the bar at the foot', async () => {
-    stub({ ...fromApp, state: 'awaitingApproval', checks: null, review: null, aiConnected: true })
+  it('previews the draft on the preview host, then links each site there', async () => {
+    const preview = { ...fromApp.checks!, id: 'p-1', kind: 'publish', target: 'preview', status: 'succeeded' }
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
+      input.endsWith('/drafts/d-1/preview') && init?.method === 'POST'
+        ? json(preview)
+        : input.includes('/resources/s-1')
+          ? json({ id: 's-1', kind: 'site', name: 'Requests', file: 'sites/requests.json', content: { path: 'buy' } })
+          : input.includes('/diff')
+            ? json({ cursor: null, resources: [] })
+            : json({ ...fromApp, draft: 'd-1' }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[
+          { id: 's-1', kind: 'site', name: 'Requests', file: 'sites/requests.json', version: 'v', usedBy: 0 },
+        ]}
+        onOpen={() => {}}
+        previewHost="preview.example.com"
+      />,
+    )
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: 'Preview the draft' }))
+    expect(await screen.findByTestId('studio-ai-preview-link')).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\/\/preview\.example\.com(:\d+)?\/buy$/),
+    )
+  })
+
+  it('shows no preview without a preview host', async () => {
+    stub({ ...fromApp, draft: 'd-1' })
     renderIn(
       <StudioAuthoringRequestPage
         application={application}
@@ -388,30 +428,49 @@ describe('a ready request’s page', () => {
       />,
     )
 
-    expect(await screen.findByRole('tab', { name: 'Plan', selected: true })).toBeInTheDocument()
+    await screen.findByTestId('studio-ai-feed-result')
+    expect(screen.queryByRole('button', { name: 'Preview the draft' })).toBeNull()
+  })
+
+  it('shows its plan while it waits for its author, with Approve plan in the bar and a reply that asks for another', async () => {
+    const fetchMock = stub({ ...fromApp, state: 'awaitingApproval', checks: null, review: null, aiConnected: true })
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
+
+    const plan = await screen.findByTestId('studio-ai-feed-plan')
+    expect(plan).toHaveAttribute('data-mark', 'waiting')
+    expect(plan).toHaveTextContent('Waits for your approval')
+    expect(within(plan).getByTestId('studio-ai-plan')).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-ai-feed-work')).toBeNull()
     const bar = screen.getByTestId('studio-ai-plan-bar')
     expect(bar).toHaveTextContent('Nothing changes until you approve the plan')
     expect(within(bar).getByRole('button', { name: 'Approve plan' })).toBeInTheDocument()
-    expect(within(bar).getByRole('button', { name: 'Change plan…' })).toBeInTheDocument()
 
-    // The overview says the plan waits, and leads to it.
     const user = userEvent.setup()
-    await user.click(screen.getByRole('tab', { name: 'Overview' }))
-    const awaiting = await screen.findByTestId('studio-ai-awaiting')
-    expect(awaiting).toHaveTextContent('The plan waits for your approval.')
-    await user.click(within(awaiting).getByRole('button', { name: 'See the plan' }))
-    expect(screen.getByRole('tab', { name: 'Plan', selected: true })).toBeInTheDocument()
+    const reply = screen.getByTestId('studio-ai-reply')
+    await user.type(within(reply).getByRole('textbox', { name: 'What should the plan do differently?' }), 'No column.')
+    await user.click(within(reply).getByRole('button', { name: 'Ask for a new plan' }))
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(([url, init]) => init?.method === 'POST' && url.endsWith('/change-plan'))
+      expect(post?.[1]?.body).toBe(JSON.stringify({ comment: 'No column.' }))
+    })
   })
 })
 
-// Proposed: the overview is always the first tab and leads with the request's stages in every state, see the review on
-// #3263.
-describe("a request's progress", () => {
+// Proposed: the feed marks where a request is in every state, see the review on #3263.
+describe("a request's feed", () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  const progressOf = async (request: Partial<StudioAuthoringRequestDetail>) => {
+  const feedOf = async (request: Partial<StudioAuthoringRequestDetail>) => {
     stub({ ...fromApp, ...request })
     renderIn(
       <StudioAuthoringRequestPage
@@ -422,35 +481,43 @@ describe("a request's progress", () => {
         onOpen={() => {}}
       />,
     )
-    expect(await screen.findByRole('tab', { name: 'Overview', selected: true })).toBeInTheDocument()
-    return within(screen.getByTestId('studio-ai-progress')).getAllByRole('listitem')
+    return await screen.findByTestId('studio-ai-feed')
   }
-
-  it('keeps the stages on a ready request, every stage before Ready done', async () => {
-    const stages = await progressOf({ state: 'ready' })
-    expect(stages).toHaveLength(6)
-    expect(stages[5]).toHaveAttribute('aria-current', 'step')
-    expect(stages[5]).toHaveTextContent('Ready')
+  const workStep = (outcome: string | null): StudioAuthoringRequestStep => ({
+    kind: 'fix',
+    summary: null,
+    outcome,
+    tokens: 0,
+    startedAt: '2026-11-10T09:00:00Z',
+    finishedAt: '2026-11-10T09:30:00Z',
   })
 
-  it('marks the stage where a failed request stopped', async () => {
-    const stages = await progressOf({
+  it('marks where a failed request stopped, in the work AI did after its plan was approved, and says why there', async () => {
+    const feed = await feedOf({
       state: 'failed',
       checks: null,
       review: null,
-      steps: [
-        {
-          kind: 'check',
-          summary: null,
-          outcome: 'unfinished',
-          tokens: 0,
-          startedAt: '2026-11-10T09:00:00Z',
-          finishedAt: '2026-11-10T09:15:00Z',
-        },
-      ],
+      approvedAt: '2026-11-10T08:59:00Z',
+      failure: 'Anthropic refused the request.',
+      steps: [workStep('unfinished')],
     })
-    expect(stages[3]).toHaveAttribute('aria-current', 'step')
-    expect(stages[3]).toHaveTextContent('Checks Failed')
+    expect(within(feed).getByTestId('studio-ai-feed-plan')).toHaveAttribute('data-mark', 'done')
+    const work = within(feed).getByTestId('studio-ai-feed-work')
+    expect(work).toHaveAttribute('data-mark', 'stopped')
+    expect(within(work).getByTestId('studio-ai-failure')).toHaveTextContent('Anthropic refused the request.')
+  })
+
+  it('ends a dropped request with when it was dropped', async () => {
+    const feed = await feedOf({
+      state: 'dropped',
+      checks: null,
+      review: null,
+      approvedAt: null,
+      finishedAt: '2026-11-10T09:00:00Z',
+      steps: [],
+    })
+    expect(within(feed).getByTestId('studio-ai-feed-plan')).toHaveAttribute('data-mark', 'idle')
+    expect(within(feed).getByTestId('studio-ai-feed-dropped')).toHaveTextContent('Dropped')
   })
 })
 
@@ -499,7 +566,7 @@ describe('a request in a fix round', () => {
 
     expect(await screen.findByText('Working')).toHaveAttribute('data-tone', 'neutral')
     expect(screen.queryByText('Fixing')).toBeNull()
-    expect(within(screen.getByTestId('studio-ai-progress')).getByText('Fix round 2')).toBeInTheDocument()
+    expect(within(screen.getByTestId('studio-ai-feed-work')).getByText('Fix round 2')).toBeInTheDocument()
   })
 })
 
@@ -622,7 +689,7 @@ describe('a plan and its review, as a pull request has them', () => {
     expect(screen.getByRole('button', { name: 'Approve plan' })).toBeInTheDocument()
   })
 
-  it('sums the review up on the overview, and ticks each step of the plan, with the resource where it falls short', async () => {
+  it('sums the review up in the result, and ticks each step of the plan, with the resource where it falls short', async () => {
     stub({
       ...fromApp,
       aiConnected: true,
@@ -650,7 +717,7 @@ describe('a plan and its review, as a pull request has them', () => {
     expect(within(review).queryByTestId('studio-ai-review-step')).toBeNull()
 
     const user = userEvent.setup()
-    await user.click(screen.getByRole('tab', { name: 'Plan' }))
+    await user.click(screen.getByRole('button', { name: 'Show the plan' }))
     const changes = await screen.findByTestId('studio-ai-plan-changes')
     expect(within(changes).getByText('What changes')).toBeInTheDocument()
     const [done, notDone] = within(changes).getAllByTestId('studio-ai-review-step')
@@ -723,7 +790,7 @@ describe("a request's history", () => {
       />,
     )
     const user = userEvent.setup()
-    await user.click(await screen.findByRole('tab', { name: 'History' }))
+    await user.click(await screen.findByRole('button', { name: 'Show the steps' }))
 
     const rows = screen.getAllByRole('row').slice(1)
     expect(rows).toHaveLength(3)
@@ -771,7 +838,7 @@ describe("a request's history", () => {
       />,
     )
     const user = userEvent.setup()
-    await user.click(await screen.findByRole('tab', { name: 'History' }))
+    await user.click(await screen.findByRole('button', { name: 'Show the steps' }))
 
     const rows = screen.getAllByRole('row').slice(1)
     expect(rows[0]).toHaveTextContent(/Checked the draft\s*1 of 2 scenarios pass/)
@@ -820,7 +887,7 @@ describe("a request's changes", () => {
       />,
     )
     const user = userEvent.setup()
-    await user.click(await screen.findByRole('tab', { name: 'Changes' }))
+    await user.click(await screen.findByRole('button', { name: 'Show the changes' }))
 
     const file = await screen.findByTestId('studio-revision-change')
     expect(file).toHaveTextContent(/Cost centre\s*Entity\s*Added/)

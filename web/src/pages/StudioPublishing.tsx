@@ -7,8 +7,7 @@ import { QuotaRefusedError } from '../platform/quota'
 import {
   fetchStudioReleases,
   fetchStudioRequest,
-  fetchStudioResource,
-  previewSiteUrl,
+  findPreviewLinks,
   previewStudioApp,
   publishStudioApp,
   activateStudioRelease,
@@ -53,34 +52,6 @@ async function findReleaseNumber(
   }
   const releases = await fetchStudioReleases(application, signal)
   return releases.items.find((item) => item.releaseId === ended.releaseId)?.number ?? null
-}
-
-// The site paths are read from the folder, so a path renamed since the request was sent gives a wrong link.
-async function findPreviewLinks(
-  application: string,
-  previewHost: string | null,
-  sites: StudioResourceItem[],
-  ended: StudioRequest,
-  signal: AbortSignal,
-): Promise<string[]> {
-  if (ended.target !== 'preview' || ended.status !== 'succeeded' || previewHost === null) {
-    return []
-  }
-  const links: string[] = []
-  for (const site of sites) {
-    try {
-      const { content } = await fetchStudioResource(application, site.id, signal)
-      if (typeof content.path === 'string') {
-        links.push(previewSiteUrl(previewHost, content.path))
-      }
-    } catch (error) {
-      if (signal.aborted || error instanceof ServerUnreachableError) {
-        throw error
-      }
-      console.warn(`Loading the site '${site.id}' for the preview links failed`, error)
-    }
-  }
-  return links
 }
 
 /**

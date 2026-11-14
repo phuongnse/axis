@@ -1213,6 +1213,53 @@ export function previewSiteUrl(
   return `${location.protocol}//${host}${location.port ? `:${location.port}` : ''}/${sitePath}`
 }
 
+/**
+ * The address of each of `sites` on the preview host once a preview request has succeeded, and none before or with no
+ * preview host. The site paths are read from the folder, so a path renamed since the request was sent gives a wrong
+ * link. The band's Preview and, proposed, a draft's preview, see the review on #3263, both show them.
+ */
+export async function findPreviewLinks(
+  application: string,
+  previewHost: string | null,
+  sites: StudioResourceItem[],
+  ended: StudioRequest,
+  signal: AbortSignal,
+): Promise<string[]> {
+  if (ended.target !== 'preview' || ended.status !== 'succeeded' || previewHost === null) {
+    return []
+  }
+  const links: string[] = []
+  for (const site of sites) {
+    try {
+      const { content } = await fetchStudioResource(application, site.id, signal)
+      if (typeof content.path === 'string') {
+        links.push(previewSiteUrl(previewHost, content.path))
+      }
+    } catch (error) {
+      if (signal.aborted || error instanceof ServerUnreachableError) {
+        throw error
+      }
+      console.warn(`Loading the site '${site.id}' for the preview links failed`, error)
+    }
+  }
+  return links
+}
+
+/**
+ * Proposed: sends a preview request for a draft, see the review on #3263, which publishes the folder with the draft's
+ * changes to the preview tenant, so its author sees the change at work before accepting it. It answers at once with the
+ * queued request, which {@link fetchStudioRequest} follows. A 401 shows the sign-in prompt and throws, as any other
+ * failure does.
+ */
+export async function previewAuthoringDraft(application: string, draft: string): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/drafts/${encodeURIComponent(draft)}/preview`
+  const response = await studioFetch(path, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
+}
+
 /** Sends an activate request for a release of the history. It answers at once with the queued request. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function activateStudioRelease(application: string, releaseId: string): Promise<StudioRequest> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/releases/${encodeURIComponent(releaseId)}/activate`

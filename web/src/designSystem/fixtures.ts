@@ -774,7 +774,8 @@ export const currentUser: CurrentUser = {
   // Proposed: Alex publishes, so Studio's band shows Publish…, see the review on #3263.
   studioPublisher: true,
   studioCreate: false,
-  studioPreviewHost: null,
+  // Proposed: the preview host, where an AI request's draft shows at work, see the review on #3263.
+  studioPreviewHost: 'preview.example.com',
   studioTest: false,
   // Proposed: Ask AI shows in Studio, see the review on #3263.
   studioAi: true,

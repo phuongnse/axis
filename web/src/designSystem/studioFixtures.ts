@@ -260,6 +260,26 @@ function releasesNow(): StudioReleases {
     changes: [],
   }
 }
+/** The site of the open application, whose path the preview links read. */
+const siteResource: StudioResource = {
+  ...resource(siteId, 'site', 'Requests', 'sites/requests.json', { [locale]: 'Purchase requests' }),
+  content: { id: siteId, kind: 'site', name: 'Requests', formatVersion: 1, path: 'purchases' },
+}
+
+/** A preview request that has published the folder to the preview tenant. */
+const previewRequest = {
+  id: 'b0b00000-0000-4000-8000-000000000002',
+  application,
+  kind: 'publish',
+  target: 'preview',
+  status: 'succeeded',
+  label: null,
+  note: null,
+  releaseId: null,
+  diagnostics: [],
+  scenarios: null,
+} satisfies StudioRequest
+
 function publishRequest() {
   return {
     id: publishRequestId,
@@ -395,6 +415,10 @@ function workspaceRoutes(folder: Folder): Record<string, () => unknown> {
     [`${folderPath}/resources/${manifestId}`]: () => manifest,
     [`${folderPath}/resources/${id(firstEntityId)}`]: () => requestEntityResource,
     [`${folderPath}/resources/${pageId}`]: () => requestListResource,
+    [`${folderPath}/resources/${siteId}`]: () => siteResource,
+    // Proposed: the band's Preview and a draft's preview end at once in the preview, see the review on #3263.
+    [`${folderPath}/preview`]: () => previewRequest,
+    [`${folderPath}/requests/${previewRequest.id}`]: () => previewRequest,
     [`${folderPath}/releases`]: () => releasesNow(),
     [`${folderPath}/releases/live/diff`]: () => ({ resources: published() ? [] : liveDiff }),
     [`${folderPath}/publish`]: () => {
@@ -948,6 +972,8 @@ const changeTitles: Record<string, string> = {
   Supplier: 'Supplier',
   RequestList: 'Requests',
   PurchaseApproval: 'Purchase approval',
+  PurchasingSystem: 'Purchasing system',
+  NightlySupplierImport: 'Nightly supplier import',
 }
 
 function change(
@@ -1473,6 +1499,7 @@ function askAiRoutes(
     [`${folderPath}/authoring-requests/${id}/change-plan`, act(id, 'planning')],
     [`${folderPath}/authoring-requests/${id}/request-changes`, act(id, 'working', 'changes')],
     [`${folderPath}/authoring-requests/${id}/drop`, act(id, 'dropped')],
+    [`${folderPath}/drafts/${draftOf(id)}/preview`, () => previewRequest],
   ])
   return { ...routes, ...(Object.fromEntries(requestRoutes) as Record<string, FixtureRoute>) }
 }
