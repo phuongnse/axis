@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { StudioAuthoringRequestDetail, StudioAuthoringRequestStep } from '../platform/studio'
+import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
 import { requestTitle } from './authoringRequests'
 import { StudioAuthoringRequestPage, StudioAuthoringRequests } from './StudioAuthoringRequests'
@@ -539,7 +540,10 @@ describe('a plan and its review, as a pull request has them', () => {
     expect(within(screen.getByTestId('studio-ai-plan-changes')).getByText('What changes')).toBeInTheDocument()
     const decisions = screen.getByTestId('studio-ai-plan-decisions')
     expect(within(decisions).getByText('Decisions to check')).toBeInTheDocument()
-    expect(within(decisions).getByText('The field is optional.').tagName).toBe('STRONG')
+    // Each choice reads as text, and why, muted, after it.
+    expect(within(decisions).getByText('The request did not say.')).toHaveStyle({
+      color: designTokensFor('light').colour.textMuted,
+    })
     expect(decisions).toHaveTextContent('The field is optional. The request did not say.')
     expect(screen.getByTestId('studio-ai-plan-risks')).toHaveTextContent('Saved requests have no cost centre.')
     expect(screen.getByTestId('studio-ai-plan-checks')).toHaveTextContent('A request saves with a cost centre.')

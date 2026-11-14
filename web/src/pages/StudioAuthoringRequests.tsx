@@ -794,7 +794,7 @@ export function StudioAuthoringRequestPage({
 
 /**
  * Proposed: a request's plan, written as a pull request's plan is, see the review on #3263: each a group named in bold,
- * What changes, Decisions to check, each choice in bold with its reason, Effects and risks, and How it will be checked,
+ * What changes, Decisions to check, each choice with its reason, muted, Effects and risks, and How it will be checked,
  * then its details, resource by resource, folded until asked for, and last `children`, such as the approval's actions.
  * Once a review ran, each step of What changes is its checklist item, a check mark when the draft does it and a cross
  * when it does not, with the resource where, as a pull request's description ticks its own list.
@@ -869,9 +869,11 @@ function PlanView({
       {group(
         'shell.studio.aiRequest.decisions',
         'studio-ai-plan-decisions',
+        // Proposed: each choice, then why, muted, so colour and not weight tells them apart, see the review on #3263.
         plan.decisions.map(({ decision, reason }) => (
           <>
-            <Typography.Text strong>{decision}</Typography.Text> {reason}
+            <Typography.Text>{decision}</Typography.Text>{' '}
+            <Typography.Text style={{ color: colour.textMuted }}>{reason}</Typography.Text>
           </>
         )),
       )}
@@ -911,8 +913,8 @@ function PlanView({
 /**
  * Proposed: a request's review, see the review on #3263, as cells of the overview's columns: "Review" in bold, its
  * verdict as a `StatusTag`, "Changes requested" while a finding must change and "No changes requested" otherwise, never
- * "Approved", as only its author approves, by accepting, and its summary, muted, as the checks' line is. Its findings
- * follow across the columns in a `StudioProblemList`, grouped by the resource they are about, what must change first,
+ * "Approved", as only its author approves, by accepting; its summary, a sentence or two, reads under them across the
+ * columns. Its findings follow across the columns in a `StudioProblemList`, grouped by the resource they are about, what must change first,
  * each led by "Must change" or "Note". How it checked each plan step shows on the plan.
  */
 function ReviewFindings({
@@ -938,7 +940,9 @@ function ReviewFindings({
             : 'shell.studio.aiRequest.review.noChangesRequested',
         )}
       </StatusTag>
-      <Typography.Text style={{ color: colour.textMuted }}>{review.summary}</Typography.Text>
+      {/* Its tag closes the line, and its summary, a sentence or two, reads under it across the columns. */}
+      <span />
+      <Typography.Text style={{ gridColumn: '1 / -1' }}>{review.summary}</Typography.Text>
       {review.findings.length > 0 && (
         <div style={{ gridColumn: '1 / -1' }}>
           <StudioProblemList
