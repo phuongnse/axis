@@ -204,6 +204,8 @@ tenant's `packageCpuSecondsPerDay` until the next day. Outside a cell nothing is
   A runner's start and idle time count for no tenant.
 - **Held calls.** At or past the quota, a call is held, not failed. Its work item is due at the next
   00:00 UTC, as a held email is. Calls in flight finish and count. A quota of 0 holds every call.
+- **Customer-hosted packages.** The calls to a [customer-hosted](extension-packages.md#customer-hosted-runners)
+  package are neither counted nor held, because they use no CPU of Axis.
 - **Refused.** While the quota is 0, turning the tenant's
   [switch](user-administration.md#application-packages) on and a publish of an application that holds an
   application's package answer the quota's `403`, see [refusals](#refusals).

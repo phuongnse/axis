@@ -575,9 +575,10 @@ operation in place of the HTTP request:
   [package runner](extension-packages.md#package-runners) instead. The worker sends the stored input and the
   resolved bindings in a `run`, and closes the connection at the `timeout`, which kills the runner. A `node` or
   `python` attempt always goes to a package runner, with `inProcess` too.
-- **Run in a customer-hosted runner** _(planned for M37)_. The worker runs no attempt of a call to a package
-  that the application [declares](extension-packages.md#declaring-packages-in-an-application) with
-  `runner: customer`. The call waits `pending`, its retry due, until a
+- **Run in a customer-hosted runner** _(planned for M37)_. The worker runs no attempt of a call to a
+  customer-hosted package, whether the application's own package or an installation's package that the
+  application [declares](extension-packages.md#declaring-packages-in-an-application) with
+  `runner: customer`, see [customer-hosted runners](extension-packages.md#customer-hosted-runners). The call waits `pending`, its retry due, until a
   [customer-hosted runner](extension-packages.md#customer-hosted-runners) that registers the package and
   version takes it, and the runner receives no binding value.
   - **The take is the Mark step.** It marks the call `sending`, counts the attempt and gives a lease that

@@ -58,5 +58,5 @@ reach them one way.
   [application packages](user-administration.md#application-packages). Otherwise it answers `403`. A read
   needs the author role only.
 - **Publishing.** A publish of an application that holds a package needs the publisher role only, and
-  builds and scans the package, see [an application's packages](extension-packages.md#an-applications-packages).
+  builds and scans each package that Axis runs, see [an application's packages](extension-packages.md#an-applications-packages).
 - **The tools.** The MCP server's tools read, write and test package files, see [tools](mcp-server.md#tools).

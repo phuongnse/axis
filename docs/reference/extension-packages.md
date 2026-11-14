@@ -3,7 +3,8 @@
 An extension package holds custom code that an application calls where configuration is not
 enough. The code may be written in C#, TypeScript or JavaScript on Node.js, or Python. This page
 covers what a package is, its manifest, the contracts it builds on, how it is installed, versioned,
-pinned and loaded, what its operations may reach, and what those limits do not protect against. An
+pinned and loaded, and what its operations may reach. What those limits do not protect against is in
+[extension package limits](extension-package-limits.md). An
 application's own packages are in [An application's packages](#an-applications-packages). How a
 process calls a package operation is in [package operations](process-execution.md#package-operations),
 and how an application declares its packages is in
@@ -35,9 +36,9 @@ and installed apart from any application, see [Installation](#installation).
   operation to a function of the library, and the library's code does not
   change.
 - **Built once** _(planned for M21)_. A package is built once, when it is
-  installed or published, see [Building a package](#building-a-package). Its
-  dependencies are installed from the lock file and scanned for known
-  vulnerabilities. A runner downloads nothing at run time.
+  installed or published or, for a customer-hosted package, by the customer with the same `build`, see
+  [Building a package](#building-a-package). Its dependencies are installed from the lock file and
+  scanned for known vulnerabilities. A runner downloads nothing at run time.
 - **No data access.** A package cannot read or write entities.
 - **Widgets** _(planned for M22)_. A package may also hold custom widgets,
   React components that a page names, which build on Axis widgets and Axis tokens, never on Ant
@@ -91,6 +92,9 @@ identity, its operations and, for a C# package, its main assembly. This example 
 - **`lock`.** Required. The language's lock file: `packages.lock.json`,
   `package-lock.json`, or `requirements.txt` with a `--hash` on every line. The schema refuses the name of
   another language's lock file.
+- **`runner`** _(planned for M37)_. Where the package runs: `axis`, the default, or `customer`. It is valid in
+  an application's package. With `customer`, the application's folder holds the manifest alone, and the files
+  that `adapter` and `lock` name stay with the customer, see [customer-hosted runners](#customer-hosted-runners).
 - **`assembly` left out** _(planned for M22)_. A package that holds only widgets has no
   `assembly`.
 - **`widgets`** _(planned for M22)_. The custom widgets the package offers,
@@ -347,8 +351,8 @@ that its release was compiled against.
   policy when it is staged, because the worker cannot rebuild the release
   without the version.
 - **An application's packages** _(planned for M37)_. The release holds the
-  built packages of the application, so running work keeps the code it
-  started with, see [An application's packages](#an-applications-packages).
+  built packages of the application, or the manifest of a customer-hosted one, so running work keeps the code
+  or the contract it started with, see [An application's packages](#an-applications-packages).
 
 ## Loading
 
@@ -440,8 +444,8 @@ see [Contracts](#contracts).
   `url` binding outside Development fails it with `AXC0101`, see
   [Deployment bindings](integration-resources.md#deployment-bindings).
 - **A customer-hosted package** _(planned for M37)_. Neither the binding resolution nor the activation
-  check applies to a package that the application runs in a customer-hosted runner, because the runner
-  keeps its own bindings, see [declaring packages in an application](#declaring-packages-in-an-application).
+  check applies to a customer-hosted package, because the runner keeps its own bindings, see
+  [customer-hosted runners](#customer-hosted-runners).
 - **Secret values stay hidden.** A secret value never appears in history,
   audit records or logs. History and audit records hold only the type of an
   exception, never its message, because a message can hold input values or
@@ -599,7 +603,8 @@ _(planned for M37)_
 
 A customer-hosted runner runs in the customer's own network and connects out to the installation with
 a credential of its own. It keeps the staging, retries and history of the engine, but none of the runner
-limits above, because the customer owns the machine.
+limits above, because the customer owns the machine. The code, its secrets and the systems it reaches
+never leave the customer, see [D148](../decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md).
 
 - **Created by the administrator.** The tenant's administrator creates and revokes a runner, see
   [package runners](user-administration.md#package-runners).
@@ -607,18 +612,48 @@ limits above, because the customer owns the machine.
   like a service account. Its access token's audience is `axis-package-runner`, so it reaches only the
   runner's routes, and a service account route refuses it because it lacks `Oidc:ServiceAudience`. Axis
   keeps no copy of the secret.
-- **Declared by the application.** An application says that a package runs in a customer-hosted runner, see
-  [declaring packages in an application](#declaring-packages-in-an-application).
-- **Registering.** The runner names the package ids and versions it runs. It takes only calls of its
-  tenant to a registered id and to the exact version the release pins.
+- **Two sources.** An application's own package is customer-hosted when its folder is
+  `packages/<id>/axis-package.json` alone, with `"runner": "customer"`. An installation's package is
+  customer-hosted when the application's `packages` entry says `runner: customer`, see
+  [declaring packages in an application](#declaring-packages-in-an-application). Both use this one
+  mechanism and differ only in where the manifest comes from.
+- **The contract stays with Axis.** Compilation types the steps against the manifest, the worker reads
+  `idempotent` and `timeout` from it, and a posted result is checked against its `output`. The release holds
+  the manifest, so running work keeps the contract it started with, see
+  [versions and pinning](#versions-and-pinning). Publishing builds and scans nothing for the package.
+- **The program.** The customer runs `docker run ... axis-package-host-<language> connect`, Axis's own
+  [runner image](installation.md#images) with the `connect` command. It reads the built packages from
+  `Extensions:Path`, where `build` writes them, and the customer builds each package with the same `build`
+  command, which scans its dependencies, see [building a package](#building-a-package). An instance runs one
+  call at a time. Several instances may share one credential, because each take is its own lease.
+- **Registering.** The runner sends the manifest of each package it runs. The server compares its `id`,
+  `version` and `operations` as JSON values with the manifest pinned by every release that is active or has a
+  running or waiting instance. A difference, or no such release that pins the version as customer-hosted,
+  answers `409` naming the package and the version, and the instance exits with code 1. So a mismatch shows
+  when the runner starts, and not at a call. The author publishes first, and the calls wait `pending` until
+  the runner starts.
+- **Upgrades.** During an upgrade the customer runs both versions side by side until the old instances end.
 - **Calls out only.** The runner connects to the tenant's host over HTTPS. No connection goes from Axis
   into the customer's network.
 - **Taking a call and posting its result.** The runner takes a call under a lease and posts the result, see
-  [staging a package call](process-execution.md#staging-a-package-call) for the lease and the outcomes.
+  [staging a package call](process-execution.md#staging-a-package-call) for the lease and the outcomes. It
+  takes only calls of its tenant to a package it registered and to the exact version whose manifest the
+  release pins.
 - **Its own secrets.** The take carries no binding value. The SDK answers `GetHttpClient` and `GetSecret`
-  from the runner's own settings, by the binding names that the manifest declares.
+  from the runner's own settings, `Connect:Urls:<binding>` and `Connect:Secrets:<binding>`, by the binding
+  names that the manifest declares.
 - **Revoked.** Every runner request reads the runner's row, so the next request of a revoked runner answers
   `401`, even with a token that has not expired.
+
+The `connect` command reads these settings, as environment variables with the names in the table:
+
+| Setting | Environment variable | Default | Meaning |
+| --- | --- | --- | --- |
+| `Connect:Url` _(planned for M37)_ | `Connect__Url` | none | The tenant's `https` address |
+| `Connect:ClientId` _(planned for M37)_ | `Connect__ClientId` | none | The client id of the runner's credential |
+| `Connect:ClientSecret` _(planned for M37)_ | `Connect__ClientSecret` | none | The client secret of the runner's credential |
+| `Connect:Urls:<binding>` _(planned for M37)_ | `Connect__Urls__<binding>` | none | The base address of the `url` binding with that name |
+| `Connect:Secrets:<binding>` _(planned for M37)_ | `Connect__Secrets__<binding>` | none | The value of the `secret` binding with that name |
 
 #### Routes
 
@@ -626,58 +661,17 @@ _(planned for M37)_
 
 | Route | Body | Answer |
 | --- | --- | --- |
-| `PUT /api/package-runner/packages` _(planned for M37)_ | `{ "packages": [{ "id": "purchasing-tools", "version": "1.0.0" }] }` | `204`. It replaces the registered list |
-| `POST /api/package-runner/calls/take` _(planned for M37)_ | None | `200` with `{ "leaseId", "package", "version", "operation", "operationId", "input", "leaseUntil" }`, or `204` when no call waits |
+| `POST /api/package-runner/packages` _(planned for M37)_ | `{ "packages": [{ "manifest": {...} }] }` | `204`. It adds to the registered list, or `409` |
+| `POST /api/package-runner/calls/take` _(planned for M37)_ | `{ "packages": [{ "id": "purchasing-tools", "version": "1.0.0" }] }`, the registered packages that this instance holds | `200` with `{ "leaseId", "package", "version", "operation", "operationId", "input", "leaseUntil" }`, or `204` when no call waits |
 | `POST /api/package-runner/leases/{leaseId}/result` _(planned for M37)_ | `{ "outcome": "succeeded", "output": {...} }`, `{ "outcome": "retryable" }` or `{ "outcome": "failed", "error": "<exception type>" }` | `204` |
 
 - **The order of the checks.** A request is checked in this order: the tenant of the host, then the token
   (`401` for the signature, the issuer, the expiry, the audience, or a runner row that is missing or
   revoked, with DPoP under `fapi2` as for service accounts), then the body (`400`). A result is then
   checked for its lease: a lease of another runner or an unknown one answers `404`, and a lease that has
-  ended or already holds a result answers `409`.
-
-## Not a sandbox
-
-A package loaded in the host's process is not isolated, because it shares that process. The capability
-limits stop mistakes, but they do not stop a package that sets out to get around them. An
-installation's packages are trusted code that the operator installs and reviews.
-
-### Limits that hold
-
-These limits hold for every package:
-
-- The operation context hands out only the bindings that the operation
-  declares.
-- The context's HTTP client reaches only the declared base addresses, and
-  follows no redirects.
-- An attempt that asks the context for anything else fails.
-- The platform stops waiting for an operation when its `timeout` passes.
-
-### Limits that do not hold
-
-A C# package that loads in the host's process and uses .NET APIs directly can do all of these:
-
-- create its own `HttpClient`, or open sockets, and reach any host;
-- read environment variables, including every tenant's secrets;
-- read and write the file system, and start processes;
-- use reflection to reach into the host;
-- keep static state that is shared across tenants;
-- use as much CPU and memory as it likes;
-- ignore the cancellation token. On a timeout the worker stops waiting, but a
-  runaway thread keeps running.
-
-### In package runners
-
-_(planned for M21)_
-
-Outside Development, an installation's packages run in [package runners](#package-runners). There, the
-runner's network route, empty environment, read-only file system, resource limits and kill at the
-timeout stop the items in the list above, and the runner holds nothing of the host to reach by
-reflection. Static state shared across tenants is the one item still possible, because one set of
-runners serves every tenant.
-
-- **Runners for each tenant** _(planned for M37)_. An application's packages run in runners that serve
-  only their tenant, which closes that gap, see [An application's packages](#an-applications-packages).
+  ended or already holds a result answers `409`. A registration is checked against the releases, and a
+  manifest that differs from a pin, or has none, answers `409`, see [registering](#customer-hosted-runners).
+- **What a take gives.** A take gives only calls whose release pins the registered manifest of the package.
 
 ## An application's packages
 
@@ -693,15 +687,18 @@ trusted code, so the platform gives it more limits than an installation's packag
   virtualization.
 - **`Extensions:ApplicationPackages`.** A server, worker and publisher setting, `false` by default.
   With `true`, the worker checks at start that `application-package-host` runs under gVisor, and does
-  not start otherwise. With `false`, an application's package is a compile error at its
-  `packages/<id>/axis-package.json`, and the tenant's switch answers `403`. So an installation without
-  gVisor refuses an application's package and runs its own packages as before.
+  not start otherwise. With `false`, an application's package that Axis runs is a compile error at its
+  `packages/<id>/axis-package.json`. So an installation without gVisor refuses it and runs its own packages
+  as before. The tenant's switch and the compile check still allow a
+  [customer-hosted](#customer-hosted-runners) package, which needs no gVisor because gVisor guards only code
+  on Axis's machines.
 - **Its own runners.** One set for each tenant and package version, with the limits of
   [package runners](#package-runners). The package host starts a set when a call comes and stops it
   once it is idle, so a tenant that calls nothing holds no runner.
 - **Quotas.** The CPU seconds of its runners count against the tenant's
   [package run time a day](tenant-quotas.md#package-run-time-a-day). A call also holds a
-  `concurrentConnectorCalls` lease, as any package call does.
+  `concurrentConnectorCalls` lease, as any package call does. A customer-hosted package counts for nothing
+  there, see [package run time a day](tenant-quotas.md#package-run-time-a-day).
 - **Plans.** In Axis SaaS only a paid plan allows an application's packages, see
   [the catalogue](plans.md#the-catalogue).
 - **Switched on by the tenant.** The tenant's administrator turns them on, see
@@ -709,12 +706,14 @@ trusted code, so the platform gives it more limits than an installation's packag
   `developer` role, see [roles](user-administration.md#roles).
 - **In the folder.** `packages/<id>/` holds the package's manifest, adapter, lock file and tests. `<id>`
   is the folder's name, and an id that an installation's package also uses is a compile error. The
-  application's `packages` list does not name it. Steps call it as `<id>/<operation>`.
-- **Built and scanned on publish.** The publisher builds and scans each package as
+  application's `packages` list does not name it. Steps call it as `<id>/<operation>`. A customer-hosted
+  package's folder holds the manifest alone, and another file in it is a compile error at that file, because
+  Axis neither builds nor scans it.
+- **Built and scanned on publish.** The publisher builds and scans each package that Axis runs as
   [built once](#what-a-package-is) says, but in the tenant's sandbox, because a dependency's install
   script is the tenant's code. A failed build or scan fails the publish with diagnostics. A publish
   needs the publisher role only.
-- **In the release.** The release holds the built package, see
+- **In the release.** The release holds the built package, or the manifest of a customer-hosted one, see
   [versions and pinning](#versions-and-pinning).
 - **Writing.** A write to a package's files needs the author role, the developer role and the tenant's
   switch on, see [packages in Studio](studio-packages.md).
@@ -851,7 +850,7 @@ declares the real sample package the same way, with
   resolves no bindings for the package's operations and starts no Axis runner for it, see
   [customer-hosted runners](#customer-hosted-runners). A module's entry has no `runner`, and the
   application's entry decides for every process of the release, because the release holds one pin per
-  package id. A wrong value is `AXC0004`.
+  package id. A wrong value is `AXC0004`. An application's own package says it in its manifest instead.
 - **Pinning.** Compilation picks the highest installed version in each range and pins it in the
   release, in the Release step of the [pipeline](configuration.md#configuration-pipeline), as
   [versions and pinning](#versions-and-pinning) says. A module's `packages` share

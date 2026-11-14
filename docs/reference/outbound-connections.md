@@ -45,4 +45,4 @@ These rules keep every destination in the hands of the operator:
   operator may add one that allows only the destinations of this page.
 - **An installation's packages are trusted code.** Installing one means trusting its code. The `url`
   binding limits the client that Axis hands to it, not the package's own code, see
-  [not a sandbox](extension-packages.md#not-a-sandbox).
+  [not a sandbox](extension-package-limits.md#not-a-sandbox).
