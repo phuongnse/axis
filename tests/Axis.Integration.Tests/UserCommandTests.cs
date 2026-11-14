@@ -37,6 +37,7 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
 {
     private const string Administrator = "administrator";
     private const string Employee = "employee";
+    private const string DeveloperRole = "studio-developer";
     private const string AuthenticatorSecret = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
     private const string PlatformSecret = "platform-secret-1";
     private const string UsersSecret = "users-secret-1";
@@ -330,7 +331,7 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         Assert.Equal("Roles", roles.GetProperty("name").GetString());
         Assert.Equal(["buyer"], roles.GetProperty("roles").EnumerateArray().Select(role => role.GetString()));
         Assert.Equal(
-            ["author", "publisher", "operator", "administrator"],
+            ["author", "publisher", "developer", "operator", "administrator"],
             body.GetProperty("platformRoles").EnumerateArray().Select(role => role.GetString()));
     }
 
@@ -413,6 +414,46 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         Assert.Equal(2L, await UserAuditCountAsync());
     }
 
+    [Fact]
+    public async Task A_given_developer_role_gives_the_developer_role_name_at_the_next_request_and_a_removed_one_does_not()
+    {
+        var pat = await SessionCookieAsync(_patId, Employee, authenticatedMinutesAgo: null);
+        var admin = await AdministratorCookieAsync(authenticatedMinutesAgo: 0);
+        Assert.DoesNotContain(DeveloperRole, await MeRolesAsync(Factory, pat));
+
+        using var given = await PostJsonAsync($"/api/users/{_patId}/give-role", admin, PlatformBody("developer"));
+
+        Assert.Equal(HttpStatusCode.NoContent, given.StatusCode);
+        Assert.Contains(DeveloperRole, await MeRolesAsync(Factory, pat));
+        Assert.Equal(1L, await PlatformRoleAuditCountAsync("user.roleGiven", "developer"));
+
+        await using (var unset = Factory.WithWebHostBuilder(builder => builder.UseSetting("Studio:DeveloperRole", string.Empty)))
+        {
+            var rolesWithoutSetting = await MeRolesAsync(unset, pat);
+            Assert.DoesNotContain(DeveloperRole, rolesWithoutSetting);
+            Assert.DoesNotContain("developer", rolesWithoutSetting);
+        }
+
+        using var removed = await PostJsonAsync($"/api/users/{_patId}/remove-role", admin, PlatformBody("developer"));
+
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        Assert.DoesNotContain(DeveloperRole, await MeRolesAsync(Factory, pat));
+        Assert.Equal(0L, await GivenRolesCountAsync());
+        Assert.Equal(1L, await PlatformRoleAuditCountAsync("user.roleRemoved", "developer"));
+    }
+
+    [Fact]
+    public async Task A_person_who_is_not_an_administrator_gets_403_giving_the_developer_role()
+    {
+        var employee = await SessionCookieAsync("someone", Employee, authenticatedMinutesAgo: 0);
+
+        using var forbidden = await PostJsonAsync($"/api/users/{_patId}/give-role", employee, PlatformBody("developer"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        Assert.Equal(0L, await GivenRolesCountAsync());
+        Assert.Equal(0L, await UserAuditCountAsync());
+    }
+
     public async ValueTask InitializeAsync()
     {
         _baseAddress = await keycloak.BaseAddressAsync();
@@ -439,6 +480,7 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
             builder.UseSetting("Tenants:a:Oidc:RolesClaim", "roles");
             builder.UseSetting("Users:AdministratorRole", Administrator);
             builder.UseSetting("Console:OperatorRole", "operator");
+            builder.UseSetting("Studio:DeveloperRole", DeveloperRole);
             builder.UseSetting("ActivateOnStartup:0", _rolesApplication.Path);
             builder.ConfigureTestServices(services => services.AddSingleton<IStartupFilter, SessionStartupFilter>());
         });
@@ -686,6 +728,22 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
         return body.GetProperty("console").GetBoolean();
+    }
+
+    private static async Task<string[]> MeRolesAsync(WebApplicationFactory<Program> factory, string cookie)
+    {
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("http://localhost"),
+            AllowAutoRedirect = false,
+            HandleCookies = false,
+        });
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/api/me", UriKind.Relative));
+        request.Headers.Add("Cookie", $"{Session.Scheme}={cookie}");
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        return [.. body.GetProperty("roles").EnumerateArray().Select(role => role.GetString()!)];
     }
 
     private async Task<HttpResponseMessage> PostJsonAsync(string path, string? cookie, string body)

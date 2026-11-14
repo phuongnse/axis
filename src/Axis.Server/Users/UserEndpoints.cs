@@ -35,9 +35,9 @@ namespace Axis.Server.Users;
 /// <para>
 /// <c>GET /api/users/{id}/roles</c> lists to an administrator the roles that were given to a person, and the roles that can be
 /// given. It also answers the person's <c>displayName</c> and <c>email</c> (<c>null</c> without one), as the list does. <c>given</c> holds the rows of <c>axis.given_roles</c>, each with its application id (null for a platform role), its
-/// role and <c>declared</c>: the active release of the application declares the role, or the platform role is one of the four
+/// role and <c>declared</c>: the active release of the application declares the role, or the platform role is one of the five
 /// kinds. A role of an application that has no active release is not declared. <c>applications</c> holds every active
-/// application with the roles that its active release declares, and <c>platformRoles</c> holds the four platform role kinds. A
+/// application with the roles that its active release declares, and <c>platformRoles</c> holds the five platform role kinds. A
 /// request is checked in order: signed-in user (401), administrator role (403), a tenant with a users client (404), the realm
 /// user (404, also for a service account). A failure at the identity provider is a 502 with a fixed title.
 /// </para>
@@ -222,7 +222,7 @@ internal sealed record UserListResponse(IReadOnlyList<UserListItem> Items, int T
 
 /// <summary>
 /// The answer of <c>GET /api/users/{id}/roles</c>: the person's display name and email, the roles given to the person, the active
-/// applications with the roles their active releases declare, and the four platform role kinds.
+/// applications with the roles their active releases declare, and the five platform role kinds.
 /// </summary>
 internal sealed record UserRolesResponse(string DisplayName, string? Email, IReadOnlyList<GivenRoleItem> Given, IReadOnlyList<GivableApplication> Applications, IReadOnlyList<string> PlatformRoles);
 

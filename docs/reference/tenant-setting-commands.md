@@ -152,7 +152,7 @@ page, Studio and the operator console accept.
 | `--metadata <binding>`      | `saml`: the binding that holds the metadata. Required. An `oidc` provider takes none                |
 | `--claim <name>=<claim>`    | The provider's claim for `displayName`, `email` or `locale`. May repeat                             |
 | `--roles-claim <claim>`     | The claim that holds the person's roles                                                             |
-| `--role <value>=<role>`     | Maps a value of the roles claim to `author`, `publisher`, `operator` or `administrator`. May repeat |
+| `--role <value>=<role>`     | Maps a value of the roles claim to `author`, `publisher`, `developer`, `operator` or `administrator`. May repeat |
 
 A successful run prints `<id> sign-in ok`. The options are named after the fields of the
 [`identityProvider` resource](identity-provider.md#identity-provider-resource), and the per-type rules are those of the
@@ -177,7 +177,7 @@ resource.
   off, a provider name is blank or given twice (letter case ignored), a type is not `oidc` or `saml` (accounts are the
   flag, not a type), an `oidc` provider lacks the issuer or the client id or has neither or both of the client secret
   and the client key, a `saml` provider lacks the metadata or names an issuer or a client binding, a binding or claim is
-  blank or a claim name is unknown or repeated, a role value is repeated, or a role is not one of the four. The
+  blank or a claim name is unknown or repeated, a role value is repeated, or a role is not one of the five. The
   `version` stays and no audit record is written. The same exit code 2 comes when an `oidc` provider names a binding
   that is missing, of the wrong kind or without a value, when the tenant has a realm and an `oidc` provider has no
   `--client-secret`, and when a provider would make one person two users. A provider splits a person when it names the

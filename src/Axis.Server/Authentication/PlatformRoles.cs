@@ -15,17 +15,18 @@ internal static class PlatformRoles
 {
     private const string Author = "author";
     private const string Publisher = "publisher";
+    private const string Developer = "developer";
     private const string Operator = "operator";
     private const string Administrator = UserInvitations.AdministratorKind;
 
     /// <summary>The kind of the administrator role, as the give-role and remove-role routes name it.</summary>
     public const string AdministratorKind = UserInvitations.AdministratorKind;
 
-    /// <summary>The kinds of the four platform roles.</summary>
-    public static IReadOnlyList<string> Kinds => [Author, Publisher, Operator, Administrator];
+    /// <summary>The kinds of the five platform roles.</summary>
+    public static IReadOnlyList<string> Kinds => [Author, Publisher, Developer, Operator, Administrator];
 
-    /// <summary>Whether <paramref name="role"/> is the kind of one of the four platform roles.</summary>
-    public static bool IsKind(string role) => role is Author or Publisher or Operator or Administrator;
+    /// <summary>Whether <paramref name="role"/> is the kind of one of the five platform roles.</summary>
+    public static bool IsKind(string role) => role is Author or Publisher or Developer or Operator or Administrator;
 
     /// <summary>
     /// The role name that the host settings configure for a platform role kind, or <c>null</c> when the kind is unknown or its
@@ -35,6 +36,7 @@ internal static class PlatformRoles
     {
         Author => studio.AuthorRole,
         Publisher => studio.PublisherRole,
+        Developer => studio.DeveloperRole,
         Operator => console.OperatorRole,
         Administrator => users.AdministratorRole,
         _ => null,

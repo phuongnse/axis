@@ -10,6 +10,7 @@ namespace Axis.Studio;
 /// value an author holds. <c>Studio:ApplicationsPath</c> is the folder where Studio creates applications, created at
 /// start when missing. With no folder, no applications path or no role, Studio is off and nobody may use it.
 /// <c>Studio:PublisherRole</c> is the roles claim value that may also publish. With no value, nobody may.
+/// <c>Studio:DeveloperRole</c> is the roles claim value that a developer holds. With no value, the developer role gives nothing.
 /// <c>Studio:Tests</c> shows the test controls to the users of Studio. It is off by default and grants no right.
 /// <c>Studio:RevisionsPath</c> is the folder that holds the git repository of each application folder, outside the folder.
 /// It defaults to <c>.revisions</c> under <c>Studio:ApplicationsPath</c>, and with neither path no revisions are kept.
@@ -23,7 +24,8 @@ internal sealed record StudioOptions(
     bool Tests = false,
     string? ApplicationsPath = null,
     bool PerTenant = false,
-    string? RevisionsPath = null)
+    string? RevisionsPath = null,
+    string? DeveloperRole = null)
 {
     public const string SectionName = "Studio";
 
@@ -46,6 +48,7 @@ internal sealed record StudioOptions(
 
         var role = section["AuthorRole"];
         var publisherRole = section["PublisherRole"];
+        var developerRole = section["DeveloperRole"];
         var applicationsPath = section["ApplicationsPath"];
         string? applications = null;
         if (!string.IsNullOrWhiteSpace(applicationsPath))
@@ -79,7 +82,8 @@ internal sealed record StudioOptions(
             section.GetValue<bool>("Tests"),
             applications,
             cell.IsCell,
-            revisions);
+            revisions,
+            string.IsNullOrWhiteSpace(developerRole) ? null : developerRole);
     }
 
     /// <summary>

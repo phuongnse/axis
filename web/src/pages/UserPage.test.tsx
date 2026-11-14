@@ -31,7 +31,7 @@ const roles: UserRoles = {
     { applicationId, role: 'dropped', declared: false },
   ],
   applications: [{ id: applicationId, name: 'Purchasing', roles: ['approver', 'buyer'] }],
-  platformRoles: ['author', 'publisher', 'operator', 'administrator'],
+  platformRoles: ['author', 'publisher', 'developer', 'operator', 'administrator'],
 }
 
 function json(body: unknown, status = 200) {
@@ -99,6 +99,25 @@ describe('UserPage', () => {
     expect(within(roleRow(page, 'approver')).getByRole('button', { name: 'Give' })).toBeVisible()
     expect(within(page).getByText('Platform')).toBeVisible()
     expect(within(roleRow(page, 'administrator')).getByRole('button', { name: 'Give' })).toBeVisible()
+  })
+
+  it('offers the developer role and shows it on a person who holds it', async () => {
+    stubRoles()
+    const page = await openAnn()
+
+    expect(await within(page).findByText('Purchasing')).toBeVisible()
+    expect(within(roleRow(page, 'developer')).getByRole('button', { name: 'Give' })).toBeVisible()
+  })
+
+  it('shows Given and Remove on the developer role of a person who holds it', async () => {
+    stubRoles(undefined, () =>
+      json({ ...roles, given: [...roles.given, { applicationId: null, role: 'developer', declared: true }] }),
+    )
+    const page = await openAnn()
+
+    expect(await within(page).findByText('Purchasing')).toBeVisible()
+    expect(within(roleRow(page, 'developer')).getByText('Given')).toBeVisible()
+    expect(within(roleRow(page, 'developer')).getByRole('button', { name: 'Remove' })).toBeVisible()
   })
 
   it('shows Not set for a person without an email', async () => {

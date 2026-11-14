@@ -28,7 +28,7 @@ public sealed class AdminTenantSignInSetTests(PostgreSqlFixture database) : ICla
                 "tenant", "sign-in", "set", id, "--accounts", "true",
                 "--provider", "company", "--type", "oidc", "--issuer", "CompanyIssuer", "--client-id", "CompanyClientId", "--client-secret", "CompanySecret",
                 "--claim", "email=mail", "--claim", "displayName=full_name", "--roles-claim", "groups",
-                "--role", "axis-admins=administrator", "--role", "ops-team=operator",
+                "--role", "axis-admins=administrator", "--role", "ops-team=operator", "--role", "dev-team=developer",
                 "--provider", "partner", "--type", "saml", "--metadata", "PartnerMetadata",
             ],
             extra: _directory);
@@ -46,7 +46,7 @@ public sealed class AdminTenantSignInSetTests(PostgreSqlFixture database) : ICla
         Assert.Equal(("CompanyIssuer", "CompanyClientId", "CompanySecret", null, null), (company.IssuerBinding, company.ClientIdBinding, company.ClientSecretBinding, company.ClientKeyBinding, company.MetadataBinding));
         Assert.Equal(("full_name", "mail", null, "groups"), (company.ClaimDisplayName, company.ClaimEmail, company.ClaimLocale, company.RolesClaim));
         Assert.Equal(
-            new Dictionary<string, string> { ["axis-admins"] = "administrator", ["ops-team"] = "operator" },
+            new Dictionary<string, string> { ["axis-admins"] = "administrator", ["ops-team"] = "operator", ["dev-team"] = "developer" },
             JsonSerializer.Deserialize<Dictionary<string, string>>(company.RoleValues));
         var partner = providers[1];
         Assert.Equal(("saml", "PartnerMetadata", "{}"), (partner.Type, partner.MetadataBinding, partner.RoleValues));
@@ -54,7 +54,7 @@ public sealed class AdminTenantSignInSetTests(PostgreSqlFixture database) : ICla
         var record = Assert.Single(records, record => record.Command == "tenant sign-in set");
         Assert.Equal(id, record.TenantId);
         Assert.Equal(["accounts", "provider:company", "provider:partner"], record.Changed);
-        string[] values = ["CompanyIssuer", "CompanyClientId", "CompanySecret", "PartnerMetadata", "full_name", "groups", "ops-team", "operator"];
+        string[] values = ["CompanyIssuer", "CompanyClientId", "CompanySecret", "PartnerMetadata", "full_name", "groups", "ops-team", "operator", "dev-team", "developer"];
         Assert.All(values, value => Assert.DoesNotContain(value, record.Text, StringComparison.Ordinal));
 
         var second = await scenario.RunAsync(
