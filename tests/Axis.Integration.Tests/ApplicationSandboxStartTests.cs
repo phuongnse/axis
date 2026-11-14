@@ -94,20 +94,13 @@ public sealed class ApplicationSandboxStartTests(PostgreSqlFixture database) : I
     [Fact]
     public async Task Check_fails_when_nothing_listens_at_the_host_address()
     {
-        var (host, port) = (IPAddress.Loopback.ToString(), ClosedPort());
+        Assert.True(PackageIsolation.TryParseHostPort(TestPackageHost.ClosedAddress(), out var host, out var port));
         var check = new ApplicationSandboxCheck(new ApplicationPackageSettings(true, host, port), NullLogger<ApplicationSandboxCheck>.Instance);
 
         var failure = await check.RunAsync(TimeSpan.FromSeconds(30), CancellationToken);
 
         Assert.NotNull(failure);
         Assert.Contains("application-package-host", failure, StringComparison.Ordinal);
-    }
-
-    private static int ClosedPort()
-    {
-        using var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 
     /// <summary>Starts the worker in this process on a migrated database and waits until <c>/health/ready</c> is healthy.</summary>
