@@ -746,7 +746,8 @@ installation, loading, the capability limits, the server's metadata-only load an
   project restores with a NuGet lock file and names `packages.lock.json` in `lock`, as does the
   test package. The package project copies each build to `artifacts/extensions/payment-references/1.0.0/`.
   `scripts/build.sh` and `scripts/dev.sh` install it there, and the Compose image holds it in
-  `/extensions`. In every run mode `Extensions:Path` names that folder.
+  `/extensions`. In every run mode `Extensions:Path` names that folder. The on-premises smoke test builds the
+  package with the `build` command of its package host image, see [tests of the example](installation.md#tests-of-the-example).
 - **Python sample package.** `samples/packages/phone-numbers/` holds `phone-numbers` 1.0.0 as plain
   files. Its adapter wraps the PyPI library `phonenumbers` and leaves it unchanged. Its one
   operation, `normalize`, is pure and has no capabilities. It takes a `number` and an optional
@@ -781,7 +782,9 @@ installation, loading, the capability limits, the server's metadata-only load an
   `assignPaymentReference`, on the request's `submittedAt`. The integration tests that use the sample fixture run
   that step through a Node.js runner of a package host over an installed copy of the sample packages.
   `scripts/dev.sh`, `scripts/e2e.sh` and the root `compose.yaml` each run a Node.js package
-  host that holds it, and point their worker at it, see [development](../development.md).
+  host that holds it, and point their worker at it, see [development](../development.md). The on-premises smoke test
+  builds the package with the `build` command of its package host image, see
+  [tests of the example](installation.md#tests-of-the-example).
 - **Test package.** A test-only package, `test-package`, lives under
   `tests/packages/`. One source is built as versions 1.0.0, 1.1.0 and 2.0.0, and the
   tests install it to cover installation and loading. Its `probe` operation

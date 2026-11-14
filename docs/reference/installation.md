@@ -441,14 +441,16 @@ Two kinds of test keep the example as this section describes it.
   proxy's TLS versions and ciphers are the ones of [TLS](#tls), and that a Studio save on one replica
   is read on the other and a stale save there answers `409`. It checks each running package host, the C#, the Python and the Node.js one: its root refuses a write
   and `/tmp` takes one, its limits are set, its environment is the one of its image, it reaches the worker but not the
-  proxy, PostgreSQL or an outside address, and the worker reaches it on 5310. It runs no `test` request against the
-  installed images.
+  proxy, PostgreSQL or an outside address, and the worker reaches it on 5310. It builds the sample packages `payment-references` and `payment-terms` with the
+  `build` command of the C# and the Node.js package host images and mounts the result as `AXIS_EXTENSIONS_DIR`, read-only in the worker and the package hosts. It
+  sets the deployment bindings of the purchase request sample for tenant one, every url binding over https, and activates the sample there, so that tenant one
+  serves `leave` and `purchasing` and tenant two serves `leave`. It runs no `test` request against the installed images.
 - **The static checks.** Other tests read the rendered configuration and check the rules of this
   section: that nothing under `deploy/compose/` holds a secret, that every secret comes only from
   `secrets:` files, that each service mounts only the secrets, certificates and folders listed here,
   that the scenario secret and `Studio__Tests` appear only with `compose.scenarios.yaml`, that every
   published port of both servers is on `127.0.0.1`, that each package host has a read-only root, its limits, no environment,
-  secret or port, and only the packages, read-only, and sits only on the internal `runners` network with the worker and the other package hosts, and that the Caddyfile and the Kestrel settings
+  secret or port, and only the packages, read-only, and sits only on the internal `runners` network with the worker and the other package hosts, that the worker mounts the same packages folder read-only, and that the Caddyfile and the Kestrel settings
   match [what the Compose example sets](#tls).
 
 ## In the cloud

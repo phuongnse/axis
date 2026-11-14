@@ -7,7 +7,11 @@
 // test authority for the name servers, and the proxy trusts that authority only. With Studio on, it saves a resource through one replica,
 // reads it back through the other, and checks that a stale save answers 409. It checks each package host's (C#, Python and Node.js) read-only root, limits, environment
 // and network: it reaches the worker only, and the worker reaches it on 5310. Each start of a service that publishes a port picks that
-// port right before it, and Docker's bind error starts it again on new ports. Requires Docker and openssl, and the
+// port right before it, and Docker's bind error starts it again on new ports. Before any start it builds the sample packages
+// payment-references and payment-terms with the `build` command of their package host images, into the folder that
+// AXIS_EXTENSIONS_DIR names, which the worker and the package hosts mount read-only. It gives tenant one the deployment
+// bindings of the purchase request sample, every url binding over https, and activates the sample there only.
+// Requires Docker, openssl, the .NET SDK, network access for Trivy's vulnerability database, which the builds scan with, and the
 // sample modules in artifacts/modules, which scripts/smoke.sh installs. Run from scripts/smoke.sh.
 //
 // Everything the test adds lives in an override file in a temporary folder: PostgreSQL over TLS, the development
@@ -28,7 +32,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
 import { tmpdir } from 'node:os'
@@ -39,6 +43,7 @@ import { fileURLToPath } from 'node:url'
 import { listedImage } from './lib/docker-images.mjs'
 import { freePort, startOnFreePorts } from './lib/free-ports.mjs'
 import { addAccount, cookieHeader, preparePlatformClient, signIn } from './lib/keycloak-sign-in.mjs'
+import { buildPackage, copyReadable, downloadTrivyDatabase, removeAsImageUser, writable } from './lib/package-build.mjs'
 import { smokeImages } from './lib/smoke-images.mjs'
 import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
 
@@ -442,7 +447,9 @@ describe('the package hosts', () => {
       const [mount] = packageHost.volumes
       assert.equal(mount.target, '/extensions')
       assert.equal(mount.read_only, true)
-      assert.equal(mount.source, services.worker.volumes.find((volume) => volume.target === '/extensions').source)
+      const workerMount = services.worker.volumes.find((volume) => volume.target === '/extensions')
+      assert.equal(workerMount.read_only, true, 'the worker mounts /extensions read-write')
+      assert.equal(mount.source, workerMount.source)
     })
   }
 
@@ -501,6 +508,8 @@ describe('the on-premises installation', () => {
   let agentPort
   let httpsPort
   let server2Port
+  let built
+  let extensions
   let overrideFile
   let caCertificate
   let adminClientSecret
@@ -664,8 +673,8 @@ describe('the on-premises installation', () => {
     return response
   }
 
-  const admin = (args, extraEnv = {}) =>
-    compose(['run', '--rm', '--no-TTY', 'admin', ...args], { env: { ...env, ...extraEnv } })
+  const admin = (args, { env: extraEnv = {}, input } = {}) =>
+    compose(['run', '--rm', '--no-TTY', 'admin', ...args], { env: { ...env, ...extraEnv }, input })
 
   before(
     async () => {
@@ -678,6 +687,31 @@ describe('the on-premises installation', () => {
 
       // Step 1, the images. scripts/smoke.sh built the seven targets with the version that compose.yaml requires.
       version = smokeImages(targets)
+
+      // The sample packages that the purchase request sample declares, built with the `build` command of their package
+      // host images, as an operator does, into the folder that AXIS_EXTENSIONS_DIR names. Every service that mounts
+      // /extensions reads it at its start, so the builds finish before the first `up`. See
+      // docs/reference/extension-packages.md#building-a-package.
+      built = writable(join(folder, 'built'))
+      extensions = writable(join(built, 'extensions'))
+      const cache = writable(join(built, 'trivy-cache'))
+      await downloadTrivyDatabase({ image: `axis-package-host-dotnet:${version}`, cache })
+
+      const referencesProject = 'samples/packages/PaymentReferences/PaymentReferences.csproj'
+      const compiled = spawnSync('dotnet', ['build', referencesProject, '-c', 'Release'], { cwd: root, encoding: 'utf8' })
+      assert.equal(compiled.status, 0, `dotnet build ${referencesProject}\n${compiled.stdout}${compiled.stderr}`)
+      const referencesSource = join(folder, 'sources', 'payment-references')
+      copyReadable(join(root, 'samples/packages/PaymentReferences/bin/Release/net10.0'), referencesSource)
+      const references = buildPackage({ image: `axis-package-host-dotnet:${version}`, source: referencesSource, extensions, cache })
+      assert.match(references, /Built payment-references 1\.0\.0 in payment-references\/1\.0\.0\//)
+
+      const termsSource = join(folder, 'sources', 'payment-terms')
+      copyReadable(join(root, 'samples/packages/payment-terms'), termsSource, (name) => name === 'node_modules')
+      const terms = buildPackage({ image: `axis-package-host-node:${version}`, source: termsSource, extensions, cache })
+      assert.match(terms, /Built payment-terms 1\.0\.0 in payment-terms\/1\.0\.0\//)
+      for (const file of ['payment-references/1.0.0/axis-package.json', 'payment-terms/1.0.0/axis-package.json', 'payment-terms/1.0.0/node_modules/dayjs/package.json']) {
+        assert.ok(existsSync(join(extensions, file)), `${file} was not written to the extensions folder`)
+      }
 
       // Step 2, the secret files. The folder and the files are readable by UID 1654.
       const secrets = join(folder, 'secrets')
@@ -849,6 +883,7 @@ describe('the on-premises installation', () => {
         AXIS_VERSION: version,
         AXIS_SECRETS_DIR: secrets,
         AXIS_MODULES_DIR: join(root, 'artifacts/modules'),
+        AXIS_EXTENSIONS_DIR: extensions,
         AXIS_APPS_DIR: join(root, 'samples/apps'),
         AXIS_SERVER_PORT: String(serverPort),
         AXIS_SERVER_2_PORT: String(server2Port),
@@ -873,6 +908,9 @@ describe('the on-premises installation', () => {
 
   after(() => {
     compose(['down', '-v', '--remove-orphans'], { stdio: 'ignore', env: { ...env, COMPOSE_PROFILES: 'admin,replicas' } })
+    // The built packages and Trivy's database belong to UID 1654, which the host user cannot delete, so the image's own
+    // shell deletes them first.
+    if (built) removeAsImageUser(`axis-package-host-dotnet:${version}`, built)
     if (folder) rmSync(folder, { recursive: true, force: true })
   })
 
@@ -981,6 +1019,37 @@ describe('the on-premises installation', () => {
       assert.equal(activate.status, 0, `activate\n${activate.stdout}${activate.stderr}`)
       for (const id of Object.keys(hosts)) assert.match(activate.stdout, new RegExp(`^${id} activate ok$`, 'm'))
 
+      // The purchase request sample, on tenant one only: it gets the sample's deployment bindings, every url binding over
+      // https, and the activation checks each of them. See docs/reference/integration-resources.md#deployment-bindings.
+      const urlBindings = {
+        PurchasingSystemUrl: 'https://purchasing.example.test',
+        PurchasingSystemTokenUrl: 'https://purchasing.example.test/oauth/token',
+        PurchaseRequestApprovedWebhookUrl: 'https://purchasing.example.test/webhooks/purchase-request-approved',
+        CompanyIssuer: identityAuthority,
+      }
+      for (const [name, value] of Object.entries(urlBindings)) {
+        const set = admin(['tenant', 'binding', 'set', 'one', name, '--url', value])
+        assert.equal(set.status, 0, `tenant binding set one ${name}\n${set.stdout}${set.stderr}`)
+      }
+      for (const name of ['PurchasingSystemClientId', 'PurchasingSystemClientSecret', 'PurchaseRequestApprovedWebhookSecret', 'CompanyClientId', 'CompanyClientSecret']) {
+        const set = admin(['tenant', 'binding', 'set', 'one', name, '--secret'], { input: password() })
+        assert.equal(set.status, 0, `tenant binding set one ${name}\n${set.stdout}${set.stderr}`)
+      }
+      const bindings = admin(['tenant', 'binding', 'list', 'one'])
+      assert.equal(bindings.status, 0, `tenant binding list one\n${bindings.stdout}${bindings.stderr}`)
+      const urls = bindings.stdout
+        .trim()
+        .split('\n')
+        .slice(1)
+        .map((row) => row.trim().split(/\s{2,}/))
+        .filter(([, kind]) => kind === 'url')
+      assert.deepEqual(urls.map(([name]) => name).sort(), Object.keys(urlBindings).sort())
+      for (const [name, , value] of urls) assert.match(value, /^https:\/\//, `the url binding ${name} is not https`)
+
+      const purchasing = admin(['activate', '/apps/purchase-requests', '--tenant', 'one'])
+      assert.equal(purchasing.status, 0, `activate purchase-requests\n${purchasing.stdout}${purchasing.stderr}`)
+      assert.match(purchasing.stdout, /^one activate ok$/m)
+
       // The hosts serve a tenant after their next refresh, here two seconds.
       for (const host of Object.values(hosts)) {
         const site = await waitFor(() => server(host, '/leave'), 200, 60)
@@ -999,8 +1068,17 @@ describe('the on-premises installation', () => {
         assert.equal(result.status, 0, result.stderr)
         return JSON.parse(result.stdout)[0]
       }
+      // The worker and each package host mount the folder that the test built the packages in, read-only.
+      const extensionsMount = (container, name) => {
+        const mount = container.Mounts.find((candidate) => candidate.Destination === '/extensions')
+        assert.ok(mount, `${name} mounts no /extensions`)
+        assert.equal(mount.Source, extensions, `${name} /extensions source`)
+        assert.equal(mount.RW, false, `${name} mounts /extensions read-write`)
+      }
+      extensionsMount(inspect(run(['ps', '-q', 'worker'])), 'worker')
       for (const [name, host] of Object.entries(packageHosts)) {
         const packageHost = inspect(run(['ps', '-q', name]))
+        extensionsMount(packageHost, name)
         assert.equal(packageHost.HostConfig.ReadonlyRootfs, true, `${name} root`)
         assert.equal(packageHost.HostConfig.NanoCpus, 1e9, `${name} CPUs`)
         assert.equal(packageHost.HostConfig.Memory, 1024 ** 3, `${name} memory`)
@@ -1050,11 +1128,12 @@ describe('the on-premises installation', () => {
       assert.ok(withTls > 0, `no Axis connection uses TLS\n${connections.stdout}`)
       assert.equal(withoutTls, 0, `${withoutTls} Axis connections do not use TLS`)
 
-      // Each tenant's database holds the active site.
+      // Each tenant's database holds its active sites: tenant one has the purchase request sample too.
+      const activeSites = { one: 'leave\npurchasing', two: 'leave' }
       for (const id of Object.keys(hosts)) {
-        const sites = compose(['exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', `axis_${id}`, '-tAc', 'select path from axis.active_sites'])
+        const sites = compose(['exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-d', `axis_${id}`, '-tAc', 'select path from axis.active_sites order by path'])
         assert.equal(sites.status, 0, sites.stderr)
-        assert.equal(sites.stdout.trim(), 'leave', `axis_${id} active sites`)
+        assert.equal(sites.stdout.trim(), activeSites[id], `axis_${id} active sites`)
       }
 
       // Each tenant has its own sign-in: a redirect to the authorization endpoint of its own realm that returns to its own host.
