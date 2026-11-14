@@ -36,11 +36,12 @@ internal sealed partial class TestPackageHost : IAsyncDisposable
     /// <summary>The log entries of the host.</summary>
     public LogCollector Logs { get; }
 
-    public static async Task<TestPackageHost> StartAsync(string extensionsRoot)
+    /// <summary>Starts the host. <paramref name="sandbox"/> is what answers a <c>sandbox</c> question, and defaults to the sandbox of this machine.</summary>
+    public static async Task<TestPackageHost> StartAsync(string extensionsRoot, Sandbox? sandbox = null)
     {
         var logs = new LogCollector();
         var loggers = LoggerFactory.Create(builder => builder.AddProvider(logs));
-        var host = new RunnerHost(extensionsRoot, TestRunnerCommand.Create(), loggers.CreateLogger<RunnerHost>());
+        var host = new RunnerHost(extensionsRoot, TestRunnerCommand.Create(), loggers.CreateLogger<RunnerHost>(), sandbox);
         return new TestPackageHost(host, loggers, await host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None), logs);
     }
 
@@ -70,6 +71,13 @@ internal sealed partial class TestPackageHost : IAsyncDisposable
             .Where(match => match.Success && match.Groups["package"].Value == package && match.Groups["version"].Value == version)
             .Select(match => int.Parse(match.Groups["id"].Value, System.Globalization.CultureInfo.InvariantCulture))];
 
+    /// <summary>What the host answered to each <c>sandbox</c> question, whether it runs under gVisor.</summary>
+    public IReadOnlyList<bool> SandboxAnswers() =>
+        [.. Logs.Entries
+            .Select(entry => SandboxAnswered().Match(entry))
+            .Where(match => match.Success)
+            .Select(match => bool.Parse(match.Groups["gvisor"].Value))];
+
     /// <summary>A loopback port where nothing listens, as <c>host:port</c>.</summary>
     public static string ClosedAddress()
     {
@@ -97,6 +105,9 @@ internal sealed partial class TestPackageHost : IAsyncDisposable
         await _host.DisposeAsync();
         _loggers.Dispose();
     }
+
+    [GeneratedRegex(@"Answered a sandbox question: gVisor (?<gvisor>True|False)\.")]
+    private static partial Regex SandboxAnswered();
 
     [GeneratedRegex(@"Runner (?<id>\d+) started for package (?<package>\S+) (?<version>\S+)\.")]
     private static partial Regex RunnerStarted();

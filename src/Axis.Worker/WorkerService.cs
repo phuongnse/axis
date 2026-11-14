@@ -18,7 +18,9 @@ using Npgsql;
 namespace Axis.Worker;
 
 /// <summary>
-/// Under the directory source it first reads the tenant directory, and retries until a read works. Then it runs
+/// With <c>Extensions:ApplicationPackages</c> on it first runs <see cref="ApplicationSandboxCheck"/>, and a host that does not run under gVisor
+/// or does not answer records the failure in <see cref="StartupCheckState"/> and stops the host before it reads any tenant or claims any work.
+/// Under the directory source it then reads the tenant directory, and retries until a read works. Then it runs
 /// <c>Worker:Concurrency</c> loops and one poll. The poll gives each tenant its own next poll time, see <see cref="TenantPolls"/>.
 /// A tenant that has work is polled every <c>Worker:PollInterval</c>. After each poll that finds nothing due, the wait of an idle
 /// tenant doubles, up to <c>Worker:IdlePollCeiling</c>, and its next poll comes at its earliest due time when that is sooner.
@@ -63,6 +65,7 @@ internal sealed partial class WorkerService(
     TenantQuotas quotas,
     PackageCatalog packages,
     StartupCheckState checkState,
+    ApplicationSandboxCheck sandboxCheck,
     CellOptions cell,
     WakeSignals wake,
     WorkerPollMetrics metrics,
@@ -117,6 +120,12 @@ internal sealed partial class WorkerService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (await sandboxCheck.RunAsync(ApplicationSandboxCheck.Wait, stoppingToken) is { } failure)
+        {
+            checkState.Failed = true;
+            throw new StartupCheckException(failure);
+        }
+
         if (tenants.TenantsSectionIgnored)
         {
             LogTenantsSectionIgnored();
@@ -1001,6 +1010,11 @@ internal sealed partial class WorkerService(
     {
         public StartupCheckException(string tenantId, Diagnostic first)
             : base($"The releases in use for tenant '{tenantId}' do not match the installed extension packages, first {first.Code}: {first.Message}")
+        {
+        }
+
+        public StartupCheckException(string message)
+            : base(message)
         {
         }
 

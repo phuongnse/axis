@@ -300,6 +300,40 @@ public sealed class PackageHostTests : IAsyncLifetime
         Assert.Null(await connection.ReceiveAsync());
     }
 
+    [Theory]
+    [InlineData("<6>[    0.000000] Starting gVisor...\n<6>[    0.100000] Waiting for children...\n", true)]
+    [InlineData("Starting gVisor...\n", true)]
+    [InlineData("<5>[    0.000000] Linux version 6.8.0 (build@host)\n<6>[    0.000001] Starting gVisor...\n", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public async Task A_sandbox_question_is_answered_from_the_kernel_log_and_starts_no_runner(string? kernelLog, bool gvisor)
+    {
+        await using var host = new RunnerHost(_extensions.Path, TestRunnerCommand.Create(), _log, new Sandbox(() => kernelLog));
+        var endpoint = await host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None);
+        using var connection = Connect(endpoint);
+        await connection.SendAsync(new SandboxMessage());
+
+        Assert.Equal(new SandboxMessage(gvisor), await connection.ReceiveAsync());
+        Assert.Null(await connection.ReceiveAsync());
+        Assert.Empty(_log.StartedRunners);
+    }
+
+    [Fact]
+    public async Task A_sandbox_line_that_already_holds_an_answer_closes_the_connection_without_one()
+    {
+        await using var host = new RunnerHost(_extensions.Path, TestRunnerCommand.Create(), _log, new Sandbox(() => "Starting gVisor"));
+        var endpoint = await host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None);
+        using var connection = Connect(endpoint);
+        await connection.SendAsync(new SandboxMessage(true));
+
+        Assert.Null(await connection.ReceiveAsync());
+        Assert.Empty(_log.StartedRunners);
+    }
+
+    [Fact]
+    public void This_machine_is_not_under_gvisor_because_the_tests_never_run_under_it() =>
+        Assert.False(Sandbox.ForThisMachine().IsGvisor());
+
     [Fact]
     public async Task A_start_for_a_version_that_is_not_installed_closes_the_connection_and_starts_no_runner()
     {
