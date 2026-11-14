@@ -530,7 +530,7 @@ illustrative `supplierCode` text field on the subject. The sample packages, `pay
 The compiler reports these as compile errors.
 
 - The package is one of the application's
-  [`packages`](extension-packages.md#declaring-packages-in-an-application), or an application's own
+  [`packages`](declaring-packages.md#declaring-packages-in-an-application), or an application's own
   package in `packages/<id>/`, see
   [an application's packages](extension-packages.md#an-applications-packages), with the package id
   matched exactly. Otherwise it is `AXC0150` at `/steps/{i}/operation`. A listed package that failed
@@ -580,7 +580,7 @@ operation in place of the HTTP request:
   `python` attempt always goes to a package runner, with `inProcess` too.
 - **Run in a customer-hosted runner** _(planned for M37)_. The worker runs no attempt of a call to a
   customer-hosted package, whether the application's own package or an installation's package that the
-  application [declares](extension-packages.md#declaring-packages-in-an-application) with
+  application [declares](declaring-packages.md#declaring-packages-in-an-application) with
   `runner: customer`, see [customer-hosted runners](extension-packages.md#customer-hosted-runners). The call waits `pending`, its retry due, until a
   [customer-hosted runner](extension-packages.md#customer-hosted-runners) that registers the package and
   version takes it, and the runner receives no binding value.

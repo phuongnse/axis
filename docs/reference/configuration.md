@@ -624,7 +624,7 @@ The Release step stores the compiled application as a release, which is immutabl
   UTF-8. It is written as lowercase hex. Formatting-only changes (whitespace, key order, line
   endings) keep the hash, and a changed value, or an added, removed or renamed file, changes it.
 - **Pinned packages in the hash.** After the resources come the pinned
-  [extension packages](extension-packages.md#declaring-packages-in-an-application), in ordinal order
+  [extension packages](declaring-packages.md#declaring-packages-in-an-application), in ordinal order
   of their id, each contributing `/packages/<id>`, a newline, the pinned version and a newline. A
   resource path never starts with `/`, so a pin cannot be confused with a file. An application
   without pins has the hash of its resources alone. So installing a newer version in range gives the
@@ -737,7 +737,7 @@ the [authoring API](authoring.md#references) to show where a resource is used an
 - **Built by the compile.** The index is built in memory, in the same pass as the
   [Resolve](#resolve) step. It is not stored in the release and costs nothing at run time.
 - **Nodes.** A node is a resource, with its `id`, `kind`, `name` and `file`, a text key, an
-  [extension package](extension-packages.md#declaring-packages-in-an-application) by its id, or a
+  [extension package](declaring-packages.md#declaring-packages-in-an-application) by its id, or a
   module by its id.
 - **Edges.** An edge runs from a resource and a JSON Pointer path in it to a node, with a relation.
   The path is the one that the compile diagnostics use.

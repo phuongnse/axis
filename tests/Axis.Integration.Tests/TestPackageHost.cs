@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Axis.Configuration.Tests;
 using Axis.PackageHost;
 using Axis.PackageHost.Tests;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Axis.Integration.Tests;
@@ -36,12 +37,16 @@ internal sealed partial class TestPackageHost : IAsyncDisposable
     /// <summary>The log entries of the host.</summary>
     public LogCollector Logs { get; }
 
-    /// <summary>Starts the host. <paramref name="sandbox"/> is what answers a <c>sandbox</c> question, and defaults to the sandbox of this machine.</summary>
-    public static async Task<TestPackageHost> StartAsync(string extensionsRoot, Sandbox? sandbox = null)
+    /// <summary>
+    /// Starts the host. <paramref name="sandbox"/> is what answers a <c>sandbox</c> question, and defaults to the sandbox of this machine.
+    /// <paramref name="settings"/> are the host's settings, such as <c>PackageBuild:Trivy</c> for a <c>build</c>.
+    /// </summary>
+    public static async Task<TestPackageHost> StartAsync(string extensionsRoot, Sandbox? sandbox = null, IReadOnlyDictionary<string, string?>? settings = null)
     {
         var logs = new LogCollector();
         var loggers = LoggerFactory.Create(builder => builder.AddProvider(logs));
-        var host = new RunnerHost(extensionsRoot, TestRunnerCommand.Create(), loggers.CreateLogger<RunnerHost>(), sandbox);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings ?? new Dictionary<string, string?>()).Build();
+        var host = new RunnerHost(extensionsRoot, TestRunnerCommand.Create(), loggers.CreateLogger<RunnerHost>(), sandbox, configuration);
         return new TestPackageHost(host, loggers, await host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None), logs);
     }
 

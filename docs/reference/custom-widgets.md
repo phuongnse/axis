@@ -78,7 +78,7 @@ A page names a custom widget with the `custom` type and sets its properties:
 ```
 
 - **The package.** The application declares the package in its
-  [`packages`](extension-packages.md#declaring-packages-in-an-application), and the release pins the version, as for
+  [`packages`](declaring-packages.md#declaring-packages-in-an-application), and the release pins the version, as for
   operations.
 - **Compilation** checks the widget and its properties against the manifest of the pinned version. An unknown package
   or widget, a property the manifest does not declare, a missing required property and a value of the wrong type are

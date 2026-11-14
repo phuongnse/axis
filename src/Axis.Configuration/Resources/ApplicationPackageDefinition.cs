@@ -13,7 +13,7 @@ public sealed record ApplicationPackageDefinition
 
     /// <summary>
     /// Where the package runs: <c>axis</c>, the default, or <c>customer</c>. Only <c>application.json</c> sets it, see
-    /// <c>docs/reference/extension-packages.md#declaring-packages-in-an-application</c>.
+    /// <c>docs/reference/declaring-packages.md#declaring-packages-in-an-application</c>.
     /// </summary>
     public string? Runner { get; init; }
 }
