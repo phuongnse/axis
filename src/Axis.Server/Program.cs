@@ -394,6 +394,7 @@ sessions.MapTenantExportEndpoints();
 sessions.MapTenantUsageEndpoints();
 sessions.MapTenantModelKeyEndpoints();
 sessions.MapTenantOutsideClientsEndpoints();
+sessions.MapTenantApplicationPackagesEndpoints();
 sessions.MapTenantPackageRunnersEndpoints();
 
 // An /api path that matches no route answers a 404 problem, never the SPA's page. GET and HEAD only, as the SPA fallback,

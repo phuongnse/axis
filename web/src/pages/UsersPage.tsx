@@ -21,6 +21,7 @@ import { ConnectedAppsTab } from './ConnectedAppsTab'
 import { usePlatform } from './context'
 import { InviteUserModal } from './InviteUserModal'
 import { NotFoundPage } from './NotFoundPage'
+import { TenantApplicationPackagesSection } from './TenantApplicationPackagesSection'
 import { TenantExportSection } from './TenantExportSection'
 import { TenantModelKeySection } from './TenantModelKeySection'
 import { TenantUsageSection } from './TenantUsageSection'
@@ -291,6 +292,7 @@ export function UsersPage() {
                   <TenantExportSection />
                   <TenantUsageSection />
                   <TenantModelKeySection />
+                  <TenantApplicationPackagesSection />
                 </>
               ),
             },

@@ -89,6 +89,9 @@ public sealed class StorageQuotaRouteTests
         // The tenant's outside clients setting is a platform row and no tenant data, so the storage quota does not count it.
         "PUT /api/tenant/outside-clients",
 
+        // The tenant's application packages switch is a platform row and no tenant data, so the storage quota does not count it.
+        "PUT /api/tenant/application-packages",
+
         // A consent revoke is a security action and is never refused over the quota, see docs/reference/tenant-quotas.md#refusals.
         "POST /api/tenant/connected-apps/{clientId}/revoke",
 

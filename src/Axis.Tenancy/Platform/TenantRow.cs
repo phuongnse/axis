@@ -119,6 +119,11 @@ public sealed class TenantRow
     /// <summary>The tenant setting <c>Ai:AllowedClients</c>: the client ids that stay on under <c>allowList</c> (<c>docs/reference/mcp-server.md#client-registration</c>).</summary>
     public string[] AiAllowedClients { get; set; } = [];
 
+    /// <summary>
+    /// The tenant's application packages switch, off by default. See <c>docs/reference/user-administration.md#application-packages</c>.
+    /// </summary>
+    public bool ApplicationPackages { get; set; }
+
     /// <summary>The time after which the purge removes the tenant. <c>null</c> when no deletion is scheduled.</summary>
     public DateTimeOffset? DeleteAfter { get; set; }
 

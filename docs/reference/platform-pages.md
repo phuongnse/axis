@@ -188,7 +188,7 @@ The People tab has an "Application packages" section below Model key, where
 an administrator turns the tenant's application packages on or off, see
 [application packages](user-administration.md#application-packages). The section is a component of its own, like Model
 key. It loads `GET /api/tenant/application-packages` and renders nothing unless the route answers `200`, so a user who is
-not an administrator and a preview tenant do not see it.
+not an administrator and a preview tenant do not see it. Its texts are `shell.users.applicationPackages.*`.
 
 - **State.** The section shows whether application packages are on.
 - **Change.** One button opens a confirmation. Only the confirmation's button sends the `PUT`, and the section then

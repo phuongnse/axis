@@ -262,8 +262,8 @@ command routes do.
 
 | Route                                              | Body              | Answer                    |
 | -------------------------------------------------- | ----------------- | ------------------------- |
-| `GET /api/tenant/application-packages` _(planned for M37)_ | None              | `200` with `{ "on": false }` |
-| `PUT /api/tenant/application-packages` _(planned for M37)_ | `{ "on": true }`  | `204`                     |
+| `GET /api/tenant/application-packages` | None              | `200` with `{ "on": false }` |
+| `PUT /api/tenant/application-packages` | `{ "on": true }`  | `204`                     |
 
 - **The order of the checks.** A request is checked in this order: a signed-in user (`401`),
   `Users:AdministratorRole` (`403`), then a tenant with a row in the tenant directory that is not a preview
