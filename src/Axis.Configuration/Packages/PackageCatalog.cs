@@ -164,6 +164,14 @@ public sealed class PackageCatalog
         }
 
         CheckManifest(manifest, Report);
+        if (manifest.CustomerHosted)
+        {
+            Report(
+                DiagnosticCodes.PackageManifestInvalid,
+                "The manifest says 'runner': 'customer', which only an application's own package may say. An application runs an installed package in a customer-hosted runner through its 'packages' entry.",
+                "/runner");
+        }
+
         if (idName is not null && !string.Equals(manifest.Id, idName, StringComparison.Ordinal))
         {
             Report(DiagnosticCodes.PackageFolderMismatch, $"The id '{manifest.Id}' differs from its folder name '{idName}'.", "/id");
@@ -375,7 +383,8 @@ public sealed class PackageCatalog
             root.TryGetProperty("assembly", out var assembly) ? assembly.GetString()! : null,
             root.TryGetProperty("adapter", out var adapter) ? adapter.GetString()! : null,
             root.GetProperty("lock").GetString()!,
-            [.. root.GetProperty("operations").EnumerateArray().Select(ParseOperation)]);
+            [.. root.GetProperty("operations").EnumerateArray().Select(ParseOperation)],
+            root.TryGetProperty("runner", out var runner) && runner.GetString() == "customer");
 
     private static PackageLanguage ParseLanguage(string language) =>
         language switch

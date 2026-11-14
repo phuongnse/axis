@@ -323,6 +323,37 @@ public sealed class ReleaseCompilerBuildModelTests
     }
 
     [Fact]
+    public void Stored_release_keeps_the_customer_hosted_flag_of_a_package_pin_and_its_steps()
+    {
+        using var packages = new TemporaryFolder().Install("1.0.0");
+        var installed = PackageCatalog.Load(packages.Path).Versions;
+        var compiled = ApplicationCompiler.Compile(
+            [
+                new ResourceContent("application.json", ManifestWithPackages.Replace("\"^1.0.0\"", "\"^1.0.0\", \"runner\": \"customer\"", StringComparison.Ordinal)),
+                new ResourceContent("entities/order.json", """
+                    { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1,
+                      "fields": [ { "name": "total", "type": "integer" } ] }
+                    """),
+                new ResourceContent("processes/add.json", """
+                    { "id": "77777777-7777-4777-8777-777777777701", "kind": "process", "name": "Add", "formatVersion": 1,
+                      "entity": "Order", "start": "add",
+                      "steps": [
+                        { "name": "add", "type": "operation", "operation": "test-package/sum",
+                          "input": { "a": "1", "b": "total" }, "output": { "total": "total" }, "next": "done" },
+                        { "name": "done", "type": "end" } ] }
+                    """),
+            ],
+            installed);
+        Assert.Empty(compiled.Diagnostics);
+
+        var model = ReleaseCompiler.BuildModel(StoredRelease(compiled), installed);
+
+        ModelAssert.Equal(compiled.Model!, model);
+        Assert.True(Assert.Single(model.Packages).CustomerHosted);
+        Assert.True(Assert.IsType<PackageOperationStepModel>(Assert.Single(model.Processes).Steps[0]).CustomerHosted);
+    }
+
+    [Fact]
     public void Stored_release_keeps_the_package_pins_of_its_modules()
     {
         using var packages = new TemporaryFolder().Install("1.0.0", "1.1.0");

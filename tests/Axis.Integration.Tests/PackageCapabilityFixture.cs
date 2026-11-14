@@ -244,6 +244,28 @@ public sealed class PackageCapabilityFixture : IAsyncLifetime
     internal async Task<ActivationResult> TryActivateAsync(string tenantId, ActivationBindings bindings) =>
         (await Tenant(tenantId).TryActivateAsync(_application.Path, (_catalog ?? throw new InvalidOperationException("The fixture is not initialized.")).Versions, bindings)).Activated;
 
+    /// <summary>
+    /// Compiles a copy of StepApp whose <c>test-package</c> entry says <c>runner: customer</c> and tries to activate it with
+    /// <paramref name="bindings"/> for a new tenant, <paramref name="tenantId"/>, that the call disposes again.
+    /// </summary>
+    internal async Task<ActivationResult> TryActivateCustomerHostedAsync(string tenantId, ActivationBindings bindings)
+    {
+        using var folder = new TemporaryFolder();
+        foreach (var file in Directory.EnumerateFiles(_application.Path, "*", SearchOption.AllDirectories))
+        {
+            folder.With(Path.GetRelativePath(_application.Path, file), await File.ReadAllTextAsync(file));
+        }
+
+        var applicationPath = Path.Combine(folder.Path, "application.json");
+        var application = JsonNode.Parse(await File.ReadAllTextAsync(applicationPath))!.AsObject();
+        application["packages"]![0]!["runner"] = "customer";
+        await File.WriteAllTextAsync(applicationPath, application.ToJsonString());
+
+        await using var tenant = new ProcessStepFixture(tenantId);
+        await tenant.InitializeAsync();
+        return (await tenant.TryActivateAsync(folder.Path, (_catalog ?? throw new InvalidOperationException("The fixture is not initialized.")).Versions, bindings)).Activated;
+    }
+
     private const string FlakyOnceProcess = """
         {
           "id": "c5d1e8a3-4f27-4b69-9e02-7a3b6c0d8f91",

@@ -15,6 +15,7 @@
     "assembly": { "type": "string", "pattern": "^[^/\\\\]+\\.dll$" },
     "adapter": { "type": "string", "pattern": "^[^/\\\\]+$" },
     "lock": { "type": "string" },
+    "runner": { "enum": ["axis", "customer"] },
     "operations": {
       "type": "array",
       "minItems": 1,

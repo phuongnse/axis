@@ -270,6 +270,53 @@ public sealed class PackageStepCompilerTests
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.SchemaViolation);
     }
 
+    [Fact]
+    public void An_entry_that_runs_the_package_at_the_customer_marks_the_pin_and_its_steps()
+    {
+        using var packages = new TemporaryFolder().Install("1.0.0");
+        using var folder = Folder(
+            Process("""{ "name": "add", "type": "operation", "operation": "test-package/sum", "input": { "a": "1", "b": "2" }, "next": "done" }"""),
+            packages: """[{ "id": "test-package", "version": "1.0.0", "runner": "customer" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, PackageCatalog.Load(packages.Path).Versions);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal([new PinnedPackageModel("test-package", "1.0.0", "1.0.0", CustomerHosted: true)], result.Model!.Packages);
+        var step = Assert.IsType<PackageOperationStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.True(step.CustomerHosted);
+    }
+
+    [Theory]
+    [InlineData("""{ "id": "test-package", "version": "1.0.0" }""")]
+    [InlineData("""{ "id": "test-package", "version": "1.0.0", "runner": "axis" }""")]
+    public void An_entry_without_a_customer_runner_leaves_the_pin_and_its_steps_with_axis(string entry)
+    {
+        using var packages = new TemporaryFolder().Install("1.0.0");
+        using var folder = Folder(
+            Process("""{ "name": "add", "type": "operation", "operation": "test-package/sum", "input": { "a": "1", "b": "2" }, "next": "done" }"""),
+            packages: $"[{entry}]");
+
+        var result = ApplicationCompiler.Compile(folder.Path, PackageCatalog.Load(packages.Path).Versions);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.False(Assert.Single(result.Model!.Packages).CustomerHosted);
+        Assert.False(Assert.IsType<PackageOperationStepModel>(Assert.Single(result.Model.Processes).Steps[0]).CustomerHosted);
+    }
+
+    [Fact]
+    public void A_runner_other_than_axis_or_customer_is_a_schema_violation_at_the_runner()
+    {
+        using var packages = new TemporaryFolder().Install("1.0.0");
+        using var folder = Folder(
+            Process("""{ "name": "add", "type": "operation", "operation": "test-package/sum", "input": { "a": "1", "b": "2" }, "next": "done" }"""),
+            packages: """[{ "id": "test-package", "version": "1.0.0", "runner": "elsewhere" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, PackageCatalog.Load(packages.Path).Versions);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SchemaViolation, "application.json", "/packages/0/runner"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
     private static string Process(string step) =>
         $$"""
         { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,

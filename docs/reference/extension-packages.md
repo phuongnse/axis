@@ -92,9 +92,10 @@ identity, its operations and, for a C# package, its main assembly. This example 
 - **`lock`.** Required. The language's lock file: `packages.lock.json`,
   `package-lock.json`, or `requirements.txt` with a `--hash` on every line. The schema refuses the name of
   another language's lock file.
-- **`runner`** _(planned for M37)_. Where the package runs: `axis`, the default, or `customer`. It is valid in
-  an application's package. With `customer`, the application's folder holds the manifest alone, and the files
-  that `adapter` and `lock` name stay with the customer, see [customer-hosted runners](#customer-hosted-runners).
+- **`runner`.** Where the package runs: `axis`, the default, or `customer`. Another value is `AXC0132`. Only an
+  application's own package may say `customer`, and its folder then holds the manifest alone, see
+  [customer-hosted runners](#customer-hosted-runners). An installed package that says it is `AXC0132` at
+  `/runner`: only the application's `packages` entry decides where an installed package runs.
 - **`assembly` left out** _(planned for M22)_. A package that holds only widgets has no
   `assembly`.
 - **`widgets`** _(planned for M22)_. The custom widgets the package offers,
@@ -352,11 +353,11 @@ that its release was compiled against.
   policy when it is staged, because the worker cannot rebuild the release
   without the version.
 - **An application's packages.** The release holds every file of the application's own packages under
-  `packages/<id>/`, see [An application's packages](#an-applications-packages). Their versions are not
+  `packages/<id>/`, and the manifest alone for a customer-hosted one, so running work keeps the contract it
+  started with, see [An application's packages](#an-applications-packages). Their versions are not
   pins: the compiled step holds the version in the package's manifest.
-- **A built or customer-hosted package in the release** _(planned for M37)_. The release holds the built
-  package, or the manifest of a customer-hosted one, so running work keeps the code or the contract it
-  started with, see [An application's packages](#an-applications-packages).
+- **A built package in the release** _(planned for M37)_. The release holds the built package, so running
+  work keeps the code it started with.
 
 ## Loading
 
@@ -385,7 +386,7 @@ to `inProcess`, see [Package runners](#package-runners).
   starts. The codes are in the diagnostic table of the
   [configuration pipeline](configuration.md#configuration-pipeline):
   - `AXC0132`: the manifest is missing, cannot be read, is not valid JSON or
-    does not match its schema;
+    does not match its schema, or it says `"runner": "customer"`, reported at `/runner`;
   - `AXC0133`: the folder names differ from `id` or `version`;
   - `AXC0134`: the `assembly` file is missing or cannot be loaded, or the `adapter` file of a `node`
     or `python` package is missing;
@@ -447,9 +448,10 @@ see [Contracts](#contracts).
   tenant, or of the wrong kind, fails activation with `AXC0100`, and an `http`
   `url` binding outside Development fails it with `AXC0101`, see
   [Deployment bindings](integration-resources.md#deployment-bindings).
-- **A customer-hosted package** _(planned for M37)_. Neither the binding resolution nor the activation
-  check applies to a customer-hosted package, because the runner keeps its own bindings, see
-  [customer-hosted runners](#customer-hosted-runners).
+- **A customer-hosted package and the activation check.** The check skips the bindings that a customer-hosted
+  package's operations declare, so a tenant without them activates the release.
+- **A customer-hosted package and the binding resolution** _(planned for M37)_. The worker resolves no binding
+  for its calls, because the [runner](#customer-hosted-runners) keeps its own bindings.
 - **Secret values stay hidden.** A secret value never appears in history,
   audit records or logs. History and audit records hold only the type of an
   exception, never its message, because a message can hold input values or
@@ -639,15 +641,8 @@ never leave the customer, see [D148](../decisions/d148-packages-in-c-typescript-
   like a service account. Its access token's audience is `axis-package-runner`, so it reaches only the
   runner's routes, and a service account route refuses it because it lacks `Oidc:ServiceAudience`. Axis
   keeps no copy of the secret.
-- **Two sources.** An application's own package is customer-hosted when its folder is
-  `packages/<id>/axis-package.json` alone, with `"runner": "customer"`. An installation's package is
-  customer-hosted when the application's `packages` entry says `runner: customer`, see
-  [declaring packages in an application](declaring-packages.md#declaring-packages-in-an-application). Both use this one
-  mechanism and differ only in where the manifest comes from.
-- **The contract stays with Axis.** Compilation types the steps against the manifest, the worker reads
-  `idempotent` and `timeout` from it, and a posted result is checked against its `output`. The release holds
-  the manifest, so running work keeps the contract it started with, see
-  [versions and pinning](#versions-and-pinning). Publishing builds and scans nothing for the package.
+- **The contract stays with Axis.** The worker reads `idempotent` and `timeout` from the manifest, and checks a
+  posted result against `output`.
 - **The program.** The customer runs `docker run ... axis-package-host-<language> connect`, Axis's own
   [runner image](installation.md#images) with the `connect` command. It reads the built packages from
   `Extensions:Path`, where `build` writes them, and the customer builds each package with the same `build`
@@ -724,9 +719,10 @@ trusted code, so the platform gives it more limits than an installation's packag
   An application's package is then a compile error at its `packages/<id>/axis-package.json`, reported
   once for each package, when the server activates a folder at start, `activate` compiles it or the publisher compiles a snapshot. So an installation without gVisor refuses it and runs its own packages as before.
   A stored release that holds one still rebuilds, whatever the setting says.
-- **A customer-hosted package and the setting** _(planned for M37)_. The tenant's switch and the compile
+- **A customer-hosted package and the setting.** The tenant's switch and the compile
   check still allow a [customer-hosted](#customer-hosted-runners) package with the setting `false`, which
-  needs no gVisor because gVisor guards only code on Axis's machines.
+  needs no gVisor because gVisor guards only code on Axis's machines. A package that Axis runs is still
+  refused, and `AXC0148` is never reported for a customer-hosted one.
 - **Its own runners** _(planned for M37)_. One set for each tenant and package version, with the limits of
   [package runners](#package-runners). The package host starts a set when a call comes and stops it
   once it is idle, so a tenant that calls nothing holds no runner.
@@ -745,8 +741,10 @@ trusted code, so the platform gives it more limits than an installation's packag
   An id that an installation's package also uses is `AXC0147`. The application's `packages` list does not
   name it. Steps call it as `<id>/<operation>`, see
   [Package step shape](process-execution.md#package-step-shape).
-- **A customer-hosted package's folder** _(planned for M37)_. It holds the manifest alone, and another file
-  in it is a compile error at that file, because Axis neither builds nor scans it.
+- **A customer-hosted package's folder.** An application's own package is customer-hosted when its folder is
+  `packages/<id>/axis-package.json` alone, with `"runner": "customer"`. Another file in it is `AXC0132` at that
+  file. Compilation types the steps against the manifest and marks them customer-hosted. Publishing builds
+  and scans nothing for it.
 - **Built and scanned on publish** _(planned for M37)_. The publisher builds and scans each package that Axis runs as
   [built once](#what-a-package-is) says, but in the tenant's sandbox, because a dependency's install
   script is the tenant's code. A failed build or scan fails the publish with diagnostics. A publish
