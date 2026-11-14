@@ -41,6 +41,9 @@ namespace Axis.PackageHost;
 /// The first line may also be a <c>test</c>, which is as long as a <c>build</c> may be. The host builds the package as for a <c>build</c>,
 /// then runs the tests of a Python package in the built copy with <see cref="PackageTests"/>, and answers <c>tested</c> with the outcome of each test,
 /// or <c>refused</c> when the build fails, the package is not a Python package, or the tests do not finish in time. It deletes its copies whatever the answer.
+/// For a runner started from files the host reads the lines both ways. It measures the runner process's own CPU time from each line to the
+/// runner and sends a <c>usage</c> line right after each <c>result</c>, <c>retryable</c> or <c>failure</c> that the runner writes, and it
+/// drops a <c>usage</c> line that the runner writes itself. A runner of an installed version gets the raw copy and no <c>usage</c> line.
 /// </summary>
 internal sealed partial class RunnerHost(
     string extensionsRoot, RunnerCommands commands, ILogger<RunnerHost> logger, Sandbox? sandbox = null, IConfiguration? configuration = null, TimeSpan? testLimit = null) : IAsyncDisposable
@@ -218,7 +221,7 @@ internal sealed partial class RunnerHost(
             LogStartedForTenant(runner.Id, tenant, start.Package, start.Version);
         }
 
-        await PipeAsync(reader, socket, runner);
+        await PipeAsync(reader, socket, runner, reportUsage: tenant is not null);
     }
 
     /// <summary>Answers a <c>sandbox</c> question with whether this machine runs under gVisor.</summary>
@@ -557,12 +560,32 @@ internal sealed partial class RunnerHost(
     /// <summary>
     /// Copies the connection to the runner's standard input and its standard output to the connection, until one
     /// side ends. The caller then kills the runner, so a runner that exits closes the connection and a closed
-    /// connection kills the runner.
+    /// connection kills the runner. With <paramref name="reportUsage"/>, which is set for a runner started from files, the copies work on lines.
+    /// The host notes the runner's CPU time when a line goes to the runner and sends a <c>usage</c> line after each answer that comes from it,
+    /// see docs/reference/extension-packages.md#the-runner-protocol. A <c>usage</c> line from the runner is dropped.
     /// </summary>
-    private async Task PipeAsync(PipeReader fromSocket, Stream socket, Process runner)
+    private async Task PipeAsync(PipeReader fromSocket, Stream socket, Process runner, bool reportUsage)
     {
-        var toRunner = fromSocket.CopyToAsync(runner.StandardInput.BaseStream, _stopping.Token);
-        var fromRunner = runner.StandardOutput.BaseStream.CopyToAsync(socket, _stopping.Token);
+        Task toRunner;
+        Task fromRunner;
+        PipeReader? runnerOutput = null;
+        if (reportUsage)
+        {
+            var cpu = new CpuClock(runner);
+            runnerOutput = PipeReader.Create(runner.StandardOutput.BaseStream);
+            toRunner = CopyLinesAsync(fromSocket, async (line, token) =>
+            {
+                cpu.Mark();
+                await WriteLineAsync(runner.StandardInput.BaseStream, line, token);
+            });
+            fromRunner = CopyLinesAsync(runnerOutput, (line, token) => AnswerLineAsync(line, socket, cpu, token));
+        }
+        else
+        {
+            toRunner = fromSocket.CopyToAsync(runner.StandardInput.BaseStream, _stopping.Token);
+            fromRunner = runner.StandardOutput.BaseStream.CopyToAsync(socket, _stopping.Token);
+        }
+
         try
         {
             await Task.WhenAny(toRunner, fromRunner);
@@ -573,6 +596,117 @@ internal sealed partial class RunnerHost(
             await KillAsync(runner);
             socket.Close();
             await Task.WhenAll(Settled(toRunner), Settled(fromRunner));
+            if (runnerOutput is not null)
+            {
+                await runnerOutput.CompleteAsync();
+            }
+        }
+    }
+
+    /// <summary>Calls <paramref name="onLine"/> with each line of <paramref name="reader"/>, without its line break, until the reader ends. A last line with no line break counts as a line.</summary>
+    private async Task CopyLinesAsync(PipeReader reader, Func<ReadOnlySequence<byte>, CancellationToken, ValueTask> onLine)
+    {
+        // The bytes that hold no line break yet are not searched again, so a long line costs one pass.
+        long searched = 0;
+        while (true)
+        {
+            var result = await reader.ReadAsync(_stopping.Token);
+            var buffer = result.Buffer;
+            while (buffer.Slice(searched).PositionOf((byte)'\n') is { } end)
+            {
+                await onLine(buffer.Slice(0, end), _stopping.Token);
+                buffer = buffer.Slice(buffer.GetPosition(1, end));
+                searched = 0;
+            }
+
+            if (result.IsCompleted)
+            {
+                if (!buffer.IsEmpty)
+                {
+                    await onLine(buffer, _stopping.Token);
+                }
+
+                reader.AdvanceTo(result.Buffer.End);
+                return;
+            }
+
+            searched = buffer.Length;
+            reader.AdvanceTo(buffer.Start, buffer.End);
+        }
+    }
+
+    /// <summary>
+    /// Passes one line of the runner's standard output on to the connection. After a <c>result</c>, a <c>retryable</c> or a <c>failure</c> it
+    /// sends <c>usage</c> with the runner's CPU time since the last line went to it. A <c>usage</c> line from the runner is dropped, because only
+    /// the host may write one. A runner that has exited gets no <c>usage</c> line.
+    /// </summary>
+    private static async ValueTask AnswerLineAsync(ReadOnlySequence<byte> line, Stream socket, CpuClock cpu, CancellationToken cancellationToken)
+    {
+        RunnerMessage? message = null;
+        try
+        {
+            message = RunnerProtocol.Read(line);
+        }
+        catch (JsonException)
+        {
+            // A line that is not a message goes through unchanged.
+        }
+
+        if (message is UsageMessage)
+        {
+            return;
+        }
+
+        await WriteLineAsync(socket, line, cancellationToken);
+        if (message is ResultMessage or RetryableMessage or FailureMessage && cpu.Since() is { } used)
+        {
+            await RunnerProtocol.WriteAsync(socket, new UsageMessage((long)Math.Ceiling(used.TotalMilliseconds)), cancellationToken);
+        }
+    }
+
+    private static async ValueTask WriteLineAsync(Stream stream, ReadOnlySequence<byte> line, CancellationToken cancellationToken)
+    {
+        foreach (var segment in line)
+        {
+            await stream.WriteAsync(segment, cancellationToken);
+        }
+
+        await stream.WriteAsync("\n"u8.ToArray(), cancellationToken);
+        await stream.FlushAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// The CPU time of one runner process, which is its own user and system time and not that of the processes it starts. <see cref="Mark"/>
+    /// notes the time when a line goes to the runner, and <see cref="Since"/> reads what the runner used after it. The marks and the reads come from
+    /// the two copies of one connection.
+    /// </summary>
+    private sealed class CpuClock(Process runner)
+    {
+        private long _marked = Read(runner)?.Ticks ?? 0;
+
+        public void Mark()
+        {
+            if (Read(runner) is { } now)
+            {
+                Interlocked.Exchange(ref _marked, now.Ticks);
+            }
+        }
+
+        /// <summary>The CPU time since the last mark, or <see langword="null"/> when the runner has exited and cannot be read.</summary>
+        public TimeSpan? Since() =>
+            Read(runner) is { } now ? TimeSpan.FromTicks(Math.Max(0, now.Ticks - Interlocked.Read(ref _marked))) : null;
+
+        private static TimeSpan? Read(Process runner)
+        {
+            try
+            {
+                return runner.TotalProcessorTime;
+            }
+            catch (InvalidOperationException)
+            {
+                // The runner has exited.
+                return null;
+            }
         }
     }
 

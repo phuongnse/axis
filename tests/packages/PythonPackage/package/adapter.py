@@ -1,4 +1,5 @@
 import os
+import time
 import urllib.request
 
 from axis_fixture_dependency import greeting
@@ -44,6 +45,14 @@ def probe(input, context):
         except Exception:
             pass
     return {"status": 0}
+
+
+def spin(input, context):
+    # Uses the given CPU milliseconds of this process, which is what the package host reports as usage.
+    until = time.process_time() + input["milliseconds"] / 1000
+    while time.process_time() < until:
+        pass
+    return {}
 
 
 def pid(input, context):

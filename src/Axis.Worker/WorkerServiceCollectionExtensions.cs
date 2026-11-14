@@ -145,6 +145,7 @@ public static class WorkerServiceCollectionExtensions
                 services.AddSingleton(new TenantUsageStore(platform));
                 services.AddSingleton(new TenantDailyCounterStore(platform));
                 services.AddSingleton<IEmailQuota, CellEmailQuota>();
+                services.AddSingleton<IPackageRunTime, CellPackageRunTime>();
                 services.AddSingleton(provider => new TenantLeases(platform, provider.GetRequiredService<ILogger<TenantLeases>>()));
                 services.AddSingleton<IImportLeases, CellImportLeases>();
                 services.AddSingleton<ICallLeases, CellCallLeases>();

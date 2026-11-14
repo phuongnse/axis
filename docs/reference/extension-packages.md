@@ -467,9 +467,8 @@ see [Contracts](#contracts).
 Outside Development, package operations run outside the worker, in package runners, so that a
 package reaches nothing of the host and no binding of another call.
 
-- **The runners.** Each runtime has its own container, whose host,
-  `Axis.PackageHost`, starts a runner process when the worker asks and stops
-  it when told. The images and containers are in [images](installation.md#images).
+- **The runners.** Each runtime has its own container, whose host, `Axis.PackageHost`, starts a runner process when the worker asks
+  and stops it when told. The images and containers are in [images](installation.md#images).
 - **The hosts in Compose.** The Compose example runs `package-host-dotnet`, `package-host-python` and `package-host-node` on an internal network `runners` that only they, the worker and
   the publisher share, and the publisher calls only `application-package-host` there. Each gets no settings or secrets and no published port, a read-only root file system apart from `/tmp`, and
   CPU and memory limits, see [on premises](installation.md#on-premises).
@@ -481,13 +480,11 @@ package reaches nothing of the host and no binding of another call.
   [in the cloud](installation.md#in-the-cloud). With `applicationPackageHost.enabled`, the chart also runs
   `<release>-application-package-host` from the same templates, under gVisor, see
   [the sandbox](#an-applications-packages).
-- **The Python runner.** For a `start` that names a `python` version, the host runs
-  `python3 -I -B <sdk>/axis_runner.py <version folder>`. The host picks the runner from the manifest's `language`, and
-  a version whose manifest is missing or does not match the manifest schema starts no runner. The
-  image `axis-package-host-python` holds the SDK at `/app/sdk/python`. The runner moves
-  file descriptor 1 aside for the protocol and points it at standard error, so a `print` at import or while an
-  operation runs, and a library that writes to the descriptor, never reach the protocol stream. The first line
-  after `start` is `ready`.
+- **The Python runner.** For a `start` that names a `python` version, the host runs `python3 -I -B <sdk>/axis_runner.py <version
+  folder>`. The host picks the runner from the manifest's `language`, and a version whose manifest is missing or does not match the
+  manifest schema starts no runner. The image `axis-package-host-python` holds the SDK at `/app/sdk/python`. The runner moves file
+  descriptor 1 aside for the protocol and points it at standard error, so a `print` at import or while an operation runs, and a
+  library that writes to the descriptor, never reach the protocol stream. The first line after `start` is `ready`.
 - **A worker route to a Python host.** With `Extensions:Isolation` `process`, the worker sends each attempt of a
   `python` version to the host that `Extensions:Runners:Python` names. It uses the same runner pool, egress proxy,
   timeouts and outcomes as for C#.
@@ -577,6 +574,7 @@ implements the operation context over it.
 | `result` | The runner | `output` |
 | `retryable` | The runner | `error`, the name of the error's type |
 | `failure` | The runner | `error`, the name of the error's type, or `binding`, the undeclared binding it asked for |
+| `usage` | The host, for a runner started from files | `cpuMilliseconds`, a whole number, the runner process's CPU time from the `run` to the answer |
 | `stop` | The worker | None |
 | `sandbox` | The worker, to the host, and the host's answer | None in the question. `gvisor`, a boolean, in the answer |
 | `build` | A caller, to the host | `files`, mapping each relative path of the package, written with `/`, to its content in base64 |
@@ -585,72 +583,73 @@ implements the operation context over it.
 | `tested` | The host | `tests`, each with the `name` of the test, its `outcome`, `passed` or `failed`, and its `message`, the last line of a failed test's traceback cut at 1000 characters, or null |
 | `refused` | The host | `problems`, each with the `file` it is about and a `message` |
 
-- **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network. The connection
-  is neither encrypted nor authenticated, and a `run` carries binding secrets, so only the operator's
-  runner network protects it. The host listens on port 5310, or on `PackageHost:Port`, on every interface, or on the IP address of
-  `PackageHost:Address`, and reads the installed versions from `Extensions:Path`, unless a `start` carries `files`. It does not start without that
-  setting, or when the folder does not exist, or when `PackageHost:Port` is not a whole number from 1 to 65535, or
-  when `PackageHost:Address` is not an IP address, and it exits with code 2 and a message that names the setting.
-  `scripts/dev.sh` and `scripts/e2e.sh` set `PackageHost:Address` to `127.0.0.1`, because the protocol has no authentication.
-- **One connection, one runner.** The worker opens a connection for each runner and sends `start`. The
-  host starts the runner of the manifest's `language`, the C# runner, the Node.js runner or the Python runner, and pipes the
-  connection to the runner's standard input and output. A Node.js runner also gets `NODE_USE_ENV_PROXY=1`,
-  so that its own HTTP calls go through the proxy.
-- **Start.** A `start` for a version that is not installed, or whose `package`, `version` or `proxy` is not
-  well formed, closes the connection and starts no runner. So does a `start` for a version whose runtime
-  is missing from the host's image. The runner answers `ready` once it has
-  loaded the version. A `start` with `files` may be as long as a `build`. The host refuses a path by the rule of the Build
-  bullet, a missing `tenant`, and a manifest whose id or version differs from the `start`. It then closes the connection and
-  starts no runner. Otherwise it writes the files to `/tmp/axis-runner-<random>/<package>/<version>/`, starts the runner from
-  there and deletes the folder when the runner ends. It logs the tenant with the runner's process ID, and no file names.
-- **Sandbox.** A `sandbox` may be the first line of a connection instead of a `start`. The host answers `sandbox`
-  with `gvisor` set, `true` only when its kernel log, as `dmesg` reads it, begins with gVisor's `Starting gVisor` line. A kernel
-  log that begins otherwise, or a read that is refused, answers `false`. Then the host closes the connection and starts no runner.
-  A `sandbox` that already holds `gvisor` closes the connection without an answer.
-- **Build.** A `build` may be the first line of a connection instead of a `start`. It may be longer than the other
-  first lines, as may a `start` with `files`, up to the limit in `RunnerHost`, because a package with a wheel needs megabytes, and a longer line closes
-  the connection. The host writes the files into a temporary copy and runs steps 1, 2, 4 and 5 of
-  [building a package](#building-a-package) on it, reading the manifest as metadata only, so no package code runs in the
-  host. It answers `built` with every file of the built copy, or `refused` with each problem. Then it closes the connection.
-  The `message` of a problem is the line that the `build` command prints for it. Its `file` is `axis-package.json` for a
-  manifest problem and the manifest's lock file for a lock file, install or scan problem. A path that is empty, absolute,
-  holds `\` or an empty, `.` or `..` segment is refused, naming the path, before the host writes anything. The `built` answer
-  leaves out symbolic links, because one could point outside the copy. The host writes nothing to `Extensions:Path` and deletes
-  its copy whatever the answer. A build that cannot run, such as a pip or Trivy that cannot start, is the operator's problem and
-  not the author's, so the host logs why and closes the connection with no answer.
-- **Test.** A `test` may be the first line of a connection instead of a `start`. Its line limit and its path rules are
-  those of `build`. The host builds the package exactly as for a `build`, and a build that fails answers `refused` and runs no
-  test. Then it runs the tests of a `python` package in the built copy. A `csharp` or `node` package answers `refused` with one
-  problem at `axis-package.json`, saying that its tests do not run yet. The tests are the files that the caller sent whose name
-  matches `test_*.py`, in any folder, and the standard library's `unittest` loads and runs them. The host runs them with the
+- **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network. The connection is neither encrypted nor
+  authenticated, and a `run` carries binding secrets, so only the operator's runner network protects it. The host listens on port
+  5310, or on `PackageHost:Port`, on every interface, or on the IP address of `PackageHost:Address`, and reads the installed
+  versions from `Extensions:Path`, unless a `start` carries `files`. It does not start without that setting, or when the folder does
+  not exist, or when `PackageHost:Port` is not a whole number from 1 to 65535, or when `PackageHost:Address` is not an IP address,
+  and it exits with code 2 and a message that names the setting. `scripts/dev.sh` and `scripts/e2e.sh` set `PackageHost:Address` to
+  `127.0.0.1`, because the protocol has no authentication.
+- **One connection, one runner.** The worker opens a connection for each runner and sends `start`. The host starts the runner of the
+  manifest's `language`, the C# runner, the Node.js runner or the Python runner, and pipes the connection to the runner's standard
+  input and output, line by line for a `start` with `files`, see Usage below. A Node.js runner also gets `NODE_USE_ENV_PROXY=1`, so
+  that its own HTTP calls go through the proxy.
+- **Start.** A `start` for a version that is not installed, or whose `package`, `version` or `proxy` is not well formed, closes the
+  connection and starts no runner. So does a `start` for a version whose runtime is missing from the host's image. The runner
+  answers `ready` once it has loaded the version. A `start` with `files` may be as long as a `build`. The host refuses a path by the
+  rule of the Build bullet, a missing `tenant`, and a manifest whose id or version differs from the `start`. It then closes the
+  connection and starts no runner. Otherwise it writes the files to `/tmp/axis-runner-<random>/<package>/<version>/`, starts the
+  runner from there and deletes the folder when the runner ends. It logs the tenant with the runner's process ID, and no file names.
+- **Usage.** For a `start` with `files`, the host reads the lines both ways and sends `usage` after each `result`, `retryable` or
+  `failure`. It holds the runner process's own CPU time since the `run`, so start and idle time belong to no call, and not the CPU
+  of processes that the runner starts. The host drops a `usage` line that the runner writes, because only the host writes one, and a
+  runner that has exited gets none. A worker that gets an answer with no `usage` closes the connection. The runner of an installed
+  version gets no `usage`. The worker counts the seconds as [package run time a day](tenant-quotas.md#package-run-time-a-day).
+- **Sandbox.** A `sandbox` may be the first line of a connection instead of a `start`. The host answers `sandbox` with `gvisor` set,
+  `true` only when its kernel log, as `dmesg` reads it, begins with gVisor's `Starting gVisor` line. A kernel log that begins
+  otherwise, or a read that is refused, answers `false`. Then the host closes the connection and starts no runner. A `sandbox` that
+  already holds `gvisor` closes the connection without an answer.
+- **Build.** A `build` may be the first line of a connection instead of a `start`. It may be longer than the other first lines, as
+  may a `start` with `files`, up to the limit in `RunnerHost`, because a package with a wheel needs megabytes, and a longer line
+  closes the connection. The host writes the files into a temporary copy and runs steps 1, 2, 4 and 5 of [building a
+  package](#building-a-package) on it, reading the manifest as metadata only, so no package code runs in the host. It answers
+  `built` with every file of the built copy, or `refused` with each problem. Then it closes the connection. The `message` of a
+  problem is the line that the `build` command prints for it. Its `file` is `axis-package.json` for a manifest problem and the
+  manifest's lock file for a lock file, install or scan problem. A path that is empty, absolute, holds `\` or an empty, `.` or `..`
+  segment is refused, naming the path, before the host writes anything. The `built` answer leaves out symbolic links, because one
+  could point outside the copy. The host writes nothing to `Extensions:Path` and deletes its copy whatever the answer. A build that
+  cannot run, such as a pip or Trivy that cannot start, is the operator's problem and not the author's, so the host logs why and
+  closes the connection with no answer.
+- **Test.** A `test` may be the first line of a connection instead of a `start`. Its line limit and its path rules are those of
+  `build`. The host builds the package exactly as for a `build`, and a build that fails answers `refused` and runs no test. Then it
+  runs the tests of a `python` package in the built copy. A `csharp` or `node` package answers `refused` with one problem at
+  `axis-package.json`, saying that its tests do not run yet. The tests are the files that the caller sent whose name matches
+  `test_*.py`, in any folder, and the standard library's `unittest` loads and runs them. The host runs them with the
   `PackageBuild:Python` command, `-I -B` and a runner script embedded in `Axis.PackageHost`. The script puts the built copy and then
   `sdk/python` beside the host on `sys.path`, so that a test can import the adapter and the SDK. The process runs in the built copy
   with an empty environment, so it has no proxy and no outbound network. The host stops it after 2 minutes and kills its process
   tree, and a stopped run answers `refused` with one problem at `axis-package.json`. A package with no test files answers `tested`
-  with no tests. The answer is `tested`, whose `name` is the `unittest` id of the test, such as `test_sample.SampleTests.test_fails`.
-  A skipped test is left out, an expected failure is `passed` and an unexpected success is `failed`. A run that ends with no valid
-  result, such as a test that exits the process, answers `refused` at `axis-package.json`. A run that cannot start is the
-  operator's problem and gets no answer, as for a `build`. The host logs `Tested package <id> <version>.` and deletes its copies
-  whatever the answer. The tests run the author's code in the host's own container, so a caller sends `test` only to a host that
-  runs under gVisor, such as `application-package-host`.
-- **Standard output.** The runner's standard output holds only protocol lines. What a package writes to
-  the console goes to standard error.
-- **Runner errors.** An operation that is not in the manifest, an input that does not fit its field
-  types, and an output whose type does not fit its field are each a `failure` with the name of
-  the error's type. The name is the full type name for C#, such as `System.FormatException`. The Node.js runner
-  names an error by its JavaScript `name`, such as `RangeError`, and answers these three with `TypeError`. For
-  Python the name is `module.QualName` with the module left out for a built-in exception, such as `ValueError`,
-  `LookupError` and `axis_sdk.RetryableError`.
-- **Closing kills the runner.** When the worker closes a connection, at a timeout or at `stop`, the host
-  kills that runner. A runner that exits closes its connection, and the worker takes that as an
-  unknown outcome.
-- **Values.** `text` is a string. `integer` and `decimal` are strings, so that no language loses
-  precision, and an `integer` is a whole number in the signed 64-bit range. `boolean` is a JSON boolean. `date` is `YYYY-MM-DD` and `date-time` is ISO 8601 with an
+  with no tests. The answer is `tested`, whose `name` is the `unittest` id of the test, such as
+  `test_sample.SampleTests.test_fails`. A skipped test is left out, an expected failure is `passed` and an unexpected success is
+  `failed`. A run that ends with no valid result, such as a test that exits the process, answers `refused` at `axis-package.json`. A
+  run that cannot start is the operator's problem and gets no answer, as for a `build`. The host logs `Tested package <id>
+  <version>.` and deletes its copies whatever the answer. The tests run the author's code in the host's own container, so a caller
+  sends `test` only to a host that runs under gVisor, such as `application-package-host`.
+- **Standard output.** The runner's standard output holds only protocol lines. What a package writes to the console goes to standard
+  error.
+- **Runner errors.** An operation that is not in the manifest, an input that does not fit its field types, and an output whose type
+  does not fit its field are each a `failure` with the name of the error's type. The name is the full type name for C#, such as
+  `System.FormatException`. The Node.js runner names an error by its JavaScript `name`, such as `RangeError`, and answers these
+  three with `TypeError`. For Python the name is `module.QualName` with the module left out for a built-in exception, such as
+  `ValueError`, `LookupError` and `axis_sdk.RetryableError`.
+- **Closing kills the runner.** When the worker closes a connection, at a timeout or at `stop`, the host kills that runner. A runner
+  that exits closes its connection, and the worker takes that as an unknown outcome.
+- **Values.** `text` is a string. `integer` and `decimal` are strings, so that no language loses precision, and an `integer` is a
+  whole number in the signed 64-bit range. `boolean` is a JSON boolean. `date` is `YYYY-MM-DD` and `date-time` is ISO 8601 with an
   offset. A missing value is `null`.
-- **No exception message.** No message carries an exception message, because history keeps only the
-  type of an exception, see [Capabilities](#capabilities).
-- **The schema.** `sdk/package-runner-protocol.schema.json` holds the exact shape of each message.
-  Every SDK's tests read it.
+- **No exception message.** No message carries an exception message, because history keeps only the type of an exception, see
+  [Capabilities](#capabilities).
+- **The schema.** `sdk/package-runner-protocol.schema.json` holds the exact shape of each message. Every SDK's tests read it.
 
 ### Customer-hosted runners
 
@@ -760,7 +759,7 @@ trusted code, so the platform gives it more limits than an installation's packag
   deletes its files. A release with no built files, such as one `activate` stored, fails the call at once, naming the package and no
   path. Unset `Extensions:Runners:Application` makes a call retryable and names the setting.
 - **Quotas.** A call also holds a `concurrentConnectorCalls` lease, as any package call does.
-- **CPU seconds** _(planned for M37)_. The CPU seconds of its runners count against the tenant's
+- **CPU seconds.** The worker of a cell counts the CPU seconds of each call to its runners in the tenant's
   [package run time a day](tenant-quotas.md#package-run-time-a-day). A customer-hosted package counts for nothing there.
 - **Plans** _(planned for M37)_. In Axis SaaS only a paid plan allows an application's packages, see
   [the catalogue](plans.md#the-catalogue).
@@ -889,10 +888,10 @@ installation, loading, the capability limits, the server's metadata-only load an
   together with the CommonJS `node-test-package` the tests cover both module forms. Its operations mirror the
   C# test package's: `sum`, `fail`, `flaky` and `probe`, with the same modes. It adds `badOutput`, which returns an
   `integer` as a JavaScript number, and `log`, which writes to the console.
-- **Python test package.** `python-test-package` lives under `tests/packages/PythonPackage/` as plain files:
-  the package's manifest and adapter, and one small dependency. The package build tests zip the
-  dependency into a wheel, lock it in `requirements.txt` with its SHA-256 hash, and build the package
-  offline, so the repository holds no binary file. Its operations cover each outcome of the Python
-  runner: `greet` maps onto the dependency, `echo` returns all six field types, `probe` uses its declared bindings, asks for an
-  undeclared one or, in the mode `ownOtherHost`, requests one with `urllib`, `pid` returns its process ID and the folder it runs from, `flaky` raises
+- **Python test package.** `python-test-package` lives under `tests/packages/PythonPackage/` as plain files: the package's manifest
+  and adapter, and one small dependency. The package build tests zip the dependency into a wheel, lock it in `requirements.txt` with
+  its SHA-256 hash, and build the package offline, so the repository holds no binary file. Its operations cover each outcome of the
+  Python runner: `greet` maps onto the dependency, `echo` returns all six field types, `probe` uses its declared bindings, asks for
+  an undeclared one or, in the mode `ownOtherHost`, requests one with `urllib`, `pid` returns its process ID and the folder it runs
+  from, `spin` uses the CPU milliseconds that its input names and declares a `timeout` of 10 seconds, `flaky` raises
   `RetryableError` and `fail` raises `ValueError`. The package host tests install the package by copying it, so they need no pip.

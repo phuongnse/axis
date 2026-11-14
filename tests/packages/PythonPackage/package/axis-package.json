@@ -43,6 +43,13 @@
       "capabilities": { "urls": ["TestUrl"], "secrets": ["TestToken"] }
     },
     {
+      "name": "spin",
+      "type": "spin",
+      "idempotent": true,
+      "timeout": "PT10S",
+      "input": [{ "name": "milliseconds", "type": "integer", "required": true }]
+    },
+    {
       "name": "pid",
       "type": "pid",
       "idempotent": true,

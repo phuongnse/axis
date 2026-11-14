@@ -398,9 +398,64 @@ public sealed class PackageHostTests : IAsyncLifetime
         using var connection = await StartFromFilesAsync(TestPackages.PythonId, "1.0.0", PythonFiles(), endpoint: endpoint);
 
         Assert.Equal(new ReadyMessage(), await connection.ReceiveAsync());
-        var greet = await connection.RunAsync("greet", new JsonObject { ["name"] = "Axis" }, withBindings: false);
+        var greet = await connection.RunAsync("greet", new JsonObject { ["name"] = "Axis" }, withBindings: false, fromFiles: true);
         Assert.Equal("Hello, Axis", Assert.IsType<ResultMessage>(greet.Answer).Output["greeting"]!.GetValue<string>());
+        Assert.NotNull(greet.Usage);
         Assert.Single(_log.StartedRunners);
+    }
+
+    [Fact]
+    public async Task A_runner_started_from_files_reports_the_CPU_time_from_the_run_to_the_answer_and_not_its_start_or_idle_time()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
+        var before = RunnerFolders();
+        var files = PythonFiles();
+        var burn = """
+            import os
+            import threading
+            import time
+
+
+            def _burn(milliseconds):
+                until = time.process_time() + milliseconds / 1000
+                while time.process_time() < until:
+                    pass
+
+
+            # The runner uses CPU while it starts and, in a thread, while it is idle. Neither belongs to a call.
+            _burn(1100)
+
+
+            def _idle():
+                _burn(1100)
+                open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "idle.done"), "w").close()
+
+
+            threading.Thread(target=_idle, daemon=True).start()
+
+
+            """;
+        files["adapter.py"] = [.. Encoding.UTF8.GetBytes(burn.ReplaceLineEndings("\n")), .. files["adapter.py"]];
+        using var connection = await StartFromFilesAsync(TestPackages.PythonId, "1.0.0", files);
+        Assert.Equal(new ReadyMessage(), await connection.ReceiveAsync());
+        var folder = Assert.Single(RunnerFolders().Except(before));
+        var deadline = DateTime.UtcNow + _deadline;
+        while (Directory.GetFiles(folder, "idle.done", SearchOption.AllDirectories).Length == 0 && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+        }
+
+        using var runner = Process.GetProcessById(Assert.Single(_log.StartedRunners));
+        Assert.True(runner.TotalProcessorTime > TimeSpan.FromSeconds(2));
+
+        var echo = await connection.RunAsync("echo", new JsonObject(), withBindings: false, fromFiles: true);
+        Assert.IsType<ResultMessage>(echo.Answer);
+        Assert.True(Assert.IsType<UsageMessage>(echo.Usage).CpuMilliseconds < 1000);
+
+        var spin = await connection.RunAsync("spin", new JsonObject { ["milliseconds"] = "1200" }, withBindings: false, fromFiles: true);
+        Assert.IsType<ResultMessage>(spin.Answer);
+        // The kernel counts a process's CPU time in ticks of 10 ms, so the reading can fall a little short of the 1200 ms that the package measured itself.
+        Assert.True(Assert.IsType<UsageMessage>(spin.Usage).CpuMilliseconds >= 1100);
     }
 
     [Fact]
@@ -1042,7 +1097,12 @@ public sealed class PackageHostTests : IAsyncLifetime
         /// <summary>The next message, or <see langword="null"/> when the host closed the connection.</summary>
         public async Task<RunnerMessage?> ReceiveAsync() => (await ReceiveLineAsync()) is { } line ? RunnerProtocol.Read(line) : null;
 
-        public async Task<(RunnerMessage Answer, string Line, Guid OperationId)> RunAsync(string operation, JsonObject input, bool withBindings)
+        /// <summary>
+        /// Sends a <c>run</c> and reads the answer. A runner started from files, with <paramref name="fromFiles"/>, sends a <c>usage</c> line after it, which
+        /// <c>Usage</c> holds. A runner of an installed version sends none.
+        /// </summary>
+        public async Task<(RunnerMessage Answer, string Line, Guid OperationId, UsageMessage? Usage)> RunAsync(
+            string operation, JsonObject input, bool withBindings, bool fromFiles = false)
         {
             var operationId = Guid.NewGuid();
             var bindings = withBindings
@@ -1050,7 +1110,8 @@ public sealed class PackageHostTests : IAsyncLifetime
                 : new RunBindings([], []);
             await SendAsync(new RunMessage(operation, operationId, input, bindings));
             var line = await ReceiveLineAsync() ?? throw new InvalidOperationException("The connection closed before the answer.");
-            return (RunnerProtocol.Read(line), line, operationId);
+            var usage = fromFiles && await ReceiveLineAsync() is { } usageLine ? RunnerProtocol.Read(usageLine) as UsageMessage : null;
+            return (RunnerProtocol.Read(line), line, operationId, usage);
         }
 
         public void Dispose() => _client.Dispose();
