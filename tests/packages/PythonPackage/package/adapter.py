@@ -47,7 +47,7 @@ def probe(input, context):
 
 
 def pid(input, context):
-    return {"pid": os.getpid()}
+    return {"pid": os.getpid(), "folder": os.path.dirname(os.path.abspath(__file__))}
 
 
 def flaky(input, context):

@@ -46,7 +46,10 @@
       "name": "pid",
       "type": "pid",
       "idempotent": true,
-      "output": [{ "name": "pid", "type": "integer", "required": true }]
+      "output": [
+        { "name": "pid", "type": "integer", "required": true },
+        { "name": "folder", "type": "text", "required": true }
+      ]
     },
     {
       "name": "flaky",

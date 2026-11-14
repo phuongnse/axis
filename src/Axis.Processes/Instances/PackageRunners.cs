@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -19,24 +20,54 @@ namespace Axis.Processes.Instances;
 /// start when an attempt needs one, so a version never has more of them than calls in flight. The pool uses the
 /// worker's <see cref="EgressProxy"/>, which starts with the first runner and which <see cref="PackageRunnerPools"/>
 /// owns. Each runner gets its own proxy token in <c>start</c>, together with the address of the proxy as the host
-/// reaches it. <paramref name="setting"/> is the name of the setting that holds the host's address.
+/// reaches it. <paramref name="setting"/> is the name of the setting that holds the host's address. When
+/// <paramref name="idleTime"/> is set, the pool stops a runner that has waited that long, which makes the host kill it and delete its
+/// copy of the files, see docs/reference/extension-packages.md#an-applications-packages. Only the application pool sets it.
+/// The pools of installation packages keep their idle runners until the worker stops.
 /// </summary>
-internal sealed class PackageRunners(string setting, string? host, int port, EgressProxy proxy) : IAsyncDisposable
+internal sealed class PackageRunners : IAsyncDisposable
 {
+    /// <summary>
+    /// How long a runner of an application's package may sit idle in its pool before the worker stops it, see
+    /// docs/reference/extension-packages.md#an-applications-packages.
+    /// </summary>
+    public static readonly TimeSpan ApplicationIdleTime = TimeSpan.FromMinutes(5);
+
     /// <summary>
     /// The longest <see cref="RentAsync"/> may take to connect and get <c>ready</c>. It is not part of an operation's
     /// timeout, which starts when the <c>run</c> is sent, so a slow start never counts as an unknown outcome.
     /// </summary>
     public static readonly TimeSpan StartTimeout = TimeSpan.FromSeconds(30);
 
-    private readonly ConcurrentDictionary<(string? Tenant, string Package, string Version, string? Build), ConcurrentBag<RunnerConnection>> _idle = new();
+    private readonly ConcurrentDictionary<(string? Tenant, string Package, string Version, string? Build), ConcurrentBag<IdleRunner>> _idle = new();
+    private readonly string _setting;
+    private readonly string? _host;
+    private readonly int _port;
+    private readonly EgressProxy _proxy;
+    private readonly CancellationTokenSource? _sweeping;
+    private readonly Task _sweep = Task.CompletedTask;
     private volatile bool _disposed;
 
+    public PackageRunners(string setting, string? host, int port, EgressProxy proxy, TimeSpan? idleTime = null)
+    {
+        _setting = setting;
+        _host = host;
+        _port = port;
+        _proxy = proxy;
+        if (idleTime is { } idle && host is not null)
+        {
+            _sweeping = new CancellationTokenSource();
+            _sweep = SweepAsync(idle, _sweeping.Token);
+        }
+    }
+
+    private readonly record struct IdleRunner(RunnerConnection Runner, long ReturnedAt);
+
     /// <summary>The name of the setting that holds the address of the package host, for the errors of an attempt.</summary>
-    public string Setting => setting;
+    public string Setting => _setting;
 
     /// <summary>Whether <see cref="Setting"/> names a host.</summary>
-    public bool IsSet => host is not null;
+    public bool IsSet => _host is not null;
 
     /// <summary>
     /// Takes an idle runner of the version whose connection is still open, or connects to the host, sends
@@ -52,7 +83,7 @@ internal sealed class PackageRunners(string setting, string? host, int port, Egr
         string? tenant = null,
         IReadOnlyDictionary<string, byte[]>? files = null)
     {
-        if (host is null)
+        if (_host is null)
         {
             throw new InvalidOperationException("No package host is set.");
         }
@@ -62,21 +93,21 @@ internal sealed class PackageRunners(string setting, string? host, int port, Egr
         {
             while (bag.TryTake(out var idle))
             {
-                if (idle.IsOpen)
+                if (idle.Runner.IsOpen)
                 {
-                    return idle;
+                    return idle.Runner;
                 }
 
-                idle.Dispose();
+                idle.Runner.Dispose();
             }
         }
 
         var client = new TcpClient { NoDelay = true };
         try
         {
-            proxy.EnsureStarted();
-            await client.ConnectAsync(host, port, cancellationToken);
-            var runner = new RunnerConnection(client, package, version, ProxyAddress(client), proxy.Register(), proxy, tenant, build);
+            _proxy.EnsureStarted();
+            await client.ConnectAsync(_host, _port, cancellationToken);
+            var runner = new RunnerConnection(client, package, version, ProxyAddress(client), _proxy.Register(), _proxy, tenant, build);
             try
             {
                 await runner.StartAsync(files, cancellationToken);
@@ -104,7 +135,7 @@ internal sealed class PackageRunners(string setting, string? host, int port, Egr
             address = address.MapToIPv4();
         }
 
-        return address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{address}]:{proxy.Port}" : $"{address}:{proxy.Port}";
+        return address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{address}]:{_proxy.Port}" : $"{address}:{_proxy.Port}";
     }
 
     /// <summary>Keeps <paramref name="runner"/>, which finished its attempt, for the next one of its version.</summary>
@@ -116,19 +147,66 @@ internal sealed class PackageRunners(string setting, string? host, int port, Egr
             return;
         }
 
-        _idle.GetOrAdd((runner.Tenant, runner.Package, runner.Version, runner.Build), _ => []).Add(runner);
+        _idle.GetOrAdd((runner.Tenant, runner.Package, runner.Version, runner.Build), _ => []).Add(new IdleRunner(runner, Stopwatch.GetTimestamp()));
+    }
+
+    /// <summary>
+    /// Stops the runners that have been idle for <paramref name="idleTime"/>, checking five times in that time. The sweep takes a
+    /// runner out of its bag before it looks at its age, so <see cref="RentAsync"/> never gets a runner that is being closed.
+    /// </summary>
+    private async Task SweepAsync(TimeSpan idleTime, CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(idleTime / 5);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                foreach (var bag in _idle.Values)
+                {
+                    var kept = new List<IdleRunner>();
+                    while (bag.TryTake(out var idle))
+                    {
+                        if (Stopwatch.GetElapsedTime(idle.ReturnedAt) >= idleTime)
+                        {
+                            await idle.Runner.StopAsync();
+                            idle.Runner.Dispose();
+                        }
+                        else
+                        {
+                            kept.Add(idle);
+                        }
+                    }
+
+                    foreach (var idle in kept)
+                    {
+                        bag.Add(idle);
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The pool is disposed.
+        }
     }
 
     /// <summary>Sends <c>stop</c> to each idle runner and closes it. The proxy stays, because the other pool uses it.</summary>
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
+        if (_sweeping is not null)
+        {
+            await _sweeping.CancelAsync();
+            await _sweep;
+            _sweeping.Dispose();
+        }
+
         foreach (var bag in _idle.Values)
         {
-            while (bag.TryTake(out var runner))
+            while (bag.TryTake(out var idle))
             {
-                await runner.StopAsync();
-                runner.Dispose();
+                await idle.Runner.StopAsync();
+                idle.Runner.Dispose();
             }
         }
     }
@@ -140,7 +218,9 @@ internal sealed class PackageRunners(string setting, string? host, int port, Egr
 /// <c>Extensions:Isolation</c> is <c>inProcess</c>, which loads C# packages into the worker. The Node.js pool always exists,
 /// because the worker cannot load JavaScript, and so does the Python pool, because the worker cannot load Python. The
 /// <see cref="Application"/> pool always exists too: it runs an application's own package, of any language, in a runner of
-/// <c>application-package-host</c>, see docs/reference/extension-packages.md#an-applications-packages.
+/// <c>application-package-host</c>, see docs/reference/extension-packages.md#an-applications-packages. Only that pool stops a runner that
+/// has been idle for <see cref="PackageRunners.ApplicationIdleTime"/> unless <c>applicationIdleTime</c> says otherwise, and the pools of installation
+/// packages keep their idle runners until the worker stops.
 /// </summary>
 internal sealed class PackageRunnerPools : IAsyncDisposable
 {
@@ -150,7 +230,7 @@ internal sealed class PackageRunnerPools : IAsyncDisposable
     private readonly PackageRunners _python;
     private readonly PackageRunners _application;
 
-    public PackageRunnerPools(PackageIsolation isolation, ApplicationPackageSettings application, bool allowHttp)
+    public PackageRunnerPools(PackageIsolation isolation, ApplicationPackageSettings application, bool allowHttp, TimeSpan? applicationIdleTime = null)
     {
         ArgumentNullException.ThrowIfNull(isolation);
         ArgumentNullException.ThrowIfNull(application);
@@ -161,7 +241,7 @@ internal sealed class PackageRunnerPools : IAsyncDisposable
             : new PackageRunners(PackageIsolation.DotnetRunnerSetting, isolation.DotnetHost, isolation.DotnetPort, _proxy);
         _node = new PackageRunners(PackageIsolation.NodeRunnerSetting, isolation.NodeHost, isolation.NodePort, _proxy);
         _python = new PackageRunners(PackageIsolation.PythonRunnerSetting, isolation.PythonHost, isolation.PythonPort, _proxy);
-        _application = new PackageRunners(ApplicationPackageSettings.RunnerSetting, application.RunnerHost, application.RunnerPort, _proxy);
+        _application = new PackageRunners(ApplicationPackageSettings.RunnerSetting, application.RunnerHost, application.RunnerPort, _proxy, applicationIdleTime ?? PackageRunners.ApplicationIdleTime);
     }
 
     /// <summary>The pool of <c>application-package-host</c>, which runs the application's own packages, whatever their language.</summary>
