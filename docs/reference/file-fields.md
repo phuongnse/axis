@@ -60,8 +60,8 @@ module has no upload route. A service account may upload, as it may write record
 - **Body.** The request must be `multipart/form-data` with a boundary, or it is a `415`. A missing
   `file` part, an extra part, a part without a file name and an empty file are `400` at `file`.
 - **Name.** The stored name is the last path segment of the part's file name, without control
-  characters. A longer name is cut before its extension, so the stored name keeps the extension
-  that was checked.
+  characters, at most 255 characters. A longer name is cut before its extension, so the stored
+  name keeps the extension that was checked.
 - **Media type.** The media type comes from the part's `Content-Type`, without its parameters, such
   as `charset`. A part without one is `application/octet-stream`, which Axis cannot check, so it is
   refused.
