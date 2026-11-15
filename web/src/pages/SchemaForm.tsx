@@ -1,6 +1,6 @@
 import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { Link } from 'react-router'
-import { createContext, lazy, Suspense, useContext, useState, type ReactElement, type ReactNode } from 'react'
+import { createContext, useContext, useState, type ReactElement, type ReactNode } from 'react'
 import { textIn, type StudioCatalog, type StudioFolderRelaxedPoint, type StudioNames } from '../platform/studio'
 import { setAt } from '../platform/jsonPatch'
 import { keyPropertyOf, markOf, type KeyedLists } from '../platform/layerMarks'
@@ -28,7 +28,7 @@ import { PlatformContext } from './context'
 import { relaxedPointLabel } from './relaxEntries'
 import { BindingSelect, CatalogChoice, ModuleSlots, TimeZoneSelect, VersionRangeInput } from './CatalogControls'
 import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
+import { ExpressionField } from './ExpressionField'
 import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
 import { ObjectListTable, type ObjectListColumn } from './ObjectListTable'
@@ -37,8 +37,6 @@ import { ReferencePicker } from './ReferencePicker'
 import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
 import { SchemaLayerContext } from './schemaLayerContext'
 import { sectionsByKind } from './schemaFormSections'
-
-const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 /** Whether the node is drawn inside an item's dialog, where a nested list is rows of inputs and never a table. */
 const ItemDialogContext = createContext(false)
@@ -271,14 +269,6 @@ function fieldTexts(
   return { label: t(key), help: help === `${key}.help` ? undefined : help }
 }
 
-/**
- * The expression editor while it loads. `AxisField` gives its input an id and a description, which the editor does not
- * take yet, so they stop here and never reach `Suspense`. The editor keeps its own name.
- */
-export function ExpressionInput({ fallback, children }: { fallback: ReactNode; children: ReactNode }) {
-  return <Suspense fallback={fallback}>{children}</Suspense>
-}
-
 function SchemaNode({
   node,
   root,
@@ -387,18 +377,14 @@ function SchemaNode({
   } else if (schema.type === 'string' && schema['x-axis-expression'] === true && check) {
     const text = typeof value === 'string' ? value : ''
     input = (
-      <ExpressionInput fallback={<Input aria-label={name} value={text} readOnly aria-busy="true" />}>
-        <LazyExpressionEditor
-          application={check.application}
-          resourceId={check.resourceId}
-          path={pointer}
-          name={name}
-          value={text}
-          required={required}
-          options={expressionScope(check.kind, check.draft, pointer, check.names)}
-          onChange={onChange}
-        />
-      </ExpressionInput>
+      <ExpressionField
+        check={check}
+        pointer={pointer}
+        name={name}
+        value={text}
+        required={required}
+        onChange={onChange}
+      />
     )
   } else if (schema.type === 'string') {
     input = (

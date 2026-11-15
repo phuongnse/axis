@@ -236,11 +236,13 @@ describe('axis/field-label-through-axis-field', () => {
       '    <Suspense fallback={null}>',
       '      <LazyExpressionEditor />',
       '    </Suspense>',
+      '    <span>Filter</span>',
+      '    <ExpressionField />',
       '  </>',
       ')',
       '',
     ].join('\n')
-    expect(lint(source, { rules })).toEqual([`${rule}:4`, `${rule}:6`])
+    expect(lint(source, { rules })).toEqual([`${rule}:4`, `${rule}:6`, `${rule}:10`])
   })
 
   it('allows AxisField, a Form.Item with no label, a Button before a Select and a Checkbox with its own text', () => {
