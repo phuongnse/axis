@@ -35,7 +35,7 @@ Each common job has one shared widget or helper:
 | A tag's colour                                 | The colour tokens, never a preset name such as `blue` or `success`                                     |
 | A choice of a name that an application defines | `ReferencePicker`, whose choices come from `referenceOptions`, each named by its label                 |
 | A value with nothing to show                   | `EmptyDash`                                                                                            |
-| A field of a platform screen                   | `AxisField` and `AxisFieldGroup`, with `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` _(planned for M33)_, and a `status` for what the screen found about a field |
+| A field of a platform screen                   | `AxisField` and `AxisFieldGroup`, with `AxisCheckboxField` (a yes-or-no box or switch), `AxisChoiceField` (radios, each with its help) and `AxisFieldRow` (two fields of one titled group side by side, stacked at narrow width), and a `status` for what the screen found about a field |
 | A row of actions                               | `AxisActionRow`                                                                                        |
 | A count on a button or a filter                | `CountBadge` _(planned for M35)_, never Ant Design's `Badge` with a count                              |
 | A section of a Studio page                     | `ResourceFormSection`, in `ResourceFormSections`                                                       |

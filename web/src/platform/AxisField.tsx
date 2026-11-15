@@ -14,7 +14,7 @@ type FormFieldProps = {
   /** Required: every platform field has help, see docs/reference/frontend.md#platform-field-help. An empty help draws no help line. */
   help: string
   name: NonNullable<FormItemProps['name']>
-  /** The message under the field when it is empty, such as "Enter a name.". It marks the field required and checks it. A multiple select is empty when nothing is chosen. */
+  /** The message under the field when it is empty, such as "Enter a name.". It marks the field required and checks it. A multiple select is empty when nothing is chosen, and an unticked box is empty. */
   requiredMessage?: string
   /** More rules of Ant Design's form, checked after the required one. */
   rules?: FormItemProps['rules']
@@ -69,7 +69,7 @@ function isEmpty(value: unknown): boolean {
  *
  * - With a `name`, the field belongs inside a vertical form that takes the shared `requiredMark`, and Ant Design's form
  *   gives the input its value and change handler. A `requiredMessage` marks the field required and adds the rule that
- *   checks it, so the mark and the check never part. The check holds for text, numbers and lists, and blank text is
+ *   checks it, so the mark and the check never part. The check holds for text, numbers, lists and boxes, and blank text and an unticked box are
  *   empty.
  * - Without a `name`, the field needs no form: the caller gives the input its `value` and change handler, and the
  *   label still names the input.
@@ -153,7 +153,9 @@ function FormField({
                 required: true,
                 message: requiredMessage,
                 validator: (_rule: unknown, value: unknown) =>
-                  isEmpty(value) ? Promise.reject(new Error(requiredMessage)) : Promise.resolve(),
+                  isEmpty(value) || (valuePropName === 'checked' && value !== true)
+                    ? Promise.reject(new Error(requiredMessage))
+                    : Promise.resolve(),
               },
             ]),
         ...(rules ?? []),
