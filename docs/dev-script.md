@@ -14,8 +14,9 @@ Docker, .NET and Node, and works on a fresh clone.
    since the last install. It installs no Playwright browser.
 2. It builds the Keycloak theme into `artifacts/keycloak-theme`, which the Compose `keycloak` service
    mounts, and copies the email theme with it. It fails when one of the theme's files is missing.
-3. **Sample themes and licences** _(planned for M33)_. It copies the sample themes of
-   `samples/keycloak/themes` beside the Axis theme, and writes the list of
+3. **Sample themes and licences.** It copies the sample themes of
+   `samples/keycloak/themes` beside the Axis theme. It restores the server, worker and publisher
+   projects, because the list reads their restored packages, and writes the list of
    [open source licences](reference/legal.md#open-source-licences) that `/licences` shows.
 4. It starts PostgreSQL, Keycloak, Mailpit and the purchasing system stub with Docker Compose, and
    waits until PostgreSQL accepts connections and Keycloak's `axis` realm, Mailpit and the stub
@@ -42,8 +43,8 @@ Docker, .NET and Node, and works on a fresh clone.
    authentication. The worker's `Extensions__Runners__Node` names that address, see
    [package runners](reference/extension-packages.md#package-runners).
 10. It runs the server and the worker under `dotnet watch` and the SPA on Vite, in one terminal. It
-    starts the worker once the server has migrated the tenant databases. The SPA proxies `/api` and
-    `/health` to the server.
+    starts the worker once the server has migrated the tenant databases. The SPA proxies `/api`,
+    `/health` and `/licences.json` to the server, so the licences page works signed out too.
 11. It runs one publisher, `axis-admin publisher`, once the server has migrated the tenant databases.
     The publisher runs from the built `Axis.Admin.dll`, not under `dotnet watch`. The script sets its
     tenant settings as environment variables of that process only, because `Axis.Admin` reads no
@@ -55,6 +56,11 @@ messages start with `[dev]`.
 
 ### Settings it sets
 
+- **Legal links.** `scripts/dev.sh` sets `Tenants:default:Legal:PrivacyUrl` to
+  `https://example.com/privacy`, `TermsUrl` to `https://example.com/terms` and `TermsVersion` to `1`,
+  see [legal settings](reference/legal.md#legal-settings). They reach the server and the publisher
+  only, because the publisher's realm sync would otherwise remove them at the next Studio publish. E2E
+  and the Compose stack set none, so their sign-in has no terms step.
 - **Studio's new applications.** `scripts/dev.sh` and the Compose server set `Studio:ApplicationsPath`
   to `artifacts/studio-apps`, which `artifacts/` keeps out of git. An exported
   `Studio__ApplicationsPath` replaces that folder. E2E's journey server sets it to a temporary folder.

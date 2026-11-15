@@ -4,7 +4,10 @@
 # PostgreSQL accepts connections, Keycloak's development realm answers and the stub answers. The
 # server signs people in through that realm at /api/auth/sign-in. Before the server starts, this script adds the axis first
 # login flow to the realm through the admin API. The SPA does not offer it yet. The realm signs
-# people in on the Axis theme, which this script builds into artifacts/keycloak-theme before Keycloak starts.
+# people in on the Axis theme, which this script builds into artifacts/keycloak-theme before Keycloak starts. It copies the sample
+# themes of samples/keycloak/themes beside it, so the company realm signs people in on a look of its own, and writes the
+# open source licences list that /licences shows. It gives the default tenant example privacy and terms links and a terms
+# version, so the identity provider shows the legal line and the terms step.
 # The worker and the publisher start once the server has migrated the tenant databases. The
 # publisher runs the publish requests of Studio. A change to a JSON file
 # in an application folder that the server activates at startup restarts the server, so that it
@@ -89,6 +92,22 @@ fi
 log "Building the Keycloak theme"
 npm run build:keycloak-theme --prefix web
 
+# The sample themes are sample data, so only this script copies them. The Vite build empties only axis/login/resources,
+# so the copies stay.
+log "Copying the sample themes"
+for theme in samples/keycloak/themes/*/; do
+  name="$(basename "$theme")"
+  rm -rf "artifacts/keycloak-theme/$name"
+  cp -R "$theme" "artifacts/keycloak-theme/$name"
+done
+
+# write-licences.mjs reads obj/project.assets.json of each project, which a fresh clone has not restored yet.
+log "Writing the open source licences list"
+for project in Axis.Server Axis.Worker Axis.Admin; do
+  dotnet restore "src/$project/$project.csproj" --nologo -v quiet
+done
+node scripts/write-licences.mjs
+
 # The health checks make --wait return once PostgreSQL accepts connections, the realm answers
 # and the purchasing system stub and Mailpit answer. --build rebuilds the stub's image when it changed.
 log "Starting PostgreSQL on port $postgres_port, Keycloak on port $keycloak_port, Mailpit on ports $mailpit_smtp_port and $mailpit_web_port and the purchasing system stub on port $purchasing_port"
@@ -132,6 +151,17 @@ if [ -n "${AXIS_PURCHASING_PORT:-}" ]; then
   export Tenants__default__Bindings__PurchasingSystemTokenUrl__Value="http://localhost:$AXIS_PURCHASING_PORT/oauth/token"
   export Tenants__default__Bindings__PurchaseRequestApprovedWebhookUrl__Value="http://localhost:$AXIS_PURCHASING_PORT/webhooks/purchase-request-approved"
 fi
+
+# The example legal links and terms version of the default tenant, so the realm sync turns the terms step on. E2E imports the
+# same realm file and sets no Legal, so it keeps signing in without a terms step, see
+# docs/reference/legal.md#legal-settings. They are not exported, because the worker does not read them. The publisher
+# gets them too, or its realm sync on a Studio publish would remove the links and turn the terms step off.
+legal_env=(
+  "Tenants__default__Legal__PrivacyUrl=https://example.com/privacy"
+  "Tenants__default__Legal__TermsUrl=https://example.com/terms"
+  "Tenants__default__Legal__TermsVersion=1"
+)
+server_env+=("${legal_env[@]}")
 
 # Job control leaves SIGINT enabled for the background processes. Without it, a
 # non-interactive bash starts them with SIGINT ignored. The jobs are disowned so that bash
@@ -363,6 +393,7 @@ while :; do
       Email__Smtp__Host=mailpit Email__Smtp__Port=1025 Email__Smtp__UseTls=false Email__From=axis@localhost \
       Extensions__Path="$PWD/artifacts/extensions" \
       Modules__Path="$PWD/artifacts/modules" \
+      "${legal_env[@]}" \
       Tenants__default__Hosts__0=localhost \
       Tenants__default__DataKeys__1=AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE= \
       Tenants__default__LookupKeys__1=AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= \

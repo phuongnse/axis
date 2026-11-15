@@ -38,6 +38,7 @@ export default defineConfig({
     proxy: {
       '/api': { target: serverUrl, configure: answerBadGateway },
       '/health': { target: serverUrl, configure: answerBadGateway },
+      '/licences.json': { target: serverUrl, configure: answerBadGateway },
     },
   },
   test: {
