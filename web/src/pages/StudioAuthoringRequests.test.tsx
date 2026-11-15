@@ -366,9 +366,7 @@ describe('a ready request’s page', () => {
     const checks = await screen.findByTestId('studio-ai-checks')
     expect(within(checks).getByText('Passed')).toHaveAttribute('data-tone', 'success')
     expect(within(checks).getByText('The scenario passes')).toBeInTheDocument()
-    expect(screen.getByTestId('studio-ai-guide')).toHaveTextContent(
-      'Checks and review passed. Preview the draft if you like, then accept it.',
-    )
+    expect(screen.getByTestId('studio-ai-guide')).toHaveTextContent('Checks and review passed')
     expect(screen.queryByRole('tab')).toBeNull()
     expect(screen.getByTestId('studio-ai-feed-plan')).toHaveAttribute('data-mark', 'done')
     const result = screen.getByTestId('studio-ai-feed-result')
@@ -453,7 +451,7 @@ describe('a ready request’s page', () => {
     expect(within(plan).getByTestId('studio-ai-plan')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-ai-feed-work')).toBeNull()
     const bar = screen.getByTestId('studio-ai-bar')
-    expect(bar).toHaveTextContent('Read the plan, then approve it or say what to change.')
+    expect(bar).toHaveTextContent('Plan ready for your approval')
     expect(within(bar).getByRole('button', { name: 'Approve plan' })).toBeInTheDocument()
 
     const user = userEvent.setup()
@@ -916,12 +914,12 @@ describe("a request's guide", () => {
       />,
     )
 
-  it('says AI works and the author may leave, with no main action', async () => {
+  it('says AI works, with no main action', async () => {
     stub({ ...fromApp, state: 'working', checks: null, aiConnected: true })
     renderPage()
 
     const bar = await screen.findByTestId('studio-ai-bar')
-    expect(bar).toHaveTextContent('AI is working on it. You can leave this page; the bell tells you when it needs you.')
+    expect(bar).toHaveTextContent('AI is working on it')
     expect(
       within(bar)
         .getAllByRole('button')
@@ -945,7 +943,7 @@ describe("a request's guide", () => {
     renderPage()
 
     const bar = await screen.findByTestId('studio-ai-bar')
-    expect(bar).toHaveTextContent('The review found 1 thing to change. Ask AI to fix it, or accept the draft as it is.')
+    expect(bar).toHaveTextContent('1 finding to fix')
     await userEvent.setup().click(within(bar).getByRole('button', { name: 'Ask AI to fix it' }))
     await waitFor(() => {
       const post = fetchMock.mock.calls.find(
@@ -962,7 +960,7 @@ describe("a request's guide", () => {
     renderPage()
 
     const bar = await screen.findByTestId('studio-ai-bar')
-    expect(bar).toHaveTextContent('AI could not finish. Do what the message says, then send the request again.')
+    expect(bar).toHaveTextContent('AI could not finish')
     await userEvent.setup().click(within(bar).getByRole('button', { name: 'Send again' }))
     await waitFor(() => {
       const post = fetchMock.mock.calls.find(
