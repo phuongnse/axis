@@ -384,7 +384,7 @@ describe('a ready request’s page', () => {
 
     const checks = await screen.findByTestId('studio-ai-checks')
     expect(within(checks).getByText('Passed')).toHaveAttribute('data-tone', 'success')
-    expect(within(checks).getByText('The scenario passes')).toBeInTheDocument()
+    expect(within(checks).getByText('All scenarios pass')).toBeInTheDocument()
     expect(screen.getByTestId('studio-ai-guide')).toHaveTextContent('Checks and review passed')
     expect(screen.queryByRole('tab')).toBeNull()
     expect(screen.getByTestId('studio-ai-feed-plan')).toHaveAttribute('data-mark', 'done')
@@ -912,8 +912,8 @@ describe("a request's history", () => {
     const rows = screen.getAllByRole('row').slice(1)
     expect(rows[0]).toHaveTextContent(/Checked the draft\s*1 of 2 scenarios pass/)
     expect(rows[1]).toHaveTextContent(/Fixed the draft\s*Draft saved/)
-    // Two scenarios that pass read as both.
-    expect(rows[2]).toHaveTextContent(/Checked the draft\s*Both scenarios pass/)
+    // Proposed: scenarios that all pass read as all, with no count.
+    expect(rows[2]).toHaveTextContent(/Checked the draft\s*All scenarios pass/)
     expect(rows[3]).toHaveTextContent(/Reviewed the draft\s*Ran out of time.*30 min/)
   })
 })

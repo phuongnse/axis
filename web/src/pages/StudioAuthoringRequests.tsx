@@ -1396,14 +1396,8 @@ function checksSummary(
     return { text: t('shell.studio.aiRequest.checks.noScenarios'), passed: true }
   }
   if (passed === scenarios.length) {
-    // One scenario, two and more read differently in English: "The scenario passes", "Both scenarios pass", "All 8 …".
-    const key =
-      passed === 1
-        ? 'shell.studio.aiRequest.checks.oneScenario'
-        : passed === 2
-          ? 'shell.studio.aiRequest.checks.bothScenarios'
-          : 'shell.studio.aiRequest.checks.allScenarios'
-    return { text: t(key).replace('{total}', String(passed)), passed: true }
+    // Proposed: when every scenario passes the count adds nothing, which Show the checks lists, see the review on #3263.
+    return { text: t('shell.studio.aiRequest.checks.allScenarios'), passed: true }
   }
   if (scenarios.length === 1) {
     return { text: t('shell.studio.aiRequest.checks.oneScenarioFails'), passed: false }
