@@ -290,23 +290,25 @@ describe('a ready request’s review', () => {
     expect(within(review).getByText('Changes requested')).toHaveAttribute('data-tone', 'attention')
     expect(within(review).queryByText(/Approved/)).toBeNull()
     // Proposed: Things to look at, the findings in one list by the resource they are about, the blocking first, each led
-    // by its kind, Blocking in dangerText and Suggestion in infoText, so it takes no bullet.
+    // by its kind, an icon and its word in the colour it asks for, so it takes no bullet.
     const found = within(review).getByTestId('studio-ai-findings')
     expect(within(found).getByText('Things to look at')).toBeInTheDocument()
     const [page, loose] = within(found).getAllByTestId('studio-problem-group')
     expect(within(page).getAllByRole('button', { name: 'Requests' })).toHaveLength(1)
     expect(within(page).getByText('Page')).toBeInTheDocument()
-    expect(page).toHaveTextContent(/Blocking Mails the approver too\..*Suggestion Could say why\./)
+    expect(page).toHaveTextContent(/Blocking: Mails the approver too\..*Suggestion: Could say why\./)
     const { colour } = designTokensFor('light')
-    expect(within(page).getByText('Blocking')).toHaveStyle({ color: colour.dangerText })
-    expect(within(page).getByText('Suggestion')).toHaveStyle({ color: colour.infoText })
+    expect(within(page).getByText('Blocking:')).toHaveStyle({ color: colour.dangerText })
+    expect(within(page).getByText('Blocking:').querySelector('[aria-hidden] .anticon-stop')).not.toBeNull()
+    expect(within(page).getByText('Suggestion:')).toHaveStyle({ color: colour.warningText })
+    expect(within(page).getByText('Suggestion:').querySelector('.anticon-bulb')).not.toBeNull()
     // Proposed: a resource's findings sit half of spacing-xs under its name.
     expect(page).toHaveStyle({ gap: '4px' })
     expect(within(page).getAllByTestId('studio-problem')[0].parentElement).toHaveStyle({
       listStyleType: 'none',
       paddingInlineStart: '16px',
     })
-    expect(loose).toHaveTextContent(/misc\.json\s*Suggestion A loose end\./)
+    expect(loose).toHaveTextContent(/misc\.json\s*Suggestion: A loose end\./)
     expect(within(loose).queryByRole('button')).toBeNull()
 
     const user = userEvent.setup()
@@ -334,17 +336,20 @@ describe('a ready request’s review', () => {
 
     const criteria = await screen.findByTestId('studio-ai-review-criteria')
     expect(within(criteria).getByText('Acceptance criteria')).toBeInTheDocument()
+    const { colour } = designTokensFor('light')
     const [met, notMet] = within(criteria).getAllByRole('listitem')
-    expect(within(met).getByText('Met')).toHaveAttribute('data-tone', 'success')
-    expect(met).toHaveTextContent('It saves.')
-    expect(within(notMet).getByText('Not met')).toHaveAttribute('data-tone', 'danger')
-    expect(within(notMet).getByText('No such column.')).toHaveStyle({
-      color: designTokensFor('light').colour.textMuted,
-    })
+    // Proposed: each led by an icon and its outcome in the colour it asks for, the why muted after the words on their line.
+    expect(within(met).getByText('Met')).toHaveStyle({ color: colour.successText })
+    expect(within(met).getByText('Met').querySelector('.anticon-check-circle')).not.toBeNull()
+    expect(met).toHaveTextContent(/Met\s*It saves\./)
+    expect(within(notMet).getByText('Not met')).toHaveStyle({ color: colour.dangerText })
+    expect(within(notMet).getByText('No such column.')).toHaveStyle({ color: colour.textMuted })
+    expect(notMet).toHaveTextContent(/Not met\s*It shows a column\. No such column\./)
+    expect(within(notMet).queryByRole('br')).toBeNull()
     const checklist = screen.getByTestId('studio-ai-review-checklist')
     expect(within(checklist).getByText('Checklist')).toBeInTheDocument()
-    expect(within(checklist).getByText('Skipped')).toHaveAttribute('data-tone', 'muted')
-    expect(checklist).toHaveTextContent('Texts.No Vietnamese texts yet.')
+    expect(within(checklist).getByText('Skipped')).toHaveStyle({ color: colour.textMuted })
+    expect(checklist).toHaveTextContent(/Skipped\s*Texts\. No Vietnamese texts yet\./)
     expect(screen.queryByTestId('studio-ai-findings')).toBeNull()
   })
 
@@ -1085,7 +1090,7 @@ describe("a request's guide", () => {
     const dialog = await screen.findByRole('dialog', { name: 'Accept without these changes?' })
     // The findings it leaves out read as the review lists them, the blocking ones alone.
     const left = within(dialog).getByTestId('studio-ai-anyway-findings')
-    expect(left).toHaveTextContent(/Blocking Show the column\./)
+    expect(left).toHaveTextContent(/Blocking: Show the column\./)
     expect(left).not.toHaveTextContent('Could say why.')
     expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/accept'))).toBe(false)
     await user.click(within(dialog).getByRole('button', { name: 'Accept anyway' }))

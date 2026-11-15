@@ -60,7 +60,18 @@ import { StudioPageHeading } from './StudioPageHeading'
 import { bulletList } from '../platform/bulletList'
 import { StudioProblemList } from './StudioProblems'
 import { ResourceReference } from './ResourceReference'
-import { CheckOutlined, ClockCircleOutlined, CloseOutlined, LoadingOutlined, MinusOutlined } from '@ant-design/icons'
+import {
+  BulbFilled,
+  CheckCircleFilled,
+  CheckOutlined,
+  ClockCircleOutlined,
+  CloseCircleFilled,
+  CloseOutlined,
+  LoadingOutlined,
+  MinusCircleOutlined,
+  MinusOutlined,
+  StopFilled,
+} from '@ant-design/icons'
 import { useDiagnosticItems } from './useDiagnosticItems'
 import { StudioRequestStatus } from './StudioRequestStatus'
 import { StudioTestResults } from './StudioTestResults'
@@ -1327,10 +1338,39 @@ function ReviewFindings({
 }
 
 /**
+ * Proposed: what leads an item of what a review found, see the review on #3263: an icon that says its kind or its
+ * outcome at a glance, then its word, both in the colour of what it asks of the reader, as docs/reference/actions-and-
+ * controls.md#buttons lets an icon go with text for a status or a severity. A finding is Blocking, a red stop, or a
+ * Suggestion, a bulb in warningText; a criterion or a checklist item is Met, a green check, Not met, a red cross, or
+ * Skipped, a muted dash. The icon is hidden from assistive technology, which reads the word.
+ */
+function ReviewMark({ mark, words }: { mark: ReviewMarkKind; words: string }) {
+  const { colour, spacing } = useDesignTokens()
+  const look = {
+    blocking: { icon: <StopFilled />, ink: colour.dangerText },
+    suggestion: { icon: <BulbFilled />, ink: colour.warningText },
+    met: { icon: <CheckCircleFilled />, ink: colour.successText },
+    notMet: { icon: <CloseCircleFilled />, ink: colour.dangerText },
+    skipped: { icon: <MinusCircleOutlined />, ink: colour.textMuted },
+  }[mark]
+  return (
+    <span data-mark={mark} style={{ color: look.ink, whiteSpace: 'nowrap' }}>
+      <span aria-hidden style={{ marginInlineEnd: spacing.xs / 2 }}>
+        {look.icon}
+      </span>
+      {words}
+    </span>
+  )
+}
+
+type ReviewMarkKind = StudioReviewFinding['kind'] | StudioReviewOutcome['outcome']
+
+/**
  * Proposed: how the review found each acceptance criterion of the plan or each item of Axis's checklist, see the review
- * on #3263: under its heading in bold, each item led by its outcome as a `StatusTag`, Met (`success`), Not met
- * (`danger`) or Skipped (`muted`), in a column of their own so the words start together, with the review's note, muted,
- * under the words of one not met or skipped. The tag leads each item, so it takes no bullet.
+ * on #3263: under its heading in bold, each item led by its outcome as a `ReviewMark`, Met, Not met or Skipped, in a
+ * column of their own so the words start together, then its words, with the review's short why, muted, after them on
+ * their line for one not met or skipped, as a decision of the plan reads with its reason. The mark leads each item, so
+ * it takes no bullet.
  */
 function ReviewOutcomes({
   heading,
@@ -1346,7 +1386,6 @@ function ReviewOutcomes({
   if (items.length === 0) {
     return null
   }
-  const tone = { met: 'success', notMet: 'danger', skipped: 'muted' } as const
   return (
     <Flex vertical gap={spacing.xs} data-testid={testId}>
       <Typography.Text strong>{t(heading)}</Typography.Text>
@@ -1360,19 +1399,16 @@ function ReviewOutcomes({
           columnGap: spacing.sm,
           rowGap: spacing.xs,
           alignItems: 'baseline',
-          justifyItems: 'start',
         }}
       >
         {items.map((item, index) => (
           <li key={index} data-outcome={item.outcome} style={{ display: 'contents' }}>
-            <StatusTag tone={tone[item.outcome]}>
-              {t(`shell.studio.aiRequest.review.outcome.${item.outcome}`)}
-            </StatusTag>
+            <ReviewMark mark={item.outcome} words={t(`shell.studio.aiRequest.review.outcome.${item.outcome}`)} />
             <span>
               <Typography.Text>{item.text}</Typography.Text>
               {item.note !== null && (
                 <>
-                  <br />
+                  {' '}
                   <Typography.Text style={{ color: colour.textMuted }}>{item.note}</Typography.Text>
                 </>
               )}
@@ -1386,8 +1422,8 @@ function ReviewOutcomes({
 
 /**
  * Proposed: a review's findings in one list, see the review on #3263, as `StudioProblemList` lists problems: grouped by
- * the resource they are about, the resource a link, each finding led by its kind as a problem is led by its severity,
- * "Blocking" in dangerText and "Suggestion" in infoText, so a glance tells what holds the draft back. The blocking ones
+ * the resource they are about, the resource a link, each finding led by its kind as a `ReviewMark` and a colon, as a
+ * problem is led by its severity, "Blocking:" or "Suggestion:", so a glance tells what holds the draft back. The blocking ones
  * come first. The review's result shows them all, and the Accept anyway dialog the blocking ones alone.
  */
 function FindingList({
@@ -1405,8 +1441,6 @@ function FindingList({
   only?: 'blocking'
 }) {
   const t = useText()
-  const { colour } = useDesignTokens()
-  const ink = { blocking: colour.dangerText, suggestion: colour.infoText }
   const listed = [
     ...findings.filter((finding) => finding.kind === 'blocking'),
     ...(only === undefined ? findings.filter((finding) => finding.kind !== 'blocking') : []),
@@ -1415,11 +1449,7 @@ function FindingList({
     <StudioProblemList
       testId={testId}
       items={listed.map((finding) => ({
-        lead: (
-          <Typography.Text style={{ color: ink[finding.kind] }} data-kind={finding.kind}>
-            {t(`shell.studio.aiRequest.review.kind.${finding.kind}`)}
-          </Typography.Text>
-        ),
+        lead: <ReviewMark mark={finding.kind} words={`${t(`shell.studio.aiRequest.review.kind.${finding.kind}`)}:`} />,
         message: finding.text,
         resourceId: finding.resourceId,
         file: finding.file,
