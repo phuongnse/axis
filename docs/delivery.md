@@ -334,7 +334,9 @@ A milestone goes from a readiness check to its close in five steps.
    - the **From** column of [concepts.md](domain/concepts.md) for every concept listed for this
      milestone, moved to a later milestone when the concept was not delivered;
    - every *(planned for Mx)* marker for this milestone in any doc, removed when the work was built
-     and moved to a later milestone when it was not;
+     and moved to a later milestone when it was not. A moved marker has an open issue in its new
+     milestone, which the sweep links in its pull request or opens first, as
+     [planned work](writing-docs.md#planned-work) says;
    - the doc sections that the milestone's pull requests changed: what is said twice is merged into
      its one home, what a later rule replaced is deleted, and the decisions they link hold only
      choices still in force;
