@@ -14,7 +14,6 @@ the table, and a reviewer judges what the script cannot.
   Level 2 requirement of ASVS 5.0 once, in the standard's order, by its id, such as `V6.2.1`.
 - **A status for each.** The status is one of:
   - **Met:** Axis meets it. The evidence names a test class, a doc section or a check that shows it.
-  - **Gap:** Axis does not meet it. The evidence links the issue that closes it.
   - **Delegated:** the identity provider or the deployment's operator meets it. The identity
     provider meets multi-factor authentication, password rules, account lockout and account
     recovery, because Axis has no passwords of its own, see
@@ -31,9 +30,9 @@ the table, and a reviewer judges what the script cannot.
     `.cs` file under `tests/`, `controlplane/tests/` or `samples/` declares. It does not judge that
     the test covers the requirement. A reviewer does.
   - It fails on a listed id that has no row, so every listed id appears exactly once.
-  - It fails on a **Gap** row whose evidence links no GitHub issue, as a Markdown link to
-    `https://github.com/<owner>/<repo>/issues/<n>`. It does not check that the issue exists, is
-    open or closes the requirement. A reviewer does.
+  - It fails on every **Gap** row, with or without an issue link. Checking that an issue is open would
+    make the offline check call GitHub. A gap found later is closed in the change that finds it, or
+    that change waits for the issue that closes it.
 - **Kept current.** A change that adds a route, a setting or a stored secret checks the rows it
   touches, in the same change.
 - **Sign-off** _(planned for M32)_. A final pass over every row confirms that each requirement is
