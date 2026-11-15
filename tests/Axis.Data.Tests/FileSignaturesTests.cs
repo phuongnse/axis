@@ -38,6 +38,18 @@ public sealed class FileSignaturesTests
     [InlineData("application/zip", "PK\u0003\u0004rest")]
     [InlineData("application/zip", "PK\u0005\u0006rest")]
     [InlineData("application/zip", "PK\u0007\u0008rest")]
+    [InlineData("image/bmp", "BM....")]
+    [InlineData("image/tiff", "II*\0....")]
+    [InlineData("image/tiff", "MM\0*....")]
+    [InlineData("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "PK\u0003\u0004rest")]
+    [InlineData("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "PK\u0003\u0004rest")]
+    [InlineData("application/vnd.openxmlformats-officedocument.presentationml.presentation", "PK\u0003\u0004rest")]
+    [InlineData("application/vnd.oasis.opendocument.text", "PK\u0003\u0004rest")]
+    [InlineData("application/vnd.oasis.opendocument.spreadsheet", "PK\u0003\u0004rest")]
+    [InlineData("application/vnd.oasis.opendocument.presentation", "PK\u0003\u0004rest")]
+    [InlineData("application/msword", "\u00D0\u00CF\u0011\u00E0\u00A1\u00B1\u001A\u00E1rest")]
+    [InlineData("application/vnd.ms-excel", "\u00D0\u00CF\u0011\u00E0\u00A1\u00B1\u001A\u00E1rest")]
+    [InlineData("application/vnd.ms-powerpoint", "\u00D0\u00CF\u0011\u00E0\u00A1\u00B1\u001A\u00E1rest")]
     public void Bytes_that_start_as_the_declared_type_match(string mediaType, string head)
     {
         Assert.True(FileSignatures.Matches(mediaType, Encoding.Latin1.GetBytes(head)));
@@ -57,6 +69,24 @@ public sealed class FileSignaturesTests
     [InlineData("image/webp", "RIFF\0\0\0\0WAVEfmt ")]
     [InlineData("image/webp", "RIFF\0\0\0")]
     [InlineData("application/zip", "PK\u0001\u0002rest")]
+    [InlineData("image/bmp", "BX....")]
+    [InlineData("image/tiff", "II\0*....")]
+    [InlineData("image/tiff", "MM*\0....")]
+    [InlineData("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "%PDF-1.7")]
+    [InlineData("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "%PDF-1.7")]
+    [InlineData("application/vnd.openxmlformats-officedocument.presentationml.presentation", "%PDF-1.7")]
+    [InlineData("application/vnd.oasis.opendocument.text", "%PDF-1.7")]
+    [InlineData("application/vnd.oasis.opendocument.spreadsheet", "%PDF-1.7")]
+    [InlineData("application/vnd.oasis.opendocument.presentation", "%PDF-1.7")]
+    [InlineData("application/msword", "PK\u0003\u0004rest")]
+    [InlineData("application/vnd.ms-excel", "PK\u0003\u0004rest")]
+    [InlineData("application/vnd.ms-powerpoint", "PK\u0003\u0004rest")]
+    [InlineData("text/plain", "a\0b")]
+    [InlineData("text/csv", "a,b\u0001")]
+    [InlineData("application/json", "{\"a\":\u001B}")]
+    [InlineData("application/xml", "<a/>\0")]
+    [InlineData("text/xml", "<a/>\0")]
+    [InlineData("text/html", "<p>\u0002</p>")]
     public void Bytes_that_do_not_start_as_the_declared_type_do_not_match(string mediaType, string head)
     {
         Assert.False(FileSignatures.Matches(mediaType, Encoding.Latin1.GetBytes(head)));
@@ -70,12 +100,81 @@ public sealed class FileSignaturesTests
     }
 
     [Theory]
-    [InlineData("text/plain")]
-    [InlineData("application/octet-stream")]
-    [InlineData("application/vnd.ms-excel")]
-    public void A_type_without_a_known_start_matches_any_bytes(string mediaType)
+    [InlineData("text/plain", "a note\r\n\tline\f")]
+    [InlineData("text/csv", "name,note\n")]
+    [InlineData("application/json", "{\"a\": 1}")]
+    [InlineData("application/xml", "<a>text</a>")]
+    [InlineData("text/xml", "<a>text</a>")]
+    [InlineData("text/html", "<p>hi</p>")]
+    public void Text_without_control_bytes_matches_in_any_encoding_of_one_byte_characters(string mediaType, string head)
     {
-        Assert.True(FileSignatures.Matches(mediaType, "anything"u8));
-        Assert.True(FileSignatures.Matches(mediaType, []));
+        Assert.True(FileSignatures.Matches(mediaType, Encoding.Latin1.GetBytes(head)));
+        Assert.True(FileSignatures.Matches(mediaType, Encoding.UTF8.GetBytes(head + " Tiếng Việt")));
+        Assert.True(FileSignatures.Matches(mediaType, Encoding.Latin1.GetBytes(head + " caf\u00E9")));
+    }
+
+    [Theory]
+    [InlineData("image/svg+xml")]
+    [InlineData("application/octet-stream")]
+    [InlineData("application/x-unknown")]
+    public void A_type_that_is_not_checked_matches_no_bytes_and_has_no_extension(string mediaType)
+    {
+        Assert.False(FileSignatures.IsChecked(mediaType));
+        Assert.False(FileSignatures.Matches(mediaType, "anything"u8));
+        Assert.False(FileSignatures.Matches(mediaType, []));
+        Assert.False(FileSignatures.HasExtension(mediaType, "file.svg"));
+        Assert.False(FileSignatures.HasExtension(mediaType, "file.bin"));
+    }
+
+    [Fact]
+    public void Every_type_in_the_table_has_lower_case_extensions_that_start_with_a_dot()
+    {
+        Assert.NotEmpty(FileSignatures.Types);
+        Assert.All(FileSignatures.Types, type =>
+        {
+            Assert.Equal(type.Key.ToLowerInvariant(), type.Key);
+            Assert.NotEmpty(type.Value.Extensions);
+            Assert.All(type.Value.Extensions, extension =>
+            {
+                Assert.StartsWith(".", extension, StringComparison.Ordinal);
+                Assert.Equal(extension.ToLowerInvariant(), extension);
+                Assert.True(extension.Length > 1);
+            });
+        });
+    }
+
+    [Fact]
+    public void Every_type_accepts_each_of_its_extensions_in_any_letter_case()
+    {
+        foreach (var (mediaType, type) in FileSignatures.Types)
+        {
+            Assert.True(FileSignatures.IsChecked(mediaType.ToUpperInvariant()));
+            foreach (var extension in type.Extensions)
+            {
+                Assert.True(FileSignatures.HasExtension(mediaType, $"invoice{extension}"), $"{mediaType} {extension}");
+                Assert.True(FileSignatures.HasExtension(mediaType.ToUpperInvariant(), $"INVOICE{extension.ToUpperInvariant()}"), $"{mediaType} {extension}");
+            }
+        }
+    }
+
+    [Fact]
+    public void Every_type_refuses_the_extension_of_another_type_and_a_name_without_an_extension()
+    {
+        foreach (var (mediaType, type) in FileSignatures.Types)
+        {
+            var other = FileSignatures.Types.Values.SelectMany(candidate => candidate.Extensions).First(extension => !type.Extensions.Contains(extension));
+            Assert.False(FileSignatures.HasExtension(mediaType, $"invoice{other}"), $"{mediaType} {other}");
+            Assert.False(FileSignatures.HasExtension(mediaType, "invoice"), mediaType);
+            Assert.False(FileSignatures.HasExtension(mediaType, "invoice."), mediaType);
+            Assert.False(FileSignatures.HasExtension(mediaType, type.Extensions[0].TrimStart('.')), mediaType);
+        }
+    }
+
+    [Fact]
+    public void A_png_name_is_refused_for_a_pdf()
+    {
+        Assert.False(FileSignatures.HasExtension("application/pdf", "invoice.png"));
+        Assert.False(FileSignatures.HasExtension("application/pdf", "invoice.pdf.png"));
+        Assert.True(FileSignatures.HasExtension("application/pdf", "invoice.png.pdf"));
     }
 }

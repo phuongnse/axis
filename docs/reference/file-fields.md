@@ -14,14 +14,13 @@ contain.
   `maxSize` is in bytes and is at most `Files:MaxSize`. `accept` lists media types, and `type/*`
   matches any subtype. Both are optional. See
   [entity field types](resource-files.md#entity-field-types-and-constraints).
-- **Extensions.** The extension of the file name is never checked, and the stored name keeps
-  whatever extension it was sent with. The declared media type and the file's first bytes decide
-  what is accepted, as the [upload checks](#upload) say.
+- **Extensions.** The extension of the file name must be one of the declared media type's, as the
+  [upload checks](#upload) say, and the stored name keeps it, also when a long name is cut.
 - **Unpacking.** An upload is stored as sent and never unpacked, so `maxSize` and `Files:MaxSize`
   also limit its unpacked size.
-- **Malicious files.** An upload that starts like an executable, declares `image/svg+xml`, or does
-  not start as its declared PDF, PNG, JPEG, GIF, WebP or ZIP type is refused with a `415`, and
-  nothing is stored. Every other file is only ever downloaded as an attachment with `nosniff`, as
+- **Malicious files.** An upload that starts like an executable, declares `image/svg+xml`, declares
+  a type Axis cannot check, has an extension that does not belong to its declared type, or has
+  content that does not match that type is refused with a `415`, and nothing is stored. Every other file is only ever downloaded as an attachment with `nosniff`, as
   the [download headers](#download) say. Axis does not scan uploads for malware, so an
   operator that needs scanning puts a scanning proxy in front of the upload route.
 - **Several files.** A record holds several files through a child collection whose child entity has
@@ -61,15 +60,49 @@ module has no upload route. A service account may upload, as it may write record
 - **Body.** The request must be `multipart/form-data` with a boundary, or it is a `415`. A missing
   `file` part, an extra part, a part without a file name and an empty file are `400` at `file`.
 - **Name.** The stored name is the last path segment of the part's file name, without control
-  characters, at most 255 characters.
+  characters. A longer name is cut before its extension, so the stored name keeps the extension
+  that was checked.
 - **Media type.** The media type comes from the part's `Content-Type`, without its parameters, such
-  as `charset`. A part without one is stored as `application/octet-stream`.
-- **Checks.** A file larger than the field's `maxSize`, or than `Files:MaxSize`, is a `413` as soon
-  as the count passes the limit. A media type that `accept` does not allow is a `415`. A declared
-  `image/svg+xml` is a `415` whatever `accept` allows, because an SVG can carry scripts. A file that
-  starts like a Windows, Linux or macOS executable is a `415` whatever type it declares. A file
-  declared as PDF, PNG, JPEG, GIF, WebP or ZIP must start as that type does, or it is a `415`. Other
-  types are checked only for an executable start.
+  as `charset`. A part without one is `application/octet-stream`, which Axis cannot check, so it is
+  refused.
+- **Checks.** They run in this order. A media type that `accept` does not allow is a `415`. A
+  declared `image/svg+xml` is a `415` whatever `accept` allows, because an SVG can carry scripts. A
+  media type that is not in the table below is a `415`, because Axis can check neither its
+  extension nor its content. A file name whose extension is not one of the type's, or that has no
+  extension, is a `415`, and the body is not read. A file larger than the field's `maxSize`, or than
+  `Files:MaxSize`, is a `413` as soon as the count passes the limit. A file that starts like a
+  Windows, Linux or macOS executable is a `415` whatever type it declares. A file whose content
+  does not match its type is a `415`. The checks read the first 512 bytes of the file, and Axis
+  never opens an archive or an Office file.
+
+  | Media type | Extensions | Content |
+  | --- | --- | --- |
+  | `application/pdf` | `.pdf` | Starts with `%PDF-`. |
+  | `image/png` | `.png` | Starts with the PNG signature. |
+  | `image/jpeg` | `.jpg`, `.jpeg` | Starts with the JPEG signature. |
+  | `image/gif` | `.gif` | Starts with `GIF87a` or `GIF89a`. |
+  | `image/webp` | `.webp` | Starts with `RIFF`, and holds `WEBP` at byte 8. |
+  | `image/bmp` | `.bmp` | Starts with `BM`. |
+  | `image/tiff` | `.tif`, `.tiff` | Starts with the TIFF signature in either byte order. |
+  | `application/zip` | `.zip` | Starts with a ZIP signature. |
+  | `application/vnd.openxmlformats-officedocument.wordprocessingml.document` | `.docx` | Starts with a ZIP signature. |
+  | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | `.xlsx` | Starts with a ZIP signature. |
+  | `application/vnd.openxmlformats-officedocument.presentationml.presentation` | `.pptx` | Starts with a ZIP signature. |
+  | `application/vnd.oasis.opendocument.text` | `.odt` | Starts with a ZIP signature. |
+  | `application/vnd.oasis.opendocument.spreadsheet` | `.ods` | Starts with a ZIP signature. |
+  | `application/vnd.oasis.opendocument.presentation` | `.odp` | Starts with a ZIP signature. |
+  | `application/msword` | `.doc` | Starts with the compound file signature. |
+  | `application/vnd.ms-excel` | `.xls` | Starts with the compound file signature. |
+  | `application/vnd.ms-powerpoint` | `.ppt` | Starts with the compound file signature. |
+  | `text/plain` | `.txt` | Text: no NUL or other control byte but tab, line feed, form feed and carriage return. |
+  | `text/csv` | `.csv` | Text, as above. |
+  | `application/json` | `.json` | Text, as above. |
+  | `application/xml` | `.xml` | Text, as above. |
+  | `text/xml` | `.xml` | Text, as above. |
+  | `text/html` | `.html`, `.htm` | Text, as above. |
+
+  Text need not be UTF-8, so a CSV file in a legacy encoding passes. Text in UTF-16 holds NUL
+  bytes, so it is refused.
 - **Pending.** The file is stored as `pending`, owned by the user, the entity and the field path
   (`receipt`, or `attachments/file` for a child field). Nothing points to it yet, so the response
   has no `Location` header: a pending file cannot be downloaded.
