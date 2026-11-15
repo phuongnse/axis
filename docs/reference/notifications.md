@@ -37,6 +37,7 @@ It is a step of the [process resource](processes.md), and it looks like this:
   `/steps/{i}/to/{j}/email`.
 - **`channels`** lists `inApp`, `email` or both. Any other channel is `AXC0004`, and an empty list is `AXC0269` at `/steps/{i}/channels`. A
   channel named twice is a schema violation (`AXC0004`).
+- **`kind`** _(planned for M35)_. It is `info`, `warning` or `action`, and `info` when it is left out. Any other value is a schema violation (`AXC0004`) at `/steps/{i}/kind`. An `action` notification waits in Needs action until it is done, see [in-app notifications](#in-app-notifications). A task escalation's `notify` takes it too.
 - **No role by email.** A `role` recipient with the `email` channel is `AXC0270` at
   `/steps/{i}/to/{j}/role`, because Axis has no directory to expand a role into addresses.
 - **`message`.** `message.subject` and `message.body` are text keys, checked as a label is at
@@ -111,6 +112,9 @@ period.
 - **Who sees one.** A user sees the notifications addressed to their user id, and those addressed to a
   role they hold that the active release declares, checked when read, as a role task is.
 - **Read state.** `axis.notification_reads` holds one row per notification and user who read it.
+- **Source and kind** _(planned for M35)_. Each row keeps its source and its kind. A `notify` step or a task escalation gives the source `process`, with the kind its step gives, see [the `notify` operation](#notify-operation). A quota notice gives `quota` and is a `warning`. An AI request notice gives `authoringRequest`, see [tenant notices](#tenant-notices).
+- **Read is not done** _(planned for M35)_. Reading a notification marks nothing done. An `info` or `warning` notification is always done. A process's `action` notification is done only when it is cleared, because Axis cannot tell whether its action was taken. An AI request's `action` notice is done when its request leaves the state it waits on, see [tenant notices](#tenant-notices).
+- **Clearing** _(planned for M35)_. A clear sets `cleared_at` on the caller's read row, and sets `read_at` too when it is missing. A cleared notification is no longer listed or counted for that caller. Other recipients see no change, and nothing is deleted before the retention period ends.
 - **Kept for.** The worker deletes the notifications whose `created_at` is older than
   `Notifications:RetentionDays`, a [worker setting](process-execution.md#worker-settings) of 90 days
   by default, by its own clock. It deletes their `axis.notification_reads` rows in the same
@@ -126,20 +130,24 @@ period.
 The routes list a user's notifications of one application and mark them read. They need a session
 (`401`), and the POSTs follow the CSRF rule.
 
-| Route                                          | What it does                                                                                      |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `GET /api/apps/{app}/notifications`            | Lists the user's notifications of an application, see [notification routes](#notification-routes) |
-| `POST /api/apps/{app}/notifications/{id}/read` | Marks one notification read, see [notification routes](#notification-routes)                      |
-| `POST /api/apps/{app}/notifications/read-all`  | Marks every notification the user sees read, see [notification routes](#notification-routes)      |
+| Route                                                               | What it does                                                                                                                                |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/apps/{app}/notifications`                                 | Lists the user's notifications of an application, see [notification routes](#notification-routes)                                           |
+| `POST /api/apps/{app}/notifications/{id}/read`                      | Marks one notification read, see [notification routes](#notification-routes)                                                                |
+| `POST /api/apps/{app}/notifications/read-all`                       | Marks every notification the user sees read, see [notification routes](#notification-routes)                                                |
+| `POST /api/apps/{app}/notifications/{id}/clear` _(planned for M35)_ | Clears one notification for the caller, see [notification routes](#notification-routes)                                                     |
+| `POST /api/apps/{app}/notifications/clear-all` _(planned for M35)_  | Clears the notifications the user sees now, except the `action` notifications not yet done, see [notification routes](#notification-routes) |
 
 - **List.** `GET /api/apps/{app}/notifications?page=&pageSize=&unread=` lists the user's
   notifications, newest first. It answers `items`, `page`, `pageSize`, `totalCount` and `unreadCount`.
   With `unread=true` the items and `totalCount` are the unread ones only, and `unreadCount` always
   counts every unread one. A notification sent to the user and to a role the user holds is listed once.
   A bad `page`, `pageSize` or `unread` (`true` or `false`) is a `400` that lists every bad parameter.
+- **Needs action** _(planned for M35)_. `needsAction=true` lists only the `action` notifications that are not yet done. `totalCount` follows that filter. `needsAction` takes `true` or `false`, and any other value is a `400`, as `unread` is.
 - **Item.** An item has `id`, `releaseId`, `subject`, `body`, `open`, `read` and `createdAt`. `open` is
   `{ "page", "parameters" }` with the stored raw parameters, or null when the notification opens no
   page.
+- **Item fields** _(planned for M35)_. An item also has `source`, `kind` and `done`. `done` is true once the notification is done, see [in-app notifications](#in-app-notifications).
 - **Texts.** Texts come from the notification's release, in the user's profile locale when that release
   has texts for it, otherwise its first locale in ordinal order, as for [email](#email). Each `{name}`
   is filled with the stored value formatted as [placeholders](#placeholders) says: a number, a date and
@@ -150,6 +158,7 @@ The routes list a user's notifications of one application and mark them read. Th
   write read rows for the caller only, so another recipient's unread count does not change. Both answer
   `204` with no body, and so does marking a notification that is already read. A notification the user
   does not see, or that does not exist, is a `404`.
+- **Clear** _(planned for M35)_. Both routes answer `204` with no body. `clear-all` clears every notification the user sees now, except the `action` notifications not yet done. An id the user does not see, or that does not exist, is a `404`.
 
 ### Tenant notices
 
@@ -157,11 +166,13 @@ A tenant notice is an in-app notification, in `axis.notifications`, that the wor
 tenant's administrators. It has no application and no release, uses platform text keys and the
 recipient kind `platformRole`, and no application lists it.
 
-| Route                               | What it does                                                                        |
-| ----------------------------------- | ----------------------------------------------------------------------------------- |
-| `GET /api/notifications`            | Lists the tenant notices of the user, see [tenant notices](#tenant-notices)         |
-| `POST /api/notifications/{id}/read` | Marks one tenant notice read, see [tenant notices](#tenant-notices)                 |
-| `POST /api/notifications/read-all`  | Marks every tenant notice the user sees read, see [tenant notices](#tenant-notices) |
+| Route                                                    | What it does                                                                                                                 |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/notifications`                                 | Lists the tenant notices of the user, see [tenant notices](#tenant-notices)                                                  |
+| `POST /api/notifications/{id}/read`                      | Marks one tenant notice read, see [tenant notices](#tenant-notices)                                                          |
+| `POST /api/notifications/read-all`                       | Marks every tenant notice the user sees read, see [tenant notices](#tenant-notices)                                          |
+| `POST /api/notifications/{id}/clear` _(planned for M35)_ | Clears one tenant notice for the user, see [tenant notices](#tenant-notices)                                                 |
+| `POST /api/notifications/clear-all` _(planned for M35)_  | Clears the tenant notices the user sees now, except the `action` notices not yet done, see [tenant notices](#tenant-notices) |
 
 - **Routes.** `GET /api/notifications?page=&pageSize=&unread=`, `POST /api/notifications/{id}/read`
   and `POST /api/notifications/read-all` list tenant notices and mark them read. They answer in the
@@ -171,9 +182,19 @@ recipient kind `platformRole`, and no application lists it.
 - **Who sees one.** A user sees a notice for the `administrator` kind only while they hold the role
   that `Users:AdministratorRole` names. Anyone else gets an empty list with zero counts and a `404`
   when marking a notice read, and read-all writes nothing for them.
+- **To one person** _(planned for M35)_. A tenant notice may go to one person. Its recipient kind is `platformUser`, and its recipient is the person's user id. Only that user sees it, and only on the platform host.
 - **Texts.** The texts are platform texts in the user's profile locale, matched by the whole tag
   ignoring letter case, with `en` as the fallback, so `vi-VN` shows `en`. Numbers are formatted in the
   profile locale, and a `date-time` shows in UTC, because a notice has no release time zone.
+- **AI request notices** _(planned for M35)_. The author of an [authoring request](authoring-requests.md) gets four notices. Each is stored in the same commit as the move of the request that it names:
+  - **Plan ready** on a move to `awaitingApproval`. The kind is `action`. The text key `notices.authoringPlanReady` gives the subject "Plan ready to approve" and the body "Read the plan for your request in {application} and approve it or ask for another."
+  - **Draft ready** on a move to `ready` when the request did not ask for auto-accept, or after the agent's accept is `refused`. The kind is `action`. The text key `notices.authoringDraftReady` gives "Draft ready to accept" and "The draft for your request in {application} passed its checks and review. Accept or drop it."
+  - **Draft accepted** when the agent's accept succeeds. The kind is `info`. The text key `notices.authoringAccepted` gives "Draft accepted" and "AI accepted the draft for your request in {application}. It goes live when someone publishes it."
+  - **Request stopped** on a move to `failed`. The kind is `warning`. The text key `notices.authoringFailed` gives "Request stopped" and "Your request in {application} stopped before it was done. Open it to see why."
+
+  The values are `application`, the application's name, and `request`. The states are in [authoring requests](authoring-requests.md#states).
+- **Read and done** _(planned for M35)_. A notice is read when its person opens it from the bell or marks it read. An `action` notice is done when its request leaves the state it waits on, whether it is read or not. Plan ready waits on `awaitingApproval`, and draft ready waits on `ready`.
+- **Open** _(planned for M35)_. An AI request notice opens its request in Studio, with `{ "page": "studio", "parameters": { "app", "request" } }`. The bell opens `/studio?app=<name>&request=<id>`, see [AI authoring in Studio](ai-authoring-in-studio.md#the-request-panel).
 
 ### The bell
 
@@ -185,12 +206,16 @@ A bell in the header shows the signed-in user's unread count and opens their not
 - **Platform site.** The platform site shows the bell when `GET /api/me` answers `users: true`, and it
   reads the [tenant notices](#tenant-notices) from `/api/notifications`. Anyone else, and a visitor
   who is not signed in, gets no bell.
+- **Everyone on the platform site** _(planned for M35)_. Every signed-in person on the platform site has the bell. Each person sees the notifications addressed to them, and an administrator also sees the tenant notices.
 - **Name.** The bell is a button with the accessible name "Notifications, 2 unread", or "Notifications"
   with no count. A polite live region announces a change of the count.
+- **Icon button** _(planned for M35)_. The bell is an icon button, and its unread count is drawn by `CountBadge`, the [shared widget](shared-widgets.md#which-widget) for a count. Its accessible name is the one given in Name above.
 - **Panel.** The bell opens a panel that lists the notifications newest first, 10 to a page, each with
   its subject, body and time. Unread rows are marked, and a Mark all read button sits at the top.
+- **Popover** _(planned for M35)_. The bell opens a popover list of the notifications, newest first. Its filters are All, Unread and Needs action, and Needs action lists the `action` notifications not yet done. Two buttons sit on it: Mark all read and Clear all.
 - **Rows.** A row opens its page, if it has one, with its parameters and marks the notification read.
   A row without a page, such as a tenant notice, only marks it read.
+- **Row details** _(planned for M35)_. Each row shows its subject, its body and how long ago it arrived, such as "5 minutes ago", in the person's locale. An unread row is marked, and each row has a Clear button. A screen reader names the row by its subject. Its description reads "Unread" and "Needs action" when they apply, then the body and the full date and time.
 - **Reloads.** The count reloads when the site loads, on every page navigation, when the panel opens
   and after any mark read. There is no timer. A failure to read the list hides the bell and never
   shows the sign-in prompt.

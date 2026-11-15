@@ -257,14 +257,17 @@ filtered index of the same columns without `application_id`,
 | `id` | `uuid` | A version 7 UUID, the notification's id. Every recipient's row has it |
 | `application_id` | `uuid`, null | The application. Null for a tenant notice |
 | `release_id` | `uuid`, null | The release the notifying instance is pinned to. It resolves the text keys and the page. Null for a tenant notice, whose text keys are platform texts |
-| `recipient_kind` | `text` | `user` or `role`. A tenant notice uses `platformRole` |
+| `recipient_kind` | `text` | `user` or `role`. A tenant notice uses `platformRole`, and a notice to one person uses `platformUser` _(planned for M35)_ |
 | `recipient` | `text` | The user id or the role name. For `platformRole`, the platform role kind, `administrator` |
 | `subject_key` | `text` | The text key of the subject |
 | `body_key` | `text` | The text key of the body |
+| `source` _(planned for M35)_ | `text` | What made the notification, such as a `notify` step or a quota notice, see [In-app notifications](notifications.md#in-app-notifications) |
+| `kind` _(planned for M35)_ | `text` | The kind of the notification, see [In-app notifications](notifications.md#in-app-notifications) |
 | `values` | `jsonb` | The raw evaluated placeholder values, keyed by the placeholders' names. Dates are ISO text, as in an event payload. They are formatted when read |
 | `open_page` | `text`, null | The declared name of the page the notification opens. Null when the step has no `open` |
 | `open_parameters` | `jsonb`, null | The raw evaluated page parameters, keyed by the parameters' declared names. Null when the step has no `open` |
 | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
+| `done_at` _(planned for M35)_ | `timestamptz`, null | When the notification was done, null until then, see [In-app notifications](notifications.md#in-app-notifications) |
 
 `axis.notification_reads` holds one row per notification and user who read it, see
 [In-app notifications](notifications.md#in-app-notifications). It has no foreign key to
@@ -275,6 +278,7 @@ filtered index of the same columns without `application_id`,
 | `notification_id` | `uuid` | The notification's id |
 | `user_id` | `text` | The user who read it |
 | `read_at` | `timestamptz` | When the user read it, `now()` |
+| `cleared_at` _(planned for M35)_ | `timestamptz`, null | When the user cleared it, null while it is listed, see [In-app notifications](notifications.md#in-app-notifications) |
 
 `axis.email_outbox` holds one row per email that a `notify` step with the `email` channel staged, see
 [Email](notifications.md#email).
