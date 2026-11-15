@@ -51,7 +51,14 @@ has one implementation.
   in the same transaction as the job's final state. The record names the operator or the machine
   caller as actor, the tenant, the command name of the matching `Axis.Admin` command and `job:<id>`
   in `changed`, and holds no secret.
-- **Refused calls** _(planned for M33)_. A refused call writes a log event and no audit record.
+- **Refused calls.** A call that a signed-in operator or machine caller makes, and the API refuses
+  with a `4xx` other than `401`, `403` and `429`, writes one warning. It names the HTTP method, the
+  route template, the status, a fixed reason and the caller's id, the same id a job stores as its
+  actor. The message never holds a token, a cookie, the request body, a value from the path or the
+  query, or the `Idempotency-Key`. Its scope holds only what every entry of a request holds, the
+  framework's `RequestPath` among it. A refused call writes no audit record and no job. An anonymous
+  `401` and a `403` write what [security events](log-inventory.md#security-events) says. Test:
+  `CellProvisioningApiTests`.
 
 ### Jobs
 

@@ -90,7 +90,7 @@ if { in_shard images && affected images; } || { in_shard onprem && affected onpr
 fi
 
 if in_shard images; then
-  HELM="$helm" run_suite_if_affected images . node --test --test-reporter=spec --test-reporter-destination=stdout \
+  run_suite_if_affected images . env HELM="$helm" node --test --test-reporter=spec --test-reporter-destination=stdout \
     --test-reporter=junit --test-reporter-destination="$results_dir/images.xml" scripts/images.test.mjs
 fi
 

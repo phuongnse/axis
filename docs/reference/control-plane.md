@@ -256,7 +256,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:TenantDomain` | The domain of the region's tenant subdomains, such as `vn.example.com` | A valid domain name |
 | `ControlPlane:PublicUrl` | The address that the links of the control plane's emails start with. Optional. Default `https://account.<ControlPlane:TenantDomain>` | An absolute URL, and `https` outside Development and Testing |
 | `ControlPlane:ConnectionString` | The connection to the control plane's own PostgreSQL | A valid Npgsql connection string. Outside Development and Testing it must set `SSL Mode=VerifyFull` |
-| `ControlPlane:DirectoryConnectionString` | The connection to the [region directory](region-directory.md)'s own PostgreSQL. Optional | When set, the same checks as `ControlPlane:ConnectionString`, and `ControlPlane:Dns:Provider` is required |
+| `ControlPlane:DirectoryConnectionString` | The connection to the [region directory](region-directory.md)'s own PostgreSQL. Optional | When set, the same checks as `ControlPlane:ConnectionString`, `ControlPlane:Dns:Provider` is required, and ready checks the directory's database |
 | `ControlPlane:MailFrom` | The address every email of the control plane comes from | A valid email address |
 | `ControlPlane:Mail:Host` | The host of the SMTP relay | Not empty |
 | `ControlPlane:Mail:Port` | The SMTP port. Default 587 | 1 to 65535. Port 465 starts with TLS, any other port upgrades with STARTTLS |
@@ -387,10 +387,12 @@ The control plane reports its health and telemetry as the platform's hosts do.
 
 - **Health.** `/health/live` and `/health/ready`, as the platform's hosts answer them. Live runs no
   check. Ready checks its database, which must answer `SELECT 1`, and the mail relay, which must
-  accept a connection (the check signs in with nothing and sends no email). It answers 503
-  `Unhealthy` when either does not, so a relay outage takes every replica out of readiness.
-- **The directory in the ready check** _(planned for M33)_. Ready also checks the
-  [region directory](region-directory.md).
+  accept a connection (the check signs in with nothing and sends no email). Only when
+  `ControlPlane:DirectoryConnectionString` is set, ready also checks the
+  [region directory](region-directory.md)'s database, which must answer `SELECT 1` too. Ready answers
+  503 `Unhealthy` when any check does not pass, so a relay or directory outage takes every replica
+  out of readiness. The answer names no check. The log names the failed one, `directory` for the
+  region directory.
 - **Telemetry.** Logs, metrics and traces as the platform's hosts write them, under the service name
   `axis-controlplane`, and the platform's security headers on every response. A log never holds a
   payment card, a bank account, a tax code or a webhook body.
