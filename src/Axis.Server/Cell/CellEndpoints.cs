@@ -95,6 +95,16 @@ namespace Axis.Server.CellApi;
 /// <c>POST /api/cell/tenants/{id}/exports</c> queues an <c>export</c> job with the one step <c>export</c> in the same way.
 /// </para>
 /// <para>
+/// <c>POST /api/cell/jobs/{id}/run-again</c> queues a new job from a <c>failed</c> one, see <see cref="RunAgainJob"/>, and answers <c>202</c> as the
+/// suspend route does. The new job has the kind, tenant and input of the failed job, keeps the steps that succeeded and starts the others
+/// <c>pending</c>, with fresh claims. The failed job keeps its state and its audit record, and the new job writes a record of its own. The checks run in
+/// this order: an unknown job answers <c>404</c>, then the <c>Idempotency-Key</c> header (<c>400</c>), then the replay of the first job or <c>422</c>
+/// for a request of the job id and the body. Then, under a transaction lock on the tenant and kind, the route answers <c>409</c> for a job that is not
+/// <c>failed</c>, for a <c>purge</c> job, which the publisher queues again on its own, and for a job that is not the tenant's newest of its kind. A <c>create</c> job
+/// takes the cell-wide lock of the create route too and answers <c>409</c> for the id of a deleted tenant and, while the tenant has no directory
+/// row, for a cell at its <see cref="CellOptions.TenantCap"/> (<c>409</c>, "This cell is full.").
+/// </para>
+/// <para>
 /// <c>GET /api/cell/tenants/{id}/exports/{exportId}</c> answers the export as <c>{ id, tenantId, state, createdAt, expiresAt }</c>, where
 /// <c>expiresAt</c> is <see cref="TenantExports.Kept"/> after the job finished and <see langword="null"/> until it succeeded. With
 /// <c>Accept: application/zip</c> it streams the stored ZIP instead, after it wrote one platform audit record, command
@@ -131,6 +141,8 @@ internal static partial class CellEndpoints
     private const string IdempotencyKeyHeader = "Idempotency-Key";
 
     private const int MaxIdempotencyKeyLength = 255;
+
+    private const string PurgeJobKind = "purge";
 
     private const int DefaultJobListLimit = 50;
 
@@ -189,6 +201,7 @@ internal static partial class CellEndpoints
         cell.MapGet("/tenants/{id}/exports/{exportId:guid}", GetExportAsync);
         cell.MapGet("/jobs", ListJobsAsync);
         cell.MapGet("/jobs/{id:guid}", GetJobAsync);
+        cell.MapPost("/jobs/{id:guid}/run-again", RunJobAgainAsync);
 
         // Sign-in and sign-out are the only routes that skip the operator policy. They keep the route marker, so the console
         // host serves them and tenant resolution has no second way through.
@@ -557,6 +570,12 @@ internal static partial class CellEndpoints
             + await unfinished.CountAsync(job => !platform.Tenants.Any(tenant => tenant.Id == job.TenantId), cancellationToken);
     }
 
+    private static async Task<bool> IsFullAsync(PlatformDbContext platform, CellOptions cell, CancellationToken cancellationToken) =>
+        cell.TenantCap is { } cap && await CountTowardsCapAsync(platform, cancellationToken) >= cap;
+
+    private static IResult CellFull() =>
+        Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This cell is full.");
+
     private static async Task<IResult> CreateTenantAsync(
         HttpContext httpContext,
         NpgsqlDataSource dataSource,
@@ -607,12 +626,9 @@ internal static partial class CellEndpoints
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "A tenant of the cell already has this id.");
         }
 
-        if (cell.TenantCap is { } cap)
+        if (await IsFullAsync(platform, cell, cancellationToken))
         {
-            if (await CountTowardsCapAsync(platform, cancellationToken) >= cap)
-            {
-                return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This cell is full.");
-            }
+            return CellFull();
         }
 
         var input = JsonSerializer.Serialize(
@@ -739,6 +755,118 @@ internal static partial class CellEndpoints
             CreatedAt = DateTimeOffset.UtcNow,
         };
 
+    // A new job for a failed one: the same kind, tenant and input, the steps that succeeded kept and the others pending, and fresh claims.
+    // The failed row stays as it is, so it keeps its audit record, see docs/reference/tenant-lifecycle.md#jobs.
+    internal static JobRow RunAgainJob(JobRow failed, string actor, string? key, string? hash)
+    {
+        ArgumentNullException.ThrowIfNull(failed);
+        var steps = (JsonSerializer.Deserialize<List<CellJobStepResponse>>(failed.Steps, JsonSerializerOptions.Web) ?? [])
+            .Select(step => step.State == "succeeded" ? step : new CellJobStepResponse(step.Name, "pending", null));
+        return new JobRow
+        {
+            Id = Guid.CreateVersion7(),
+            Kind = failed.Kind,
+            TenantId = failed.TenantId,
+            State = "queued",
+            Steps = JsonSerializer.Serialize(steps, JsonSerializerOptions.Web),
+            Input = failed.Input,
+            Actor = actor,
+            IdempotencyKey = key,
+            RequestHash = hash,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+    }
+
+    private static async Task<IResult> RunJobAgainAsync(
+        Guid id,
+        HttpContext httpContext,
+        NpgsqlDataSource dataSource,
+        CellOptions cell,
+        CancellationToken cancellationToken)
+    {
+        await using var platform = Open(dataSource);
+        await using var transaction = await platform.Database.BeginTransactionAsync(cancellationToken);
+        if (!await platform.Jobs.AsNoTracking().AnyAsync(row => row.Id == id, cancellationToken))
+        {
+            return NoJob();
+        }
+
+        if (ReadIdempotencyKey(httpContext) is not { } key)
+        {
+            return MissingKey();
+        }
+
+        var hash = HashRequest("run-again", id.ToString("D"), await ReadBodyAsync(httpContext, cancellationToken));
+        if (await ReplayAsync(platform, transaction, key, hash, cancellationToken) is { } replay)
+        {
+            return replay;
+        }
+
+        // The lock keeps two parallel requests for jobs of one tenant and kind from both passing the newest-job check, so the job is read again after it.
+        var failed = await platform.Jobs.AsNoTracking().SingleOrDefaultAsync(row => row.Id == id, cancellationToken);
+        if (failed is null)
+        {
+            return NoJob();
+        }
+
+        await platform.Database.ExecuteSqlAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended('axis-job-run-again:' || {failed.TenantId} || ':' || {failed.Kind}, 0))",
+            cancellationToken);
+        failed = await platform.Jobs.AsNoTracking().SingleOrDefaultAsync(row => row.Id == id, cancellationToken);
+        if (failed is null)
+        {
+            return NoJob();
+        }
+
+        if (failed.State != "failed")
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Only a failed job can be run again.");
+        }
+
+        if (failed.Kind == PurgeJobKind)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "The publisher queues a failed purge job again on its own.");
+        }
+
+        // The newest job of the kind is the one the list shows first, so a job that is not the newest has a newer one.
+        var newest = await platform.Jobs.AsNoTracking()
+            .Where(job => job.TenantId == failed.TenantId && job.Kind == failed.Kind)
+            .OrderByDescending(job => job.CreatedAt)
+            .ThenByDescending(job => job.Id)
+            .FirstAsync(cancellationToken);
+        if (newest.Id != failed.Id)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "The tenant has a newer job of this kind.");
+        }
+
+        if (failed.Kind == "create")
+        {
+            // The checks of the create route, as a create whose tenant step never ran has not met them yet.
+            await platform.Database.ExecuteSqlAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended('axis-tenant-create', 0))",
+                cancellationToken);
+            if (await DeletedTenantHolds.IsDeletedIdAsync(platform, failed.TenantId, cancellationToken))
+            {
+                return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "A tenant of the cell already has this id.");
+            }
+
+            if (!await platform.Tenants.AnyAsync(tenant => tenant.Id == failed.TenantId, cancellationToken)
+                && await IsFullAsync(platform, cell, cancellationToken))
+            {
+                return CellFull();
+            }
+        }
+
+        var job = RunAgainJob(failed, httpContext.User.FindFirst(CellOperator.IdClaim)!.Value, key, hash);
+        platform.Jobs.Add(job);
+        await platform.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Accepted(job);
+    }
+
+    private static IResult NoJob() =>
+        Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No job has this id.");
+
     private static IResult Accepted(JobRow job) =>
         Results.Accepted($"/api/cell/jobs/{job.Id:D}", new CellJobResponse(job.Id, job.Kind, job.TenantId, job.State, job.CreatedAt));
 
@@ -769,7 +897,7 @@ internal static partial class CellEndpoints
         var job = await platform.Jobs.AsNoTracking().SingleOrDefaultAsync(row => row.Id == id, cancellationToken);
         if (job is null)
         {
-            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No job has this id.");
+            return NoJob();
         }
 
         return Results.Ok(JobDetail(job));

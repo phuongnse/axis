@@ -232,6 +232,14 @@ export function queueCellTenantJob(
   return sendCellJob(requests[action].method, requests[action].url, idempotencyKey)
 }
 
+/**
+ * Queues a new job from the failed job `id`, see {@link sendCellJob}. The route answers 409 for a job that is not
+ * failed, a `purge` job or a job with a newer job of its kind. The request has no body.
+ */
+export function runCellJobAgain(id: string, idempotencyKey: string): Promise<CellActionResult> {
+  return sendCellJob('POST', `/api/cell/jobs/${encodeURIComponent(id)}/run-again`, idempotencyKey)
+}
+
 /** The fields of a tenant to create. */
 export interface CellTenantRequest {
   id: string

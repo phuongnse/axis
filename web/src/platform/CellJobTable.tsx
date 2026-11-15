@@ -1,3 +1,4 @@
+import { RedoOutlined } from '@ant-design/icons'
 import { Flex, Tag, Typography } from 'antd'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import type { CellJob } from './cell'
@@ -5,8 +6,19 @@ import { EmptyDash } from './EmptyValue'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
-/** The table of the cell console's jobs, in the order given. The Jobs page shows the cell's, and a tenant's view can show the tenant's. */
-export function CellJobTable({ jobs, locale }: { jobs: readonly CellJob[]; locale: string }) {
+/**
+ * The table of the cell console's jobs, in the order given. The Jobs page shows the cell's, and a tenant's view can show the tenant's.
+ * With `onRunAgain`, a failed job other than a `purge` job has the Run again row action: the publisher queues a failed purge again on its own.
+ */
+export function CellJobTable({
+  jobs,
+  locale,
+  onRunAgain,
+}: {
+  jobs: readonly CellJob[]
+  locale: string
+  onRunAgain?: (job: CellJob) => void
+}) {
   const t = useText()
   const { colour } = useDesignTokens()
   const stateColours: Record<CellJob['state'], string> = {
@@ -84,6 +96,22 @@ export function CellJobTable({ jobs, locale }: { jobs: readonly CellJob[]; local
       dataSource={jobs}
       columns={columns}
       emptyText={t('shell.cell.jobs.empty')}
+      rowActions={
+        onRunAgain && {
+          configured: 1,
+          actions: (job) =>
+            job.state === 'failed' && job.kind !== 'purge'
+              ? [
+                  {
+                    key: 'runAgain',
+                    labelKey: 'shell.cell.jobs.runAgain',
+                    icon: <RedoOutlined />,
+                    onClick: () => onRunAgain(job),
+                  },
+                ]
+              : null,
+        }
+      }
     />
   )
 }

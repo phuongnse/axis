@@ -44,9 +44,9 @@ has one implementation.
 - **Idempotency.** Each `POST` that queues a job needs an `Idempotency-Key` header of 1 to 255
   characters, and the answer is `400` without one, with no job queued. The same key with the same
   request answers the first job again for 24 hours. The request is the kind, the tenant and the body,
-  hashed with SHA-256, so the body must match byte for byte. The same key with another request
-  answers `422`. A key is shared across the cell, not kept for each caller, and a lock on the key
-  keeps two parallel retries from queuing two jobs.
+  hashed with SHA-256, so the body must match byte for byte. For the run again route it is the job id and
+  the body. The same key with another request answers `422`. A key is shared across the cell, not kept
+  for each caller, and a lock on the key keeps two parallel retries from queuing two jobs.
 - **Audit.** Each job writes one platform audit record when it ends, whether it succeeded or failed,
   in the same transaction as the job's final state. The record names the operator or the machine
   caller as actor, the tenant, the command name of the matching `Axis.Admin` command and `job:<id>`
@@ -71,8 +71,18 @@ over the schema role.
 - **Waiting for a lease.** A step may take a lease of the tenant first, as the `export` step does. A
   wait for a lease uses no claim: it adds to the job's `waits` count, and the limit of three is
   `claims` minus `waits`.
-- **Running a failed job again** _(planned for M33)_. A failed job can be run again, and it skips the
-  steps already done, as `tenant create` does.
+- **Running a failed job again.** `POST /api/cell/jobs/{id}/run-again` queues a new job from a `failed` one
+  and answers `202` as the other job routes do. The new job has the kind, the tenant and the input of the
+  failed job, and `claims` of 0. It keeps the steps that succeeded, so the publisher skips them, and starts
+  the others `pending`. A half-created tenant is finished and not created again, as `tenant create` does. The
+  failed job stays `failed` and keeps its audit record. The new job writes a record of its own when it ends,
+  and it names the operator who ran the job again. The route refuses with `409` and queues nothing for a job
+  that is `queued`, `running` or `succeeded`, for a `purge` job, which the publisher queues again on its own,
+  and for a job that is not the tenant's newest of its kind. So a failed job is run again once, and an old
+  failed job cannot override later work. A new job that fails can itself be run again. A `create` job also
+  answers `409` for the id of a deleted tenant and, while the tenant has no directory row, for a cell at its
+  cap, because a create whose `tenant` step never ran has not met the checks of
+  [creating a tenant](#creating-a-tenant) yet. An unknown job answers `404`.
 
 | Kind | Queued by | Steps |
 | --- | --- | --- |
@@ -81,7 +91,7 @@ over the schema role.
 | `export` | `POST /api/cell/tenants/{id}/exports` or `POST /api/tenant/exports` | One `export` step, see [exporting a tenant](#exporting-a-tenant) |
 | `delete` | `DELETE /api/cell/tenants/{id}` | One `schedule` step |
 | `cancel-deletion` | `POST /api/cell/tenants/{id}/deletion/cancel` | One `cancel` step |
-| `purge` | The publisher, never a route | The eight steps of [deleting a tenant](#deleting-a-tenant), see the [purge job](administration.md#purge-job) |
+| `purge` | The publisher, never a route. An operator does not run a failed one again | The eight steps of [deleting a tenant](#deleting-a-tenant), see the [purge job](administration.md#purge-job) |
 
 ### Routes
 
@@ -105,6 +115,7 @@ over the schema role.
 | `DELETE /api/cell/tenants/{id}` | Schedules the deletion through a `delete` job, see [deleting a tenant](#deleting-a-tenant). It answers `202` as `suspend` does. |
 | `POST /api/cell/tenants/{id}/deletion/cancel` | Cancels a deletion in its grace window through a `cancel-deletion` job. It answers as `suspend` does. |
 | `GET /api/cell/jobs` | Lists the cell's jobs as `{ "items": [...] }`, newest first by `createdAt`, then by id. Each item is a job as the job read answers it, with its `steps` and `error`. The `actor` and the `input` of a job are never returned. `tenant` keeps one tenant's jobs, and an unknown tenant answers an empty list. `limit` is a whole number from 1 to 200 and is 50 when missing. Any other value answers `400`. There is no paging past `limit`. |
+| `POST /api/cell/jobs/{id}/run-again` | Runs a failed job again through a new job, see [running a failed job again](#jobs). It answers `202` with the new job and a `Location` header, `404` for an unknown id, then `400` without a valid `Idempotency-Key`, and `409` for a job that cannot be run again. |
 | `GET /api/cell/jobs/{id}` | Answers a job as the `202` does, with its `steps`, each `{ name, state, error }`, and the `error` of a failed job. An unknown id answers `404`. |
 
 - **A tenant's application.** The create job records the tenant's application on its row in
