@@ -9,7 +9,7 @@ import { compareApplicationFolders, textEditorKeys } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
-import { expectForm, pick, save, sample } from '../service-desk-studio'
+import { expectForm, pick, pickLabelled, save, sample } from '../service-desk-studio'
 import {
   addListItem,
   addListRow,
@@ -530,7 +530,13 @@ test.describe('the author builds the service desk with Studio only', () => {
           if (sectionIndex > 0 || fieldIndex > 0) {
             await addListRow(page, `/sections/${sectionIndex}/fields`)
           }
-          await pick(page, `studio-field-/sections/${sectionIndex}/fields/${fieldIndex}/field`, field.field)
+          await pickLabelled(
+            page,
+            `studio-field-/sections/${sectionIndex}/fields/${fieldIndex}/field`,
+            'entities',
+            form.entity,
+            field.field,
+          )
           if (field.readOnly) {
             await page
               .getByTestId(`studio-field-/sections/${sectionIndex}/fields/${fieldIndex}/readOnly`)
@@ -598,7 +604,7 @@ test.describe('the author builds the service desk with Studio only', () => {
           .locator('label')
           .filter({ has: page.getByRole('radio', { name: 'Role', exact: true }) })
           .click()
-        await pick(page, `${recipient}/role`, spec.to.role)
+        await pickLabelled(page, `${recipient}/role`, 'roles', spec.to.role)
       } else {
         const user = page.getByTestId(`${recipient}/user`)
         await expect(user.locator('.cm-editor')).toBeVisible()
@@ -647,7 +653,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       await pick(page, `studio-field-/steps/${index}/label/textKey`, spec.label, spec.label)
       if ('role' in spec.assignee) {
         await page.getByTestId(`studio-field-/steps/${index}/assignee`).getByText('Role', { exact: true }).click()
-        await pick(page, `studio-field-/steps/${index}/assignee/role`, spec.assignee.role)
+        await pickLabelled(page, `studio-field-/steps/${index}/assignee/role`, 'roles', spec.assignee.role)
       } else {
         const user = page.getByTestId(`studio-field-/steps/${index}/assignee/user`)
         await expect(user.locator('.cm-editor')).toBeVisible()
@@ -671,7 +677,7 @@ test.describe('the author builds the service desk with Studio only', () => {
           // A new reassign starts as a user, so the Role radio is picked before the role.
           await fields.getByRole('switch', { name: 'Reassign', exact: true }).click()
           await page.getByTestId(`studio-field-${row}/reassign`).getByText('Role', { exact: true }).click()
-          await pick(page, `studio-field-${row}/reassign/role`, escalation.reassign.role)
+          await pickLabelled(page, `studio-field-${row}/reassign/role`, 'roles', escalation.reassign.role)
         }
       }
       for (const [position, outcome] of spec.outcomes.entries()) {
@@ -829,7 +835,7 @@ test.describe('the author builds the service desk with Studio only', () => {
           .getByTestId(`studio-field-/widgets/0/${kind}`)
           .getByRole('button', { name: 'Add navigate action', exact: true })
           .click()
-        await pick(page, `${action}/page`, target)
+        await pickLabelled(page, `${action}/page`, 'pages', target)
         await writeLabel(page, `${action}/label`, text(key))
         if (kind === 'rowActions') {
           // The record of the form link and the ticket parameter of the detail link both take the id of the row.
@@ -875,7 +881,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     ]
     for (const [index, [target, key, icon]] of navigation.entries()) {
       await (index === 0 ? openListItem(page, '/navigation', 0) : addListItem(page, '/navigation'))
-      await pick(page, `studio-field-/navigation/${index}/page`, target)
+      await pickLabelled(page, `studio-field-/navigation/${index}/page`, 'pages', target)
       await writeLabel(page, `studio-field-/navigation/${index}/label`, text(key))
       await pick(page, `studio-field-/navigation/${index}/icon`, icon)
       await doneListItem(page)
@@ -933,7 +939,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       .getByTestId('studio-field-/steps/5/open')
       .getByRole('checkbox', { name: 'Open a page', exact: true })
       .check()
-    await pick(page, 'studio-field-/steps/5/open/page', 'TicketDetail')
+    await pickLabelled(page, 'studio-field-/steps/5/open/page', 'pages', 'TicketDetail')
     // The page has a ticket parameter, so the mapping key is picked from its parameters.
     const row = page.getByTestId('studio-field-/steps/5/open/parameters/ticket')
     await pickAction(
@@ -1000,7 +1006,7 @@ test.describe('the author builds the service desk with Studio only', () => {
           .getByTestId(`studio-field-${base}/navigate`)
           .getByRole('button', { name: 'Add navigate action', exact: true })
           .click()
-        await pick(panel, `studio-field-${base}/navigate/page`, 'AllTickets')
+        await pickLabelled(panel, `studio-field-${base}/navigate/page`, 'pages', 'AllTickets')
         await writeLabel(panel, `studio-field-${base}/navigate/label`, text(tile.show))
       }
     }
@@ -1096,7 +1102,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         .locator('label')
         .filter({ has: page.getByRole('radio', { name: 'Role', exact: true }) })
         .click()
-      await pick(page, 'studio-field-/steps/0/to/0/role', 'service-desk-lead')
+      await pickLabelled(page, 'studio-field-/steps/0/to/0/role', 'roles', 'service-desk-lead')
       await page
         .getByTestId('studio-field-/steps/0/channels')
         .getByRole('checkbox', { name: 'In-app', exact: true })
@@ -1116,7 +1122,7 @@ test.describe('the author builds the service desk with Studio only', () => {
           .getByTestId('studio-field-/steps/0/open')
           .getByRole('checkbox', { name: 'Open a page', exact: true })
           .check()
-        await pick(page, 'studio-field-/steps/0/open/page', step.page)
+        await pickLabelled(page, 'studio-field-/steps/0/open/page', 'pages', step.page)
       }
       await pick(page, 'studio-field-/steps/0/next', 'done')
       await pick(page, 'studio-field-/start', step.name)

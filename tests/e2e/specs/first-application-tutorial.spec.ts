@@ -235,7 +235,13 @@ test.describe('the tutorial builds a first application in Studio', () => {
         if (index > 0) {
           await addListRow(page, '/sections/0/fields')
         }
-        await pick(page, `studio-field-/sections/0/fields/${index}/field`, field)
+        // The picker names a field by its label.
+        await pick(
+          page,
+          `studio-field-/sections/0/fields/${index}/field`,
+          en[`expense.${field}` as keyof typeof en],
+          field,
+        )
         if (readOnly) {
           await page.getByTestId(`studio-field-/sections/0/fields/${index}/readOnly`).getByRole('checkbox').check()
         }
@@ -282,7 +288,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
 
     await pick(page, 'studio-field-/steps/1/label/textKey', 'task.review', 'task.review')
     await page.getByTestId('studio-field-/steps/1/assignee').getByText('Role', { exact: true }).click()
-    await pick(page, 'studio-field-/steps/1/assignee/role', 'department-manager')
+    await pick(page, 'studio-field-/steps/1/assignee/role', en['role.departmentManager'], 'department-manager')
     await pick(page, 'studio-field-/steps/1/form', 'ExpenseReview')
     await page.getByTestId('studio-field-/steps/1/dueIn').getByRole('textbox').fill('P3D')
     for (const [position, [name, label, next]] of [
@@ -347,7 +353,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
         .getByTestId(`studio-field-/widgets/0/${kind}`)
         .getByRole('button', { name: 'Add navigate action', exact: true })
         .click()
-      await pick(page, `${action}/page`, 'ExpenseForm')
+      await pick(page, `${action}/page`, en['pages.expenseForm.title'], 'ExpenseForm')
       await writeLabel(page, `${action}/label`, { en: en[key] })
       if (recordInput) {
         await page.getByTestId(`${action}/record`).getByRole('textbox').fill('id')

@@ -54,8 +54,8 @@ test.describe("Studio builds pages in the page editor", () => {
     await writeLabel(page, label, { en, vi });
   }
 
-  async function pick(page: Page, field: string, option: string) {
-    await pickOption(page.getByTestId(field).getByRole("combobox"), option);
+  async function pick(page: Page, field: string, option: string, filter?: string) {
+    await pickOption(page.getByTestId(field).getByRole("combobox"), option, filter);
   }
 
   async function save(page: Page) {
@@ -84,7 +84,12 @@ test.describe("Studio builds pages in the page editor", () => {
       "Biểu mẫu xem xét",
     );
     await pick(page, "studio-field-/widgets/0/type", "form");
-    await pick(page, "studio-field-/widgets/0/entity", "PurchaseRequest");
+    await pick(
+      page,
+      "studio-field-/widgets/0/entity",
+      "Purchase request",
+      "PurchaseRequest",
+    );
     await page.getByRole("button", { name: "Add action", exact: true }).click();
     await pick(
       page,
@@ -124,7 +129,12 @@ test.describe("Studio builds pages in the page editor", () => {
       .getByTestId("studio-field-/widgets/0/rowActions")
       .getByRole("button", { name: "Add navigate action", exact: true })
       .click();
-    await pick(page, "studio-field-/widgets/0/rowActions/0/page", "ReviewForm");
+    await pick(
+      page,
+      "studio-field-/widgets/0/rowActions/0/page",
+      "Review form",
+      "ReviewForm",
+    );
     await fillTexts(
       page,
       "studio-field-/widgets/0/rowActions/0/label",

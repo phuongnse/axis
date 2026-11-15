@@ -35,8 +35,8 @@ test.describe('Studio edits a scenario in the typed editor', () => {
     }
   })
 
-  async function choose(page: Page, field: Locator, option: string) {
-    await pickOption(field.getByRole('combobox'), option)
+  async function choose(page: Page, field: Locator, option: string, filter?: string) {
+    await pickOption(field.getByRole('combobox'), option, filter)
   }
 
   async function addStep(page: Page, index: number, type: string) {
@@ -72,7 +72,7 @@ test.describe('Studio edits a scenario in the typed editor', () => {
     scenarioURL = page.url()
 
     await choose(page, page.getByTestId('studio-field-/steps/0/type'), 'createRecord')
-    await choose(page, page.getByTestId('studio-field-/steps/0/entity'), 'PurchaseRequest')
+    await choose(page, page.getByTestId('studio-field-/steps/0/entity'), 'Purchase request', 'PurchaseRequest')
     await choose(page, page.getByTestId('studio-field-/steps/0/as'), 'author')
     await page.getByTestId('studio-field-/steps/0/save').getByRole('textbox').fill('request')
     await pickAction(
