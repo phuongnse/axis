@@ -8,6 +8,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
 import { isSignInNeeded } from '../platform/signInNeeded'
 import { assignLocation } from '../platform/navigation'
+import { ShellAsideContext } from '../platform/shellAsideContext'
 import { ShellSidebarContext } from '../platform/shellSidebarContext'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
@@ -258,10 +259,20 @@ function Location() {
 }
 
 let sidebar: HTMLDivElement | undefined
+/** The shell's right column, where a side panel draws, as the shell gives it. */
+let aside: HTMLDivElement | undefined
+
+/** Adds the shell's right column to the document. */
+function addAside() {
+  aside = document.createElement('div')
+  document.body.append(aside)
+  return aside
+}
 
 /** Renders the page with a shell sidebar. The sidebar's content goes into `sidebar`, and the returned spy counts its claims. */
 function renderPage(entry = '/studio?app=PurchaseRequests', locale?: string) {
   const claim = vi.fn(() => () => {})
+  const column = addAside()
   sidebar = document.createElement('div')
   sidebar.dataset.testid = 'sidebar'
   document.body.append(sidebar)
@@ -271,10 +282,12 @@ function renderPage(entry = '/studio?app=PurchaseRequests', locale?: string) {
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <ShellSidebarContext.Provider value={{ target: sidebar, collapsed: false, claim }}>
-            <MemoryRouter initialEntries={[entry]}>
-              <StudioPage />
-              <Location />
-            </MemoryRouter>
+            <ShellAsideContext.Provider value={{ target: column, claim: () => () => {} }}>
+              <MemoryRouter initialEntries={[entry]}>
+                <StudioPage />
+                <Location />
+              </MemoryRouter>
+            </ShellAsideContext.Provider>
           </ShellSidebarContext.Provider>
         </TextProvider>
       </ThemeModeProvider>
@@ -295,6 +308,7 @@ function renderPage(entry = '/studio?app=PurchaseRequests', locale?: string) {
  * last one open. A link to `/` stands for a link in the shell. Returns the router.
  */
 function renderGuardedPage(entries: string[]) {
+  const column = addAside()
   sidebar = document.createElement('div')
   sidebar.dataset.testid = 'sidebar'
   document.body.append(sidebar)
@@ -307,12 +321,14 @@ function renderGuardedPage(entries: string[]) {
             <ThemeModeProvider>
               <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
                 <ShellSidebarContext.Provider value={{ target: sidebar, collapsed: false, claim: () => () => {} }}>
-                  <UnsavedChangesGuard>
-                    <StudioPage />
-                    <Location />
-                    <Link to="/">Home</Link>
-                    <LeaveWithoutSaving />
-                  </UnsavedChangesGuard>
+                  <ShellAsideContext.Provider value={{ target: column, claim: () => () => {} }}>
+                    <UnsavedChangesGuard>
+                      <StudioPage />
+                      <Location />
+                      <Link to="/">Home</Link>
+                      <LeaveWithoutSaving />
+                    </UnsavedChangesGuard>
+                  </ShellAsideContext.Provider>
                 </ShellSidebarContext.Provider>
               </TextProvider>
             </ThemeModeProvider>
@@ -326,6 +342,11 @@ function renderGuardedPage(entries: string[]) {
   return router
 }
 
+/** Finds, in the open Problems panel, the link of the resource its problems are grouped under, by its name. */
+function findProblemResource(name = 'PurchaseRequest', options?: Parameters<typeof screen.findByRole>[2]) {
+  return within(screen.getByTestId('studio-diagnostics')).findByRole('button', { name }, options)
+}
+
 /** Opens the Problems panel from the band's problems button and returns it. */
 async function openProblems() {
   await userEvent.click(await screen.findByTestId('studio-problems'))
@@ -336,6 +357,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
   sidebar?.remove()
   sidebar = undefined
+  aside?.remove()
+  aside = undefined
 })
 
 describe('StudioPage', () => {
@@ -549,23 +572,26 @@ describe('StudioPage', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })
 
-  it('shows each diagnostic with its file and path', async () => {
+  it('lists each diagnostic under the resource it is about, by its name, or its file when it names none', async () => {
     stubServer()
     renderPage()
 
     const panel = await openProblems()
-    expect(within(panel).getByText('AXC0101')).toBeInTheDocument()
-    expect(within(panel).getByText('The field type is unknown.')).toBeInTheDocument()
-    expect(within(panel).getByText(/entities\/purchase-request\.json, Path: \/fields\/0\/type/)).toBeInTheDocument()
-    expect(within(panel).getByText(/application\.json, Path: \/description/)).toBeInTheDocument()
+    const [entity, application] = within(panel).getAllByTestId('studio-problem-group')
+    expect(within(entity).getByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
+    expect(entity).toHaveTextContent('Error AXC0101 The field type is unknown.')
+    // Proposed: a problem led by its severity and code takes no bullet, as its lead marks it.
+    expect(within(entity).getByTestId('studio-problem')).toHaveStyle({ listStyleType: 'none' })
+    expect(within(application).getByText('application.json')).toBeInTheDocument()
+    expect(application).toHaveTextContent('Warning AXC0001 The application has no description.')
   })
 
-  it('selects the resource of a clicked diagnostic and shows its file', async () => {
+  it('selects the resource of a diagnostic from its name and shows its file', async () => {
     stubServer()
     renderPage()
 
     await openProblems()
-    await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
+    await userEvent.click(await findProblemResource())
 
     expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('entities/purchase-request.json')
     expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}`)
@@ -578,8 +604,11 @@ describe('StudioPage', () => {
     await openProblems()
     await screen.findByText('The application has no description.')
 
-    expect(screen.queryByRole('button', { name: /AXC0001/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /AXC0101/ })).toBeInTheDocument()
+    const [entity, application] = within(screen.getByTestId('studio-diagnostics')).getAllByTestId(
+      'studio-problem-group',
+    )
+    expect(within(application).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(entity).getByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
   })
 
   it('opens the resource of a clicked diagnostic at its path and scrolls to that field', async () => {
@@ -590,7 +619,7 @@ describe('StudioPage', () => {
       renderPage()
 
       await openProblems()
-      await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
+      await userEvent.click(await findProblemResource())
 
       const field = await screen.findByTestId('studio-field-/fields/0/type')
       await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
@@ -624,7 +653,7 @@ describe('StudioPage', () => {
       renderPage()
 
       await openProblems()
-      await userEvent.click(await screen.findByRole('button', { name: /AXC0102/ }))
+      await userEvent.click(await findProblemResource())
 
       await screen.findByTestId('studio-field-/fields/0/name')
       expect(screen.getByTestId('location')).toHaveTextContent(/resource=[^&]+$/)
@@ -848,11 +877,11 @@ describe('StudioPage', () => {
 
       const panel = await openProblems()
       expect(button).toHaveAttribute('aria-expanded', 'true')
-      const items = within(panel).getAllByRole('listitem')
-      expect(items[0]).toHaveTextContent('AXC0101')
-      expect(items[1]).toHaveTextContent('AXC0001')
+      const groups = within(panel).getAllByTestId('studio-problem-group')
+      expect(groups[0]).toHaveTextContent('AXC0101')
+      expect(groups[1]).toHaveTextContent('AXC0001')
 
-      await userEvent.click(within(panel).getByRole('button', { name: /AXC0101/ }))
+      await userEvent.click(within(panel).getByRole('button', { name: 'PurchaseRequest' }))
 
       expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}`)
       expect(await screen.findByTestId('studio-editor')).toBeInTheDocument()
@@ -1081,7 +1110,7 @@ describe('StudioPage', () => {
       )
 
       await openProblems()
-      await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }, slow))
+      await userEvent.click(await findProblemResource('PurchaseRequest', slow))
 
       const field = await screen.findByTestId('studio-field-/fields/0/type', {}, slow)
       await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }), slow)
@@ -1307,7 +1336,7 @@ describe('StudioPage leaving unsaved changes', () => {
     const maxLength = await editMaxLength()
 
     await openProblems()
-    await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
+    await userEvent.click(await findProblemResource())
     await stay()
 
     expect(router.state.location.pathname + router.state.location.search).toBe(entityAddress)
@@ -1440,6 +1469,22 @@ describe('StudioPage publishing', () => {
       if (input === `${folder}/requests/${requestId}`) {
         return json(answers.length > 1 ? answers.shift() : answers[0])
       }
+      if (input === `${folder}/releases/live/diff`) {
+        return json({
+          resources: [
+            {
+              file: 'entities/purchase-request.json',
+              change: 'changed',
+              id: entityId,
+              kind: 'entity',
+              name: 'PurchaseRequest',
+              before: '{}',
+              after: '{"name":"PurchaseRequest"}',
+              by: [{ kind: 'person', id: 'author', name: null }],
+            },
+          ],
+        })
+      }
       if (input === `${folder}/releases`) {
         return json({
           active: { releaseId, number: 3, contentHash: 'hash-3' },
@@ -1473,13 +1518,33 @@ describe('StudioPage publishing', () => {
     await waitFor(() => expect(screen.queryAllByRole('button', { name: 'Publish…' })).toHaveLength(shown ? 1 : 0))
   })
 
-  it('opens the publish dialog from Publish… and confirms with its own Publish button', async () => {
+  /**
+   * Publishes from the publish page, which Publish… on the band opens, with `label` when given, once the page has loaded
+   * what goes live.
+   */
+  async function publishFromPage(label?: string) {
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
+    const page = await screen.findByTestId('studio-publish-page')
+    const confirm = within(page).getByTestId('studio-publish-confirm')
+    await waitFor(() => expect(confirm).toBeEnabled())
+    if (label !== undefined) {
+      await userEvent.type(within(page).getByRole('textbox', { name: 'Label' }), label)
+    }
+    await userEvent.click(confirm)
+  }
+
+  it('opens the publish page from Publish… and goes back to where it was opened once it publishes', async () => {
     stubPublishing(publisher)
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
+    const page = await screen.findByTestId('studio-publish-page')
+    expect(screen.getByTestId('location')).toHaveTextContent('view=publish')
+    expect(await within(page).findByText('1 file changed since the live release')).toBeInTheDocument()
 
-    expect(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Publish' })).toBeInTheDocument()
+    await userEvent.click(within(page).getByTestId('studio-publish-confirm'))
+    await waitFor(() => expect(screen.queryByTestId('studio-publish-page')).not.toBeInTheDocument())
+    expect(screen.getByTestId('location')).not.toHaveTextContent('view=publish')
   })
 
   it("heads the band's actions with New resource… and ends them with Publish…", async () => {
@@ -1503,9 +1568,7 @@ describe('StudioPage publishing', () => {
       request('succeeded', { releaseId, diagnostics: [published] }),
     ])
     renderPage()
-    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
-    await userEvent.type(screen.getByRole('textbox', { name: 'Label (optional)' }), 'May')
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
+    await publishFromPage('May')
 
     const status = await screen.findByTestId('studio-request-status')
     expect(status).toHaveAttribute('data-status', 'queued')
@@ -1556,8 +1619,7 @@ describe('StudioPage publishing', () => {
       await within(await screen.findByTestId('studio-releases')).findAllByTestId('studio-release-row'),
     ).toHaveLength(1)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
+    await publishFromPage()
 
     await vi.advanceTimersByTimeAsync(1000)
     await vi.advanceTimersByTimeAsync(1000)
@@ -1647,8 +1709,7 @@ describe('StudioPage publishing', () => {
         : base(input, init),
     )
     renderPage()
-    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
+    await publishFromPage()
 
     expect(await screen.findByTestId('studio-request-error')).toHaveTextContent(
       'This tenant has reached its storage quota.',

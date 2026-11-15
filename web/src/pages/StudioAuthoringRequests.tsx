@@ -55,6 +55,7 @@ import { StatusTag } from '../platform/StatusTag'
 import { StudioChanges } from './StudioHistory'
 import { ActionBar } from './SaveBar'
 import { StudioPageHeading } from './StudioPageHeading'
+import { bulletList } from '../platform/bulletList'
 import { StudioProblemList } from './StudioProblems'
 import { ResourceReference } from './ResourceReference'
 import { CheckOutlined, ClockCircleOutlined, CloseOutlined, LoadingOutlined, MinusOutlined } from '@ant-design/icons'
@@ -814,7 +815,7 @@ export function StudioAuthoringRequestPage({
           data-testid="studio-ai-conflict"
           message={t('shell.studio.aiRequest.conflict')}
           description={
-            <ul style={{ margin: 0, paddingInlineStart: spacing.lg }}>
+            <ul style={bulletList}>
               {conflicts.map((conflict, index) => (
                 <li key={index}>{conflict.message}</li>
               ))}
@@ -1180,7 +1181,7 @@ function PlanView({
   const { colour, spacing } = useDesignTokens()
   const [details, setDetails] = useState(false)
   const bullets = (items: readonly ReactNode[]) => (
-    <ul style={{ margin: 0, paddingInlineStart: spacing.lg }}>
+    <ul style={bulletList}>
       {items.map((item, index) => (
         <li key={index}>
           <Typography.Text>{item}</Typography.Text>

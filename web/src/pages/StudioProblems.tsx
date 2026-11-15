@@ -1,6 +1,7 @@
 import { Typography } from 'antd'
 import type { ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
+import { bulletList } from '../platform/bulletList'
 import type { StudioDiagnostic, StudioResourceItem } from '../platform/studio'
 import { ResourceReference } from './ResourceReference'
 import { useDiagnosticItems } from './useDiagnosticItems'
@@ -70,7 +71,7 @@ export interface StudioProblemItem {
  * Proposed: problems grouped by the resource they are about, as an editor's problems panel groups them by file, see the
  * review on #3263. Each resource shows once, its name as the only link, opening it at its first problem's path, and its
  * kind muted after it, as the changes of a draft name a resource; one that names no resource is its file, muted. Its
- * problems follow, indented, each led by its `lead`, its words as text, and, after the first, a Show link to its own
+ * problems follow, indented, each led by its `lead`, or by a bullet when it has none, its words as text, and, after the first, a Show link to its own
  * place. The Problems panel, a request's checks and its review all list their problems with it.
  */
 export function StudioProblemList({
@@ -119,9 +120,14 @@ export function StudioProblemList({
                 onSelect={onSelect}
               />
             </div>
-            <ul style={{ listStyle: 'none', margin: 0, paddingInlineStart: spacing.md }}>
+            <ul style={bulletList}>
               {group.items.map((item, index) => (
-                <li key={index} data-testid="studio-problem">
+                // A problem led by its lead, such as Error AX0412, takes no bullet, and one that is words alone does.
+                <li
+                  key={index}
+                  data-testid="studio-problem"
+                  style={item.lead === null ? undefined : { listStyleType: 'none' }}
+                >
                   {item.lead !== null && <>{item.lead} </>}
                   <Typography.Text>{item.message}</Typography.Text>
                   {/* A problem at another place of the resource than its first has a link to its own. */}
