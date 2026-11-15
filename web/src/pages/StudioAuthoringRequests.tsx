@@ -599,6 +599,15 @@ export function StudioAuthoringRequestPage({
       : []
   const changes = diff !== undefined && diff.key === diffKey ? diff.changes : undefined
   const summaries = new Map(request.changes.map((change) => [change.file, change.summary]))
+  // Each resource only the draft adds, by its file, named as its diff names it, so a scenario it adds reads by its name.
+  const drafted = new Map(
+    (Array.isArray(changes) ? changes : [])
+      .filter((change) => change.change === 'added' && change.kind !== null)
+      .map((change) => [
+        change.file,
+        { name: change.titles?.[locale] ?? change.titles?.en ?? change.name ?? change.file, kind: change.kind! },
+      ]),
+  )
   const problems = request.checks?.diagnostics ?? []
   const working = ['working', 'checking', 'fixing', 'reviewing'].includes(request.state)
   const fixRound = request.round > 1 && working
@@ -643,11 +652,12 @@ export function StudioAuthoringRequestPage({
       </AxisButton>
     </span>
   )
+  // Proposed: a failure is one line, as every error of Studio is, its words and why in one message, see the review on
+  // #3263.
   const failure = (
     <AxisAlert
       kind="error"
-      message={t('shell.studio.aiRequest.failed')}
-      description={request.failure ?? undefined}
+      message={[t('shell.studio.aiRequest.failed'), request.failure].filter((part) => part).join(' ')}
       data-testid="studio-ai-failure"
     />
   )
@@ -672,17 +682,17 @@ export function StudioAuthoringRequestPage({
       title={t('shell.studio.aiRequest.plan')}
       // Its blocks, the summary, the plan's groups and the fold, are `spacing-md` apart, as the result's are.
       gap={spacing.md}
+      // Proposed: beside its title only when it was approved; that it waits, its mark and the bar say, see the review on
+      // #3263.
       aside={
-        awaiting
-          ? t(mine ? 'shell.studio.aiRequest.feed.planWaits' : 'shell.studio.aiRequest.feed.planWaitsAuthor')
-          : request.approvedAt !== null
-            ? t('shell.studio.aiRequest.feed.planApproved').replace('{time}', sentTime(request.approvedAt))
-            : undefined
+        request.approvedAt !== null
+          ? t('shell.studio.aiRequest.feed.planApproved').replace('{time}', sentTime(request.approvedAt))
+          : undefined
       }
     >
       {/* The author's comments that asked for another plan, oldest first, so the plan reads with why it changed. */}
       {planComments.map((step, index) => (
-        <Typography.Text key={index} style={{ color: colour.textMuted }}>
+        <Typography.Text key={index}>
           {t('shell.studio.aiRequest.planChange').replace('{comment}', step.summary ?? '')}
         </Typography.Text>
       ))}
@@ -811,7 +821,13 @@ export function StudioAuthoringRequestPage({
                   <StudioProblemList items={diagnosticItems(problems)} resources={resources} onSelect={onOpen} />
                 )}
                 {request.checks !== null && (
-                  <StudioTestResults request={request.checks} resources={resources} onSelect={onOpen} nested />
+                  <StudioTestResults
+                    request={request.checks}
+                    resources={resources}
+                    drafted={drafted}
+                    onSelect={onOpen}
+                    nested
+                  />
                 )}
               </Flex>
             )}
@@ -1253,7 +1269,7 @@ function PlanView({
   onOpen: (resourceId: string, path: string) => void
 }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const { spacing } = useDesignTokens()
   const bulletList = useBulletList()
   const [details, setDetails] = useState(false)
   const bullets = (items: readonly ReactNode[]) => (
@@ -1274,12 +1290,10 @@ function PlanView({
     )
   return (
     <Flex vertical gap="middle" data-testid="studio-ai-plan">
-      {/* What AI cannot decide alone comes first, as the plan waits on its answers, its heading in warningText. */}
+      {/* What AI cannot decide alone comes first, as the plan waits on its answers, under a heading as every group's. */}
       {plan.questions.length > 0 && (
         <Flex vertical gap={spacing.xs} data-testid="studio-ai-plan-questions">
-          <Typography.Text strong style={{ color: colour.warningText }}>
-            {t('shell.studio.aiRequest.plan.questions')}
-          </Typography.Text>
+          <Typography.Text strong>{t('shell.studio.aiRequest.plan.questions')}</Typography.Text>
           {bullets(plan.questions)}
         </Flex>
       )}

@@ -583,7 +583,6 @@ describe('a ready request’s page', () => {
 
     const plan = await screen.findByTestId('studio-ai-feed-plan')
     expect(plan).toHaveAttribute('data-mark', 'waiting')
-    expect(plan).toHaveTextContent('Waits for your approval')
     expect(within(plan).getByTestId('studio-ai-plan')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-ai-feed-work')).toBeNull()
     const bar = screen.getByTestId('studio-ai-bar')
@@ -642,7 +641,10 @@ describe("a request's feed", () => {
     expect(within(feed).getByTestId('studio-ai-feed-plan')).toHaveAttribute('data-mark', 'done')
     const work = within(feed).getByTestId('studio-ai-feed-work')
     expect(work).toHaveAttribute('data-mark', 'stopped')
-    expect(within(work).getByTestId('studio-ai-failure')).toHaveTextContent('Anthropic refused the request.')
+    // Proposed: a failure is one line, its words and why in one message, as every error of Studio is.
+    const failure = within(work).getByTestId('studio-ai-failure')
+    expect(failure).toHaveTextContent('AI could not finish this request. Anthropic refused the request.')
+    expect(failure.querySelector('.ant-alert-description')).toBeNull()
   })
 
   it('ends a dropped request with when it was dropped', async () => {

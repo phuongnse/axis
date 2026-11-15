@@ -2162,8 +2162,6 @@
   "shell.studio.aiRequest.askOther": "Ask for other changes…",
   "shell.studio.aiRequest.changePlan": "Change the plan…",
   "shell.studio.aiRequest.checksName": "Checks",
-  "shell.studio.aiRequest.feed.planWaits": "Waits for your approval",
-  "shell.studio.aiRequest.feed.planWaitsAuthor": "Waits for its author's approval",
   "shell.studio.aiRequest.feed.planApproved": "Approved on {time}",
   "shell.studio.aiRequest.feed.showPlan": "Show the plan",
   "shell.studio.aiRequest.feed.hidePlan": "Hide the plan",

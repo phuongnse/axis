@@ -1012,6 +1012,7 @@ const changeTitles: Record<string, string> = {
   PurchaseApproval: 'Purchase approval',
   PurchasingSystem: 'Purchasing system',
   NightlySupplierImport: 'Nightly supplier import',
+  SuppliersAreImported: 'Suppliers are imported',
 }
 
 function change(
@@ -1158,6 +1159,14 @@ const draftChanges: Record<string, (StudioRevisionChange & { summary: string })[
       { kind: 'trigger', name: 'NightlySupplierImport', schedule: '0 2 * * *' },
       'A trigger that imports the suppliers every night at 2 AM.',
     ),
+    change(
+      'scenarios/suppliers-are-imported.json',
+      'scenario',
+      'SuppliersAreImported',
+      null,
+      { kind: 'scenario', name: 'SuppliersAreImported' },
+      'A new scenario: the import adds the suppliers the purchasing system lists.',
+    ),
   ],
 }
 
@@ -1212,7 +1221,14 @@ function checksOf(request: StudioAuthoringRequest, state: StudioAuthoringRequest
           ]
         : [],
     scenarios: failed
-      ? [scenario('NightlySupplierImport', 'failed', 'The purchasing system did not answer at its test address.')]
+      ? [
+          {
+            ...scenario('SuppliersAreImported', 'failed', 'The purchasing system did not answer at its test address.'),
+            // A scenario the draft adds, which the application does not hold yet.
+            resourceId: 'a5e00000-0000-4000-8000-0000000000aa',
+            file: 'scenarios/suppliers-are-imported.json',
+          },
+        ]
       : [scenario('RequestSavesWithSupplier', 'passed'), scenario('RequestIsApproved', 'passed')],
   }
 }

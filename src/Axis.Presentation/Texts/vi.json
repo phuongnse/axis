@@ -2162,8 +2162,6 @@
   "shell.studio.aiRequest.askOther": "Yêu cầu sửa khác…",
   "shell.studio.aiRequest.changePlan": "Đổi kế hoạch…",
   "shell.studio.aiRequest.checksName": "Kiểm tra",
-  "shell.studio.aiRequest.feed.planWaits": "Đang chờ bạn duyệt",
-  "shell.studio.aiRequest.feed.planWaitsAuthor": "Đang chờ người gửi duyệt",
   "shell.studio.aiRequest.feed.planApproved": "Đã duyệt lúc {time}",
   "shell.studio.aiRequest.feed.showPlan": "Hiện kế hoạch",
   "shell.studio.aiRequest.feed.hidePlan": "Ẩn kế hoạch",

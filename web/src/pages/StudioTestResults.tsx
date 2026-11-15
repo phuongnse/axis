@@ -22,10 +22,16 @@ export function StudioTestResults({
   resources = [],
   onSelect,
   nested = false,
+  drafted,
 }: {
   request: StudioRequest
   /** The application's resources, which name each scenario. */
   resources?: readonly StudioResourceItem[]
+  /**
+   * Proposed: the name and kind of each resource only a draft adds, by its file, see the review on #3263, so a scenario
+   * the draft adds reads by its name, as text, as no one opens it yet.
+   */
+  drafted?: ReadonlyMap<string, { name: string; kind: string }>
   onSelect: (resourceId: string, path: string) => void
   /** Proposed: inside a part of a panel, its title is bold text, not a heading, see the review on #3263. */
   nested?: boolean
@@ -52,7 +58,7 @@ export function StudioTestResults({
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {scenarios.map((scenario) => (
             <li key={scenario.file} data-testid="studio-test-result" data-outcome={scenario.outcome}>
-              <ScenarioRow scenario={scenario} resources={resources} onSelect={onSelect} />
+              <ScenarioRow scenario={scenario} resources={resources} drafted={drafted} onSelect={onSelect} />
             </li>
           ))}
         </ul>
@@ -63,16 +69,19 @@ export function StudioTestResults({
 
 /**
  * Proposed: one scenario's result, see the review on #3263: its outcome as a `StatusTag`, then its name as a link to its
- * resource, a failed one's at its failing step, and its time, muted, each a token's gap apart; a failure's step and
- * message under it. A skipped contract scenario is a module's, so its name is text and it opens nothing.
+ * resource, a failed one's at its failing step, and its time, muted, each a token's gap apart; under it, a failure's
+ * step and what went wrong as one sentence in the text colour, "Step 2: …". A skipped contract scenario is a module's,
+ * so its name is text and it opens nothing.
  */
 function ScenarioRow({
   scenario,
   resources,
+  drafted,
   onSelect,
 }: {
   scenario: StudioScenarioResult | StudioSkippedScenarioResult
   resources: readonly StudioResourceItem[]
+  drafted?: ReadonlyMap<string, { name: string; kind: string }>
   onSelect: (resourceId: string, path: string) => void
 }) {
   const t = useText()
@@ -90,6 +99,13 @@ function ScenarioRow({
     )
   }
   const failed = scenario.outcome === 'failed'
+  // A scenario the application does not hold yet, which a draft adds, reads by its name and opens nothing.
+  const added = resources.some((item) => item.id === scenario.resourceId) ? undefined : drafted?.get(scenario.file)
+  const why = failed
+    ? [scenario.step === null ? null : `${t('shell.studio.tests.step')} ${scenario.step + 1}:`, scenario.message]
+        .filter((part) => part !== null)
+        .join(' ')
+    : ''
   return (
     <Flex vertical align="flex-start" style={{ paddingBlock: spacing.xs / 2 }}>
       <Flex {...line}>
@@ -97,7 +113,9 @@ function ScenarioRow({
           {t(failed ? 'shell.studio.tests.failed' : 'shell.studio.tests.passed')}
         </StatusTag>
         <ResourceReference
-          resourceId={scenario.resourceId}
+          resourceId={added === undefined ? scenario.resourceId : null}
+          name={added?.name}
+          kind={added?.kind}
           file={scenario.file}
           path={failed ? (scenario.path ?? '') : ''}
           resources={resources}
@@ -105,10 +123,7 @@ function ScenarioRow({
         />
         <Typography.Text style={{ color: colour.textMuted }}>{`${scenario.durationMs} ms`}</Typography.Text>
       </Flex>
-      {failed && scenario.step !== null && (
-        <Typography.Text>{`${t('shell.studio.tests.step')} ${scenario.step + 1}`}</Typography.Text>
-      )}
-      {failed && scenario.message !== null && <Typography.Text type="danger">{scenario.message}</Typography.Text>}
+      {why !== '' && <Typography.Text data-testid="studio-test-failure">{why}</Typography.Text>}
     </Flex>
   )
 }
