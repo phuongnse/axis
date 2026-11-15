@@ -4,8 +4,7 @@ Status: **Agreed**
 
 ## Context
 
-[D119](d119-ai-authoring-in-studio.md) and
-[D125](d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md) let each author connect their own
+[D150](d150-each-authors-own-ai-with-axis-counting-no-requests.md) lets each author connect their own
 AI account, whose key runs the requests they send. Every stored secret is encrypted with one
 installation key, see [D42](d42-tenant-directory-in-the-platform-database.md) and
 [D87](d87-tenant-setting-commands-and-key-rotation.md). The server, the worker, the admin tool and the
@@ -14,8 +13,8 @@ that faces the internet, which never uses an AI key.
 
 ## Decision
 
-D42's installation key still encrypts the installation's own secrets, the tenant's own model key
-included. This decision adds where that key rests, and how a person's own secret is kept.
+D42's installation key still encrypts the installation's own secrets. This decision adds where that
+key rests, and how a person's own secret is kept.
 
 - **Write-only.** A secret that a person gives, such as their AI key, is sealed in the browser with the
   public key of the host that uses it, by HPKE (RFC 9180), before it is sent. The server stores the

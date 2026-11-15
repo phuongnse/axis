@@ -43,6 +43,8 @@ Each quota has a key, a cell-wide default and a kind, which says how it is count
 - **Authoring requests.** `authoringRequests` counts the requests sent since 00:00 UTC on the first
   day of the month, once each, when the author sends it. A dropped or failed request still counts,
   and a change of plan does not count again. Its default is no limit.
+- **No request quota** _(planned for M35)_. There is no `authoringRequests` quota. Each author's own key pays
+  for the author's requests, so Axis counts no request, see [a person's own key](model-bindings.md#a-persons-own-key).
 - **Lowering a quota below use.** It refuses new use and removes nothing. A tenant over its storage
   quota keeps its data and can still delete.
 
@@ -275,8 +277,6 @@ user name.
   the tenant directory, with or without `Cell:Id`, and writes nothing under
   `Tenancy:Source=configuration`. Each write deletes the tenant's token rows older than 13 months.
   The usage route and the cell console do not show these rows yet.
-- **Authoring requests sent** _(planned for M35)_. The daily row also holds the authoring requests
-  sent, see [authoring requests](authoring-requests.md#audit).
 - **Counts.** Each work item the worker runs adds one to the day's work-item count, and a connector
   call or a package call adds one to the day's call count too. A retry that the handler reschedules
   counts, because every attempt is real work. The count is added in a short transaction on the

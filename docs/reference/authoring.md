@@ -43,6 +43,7 @@ that work:
 | `studio`            | True when Studio is on and the user holds the author role                                                                     | Show Studio                                                     |
 | `studioPublisher`   | True when `studio` is true and the user also holds the publisher role                                                         | Show Publish…, Activate… and the auto-accept switch as editable |
 | `studioCreate`      | True when `studio` is true and `Studio:ApplicationsPath` is set                                                               | Show New application…                                           |
+| `studioAi` _(planned for M35)_ | True when `studio` is true, `Ai:DefaultBinding` is set and the tenant's AI authoring setting is on, see [AI authoring](user-administration.md#ai-authoring) | Show the request panel |
 | `studioTest`        | True when `studio` is true and `Studio:Tests` is true                                                                         | Show Run tests and a scenario's Run                             |
 | `studioPreviewHost` | The first host of the served tenant whose `PreviewOf` is the session's tenant, else `null`, and `null` when `studio` is false | Show Preview, only when it is set                               |
 

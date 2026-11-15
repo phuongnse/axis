@@ -179,6 +179,9 @@ with no directory row or a preview tenant. A `403` or `404` is not logged, and a
 - **Remove.** The "Remove key…" button opens a confirmation titled "Remove the model key?". Only the confirmation's
   "Remove" button sends `DELETE /api/tenant/model-key`. A failed remove shows "The key was not removed."
 - **After a change.** The section reads `GET /api/tenant/model-key` again, so it shows what the server stored.
+- **The switch** _(planned for M35)_. The section is the AI authoring switch, see
+  [AI authoring](user-administration.md#ai-authoring). Each person sets their own key on the
+  [account page](#account-page), not here.
 
 ### Application packages
 

@@ -10,7 +10,7 @@ The policy follows the lifecycle terms of NIST SP 800-57. It covers each key fro
 - **Storage.** A secret comes from a file in `/run/secrets` or from the platform's secret store, never from a committed file. Axis keeps each tenant secret encrypted in the platform tables. It keeps no key in code, images or logs.
 - **Holders.** The server, the worker, the admin tool and the agent host of one installation share its installation key, and every replica holds the same value. A client key's private half stays with Axis. Only its public half goes to the identity provider. A webhook secret is shared by exactly two parties.
 - **Key service.** _(planned for M35)_ In SaaS the cloud's key service (AWS KMS, Azure Key Vault, Google Cloud KMS or HashiCorp Vault) wraps the private key of each host that opens a sealed secret and the installation key. Its policy lets only each host's own identity unwrap its key, and it logs every unwrap. On premises the customer chooses a key file or their own key service.
-- **Sealed secrets.** _(planned for M35)_ A secret that a person gives is sealed in the browser for the host that uses it, with a data key of its own, and only that host opens it, in memory, for the call that needs it, see [D149](../decisions/d149-a-persons-secrets-are-sealed-for-the-host-that-uses-them-and-every-secret-rests-on-a-key-service.md).
+- **Sealed secrets.** _(planned for M35)_ A secret that a person gives is sealed in the browser for the host that uses it, with a data key of its own, and only that host opens it, in memory, for the call that needs it, see [D149](../decisions/d149-a-persons-secrets-are-sealed-for-the-host-that-uses-them-and-every-secret-rests-on-a-key-service.md). A person's AI key is the only AI key that Axis stores.
 - **Use.** Each key has one purpose. The installation key only encrypts stored secrets and data protection keys. A client key only signs client assertions. The [cryptographic inventory](#cryptographic-inventory) lists where each key may and may not be used.
 - **Cryptoperiod.** Axis rotates the installation key at least once a year, and at once when it may have leaked. The framework makes a new data protection key every 90 days. No other key has a set period.
 - **Rotation.** Each key rotates on its own path.
@@ -76,7 +76,7 @@ Each secret has the hosts that open it and the hosts that cannot, so a reader se
 | Secret | Opened by | Cannot open |
 | --- | --- | --- |
 | A person's AI key | The agent host only, with its own private key, in memory, for the call that needs it | The server, the worker, the admin tool and the operator |
-| The installation's own secrets, the tenant's own model key among them | The server, the worker, the admin tool and the agent host, each by unwrapping the installation key at the cloud's or the customer's key service | A caller or a person with no host identity |
+| The installation's own secrets | The server, the worker, the admin tool and the agent host, each by unwrapping the installation key at the cloud's or the customer's key service | A caller or a person with no host identity |
 
 Code that uses a key touches it while it uses it. Signed images, see I5 in the [installation threat model](threat-model-installation.md), and the review of the agent host's changes guard that limit.
 

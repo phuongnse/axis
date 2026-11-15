@@ -63,6 +63,8 @@ The numbers above show the shape only. They are not prices.
   migrations the start reads every pinned version, and it stops when `ControlPlane:Plans` no longer
   lists one, naming each missing plan code and version.
 - **The trial's plan.** A plan marked `"trial": true` has no price and no add-ons.
+- **No AI requests** _(planned for M35)_. A plan sets no `authoringRequests`, because each author's own key
+  pays for the author's requests, see [a person's own key](model-bindings.md#a-persons-own-key).
 - **Package run time**. Each plan sets `packageCpuSecondsPerDay`, see
   [package run time a day](tenant-quotas.md#package-run-time-a-day). The start check refuses a trial
   plan whose value is not 0, so only a paid plan runs an application's packages.

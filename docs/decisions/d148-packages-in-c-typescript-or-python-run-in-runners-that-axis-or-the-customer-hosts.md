@@ -15,7 +15,7 @@ TypeScript, Python or C#, published to its own registry, and rewriting it in C# 
 change it serves. A connector reaches a system that runs as a service with an API, but a library that
 no service exposes has no API to call. And anyone may write the code now: the operator's developers, a
 partner, the business's own developers, or an agent that the business asks in words, as
-[D119](d119-ai-authoring-in-studio.md) agrees. In an Axis SaaS cell, code that a tenant brings runs
+[D150](d150-each-authors-own-ai-with-axis-counting-no-requests.md) agrees. In an Axis SaaS cell, code that a tenant brings runs
 beside up to 1,000 other tenants, so it cannot be trusted the way an operator's package is.
 
 ## Decision
@@ -90,7 +90,7 @@ This decision replaces D7, D28 and D90, and restates what still holds from them.
   in Studio, or in their own tools through the authoring API. An agent writes a package's adapter,
   manifest and tests over a library the author names only through an authoring request, the one place
   in Axis where an agent works, under the plan, review and accept of
-  [D125](d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md), and it never publishes.
+  [D150](d150-each-authors-own-ai-with-axis-counting-no-requests.md), and it never publishes.
 
 ## Consequences
 

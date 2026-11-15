@@ -11,12 +11,11 @@ _(planned for M35)_
 The request panel is where an author sends requests and follows them.
 
 - **Where.** An Ask AI button on the application's [band](studio-workspace.md#band) opens a panel
-  beside the editor. It shows only when `Ai:DefaultBinding` is set and the person holds the author
-  role.
+  beside the editor. It shows only when `studioAi` is true, the field that
+  [`GET /api/me`](security.md#roles-and-the-current-user) answers.
 - **Sending.** The author writes what they want in words, in any language, and sends it. A check box,
   "Accept when checks and review pass", asks for auto-accept, and shows only when the application
-  [allows it](#auto-accept). The panel shows the tenant's requests left this month when the tenant has
-  a quota.
+  [allows it](#auto-accept).
 - **The list.** The panel lists the application's requests, newest first, with their author, state and
   time. Each opens its page in the panel.
 - **Progress.** A request's page shows its state in words, as
