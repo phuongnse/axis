@@ -230,7 +230,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   named, the ones it needs are required. The sign-up applications are optional, and each listed one
   needs an id, both titles and both descriptions. The sign-up documents are optional, and once one of
   their settings is set, all of them are required. The sign-up challenge key is optional. The disposable domain list is optional, and once one of its
-  settings is set, both are required. The trial quotas are optional. The public URL is optional. The PayOS provider is optional, and with `PayOs` the base URL and the client id, API
+  settings is set, both are required. The public URL is optional. The PayOS provider is optional, and with `PayOs` the base URL and the client id, API
   key and checksum key are required.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
   index of a cell or an application, or the quota key, and never its value.
@@ -289,7 +289,6 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:PublicMailboxDomains:<n>` | A public mailbox domain, such as `gmail.com`, whose addresses the [sign-up domain limit](sign-up.md#bots-and-abuse) counts one by one. Optional | A domain name |
 | `ControlPlane:SignUp:DisposableDomains:Url` | The address of the open-source list of disposable mailbox domains, one domain per line. Optional | An absolute `https` URL, when either is set |
 | `ControlPlane:SignUp:DisposableDomains:Sha256` | The SHA-256 of that list, as hex. The job refreshes the table only from a list with this hash | 64 hex characters, when either is set |
-| `ControlPlane:SignUp:TrialQuotas:<quota key>` | The quota that a new trial gets for that [quota key](tenant-quotas.md#quotas), such as `users`, which [provisioning](sign-up.md#provisioning) sends to the cell. Empty, or `null` in a JSON file, for no limit. Optional. A quota key that is not set keeps the cell's default | A quota key, and a whole number of zero or more when not empty |
 | `ControlPlane:SignUp:Terms:Version` | The version of the terms of service that a person accepts, such as `2026-01`. Optional. Without the documents `GET /api/sign-up/documents` and `POST /api/sign-up` answer `503`. A [sign-up](sign-up.md#the-documents) must send the current version of each document | Not empty, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:en` | The English address of the terms of service | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:vi` | The Vietnamese address of the terms of service | An absolute `https` URL, when a document is set |
@@ -306,7 +305,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:Plans:<n>:Name:en` | The English name of the plan | Not empty |
 | `ControlPlane:Plans:<n>:Name:vi` | The Vietnamese name of the plan | Not empty |
 | `ControlPlane:Plans:<n>:IncludedUsers` | The users that the plan's price includes | Plain digits, at least 1 |
-| `ControlPlane:Plans:<n>:Trial` | Whether the plan sets a trial's quotas. Default off | A trial plan has no price and no add-on |
+| `ControlPlane:Plans:<n>:Trial` | Whether the plan is the trial plan, which sets a new trial's quotas, see [the catalogue](plans.md#the-catalogue). Default off | A trial plan has no price and no add-on and at most 10 included users, and every trial plan has the same code |
 | `ControlPlane:Plans:<n>:Quotas:<quota>` | A quota of the plan, by the key of [tenant quotas](tenant-quotas.md#quotas), such as `storage` | Every quota key except `users` is set, no other key, and each is plain digits from 0 |
 | `ControlPlane:Plans:<n>:Prices:<n>:Currency` | The currency of a monthly price | `VND` or `USD`, each once, and both set unless the plan is a trial plan |
 | `ControlPlane:Plans:<n>:Prices:<n>:Month` | The monthly price in the currency's smallest unit. A year costs 10 times it, computed | Plain digits, at least 1 and at most a tenth of the largest 64-bit integer |

@@ -6,6 +6,7 @@ using System.Text.Json.Nodes;
 using Axis.ControlPlane.Audit;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Jobs;
+using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.Subscriptions;
 using Axis.Server.Http;
 using MimeKit;
@@ -41,8 +42,8 @@ internal static class SignUpEndpoints
                 ? Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable)
                 : Results.Ok(SignUpChallenge.Create(Convert.FromBase64String(options.SignUp.ChallengeKey), clock.GetUtcNow())));
 
-        // See docs/reference/sign-up.md#sending-the-form. It checks, in this order, the settings (the challenge key, the documents and the
-        // directory), the body, the proof-of-work solution in altcha, the client address limit, then the form's fields, the email's domain limit,
+        // See docs/reference/sign-up.md#sending-the-form. It checks, in this order, the settings (the challenge key, the documents, the trial plan and
+        // the directory), the body, the proof-of-work solution in altcha, the client address limit, then the form's fields, the email's domain limit,
         // a disposable email domain and the subdomain, see docs/reference/sign-up.md#bots-and-abuse. The form's three document versions must each
         // equal the region's current one, see docs/reference/sign-up.md#the-documents, and the route stores them on the pending sign-up.
         // A missing, malformed, wrong, expired or used solution is refused
@@ -51,7 +52,7 @@ internal static class SignUpEndpoints
         // email instead: nothing is stored and no subdomain is held, and the answer is the same. An address that already has three
         // sign-up emails in 24 hours gets none: nothing is stored and no subdomain is held, and the answer is the same, see
         // docs/reference/sign-up.md#bots-and-abuse. The answer is 202 with { resend }, the opaque token of Send again. Without the
-        // key, the documents or the directory the route answers 503.
+        // key, the documents, a trial plan or the directory the route answers 503.
         endpoints.MapPost("/api/sign-up", SignUpAsync);
 
         // See docs/reference/sign-up.md#check-your-inbox. It answers 202 for every token, so a caller learns nothing about the sign-ups it
@@ -120,6 +121,7 @@ internal static class SignUpEndpoints
         HttpContext context,
         IServiceProvider services,
         ControlPlaneOptions options,
+        PlanCatalogue catalogue,
         EmailTemplates templates,
         SignUpLimits limits,
         NpgsqlDataSource controlPlane,
@@ -133,6 +135,11 @@ internal static class SignUpEndpoints
         }
 
         if (!options.SignUp.HasDocuments)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        if (catalogue.Trial is null)
         {
             return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable);
         }

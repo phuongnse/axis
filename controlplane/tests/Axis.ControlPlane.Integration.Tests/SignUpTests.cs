@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.SignUp;
 using Axis.Core.Telemetry;
+using Axis.Tenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -320,6 +321,19 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         await AssertNothingStoredAsync();
         Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_challenges"));
+    }
+
+    [Fact]
+    public async Task A_sign_up_without_a_trial_plan_answers_503_and_stores_nothing()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync(trialPlan: false);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, NewAddress(), NewSubdomain()), cancellation);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        await AssertNothingStoredAsync();
     }
 
     [Fact]
@@ -1264,7 +1278,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         }
     }
 
-    private async Task<WebApplicationFactory<Program>> FactoryAsync(bool documents = true, string termsVersion = TermsVersion, string dpaVersion = DpaVersion, string privacyVersion = PrivacyVersion, bool challengeKey = true)
+    private async Task<WebApplicationFactory<Program>> FactoryAsync(bool documents = true, string termsVersion = TermsVersion, string dpaVersion = DpaVersion, string privacyVersion = PrivacyVersion, bool challengeKey = true, bool trialPlan = true)
     {
         var host = await mailpit.SmtpHostAsync();
         var port = await mailpit.SmtpPortAsync();
@@ -1301,6 +1315,21 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
                 }
 
                 builder.UseSetting("ControlPlane:SignUp:LicencesUrl", "https://example.com/licences");
+            }
+
+            // The trial plan that a new trial's quotas come from. Without one the route answers 503.
+            if (trialPlan)
+            {
+                builder.UseSetting("ControlPlane:Plans:0:Code", "trial");
+                builder.UseSetting("ControlPlane:Plans:0:Version", "1");
+                builder.UseSetting("ControlPlane:Plans:0:Name:en", "Trial");
+                builder.UseSetting("ControlPlane:Plans:0:Name:vi", "Dùng thử");
+                builder.UseSetting("ControlPlane:Plans:0:IncludedUsers", "10");
+                builder.UseSetting("ControlPlane:Plans:0:Trial", "true");
+                foreach (var key in QuotaKeys.All.Where(key => key != QuotaKeys.Users))
+                {
+                    builder.UseSetting($"ControlPlane:Plans:0:Quotas:{key}", key == QuotaKeys.PackageCpuSecondsPerDay ? "0" : "1");
+                }
             }
 
             // The test server has no client address, so the filter gives every request the one proxy the control plane trusts.

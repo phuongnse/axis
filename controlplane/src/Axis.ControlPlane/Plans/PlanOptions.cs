@@ -20,7 +20,7 @@ public sealed class PlanOptions
     /// <summary>The users that the price includes.</summary>
     public string? IncludedUsers { get; set; }
 
-    /// <summary>Whether the plan sets a trial's quotas. A trial plan has no price and no add-on.</summary>
+    /// <summary>Whether the plan is the trial plan, which sets a new trial's quotas, see <c>docs/reference/plans.md#the-catalogue</c>. A trial plan has no price, no add-on and at most 10 included users, and every trial plan has the same code.</summary>
     public bool Trial { get; set; }
 
     /// <summary>The quotas of the plan by quota key, every key of the tenant quotas except <c>users</c>.</summary>
