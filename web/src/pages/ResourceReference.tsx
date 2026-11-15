@@ -6,13 +6,14 @@ import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
+import { DraftResourcesContext } from './draftResources'
 
 /**
  * Proposed: a pointer to a resource, see the review on #3263: the resource's title in the reader's language as the only
  * link, opening it at `path`, and its kind after it, muted, as the changes of a draft name a resource. A resource only
- * the draft adds is its name and its kind; with `onShowDraft`, on a request's page, its name is the link that shows its
- * change in the draft's diff, and otherwise text, as no one opens it yet. Any other pointer no one can open is its file,
- * muted.
+ * the draft adds is its name and its kind; under a `DraftResourcesContext` that holds it, its name is the link that
+ * shows its change in the draft's diff, and otherwise text, as no one opens it yet. Any other pointer no one can open is
+ * its file, muted.
  */
 export function ResourceReference({
   resourceId,
@@ -22,7 +23,6 @@ export function ResourceReference({
   path,
   resources,
   onSelect,
-  onShowDraft,
 }: {
   resourceId: string | null
   file: string | null
@@ -32,30 +32,35 @@ export function ResourceReference({
   path: string
   resources: readonly StudioResourceItem[]
   onSelect: (resourceId: string, path: string) => void
-  /** Proposed: shows the change of a resource only the draft adds, by its file, in the draft's diff. */
-  onShowDraft?: (file: string) => void
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const draft = useContext(DraftResourcesContext)
+  const resource = resources.find((entry) => entry.id === resourceId)
+  // A resource the application does not hold, which the draft adds, reads as the draft's diff names it.
+  const added = resource === undefined && file !== null ? draft?.added.get(file) : undefined
+  if (added !== undefined) {
+    return (
+      <Flex component="span" align="baseline" gap={spacing.xs} wrap style={{ display: 'inline-flex' }}>
+        <AxisButton role="link" size="small" onClick={() => draft!.show(file!)}>
+          {added.name}
+        </AxisButton>
+        <Typography.Text style={{ color: colour.textMuted }}>{kindSingular(added.kind, t)}</Typography.Text>
+      </Flex>
+    )
+  }
   if (resourceId === null) {
     if (name !== null && kind !== null) {
       return (
         <Flex component="span" align="baseline" gap={spacing.xs} wrap style={{ display: 'inline-flex' }}>
-          {onShowDraft !== undefined && file !== null ? (
-            <AxisButton role="link" size="small" onClick={() => onShowDraft(file)}>
-              {name}
-            </AxisButton>
-          ) : (
-            <Typography.Text>{name}</Typography.Text>
-          )}
+          <Typography.Text>{name}</Typography.Text>
           <Typography.Text style={{ color: colour.textMuted }}>{kindSingular(kind, t)}</Typography.Text>
         </Flex>
       )
     }
     return file === null ? null : <Typography.Text style={{ color: colour.textMuted }}>{file}</Typography.Text>
   }
-  const resource = resources.find((entry) => entry.id === resourceId)
   return (
     <Flex component="span" align="baseline" gap={spacing.xs} wrap style={{ display: 'inline-flex' }}>
       {/* A small link, as a table's link, so a pointer in a line of text keeps the line's height. */}

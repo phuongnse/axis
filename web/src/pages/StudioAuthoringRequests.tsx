@@ -62,6 +62,7 @@ import { ActionBar } from './SaveBar'
 import { StudioPageHeading } from './StudioPageHeading'
 import { useBulletList } from '../platform/bulletList'
 import { StudioProblemList } from './StudioProblems'
+import { DraftResourcesContext } from './draftResources'
 import { ResourceReference } from './ResourceReference'
 import {
   BulbOutlined,
@@ -824,14 +825,7 @@ export function StudioAuthoringRequestPage({
                   <StudioProblemList items={diagnosticItems(problems)} resources={resources} onSelect={onOpen} />
                 )}
                 {request.checks !== null && (
-                  <StudioTestResults
-                    request={request.checks}
-                    resources={resources}
-                    drafted={drafted}
-                    onSelect={onOpen}
-                    onShowDraft={showDraft}
-                    nested
-                  />
+                  <StudioTestResults request={request.checks} resources={resources} onSelect={onOpen} nested />
                 )}
               </Flex>
             )}
@@ -852,15 +846,7 @@ export function StudioAuthoringRequestPage({
           </div>
         )}
         {/* The review runs only once the checks pass, so a request that failed before it has no findings. */}
-        {request.review !== null && (
-          <ReviewFindings
-            review={request.review}
-            resources={resources}
-            onOpen={onOpen}
-            drafted={drafted}
-            onShowDraft={showDraft}
-          />
-        )}
+        {request.review !== null && <ReviewFindings review={request.review} resources={resources} onOpen={onOpen} />}
       </div>
       {/* Proposed: what the request changes is its diff, after the checks and the review, which sum it up, each resource a
           block that starts folded under its name, kind and change, with the summary its request wrote, and opens to its
@@ -1073,120 +1059,126 @@ export function StudioAuthoringRequestPage({
   })()
 
   return (
-    <Flex vertical gap="middle" data-testid="studio-ai-request">
-      {/* Proposed: the request's name as the heading with its state beside it, then, close under it, its words and who
+    // Proposed: every pointer on the page to a resource the draft adds reads by its name and shows its change, see the
+    // review on #3263.
+    <DraftResourcesContext.Provider value={drafted.size > 0 ? { added: drafted, show: showDraft } : null}>
+      <Flex vertical gap="middle" data-testid="studio-ai-request">
+        {/* Proposed: the request's name as the heading with its state beside it, then, close under it, its words and who
           sent it with the AIs that made it, see the review on #3263. */}
-      <Flex vertical gap={spacing.xs} data-testid="studio-ai-asked">
-        <StudioPageHeading
-          title={requestTitle(request)}
-          tags={<StatusTag tone={requestStateTone(request.state)}>{stateWords(request)}</StatusTag>}
-        />
-        {quoted(request.text)}
-        <Typography.Text style={{ color: colour.textMuted }}>{line}</Typography.Text>
-      </Flex>
-      {actionError && <AxisAlert kind="error" message={t('shell.studio.aiRequest.actionFailed')} />}
-      <ol style={{ listStyle: 'none', margin: 0, padding: 0 }} data-testid="studio-ai-feed">
-        {[planItem, workItem, resultItem, droppedItem]
-          .filter((item) => item !== false)
-          .map((item, index, items) => (
-            <FeedLast.Provider key={index} value={index === items.length - 1}>
-              {item}
-            </FeedLast.Provider>
-          ))}
-      </ol>
-      {/* Proposed: asking for another plan, answering the plan's questions and asking for other changes each open a
-          dialog, as Drop… and Accept anyway… do, see the review on #3263. */}
-      <Modal
-        open={replyKind !== null && replyOpen}
-        width={size.dialog.medium}
-        title={t(
-          asksChanges
-            ? 'shell.studio.aiRequest.reply.askOther'
-            : questions > 0
-              ? 'shell.studio.aiRequest.reply.answer'
-              : 'shell.studio.aiRequest.reply.changePlan',
-        )}
-        okText={t(asksChanges ? 'shell.studio.aiRequest.requestChanges.ok' : 'shell.studio.aiRequest.changePlan.ok')}
-        cancelText={t('shell.studio.cancel')}
-        confirmLoading={acting}
-        onOk={() => replyForm.submit()}
-        onCancel={() => setReplyOpen(false)}
-        destroyOnHidden
-      >
-        <Form
-          form={replyForm}
-          layout="vertical"
-          requiredMark={requiredMark}
-          onFinish={(values) => replyKind !== null && void act(replyKind, values.comment.trim())}
-          data-testid="studio-ai-reply"
-        >
-          <AxisField
-            name="comment"
-            label={t(replyLabel)}
-            help={t(`${replyLabel}.help`)}
-            requiredMessage={t(
-              asksChanges ? 'shell.studio.aiRequest.changesCommentRequired' : 'shell.studio.aiRequest.commentRequired',
-            )}
-          >
-            <Input.TextArea
-              aria-label={t(replyLabel)}
-              autoSize={{ minRows: 3, maxRows: 8 }}
-              maxLength={2000}
-              autoFocus
-            />
-          </AxisField>
-        </Form>
-      </Modal>
-      <ActionBar testId="studio-ai-bar">
-        <span data-testid="studio-ai-guide">{guide.words}</span>
-        {guide.actions.some((action) => action !== null) && (
-          <AxisActionRow align="center" fold>
-            {guide.actions}
-          </AxisActionRow>
-        )}
-      </ActionBar>
-      <Modal
-        open={anywayOpen}
-        width={size.dialog.medium}
-        title={t('shell.studio.aiRequest.acceptAnyway.title')}
-        okText={t('shell.studio.aiRequest.acceptAnyway.ok')}
-        cancelText={t('shell.studio.cancel')}
-        confirmLoading={acting}
-        onOk={() => {
-          setAnywayOpen(false)
-          void startAccept()
-        }}
-        onCancel={() => setAnywayOpen(false)}
-      >
-        <Flex vertical gap={spacing.md}>
-          <Typography.Text>{t('shell.studio.aiRequest.acceptAnyway.text')}</Typography.Text>
-          {/* The blocking findings it leaves out, listed as the review lists them; a suggestion asks for no change. */}
-          <FindingList
-            testId="studio-ai-anyway-findings"
-            only="blocking"
-            findings={request.review?.findings ?? []}
-            resources={resources}
-            onOpen={(resourceId, path) => {
-              setAnywayOpen(false)
-              onOpen(resourceId, path)
-            }}
+        <Flex vertical gap={spacing.xs} data-testid="studio-ai-asked">
+          <StudioPageHeading
+            title={requestTitle(request)}
+            tags={<StatusTag tone={requestStateTone(request.state)}>{stateWords(request)}</StatusTag>}
           />
+          {quoted(request.text)}
+          <Typography.Text style={{ color: colour.textMuted }}>{line}</Typography.Text>
         </Flex>
-      </Modal>
-      <Modal
-        open={dropOpen}
-        width={size.dialog.small}
-        title={t('shell.studio.aiRequest.dropConfirm')}
-        okText={t('shell.studio.aiRequest.dropOk')}
-        okButtonProps={{ danger: true }}
-        cancelText={t('shell.studio.cancel')}
-        confirmLoading={acting}
-        onOk={() => void act('drop')}
-        onCancel={() => setDropOpen(false)}
-      >
-        {t('shell.studio.aiRequest.dropHelp')}
-      </Modal>
-    </Flex>
+        {actionError && <AxisAlert kind="error" message={t('shell.studio.aiRequest.actionFailed')} />}
+        <ol style={{ listStyle: 'none', margin: 0, padding: 0 }} data-testid="studio-ai-feed">
+          {[planItem, workItem, resultItem, droppedItem]
+            .filter((item) => item !== false)
+            .map((item, index, items) => (
+              <FeedLast.Provider key={index} value={index === items.length - 1}>
+                {item}
+              </FeedLast.Provider>
+            ))}
+        </ol>
+        {/* Proposed: asking for another plan, answering the plan's questions and asking for other changes each open a
+          dialog, as Drop… and Accept anyway… do, see the review on #3263. */}
+        <Modal
+          open={replyKind !== null && replyOpen}
+          width={size.dialog.medium}
+          title={t(
+            asksChanges
+              ? 'shell.studio.aiRequest.reply.askOther'
+              : questions > 0
+                ? 'shell.studio.aiRequest.reply.answer'
+                : 'shell.studio.aiRequest.reply.changePlan',
+          )}
+          okText={t(asksChanges ? 'shell.studio.aiRequest.requestChanges.ok' : 'shell.studio.aiRequest.changePlan.ok')}
+          cancelText={t('shell.studio.cancel')}
+          confirmLoading={acting}
+          onOk={() => replyForm.submit()}
+          onCancel={() => setReplyOpen(false)}
+          destroyOnHidden
+        >
+          <Form
+            form={replyForm}
+            layout="vertical"
+            requiredMark={requiredMark}
+            onFinish={(values) => replyKind !== null && void act(replyKind, values.comment.trim())}
+            data-testid="studio-ai-reply"
+          >
+            <AxisField
+              name="comment"
+              label={t(replyLabel)}
+              help={t(`${replyLabel}.help`)}
+              requiredMessage={t(
+                asksChanges
+                  ? 'shell.studio.aiRequest.changesCommentRequired'
+                  : 'shell.studio.aiRequest.commentRequired',
+              )}
+            >
+              <Input.TextArea
+                aria-label={t(replyLabel)}
+                autoSize={{ minRows: 3, maxRows: 8 }}
+                maxLength={2000}
+                autoFocus
+              />
+            </AxisField>
+          </Form>
+        </Modal>
+        <ActionBar testId="studio-ai-bar">
+          <span data-testid="studio-ai-guide">{guide.words}</span>
+          {guide.actions.some((action) => action !== null) && (
+            <AxisActionRow align="center" fold>
+              {guide.actions}
+            </AxisActionRow>
+          )}
+        </ActionBar>
+        <Modal
+          open={anywayOpen}
+          width={size.dialog.medium}
+          title={t('shell.studio.aiRequest.acceptAnyway.title')}
+          okText={t('shell.studio.aiRequest.acceptAnyway.ok')}
+          cancelText={t('shell.studio.cancel')}
+          confirmLoading={acting}
+          onOk={() => {
+            setAnywayOpen(false)
+            void startAccept()
+          }}
+          onCancel={() => setAnywayOpen(false)}
+        >
+          <Flex vertical gap={spacing.md}>
+            <Typography.Text>{t('shell.studio.aiRequest.acceptAnyway.text')}</Typography.Text>
+            {/* The blocking findings it leaves out, listed as the review lists them; a suggestion asks for no change. */}
+            <FindingList
+              testId="studio-ai-anyway-findings"
+              only="blocking"
+              findings={request.review?.findings ?? []}
+              resources={resources}
+              onOpen={(resourceId, path) => {
+                setAnywayOpen(false)
+                onOpen(resourceId, path)
+              }}
+            />
+          </Flex>
+        </Modal>
+        <Modal
+          open={dropOpen}
+          width={size.dialog.small}
+          title={t('shell.studio.aiRequest.dropConfirm')}
+          okText={t('shell.studio.aiRequest.dropOk')}
+          okButtonProps={{ danger: true }}
+          cancelText={t('shell.studio.cancel')}
+          confirmLoading={acting}
+          onOk={() => void act('drop')}
+          onCancel={() => setDropOpen(false)}
+        >
+          {t('shell.studio.aiRequest.dropHelp')}
+        </Modal>
+      </Flex>
+    </DraftResourcesContext.Provider>
   )
 }
 
@@ -1370,14 +1362,10 @@ function ReviewFindings({
   review,
   resources,
   onOpen,
-  drafted,
-  onShowDraft,
 }: {
   review: StudioReview
   resources: readonly StudioResourceItem[]
   onOpen: (resourceId: string, path: string) => void
-  drafted?: ReadonlyMap<string, { name: string; kind: string }>
-  onShowDraft?: (file: string) => void
 }) {
   const t = useText()
   const { spacing } = useDesignTokens()
@@ -1409,13 +1397,7 @@ function ReviewFindings({
           {review.findings.length > 0 && (
             <Flex vertical gap={spacing.xs} data-testid="studio-ai-findings">
               <Typography.Text strong>{t('shell.studio.aiRequest.review.thingsToLookAt')}</Typography.Text>
-              <FindingList
-                findings={review.findings}
-                resources={resources}
-                onOpen={onOpen}
-                drafted={drafted}
-                onShowDraft={onShowDraft}
-              />
+              <FindingList findings={review.findings} resources={resources} onOpen={onOpen} />
             </Flex>
           )}
           <ReviewOutcomes
@@ -1514,8 +1496,6 @@ function FindingList({
   onOpen,
   testId,
   only,
-  drafted,
-  onShowDraft,
 }: {
   findings: readonly StudioReviewFinding[]
   resources: readonly StudioResourceItem[]
@@ -1523,9 +1503,6 @@ function FindingList({
   testId?: string
   /** Shows the blocking findings alone. */
   only?: 'blocking'
-  /** Proposed: each resource only the draft adds, by its file, named as its diff names it. */
-  drafted?: ReadonlyMap<string, { name: string; kind: string }>
-  onShowDraft?: (file: string) => void
 }) {
   const t = useText()
   const bulletList = useBulletList()
@@ -1539,48 +1516,16 @@ function FindingList({
         <li key={index} data-testid="studio-ai-finding" data-kind={finding.kind}>
           <ReviewMark mark={finding.kind} words={t(`shell.studio.aiRequest.review.kind.${finding.kind}`)} />{' '}
           <Typography.Text>{finding.text}</Typography.Text>{' '}
-          <FindingResource
-            finding={finding}
+          <ResourceReference
+            resourceId={finding.resourceId}
+            file={finding.file}
+            path={finding.path}
             resources={resources}
-            onOpen={onOpen}
-            drafted={drafted}
-            onShowDraft={onShowDraft}
+            onSelect={onOpen}
           />
         </li>
       ))}
     </ul>
-  )
-}
-
-/**
- * The resource a finding is about, at the end of its line: a link that opens it at the finding's path, or, for a
- * resource only the draft adds, its name as its diff names it, the link showing its change.
- */
-function FindingResource({
-  finding,
-  resources,
-  onOpen,
-  drafted,
-  onShowDraft,
-}: {
-  finding: StudioReviewFinding
-  resources: readonly StudioResourceItem[]
-  onOpen: (resourceId: string, path: string) => void
-  drafted?: ReadonlyMap<string, { name: string; kind: string }>
-  onShowDraft?: (file: string) => void
-}) {
-  const added = resources.some((item) => item.id === finding.resourceId) ? undefined : drafted?.get(finding.file)
-  return (
-    <ResourceReference
-      resourceId={added === undefined ? finding.resourceId : null}
-      name={added?.name}
-      kind={added?.kind}
-      file={finding.file}
-      path={finding.path}
-      resources={resources}
-      onSelect={onOpen}
-      onShowDraft={onShowDraft}
-    />
   )
 }
 

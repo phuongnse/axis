@@ -10,6 +10,7 @@ import type {
   StudioSkippedScenarioResult,
 } from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
+import { DraftResourcesContext } from './draftResources'
 import { StudioTestResults } from './StudioTestResults'
 
 const approval: StudioScenarioResult = {
@@ -69,13 +70,9 @@ function renderResults(
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioTestResults
-          request={value}
-          resources={resources}
-          drafted={drafted}
-          onSelect={onSelect}
-          onShowDraft={onShowDraft}
-        />
+        <DraftResourcesContext.Provider value={drafted ? { added: drafted, show: onShowDraft } : null}>
+          <StudioTestResults request={value} resources={resources} onSelect={onSelect} />
+        </DraftResourcesContext.Provider>
       </TextProvider>
     </ThemeModeProvider>,
   )
@@ -110,7 +107,7 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     expect(onSelect).toHaveBeenCalledWith('7f1c2d3e-4a5b-4c6d-8e7f-9a0b1c2d3e4f', '')
   })
 
-  it('shows a failed scenario on one line, its name opening it at the step where its details are', async () => {
+  it('shows a failed scenario with where and why under its name, its name opening it at the step', async () => {
     const { onSelect } = renderResults(request({ status: 'failed', scenarios: [finance, approval] }))
 
     const rows = screen.getAllByTestId('studio-test-result')
@@ -118,8 +115,12 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     const failed = rows[1]
     expect(failed).toHaveAttribute('data-outcome', 'failed')
     expect(within(failed).getByText('Failed')).toHaveAttribute('data-tone', 'danger')
-    // Proposed: the row is its outcome, its name and its time alone; the details are where its link goes.
-    expect(failed).toHaveTextContent(/^Failed\s*ApprovalBelowThreshold\s*Test scenario\s*412 ms$/)
+    expect(failed).toHaveTextContent(/^Failed\s*ApprovalBelowThreshold\s*Test scenario\s*412 ms/)
+    // Proposed: where and why in one sentence in the text colour, under the name, in its column.
+    const why = within(failed).getByTestId('studio-test-failure')
+    expect(why).toHaveTextContent(/^Failed at step 6: The record status is approved, not rejected\.$/)
+    expect(why).toHaveStyle({ gridColumn: '2' })
+    expect(why).not.toHaveClass('ant-typography-danger')
 
     await userEvent.click(within(failed).getByRole('button', { name: 'ApprovalBelowThreshold' }))
     expect(onSelect).toHaveBeenCalledWith('09d75317-fd9e-411e-8322-317778fc1b2b', '/steps/5')

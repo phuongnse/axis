@@ -2015,7 +2015,7 @@
   "shell.studio.tests.none": "Chưa chạy kịch bản kiểm thử nào. Xem các vấn đề.",
   "shell.studio.tests.passed": "Đạt",
   "shell.studio.tests.failed": "Không đạt",
-  "shell.studio.tests.step": "Bước",
+  "shell.studio.tests.failedAt": "Lỗi ở bước {step}: {message}",
   "shell.studio.tests.contractTitle": "Kịch bản kiểm thử của cam kết",
   "shell.studio.tests.skipped": "Bỏ qua",
   "shell.studio.tests.relaxedPoint": "Điểm nới lỏng",

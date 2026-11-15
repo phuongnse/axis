@@ -2015,7 +2015,7 @@
   "shell.studio.tests.none": "No scenario ran. See the problems.",
   "shell.studio.tests.passed": "Passed",
   "shell.studio.tests.failed": "Failed",
-  "shell.studio.tests.step": "Step",
+  "shell.studio.tests.failedAt": "Failed at step {step}: {message}",
   "shell.studio.tests.contractTitle": "Contract scenarios",
   "shell.studio.tests.skipped": "Skipped",
   "shell.studio.tests.relaxedPoint": "Relaxed point",
