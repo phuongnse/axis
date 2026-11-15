@@ -66,7 +66,15 @@ describe('design-system previews', () => {
   test.each([
     [
       'shell',
-      ['Application site', 'Navigation collapsed', 'Form page', 'Platform site', 'App switcher', 'Language and theme'],
+      [
+        'Application site',
+        'Navigation collapsed',
+        'Form page',
+        'Platform site',
+        'App switcher',
+        'Account menu',
+        'Language and theme',
+      ],
     ],
     ['signIn', ['Sign-in refused', 'Signed out', 'Session ended']],
     [
@@ -95,7 +103,7 @@ describe('design-system previews', () => {
     }
   })
 
-  test('the cards have the 27 names of the Design System artifact, in group order', () => {
+  test('the cards have the 28 names of the Design System artifact, in group order', () => {
     expect(cardGroups.flatMap(({ previews: group }) => group).map(cardName)).toEqual([
       'TextField',
       'IntegerField',
@@ -119,6 +127,7 @@ describe('design-system previews', () => {
       'Tabs',
       'Section',
       'States',
+      'StatusTag',
       'Shell',
       'SignIn',
       'IdentitySignIn',
@@ -127,7 +136,7 @@ describe('design-system previews', () => {
     ])
   })
 
-  test('the studio preview has its seven states, each with a slug of its own and a frame', () => {
+  test('the studio preview has its states, each with a slug of its own and a frame', () => {
     const states = previews.studio
 
     expect(states.map(({ caption }) => caption)).toEqual([
@@ -138,6 +147,11 @@ describe('design-system previews', () => {
       'Many rows',
       'Long names',
       'Access denied',
+      'Ask AI',
+      'Ask AI, first request',
+      'Ask AI, not connected',
+      'Publish',
+      'Ask AI, narrow width',
     ])
     expect(states.map(({ caption }) => stateSlug(caption))).toEqual([
       'typical',
@@ -147,6 +161,11 @@ describe('design-system previews', () => {
       'many-rows',
       'long-names',
       'access-denied',
+      'ask-ai',
+      'ask-ai-first-request',
+      'ask-ai-not-connected',
+      'publish',
+      'ask-ai-narrow-width',
     ])
     for (const { frameHeight, fixtures } of states) {
       expect(frameHeight).toBeGreaterThan(0)

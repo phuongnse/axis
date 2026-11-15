@@ -139,11 +139,13 @@ describe('tokens with page values', () => {
 })
 
 describe('size tokens', () => {
-  it('are the shell bar, the small control, the table row and the dialog widths', () => {
+  it('are the shell bar, the small control, the table row, the side panel, the menu and the dialog widths', () => {
     expect(sizeTokens).toEqual({
       bar: 48,
       smallControl: 24,
       tableRow: 40,
+      sidePanel: 400,
+      menu: 200,
       dialog: { small: 400, medium: 560, large: 880 },
     })
   })

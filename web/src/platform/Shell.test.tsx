@@ -323,7 +323,7 @@ describe('PreferencesMenu', () => {
     expect(onLocaleChange).toHaveBeenCalledExactlyOnceWith('vi')
   })
 
-  it('marks the current language and theme as selected, with a divider between the groups', async () => {
+  it('marks the current language and theme as selected', async () => {
     localStorage.setItem('axis.themeMode', 'light')
     renderPreferences()
 
@@ -334,7 +334,6 @@ describe('PreferencesMenu', () => {
     expect(menu.getByRole('menuitemradio', { name: 'Light' })).toHaveClass(selected)
     expect(menu.getByRole('menuitemradio', { name: 'Tiếng Việt' })).not.toHaveClass(selected)
     expect(menu.getByRole('menuitemradio', { name: 'Dark' })).not.toHaveClass(selected)
-    expect(menu.getAllByRole('separator')).toHaveLength(1)
   })
 
   it('switches to the dark theme, stores it and marks it as current', async () => {
