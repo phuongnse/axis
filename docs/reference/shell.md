@@ -38,11 +38,18 @@ their own controls where they expect them.
   `borderSubtle` rule on its right. An open entry shows its label alone, and a collapsed entry its icon
   alone, see [navigation icons](#navigation-icons). No entry shows a count. The entry of the current
   page is drawn in `primaryText` on a `primary` tint and marked `aria-current`.
+- **Parent entries** _(planned for M35)_. A `ShellNavigation` entry that holds entries is a parent entry, drawn as Ant
+  Design's inline submenu.
 - **A page's own sidebar.** A page with its own navigation, such as Studio, claims the sidebar by
   rendering `ShellSidebar`, and draws its navigation there in place of the site's. Such a page is a
   workspace, with `spacing-md` round its content, compact sidebar entries and a compact band, see
   [Studio workspace](studio-workspace.md#workspace). The sidebar and its collapse button show even on a
   one-page site.
+- **A right column** _(planned for M35)_. A page claims a column on the right by rendering `ShellAside`. The column is
+  `sidePanel` wide and runs from under the header to the footer.
+- **One side panel in Studio** _(planned for M35)_. Studio shows one side panel at a time, such as the problems panel or
+  the Ask AI request panel, in `StudioSidePanel`, which draws it in `ShellAside`. Opening one panel closes the other.
+  By default the panel's head stays in place, its body scrolls on its own, and the page keeps the browser's scroll.
 - **Collapsed sidebar.** The header's button collapses the sidebar to a narrow strip of the entries'
   icons, each centred and named by a tooltip, and opens it again. Collapsed, a group's title gives way
   to a thin rule. The button names what it does, "Collapse navigation" or "Expand navigation", and has
@@ -63,6 +70,10 @@ their own controls where they expect them.
   page declares its colour scheme, so every scrollbar, the page's and the sidebar's, follows the mode.
 - **Page area.** Pages draw on `canvas` with `spacing-lg` padding. A wide table scrolls inside its
   widget, so the page never scrolls sideways.
+- **Flush page area** _(planned for M35)_. Pages draw on `surface`, flush with the frame. Their parts sit a `divider`
+  rule apart, and each part's heading is `heading5`.
+- **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area, just above the footer. It
+  has no link back, because the navigation and the breadcrumb lead back.
 - **Footer.** A slim footer on `surface` with a `borderSubtle` rule above it, with `spacing-xs`
   padding above and below and `spacing-lg` at its sides, and its text in `textMuted`. Without a
   sidebar it runs the full width under the page. Beside a sidebar it sits under the content column
@@ -70,6 +81,8 @@ their own controls where they expect them.
   [legal line](legal.md#legal-line): the copyright "© <year> Axis" on the left and the legal links on
   the right, from the `legal` of the site the shell shows, see [legal settings](legal.md#legal-settings).
   It shows no server status, and a page that cannot reach the server says so where it fails.
+- **Footer across the window** _(planned for M35)_. The footer runs across the whole window, under the sidebar, the page
+  and the right column. It sits at the window's foot even when the page is short.
 - **Version.** A signed-in person also sees the server's version in the footer, after the copyright.
   An anonymous visitor never sees it, because it tells an attacker which known weaknesses to try.
 - **The version as an item of its own**. The version stands beside the copyright as
@@ -130,11 +143,14 @@ theme.
   is not shown. On a site's own host it lists only that site and no tools.
 - **Menus.** Every dropdown menu keeps `spacing-xs` round its items, so a selected last item does not
   sit on the menu's edge.
+- **Inset as Ant Design draws it** _(planned for M35)_. Menu items keep the inset that Ant Design draws, with no spacing
+  of Axis's own round them.
 - **Language and theme.** An icon button with a settings gear, named "Language and theme", opens one
   menu with the site's languages and the themes, for signed-in people and for nobody signed in alike. A
   divider separates the languages from the themes. The current language and theme are drawn selected,
   [as a marked choice](actions-and-controls.md#menus) is, not only marked for assistive technology. At
   narrow width the button sits in the Menu panel, see [layout](#layout).
+- **No divider between the groups** _(planned for M35)_. No divider separates the languages from the themes.
 - **Themes.** The themes are System, Light and Dark. System is the default when the browser holds no
   choice, and follows the operating system's light or dark setting, changing at once when it changes.
   Light and Dark keep their mode. The choice is kept in `localStorage` under `axis.themeMode`, as
