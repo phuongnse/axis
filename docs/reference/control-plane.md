@@ -64,7 +64,7 @@ over a private network with mutual TLS.
   [internal listener](tenant-lifecycle.md#provisioning-api) only a client certificate that the
   region's internal certificate authority issued to the control plane. A cell sets
   `Cell:InternalClientCa` for this, see [host settings](host-settings.md#cell-settings).
-- **The chart's wiring** _(planned for M33)_. The Helm chart mounts the client certificate, the
+- **The chart's wiring.** The Helm chart mounts the client certificate, the
   authority file and the cells' secrets, so that a region's control plane reaches its cells.
 - **Idempotent.** Every `POST` to a cell carries an `Idempotency-Key` that the control plane derives
   from its own record, such as the sign-up id, so a retried call never makes a second tenant. The key
@@ -356,16 +356,30 @@ The control plane ships as its own image and Helm chart, beside the platform's.
   `https://api-merchant.payos.vn`. `secrets.payOs` names one Kubernetes Secret with the keys
   `ControlPlane__PayOs__ClientId`, `ControlPlane__PayOs__ApiKey` and `ControlPlane__PayOs__ChecksumKey`,
   which the chart mounts as the files of the same names, and is left out when the provider is empty.
+  `controlPlane.cells` lists the region's cells. Each entry holds `id`, `internalUrl`, `tokenUrl` and
+  `clientId`, which set `ControlPlane:Cells:<n>:Id`, `:InternalUrl`, `:TokenUrl` and `:ClientId`, and
+  `clientSecret`, the name and optionally the key of the Kubernetes Secret that holds the cell's client
+  secret, which the chart mounts as the file `/run/secrets/ControlPlane__CellSecrets__<cell id>`. The
+  schema limits `id` to lowercase letters and digits joined by single hyphens.
+  `secrets.cellClientCertificate` names a Kubernetes TLS Secret, which the chart mounts at
+  `/cell-client-tls` and names in `ControlPlane:CellClientCertificate:Path` and `:KeyPath`.
+  `secrets.cellCertificateAuthority` names a Secret and its key, `ca.crt` by default, which the chart
+  mounts at `/cell-ca/ca.crt` and names in `ControlPlane:CellCertificateAuthorityPath`, and is
+  optional. The certificate and the authority are mounted outside `/run/secrets`, which the service
+  reads as settings. The chart renders none of these without a listed cell.
   `image`, `replicas`, `resources` and `service` are the usual. The chart holds no secret
   value and creates no Secret, and its schema rejects a `value` in a secret reference.
 - **Render failures.** Rendering fails and names the value when `controlPlane.region`,
   `controlPlane.tenantDomain`, `controlPlane.mailFrom`, `controlPlane.mail.host`,
   `secrets.connectionString.name` or `secrets.certificate.name` is not set. It also fails and names
-  `secrets.payOs.name` when `controlPlane.payOs.provider` is `PayOs` and no Secret is named.
+  `secrets.payOs.name` when `controlPlane.payOs.provider` is `PayOs` and no Secret is named,
+  `controlPlane.cells[<n>].clientSecret.name` when a listed cell names no Secret, and
+  `secrets.cellClientCertificate.name` when a cell is listed and no Secret is named.
 - **Checks.** `scripts/lint.sh` lints the chart and checks its rendered manifests against the
   Kubernetes schemas, `scripts/helm-controlplane.test.mjs` tests the render, the image scan covers the
   image, and the `images` smoke suite starts it read-only against PostgreSQL over TLS and runs
-  `sign-ups list` in it.
+  `sign-ups list` in it. The suite also starts it with one cell, from the settings and file paths that
+  the chart renders, with the client certificate and the authority mounted.
 
 ## Health and telemetry
 

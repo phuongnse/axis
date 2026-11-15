@@ -45,6 +45,17 @@ controlPlane:
     provider: ""
     # ControlPlane:PayOs:BaseUrl, the https address of the PayOS API. Used only with the provider "PayOs".
     baseUrl: https://api-merchant.payos.vn
+  # ControlPlane:Cells, the cells of the region that the control plane calls over mutual TLS. Optional: an empty list sets no
+  # cell, and then the chart renders no cell setting, no cell secret, no client certificate and no authority. An entry is
+  #   - id: vn-1                                 # ControlPlane:Cells:<n>:Id, lowercase letters and digits joined by single hyphens
+  #     internalUrl: https://cell.vn-1.internal  # ControlPlane:Cells:<n>:InternalUrl, the https address of the cell's internal listener
+  #     tokenUrl: https://.../token              # ControlPlane:Cells:<n>:TokenUrl, the https token endpoint of the cell's operator realm
+  #     clientId: axis-controlplane              # ControlPlane:Cells:<n>:ClientId, the realm's client for the control plane
+  #     clientSecret:                            # The client secret of that client. Required: the Secret's name.
+  #       name: vn-1-client-secret               # The chart mounts the key as /run/secrets/ControlPlane__CellSecrets__<id>.
+  #       key: ControlPlane__CellSecrets__vn-1   # Optional, defaults to the file name.
+  # Once a cell is listed, secrets.cellClientCertificate is required.
+  cells: []
 
 secrets:
   # ControlPlane:ConnectionString, the connection string of the control plane database. It must set
@@ -73,3 +84,15 @@ secrets:
   # so the reference holds only the name. Required when controlPlane.payOs.provider is "PayOs", and left out otherwise.
   payOs:
     name: ""
+  # ControlPlane:CellClientCertificate, the certificate and key that the control plane presents to every cell: a Kubernetes TLS
+  # Secret with tls.crt and tls.key, issued by the region's internal certificate authority. The chart mounts it at
+  # /cell-client-tls. Required when controlPlane.cells lists a cell, and left out otherwise. The keys are fixed, so the
+  # reference holds only the name.
+  cellClientCertificate:
+    name: ""
+  # ControlPlane:CellCertificateAuthorityPath, the PEM file of the region's internal certificate authority, which the control
+  # plane trusts for the cells' server certificates. The chart mounts the key at /cell-ca/ca.crt. Optional: leave the name empty
+  # and the system trust store decides. Used only when controlPlane.cells lists a cell.
+  cellCertificateAuthority:
+    name: ""
+    key: ca.crt
