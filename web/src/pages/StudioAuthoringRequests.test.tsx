@@ -322,10 +322,8 @@ describe('a ready request’s page', () => {
 
   it('reads as one feed, its plan and its work done, then its result, with the changes and the checks unfolded on asking', async () => {
     const fetchMock = vi.fn(async (input: string) =>
-      input.includes('/drafts/')
+      input.endsWith('/diff')
         ? json({
-            start: 'a',
-            tip: 'b',
             cursor: null,
             resources: [
               {
@@ -382,18 +380,19 @@ describe('a ready request’s page', () => {
     expect(screen.getByTestId('studio-ai-feed-plan')).toHaveAttribute('data-mark', 'done')
     const result = screen.getByTestId('studio-ai-feed-result')
     expect(result).toHaveAttribute('data-mark', 'waiting')
-    // What the draft changes, each resource as people read it, with the summary its request wrote.
-    // The diff, which names a resource only the draft adds, loads after the request.
-    await waitFor(() =>
-      expect(within(result).getByTestId('studio-ai-changed')).toHaveTextContent(
-        /Cost centre\s*Entity\s*A cost centre with a name and a code\./,
-      ),
-    )
-
+    // Proposed: what the draft changes is its diff, each resource as people read it with the summary its request wrote,
+    // folded until its author opens it.
+    const file = await within(result).findByTestId('studio-revision-change')
+    expect(file).toHaveTextContent(/Cost centre\s*Entity\s*Added.*A cost centre with a name and a code\./)
     const user = userEvent.setup()
-    expect(screen.queryByTestId('studio-ai-changes')).toBeNull()
-    await user.click(within(result).getByRole('button', { name: 'Show the changes' }))
-    expect(await screen.findByTestId('studio-ai-changes')).toBeInTheDocument()
+    const toggle = within(file).getByRole('button', { name: /Cost centre/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/studio/apps/${application}/authoring-requests/${fromApp.id}/diff`,
+      expect.anything(),
+    )
     expect(screen.queryByTestId('studio-ai-check-details')).toBeNull()
     await user.click(within(result).getByRole('button', { name: 'Show the checks' }))
     expect(screen.getByTestId('studio-ai-check-details')).toBeInTheDocument()
@@ -914,8 +913,11 @@ describe("a request's changes", () => {
     vi.unstubAllGlobals()
   })
 
-  it('names each changed resource by its label, a resource only the draft adds too', async () => {
-    const detail = { ...fromApp, state: 'ready', draft: 'd-1' }
+  it.each([
+    ['a ready request, from its draft', { state: 'ready', draft: 'd-1' }],
+    ['an accepted request, from the revision its accept made', { state: 'accepted', draft: null }],
+  ])('names each changed resource by its label, a resource only the draft adds too: %s', async (_name, state) => {
+    const detail = { ...fromApp, ...state }
     const diff = {
       cursor: null,
       resources: [
@@ -944,9 +946,6 @@ describe("a request's changes", () => {
         onOpen={() => {}}
       />,
     )
-    const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'Show the changes' }))
-
     const file = await screen.findByTestId('studio-revision-change')
     expect(file).toHaveTextContent(/Cost centre\s*Entity\s*Added/)
   })

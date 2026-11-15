@@ -2168,8 +2168,6 @@
   "shell.studio.aiRequest.feed.showChecks": "Hiện chi tiết kiểm tra",
   "shell.studio.aiRequest.feed.hideChecks": "Ẩn chi tiết kiểm tra",
   "shell.studio.aiRequest.feed.preview": "Xem trước bản nháp",
-  "shell.studio.aiRequest.feed.showChanges": "Hiện các thay đổi",
-  "shell.studio.aiRequest.feed.hideChanges": "Ẩn các thay đổi",
   "shell.studio.aiRequest.round": "Vòng sửa {round}",
   "shell.studio.aiRequest.approve": "Duyệt kế hoạch",
   "shell.studio.aiRequest.changePlan.ok": "Lập lại kế hoạch",

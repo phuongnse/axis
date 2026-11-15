@@ -1472,11 +1472,11 @@ function askAiRoutes(
     [`${folderPath}/authoring-requests/${id}/retry`, retry(id)],
     [`${folderPath}/requests/${id.replace('a1e00000', 'acc00000')}`, acceptStatus(id)],
     [
-      `${folderPath}/drafts/${draftOf(id)}/diff`,
+      `${folderPath}/authoring-requests/${id}/diff`,
       () => {
         const request = all().find((item) => item.id === id)!
         const resources = (draftChanges[id] ?? genericChanges(request)).map(({ summary: _summary, ...entry }) => entry)
-        return { start: 'a'.repeat(40), tip: 'b'.repeat(40), resources, cursor: null }
+        return { resources, cursor: null }
       },
     ],
     [`${folderPath}/authoring-requests/${id}`, one(id)],

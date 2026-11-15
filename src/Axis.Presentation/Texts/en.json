@@ -2168,8 +2168,6 @@
   "shell.studio.aiRequest.feed.showChecks": "Show the checks",
   "shell.studio.aiRequest.feed.hideChecks": "Hide the checks",
   "shell.studio.aiRequest.feed.preview": "Preview the draft",
-  "shell.studio.aiRequest.feed.showChanges": "Show the changes",
-  "shell.studio.aiRequest.feed.hideChanges": "Hide the changes",
   "shell.studio.aiRequest.round": "Fix round {round}",
   "shell.studio.aiRequest.approve": "Approve plan",
   "shell.studio.aiRequest.changePlan.ok": "Ask for a new plan",

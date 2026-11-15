@@ -21,7 +21,7 @@ import {
   actOnAuthoringRequest,
   fetchAuthoringRequest,
   fetchAuthoringRequests,
-  fetchDraftDiff,
+  fetchAuthoringRequestDiff,
   fetchStudioRequest,
   findPreviewLinks,
   previewAuthoringDraft,
@@ -207,12 +207,11 @@ export function StudioAuthoringRequestPage({
   const [anywayOpen, setAnywayOpen] = useState(false)
   const [stepsOpen, setStepsOpen] = useState(false)
   const [checksOpen, setChecksOpen] = useState(false)
-  const [changesOpen, setChangesOpen] = useState(false)
   const [dropOpen, setDropOpen] = useState(false)
   const [replyForm] = Form.useForm<{ comment: string }>()
   // Proposed: the preview of the ready draft, as a preview request, then the links to its sites.
   const [preview, setPreview] = useState<{ draft: string; request: StudioRequest; links: string[] }>()
-  const [diff, setDiff] = useState<{ draft: string; changes: StudioRevisionChange[] | 'failed' }>()
+  const [diff, setDiff] = useState<{ key: string; changes: StudioRevisionChange[] | 'failed' }>()
   const [accepting, setAccepting] = useState<{ id: string; accept: StudioRequest }>()
 
   const request = loaded?.id === requestId ? loaded.request : undefined
@@ -221,15 +220,18 @@ export function StudioAuthoringRequestPage({
   const accept = accepting?.id === requestId ? accepting.accept : (request?.accept ?? null)
   const acceptPending = accept !== null && (accept.status === 'queued' || accept.status === 'running')
 
-  // The draft's diff, once the request has a draft that is ready or failed.
-  const showsDiff = request?.state === 'ready' || request?.state === 'failed'
+  // Proposed: the request's diff, its draft's while it is ready or failed and its accept's once accepted, read again
+  // when the request moves on, see the review on #3263.
+  const showsDiff =
+    request?.state === 'accepted' || ((request?.state === 'ready' || request?.state === 'failed') && draft !== null)
+  const diffKey = showsDiff ? `${requestId}/${request?.state}/${draft ?? ''}` : null
   useEffect(() => {
-    if (draft === null || !showsDiff) {
+    if (diffKey === null) {
       return
     }
     const controller = new AbortController()
-    fetchDraftDiff(application, draft, controller.signal).then(
-      (changes) => setDiff({ draft, changes }),
+    fetchAuthoringRequestDiff(application, requestId, controller.signal).then(
+      (changes) => setDiff({ key: diffKey, changes }),
       (error: unknown) => {
         if (controller.signal.aborted) {
           return
@@ -238,11 +240,11 @@ export function StudioAuthoringRequestPage({
           lost()
           return
         }
-        setDiff({ draft, changes: 'failed' })
+        setDiff({ key: diffKey, changes: 'failed' })
       },
     )
     return () => controller.abort()
-  }, [application, draft, showsDiff, generation, lost])
+  }, [application, requestId, diffKey, generation, lost])
 
   // An accept runs as a publish request; when it ends the request is read again.
   useFollowJob(acceptPending && accept !== null ? `${application}/accept/${accept.id}/${generation}` : null, {
@@ -516,7 +518,7 @@ export function StudioAuthoringRequestPage({
     accept !== null && accept.status === 'failed'
       ? accept.diagnostics.filter((diagnostic) => diagnostic.code === 'AXC0377')
       : []
-  const changes = diff?.draft === draft ? diff?.changes : undefined
+  const changes = diff !== undefined && diff.key === diffKey ? diff.changes : undefined
   const summaries = new Map(request.changes.map((change) => [change.file, change.summary]))
   const problems = request.checks?.diagnostics ?? []
   const working = ['working', 'checking', 'fixing', 'reviewing'].includes(request.state)
@@ -682,19 +684,6 @@ export function StudioAuthoringRequestPage({
     </FeedItem>
   )
 
-  // What the draft changes, resource by resource, as people read them; the diff names a resource only the draft adds.
-  const changedRows = request.changes.map((change) => {
-    const item = resources.find((resource) => resource.file === change.file)
-    const loaded = Array.isArray(changes) ? changes.find((entry) => entry.file === change.file) : undefined
-    const titles = loaded?.titles ?? {}
-    return {
-      file: change.file,
-      summary: change.summary,
-      resourceId: item?.id ?? null,
-      name: item === undefined ? (titles[locale] ?? titles.en ?? loaded?.name ?? null) : null,
-      kind: item === undefined ? (loaded?.kind ?? null) : null,
-    }
-  })
   // Proposed: what belongs to the checks' or the review's line sits inside it, across the columns and indented by
   // spacing-md, as layout shows structure, see the review on #3263.
   const inside: CSSProperties = { gridColumn: '1 / -1', paddingInlineStart: spacing.md }
@@ -706,23 +695,20 @@ export function StudioAuthoringRequestPage({
       // Its blocks, what changes, the checks and the review, and the actions, are `spacing-md` apart.
       gap={spacing.md}
     >
-      {/* Each changed resource once, as the plan's details and the review's findings list them, its summary under it. */}
-      {changedRows.length > 0 && (
-        <StudioProblemList
-          testId="studio-ai-changed"
-          items={changedRows.map((row) => ({
-            lead: null,
-            message: row.summary,
-            resourceId: row.resourceId,
-            file: row.file,
-            path: '',
-            name: row.name,
-            kind: row.kind,
-          }))}
-          resources={resources}
-          onSelect={onOpen}
-        />
-      )}
+      {/* Proposed: what the request changes is its diff, each resource a block that starts folded under its name, kind and
+          change, with the summary its request wrote, and opens to its JSON diff, see the review on #3263. */}
+      {showsDiff &&
+        (changes === undefined ? (
+          <Spin />
+        ) : changes === 'failed' ? (
+          <AxisAlert kind="error" message={t('shell.studio.aiRequest.diffFailed')} />
+        ) : (
+          changes.length > 0 && (
+            <Flex vertical gap={spacing.xs} data-testid="studio-ai-changes">
+              <StudioChanges changes={changes} resources={resources} summaries={summaries} folded />
+            </Flex>
+          )
+        ))}
       {/* Proposed: the checks and the review as lines of one shape, see the review on #3263: each its name in bold and its
           verdict as a tag, in columns so the tags start together, its summary under it, then what the review found. */}
       <div
@@ -781,28 +767,18 @@ export function StudioAuthoringRequestPage({
         {/* The review runs only once the checks pass, so a request that failed before it has no findings. */}
         {request.review !== null && <ReviewFindings review={request.review} resources={resources} onOpen={onOpen} />}
       </div>
-      {draft !== null && showsDiff && (
-        <Flex align="center" gap={spacing.sm} wrap>
-          {/* Proposed: the author sees the draft at work on the preview host before accepting it, see the review on
-              #3263. */}
-          {ready && previewHost !== null && (
-            <AxisButton
-              role="secondary"
-              disabled={previewPending}
-              onClick={() => void startPreview()}
-              data-testid="studio-ai-preview"
-            >
-              {t('shell.studio.aiRequest.feed.preview')}
-            </AxisButton>
-          )}
-          {fold(
-            changesOpen,
-            () => setChangesOpen(!changesOpen),
-            'shell.studio.aiRequest.feed.showChanges',
-            'shell.studio.aiRequest.feed.hideChanges',
-            'studio-ai-changes-fold',
-          )}
-        </Flex>
+      {/* Proposed: the author sees the draft at work on the preview host before accepting it, see the review on #3263. */}
+      {ready && draft !== null && previewHost !== null && (
+        <span>
+          <AxisButton
+            role="secondary"
+            disabled={previewPending}
+            onClick={() => void startPreview()}
+            data-testid="studio-ai-preview"
+          >
+            {t('shell.studio.aiRequest.feed.preview')}
+          </AxisButton>
+        </span>
       )}
       {preview !== undefined && preview.draft === draft && (
         <Flex vertical gap={spacing.xs} data-testid="studio-ai-preview-status">
@@ -814,16 +790,6 @@ export function StudioAuthoringRequestPage({
           ))}
         </Flex>
       )}
-      {changesOpen &&
-        (changes === undefined ? (
-          <Spin />
-        ) : changes === 'failed' ? (
-          <AxisAlert kind="error" message={t('shell.studio.aiRequest.diffFailed')} />
-        ) : (
-          <div data-testid="studio-ai-changes" style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
-            <StudioChanges changes={changes} resources={resources} summaries={summaries} />
-          </div>
-        ))}
       {conflicts.length > 0 ? (
         <AxisAlert
           kind="warning"

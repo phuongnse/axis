@@ -1942,13 +1942,19 @@ export interface StudioReview {
   findings: StudioReviewFinding[]
 }
 
-/** Reads the whole diff of the signed-in user's draft, page after page, see docs/reference/authoring-revisions.md#draft-diff. */
-export async function fetchDraftDiff(
+/**
+ * Proposed: reads the whole diff of an authoring request, page after page, see the review on #3263:
+ * `GET .../authoring-requests/{id}/diff` answers `200` with `{ resources, cursor }` as the draft diff does, see
+ * docs/reference/authoring-revisions.md#draft-diff, the changes of its draft while it is `ready` or `failed`, and once it
+ * is `accepted`, the changes of the revision its accept made. Anyone who may read the request reads its diff, as they
+ * read its plan and its review. A request with neither answers `404`.
+ */
+export async function fetchAuthoringRequestDiff(
   application: string,
-  draft: string,
+  id: string,
   signal?: AbortSignal,
 ): Promise<StudioRevisionChange[]> {
-  const base = `/api/studio/apps/${encodeURIComponent(application)}/drafts/${encodeURIComponent(draft)}/diff`
+  const base = authoringRequestsPath(application, id, 'diff')
   const resources: StudioRevisionChange[] = []
   let cursor: string | null = null
   do {
