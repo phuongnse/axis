@@ -201,7 +201,7 @@ function ListRows({
               name={from.label}
               value={fromValue}
               required
-              options={collections.map((item) => item.name)}
+              options={collections}
               onChange={(next) => onChange(`${pointer}/from`, next ?? '')}
             />
           )}

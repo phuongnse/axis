@@ -113,7 +113,10 @@ says what is built.
 
 A planned rule describes the agreed result. It does not also describe what Axis does until then: the
 issue that builds it knows the starting point. The docs sweep of the milestone removes the marker, or
-moves it to a later milestone when the work moved.
+moves it to a later milestone when the work moved. A moved marker never names a milestone that has
+no open issue to build the rule. So a sweep that moves a marker links, in its pull request, the open
+issue in the new milestone that builds it. When there is none, the sweep opens one in that milestone
+before its pull request is ready, as [follow-ups](delivery.md#the-life-of-an-issue) say.
 
 ## References in the code
 

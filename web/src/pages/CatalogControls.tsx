@@ -4,6 +4,7 @@ import { AxisField } from '../platform/AxisField'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import type { StudioCatalogSlot } from '../platform/studio'
 import { slotTitle, timeZoneText, type RangeOperator } from '../platform/studioCatalog'
+import type { ReferenceOption } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { ReferencePicker } from './ReferencePicker'
@@ -155,7 +156,7 @@ export function ModuleSlots({
   /** Whether to say that the module has no roles or connectors. */
   noSlots: boolean
   /** The application's roles or connectors that the slots take. */
-  names: string[]
+  names: ReferenceOption[]
   value: unknown
   pointer: string
   locale: string

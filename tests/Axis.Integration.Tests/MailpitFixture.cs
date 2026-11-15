@@ -41,6 +41,8 @@ public sealed class MailpitFixture : IAsyncDisposable
     // The start takes no test's cancellation token, so cancelling one test does not fail the other.
     private readonly Lazy<Task<IContainer>> _container = new(() => StartContainerAsync(null, NetworkAlias));
     private readonly Lazy<Task<IContainer>> _authContainer = new(() => StartContainerAsync(AuthSmtp, AuthNetworkAlias));
+    private static readonly string[] _recipientFields = ["To", "Cc", "Bcc"];
+
     private readonly HttpClient _client = new();
 
     /// <summary>Starts the container if no test has yet, and returns the host that the SMTP port is published on.</summary>
@@ -59,8 +61,9 @@ public sealed class MailpitFixture : IAsyncDisposable
     public async Task<int> AuthSmtpPortAsync() => (await _authContainer.Value).GetMappedPublicPort(SmtpContainerPort);
 
     /// <summary>
-    /// Every email sent to an address that contains <paramref name="addressPart"/>, with its plain text, <c>Message-ID</c>
-    /// without angle brackets, subject and <c>Content-Type</c> header, oldest first. It reads the second server when
+    /// Every email sent to an address that contains <paramref name="addressPart"/> in its <c>To</c>, <c>Cc</c> or <c>Bcc</c>, with its
+    /// plain text, <c>Message-ID</c> without angle brackets, subject, <c>Content-Type</c> header and headers, oldest first. Mailpit
+    /// lists an envelope recipient that is in none of the headers under <c>Bcc</c>. It reads the second server when
     /// <paramref name="authenticated"/> is set, otherwise the first.
     /// </summary>
     public async Task<IReadOnlyList<MailpitMessage>> MessagesToAsync(string addressPart, CancellationToken cancellationToken, bool authenticated = false)
@@ -73,7 +76,10 @@ public sealed class MailpitFixture : IAsyncDisposable
         {
             var id = summary!["ID"]!.GetValue<string>();
             var message = (await _client.GetFromJsonAsync<JsonObject>(new Uri(api, $"api/v1/message/{id}"), cancellationToken))!;
-            var recipients = message["To"]!.AsArray().Select(recipient => recipient!["Address"]!.GetValue<string>()).ToList();
+            var recipients = _recipientFields
+                .SelectMany(field => message[field]?.AsArray() ?? [])
+                .Select(recipient => recipient!["Address"]!.GetValue<string>())
+                .ToList();
             if (!recipients.Any(address => address.Contains(addressPart, StringComparison.Ordinal)))
             {
                 continue;
@@ -85,7 +91,11 @@ public sealed class MailpitFixture : IAsyncDisposable
                 message["Subject"]!.GetValue<string>(),
                 message["Text"]!.GetValue<string>(),
                 message["MessageID"]!.GetValue<string>(),
-                headers["Content-Type"]!.AsArray()[0]!.GetValue<string>()));
+                headers["Content-Type"]!.AsArray()[0]!.GetValue<string>(),
+                headers.ToDictionary(
+                    header => header.Key,
+                    header => (IReadOnlyList<string>)header.Value!.AsArray().Select(value => value!.GetValue<string>()).ToList(),
+                    StringComparer.OrdinalIgnoreCase)));
         }
 
         return messages;
@@ -135,9 +145,16 @@ public sealed class MailpitFixture : IAsyncDisposable
 }
 
 /// <summary>An email that Mailpit received.</summary>
-/// <param name="To">The recipient addresses.</param>
+/// <param name="To">The recipient addresses of <c>To</c>, <c>Cc</c> and <c>Bcc</c>.</param>
 /// <param name="Subject">The decoded subject.</param>
 /// <param name="Text">The decoded plain text body.</param>
 /// <param name="MessageId">The <c>Message-ID</c> without angle brackets.</param>
 /// <param name="ContentType">The <c>Content-Type</c> header of the message.</param>
-public sealed record MailpitMessage(IReadOnlyList<string> To, string Subject, string Text, string MessageId, string ContentType);
+/// <param name="Headers">The values of every header of the message, by header name without regard to case.</param>
+public sealed record MailpitMessage(
+    IReadOnlyList<string> To,
+    string Subject,
+    string Text,
+    string MessageId,
+    string ContentType,
+    IReadOnlyDictionary<string, IReadOnlyList<string>> Headers);

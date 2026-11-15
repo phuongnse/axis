@@ -37,8 +37,8 @@ test.describe('Studio builds a process without a subject and its triggers in the
     return (await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/diagnostics`)).json()
   }
 
-  async function pick(page: Page, field: string, name: string) {
-    await pickOption(page.getByTestId(`studio-field-${field}`).getByRole('combobox'), name)
+  async function pick(page: Page, field: string, option: string, filter?: string) {
+    await pickOption(page.getByTestId(`studio-field-${field}`).getByRole('combobox'), option, filter)
   }
 
   async function save(page: Page) {
@@ -67,7 +67,7 @@ test.describe('Studio builds a process without a subject and its triggers in the
     // The sample has no event. An event is only there so that a new trigger's `event` can be picked and cleared.
     await createResource(page, 'event', 'ReminderSent')
     await openFormTab(page)
-    await pick(page, '/entity', 'PurchaseRequest')
+    await pick(page, '/entity', 'Purchase request', 'PurchaseRequest')
     await save(page)
     const before = await diagnostics(page)
 
@@ -99,7 +99,7 @@ test.describe('Studio builds a process without a subject and its triggers in the
     await openFormTab(page)
     await pick(page, '/type', 'dataChange')
     await dropEvent(page)
-    await pick(page, '/entity', 'PurchaseRequest')
+    await pick(page, '/entity', 'Purchase request', 'PurchaseRequest')
     await page.getByTestId('studio-field-/on').getByRole('button', { name: 'Add', exact: true }).click()
     await pick(page, '/on/0', 'delete')
     await pick(page, '/process', 'DailyReminder')

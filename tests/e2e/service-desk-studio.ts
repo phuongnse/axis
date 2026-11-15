@@ -2,11 +2,20 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, type Locator, type Page } from '@playwright/test'
 import { waitForDialog } from './dialogs'
+import { pickerLabel } from './picker-labels'
 import { pickOption } from './select'
 import { serviceDesk } from './server-settings'
 
 export async function pick(scope: Page | Locator, testId: string, option: string, filter?: string) {
   await pickOption(scope.getByTestId(testId).getByRole('combobox'), option, filter)
+}
+
+/**
+ * Picks the choice of a reference picker that names a resource of the service desk sample, or one of its fields, by its
+ * label. The name is typed to find it.
+ */
+export async function pickLabelled(scope: Page | Locator, testId: string, folder: string, name: string, field?: string) {
+  await pick(scope, testId, await pickerLabel(serviceDesk, folder, name, field), field ?? name)
 }
 
 export async function save(page: Page, answers: [field: string, choice: string, expression?: string][] = []) {

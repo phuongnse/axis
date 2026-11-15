@@ -4,6 +4,7 @@ import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { startServer } from '../activate'
 import { compareApplicationFolders } from '../folder-comparison'
+import { pickerLabel } from '../picker-labels'
 import { pickAction, pickOption, pickOptions } from '../select'
 import { e2eApp, serviceDesk } from '../server-settings'
 import { useSession } from '../sessions'
@@ -37,8 +38,14 @@ const scenarios = [
 test.setTimeout(300_000)
 
 // A row with more than one select names the one to pick, since pick() would match them all.
-async function pickNamed(page: Page, testId: string, name: string, option: string) {
-  await pickOption(page.getByTestId(testId).getByRole('combobox', { name, exact: true }), option)
+async function pickNamed(page: Page, testId: string, name: string, option: string, filter?: string) {
+  await pickOption(page.getByTestId(testId).getByRole('combobox', { name, exact: true }), option, filter)
+}
+
+// A role is shown by its label, and a user by its name.
+async function pickAccount(page: Page, testId: string, kind: string, name: string) {
+  const type = kind === 'role' ? 'Role' : 'User'
+  await pickNamed(page, testId, type, kind === 'role' ? await pickerLabel(serviceDesk, 'roles', name) : name, name)
 }
 
 async function writeScenarioStep(
@@ -61,7 +68,7 @@ async function writeScenarioStep(
   if ('assignee' in step) {
     const [[kind, name]] = Object.entries(step.assignee as Record<string, string>)
     await pickNamed(page, `${at}/assignee`, 'Assignee type', kind === 'role' ? 'Role' : 'User')
-    await pickNamed(page, `${at}/assignee`, kind === 'role' ? 'Role' : 'User', name)
+    await pickAccount(page, `${at}/assignee`, kind, name)
   }
   if ('by' in step) {
     await page.getByTestId(`${at}/by`).getByRole('textbox').fill(String(step.by))
@@ -69,7 +76,7 @@ async function writeScenarioStep(
   if ('recipient' in step) {
     const [[kind, name]] = Object.entries(step.recipient as Record<string, string>)
     await pickNamed(page, `${at}/recipient`, 'Recipient type', kind === 'role' ? 'Role' : 'User')
-    await pickNamed(page, `${at}/recipient`, kind === 'role' ? 'Role' : 'User', name)
+    await pickAccount(page, `${at}/recipient`, kind, name)
   }
   if ('channel' in step) {
     await pick(page, `${at}/channel`, String(step.channel))

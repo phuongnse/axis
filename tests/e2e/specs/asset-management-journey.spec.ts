@@ -5,6 +5,7 @@ import type { Locator, Page } from '@playwright/test'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { dragTo, waitForCanvas } from '../design-drag'
 import { compareApplicationFolders, textEditorKeys } from '../folder-comparison'
+import { pickerLabel } from '../picker-labels'
 import { pickAction, pickOption, pickOptions } from '../select'
 import { assetManagement, journeyApplications, journeyURL } from '../server-settings'
 import { csrfHeaders } from '../csrf'
@@ -75,6 +76,11 @@ test.describe('the author builds the asset management application with Studio on
   // panel as `scope`, so that only the panel's field matches.
   async function pick(scope: Page | Locator, testId: string, option: string, filter?: string) {
     await pickOption(scope.getByTestId(testId).getByRole('combobox'), option, filter)
+  }
+
+  // A reference picker shows a resource of the sample by its label, so the name is typed to find the choice.
+  async function pickLabelled(scope: Page | Locator, testId: string, folder: string, name: string) {
+    await pick(scope, testId, await pickerLabel(assetManagement, folder, name), name)
   }
 
   async function save(page: Page, answers: [field: string, choice: string][] = []) {
@@ -562,7 +568,7 @@ test.describe('the author builds the asset management application with Studio on
 
     await addField(page, 11, 'maintenance')
     await pick(page, 'studio-field-/fields/11/type', 'child-collection')
-    await pick(page, 'studio-field-/fields/11/target', 'MaintenanceEntry')
+    await pickLabelled(page, 'studio-field-/fields/11/target', 'entities', 'MaintenanceEntry')
     await pick(page, 'studio-field-/fields/11/label', 'asset.maintenance', 'asset.maintenance')
 
     await addField(page, 12, 'software')
@@ -751,7 +757,7 @@ test.describe('the author builds the asset management application with Studio on
         .getByTestId(`studio-field-/widgets/0/${kind}`)
         .getByRole('button', { name: 'Add navigate action', exact: true })
         .click()
-      await pick(page, `${action}/page`, target)
+      await pickLabelled(page, `${action}/page`, 'pages', target)
       await writeLabel(page, `${action}/label`, text(key))
       if (kind === 'rowActions') {
         // The record of the form link and the asset parameter of the detail link both take the id of the row.
@@ -788,7 +794,7 @@ test.describe('the author builds the asset management application with Studio on
     ]
     for (const [index, [target, key, icon]] of navigation.entries()) {
       await (index === 0 ? openListItem(page, '/navigation', 0) : addListItem(page, '/navigation'))
-      await pick(page, `studio-field-/navigation/${index}/page`, target)
+      await pickLabelled(page, `studio-field-/navigation/${index}/page`, 'pages', target)
       await writeLabel(page, `studio-field-/navigation/${index}/label`, text(key))
       await pick(page, `studio-field-/navigation/${index}/icon`, icon)
       await doneListItem(page)
@@ -1097,7 +1103,7 @@ test.describe('the author builds the asset management application with Studio on
       .locator('label')
       .filter({ has: page.getByRole('radio', { name: 'Role', exact: true }) })
       .click()
-    await pick(page, 'studio-field-/steps/0/to/0/role', 'asset-manager')
+    await pickLabelled(page, 'studio-field-/steps/0/to/0/role', 'roles', 'asset-manager')
     await page
       .getByTestId('studio-field-/steps/0/channels')
       .getByRole('checkbox', { name: 'In-app', exact: true })
@@ -1123,7 +1129,7 @@ test.describe('the author builds the asset management application with Studio on
       .getByTestId('studio-field-/steps/0/open')
       .getByRole('checkbox', { name: 'Open a page', exact: true })
       .check()
-    await pick(page, 'studio-field-/steps/0/open/page', 'AssetDetail')
+    await pickLabelled(page, 'studio-field-/steps/0/open/page', 'pages', 'AssetDetail')
     // The page's parameters are offered by name, so the author picks `asset` and writes the expression.
     await pickAction(
       page

@@ -24,6 +24,7 @@ import {
   ServerUnreachableError,
   studioAppDescription,
   studioAppTitle,
+  textIn,
   undoStudioRevision,
   type StudioReleaseChange,
   type StudioRevision,
@@ -239,6 +240,31 @@ const items = [
   resource('cccc0003-0000-4000-8000-000000000000', 'entity', 'Department', 'entities/department.json'),
   resource('dddd0004-0000-4000-8000-000000000000', 'application', null, 'application.json'),
 ]
+
+describe('textIn', () => {
+  const texts = { en: 'Purchase request', vi: 'Yêu cầu mua hàng' }
+
+  it('takes the text in the author language', () => {
+    expect(textIn(texts, 'vi')).toBe('Yêu cầu mua hàng')
+  })
+
+  it('falls back to the en text when the author language has none', () => {
+    expect(textIn(texts, 'fr')).toBe('Purchase request')
+  })
+
+  it('gives nothing when neither language has a text', () => {
+    expect(textIn({ vi: 'Yêu cầu mua hàng' }, 'fr')).toBeUndefined()
+    expect(textIn({}, 'en')).toBeUndefined()
+    expect(textIn(null, 'en')).toBeUndefined()
+    expect(textIn(undefined, 'en')).toBeUndefined()
+  })
+
+  it('counts a blank text as missing', () => {
+    expect(textIn({ en: 'Purchase request', vi: '' }, 'vi')).toBe('Purchase request')
+    expect(textIn({ en: 'Purchase request', vi: '   ' }, 'vi')).toBe('Purchase request')
+    expect(textIn({ en: ' ', vi: '' }, 'vi')).toBeUndefined()
+  })
+})
 
 describe('resourceTitle', () => {
   const entity = {

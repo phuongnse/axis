@@ -257,6 +257,40 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
     }
 
     [Fact]
+    public async Task Line_break_in_a_staged_subject_or_address_adds_no_recipient_or_header_in_Mailpit()
+    {
+        var address = UniqueAddress();
+        var injectedBySubject = UniqueAddress();
+        var injectedByAddress = UniqueAddress();
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, address);
+        var (subjectTitle, _, _) = await StageAsync(releaseId, model, viProfile: false);
+        var (addressTitle, _, _) = await StageAsync(releaseId, model, viProfile: false);
+
+        // The address comes from a JSON expression or a profile, so the rows are changed as the worker reads them. Each goes in its own email, since an address that fails to parse fails the send before the subject is read.
+        var bySubject = Assert.Single(await EmailsAsync(subjectTitle));
+        var byAddress = Assert.Single(await EmailsAsync(addressTitle));
+        await fixture.ScalarAsync(
+            "UPDATE axis.email_outbox SET subject = @subject WHERE id = @id",
+            ("subject", $"Request {subjectTitle}\r\nBcc: {injectedBySubject}"),
+            ("id", bySubject.Id));
+        await fixture.ScalarAsync(
+            "UPDATE axis.email_outbox SET address = @address WHERE id = @id",
+            ("address", $"{address}\r\nBcc: {injectedByAddress}"),
+            ("id", byAddress.Id));
+        await using var worker = Worker(new LogCollector(), await MailpitSettingsAsync("Email"));
+
+        await RunUntilIdleAsync(worker);
+
+        Assert.Empty(await mailpit.MessagesToAsync(injectedBySubject, CancellationToken));
+        Assert.Empty(await mailpit.MessagesToAsync(injectedByAddress, CancellationToken));
+        var message = Assert.Single(await mailpit.MessagesToAsync(address, CancellationToken), found => found.Subject.Contains(subjectTitle, StringComparison.Ordinal));
+        Assert.Single(message.Headers["Subject"]);
+        Assert.DoesNotContain(message.Headers.Keys, name => string.Equals(name, "Bcc", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(injectedBySubject, message.Subject, StringComparison.Ordinal);
+        Assert.Equal([address], message.To);
+    }
+
+    [Fact]
     public async Task Directory_tenant_SMTP_override_sends_through_the_tenant_server()
     {
         var address = UniqueAddress();

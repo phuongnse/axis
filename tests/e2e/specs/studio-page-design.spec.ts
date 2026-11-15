@@ -5,6 +5,7 @@ import { expect, test } from "../test";
 import { startServer } from "../activate";
 import { dragTo, waitForCanvas } from "../design-drag";
 import { waitForDialog } from "../dialogs";
+import { pickerLabel } from "../picker-labels";
 import { pickOption } from "../select";
 import { e2eApp, serviceDesk } from "../server-settings";
 import { useSession } from "../sessions";
@@ -790,6 +791,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     const action = "studio-field-/widgets/0/rowActions/2";
     await pickOption(
       panel.getByTestId(`${action}/page`).getByRole("combobox"),
+      await pickerLabel(serviceDesk, "pages", "TicketDetail"),
       "TicketDetail",
     );
     await writeLabel(panel, `${action}/label`, {

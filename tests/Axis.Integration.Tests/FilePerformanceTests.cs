@@ -49,7 +49,7 @@ public sealed class FilePerformanceTests(RecordApiFixture fixture) : IClassFixtu
     {
         var data = new byte[FileSize];
         new Random(76).NextBytes(data);
-        "AXIS"u8.CopyTo(data);
+        "%PDF-"u8.CopyTo(data);
         return data;
     }
 
@@ -58,8 +58,8 @@ public sealed class FilePerformanceTests(RecordApiFixture fixture) : IClassFixtu
         var request = Request(HttpMethod.Post, Attachment, HostA);
         var form = new MultipartFormDataContent();
         var part = new StreamContent(new MemoryStream(data, writable: false));
-        part.Headers.TryAddWithoutValidation("Content-Type", "application/octet-stream");
-        form.Add(part, "file", "large.bin");
+        part.Headers.TryAddWithoutValidation("Content-Type", "application/pdf");
+        form.Add(part, "file", "large.pdf");
         request.Content = form;
         using var response = await client.SendAsync(request, CancellationToken);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);

@@ -3,7 +3,7 @@ import { readFileSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { beforeEach, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { asvsListFile, asvsStatuses, checkAsvs } from './asvs.mjs'
+import { asvsListFile, checkAsvs } from './asvs.mjs'
 import { useTempRoot } from './testing.mjs'
 
 const repositoryRoot = fileURLToPath(new URL('../../..', import.meta.url))
@@ -13,7 +13,7 @@ const messages = () => fixture.messages(checkAsvs)
 
 describe('ASVS table', () => {
   const header = ['## Requirements', '', '| Id | Requirement | Status | Evidence |', '| --- | --- | --- | --- |']
-  const row = (id, status = '**Gap**', evidence = '[#1](https://github.com/o/r/issues/1).') => `| \`${id}\` | Text \\| more. | ${status} | ${evidence} |`
+  const row = (id, status = '**Delegated**', evidence = 'The identity provider.') => `| \`${id}\` | Text \\| more. | ${status} | ${evidence} |`
   const table = (...rows) => ['# ASVS', '', ...header, ...rows].join('\n') + '\n'
 
   beforeEach(() => {
@@ -39,7 +39,7 @@ describe('ASVS table', () => {
   test('passes on every status', () => {
     write(
       'docs/reference/asvs.md',
-      table(row('V1.1.1', `**${asvsStatuses[2]}**`), row('V1.2.1', `**${asvsStatuses[3]}**`, 'No such thing.'), row('V9.1.1')),
+      table(row('V1.1.1', '**Met**', '`FooTests`.'), row('V1.2.1', '**Delegated**', 'The identity provider.'), row('V9.1.1', '**Not applicable**', 'No such thing.')),
     )
 
     assert.deepEqual(messages(), [])
@@ -62,12 +62,12 @@ describe('ASVS table', () => {
 
     const found = messages()
     assert.equal(found.length, 2)
-    assert.match(found[0], /^docs\/reference\/asvs\.md:7: V1\.1\.1 status '\*\*Done\*\*' is not one of \*\*Met\*\*, \*\*Gap\*\*/)
+    assert.match(found[0], /^docs\/reference\/asvs\.md:7: V1\.1\.1 status '\*\*Done\*\*' is not one of \*\*Met\*\*, \*\*Delegated\*\*, \*\*Not applicable\*\*$/)
     assert.match(found[1], /^docs\/reference\/asvs\.md:8: V1\.2\.1 status 'Gap' is not one of/)
   })
 
   test('reports a row without evidence', () => {
-    write('docs/reference/asvs.md', table(row('V1.1.1', '**Gap**', ''), row('V1.2.1'), row('V9.1.1')))
+    write('docs/reference/asvs.md', table(row('V1.1.1', '**Delegated**', ''), row('V1.2.1'), row('V9.1.1')))
 
     assert.deepEqual(messages(), ['docs/reference/asvs.md:7: V1.1.1 has no evidence'])
   })
@@ -93,44 +93,19 @@ describe('ASVS table', () => {
     assert.deepEqual(messages(), [])
   })
 
+  test('reports a Gap row that links an issue', () => {
+    write(
+      'docs/reference/asvs.md',
+      table(row('V1.1.1', '**Gap**', 'Planned with `MissingTests`, [#12](https://github.com/phuongnse/axis/issues/12).'), row('V1.2.1'), row('V9.1.1')),
+    )
+
+    assert.deepEqual(messages(), ['docs/reference/asvs.md:7: V1.1.1 is a Gap: meet it in this change, or wait for the issue that closes it'])
+  })
+
   test('reports a Gap row that links no issue', () => {
     write('docs/reference/asvs.md', table(row('V1.1.1', '**Gap**', 'Planned for M16.'), row('V1.2.1'), row('V9.1.1')))
 
-    assert.deepEqual(messages(), ['docs/reference/asvs.md:7: V1.1.1 is a Gap and links no issue: link the GitHub issue that closes it'])
-  })
-
-  test('does not take a bare issue number or another link for an issue link', () => {
-    write(
-      'docs/reference/asvs.md',
-      table(row('V1.1.1', '**Gap**', 'See #12.'), row('V1.2.1', '**Gap**', '[doc](guide.md).'), row('V9.1.1')),
-    )
-
-    assert.deepEqual(messages(), [
-      'docs/reference/asvs.md:7: V1.1.1 is a Gap and links no issue: link the GitHub issue that closes it',
-      'docs/reference/asvs.md:8: V1.2.1 is a Gap and links no issue: link the GitHub issue that closes it',
-    ])
-  })
-
-  test('passes a Gap row once it links an issue', () => {
-    write(
-      'docs/reference/asvs.md',
-      table(row('V1.1.1', '**Gap**', 'Planned in [#12](https://github.com/phuongnse/axis/issues/12).'), row('V1.2.1'), row('V9.1.1')),
-    )
-
-    assert.deepEqual(messages(), [])
-  })
-
-  test('needs no issue link on a Met, Delegated or Not applicable row', () => {
-    write(
-      'docs/reference/asvs.md',
-      table(
-        row('V1.1.1', '**Met**', '`FooTests`.'),
-        row('V1.2.1', `**${asvsStatuses[2]}**`, 'The identity provider.'),
-        row('V9.1.1', `**${asvsStatuses[3]}**`, 'No such thing.'),
-      ),
-    )
-
-    assert.deepEqual(messages(), [])
+    assert.deepEqual(messages(), ['docs/reference/asvs.md:7: V1.1.1 is a Gap: meet it in this change, or wait for the issue that closes it'])
   })
 
   test('reports a Met row that names a test class that no .cs file declares', () => {
@@ -148,12 +123,6 @@ describe('ASVS table', () => {
     assert.deepEqual(messages(), [
       'docs/reference/asvs.md:8: V1.2.1 names the test class BarTests, which no .cs file under tests/, controlplane/tests/ or samples/ declares',
     ])
-  })
-
-  test('does not look for a test class in a Gap row', () => {
-    write('docs/reference/asvs.md', table(row('V1.1.1', '**Gap**', 'Planned with `MissingTests`, [#1](https://github.com/o/r/issues/1).'), row('V1.2.1'), row('V9.1.1')))
-
-    assert.deepEqual(messages(), [])
   })
 
   test('reports the page when the list is missing', () => {
