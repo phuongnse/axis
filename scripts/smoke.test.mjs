@@ -30,6 +30,9 @@ function runSmoke({ changed, failing = [], saved = [], dockerFails = '', env: ex
     for (const file of [
       'scripts/smoke.sh',
       'scripts/lib/test-results.sh',
+      'scripts/lib/tools.sh',
+      'scripts/lib/trivy.sh',
+      'scripts/lib/retry.sh',
       'scripts/lib/affected.mjs',
       '.nexkit/config.json',
       'scripts/lib/install-modules.sh',
@@ -53,7 +56,12 @@ function runSmoke({ changed, failing = [], saved = [], dockerFails = '', env: ex
     mkdirSync(join(dir, 'samples/modules/department-budgets'), { recursive: true })
     writeFileSync(join(dir, 'samples/modules/department-budgets/module.json'), '{"id":"department-budgets","version":"1.2.0"}')
     for (const [suite, files] of Object.entries(suites)) {
-      const body = failing.includes(suite) ? 'assert.fail()' : ''
+      // The images stub records the Helm path that smoke.sh passes in, as the real images test renders the chart with it.
+      const body = failing.includes(suite)
+        ? 'assert.fail()'
+        : suite === 'images'
+          ? "process.stdout.write('HELM=' + (process.env.HELM ?? '') + '\\n')"
+          : ''
       for (const file of files) {
         writeFileSync(
           join(dir, `scripts/${file}.test.mjs`),
@@ -142,6 +150,13 @@ describe('scripts/smoke.sh', () => {
     for (const [suite, files] of Object.entries(suites)) {
       assert.match(run.stdout, new RegExp(`^\\| ${suite} \\| ${files.length} \\| 0 \\| 0 \\| `, 'm'))
     }
+  })
+
+  test('gives the images suite the pinned Helm that its chart render needs', () => {
+    const run = runSmoke({ env: { AXIS_SMOKE_SHARD: '3/3' } })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.match(run.stdout, /HELM=\S*\/helm-v[\d.]+\/helm$/m)
   })
 
   test('loads the saved container images once, before the first suite, and pulls no image', () => {
