@@ -1,7 +1,7 @@
 import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { Link } from 'react-router'
 import { createContext, lazy, Suspense, useContext, useState, type ReactElement, type ReactNode } from 'react'
-import type { StudioCatalog, StudioFolderRelaxedPoint, StudioNames } from '../platform/studio'
+import { textIn, type StudioCatalog, type StudioFolderRelaxedPoint, type StudioNames } from '../platform/studio'
 import { setAt } from '../platform/jsonPatch'
 import { keyPropertyOf, markOf, type KeyedLists } from '../platform/layerMarks'
 import {
@@ -854,7 +854,7 @@ function ObjectList({
         return ''
       }
       const texts = labels?.texts[key] ?? textsOf(names, key)
-      return texts[names.locales[0]] || Object.values(texts).find((text) => text !== '') || ''
+      return textIn(texts, locale) ?? ''
     },
   }
   const columns: ObjectListColumn[] = properties.map(([name, child]) => {

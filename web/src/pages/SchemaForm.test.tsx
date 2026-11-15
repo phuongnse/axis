@@ -551,6 +551,33 @@ describe('SchemaForm lists of objects', () => {
     expect(within(rowOf(1)).getByText('No')).toBeVisible()
   })
 
+  it("shows a label in a list cell in the author's language, else English, not the application's first language", () => {
+    const viFirst = {
+      ...namesWithTexts,
+      locales: ['vi', 'en'],
+      texts: [
+        { key: 'k.budget', texts: { en: 'Budget', vi: 'Ngân sách' }, usedBy: 1 },
+        { key: 'k.leave', texts: { vi: 'Nghỉ phép' }, usedBy: 1 },
+      ],
+    } as unknown as StudioNames
+    renderForm(
+      listSchema,
+      {
+        kind: 'example',
+        rows: [
+          { name: 'budget', label: { textKey: 'k.budget' } },
+          { name: 'leave', label: { textKey: 'k.leave' } },
+        ],
+      },
+      vi.fn(),
+      { names: viFirst },
+    )
+
+    expect(within(rowOf(0)).getByText('Budget')).toBeVisible()
+    expect(within(rowOf(0)).queryByText('Ngân sách')).toBeNull()
+    expect(within(rowOf(1)).queryByText('Nghỉ phép')).toBeNull()
+  })
+
   it('keeps a list of plain values as inline rows of inputs', () => {
     renderForm(listSchema, { kind: 'example', rows: [], plain: ['x', 'y'] })
 
