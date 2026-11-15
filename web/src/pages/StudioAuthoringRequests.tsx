@@ -656,7 +656,9 @@ export function StudioAuthoringRequestPage({
       mark={working ? 'now' : failed ? 'stopped' : dropped ? 'idle' : 'done'}
       title={t('shell.studio.aiRequest.feed.work')}
       // Proposed: beside the title, how the item stands, as the plan's approval does; what it did reads under it.
-      aside={working && fixRound ? t('shell.studio.aiRequest.round').replace('{round}', String(request.round)) : undefined}
+      aside={
+        working && fixRound ? t('shell.studio.aiRequest.round').replace('{round}', String(request.round)) : undefined
+      }
     >
       {failed && approved && failure}
       {/* Proposed: under the title, what AI does now or what it did, with the fold of its steps after it on its line,

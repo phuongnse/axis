@@ -320,7 +320,7 @@ describe('a ready request’s page', () => {
     vi.unstubAllGlobals()
   })
 
-  it("reads as one feed, its plan and its work done, then its result, with the changes and the checks unfolded on asking", async () => {
+  it('reads as one feed, its plan and its work done, then its result, with the changes and the checks unfolded on asking', async () => {
     const fetchMock = vi.fn(async (input: string) =>
       input.includes('/drafts/')
         ? json({
