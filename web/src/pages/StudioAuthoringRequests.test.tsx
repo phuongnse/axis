@@ -1076,6 +1076,76 @@ describe("a request's changes", () => {
   })
 })
 
+// Proposed: a link to a resource only the draft adds shows its change in the draft's diff, see the review on #3263.
+describe("a link to a draft's own resource", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('opens and shows its change in the diff, from a finding about it', async () => {
+    const detail = {
+      ...fromApp,
+      state: 'ready',
+      draft: 'd-1',
+      aiConnected: true,
+      review: {
+        summary: 'Almost.',
+        findings: [
+          {
+            kind: 'suggestion',
+            text: 'Could have a code.',
+            file: 'entities/cost-centre.json',
+            path: '/fields/0',
+            resourceId: null,
+          },
+        ],
+        criteria: [],
+        checklist: [],
+      },
+    }
+    const diff = {
+      cursor: null,
+      resources: [
+        {
+          file: 'entities/cost-centre.json',
+          change: 'added',
+          id: null,
+          kind: 'entity',
+          name: 'CostCentre',
+          before: null,
+          after: '{"kind":"entity","name":"CostCentre"}',
+          titles: { en: 'Cost centre' },
+        },
+      ],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => json(input.endsWith('/diff') ? diff : detail)),
+    )
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
+
+    const file = await screen.findByTestId('studio-revision-change')
+    const fold = within(file).getByRole('button', { name: /Cost centre/ })
+    expect(fold).toHaveAttribute('aria-expanded', 'false')
+    const finding = await screen.findByTestId('studio-ai-finding')
+    await userEvent.click(within(finding).getByRole('button', { name: 'Cost centre' }))
+
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('studio-revision-change')).getByRole('button', { name: /Cost centre/ }),
+      ).toHaveAttribute('aria-expanded', 'true'),
+    )
+  })
+})
+
 // Proposed: the bar at the foot of the window says what comes next, with one main action for it, see the review on #3263.
 describe("a request's guide", () => {
   afterEach(() => {

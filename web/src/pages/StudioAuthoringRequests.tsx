@@ -290,6 +290,9 @@ export function StudioAuthoringRequestPage({
   const [replyForm] = Form.useForm<{ comment: string }>()
   // Proposed: the preview of the ready draft, as a preview request, then the links to its sites.
   const [preview, setPreview] = useState<{ draft: string; request: StudioRequest; links: StudioPreviewLink[] }>()
+  // Proposed: the change a link to a resource only the draft adds asked to show, see the review on #3263.
+  const [reveal, setReveal] = useState<{ file: string; at: number }>()
+  const showDraft = (file: string) => setReveal({ file, at: Date.now() })
   const [diff, setDiff] = useState<{ key: string; changes: StudioRevisionChange[] | 'failed' }>()
   const [accepting, setAccepting] = useState<{ id: string; accept: StudioRequest }>()
 
@@ -826,6 +829,7 @@ export function StudioAuthoringRequestPage({
                     resources={resources}
                     drafted={drafted}
                     onSelect={onOpen}
+                    onShowDraft={showDraft}
                     nested
                   />
                 )}
@@ -848,7 +852,15 @@ export function StudioAuthoringRequestPage({
           </div>
         )}
         {/* The review runs only once the checks pass, so a request that failed before it has no findings. */}
-        {request.review !== null && <ReviewFindings review={request.review} resources={resources} onOpen={onOpen} />}
+        {request.review !== null && (
+          <ReviewFindings
+            review={request.review}
+            resources={resources}
+            onOpen={onOpen}
+            drafted={drafted}
+            onShowDraft={showDraft}
+          />
+        )}
       </div>
       {/* Proposed: what the request changes is its diff, after the checks and the review, which sum it up, each resource a
           block that starts folded under its name, kind and change, with the summary its request wrote, and opens to its
@@ -861,7 +873,7 @@ export function StudioAuthoringRequestPage({
         ) : (
           changes.length > 0 && (
             <Flex vertical gap={spacing.xs} data-testid="studio-ai-changes">
-              <StudioChanges changes={changes} resources={resources} summaries={summaries} folded />
+              <StudioChanges changes={changes} resources={resources} summaries={summaries} folded reveal={reveal} />
             </Flex>
           )
         ))}
@@ -1236,7 +1248,9 @@ function FeedItem({
           <span aria-hidden style={{ flex: 1, width: 1, marginBlock: spacing.xs / 2, background: colour.border }} />
         )}
       </div>
-      <Flex vertical gap={spacing.xs} style={{ flex: 1, minWidth: 0, paddingBottom: last ? 0 : spacing.lg }}>
+      {/* Proposed: items `spacing-md` apart, so an item's words sit nearer their title than the next item and the
+          space under them is no more than half again the space above, see the review on #3263. */}
+      <Flex vertical gap={spacing.xs} style={{ flex: 1, minWidth: 0, paddingBottom: last ? 0 : spacing.md }}>
         <Flex align="center" gap={spacing.sm} wrap style={{ minHeight: size.smallControl }}>
           <Typography.Text strong>{title}</Typography.Text>
           {aside !== undefined && <Typography.Text style={{ color: colour.textMuted }}>{aside}</Typography.Text>}
@@ -1356,10 +1370,14 @@ function ReviewFindings({
   review,
   resources,
   onOpen,
+  drafted,
+  onShowDraft,
 }: {
   review: StudioReview
   resources: readonly StudioResourceItem[]
   onOpen: (resourceId: string, path: string) => void
+  drafted?: ReadonlyMap<string, { name: string; kind: string }>
+  onShowDraft?: (file: string) => void
 }) {
   const t = useText()
   const { spacing } = useDesignTokens()
@@ -1391,7 +1409,13 @@ function ReviewFindings({
           {review.findings.length > 0 && (
             <Flex vertical gap={spacing.xs} data-testid="studio-ai-findings">
               <Typography.Text strong>{t('shell.studio.aiRequest.review.thingsToLookAt')}</Typography.Text>
-              <FindingList findings={review.findings} resources={resources} onOpen={onOpen} />
+              <FindingList
+                findings={review.findings}
+                resources={resources}
+                onOpen={onOpen}
+                drafted={drafted}
+                onShowDraft={onShowDraft}
+              />
             </Flex>
           )}
           <ReviewOutcomes
@@ -1490,6 +1514,8 @@ function FindingList({
   onOpen,
   testId,
   only,
+  drafted,
+  onShowDraft,
 }: {
   findings: readonly StudioReviewFinding[]
   resources: readonly StudioResourceItem[]
@@ -1497,6 +1523,9 @@ function FindingList({
   testId?: string
   /** Shows the blocking findings alone. */
   only?: 'blocking'
+  /** Proposed: each resource only the draft adds, by its file, named as its diff names it. */
+  drafted?: ReadonlyMap<string, { name: string; kind: string }>
+  onShowDraft?: (file: string) => void
 }) {
   const t = useText()
   const bulletList = useBulletList()
@@ -1510,16 +1539,48 @@ function FindingList({
         <li key={index} data-testid="studio-ai-finding" data-kind={finding.kind}>
           <ReviewMark mark={finding.kind} words={t(`shell.studio.aiRequest.review.kind.${finding.kind}`)} />{' '}
           <Typography.Text>{finding.text}</Typography.Text>{' '}
-          <ResourceReference
-            resourceId={finding.resourceId}
-            file={finding.file}
-            path={finding.path}
+          <FindingResource
+            finding={finding}
             resources={resources}
-            onSelect={onOpen}
+            onOpen={onOpen}
+            drafted={drafted}
+            onShowDraft={onShowDraft}
           />
         </li>
       ))}
     </ul>
+  )
+}
+
+/**
+ * The resource a finding is about, at the end of its line: a link that opens it at the finding's path, or, for a
+ * resource only the draft adds, its name as its diff names it, the link showing its change.
+ */
+function FindingResource({
+  finding,
+  resources,
+  onOpen,
+  drafted,
+  onShowDraft,
+}: {
+  finding: StudioReviewFinding
+  resources: readonly StudioResourceItem[]
+  onOpen: (resourceId: string, path: string) => void
+  drafted?: ReadonlyMap<string, { name: string; kind: string }>
+  onShowDraft?: (file: string) => void
+}) {
+  const added = resources.some((item) => item.id === finding.resourceId) ? undefined : drafted?.get(finding.file)
+  return (
+    <ResourceReference
+      resourceId={added === undefined ? finding.resourceId : null}
+      name={added?.name}
+      kind={added?.kind}
+      file={finding.file}
+      path={finding.path}
+      resources={resources}
+      onSelect={onOpen}
+      onShowDraft={onShowDraft}
+    />
   )
 }
 

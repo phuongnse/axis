@@ -21,6 +21,14 @@ describe.each(Object.entries(icons) as [AlertKind, string][])('the %s message', 
     expect(alert).toHaveTextContent('Saved')
     expect(within(alert).getByRole('img', { name: icon, hidden: true })).toBeInTheDocument()
   })
+
+  // Proposed: the icon sits on the first line of the words, so a message that wraps reads from it.
+  it('puts its icon on the first line of its words', () => {
+    render(<AxisAlert kind={kind} message="Saved" />)
+
+    const iconBox = within(screen.getByRole('alert')).getByRole('img', { name: icon, hidden: true }).parentElement!
+    expect(iconBox.closest('.ant-alert-icon') ?? iconBox).toHaveStyle({ alignSelf: 'flex-start', marginTop: '4px' })
+  })
 })
 
 describe.each(['light', 'dark'] as const)('the icon colour in %s mode', (mode) => {

@@ -10,8 +10,9 @@ import { PlatformContext } from './context'
 /**
  * Proposed: a pointer to a resource, see the review on #3263: the resource's title in the reader's language as the only
  * link, opening it at `path`, and its kind after it, muted, as the changes of a draft name a resource. A resource only
- * the draft adds is its name and its kind, as text, not a link, as no one opens it yet; any other pointer no one can
- * open is its file, muted.
+ * the draft adds is its name and its kind; with `onShowDraft`, on a request's page, its name is the link that shows its
+ * change in the draft's diff, and otherwise text, as no one opens it yet. Any other pointer no one can open is its file,
+ * muted.
  */
 export function ResourceReference({
   resourceId,
@@ -21,6 +22,7 @@ export function ResourceReference({
   path,
   resources,
   onSelect,
+  onShowDraft,
 }: {
   resourceId: string | null
   file: string | null
@@ -30,6 +32,8 @@ export function ResourceReference({
   path: string
   resources: readonly StudioResourceItem[]
   onSelect: (resourceId: string, path: string) => void
+  /** Proposed: shows the change of a resource only the draft adds, by its file, in the draft's diff. */
+  onShowDraft?: (file: string) => void
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
@@ -38,7 +42,13 @@ export function ResourceReference({
     if (name !== null && kind !== null) {
       return (
         <Flex component="span" align="baseline" gap={spacing.xs} wrap style={{ display: 'inline-flex' }}>
-          <Typography.Text>{name}</Typography.Text>
+          {onShowDraft !== undefined && file !== null ? (
+            <AxisButton role="link" size="small" onClick={() => onShowDraft(file)}>
+              {name}
+            </AxisButton>
+          ) : (
+            <Typography.Text>{name}</Typography.Text>
+          )}
           <Typography.Text style={{ color: colour.textMuted }}>{kindSingular(kind, t)}</Typography.Text>
         </Flex>
       )

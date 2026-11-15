@@ -2,7 +2,7 @@ import { UndoOutlined } from '@ant-design/icons'
 import { FoldIcon } from '../platform/FoldIcon'
 import { Flex, Spin, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { lazy, Suspense, useContext, useEffect, useState, type HTMLAttributes, type ReactNode } from 'react'
+import { lazy, Suspense, useContext, useEffect, useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { QuotaRefusedError } from '../platform/quota'
@@ -297,6 +297,7 @@ export function StudioChanges({
   summaries,
   authors,
   folded = false,
+  reveal,
 }: {
   changes: StudioRevisionChange[]
   resources: StudioResourceItem[]
@@ -306,6 +307,11 @@ export function StudioChanges({
   authors?: ReadonlyMap<string, ReactNode>
   /** Proposed: every file starts folded, for a long list such as the publish page's. */
   folded?: boolean
+  /**
+   * Proposed: the file a link asked to show, opened and scrolled into view; `at` tells a second ask for the same file
+   * from the first, see the review on #3263.
+   */
+  reveal?: { file: string; at: number }
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -323,9 +329,12 @@ export function StudioChanges({
     <>
       {changeRows(rows, resources, locale, t).map((row) => {
         const resource = byKey.get(row.key)
+        const revealed = reveal !== undefined && resource?.file === reveal.file
         return (
           <ChangedFile
-            key={row.key}
+            // A file a link asks to show starts again, open.
+            key={revealed ? `${row.key}@${reveal.at}` : row.key}
+            revealed={revealed}
             name={row.name}
             kind={row.kind === null ? '—' : kindSingular(row.kind, t)}
             change={t(`shell.studio.overview.change.${row.change}`)}
@@ -351,6 +360,7 @@ function ChangedFile({
   summary,
   author,
   folded,
+  revealed = false,
   before,
   after,
 }: {
@@ -361,15 +371,24 @@ function ChangedFile({
   summary: string | undefined
   author: ReactNode
   folded: boolean
+  /** Whether a link asked to show it: it opens and scrolls into view. */
+  revealed?: boolean
   before: string | null
   after: string | null
 }) {
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
-  const [open, setOpen] = useState(!folded)
+  const [open, setOpen] = useState(!folded || revealed)
+  const block = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (revealed) {
+      block.current?.scrollIntoView?.({ block: 'start' })
+    }
+  }, [revealed])
   const [counts, setCounts] = useState<DiffCounts>()
   return (
     <section
+      ref={block}
       data-testid="studio-revision-change"
       data-file={file}
       // The block clips its diff to its rounded corners.

@@ -64,15 +64,22 @@ function renderResults(
   value: StudioRequest,
   onSelect = vi.fn(),
   drafted?: ReadonlyMap<string, { name: string; kind: string }>,
+  onShowDraft = vi.fn(),
 ) {
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioTestResults request={value} resources={resources} drafted={drafted} onSelect={onSelect} />
+        <StudioTestResults
+          request={value}
+          resources={resources}
+          drafted={drafted}
+          onSelect={onSelect}
+          onShowDraft={onShowDraft}
+        />
       </TextProvider>
     </ThemeModeProvider>,
   )
-  return { section: screen.getByTestId('studio-test-results'), onSelect }
+  return { section: screen.getByTestId('studio-test-results'), onSelect, onShowDraft }
 }
 
 afterEach(() => localStorage.clear())
@@ -103,7 +110,7 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     expect(onSelect).toHaveBeenCalledWith('7f1c2d3e-4a5b-4c6d-8e7f-9a0b1c2d3e4f', '')
   })
 
-  it('shows a failed scenario with its step and message, and its name opens it at the step', async () => {
+  it('shows a failed scenario on one line, its name opening it at the step where its details are', async () => {
     const { onSelect } = renderResults(request({ status: 'failed', scenarios: [finance, approval] }))
 
     const rows = screen.getAllByTestId('studio-test-result')
@@ -111,23 +118,21 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     const failed = rows[1]
     expect(failed).toHaveAttribute('data-outcome', 'failed')
     expect(within(failed).getByText('Failed')).toHaveAttribute('data-tone', 'danger')
-    // Proposed: the step and what went wrong as one sentence, in the text colour.
-    const why = within(failed).getByTestId('studio-test-failure')
-    expect(why).toHaveTextContent(/^Step 6: The record status is approved, not rejected\.$/)
-    expect(why).not.toHaveClass('ant-typography-danger')
+    // Proposed: the row is its outcome, its name and its time alone; the details are where its link goes.
+    expect(failed).toHaveTextContent(/^Failed\s*ApprovalBelowThreshold\s*Test scenario\s*412 ms$/)
 
     await userEvent.click(within(failed).getByRole('button', { name: 'ApprovalBelowThreshold' }))
     expect(onSelect).toHaveBeenCalledWith('09d75317-fd9e-411e-8322-317778fc1b2b', '/steps/5')
   })
 
-  // Proposed: a scenario only a draft adds reads by its name, as text, as no one opens it yet.
-  it('names a scenario a draft adds by its name and kind, as text', () => {
+  // Proposed: a scenario only a draft adds reads by its name, its link showing its change in the draft's diff.
+  it('names a scenario a draft adds by its name and kind, its link showing its change', async () => {
     const added: StudioScenarioResult = {
       ...approval,
       resourceId: 'a5e00000-0000-4000-8000-0000000000aa',
       file: 'scenarios/suppliers-are-imported.json',
     }
-    renderResults(
+    const { onSelect, onShowDraft } = renderResults(
       request({ status: 'failed', scenarios: [added] }),
       vi.fn(),
       new Map([[added.file, { name: 'Suppliers are imported', kind: 'scenario' }]]),
@@ -135,8 +140,10 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
 
     const row = screen.getByTestId('studio-test-result')
     expect(row).toHaveTextContent(/Suppliers are imported\s*Test scenario/)
-    expect(within(row).queryByRole('button')).toBeNull()
     expect(row).not.toHaveTextContent('scenarios/suppliers-are-imported.json')
+    await userEvent.click(within(row).getByRole('button', { name: 'Suppliers are imported' }))
+    expect(onShowDraft).toHaveBeenCalledWith('scenarios/suppliers-are-imported.json')
+    expect(onSelect).not.toHaveBeenCalled()
   })
 
   it('shows a skipped contract scenario with its relaxed point, and opens nothing when clicked', async () => {
