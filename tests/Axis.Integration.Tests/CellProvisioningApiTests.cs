@@ -409,9 +409,11 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             Assert.Contains(reason, entry.Message, StringComparison.Ordinal);
         }
 
-        // The scope of every entry of a request holds the framework's RequestPath, which is not a value of the warning.
-        var texts = logs.Records
-            .Where(record => record.Message.Contains("by operator", StringComparison.Ordinal))
+        // Every entry of a request carries the framework's RequestPath scope, which holds the path as for any other entry. The
+        // warning's own message and every other scope must hold no value of the request.
+        var entries = logs.Records.Where(record => record.Message.Contains("by operator", StringComparison.Ordinal)).ToList();
+        Assert.All(entries, record => Assert.Contains(record.Scope, pair => pair.Key == "RequestPath"));
+        var texts = entries
             .SelectMany(record => record.Scope.Where(pair => pair.Key != "RequestPath").Select(pair => pair.Value?.ToString() ?? "").Append(record.Message))
             .ToList();
         foreach (var absent in new[] { token, "Bearer", "Cookie", "5093817264", "6203948175", "8172635940", "7364519820", "4829175036", "admin@example.test" })

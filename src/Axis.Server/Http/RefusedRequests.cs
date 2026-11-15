@@ -27,8 +27,8 @@ internal static partial class RefusedRequests
     /// whether a grant, a record filter, the CSRF header, the session or a Studio role refused the request. It writes a second
     /// kind of warning for a <c>4xx</c> other than <c>401</c>, <c>403</c> and <c>429</c> on a route of the provisioning API
     /// when the caller is signed in: the method, the route template, the caller's id, the status and the fixed reason. The route
-    /// is the template, such as <c>/api/apps/{app}/entities/{entity}/records</c>, and never the path or the query string, so
-    /// the entry holds no value. It sits after tenant resolution, so the entry carries the <c>TenantId</c> scope.
+    /// is the template, such as <c>/api/apps/{app}/entities/{entity}/records</c>, and never the path or the query string in the
+    /// message, so the message holds no value. The framework's <c>RequestPath</c> scope still holds the path. It sits after tenant resolution, so the entry carries the <c>TenantId</c> scope.
     /// </summary>
     public static IApplicationBuilder UseRefusedRequestLog(this IApplicationBuilder app) =>
         app.Use(async (context, next) =>

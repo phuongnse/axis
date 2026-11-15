@@ -79,12 +79,13 @@ every log.
   run-time error logs the error kind, never the error message.
 - **Refused bearer tokens.** A refused token logs a warning with the tenant and a reason: a fixed text,
   or the exception type, never a message or the token.
-- **Refused requests.** A `403` logs a warning with the HTTP method and the route template, never the
-  path or the query string.
+- **Refused requests.** A `403` logs a warning with the HTTP method and the route template, and no
+  path or query string in its message or properties.
 - **Refused provisioning calls.** A `4xx` that the provisioning API answers to a signed-in operator, other than
   `401`, `403` and `429`, logs a warning with the HTTP method, the route template, the status, a fixed reason
-  and the operator's id, never the path, the query string, the body or the `Idempotency-Key`, see
-  [refused calls](tenant-lifecycle.md#provisioning-api).
+  and the operator's id, and no path, query string, body or `Idempotency-Key` in its message or properties, see
+  [refused calls](tenant-lifecycle.md#provisioning-api). Like every entry written while a request runs, it carries the
+  framework's `RequestPath` scope, which holds the path of the request.
 - **Line breaks.** The console formatter indents every line of a message after its first, so a value
   with a line break cannot start a new log entry. It also starts each entry with a UTC timestamp.
 
