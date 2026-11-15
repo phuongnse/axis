@@ -37,6 +37,7 @@ Each common job has one shared widget or helper:
 | A value with nothing to show                   | `EmptyDash`                                                                                            |
 | A field of a platform screen                   | `AxisField` and `AxisFieldGroup`, with `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` _(planned for M33)_, and a `status` for what the screen found about a field |
 | A row of actions                               | `AxisActionRow`                                                                                        |
+| A count on a button or a filter                | `CountBadge` _(planned for M35)_, never Ant Design's `Badge` with a count                              |
 | A section of a Studio page                     | `ResourceFormSection`, in `ResourceFormSections`                                                       |
 | A text in the author's language                | `textIn`, else `en` _(planned for M33)_                                                                |
 | The address of a Studio resource               | `studioResourceAddress`                                                                                |

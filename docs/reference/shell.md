@@ -19,6 +19,7 @@ their own controls where they expect them.
   padding at its sides, and the items on its right are `spacing-sm` apart.
   On the cell console's host the operator's name takes the place of the app switcher and the account
   button, see [the console's views](cell-console.md#views).
+- **The bell's audience** _(planned for M35)_. Every signed-in person on the platform site has the bell, see [the bell](notifications.md#the-bell).
 - **Read-only banner.** While the tenant is [read-only](subscriptions.md#the-read-only-tenant), a
   warning banner with the alert role sits at the top of the content, under the header and beside the
   sidebar, on every page of every site. It says that the workspace is read-only and why. An

@@ -19,6 +19,7 @@ The request panel is where an author sends requests and follows them.
   a quota.
 - **The list.** The panel lists the application's requests, newest first, with their author, state and
   time. Each opens its page in the panel.
+- **Address.** A Studio address with `app` and `request`, such as `/studio?app=<name>&request=<id>`, opens that request's page in the panel. The notices of AI requests use it, see [tenant notices](notifications.md#tenant-notices).
 - **Progress.** A request's page shows its state in words, as
   [authoring requests](authoring-requests.md#states) name the states, with the current step and the fix
   round. It updates by polling, as the publish status does.
