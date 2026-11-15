@@ -30,7 +30,9 @@ public sealed class SubdomainEndpointTests
     [Fact]
     public async Task The_sign_up_route_answers_503_without_the_directory()
     {
-        var settings = new Dictionary<string, string?> { ["ControlPlane:SignUp:ChallengeKey"] = Convert.ToBase64String(new byte[32]), ["ControlPlane:SignUp:LicencesUrl"] = "https://example.com/licences" };
+        var settings = ControlPlaneFactory.TrialPlanSettings();
+        settings["ControlPlane:SignUp:ChallengeKey"] = Convert.ToBase64String(new byte[32]);
+        settings["ControlPlane:SignUp:LicencesUrl"] = "https://example.com/licences";
         foreach (var document in new[] { "Terms", "Dpa", "Privacy" })
         {
             settings[$"ControlPlane:SignUp:{document}:Version"] = "2026-01";

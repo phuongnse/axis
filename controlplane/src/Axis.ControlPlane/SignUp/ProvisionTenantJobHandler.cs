@@ -2,7 +2,9 @@ using System.Text.Json.Nodes;
 using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Jobs;
+using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.RegionDirectory;
+using Axis.Tenancy;
 using Npgsql;
 
 namespace Axis.ControlPlane.SignUp;
@@ -11,7 +13,7 @@ namespace Axis.ControlPlane.SignUp;
 /// Runs a <c>provisionTenant</c> job: creates the tenant of a confirmed sign-up in a cell, see
 /// <c>docs/reference/sign-up.md#provisioning</c>. The payload is only <c>{ signUpId }</c>, and the job reads the rest from the sign-up. The
 /// create call to the cell carries the subdomain as the tenant id, the chosen application unless it is the blank one, the person's email as
-/// the administrator and the trial's quotas in key order, with the idempotency key <c>tenant-create:&lt;sign-up id&gt;</c>. The body is the same
+/// the administrator and the quotas of the trial plan, with the users set to its included users, in key order, with the idempotency key <c>tenant-create:&lt;sign-up id&gt;</c>. The body is the same
 /// on every run, as the cell refuses the same key with another body. A tenant that the directory holds already goes to its own cell again,
 /// and not to a cell the <see cref="CellPicker"/> chooses, so a run that follows a crash never creates a second tenant. With no cell left the
 /// sign-up is <c>queued</c> and the job queues itself again in 5 minutes and succeeds, so the wait for an operator does not use up its
@@ -25,6 +27,7 @@ internal sealed partial class ProvisionTenantJobHandler(
     NpgsqlDataSource controlPlane,
     CellPicker picker,
     CellClients cells,
+    PlanCatalogue catalogue,
     EmailTemplates templates,
     ControlPlaneOptions options,
     TimeProvider clock,
@@ -70,10 +73,15 @@ internal sealed partial class ProvisionTenantJobHandler(
             body["application"] = application;
         }
 
-        // Key order and a null kept as null, so every run sends the same bytes. No quota set is {}.
-        body["quotas"] = new JsonObject(options.SignUp.TrialQuotas
+        // A trial gets the quotas of the region's trial plan, see docs/reference/plans.md#the-catalogue. Without one the job fails and is retried.
+        var trial = catalogue.Trial
+            ?? throw new InvalidOperationException("The catalogue has no trial plan, see docs/reference/plans.md#the-catalogue.");
+
+        // Key order, so every run sends the same bytes.
+        body["quotas"] = new JsonObject(trial.Quotas
+            .Append(KeyValuePair.Create(QuotaKeys.Users, trial.IncludedUsers))
             .OrderBy(quota => quota.Key, StringComparer.Ordinal)
-            .Select(quota => KeyValuePair.Create(quota.Key, quota.Value is { } limit ? JsonValue.Create(limit) : (JsonNode?)null)));
+            .Select(quota => KeyValuePair.Create(quota.Key, (JsonNode?)JsonValue.Create(quota.Value))));
 
         var operation = new CellOperation("tenant-create", signUpId);
         CellClient? client = null;

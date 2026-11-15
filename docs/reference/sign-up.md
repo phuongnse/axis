@@ -392,10 +392,10 @@ sign-up's `provisioning`, which is `queued`, `creating`, `ready` or `delayed`. I
 1. Pick a cell, see [picking a cell](region-directory.md#picking-a-cell). A tenant that the directory
    holds already goes to its own cell again, so a run after a crash never creates a second tenant.
 2. Call `POST /api/cell/tenants` on it with the subdomain as the tenant id, the built-in application,
-   the person's email as the administrator, and the trial's quotas, see
+   the person's email as the administrator, and the quotas of the region's trial plan with `users`
+   set to its included users, see [the catalogue](plans.md#the-catalogue) and
    [creating a tenant](tenant-lifecycle.md#creating-a-tenant). The application is left out when the
-   sign-up chose a blank one. The quotas go in key order, and as `{}` when none are set, so every run
-   sends the same body.
+   sign-up chose a blank one. The quotas go in key order, so every run sends the same body.
 3. When the cell accepts, write the tenant and its host to the [directory](region-directory.md), and
    its `CNAME` record.
 4. Poll the cell job until it ends.

@@ -330,7 +330,7 @@ if affected playwright; then
   : >"$control_plane_log"
   export AXIS_E2E_CONTROL_PLANE_URL="http://127.0.0.1:${AXIS_E2E_CONTROL_PLANE_PORT:-5290}"
   # The control plane is up when /health/live answers. ControlPlane__SignUp__ChallengeKey is a test key: the sign-up page solves a real challenge.
-  # The document settings let the page send the document versions, without which a sign-up answers 503.
+  # The document settings let the page send the document versions, without which a sign-up answers 503. So does a catalogue without a trial plan.
   ASPNETCORE_URLS="$AXIS_E2E_CONTROL_PLANE_URL" ASPNETCORE_ENVIRONMENT=Testing \
     ControlPlane__Region=vn ControlPlane__TenantDomain=vn.example.com \
     ControlPlane__ConnectionString="Host=127.0.0.1;Port=$port;Database=axis_controlplane;Username=axis_controlplane;Password=axis" \
@@ -346,6 +346,13 @@ if affected playwright; then
     ControlPlane__SignUp__Privacy__Version=2026-01 ControlPlane__SignUp__Privacy__Urls__en=https://example.com/privacy/en \
     ControlPlane__SignUp__Privacy__Urls__vi=https://example.com/privacy/vi \
     ControlPlane__SignUp__LicencesUrl=https://example.com/licences \
+    ControlPlane__Plans__0__Code=trial ControlPlane__Plans__0__Version=1 ControlPlane__Plans__0__Name__en=Trial \
+    ControlPlane__Plans__0__Name__vi="Dùng thử" ControlPlane__Plans__0__IncludedUsers=10 ControlPlane__Plans__0__Trial=true \
+    ControlPlane__Plans__0__Quotas__storage=1073741824 ControlPlane__Plans__0__Quotas__applications=10 \
+    ControlPlane__Plans__0__Quotas__emailsPerDay=500 ControlPlane__Plans__0__Quotas__packageCpuSecondsPerDay=0 \
+    ControlPlane__Plans__0__Quotas__concurrentImports=2 ControlPlane__Plans__0__Quotas__concurrentConnectorCalls=5 \
+    ControlPlane__Plans__0__Quotas__concurrentQueries=10 ControlPlane__Plans__0__Quotas__workerWeight=2 \
+    ControlPlane__Plans__0__Quotas__authoringRequests=100 \
     dotnet controlplane/src/Axis.ControlPlane/bin/Release/net10.0/Axis.ControlPlane.dll \
     --contentRoot "$root/controlplane/src/Axis.ControlPlane" >>"$control_plane_log" 2>&1 &
   control_plane_pid=$!

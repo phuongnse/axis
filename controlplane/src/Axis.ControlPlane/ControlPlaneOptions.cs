@@ -18,7 +18,6 @@ namespace Axis.ControlPlane;
 /// The sign-up documents are optional as a group, and once one is set, all of them are required. The sign-up challenge key is optional, and when set it must be base64 of at least 32 bytes.
 /// The sign-up disposable domain list is optional as a pair, and once one of its settings is set, both are required, as an https URL and a 64-character hex SHA-256.
 /// The plans are optional, and each needs a code, a version, both names, included users, every quota except the users, and a price in each currency, unless it is a trial plan, which has no price. A number is plain digits.
-/// The sign-up trial quotas are optional, and each must be a quota key with a whole number of zero or more, or empty.
 /// The PayOS provider is optional, and with <c>PayOs</c> the base URL, the client id, the API key and the checksum key are required.
 /// The public URL is optional and defaults to <c>https://account.&lt;TenantDomain&gt;</c>. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
@@ -96,7 +95,6 @@ public sealed partial class ControlPlaneOptions
         configuration.GetSection(SectionName).Bind(options);
 
         var problems = new List<string>();
-        options.SignUp.TrialQuotas = TrialQuotas(configuration, problems);
         if (string.IsNullOrWhiteSpace(options.Region))
         {
             problems.Add(Required(nameof(Region)));
@@ -196,36 +194,6 @@ public sealed partial class ControlPlaneOptions
             ? $"https://account.{options.TenantDomain}"
             : options.PublicUrl.Trim().TrimEnd('/');
         return options;
-    }
-
-    // Read from the configuration, not bound, so an empty value stays no limit and an absent key stays not set,
-    // see the settings table in docs/reference/control-plane.md#settings. The messages never hold a value.
-    private static Dictionary<string, long?> TrialQuotas(IConfiguration configuration, List<string> problems)
-    {
-        var quotas = new Dictionary<string, long?>(StringComparer.Ordinal);
-        var prefix = $"{SectionName}:{nameof(SignUp)}:{nameof(SignUpOptions.TrialQuotas)}";
-        foreach (var child in configuration.GetSection(prefix).GetChildren())
-        {
-            var name = $"{prefix}:{child.Key}";
-            if (!QuotaKeys.All.Contains(child.Key, StringComparer.Ordinal))
-            {
-                problems.Add($"The setting {name} is not a quota key. The quota keys are {string.Join(", ", QuotaKeys.All)}.");
-            }
-            else if (string.IsNullOrWhiteSpace(child.Value))
-            {
-                quotas[child.Key] = null;
-            }
-            else if (long.TryParse(child.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var value))
-            {
-                quotas[child.Key] = value;
-            }
-            else
-            {
-                problems.Add($"The setting {name} must be a whole number of zero or more, or empty for no limit.");
-            }
-        }
-
-        return quotas;
     }
 
     private static List<string> CellProblems(ControlPlaneOptions options)
