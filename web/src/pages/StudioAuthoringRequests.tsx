@@ -195,6 +195,7 @@ export function StudioAuthoringRequestPage({
   // Proposed: what the feed has unfolded, see the review on #3263.
   const [planOpen, setPlanOpen] = useState(false)
   const [replyOpen, setReplyOpen] = useState(false)
+  const [anywayOpen, setAnywayOpen] = useState(false)
   const [stepsOpen, setStepsOpen] = useState(false)
   const [checksOpen, setChecksOpen] = useState(false)
   const [changesOpen, setChangesOpen] = useState(false)
@@ -887,7 +888,9 @@ export function StudioAuthoringRequestPage({
             ).replace('{count}', String(blockingTexts.length)),
             actions: [
               dropButton,
-              button('accept', 'secondary', t('shell.studio.aiRequest.accept'), () => void startAccept()),
+              // Proposed: accepting past an open must-change finding asks first, and lists what it leaves out, as
+              // merging past a required review does, see the review on #3263.
+              button('accept', 'secondary', t('shell.studio.aiRequest.acceptAnyway'), () => setAnywayOpen(true)),
               // The review's must-change findings become the comment that asks AI for changes.
               button(
                 'fix',
@@ -998,6 +1001,30 @@ export function StudioAuthoringRequestPage({
           <AxisActionRow align="center">{guide.actions}</AxisActionRow>
         )}
       </ActionBar>
+      <Modal
+        open={anywayOpen}
+        width={size.dialog.small}
+        title={t('shell.studio.aiRequest.acceptAnyway.title')}
+        okText={t('shell.studio.aiRequest.acceptAnyway.ok')}
+        cancelText={t('shell.studio.cancel')}
+        confirmLoading={acting}
+        onOk={() => {
+          setAnywayOpen(false)
+          void startAccept()
+        }}
+        onCancel={() => setAnywayOpen(false)}
+      >
+        <Flex vertical gap={spacing.xs}>
+          <Typography.Text>{t('shell.studio.aiRequest.acceptAnyway.text')}</Typography.Text>
+          <ul style={{ margin: 0, paddingInlineStart: spacing.lg }} data-testid="studio-ai-anyway-findings">
+            {blockingTexts.map((text, index) => (
+              <li key={index}>
+                <Typography.Text>{text}</Typography.Text>
+              </li>
+            ))}
+          </ul>
+        </Flex>
+      </Modal>
       <Modal
         open={dropOpen}
         width={size.dialog.small}

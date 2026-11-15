@@ -955,6 +955,31 @@ describe("a request's guide", () => {
     })
   })
 
+  it('asks before accepting past a must-change finding, and lists it', async () => {
+    const fetchMock = stub({
+      ...fromApp,
+      aiConnected: true,
+      review: {
+        summary: 'The list shows no column.',
+        steps: [],
+        findings: [
+          { blocking: true, text: 'Show the column.', file: 'pages/list.json', path: '/widgets/0', resourceId: null },
+        ],
+      },
+    })
+    renderPage()
+    const user = userEvent.setup()
+
+    await user.click(within(await screen.findByTestId('studio-ai-bar')).getByRole('button', { name: 'Accept anyway…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Accept without these changes?' })
+    expect(within(dialog).getByTestId('studio-ai-anyway-findings')).toHaveTextContent('Show the column.')
+    expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/accept'))).toBe(false)
+    await user.click(within(dialog).getByRole('button', { name: 'Accept anyway' }))
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([url, init]) => init?.method === 'POST' && url.endsWith('/accept'))).toBe(true)
+    })
+  })
+
   it('sends a failed request again as a new request', async () => {
     const fetchMock = stub({ ...fromApp, state: 'failed', checks: null, review: null, failure: 'No credit left.' })
     renderPage()
