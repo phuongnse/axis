@@ -138,7 +138,7 @@ describe('the palette of the process designer', () => {
     expect(steps[1].next).toBe('raiseEvent1')
     expect(steps[4]).toMatchObject({ name: 'raiseEvent1', operation: 'raiseEvent', next: 'done' })
     expect(calls.selected.at(-1)).toBe(4)
-    expect(announcement()).toHaveTextContent('Step raiseEvent1 added after resolve')
+    expect(announcement()).toHaveTextContent('Added step raiseEvent1 after resolve.')
   })
 
   it('adds an unconnected step, with no source named, when the selected step has no next', async () => {
@@ -149,7 +149,7 @@ describe('the palette of the process designer', () => {
     const steps = calls.changes[0][1] as Steps
     expect(steps[2]).toEqual(initial.steps[2])
     expect(steps[4]).toMatchObject({ name: 'task1', type: 'task', outcomes: [] })
-    expect(announcement()).toHaveTextContent(/^Step task1 added$/)
+    expect(announcement()).toHaveTextContent(/^Added step task1\.$/)
   })
 
   it('adds a step with no source when nothing is selected', async () => {
@@ -158,7 +158,7 @@ describe('the palette of the process designer', () => {
 
     expect(calls.changes).toEqual([['/steps', [...initial.steps, { name: 'end1', type: 'end' }]]])
     expect(calls.selected.at(-1)).toBe(4)
-    expect(announcement()).toHaveTextContent(/^Step end1 added$/)
+    expect(announcement()).toHaveTextContent(/^Added step end1\.$/)
   })
 
   it('inserts into the selected edge before the selected step', async () => {
@@ -170,7 +170,7 @@ describe('the palette of the process designer', () => {
     const steps = calls.changes.at(-1)![1] as Steps
     expect(steps[2].otherwise).toBe('decision1')
     expect(steps[4]).toMatchObject({ name: 'decision1', otherwise: 'done' })
-    expect(announcement()).toHaveTextContent('Step decision1 added after check')
+    expect(announcement()).toHaveTextContent('Added step decision1 after check.')
   })
 
   it('inserts into the edge that a drop names with one change, and selects the new step', () => {
@@ -182,7 +182,7 @@ describe('the palette of the process designer', () => {
     expect(steps[1].next).toBe('updateRecord1')
     expect(steps[4]).toMatchObject({ name: 'updateRecord1', operation: 'updateRecord', next: 'done' })
     expect(calls.selected.at(-1)).toBe(4)
-    expect(announcement()).toHaveTextContent('Step updateRecord1 added after resolve')
+    expect(announcement()).toHaveTextContent('Added step updateRecord1 after resolve.')
   })
 
   it('adds an unconnected step when the drop names the canvas', () => {
@@ -191,14 +191,14 @@ describe('the palette of the process designer', () => {
 
     const steps = calls.changes[0][1] as Steps
     expect(steps[4]).toMatchObject({ name: 'callConnector1', next: '' })
-    expect(announcement()).toHaveTextContent(/^Step callConnector1 added$/)
+    expect(announcement()).toHaveTextContent(/^Added step callConnector1\.$/)
   })
 
   it('refuses an end step on an edge, changes nothing and says why', async () => {
     const calls = renderDesign(1)
     drop('end', '/steps/1/next')
     expect(calls.changes).toEqual([])
-    expect(announcement()).toHaveTextContent('An end step cannot be inserted into a transition')
+    expect(announcement()).toHaveTextContent('An end step cannot go on a line.')
 
     await userEvent.click(screen.getByTestId('studio-process-palette-end'))
     expect(calls.changes).toEqual([])
@@ -221,7 +221,7 @@ describe('moving a step', () => {
 
     expect(calls.changes).toEqual([['/steps', [resolve, submit, check, done]]])
     expect(calls.selected.at(-1)).toBe(0)
-    expect(announcement()).toHaveTextContent(/^Step resolve moved to the start$/)
+    expect(announcement()).toHaveTextContent(/^Moved step resolve to the start\.$/)
   })
 
   it('moves a step down and names the step that is now before it', async () => {
@@ -230,7 +230,7 @@ describe('moving a step', () => {
 
     expect(calls.changes).toEqual([['/steps', [submit, check, resolve, done]]])
     expect(calls.selected.at(-1)).toBe(2)
-    expect(announcement()).toHaveTextContent(/^Step resolve moved after check$/)
+    expect(announcement()).toHaveTextContent(/^Moved step resolve after check\.$/)
   })
 
   it('moves a step up past another and names the step that is now before it', async () => {
@@ -239,7 +239,7 @@ describe('moving a step', () => {
 
     expect(calls.changes).toEqual([['/steps', [submit, check, resolve, done]]])
     expect(calls.selected.at(-1)).toBe(1)
-    expect(announcement()).toHaveTextContent(/^Step check moved after submit$/)
+    expect(announcement()).toHaveTextContent(/^Moved step check after submit\.$/)
   })
 })
 

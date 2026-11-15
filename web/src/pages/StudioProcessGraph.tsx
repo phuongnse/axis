@@ -19,6 +19,7 @@ import { type KeyboardEvent, useMemo, useRef } from 'react'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { type ProcessGraph, type ProcessGraphTransition, transitionName } from './processGraph'
+import { fillText } from '../platform/fillText'
 
 const nodeWidth = 200
 const nodeHeight = 48
@@ -65,7 +66,7 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
       <button
         type="button"
         data-testid={`studio-graph-node-${data.index}`}
-        aria-label={data.marked ? `${label}, ${t('shell.studio.processGraph.hasDiagnostics')}` : label}
+        aria-label={data.marked ? fillText(t('shell.studio.processGraph.hasDiagnostics'), { step: label }) : label}
         aria-current={data.current ? 'true' : undefined}
         data-marked={data.marked ? 'true' : undefined}
         style={{

@@ -15,6 +15,7 @@ import { ProcessPalette } from './ProcessPalette'
 import { addStep, entryLabel, insertInto, moved, type Added, type PaletteEntry } from './processPalette'
 import type { ChangeHandler } from './SchemaForm'
 import StudioProcessGraph from './StudioProcessGraph'
+import { fillText } from '../platform/fillText'
 
 function nameAt(list: unknown[], index: number): string {
   const step: unknown = list[index]
@@ -113,7 +114,7 @@ export default function StudioProcessDesign({
       steps.filter((_, position) => position !== index),
     )
     selectStep(null)
-    setAnnouncement(`${t('shell.studio.process.removedStep')} ${name || `/steps/${index}`}`)
+    setAnnouncement(fillText(t('shell.studio.process.removedStep'), { name: name || `/steps/${index}` }))
   }
 
   function moveStep(index: number, offset: number) {
@@ -121,18 +122,18 @@ export default function StudioProcessDesign({
     const next = moved(steps, index, offset)
     onChange('/steps', next)
     selectStep(to)
-    const place =
+    setAnnouncement(
       to === 0
-        ? t('shell.studio.process.movedToStart')
-        : `${t('shell.studio.process.movedAfter')} ${nameAt(next, to - 1)}`
-    setAnnouncement(`${t('shell.studio.process.stepAdded')} ${nameAt(next, to)} ${place}`)
+        ? fillText(t('shell.studio.process.movedToStart'), { name: nameAt(next, to) })
+        : fillText(t('shell.studio.process.movedAfter'), { name: nameAt(next, to), after: nameAt(next, to - 1) }),
+    )
   }
 
   function removeTransition(transition: ProcessGraphTransition) {
     const name = transitionName(graph, transition, t('shell.studio.processGraph.to'))
     onChange(transitionPointer(transition), '')
     setEdge(null)
-    setAnnouncement(`${t('shell.studio.process.removedTransition')} ${name}`)
+    setAnnouncement(fillText(t('shell.studio.process.removedTransition'), { name }))
   }
 
   function apply(source: number, target: number, choice: ConnectChoice) {
@@ -148,7 +149,7 @@ export default function StudioProcessDesign({
     let label = ''
     if (choice.kind === 'newBranch') {
       const count = Array.isArray(edit.value) ? edit.value.length : 1
-      label = `${t('shell.studio.process.branchNumber')} ${count}`
+      label = fillText(t('shell.studio.process.branchNumber'), { number: count })
     } else if (choice.kind === 'newOutcome') {
       const added: unknown = Array.isArray(edit.value) ? edit.value.at(-1) : undefined
       label = (added as { name: string }).name
@@ -158,7 +159,10 @@ export default function StudioProcessDesign({
     onChange(edit.pointer, edit.value)
     setPending(null)
     setAnnouncement(
-      `${nameOf(source)}${label ? `, ${label}` : ''} ${t('shell.studio.process.nowGoesTo')} ${nameOf(target)}`,
+      fillText(t('shell.studio.process.nowGoesTo'), {
+        source: `${nameOf(source)}${label ? `, ${label}` : ''}`,
+        target: nameOf(target),
+      }),
     )
   }
 
@@ -187,11 +191,10 @@ export default function StudioProcessDesign({
     onChange('/steps', result.steps)
     selectStep(result.index)
     const after = source === undefined ? undefined : nameOfStep(source)
-    const text = `${t('shell.studio.process.stepAdded')} ${result.name}`
     setAnnouncement(
       after === undefined
-        ? `${text} ${t('shell.studio.process.added')}`
-        : `${text} ${t('shell.studio.process.addedAfter')} ${after}`,
+        ? fillText(t('shell.studio.process.added'), { name: result.name })
+        : fillText(t('shell.studio.process.addedAfter'), { name: result.name, after }),
     )
   }
 

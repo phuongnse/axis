@@ -1,3 +1,5 @@
+import { fillText } from '../platform/fillText'
+
 export interface ProcessGraphStep {
   index: number
   name: string | null
@@ -27,9 +29,10 @@ export function transitionPointer(transition: ProcessGraphTransition): string {
 }
 
 /** The accessible name of a transition, such as "financeCheck to markApproved, otherwise". */
-export function transitionName(graph: ProcessGraph, transition: ProcessGraphTransition, to: string): string {
+export function transitionName(graph: ProcessGraph, transition: ProcessGraphTransition, text: string): string {
   const nameOf = (index: number) => graph.steps.find((step) => step.index === index)?.name ?? `/steps/${index}`
-  return `${nameOf(transition.source)} ${to} ${nameOf(transition.target)}, ${transition.label ?? transition.kind}`
+  const line = fillText(text, { source: nameOf(transition.source), target: nameOf(transition.target) })
+  return `${line}, ${transition.label ?? transition.kind}`
 }
 
 function isContent(value: unknown): value is Record<string, unknown> {
