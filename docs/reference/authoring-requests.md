@@ -5,7 +5,7 @@ on a draft, checks it, has it reviewed and fixes what fails, and then the draft 
 dropped. This page gives the agent host, how it acts for the author, how a request is stored and
 moves through its states, its budgets, how a draft is accepted, and what reaches the model. How an
 author works with a request in Studio is in [AI authoring in Studio](ai-authoring-in-studio.md), and
-the reasons are in [D119](../decisions/d119-ai-authoring-in-studio.md).
+the reasons are in [D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
 
 ## The agent host
 
@@ -113,6 +113,11 @@ an accept, which [accepting](#accepting) describes.
   [`storage` quota](tenant-quotas.md#refusals) is refused with the quota's `403` before these checks,
   as a save is, because it writes the draft as a revision. A drop is not, so the author can still end
   the request.
+- **Order of checks with an own key** _(planned for M35)_. A send checks the session (`401`), the author role
+  (`403`), the tenant's AI authoring setting (`403` when it is off), the application (`404`), its manifest `id`
+  (`409`), the content type (`415`) and the body (`400`). It then checks the author's own key (`409`) when the
+  request's binding needs a key and the author has none. Only then does it get the agent host's
+  [token](#acting-for-the-author). No quota is checked.
 - **Who.** Any author lists and reads the requests of an application. Only the author of a request
   approves its plan, changes it, drops it or accepts its draft.
 - **Body.** A send takes `{ text, autoAccept? }` with a `text` of 1 to 4,000 characters. A change of
@@ -192,6 +197,8 @@ the checks, an independent review and fix rounds.
   `PASSED`, the request moves to `ready` with the outcome `passed`. Any other text moves it to `fixing` with the
   outcome `findings`, and the text is the findings. The step stores `{ review: { outcome, findings } }` in `checks`
   on its `review` step, with `findings` null when the review passed.
+- **The review's model** _(planned for M35)_. The review runs on the request's binding, with its author's key. It
+  has no review binding of its own.
 - **Fixing works on the failures.** The step uses the tools and the draft rules of working, on the draft that the
   working step stored, and never makes a draft. The model sees the request text, the approved plan, what failed
   in the latest `check` step and the findings of the latest `review` step after it. What failed is the compile
@@ -212,6 +219,12 @@ the checks, an independent review and fix rounds.
   and every comment of the request, oldest first. Its plan replaces the earlier one.
 - **Plans need approval**. No request leaves `awaitingApproval` without the author, also when the
   application allows auto-accept.
+- **Key failures** _(planned for M35)_. When the provider refuses the author's key with `401` or `403`, the
+  request stops as `failed` with the outcome `keyRefused`. When the key is removed, or no longer opens, the
+  request stops as `failed` with the outcome `noKey`. The draft is kept in both cases.
+- **Disabled authors** _(planned for M35)_. Disabling a user stops each of their requests that is not `accepted`,
+  `dropped` or `failed` as `failed`, with the outcome `authorDisabled`, and erases its refresh token. A stopped
+  request sends no more model calls with the author's key.
 
 ## Budgets
 
@@ -243,10 +256,8 @@ Each request has limits on its rounds, tokens and time, so the cost of one reque
 - **Time.** At most `Ai:RequestTimeout` from the plan's approval, 30 minutes by default. A request past
   it stops as `failed` with the outcome `timedOut` before its next step, and a step still running at that
   time is cancelled and stops the request the same way. The draft is kept.
-- **Quota.** The request counts toward the tenant's `authoringRequests` quota once, when the author
-  sends it. A request past the quota is refused with the quota's `403`, see
-  [tenant quotas](tenant-quotas.md#refusals). A request that asks for a new plan or a new fix round
-  does not count again. [Tenant quotas](tenant-quotas.md#quotas) says how the month is counted.
+- **Quota** _(planned for M35)_. A request counts toward no quota, because the author's own key pays for it,
+  see [a person's own key](model-bindings.md#a-persons-own-key).
 
 ## Accepting
 

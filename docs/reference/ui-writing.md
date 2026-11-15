@@ -52,6 +52,8 @@ These principles hold in every language.
   A word joins the closed list only by a change of the glossary. One sentence never names a concept twice, once in each
   language.
 
+- **AI by what it does.** A screen text says AI and names no model or provider, because the installation picks
+  the model. The one exception is a text that asks for a key. It names whose key it takes, such as "Anthropic key".
 - **Plain, polite and neutral.** Axis is software for companies: no slang, no jokes, no exclamation marks, and no
   familiar tone. Polite does not mean wordy. How a text addresses the person is each language's own rule, below.
 - **Short.** A button is one to three words. A label is a noun phrase. A help text is one sentence, two at most. Leave

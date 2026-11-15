@@ -3,8 +3,8 @@
 The agent host calls a model through an adapter, by a binding that the installation names, so no
 model provider is built into Axis and a closed network can use a model of its own. An authoring eval
 decides which models Axis supports: a model earns its place by what it does, whoever makes it. This
-page gives the bindings and their settings, a tenant's own key, and the eval. The reasons are in
-[D119](../decisions/d119-ai-authoring-in-studio.md).
+page gives the bindings and their settings, who pays for a model, a person's own key, a tenant's own key
+and the eval. The reasons are in [D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
 
 ## Bindings
 
@@ -18,8 +18,8 @@ installation chooses either.
 - **Amazon Bedrock and Google Vertex AI** _(planned for M35)_ come with their own sign-in, which a key
   file read once does not cover. Until then an `anthropic` binding reaches them only through a gateway
   that speaks the Messages API.
-- **Who pays the provider.** On premises the customer pays its model provider. In Axis SaaS the
-  plan includes a number of requests, see [tenant quotas](tenant-quotas.md).
+- **Who pays the provider** _(planned for M35)_. Each author's own key pays for the author's requests,
+  on premises and in Axis SaaS. Axis counts no requests, see [a person's own key](#a-persons-own-key).
 - **No provider is built in.** The request loop, the tools and the checks talk to an adapter and do
   not know which model is behind it. A call hands the adapter the system text, the messages, the tool
   definitions and an output limit, and gets back text, tool calls and token counts. The limit is never
@@ -59,15 +59,40 @@ The agent host reads these settings:
   with AI authoring on.
 - **Secrets.** A key is read from its file at start, kept in memory only, and never logged, sent to a
   tool or stored in a request. A tenant's own key is read for the call only and is never logged.
-- **Axis SaaS** _(planned for M35)_ uses an `anthropic` binding with Claude by default, because it does well at long runs
-  of tool calls. That is a setting of the cell, not a rule of the platform. Each SaaS plan includes a
-  number of requests, the `authoringRequests` [quota](tenant-quotas.md#quotas), while on premises the
-  customer pays its model provider.
+- **Axis SaaS** _(planned for M35)_. It uses an `anthropic` binding with Claude by default, because it does
+  well at long runs of tool calls. That is a setting of the cell, not a rule of the platform. No plan
+  includes requests, because each author's own key pays.
+
+## A person's own key
+
+_(planned for M35)_
+
+Each author pays for their own requests with their own key. No key of the installation and no key of a
+tenant runs a request.
+
+- **The key.** An author adds an Anthropic API key on the account page. The browser seals it for the agent
+  host, and the server stores it only sealed, as [key policy](keys-and-data-protection.md#key-policy) and
+  [D149](../decisions/d149-a-persons-secrets-are-sealed-for-the-host-that-uses-them-and-every-secret-rests-on-a-key-service.md)
+  say. A person's AI key is the only AI key that Axis stores.
+- **Whose key runs a request.** A request whose binding needs a key runs on its author's key only. An author
+  with no key cannot send such a request, see [the order of checks](authoring-requests.md#routes).
+- **A binding with no key.** A binding that needs no key, such as a model the installation serves itself in a
+  closed network, runs its requests with none.
+- **Claude first.** Claude, through an Anthropic API key, is the first model that an author connects.
+- **A Claude subscription.** A subscription works only through an outside MCP client, such as Claude Code,
+  which signs in as the author and uses the subscription itself, see
+  [client registration](mcp-server.md#client-registration). The agent host never uses a subscription.
+- **The review.** The review runs on the request's binding with its author's key. The review has no binding
+  of its own.
 
 ## A tenant's own key
 
 Where `Ai:AllowTenantKeys` is on, a tenant may pay for its own model use.
 
+- **No tenant key** _(planned for M35)_. A tenant has no model key. `Ai:AllowTenantKeys`, `Ai:ReviewBinding`,
+  the model key routes, the key controls of the Model key section and threats P141 to P143 go, because each
+  author's own key pays, see [a person's own key](#a-persons-own-key). The [Model key section](platform-pages.md#model-key)
+  stays as the AI authoring switch.
 - **The key.** A tenant administrator sets, changes and removes the tenant's own key through the
   [model key routes](user-administration.md#the-tenants-model-key). It is kept as the tenant secret
   `model_key`, encrypted as other tenant secrets are, see
@@ -83,9 +108,6 @@ Where `Ai:AllowTenantKeys` is on, a tenant may pay for its own model use.
   so the installation never pays for a tenant that chose to pay for its own use. Give the server and
   the agent host the same `Ai:AllowTenantKeys`. With it off on the server and on in the agent host,
   the keys that are already stored stay in use.
-- **Usage** _(planned for M35)_. A tenant with its own key still counts toward `authoringRequests`, but
-  its tokens are recorded as its own in [usage](tenant-quotas.md#usage), so that a plan can price them
-  apart.
 - **Audit.** Setting, changing and removing the key write platform audit records with no key value, see
   [when a record is written](tenant-setting-commands.md#when-a-record-is-written).
 

@@ -5,7 +5,7 @@ acts on Axis. The [agent host](authoring-requests.md#the-agent-host) and outside
 Claude Code or NexKit, use the same tools, so there is one surface to secure, test and limit, and a
 developer builds on Axis from the tools they already use. This page gives the server's route, sign-in,
 client registration, tools, limits and audit. The reasons are in
-[D119](../decisions/d119-ai-authoring-in-studio.md).
+[D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
 
 ## Route and transport
 
@@ -219,9 +219,10 @@ A call to the server is limited in rate and size, and the agent host's requests 
 
 - **Rate limit.** Every call to `/mcp` counts in the MCP partition, by tenant and client id, see
   [rate limits](headers-and-rate-limits.md#rate-limits).
-- **Quota** _(planned for M35)_. Tool calls of outside clients count toward no quota, because the client brings its own
-  model. Requests of the agent host count toward `authoringRequests`, see
-  [tenant quotas](tenant-quotas.md#quotas).
+- **No quota** _(planned for M35)_. No call counts toward a quota, because the author's own key or the client's
+  own model pays, see [a person's own key](model-bindings.md#a-persons-own-key).
+- **A subscription** _(planned for M35)_. A Claude subscription is used only through an outside client, which
+  signs in as the person, see [a person's own key](model-bindings.md#a-persons-own-key).
 - **Size.** `POST /mcp` refuses a request body over 1 MiB with `413`, so a tool input is at most 1 MiB.
 - **Output pages.** `diff_draft` answers the diff of a draft in pages of whole entries of at most 1 MiB, as
   the [draft diff](authoring-revisions.md#draft-diff) route does, and a page's `cursor` reads the next one.

@@ -193,6 +193,25 @@ only, as the command routes do.
   and when the key has four characters or fewer, so the answer never holds the whole key. No route answers the key.
 - **Audit.** A set, a change and a remove each write a platform audit record with no key value, see
   [when a record is written](tenant-setting-commands.md#when-a-record-is-written).
+- **No tenant key** _(planned for M35)_. A tenant has no model key, so these routes go, because each author's own
+  key pays for the author's requests, see [a tenant's own key](model-bindings.md#a-tenants-own-key).
+
+### AI authoring
+
+_(planned for M35)_
+
+An administrator turns AI authoring on or off for the tenant with the setting "Authors may use AI with their own
+Anthropic key", which is on by default. The setting is in the [Model key section](platform-pages.md#model-key) of
+the users page.
+
+- **Off.** Sending an [authoring request](authoring-requests.md#routes) is refused with `403`, and `studioAi` is
+  false for every person, so Studio hides the request panel. Requests already sent go on until they end.
+- **On.** An author who has added their own key can send requests, see
+  [a person's own key](model-bindings.md#a-persons-own-key).
+- **Outside clients.** The setting does not change outside MCP clients. They keep their own switch, see
+  [outside MCP clients](#outside-mcp-clients).
+- **Audit.** A change of the setting writes a platform audit record, see
+  [when a record is written](tenant-setting-commands.md#when-a-record-is-written).
 
 ### Outside MCP clients
 

@@ -142,7 +142,7 @@ Read by people who set up or change how an agent authors applications.
 | [MCP server](reference/mcp-server.md)                         | The MCP server for agents: route, sign-in, client registration, tools, limits and audit   | You change the MCP server route, tools, limits or audit           |
 | [Authoring requests](reference/authoring-requests.md)         | The agent host and the request loop: states, plans, checks, review, budgets and accepting | You change the agent request loop, its states or checks           |
 | [Revisions and drafts](reference/revisions-and-drafts.md)     | The git repository of each application folder: revisions, drafts, accepts and undo        | You change how a folder's git history records drafts and accepts  |
-| [Model bindings](reference/model-bindings.md)                 | The `Ai` settings, model bindings, a tenant's own key and the authoring eval              | You change the Ai settings, model bindings or a tenant's own key  |
+| [Model bindings](reference/model-bindings.md)                 | The `Ai` settings, model bindings, each author's own key, a tenant's own key and the authoring eval | You change the Ai settings, model bindings or an AI key           |
 | [AI authoring in Studio](reference/ai-authoring-in-studio.md) | The request panel, plan approval, the diff, accept and drop, auto-accept and the history  | You change the request panel, plan approval or the diff in Studio |
 
 ### Operations and installation

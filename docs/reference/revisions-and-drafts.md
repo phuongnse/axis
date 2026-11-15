@@ -4,7 +4,7 @@ Each application folder has a history of revisions, so every change can be trace
 authoring requests work on drafts apart from it, so an agent's change never touches the folder before
 it is accepted. Both live in an internal git repository for each folder, because git already does
 diffs, history, branches, reverts and all-or-nothing updates. The reasons are in
-[D125](../decisions/d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md).
+[D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
 
 ## The repository
 
