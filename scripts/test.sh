@@ -70,7 +70,7 @@ fi
 # font check, licence writer, design-system bundle check, authoring eval case check, authoring eval judging, authoring eval stack settings, authoring eval client, Keycloak sign-in, dependency scan, SPA lock file, image scan, the scans' code owners, setup retries, saved container images, image build retries, E2E, integration, smoke and test shard
 # splits, the shard durations refresh, NexKit's sharded checks, the test script's shards, load script, load test workflow, load objectives, cell load scenarios, cell load script, cell load tenants, E2E folder comparison, hang guard, dialog and drag helpers, TOTP function, load test routes and TOTP module, contrast helper, Compose status
 # helper, free port helper, module install script, dev script stop helper, development realm script and Helm chart scripts' own tests,
-# and the unit test of the TypeScript sample package.
+# the unit test of the TypeScript sample package and the alert rules.
 if [ "$run_rest" = 1 ]; then
   node --test scripts/test-report.test.mjs || status=1
   node --test scripts/affected.test.mjs || status=1
@@ -129,6 +129,7 @@ if [ "$run_rest" = 1 ]; then
   node --test tests/load/totp.test.mjs || status=1
   HELM="$helm" node --test scripts/helm.test.mjs || status=1
   HELM="$helm" node --test scripts/helm-controlplane.test.mjs || status=1
+  "$promtool" test rules tests/alerts/axis-alerts.test.yaml || status=1
 fi
 
 finish_report

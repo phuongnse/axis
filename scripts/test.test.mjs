@@ -81,7 +81,14 @@ function runTest(extraEnv = {}) {
       writeFileSync(join(bin, name), body, { mode: 0o755 })
     }
 
-    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, STUB_LOG: join(dir, 'log') }
+    // The rule test runs the pinned promtool from the home cache, so a stub stands at its path.
+    const home = join(dir, 'home')
+    const toolsSh = readFileSync(join(root, 'scripts/lib/tools.sh'), 'utf8')
+    const promtool = join(home, '.cache/axis-tools', `prometheus-${toolsSh.match(/^PROMETHEUS_VERSION=(\S+)$/m)[1]}`, 'promtool')
+    mkdirSync(dirname(promtool), { recursive: true })
+    writeFileSync(promtool, `#!/usr/bin/env bash\n${log('promtool')}`, { mode: 0o755 })
+
+    const env = { ...process.env, HOME: home, PATH: `${bin}:${process.env.PATH}`, STUB_LOG: join(dir, 'log') }
     for (const name of [
       'AXIS_TEST_SHARD',
       'NEXKIT_SHARD',
@@ -112,6 +119,7 @@ const vitestCalls = (run) => run.calls.filter((call) => call.startsWith('npm tes
 const vitestFiles = (call) => call.split(' ').filter((token) => token.startsWith('src/'))
 const dotnetCalls = (run) => run.calls.filter((call) => call.startsWith('dotnet '))
 const nodeTestCalls = (run) => run.calls.filter((call) => call.startsWith('node --test '))
+const promtoolCalls = (run) => run.calls.filter((call) => call.startsWith('promtool '))
 
 describe('scripts/test.sh runs the whole suite, or one shard of it with AXIS_TEST_SHARD', () => {
   test('shard 1 of 3 runs the .NET and script tests and no Vitest file', () => {
@@ -121,6 +129,7 @@ describe('scripts/test.sh runs the whole suite, or one shard of it with AXIS_TES
     assert.ok(dotnetCalls(run).length > 0)
     assert.ok(nodeTestCalls(run).some((call) => call.includes('scripts/test-shard.test.mjs')))
     assert.deepEqual(vitestCalls(run), [])
+    assert.deepEqual(promtoolCalls(run), ['promtool test rules tests/alerts/axis-alerts.test.yaml'])
     assert.ok(run.files.includes('Axis.Server.Tests.xml'))
     assert.ok(!run.files.some((name) => name.startsWith('web')))
   })
@@ -131,6 +140,7 @@ describe('scripts/test.sh runs the whole suite, or one shard of it with AXIS_TES
     assert.deepEqual(vitestCalls(second).map(vitestFiles), [['src/b.test.ts']])
     assert.deepEqual(dotnetCalls(second), [])
     assert.deepEqual(nodeTestCalls(second), [])
+    assert.deepEqual(promtoolCalls(second), [])
     assert.deepEqual(second.files, ['web-2.xml'])
 
     const third = runTest({ AXIS_TEST_SHARD: '3/3' })

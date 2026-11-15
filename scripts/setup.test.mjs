@@ -102,6 +102,7 @@ function cacheTools(home, { schemas = true, missing = [] } = {}) {
   for (const file of [
     `helm-${version('HELM_VERSION')}/helm`,
     `kubeconform-${version('KUBECONFORM_VERSION')}/kubeconform`,
+    `prometheus-${version('PROMETHEUS_VERSION')}/promtool`,
   ]) {
     mkdirSync(dirname(join(tools, file)), { recursive: true })
     writeFileSync(join(tools, file), '', { mode: 0o755 })
@@ -293,7 +294,7 @@ describe('scripts/lib/tools.sh limits every download', () => {
     const downloads = ['scripts/lib/tools.sh', 'scripts/lib/trivy.sh'].map((file) => readFileSync(join(root, file), 'utf8'))
     const lines = downloads.join('\n').replace(/\\\n\s*/g, ' ').split('\n')
     const curls = lines.filter((line) => /(^|\$\()retry 4 curl /.test(line.trim()))
-    assert.equal(curls.length, 9)
+    assert.equal(curls.length, 11)
     for (const line of curls) {
       assert.match(line, /--connect-timeout \d+/, line)
       assert.match(line, /--max-time \d+/, line)
@@ -443,7 +444,7 @@ describe('scripts/lib/tools.sh retries a download that the host refuses once', (
         },
       })
       assert.equal(result.status, 0, result.stderr)
-      assert.equal(readFileSync(log, 'utf8').trimEnd().split('\n').length, 44)
+      assert.equal(readFileSync(log, 'utf8').trimEnd().split('\n').length, 48)
       assert.match(result.stderr, /Attempt 1 of 4 failed with status 22/)
       const schemas = join(home, '.cache', 'axis-tools', `kubernetes-schemas-${version('KUBERNETES_VERSION')}`)
       assert.deepEqual(readdirSync(schemas).sort(), [
@@ -459,6 +460,7 @@ describe('scripts/lib/tools.sh retries a download that the host refuses once', (
       ])
       const crd = join(home, '.cache', 'axis-tools', `crd-schemas-${version('CRDS_CATALOG_COMMIT')}`)
       assert.deepEqual(readdirSync(join(crd, 'cert-manager.io')).sort(), ['certificate_v1.json', 'issuer_v1.json'])
+      assert.deepEqual(readdirSync(join(crd, 'monitoring.coreos.com')), ['prometheusrule_v1.json'])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
