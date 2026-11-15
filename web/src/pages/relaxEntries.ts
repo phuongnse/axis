@@ -1,5 +1,5 @@
 import type { JsonPatchOperation } from '../platform/jsonPatch'
-import type { StudioRelaxedPoint } from '../platform/studio'
+import { textIn, type StudioRelaxedPoint } from '../platform/studio'
 
 /** A relax entry of a module in `application.json`: a named point of the module's contract, and why it is relaxed. */
 export interface RelaxEntry {
@@ -109,14 +109,14 @@ function withRelax(manifest: Record<string, unknown>, module: string, entries: R
   }
 }
 
-/** A relaxed point in words: its title in the locale, else "Other roles" for a ceiling's others, else the raw point. */
+/** A relaxed point in words: its title in the locale, then in `en`, else "Other roles" for a ceiling's others, else the raw point. */
 export function relaxedPointLabel(
   point: Pick<StudioRelaxedPoint, 'point' | 'titles'>,
   locale: string,
   t: (key: string) => string,
 ): string {
   return (
-    point.titles?.[locale] ??
+    textIn(point.titles, locale) ??
     (point.point.endsWith('ceiling/others') ? t('shell.studio.release.relaxed.others') : point.point)
   )
 }

@@ -26,7 +26,7 @@ import {
 } from '../platform/entityFields'
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
-import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
+import { referenceOptions, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { LabelTexts } from './LabelTexts'
 import { type DesignerLayer, LayerMarkTag, RemovedRows } from './LayerMarkViews'
@@ -104,7 +104,7 @@ function Picker({
   label: string
   help: string
   kind?: string
-  options?: string[]
+  options?: (string | ReferenceOption)[]
   value: unknown
   required: boolean
   onPick: (next: string | undefined) => void

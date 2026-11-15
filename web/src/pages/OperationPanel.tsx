@@ -168,7 +168,7 @@ function ConnectorChoice({
               name={nameField.label}
               value={name}
               required
-              options={names.connectors.map((item) => item.name)}
+              options={names.connectors}
               onChange={(next) => onChange(`${connectorPointer}/name`, next ?? '')}
             />
           )}
@@ -228,7 +228,7 @@ function EventChoice({
               name={eventField.label}
               value={event}
               required
-              options={names.events.map((item) => item.name)}
+              options={names.events}
               onChange={(next) => onChange(eventPointer, next ?? '')}
             />
           )}
@@ -279,7 +279,7 @@ function CreateEntityChoice({
               name={entityField.label}
               value={entity}
               required
-              options={names.entities.map((item) => item.name)}
+              options={names.entities}
               onChange={(next) => onChange(entityPointer, next ?? '')}
             />
           )}

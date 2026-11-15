@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { StudioNames } from '../platform/studio'
+import { colourTokens } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
 import { StudioNamesContext } from '../platform/studioNames'
 import type { JsonSchema } from '../platform/studioSchemas'
@@ -29,6 +30,9 @@ const names: StudioNames = {
       module: null,
       fields: [{ name: 'Email', type: 'text', target: null, values: null }],
     },
+    { id: '5', name: 'Supplier', labelKey: 'entities.supplier.label', module: null, fields: [] },
+    { id: '6', name: 'Vendor', labelKey: 'entities.vendor.label', module: null, fields: [] },
+    { id: '7', name: 'Invoice', labelKey: 'entities.invoice.label', module: null, fields: [] },
   ],
   dataSources: [
     {
@@ -56,7 +60,11 @@ const names: StudioNames = {
   pages: [],
   policies: [],
   contracts: [],
-  texts: [],
+  texts: [
+    { key: 'entities.supplier.label', texts: { en: 'Partner' }, usedBy: 1 },
+    { key: 'entities.vendor.label', texts: { en: 'Partner' }, usedBy: 1 },
+    { key: 'entities.invoice.label', texts: { en: 'Bill' }, usedBy: 1 },
+  ],
   seeds: [],
   triggers: [],
   scenarios: [],
@@ -162,6 +170,43 @@ describe.each(['light', 'dark'])('ReferencePicker in %s mode', (mode) => {
 
     expect(screen.getByRole('option', { name: 'Customer' })).toBeInTheDocument()
     expect(screen.queryByRole('option', { name: 'Order' })).not.toBeInTheDocument()
+  })
+
+  it('shows a choice by its label, and a choice with no label by its name', async () => {
+    renderForm({ grants: [] })
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'entity' }))
+
+    expect(screen.getByRole('option', { name: 'Bill' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Invoice' })).not.toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Order' })).toBeInTheDocument()
+  })
+
+  it('shows the name after a label that choices share, in the muted colour', async () => {
+    renderForm({ grants: [] })
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'entity' }))
+
+    const supplier = screen.getByRole('option', { name: 'Partner Supplier' })
+    const name = within(supplier).getByText('Supplier')
+    expect(screen.getByRole('option', { name: 'Partner Vendor' })).toBeInTheDocument()
+    expect(within(screen.getByRole('option', { name: 'Bill' })).queryByText('Invoice')).not.toBeInTheDocument()
+    expect(name).toHaveStyle({ color: colourTokens.textMuted[mode as 'light' | 'dark'] })
+  })
+
+  it('finds a choice by its label or by its name, and writes the name', async () => {
+    const onChange = renderForm({ grants: [] })
+    const picker = screen.getByRole('combobox', { name: 'entity' })
+
+    await userEvent.type(picker, 'bil')
+    expect(screen.getByRole('option', { name: 'Bill' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Order' })).not.toBeInTheDocument()
+
+    await userEvent.clear(picker)
+    await userEvent.type(picker, 'invo')
+    await userEvent.click(screen.getByRole('option', { name: 'Bill' }))
+
+    expect(onChange).toHaveBeenLastCalledWith('/entity', 'Invoice')
   })
 
   it('keeps a value that is not a name and tags it unknown', async () => {

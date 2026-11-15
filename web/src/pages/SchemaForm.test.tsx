@@ -801,6 +801,41 @@ describe('SchemaForm controls that know what they hold', () => {
     })
   })
 
+  it('lists the roles of a module role slot by their labels, and writes the name', async () => {
+    const onChange = vi.fn()
+    const labelled = {
+      ...catalogNames,
+      roles: [
+        { name: 'DepartmentManager', labelKey: 'roles.departmentManager.label' },
+        { name: 'Clerk', labelKey: 'roles.clerk.label' },
+      ],
+      texts: [
+        { key: 'roles.departmentManager.label', texts: { en: 'Department manager' }, usedBy: 1 },
+        { key: 'roles.clerk.label', texts: { en: 'Clerk on duty' }, usedBy: 1 },
+      ],
+    } as unknown as StudioNames
+    renderForm(
+      (await loadKindSchema('application'))!,
+      { name: 'Shop', modules: [{ id: 'sales', version: '^1.2.0' }] },
+      onChange,
+      { catalog, names: labelled },
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Sales' }))
+    const dialog = await findDialog('Edit module')
+
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Budget approver' }))
+    expect(screen.getByRole('option', { name: 'Clerk on duty' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Clerk' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('option', { name: 'Department manager' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    expect(onChange).toHaveBeenCalledWith('/modules/0', {
+      id: 'sales',
+      version: '^1.2.0',
+      roles: { approver: 'DepartmentManager' },
+    })
+  })
+
   it('says that a chosen module has no slots, once', async () => {
     renderForm(
       (await loadKindSchema('application'))!,

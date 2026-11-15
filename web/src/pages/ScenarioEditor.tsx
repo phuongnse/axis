@@ -63,7 +63,7 @@ function StubCard({
                     name={fieldText('connector.name').label}
                     value={connectorName}
                     required
-                    options={connectors.map((item) => item.name)}
+                    options={connectors}
                     onChange={(next) => onChange(`${pointer}/connector/name`, next ?? '')}
                   />
                 </AxisField>

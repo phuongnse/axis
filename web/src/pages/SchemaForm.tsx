@@ -1043,7 +1043,7 @@ function MarkedMap({
   }
   const unused = (key: string) => {
     const used = new Set(entries.map(([other]) => other.toLowerCase()))
-    return options(key).filter((option) => !used.has(option.toLowerCase()))
+    return options(key).filter((option) => !used.has(option.name.toLowerCase()))
   }
   const next = unused('')[0]
 
@@ -1076,7 +1076,8 @@ function MarkedMap({
             value={key}
             required
             options={options(key).filter(
-              (option) => option === key || !entries.some(([other]) => other.toLowerCase() === option.toLowerCase()),
+              (option) =>
+                option.name === key || !entries.some(([other]) => other.toLowerCase() === option.name.toLowerCase()),
             )}
             onChange={(to) => rename(key, to)}
           />
@@ -1105,7 +1106,7 @@ function MarkedMap({
         <Button
           disabled={next === undefined}
           onClick={() =>
-            next !== undefined && onChange(pointer, { ...map, [next]: defaultFor(valueSchema(next), root) })
+            next !== undefined && onChange(pointer, { ...map, [next.name]: defaultFor(valueSchema(next.name), root) })
           }
         >
           {t('shell.studio.addItem')}

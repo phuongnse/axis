@@ -117,7 +117,7 @@ Studio shows words, never an internal code, see [text](actions-and-controls.md#t
   provider by its `label`, a page or a site by its `title`. A text resource is named by its language.
   A resource that only authors see, and so has no label, is named by the name its author gave.
   `GET .../resources` gives each resource's `titles` by locale, and a text resource's `locale`.
-- **A label's language** _(planned for M33)_. A label shows in the author's language, else in `en`, see
+- **A label's language**. A label shows in the author's language, else in `en`, see
   [label texts](studio.md#label-texts).
 - **A kind** has a name for its list, such as Entities, and one for a single resource, such as Entity,
   in the author's language.
