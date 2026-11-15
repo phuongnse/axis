@@ -13,6 +13,7 @@ using Axis.ControlPlane.Subscriptions;
 using Axis.ControlPlane.Telemetry;
 using Axis.Server.Http;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -143,9 +144,15 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && options.Cel
 // The schedule that queues the recurring jobs above. It is idle when there are none.
 builder.Services.AddHostedService<JobSchedule>();
 
-builder.Services.AddHealthChecks()
-    .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag])
+var healthChecks = builder.Services.AddHealthChecks()
+    .Add(new HealthCheckRegistration("database", sp => new DatabaseHealthCheck(sp.GetRequiredService<NpgsqlDataSource>(), "The control plane database is unreachable."), failureStatus: null, tags: [HealthEndpoints.ReadyTag]))
     .AddCheck<MailRelayHealthCheck>("mail-relay", tags: [HealthEndpoints.ReadyTag]);
+
+// A replica that cannot reach the directory leaves readiness, see docs/reference/control-plane.md#health-and-telemetry.
+if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
+{
+    healthChecks.Add(new HealthCheckRegistration("directory", sp => new DatabaseHealthCheck(sp.GetRequiredKeyedService<NpgsqlDataSource>("directory"), "The region directory database is unreachable."), failureStatus: null, tags: [HealthEndpoints.ReadyTag]));
+}
 
 builder.Services.AddProblemDetails();
 builder.Services.AddControlPlaneTelemetry(builder.Configuration, builder.Environment);

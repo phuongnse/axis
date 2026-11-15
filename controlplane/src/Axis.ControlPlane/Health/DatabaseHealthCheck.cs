@@ -4,10 +4,10 @@ using Npgsql;
 namespace Axis.ControlPlane.Health;
 
 /// <summary>
-/// Reports whether the control plane database accepts queries. A failure is reported with the registration's failure status,
+/// Reports whether a PostgreSQL database accepts queries: the control plane's or the region directory's. A failure is reported with the registration's failure status,
 /// so the registration decides whether it is Unhealthy or Degraded.
 /// </summary>
-internal sealed class DatabaseHealthCheck(NpgsqlDataSource dataSource) : IHealthCheck
+internal sealed class DatabaseHealthCheck(NpgsqlDataSource dataSource, string unreachableMessage) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
@@ -21,7 +21,7 @@ internal sealed class DatabaseHealthCheck(NpgsqlDataSource dataSource) : IHealth
         }
         catch (Exception exception) when (exception is NpgsqlException or TimeoutException)
         {
-            return new HealthCheckResult(context.Registration.FailureStatus, "The control plane database is unreachable.", exception);
+            return new HealthCheckResult(context.Registration.FailureStatus, unreachableMessage, exception);
         }
     }
 }
