@@ -663,6 +663,8 @@ export function StudioAuthoringRequestPage({
       testId="studio-ai-feed-result"
       mark={ready ? 'waiting' : request.state === 'accepted' ? 'done' : 'idle'}
       title={t('shell.studio.aiRequest.feed.result')}
+      // Its blocks, what changes, the checks and the review, and the actions, are `spacing-md` apart.
+      gap={spacing.md}
     >
       {/* Each changed resource once, as the plan's details and the review's findings list them, its summary under it. */}
       {changedRows.length > 0 && (
@@ -693,7 +695,6 @@ export function StudioAuthoringRequestPage({
           alignItems: 'baseline',
           // A tag keeps its own width in its column.
           justifyItems: 'start',
-          marginTop: spacing.xs,
         }}
       >
         {checksLine !== null && (
@@ -744,7 +745,7 @@ export function StudioAuthoringRequestPage({
         {request.review !== null && <ReviewFindings review={request.review} resources={resources} onOpen={onOpen} />}
       </div>
       {draft !== null && showsDiff && (
-        <Flex align="center" gap={spacing.sm} wrap style={{ marginTop: spacing.xs }}>
+        <Flex align="center" gap={spacing.sm} wrap>
           {/* Proposed: the author sees the draft at work on the preview host before accepting it, see the review on
               #3263. */}
           {ready && previewHost !== null && (
@@ -1015,7 +1016,7 @@ export function StudioAuthoringRequestPage({
         }}
         onCancel={() => setAnywayOpen(false)}
       >
-        <Flex vertical gap={spacing.xs}>
+        <Flex vertical gap={spacing.md}>
           <Typography.Text>{t('shell.studio.aiRequest.acceptAnyway.text')}</Typography.Text>
           {/* The must-change findings it leaves out, listed as the review lists them; a note asks for no change. */}
           <FindingList
@@ -1062,12 +1063,15 @@ function FeedItem({
   mark,
   title,
   aside,
+  gap,
   children,
 }: {
   testId: string
   mark: FeedMark
   title: ReactNode
   aside?: ReactNode
+  /** The gap between the blocks of its body, `spacing-xs` unless it holds blocks of different kinds. */
+  gap?: number
   children?: ReactNode
 }) {
   const { colour, size, spacing } = useDesignTokens()
@@ -1107,7 +1111,11 @@ function FeedItem({
           <Typography.Text strong>{title}</Typography.Text>
           {aside !== undefined && <Typography.Text style={{ color: colour.textMuted }}>{aside}</Typography.Text>}
         </Flex>
-        {children}
+        {children !== undefined && (
+          <Flex vertical gap={gap ?? spacing.xs}>
+            {children}
+          </Flex>
+        )}
       </Flex>
     </li>
   )
@@ -1270,7 +1278,8 @@ function ReviewFindings({
       {/* Its tag closes the line, and its summary, a sentence or two, reads under it across the columns. */}
       <Typography.Text style={{ gridColumn: '1 / -1' }}>{review.summary}</Typography.Text>
       {review.findings.length > 0 && (
-        <div style={{ gridColumn: '1 / -1' }}>
+        // The findings are a block of their own, `spacing-md` below the summary.
+        <div style={{ gridColumn: '1 / -1', marginTop: spacing.xs }}>
           <FindingList findings={review.findings} resources={resources} onOpen={onOpen} />
         </div>
       )}
@@ -1303,7 +1312,8 @@ function FindingList({
   const group = (key: string, heading: string, items: readonly StudioReviewFinding[], danger: boolean) =>
     items.length > 0 && (
       <Flex vertical gap={spacing.xs} data-testid={key}>
-        {/* The blocking findings' heading is in dangerText, so a glance tells what holds the draft back. */}
+        {/* A heading sits `spacing-xs` above its list, and the groups `spacing-md` apart. The blocking findings'
+            heading is in dangerText, so a glance tells what holds the draft back. */}
         <Typography.Text strong style={danger ? { color: colour.dangerText } : undefined}>
           {t(heading)}
         </Typography.Text>
@@ -1321,7 +1331,7 @@ function FindingList({
       </Flex>
     )
   return (
-    <Flex vertical gap={spacing.sm} data-testid={testId}>
+    <Flex vertical gap={spacing.md} data-testid={testId}>
       {group(
         'studio-ai-findings-blocking',
         'shell.studio.aiRequest.review.blocking',

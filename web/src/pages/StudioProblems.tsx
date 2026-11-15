@@ -98,11 +98,16 @@ export function StudioProblemList({
     }
   }
   return (
-    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }} data-testid={testId}>
+    // The groups are a `spacing-xs` gap apart, with no room above the first or below the last, so the list sits flush
+    // where it is put and keeps the rhythm of what surrounds it.
+    <ul
+      style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: spacing.xs }}
+      data-testid={testId}
+    >
       {groups.map((group) => {
         const first = group.items[0]
         return (
-          <li key={group.key} style={{ paddingBlock: spacing.xs / 2 }} data-testid="studio-problem-group">
+          <li key={group.key} data-testid="studio-problem-group">
             <div>
               <ResourceReference
                 resourceId={group.resourceId}
