@@ -7,7 +7,8 @@ namespace Axis.ControlPlane.SignUp;
 /// Runs the recurring <c>expireSignUps</c> job: marks each pending sign-up whose 24 hours are over <c>expired</c>, see
 /// <c>docs/reference/sign-up.md#verifying-the-email-first</c>. Its subdomain is free again. The subdomain check and a new sign-up
 /// already ignore a pending sign-up past its end, so the job only keeps the table true. The job also deletes each used proof-of-work
-/// solution past its expiry, which the sign-up route refuses anyway, see <c>docs/reference/sign-up.md#bots-and-abuse</c>. The payload is not used.
+/// solution past its expiry, which the sign-up route refuses anyway, and each count of a sign-up email older than 24 hours, which the limit of three
+/// emails a day ignores anyway, see <c>docs/reference/sign-up.md#bots-and-abuse</c>. The payload is not used.
 /// </summary>
 internal sealed class SignUpExpiry(NpgsqlDataSource controlPlane) : IJobHandler
 {
@@ -24,5 +25,8 @@ internal sealed class SignUpExpiry(NpgsqlDataSource controlPlane) : IJobHandler
 
         await using var challenges = controlPlane.CreateCommand("DELETE FROM control_plane.sign_up_challenges WHERE expires_at <= now()");
         await challenges.ExecuteNonQueryAsync(cancellationToken);
+
+        await using var emails = controlPlane.CreateCommand("DELETE FROM control_plane.sign_up_emails WHERE queued_at <= now() - interval '24 hours'");
+        await emails.ExecuteNonQueryAsync(cancellationToken);
     }
 }

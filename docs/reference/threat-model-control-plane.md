@@ -55,7 +55,7 @@ flowchart LR
 ### Sign-up page and API
 
 The sign-up page and its API take requests from anyone on the internet, before anyone signs in.
-The control plane serves the page, see [sign-up](sign-up.md). Sending the form is planned for M33.
+The control plane serves the page and takes the form, see [sign-up](sign-up.md).
 
 ```mermaid
 flowchart LR
@@ -79,7 +79,7 @@ flowchart LR
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
 | C1 | Sign-up spam fills the cells with tenants that nobody uses. | Sign-up page and API | Denial of service | High | **Gap** | Closed by [#2460](https://github.com/phuongnse/axis/issues/2460), which adds proof of work and rate limits, and by [#2461](https://github.com/phuongnse/axis/issues/2461), which allows one trial per verified email and refuses disposable domains. |
-| C3 | A sign-up answer for a verified email reveals whether that email has signed up. | Sign-up page and API | Information disclosure | Medium | **Mitigated** | The answer is `202` with no body for every address. An address that already verified a sign-up gets the trial-used email and nothing is stored, and `SignUpTests` shows this. |
+| C3 | A sign-up answer for a verified email reveals whether that email has signed up. | Sign-up page and API | Information disclosure | Medium | **Mitigated** | The answer is `202` with a `{ resend }` token for every address. The token is encrypted, so it looks alike for a new address and one that already had a trial, and `POST /api/sign-up/resend` answers `202` for every token, good or not. An address that already verified a sign-up gets the trial-used email and nothing is stored. Each address gets at most three sign-up emails in 24 hours, and past that the answer is still `202`. `SignUpTests` shows each of these. |
 | C4 | A replayed or leaked verification link creates a tenant for someone else. | Sign-up page and API | Spoofing | High | **Mitigated** | The link is single-use and works for 24 hours. Verification changes nothing, the first confirm sets `verified` in one conditional update and a second answers `409`, and both routes refuse an expired or unknown token. Only the SHA-256 of the token is stored. The token travels after `#` and in the request body, so no request line holds it. The confirm answers a random progress secret and stores only its SHA-256. `SignUpTests` shows each of these. |
 | C5 | A forged or replayed proof of work passes the bot check. | Sign-up page and API | Tampering | Medium | **Mitigated** | The control plane signs each challenge with its own key and it expires after 10 minutes. `POST /api/sign-up` checks the solution before the limits and the form, and refuses a missing, malformed, wrong, expired or used one under `/altcha`. It stores each accepted solution in the database until it expires, so the solution works once across replicas, and a try without a good solution never uses up the address's limit. `SignUpTests` shows each of these. |
 | C20 | Someone who guesses or copies a sign-up's id learns how far its trial is and its address. | Sign-up page and API | Information disclosure | Low | **Mitigated** | `GET /api/sign-up/{id}` answers only a caller that sends the progress secret in the `Sign-Up-Secret` header, and the control plane compares the SHA-256 of that secret with the stored hash in constant time. An unknown id, a malformed id, a pending sign-up, a missing secret and a wrong secret all get the same `404` with no body. The secret is in no request line. `SignUpTests` shows this. |
