@@ -624,6 +624,10 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasDefaultValue("none")
                         .HasColumnName("ai_outside_clients");
 
+                    b.Property<string>("Application")
+                        .HasColumnType("text")
+                        .HasColumnName("application");
+
                     b.Property<bool>("ApplicationPackages")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")

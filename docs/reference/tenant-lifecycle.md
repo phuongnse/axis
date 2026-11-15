@@ -113,13 +113,17 @@ over the schema role.
 | `GET /api/cell/jobs` | Lists the cell's jobs as `{ "items": [...] }`, newest first by `createdAt`, then by id. Each item is a job as the job read answers it, with its `steps` and `error`. The `actor` and the `input` of a job are never returned. `tenant` keeps one tenant's jobs, and an unknown tenant answers an empty list. `limit` is a whole number from 1 to 200 and is 50 when missing. Any other value answers `400`. There is no paging past `limit`. |
 | `GET /api/cell/jobs/{id}` | Answers a job as the `202` does, with its `steps`, each `{ name, state, error }`, and the `error` of a failed job. An unknown id answers `404`. |
 
-- **A tenant's application** _(planned for M33)_. The create job records the tenant's application,
-  which the tenant reads answer as `application`.
+- **A tenant's application.** The create job records the tenant's application on its row in
+  `platform.tenants`, and the tenant reads answer it as `application`. It is the template id, such as
+  `approvals`, for a tenant created from a template. For a tenant created without an `application` it is
+  the name of the blank application, see [creating a tenant](#creating-a-tenant). A tenant that no
+  create job made, such as one that `tenant create` made, answers `null`, and so does a tenant created
+  before the job recorded it.
 
 ## Creating a tenant
 
 `POST /api/cell/tenants` takes `{ "id", "application", "administrator", "quotas" }` and queues a
-`create` job with five steps, all `pending`. `quotas` is optional. The job keeps the request's
+`create` job with five steps, all `pending`. `application` and `quotas` are optional. The job keeps the request's
 `application`, `administrator` and `quotas`, when the request has them, in its `input`, which the job
 read never returns.
 
@@ -131,9 +135,14 @@ read never returns.
   [application template](modules-and-templates.md#application-templates), such as the built-in
   `approvals`. An id that is not an installed template answers `400`. The job keeps the id, and its
   `application` step takes the newest version.
-- **Without an `application`** _(planned for M33)_. The request may leave `application` out. The
-  `application` step then creates a blank application named by the tenant id, as Studio's Blank does,
-  and `activate` activates its first release.
+- **Without an `application`**, the request creates a blank application, as Studio's Blank does, from
+  the same code. The `application` step creates it, and `activate` activates its first release. Its
+  name is the tenant id made into an application name: each hyphen is dropped and the letter after it
+  is upper-cased, so `acme-corp` becomes `acmeCorp`. A name that does not start with a letter, or whose
+  site path is one of the [reserved path](modules-and-templates.md#blank-application), gets the prefix `app`, as
+  `app1acme` and `appApi`. The site path is the kebab-case name, so it equals the tenant id for a
+  plain id. A person who signs up and chooses Blank gets this tenant, see
+  [provisioning](sign-up.md#provisioning).
 - **`administrator`** is the email of the person invited as the tenant's first administrator. A value
   that is not an email answers `400`.
 - **`quotas`** is optional and has the shape of the `set` object of
@@ -158,10 +167,11 @@ The publisher runs the job's steps in order, see the [create job](administration
 
 1. `tenant`: create the tenant as `tenant create` does, with the host `<id>.<Cell:TenantDomain>`, its
    realm, its keys and its backup key, see
-   [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell), and write the quota rows of
-   the job's `quotas`.
+   [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell), write the quota rows of
+   the job's `quotas`, and record the tenant's application on its row.
 2. `application`: copy the application into the tenant's Studio folder,
-   `<Studio:ApplicationsPath>/<tenant id>/`, as Studio creates one from a template.
+   `<Studio:ApplicationsPath>/<tenant id>/`, as Studio creates one from a template. Without an
+   `application` in the input it writes the blank application instead.
 3. `activate`: activate the application's first release in the tenant.
 4. `invite`: invite the administrator, as `tenant create --administrator` does.
 5. `resume`: set the tenant `active`.

@@ -103,6 +103,8 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         using var client = CreateClient(factory, _console);
         var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
 
+        // The create job records the application. A tenant that no create job made keeps null.
+        await ExecuteAsync("UPDATE platform.tenants SET application = 'approvals' WHERE id = 'a'; UPDATE platform.tenants SET application = 'AcmeCorp' WHERE id = 'b'");
         using var list = await GetAsync(client, "/api/cell/tenants", token);
         using var one = await GetAsync(client, "/api/cell/tenants/b", token);
         using var suspended = await GetAsync(client, "/api/cell/tenants/c", token);
@@ -111,7 +113,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         var items = (await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
         Assert.Equal(["a", "b", "c"], items.EnumerateArray().Select(item => item.GetProperty("id").GetString()).ToArray());
         Assert.Equal(["active", "active", "suspended"], items.EnumerateArray().Select(item => item.GetProperty("status").GetString()).ToArray());
-        Assert.All(items.EnumerateArray(), item => Assert.Equal(JsonValueKind.Null, item.GetProperty("application").ValueKind));
+        Assert.Equal(["approvals", "AcmeCorp", null], items.EnumerateArray().Select(item => item.GetProperty("application").GetString()).ToArray());
         Assert.Equal(["localhost"], Hosts(items[0]));
         Assert.Equal(["b.vn.example.test", "b2.vn.example.test"], Hosts(items[1]));
         Assert.Equal(["c.vn.example.test"], Hosts(items[2]));
@@ -120,9 +122,12 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         var tenant = await one.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
         Assert.Equal("b", tenant.GetProperty("id").GetString());
         Assert.Equal("active", tenant.GetProperty("status").GetString());
+        Assert.Equal("AcmeCorp", tenant.GetProperty("application").GetString());
         Assert.Equal(["b.vn.example.test", "b2.vn.example.test"], Hosts(tenant));
         Assert.Equal(HttpStatusCode.OK, suspended.StatusCode);
-        Assert.Equal("suspended", (await suspended.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("status").GetString());
+        var suspendedTenant = await suspended.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("suspended", suspendedTenant.GetProperty("status").GetString());
+        Assert.Equal(JsonValueKind.Null, suspendedTenant.GetProperty("application").ValueKind);
     }
 
     [Fact]
@@ -1409,6 +1414,19 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task A_create_without_an_application_answers_202_and_stores_no_application_in_the_job_input()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+
+        using var create = await PostJobAsync(client, "/api/cell/tenants", token, "create-blank", CreateBody("d", application: null));
+
+        Assert.Equal(HttpStatusCode.Accepted, create.StatusCode);
+        Assert.Equal("""{"administrator":"admin@example.test"}""", await ScalarAsync("SELECT input::text FROM platform.jobs") is string input ? Compact(input) : null);
+    }
+
+    [Fact]
     public async Task A_create_from_the_built_in_approvals_application_answers_202_when_it_is_installed_and_400_when_it_is_not()
     {
         using var empty = new TemporaryFolder();
@@ -1820,8 +1838,23 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         Assert.Equal(overridden, quota.GetProperty("overridden").GetBoolean());
     }
 
-    private static string CreateBody(string id, string application = "approvals", string administrator = "admin@example.test", object? quotas = null) =>
-        JsonSerializer.Serialize(quotas is null ? new { id, application, administrator } : (object)new { id, application, administrator, quotas });
+    // A null application is left out of the body, as a request for a blank tenant leaves it out.
+    private static string CreateBody(string id, string? application = "approvals", string administrator = "admin@example.test", object? quotas = null)
+    {
+        var body = new Dictionary<string, object?> { ["id"] = id };
+        if (application is not null)
+        {
+            body["application"] = application;
+        }
+
+        body["administrator"] = administrator;
+        if (quotas is not null)
+        {
+            body["quotas"] = quotas;
+        }
+
+        return JsonSerializer.Serialize(body);
+    }
 
     private static string Compact(string json) => JsonSerializer.Serialize(JsonSerializer.Deserialize<JsonElement>(json));
 
