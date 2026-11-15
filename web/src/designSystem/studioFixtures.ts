@@ -729,22 +729,13 @@ function planOf(request: StudioAuthoringRequest): StudioPlan {
 }
 
 /**
- * Proposed: the review of a ready request: each plan step done, at the resource that does it, and no finding, unless
- * the preview gives the request a review of its own, see the review on #3263.
+ * Proposed: the review of a ready request: no finding, unless the preview gives the request a review of its own, see
+ * the review on #3263.
  */
-function reviewOf(request: StudioAuthoringRequest, plan: StudioPlan | null): StudioReview {
+function reviewOf(request: StudioAuthoringRequest): StudioReview {
   return (
     reviews[request.id] ?? {
       summary: 'The draft does what the request and the plan ask.',
-      steps: (plan?.changes ?? []).map((step) => ({
-        step,
-        done: true,
-        resourceId: null,
-        file: null,
-        name: null,
-        kind: null,
-        path: '',
-      })),
       findings: [],
     }
   )
@@ -949,7 +940,7 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
       draft: appState === 'accepted' ? null : draftOf(request.id),
       checks: checksOf(request, appState),
       // Its author has their own AI here, so a second AI reviewed it.
-      review: appState === 'ready' ? reviewOf(request, appPlan) : null,
+      review: appState === 'ready' ? reviewOf(request) : null,
       changes: appDiff.map(({ file, summary }) => ({ file, summary })),
       failure: null,
       accept: appAccept,
@@ -976,7 +967,7 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
     aiConnected: true,
     draft: hasDraft ? draftOf(request.id) : null,
     checks: checksOf(request, state),
-    review: state === 'ready' ? reviewOf(request, plan) : null,
+    review: state === 'ready' ? reviewOf(request) : null,
     changes: diff.map(({ file, summary }) => ({ file, summary })),
     failure: state === 'failed' ? (failures[request.id] ?? null) : null,
     accept,
@@ -1208,35 +1199,6 @@ const reviews: Record<string, StudioReview> = {
   [appRequest.id]: {
     summary:
       'The draft adds the Cost centre entity and field as planned, but the request list shows no Cost centre column.',
-    steps: [
-      {
-        step: 'Add a Cost centre entity with a name and a code.',
-        done: true,
-        resourceId: null,
-        file: 'entities/cost-centre.json',
-        name: 'Cost centre',
-        kind: 'entity',
-        path: '',
-      },
-      {
-        step: 'Add a Cost centre field to the purchase request, chosen from the cost centres.',
-        done: true,
-        resourceId: id(firstEntityId),
-        file: 'entities/Request.json',
-        name: null,
-        kind: null,
-        path: '/fields/2',
-      },
-      {
-        step: 'Show the cost centre as a column of the request list.',
-        done: false,
-        resourceId: pageId,
-        file: 'pages/request-list.json',
-        name: null,
-        kind: null,
-        path: '/widgets/0/columns',
-      },
-    ],
     findings: [
       {
         blocking: true,

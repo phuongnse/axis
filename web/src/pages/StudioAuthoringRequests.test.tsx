@@ -240,7 +240,6 @@ describe('a ready request’s review', () => {
       aiConnected: true,
       review: {
         summary: 'Mails the approver too.',
-        steps: [],
         findings: [
           { blocking: false, text: 'Could say why.', file: 'pages/list.json', path: '/widgets/1', resourceId: 'r-1' },
           {
@@ -302,7 +301,7 @@ describe('a ready request’s review', () => {
   })
 
   it('says no changes are requested when nothing must change', async () => {
-    stub({ ...fromApp, aiConnected: true, review: { summary: 'All done.', steps: [], findings: [] } })
+    stub({ ...fromApp, aiConnected: true, review: { summary: 'All done.', findings: [] } })
     renderPage()
 
     const review = await screen.findByTestId('studio-ai-review')
@@ -340,7 +339,7 @@ describe('a ready request’s page', () => {
             ...fromApp,
             aiConnected: true,
             draft: 'd-1',
-            review: { summary: 'All done.', steps: [], findings: [] },
+            review: { summary: 'All done.', findings: [] },
             changes: [{ file: 'entities/cost-centre.json', summary: 'A cost centre with a name and a code.' }],
             checks: {
               ...fromApp.checks!,
@@ -719,8 +718,9 @@ describe('a plan and its review, as a pull request has them', () => {
     renderPage()
 
     const plan = await screen.findByTestId('studio-ai-feed-plan')
+    // The fold follows the summary on its line, as See the checks follows the checks' summary.
     expect(within(plan).getByTestId('studio-ai-plan-summary')).toHaveTextContent(
-      'Adds a Cost centre field to each purchase request.',
+      'Adds a Cost centre field to each purchase request. Show the plan',
     )
     expect(within(plan).queryByTestId('studio-ai-plan')).toBeNull()
   })
@@ -753,43 +753,16 @@ describe('a plan and its review, as a pull request has them', () => {
     })
   })
 
-  it('sums the review up in the result, and ticks each step of the plan, with the resource where it falls short', async () => {
+  it('sums the review up in the result', async () => {
     stub({
       ...fromApp,
       aiConnected: true,
-      review: {
-        summary: 'The field is added, but the list shows no column.',
-        steps: [
-          { step: 'Add the field.', done: true, resourceId: null, file: null, name: null, kind: null, path: '' },
-          {
-            step: 'Show it in the list.',
-            done: false,
-            resourceId: 'r-1',
-            file: 'pages/list.json',
-            name: null,
-            kind: null,
-            path: '/widgets/0',
-          },
-        ],
-        findings: [],
-      },
+      review: { summary: 'The field is added, but the list shows no column.', findings: [] },
     })
-    const onOpen = renderPage()
+    renderPage()
 
     const review = await screen.findByTestId('studio-ai-review')
     expect(within(review).getByText('The field is added, but the list shows no column.')).toBeInTheDocument()
-    expect(within(review).queryByTestId('studio-ai-review-step')).toBeNull()
-
-    const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Show the plan' }))
-    const changes = await screen.findByTestId('studio-ai-plan-changes')
-    expect(within(changes).getByText('What changes')).toBeInTheDocument()
-    const [done, notDone] = within(changes).getAllByTestId('studio-ai-review-step')
-    expect(done).toHaveAttribute('data-done', 'true')
-    expect(done).toHaveTextContent(/^Done:\s*Add the field\.$/)
-    expect(notDone).toHaveTextContent(/^Not done:\s*Show it in the list\.\s*Requests\s*Page$/)
-    await user.click(within(notDone).getByRole('button', { name: 'Requests' }))
-    expect(onOpen).toHaveBeenCalledWith('r-1', '/widgets/0')
   })
 })
 
@@ -995,7 +968,6 @@ describe("a request's guide", () => {
       aiConnected: true,
       review: {
         summary: 'The list shows no column.',
-        steps: [],
         findings: [
           { blocking: true, text: 'Show the column.', file: 'pages/list.json', path: '/widgets/0', resourceId: null },
           { blocking: false, text: 'Could say why.', file: 'pages/list.json', path: '/widgets/1', resourceId: null },
@@ -1023,7 +995,6 @@ describe("a request's guide", () => {
       aiConnected: true,
       review: {
         summary: 'The list shows no column.',
-        steps: [],
         findings: [
           { blocking: true, text: 'Show the column.', file: 'pages/list.json', path: '/widgets/0', resourceId: null },
           { blocking: false, text: 'Could say why.', file: 'pages/list.json', path: '/widgets/1', resourceId: null },

@@ -1934,27 +1934,11 @@ export interface StudioPlan {
 }
 
 /**
- * Proposed: one step of the approved plan as the review found it, see the review on #3263: whether the draft does it,
- * and the resource where it does, or where it falls short.
- */
-export interface StudioReviewStep {
-  step: string
-  done: boolean
-  resourceId: string | null
-  file: string | null
-  /** The name and kind of a resource only the draft adds, which has no id in the application. */
-  name: string | null
-  kind: string | null
-  path: string
-}
-
-/**
- * Proposed: a request's review, see the review on #3263: its summary in one or two sentences, each step of the plan
- * checked against the draft, and its findings.
+ * Proposed: a request's review, see the review on #3263: its summary in one or two sentences, and its findings, which
+ * say where the draft falls short of the request and the plan.
  */
 export interface StudioReview {
   summary: string
-  steps: StudioReviewStep[]
   findings: StudioReviewFinding[]
 }
 

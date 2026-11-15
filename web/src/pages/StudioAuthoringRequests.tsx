@@ -57,7 +57,6 @@ import { ActionBar } from './SaveBar'
 import { StudioPageHeading } from './StudioPageHeading'
 import { StudioProblemList } from './StudioProblems'
 import { ResourceReference } from './ResourceReference'
-import { visuallyHidden } from '../platform/visuallyHidden'
 import { CheckOutlined, ClockCircleOutlined, CloseOutlined, LoadingOutlined, MinusOutlined } from '@ant-design/icons'
 import { useDiagnosticItems } from './useDiagnosticItems'
 import { StudioRequestStatus } from './StudioRequestStatus'
@@ -592,25 +591,30 @@ export function StudioAuthoringRequestPage({
       ))}
       {request.state === 'planning' && !waitsForApp && nowLine(t('shell.studio.aiRequest.planning'))}
       {failed && !approved && failure}
-      {/* Proposed: the plan's summary shows even while the plan is folded, so the feed says what it does. */}
-      {request.plan !== null && request.plan.summary !== '' && (
-        <Typography.Text data-testid="studio-ai-plan-summary">{request.plan.summary}</Typography.Text>
+      {/* Proposed: the plan's summary shows even while the plan is folded, so the feed says what it does, with the fold
+          right after it, as See the checks follows the checks' summary. */}
+      {request.plan !== null && (
+        <span data-testid="studio-ai-plan-summary">
+          {request.plan.summary !== '' && <Typography.Text>{request.plan.summary}</Typography.Text>}
+          {!awaiting && (
+            <>
+              {' '}
+              <AxisButton
+                role="link"
+                size="small"
+                aria-expanded={planOpen}
+                onClick={() => setPlanOpen(!planOpen)}
+                data-testid="studio-ai-plan-fold"
+              >
+                {t(planOpen ? 'shell.studio.aiRequest.feed.hidePlan' : 'shell.studio.aiRequest.feed.showPlan')}
+              </AxisButton>
+            </>
+          )}
+        </span>
       )}
-      {request.plan !== null &&
-        (awaiting ? (
-          <PlanView plan={request.plan} review={request.review} resources={resources} onOpen={onOpen} />
-        ) : (
-          <>
-            {fold(
-              planOpen,
-              () => setPlanOpen(!planOpen),
-              'shell.studio.aiRequest.feed.showPlan',
-              'shell.studio.aiRequest.feed.hidePlan',
-              'studio-ai-plan-fold',
-            )}
-            {planOpen && <PlanView plan={request.plan} review={request.review} resources={resources} onOpen={onOpen} />}
-          </>
-        ))}
+      {request.plan !== null && (awaiting || planOpen) && (
+        <PlanView plan={request.plan} resources={resources} onOpen={onOpen} />
+      )}
     </FeedItem>
   )
 
@@ -1162,17 +1166,13 @@ const planKinds = new Set<StudioAuthoringStepKind>(['plan', 'planChange', 'propo
  * Proposed: a request's plan, written as a pull request's plan is, see the review on #3263: each a group named in bold,
  * What changes, Decisions to check, each choice with its reason, muted, Effects and risks, and How it will be checked,
  * then its details, resource by resource, folded until asked for. Its approval's actions sit in the page's bar.
- * Once a review ran, each step of What changes is its checklist item, a check mark when the draft does it and a cross
- * when it does not, with the resource where, as a pull request's description ticks its own list.
  */
 function PlanView({
   plan,
-  review,
   resources,
   onOpen,
 }: {
   plan: StudioPlan
-  review: StudioReview | null
   resources: readonly StudioResourceItem[]
   onOpen: (resourceId: string, path: string) => void
 }) {
@@ -1206,41 +1206,7 @@ function PlanView({
           {bullets(plan.questions)}
         </Flex>
       )}
-      {review === null || review.steps.length === 0 ? (
-        group('shell.studio.aiRequest.plan.changes', 'studio-ai-plan-changes', plan.changes)
-      ) : (
-        <Flex vertical gap={spacing.xs} data-testid="studio-ai-plan-changes">
-          <Typography.Text strong>{t('shell.studio.aiRequest.plan.changes')}</Typography.Text>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {review.steps.map((step, index) => (
-              <li key={index} data-testid="studio-ai-review-step" data-done={step.done}>
-                <Flex gap={spacing.xs} align="baseline" wrap>
-                  <span style={{ color: step.done ? colour.successText : colour.dangerText }}>
-                    {step.done ? <CheckOutlined aria-hidden /> : <CloseOutlined aria-hidden />}
-                    <span style={visuallyHidden}>
-                      {t(
-                        step.done
-                          ? 'shell.studio.aiRequest.review.stepDone'
-                          : 'shell.studio.aiRequest.review.stepNotDone',
-                      )}
-                    </span>
-                  </span>
-                  <Typography.Text>{step.step}</Typography.Text>
-                  <ResourceReference
-                    resourceId={step.resourceId}
-                    file={step.file}
-                    name={step.name}
-                    kind={step.kind}
-                    path={step.path}
-                    resources={resources}
-                    onSelect={onOpen}
-                  />
-                </Flex>
-              </li>
-            ))}
-          </ul>
-        </Flex>
-      )}
+      {group('shell.studio.aiRequest.plan.changes', 'studio-ai-plan-changes', plan.changes)}
       {group(
         'shell.studio.aiRequest.decisions',
         'studio-ai-plan-decisions',
