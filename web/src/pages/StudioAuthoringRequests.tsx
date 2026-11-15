@@ -544,8 +544,19 @@ export function StudioAuthoringRequestPage({
       ['working', 'checking', 'fixing', 'reviewing', 'ready', 'accepted'].includes(request.state))
   const hasWork = approved
   const hasResult = ((ready || failed) && request.checks !== null) || request.state === 'accepted'
-  const fold = (open: boolean, toggle: () => void, show: string, hide: string, testId: string) => (
-    <span>
+  // Proposed: what an item folds opens from a link at the end of the line that sums it up, the plan's summary, the
+  // work's steps, the checks' result, a space after its words, so every fold of the feed reads the same way.
+  const fold = (
+    open: boolean,
+    toggle: () => void,
+    show: string,
+    hide: string,
+    testId: string,
+    lead?: ReactNode,
+    style?: CSSProperties,
+  ) => (
+    <span style={style}>
+      {lead !== undefined && <>{lead} </>}
       <AxisButton role="link" size="small" aria-expanded={open} onClick={toggle} data-testid={testId}>
         {t(open ? hide : show)}
       </AxisButton>
@@ -559,12 +570,16 @@ export function StudioAuthoringRequestPage({
       data-testid="studio-ai-failure"
     />
   )
-  const nowLine = (words: ReactNode) => (
-    <Flex align="center" gap={spacing.sm} wrap data-testid="studio-ai-now">
-      <Spin size="small" />
-      <Typography.Text style={{ color: colour.textMuted }}>{words}</Typography.Text>
-    </Flex>
-  )
+  // What AI does now, muted after a spinner, then what else its line holds, such as the fold of the steps.
+  const nowLine = (words: ReactNode, rest?: (lead: ReactNode) => ReactNode) => {
+    const lead = <Typography.Text style={{ color: colour.textMuted }}>{words}</Typography.Text>
+    return (
+      <Flex align="center" gap={spacing.sm} wrap data-testid="studio-ai-now">
+        <Spin size="small" />
+        {rest === undefined ? lead : rest(lead)}
+      </Flex>
+    )
+  }
 
   const planComments = request.steps.filter((step) => step.kind === 'planChange')
   const planItem = (
@@ -596,20 +611,17 @@ export function StudioAuthoringRequestPage({
           right after it, as See the checks follows the checks' summary. */}
       {request.plan !== null && (
         <span data-testid="studio-ai-plan-summary">
-          {request.plan.summary !== '' && <Typography.Text>{request.plan.summary}</Typography.Text>}
-          {!awaiting && (
-            <>
-              {' '}
-              <AxisButton
-                role="link"
-                size="small"
-                aria-expanded={planOpen}
-                onClick={() => setPlanOpen(!planOpen)}
-                data-testid="studio-ai-plan-fold"
-              >
-                {t(planOpen ? 'shell.studio.aiRequest.feed.hidePlan' : 'shell.studio.aiRequest.feed.showPlan')}
-              </AxisButton>
-            </>
+          {awaiting ? (
+            <Typography.Text>{request.plan.summary}</Typography.Text>
+          ) : (
+            fold(
+              planOpen,
+              () => setPlanOpen(!planOpen),
+              'shell.studio.aiRequest.feed.showPlan',
+              'shell.studio.aiRequest.feed.hidePlan',
+              'studio-ai-plan-fold',
+              request.plan.summary !== '' ? <Typography.Text>{request.plan.summary}</Typography.Text> : undefined,
+            )
           )}
         </span>
       )}
@@ -621,36 +633,40 @@ export function StudioAuthoringRequestPage({
 
   const workStart = workSteps[0]?.startedAt
   const workEnd = workSteps.at(-1)?.finishedAt ?? null
+  const workDone =
+    !working && workStart !== undefined && workEnd !== null ? (
+      <Typography.Text>
+        {t('shell.studio.aiRequest.feed.workDone')
+          .replace('{count}', String(workSteps.length))
+          .replace('{duration}', formatDuration(Date.parse(workEnd) - Date.parse(workStart), t))}
+      </Typography.Text>
+    ) : undefined
+  const stepsFold = (lead: ReactNode) =>
+    fold(
+      stepsOpen,
+      () => setStepsOpen(!stepsOpen),
+      'shell.studio.aiRequest.feed.showSteps',
+      'shell.studio.aiRequest.feed.hideSteps',
+      'studio-ai-steps-fold',
+      lead,
+    )
   const workItem = hasWork && (
     <FeedItem
       testId="studio-ai-feed-work"
       mark={working ? 'now' : failed ? 'stopped' : dropped ? 'idle' : 'done'}
       title={t('shell.studio.aiRequest.feed.work')}
-      aside={
-        working
-          ? fixRound
-            ? t('shell.studio.aiRequest.round').replace('{round}', String(request.round))
-            : undefined
-          : workStart !== undefined && workEnd !== null
-            ? t('shell.studio.aiRequest.feed.workDone')
-                .replace('{count}', String(workSteps.length))
-                .replace('{duration}', formatDuration(Date.parse(workEnd) - Date.parse(workStart), t))
-            : undefined
-      }
+      // Proposed: beside the title, how the item stands, as the plan's approval does; what it did reads under it.
+      aside={working && fixRound ? t('shell.studio.aiRequest.round').replace('{round}', String(request.round)) : undefined}
     >
-      {working &&
-        !waitsForApp &&
-        following &&
-        nowLine(running === undefined ? t('shell.studio.aiRequest.feed.starting') : stepWords(running))}
       {failed && approved && failure}
-      {request.steps.length > 0 &&
-        fold(
-          stepsOpen,
-          () => setStepsOpen(!stepsOpen),
-          'shell.studio.aiRequest.feed.showSteps',
-          'shell.studio.aiRequest.feed.hideSteps',
-          'studio-ai-steps-fold',
-        )}
+      {/* Proposed: under the title, what AI does now or what it did, with the fold of its steps after it on its line,
+          as the plan's summary and the checks' result have theirs. */}
+      {working && !waitsForApp && following
+        ? nowLine(
+            running === undefined ? t('shell.studio.aiRequest.feed.starting') : stepWords(running),
+            (lead) => request.steps.length > 0 && stepsFold(lead),
+          )
+        : request.steps.length > 0 && stepsFold(workDone)}
       {stepsOpen && (
         <AxisTable<HistoryRow>
           columns={stepColumns}
@@ -725,18 +741,15 @@ export function StudioAuthoringRequestPage({
             <StatusTag tone={checksLine.passed ? 'success' : 'danger'}>
               {t(checksLine.passed ? 'shell.studio.aiRequest.checks.passed' : 'shell.studio.aiRequest.checks.failed')}
             </StatusTag>
-            <span style={inside}>
-              <Typography.Text>{checksLine.text}</Typography.Text>{' '}
-              <AxisButton
-                role="link"
-                size="small"
-                aria-expanded={checksOpen}
-                onClick={() => setChecksOpen(!checksOpen)}
-                data-testid="studio-ai-checks-fold"
-              >
-                {t(checksOpen ? 'shell.studio.aiRequest.feed.hideChecks' : 'shell.studio.aiRequest.feed.showChecks')}
-              </AxisButton>
-            </span>
+            {fold(
+              checksOpen,
+              () => setChecksOpen(!checksOpen),
+              'shell.studio.aiRequest.feed.showChecks',
+              'shell.studio.aiRequest.feed.hideChecks',
+              'studio-ai-checks-fold',
+              <Typography.Text>{checksLine.text}</Typography.Text>,
+              inside,
+            )}
             {checksOpen && (
               <Flex vertical gap="small" style={inside} data-testid="studio-ai-check-details">
                 {problems.length > 0 && (

@@ -2159,7 +2159,7 @@
   "shell.studio.aiRequest.feed.planApproved": "Approved on {time}",
   "shell.studio.aiRequest.feed.showPlan": "Show the plan",
   "shell.studio.aiRequest.feed.hidePlan": "Hide the plan",
-  "shell.studio.aiRequest.feed.work": "AI's work",
+  "shell.studio.aiRequest.feed.work": "Work",
   "shell.studio.aiRequest.feed.workDone": "{count} steps in {duration}",
   "shell.studio.aiRequest.feed.starting": "AI is starting the change.",
   "shell.studio.aiRequest.feed.showSteps": "Show the steps",

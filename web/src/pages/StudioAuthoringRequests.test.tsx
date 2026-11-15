@@ -150,7 +150,7 @@ describe('an outside AI app’s request while it works', () => {
 
     expect(await screen.findByText('Working')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-ai-app-works')).toBeNull()
-    // Every request reads as the same feed, whichever way it began: its plan done, AI's work going on.
+    // Every request reads as the same feed, whichever way it began: its plan done, its work going on.
     expect(screen.getByTestId('studio-ai-feed-plan')).toHaveAttribute('data-mark', 'done')
     expect(screen.getByTestId('studio-ai-feed-work')).toHaveAttribute('data-mark', 'now')
     vi.unstubAllGlobals()
@@ -320,7 +320,7 @@ describe('a ready request’s page', () => {
     vi.unstubAllGlobals()
   })
 
-  it("reads as one feed, its plan and AI's work done, then its result, with the changes and the checks unfolded on asking", async () => {
+  it("reads as one feed, its plan and its work done, then its result, with the changes and the checks unfolded on asking", async () => {
     const fetchMock = vi.fn(async (input: string) =>
       input.includes('/drafts/')
         ? json({
@@ -817,6 +817,8 @@ describe("a request's history", () => {
   it('reads writes that follow each other as one row that opens to each, in its own words, and how long each took', async () => {
     stub({
       ...fromApp,
+      state: 'working',
+      checks: null,
       aiConnected: true,
       steps: [
         step('propose_plan', '2026-11-10T09:00:00Z', '2026-11-10T09:00:40Z', null),
@@ -837,7 +839,9 @@ describe("a request's history", () => {
       />,
     )
     const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'Show the steps' }))
+    // Proposed: what AI does now reads under the item's title, the fold of its steps after it on its line.
+    expect(await screen.findByTestId('studio-ai-now')).toHaveTextContent('Compiling the draft Show the steps')
+    await user.click(screen.getByRole('button', { name: 'Show the steps' }))
 
     const rows = screen.getAllByRole('row').slice(1)
     expect(rows).toHaveLength(3)
@@ -886,7 +890,13 @@ describe("a request's history", () => {
       />,
     )
     const user = userEvent.setup()
-    await user.click(await screen.findByRole('button', { name: 'Show the steps' }))
+    // Proposed: what AI did reads under the item's title, Work, the fold of its steps after it on its line.
+    const work = await screen.findByTestId('studio-ai-feed-work')
+    expect(within(work).getByText('Work')).toBeInTheDocument()
+    expect(within(work).getByTestId('studio-ai-steps-fold').parentElement).toHaveTextContent(
+      '4 steps in 33 min Show the steps',
+    )
+    await user.click(within(work).getByRole('button', { name: 'Show the steps' }))
 
     const rows = screen.getAllByRole('row').slice(1)
     expect(rows[0]).toHaveTextContent(/Checked the draft\s*1 of 2 scenarios pass/)
