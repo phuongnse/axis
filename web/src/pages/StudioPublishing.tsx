@@ -19,6 +19,7 @@ import {
   type StudioRequest,
   testStudioApp,
   validateStudioApp,
+  type StudioPreviewLink,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
@@ -131,7 +132,7 @@ export function StudioPublishing({
   const { generation, reconnecting, lost } = useStudioConnection()
   const [request, setRequest] = useState<StudioRequest | null>(null)
   const [releaseNumber, setReleaseNumber] = useState<number | null>(null)
-  const [previewLinks, setPreviewLinks] = useState<string[]>([])
+  const [previewLinks, setPreviewLinks] = useState<StudioPreviewLink[]>([])
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [history, setHistory] = useState<StudioReleases | 'failed'>()
@@ -291,18 +292,9 @@ export function StudioPublishing({
       <Flex gap="middle" align="flex-start">
         <Flex vertical gap="middle" style={{ flex: 1, minWidth: 0 }}>
           {sendError !== null && <AxisAlert data-testid="studio-request-error" kind="error" message={sendError} />}
-          {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
+          {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} links={previewLinks} />}
           {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (
             <StudioTestResults request={request} resources={resources} onSelect={onOpenScenario} />
-          )}
-          {previewLinks.length > 0 && (
-            <Flex vertical gap={4}>
-              {previewLinks.map((link) => (
-                <a key={link} data-testid="studio-preview-link" href={link} target="_blank" rel="noreferrer">
-                  {link}
-                </a>
-              ))}
-            </Flex>
           )}
           {typeof children === 'function' ? children(history) : children}
           {releasesView && history && history !== 'failed' && (

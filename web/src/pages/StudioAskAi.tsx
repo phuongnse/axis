@@ -151,10 +151,12 @@ export function StudioAskAi({ application, onClose }: { application: string; onC
         <Typography.Text strong>
           {t(notConnected ? 'shell.studio.ai.notConnected.app' : 'shell.studio.ai.mcp')}
         </Typography.Text>
-        <Typography.Text style={{ color: colour.textMuted }}>
-          {t(notConnected ? 'shell.studio.ai.notConnected.app.help' : 'shell.studio.ai.mcp.help')}
+        {/* Proposed: the address follows "Give it this address:" on its line, as what the words point to, see the review
+            on #3263. */}
+        <Typography.Text style={{ color: colour.textMuted }} data-testid="studio-ai-mcp-help">
+          {t(notConnected ? 'shell.studio.ai.notConnected.app.help' : 'shell.studio.ai.mcp.help')}{' '}
+          <Typography.Text code copyable>{`${window.location.origin}/mcp`}</Typography.Text>
         </Typography.Text>
-        <Typography.Text code copyable>{`${window.location.origin}/mcp`}</Typography.Text>
       </Flex>
     </StudioSidePanel>
   )

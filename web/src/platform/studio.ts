@@ -1213,10 +1213,17 @@ export function previewSiteUrl(
   return `${location.protocol}//${host}${location.port ? `:${location.port}` : ''}/${sitePath}`
 }
 
+/** A site of the application and its address on the preview host. */
+export interface StudioPreviewLink {
+  site: StudioResourceItem
+  url: string
+}
+
 /**
- * The address of each of `sites` on the preview host once a preview request has succeeded, and none before or with no
- * preview host. The site paths are read from the folder, so a path renamed since the request was sent gives a wrong
- * link. The band's Preview and, proposed, a draft's preview, see the review on #3263, both show them.
+ * Each of `sites` with its address on the preview host once a preview request has succeeded, and none before or with
+ * no preview host. The site paths are read from the folder, so a path renamed since the request was sent gives a wrong
+ * link. The band's Preview and, proposed, a draft's preview, see the review on #3263, both show them in the status
+ * line of the preview.
  */
 export async function findPreviewLinks(
   application: string,
@@ -1224,16 +1231,16 @@ export async function findPreviewLinks(
   sites: StudioResourceItem[],
   ended: StudioRequest,
   signal: AbortSignal,
-): Promise<string[]> {
+): Promise<StudioPreviewLink[]> {
   if (ended.target !== 'preview' || ended.status !== 'succeeded' || previewHost === null) {
     return []
   }
-  const links: string[] = []
+  const links: StudioPreviewLink[] = []
   for (const site of sites) {
     try {
       const { content } = await fetchStudioResource(application, site.id, signal)
       if (typeof content.path === 'string') {
-        links.push(previewSiteUrl(previewHost, content.path))
+        links.push({ site, url: previewSiteUrl(previewHost, content.path) })
       }
     } catch (error) {
       if (signal.aborted || error instanceof ServerUnreachableError) {

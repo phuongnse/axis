@@ -1750,6 +1750,8 @@ describe('StudioPage publishing', () => {
     await vi.advanceTimersByTimeAsync(1000)
     await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded'))
     const link = await screen.findByTestId('studio-preview-link')
+    expect(screen.getByTestId('studio-request-status')).toContainElement(link)
+    expect(link).toHaveTextContent('Open Purchasing')
     expect(link.getAttribute('href')).toContain('//preview.example.test')
     expect(link.getAttribute('href')).toMatch(/\/purchasing$/)
     expect(screen.queryByTestId('studio-release-number')).not.toBeInTheDocument()

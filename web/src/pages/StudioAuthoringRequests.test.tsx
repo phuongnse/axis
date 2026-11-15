@@ -198,8 +198,11 @@ describe('a ready request', () => {
     )
     const user = userEvent.setup()
 
-    // Proposed: the author replies under the feed, as a comment on a pull request asks its agent for more.
-    await user.click(await screen.findByRole('button', { name: 'Ask for other changes…' }))
+    // Proposed: the bar asks for other changes, and the author replies under the feed, as a comment on a pull request
+    // asks its agent for more.
+    await user.click(
+      await within(await screen.findByTestId('studio-ai-bar')).findByRole('button', { name: 'Ask for other changes…' }),
+    )
     const reply = await screen.findByTestId('studio-ai-reply')
     await user.type(
       within(reply).getByRole('textbox', { name: 'What should AI change?' }),
@@ -383,6 +386,8 @@ describe('a ready request’s page', () => {
     // Proposed: what the draft changes is its diff, each resource as people read it with the summary its request wrote,
     // folded until its author opens it.
     const file = await within(result).findByTestId('studio-revision-change')
+    // The diff follows the checks and the review, which sum it up.
+    expect(screen.getByTestId('studio-ai-review').compareDocumentPosition(file)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     expect(file).toHaveTextContent(/Cost centre\s*Entity\s*Added.*A cost centre with a name and a code\./)
     const user = userEvent.setup()
     const toggle = within(file).getByRole('button', { name: /Cost centre/ })
@@ -424,10 +429,10 @@ describe('a ready request’s page', () => {
     )
 
     await userEvent.setup().click(await screen.findByRole('button', { name: 'Preview the draft' }))
-    expect(await screen.findByTestId('studio-ai-preview-link')).toHaveAttribute(
-      'href',
-      expect.stringMatching(/\/\/preview\.example\.com(:\d+)?\/buy$/),
-    )
+    // Proposed: the preview's status line ends with a link to each site, named by the site.
+    const link = await screen.findByTestId('studio-preview-link')
+    expect(link).toHaveAttribute('href', expect.stringMatching(/\/\/preview\.example\.com(:\d+)?\/buy$/))
+    expect(screen.getByTestId('studio-request-status')).toHaveTextContent('The preview is ready. Open Requests')
   })
 
   it('shows no preview without a preview host', async () => {
@@ -468,7 +473,7 @@ describe('a ready request’s page', () => {
     expect(within(bar).getByRole('button', { name: 'Approve plan' })).toBeInTheDocument()
 
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Change the plan…' }))
+    await user.click(within(bar).getByRole('button', { name: 'Change the plan…' }))
     const reply = screen.getByTestId('studio-ai-reply')
     await user.type(within(reply).getByRole('textbox', { name: 'What should the plan do differently?' }), 'No column.')
     await user.click(within(reply).getByRole('button', { name: 'Ask for a new plan' }))

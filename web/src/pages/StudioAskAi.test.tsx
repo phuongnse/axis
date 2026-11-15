@@ -52,6 +52,8 @@ describe('StudioAskAi', () => {
     expect(screen.queryByText(/left this month/)).toBeNull()
     expect(screen.queryByTestId('studio-ai-not-connected')).toBeNull()
     expect(within(screen.getByTestId('studio-ai-mcp')).getByText('Use your own AI app')).toBeInTheDocument()
+    // Proposed: the address follows the words that point to it, on their line.
+    expect(screen.getByTestId('studio-ai-mcp-help')).toHaveTextContent(/Give it this address: http:\/\/\S+\/mcp$/)
   })
 
   it('leads an author with no AI of their own to connect one on their account page or to use an AI app through MCP, with no form', async () => {

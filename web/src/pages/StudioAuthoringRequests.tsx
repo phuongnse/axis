@@ -38,6 +38,7 @@ import {
   type StudioRequest,
   type StudioResourceItem,
   type StudioRevisionChange,
+  type StudioPreviewLink,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
@@ -210,7 +211,7 @@ export function StudioAuthoringRequestPage({
   const [dropOpen, setDropOpen] = useState(false)
   const [replyForm] = Form.useForm<{ comment: string }>()
   // Proposed: the preview of the ready draft, as a preview request, then the links to its sites.
-  const [preview, setPreview] = useState<{ draft: string; request: StudioRequest; links: string[] }>()
+  const [preview, setPreview] = useState<{ draft: string; request: StudioRequest; links: StudioPreviewLink[] }>()
   const [diff, setDiff] = useState<{ key: string; changes: StudioRevisionChange[] | 'failed' }>()
   const [accepting, setAccepting] = useState<{ id: string; accept: StudioRequest }>()
 
@@ -692,23 +693,9 @@ export function StudioAuthoringRequestPage({
       testId="studio-ai-feed-result"
       mark={ready ? 'waiting' : request.state === 'accepted' ? 'done' : 'idle'}
       title={t('shell.studio.aiRequest.feed.result')}
-      // Its blocks, what changes, the checks and the review, and the actions, are `spacing-md` apart.
+      // Its blocks, the checks and the review, what changes, and the actions, are `spacing-md` apart.
       gap={spacing.md}
     >
-      {/* Proposed: what the request changes is its diff, each resource a block that starts folded under its name, kind and
-          change, with the summary its request wrote, and opens to its JSON diff, see the review on #3263. */}
-      {showsDiff &&
-        (changes === undefined ? (
-          <Spin />
-        ) : changes === 'failed' ? (
-          <AxisAlert kind="error" message={t('shell.studio.aiRequest.diffFailed')} />
-        ) : (
-          changes.length > 0 && (
-            <Flex vertical gap={spacing.xs} data-testid="studio-ai-changes">
-              <StudioChanges changes={changes} resources={resources} summaries={summaries} folded />
-            </Flex>
-          )
-        ))}
       {/* Proposed: the checks and the review as lines of one shape, see the review on #3263: each its name in bold and its
           verdict as a tag, in columns so the tags start together, its summary under it, then what the review found. */}
       <div
@@ -767,6 +754,21 @@ export function StudioAuthoringRequestPage({
         {/* The review runs only once the checks pass, so a request that failed before it has no findings. */}
         {request.review !== null && <ReviewFindings review={request.review} resources={resources} onOpen={onOpen} />}
       </div>
+      {/* Proposed: what the request changes is its diff, after the checks and the review, which sum it up, each resource a
+          block that starts folded under its name, kind and change, with the summary its request wrote, and opens to its
+          JSON diff, see the review on #3263. */}
+      {showsDiff &&
+        (changes === undefined ? (
+          <Spin />
+        ) : changes === 'failed' ? (
+          <AxisAlert kind="error" message={t('shell.studio.aiRequest.diffFailed')} />
+        ) : (
+          changes.length > 0 && (
+            <Flex vertical gap={spacing.xs} data-testid="studio-ai-changes">
+              <StudioChanges changes={changes} resources={resources} summaries={summaries} folded />
+            </Flex>
+          )
+        ))}
       {/* Proposed: the author sees the draft at work on the preview host before accepting it, see the review on #3263. */}
       {ready && draft !== null && previewHost !== null && (
         <span>
@@ -781,14 +783,9 @@ export function StudioAuthoringRequestPage({
         </span>
       )}
       {preview !== undefined && preview.draft === draft && (
-        <Flex vertical gap={spacing.xs} data-testid="studio-ai-preview-status">
-          <StudioRequestStatus request={preview.request} releaseNumber={null} />
-          {preview.links.map((link) => (
-            <a key={link} href={link} target="_blank" rel="noreferrer" data-testid="studio-ai-preview-link">
-              {link}
-            </a>
-          ))}
-        </Flex>
+        <div data-testid="studio-ai-preview-status">
+          <StudioRequestStatus request={preview.request} releaseNumber={null} links={preview.links} />
+        </div>
       )}
       {conflicts.length > 0 ? (
         <AxisAlert
@@ -843,6 +840,17 @@ export function StudioAuthoringRequestPage({
   const dropButton = canDrop
     ? button('drop', 'secondary', t('shell.studio.aiRequest.drop'), () => setDropOpen(true))
     : null
+  // Proposed: asking for another plan or other changes is an action of the bar, secondary beside the main one, which
+  // opens the reply under the feed, see the review on #3263. While the plan has questions, Answer… opens it.
+  const replyButton =
+    replyKind !== null && questions === 0
+      ? button(
+          'reply',
+          'secondary',
+          t(asksChanges ? 'shell.studio.aiRequest.askOther' : 'shell.studio.aiRequest.changePlan'),
+          () => setReplyOpen(true),
+        )
+      : null
   // Proposed: the bar at the foot of the window guides in every state, see the review on #3263: one sentence of what
   // comes next in plain words, then at most one main action for it, so no one needs to read how the page works.
   const guide = ((): { words: string; actions: ReactNode[] } => {
@@ -886,6 +894,7 @@ export function StudioAuthoringRequestPage({
               words: t('shell.studio.aiRequest.guide.awaiting'),
               actions: [
                 dropButton,
+                replyButton,
                 button('approve', 'finish', t('shell.studio.aiRequest.approve'), () => void act('approve')),
               ],
             }
@@ -912,6 +921,7 @@ export function StudioAuthoringRequestPage({
             ).replace('{count}', String(blockingTexts.length)),
             actions: [
               dropButton,
+              replyButton,
               // Proposed: accepting past an open must-change finding asks first, and lists what it leaves out, as
               // merging past a required review does, see the review on #3263.
               button('accept', 'secondary', t('shell.studio.aiRequest.acceptAnyway'), () => setAnywayOpen(true)),
@@ -933,6 +943,7 @@ export function StudioAuthoringRequestPage({
           words: t('shell.studio.aiRequest.guide.passed'),
           actions: [
             dropButton,
+            replyButton,
             button('accept', 'finish', t('shell.studio.aiRequest.accept'), () => void startAccept()),
           ],
         }
@@ -975,48 +986,39 @@ export function StudioAuthoringRequestPage({
             </FeedLast.Provider>
           ))}
       </ol>
-      {replyKind !== null &&
-        (replyOpen ? (
-          <Form
-            form={replyForm}
-            layout="vertical"
-            requiredMark={requiredMark}
-            onFinish={(values) => void act(replyKind, values.comment.trim())}
-            data-testid="studio-ai-reply"
+      {replyKind !== null && replyOpen && (
+        <Form
+          form={replyForm}
+          layout="vertical"
+          requiredMark={requiredMark}
+          onFinish={(values) => void act(replyKind, values.comment.trim())}
+          data-testid="studio-ai-reply"
+        >
+          <AxisField
+            name="comment"
+            label={t(replyLabel)}
+            help={t(`${replyLabel}.help`)}
+            requiredMessage={t(
+              asksChanges ? 'shell.studio.aiRequest.changesCommentRequired' : 'shell.studio.aiRequest.commentRequired',
+            )}
           >
-            <AxisField
-              name="comment"
-              label={t(replyLabel)}
-              help={t(`${replyLabel}.help`)}
-              requiredMessage={t(
-                asksChanges
-                  ? 'shell.studio.aiRequest.changesCommentRequired'
-                  : 'shell.studio.aiRequest.commentRequired',
-              )}
-            >
-              <Input.TextArea
-                aria-label={t(replyLabel)}
-                autoSize={{ minRows: 2, maxRows: 8 }}
-                maxLength={2000}
-                autoFocus
-              />
-            </AxisField>
-            <AxisActionRow>
-              <AxisButton role="secondary" htmlType="submit" disabled={acting}>
-                {t(asksChanges ? 'shell.studio.aiRequest.requestChanges.ok' : 'shell.studio.aiRequest.changePlan.ok')}
-              </AxisButton>
-              <AxisButton role="secondary" onClick={() => setReplyOpen(false)}>
-                {t('shell.studio.cancel')}
-              </AxisButton>
-            </AxisActionRow>
-          </Form>
-        ) : (
-          <span>
-            <AxisButton role="link" onClick={() => setReplyOpen(true)} data-testid="studio-ai-reply-open">
-              {t(asksChanges ? 'shell.studio.aiRequest.askOther' : 'shell.studio.aiRequest.changePlan')}
+            <Input.TextArea
+              aria-label={t(replyLabel)}
+              autoSize={{ minRows: 2, maxRows: 8 }}
+              maxLength={2000}
+              autoFocus
+            />
+          </AxisField>
+          <AxisActionRow>
+            <AxisButton role="secondary" htmlType="submit" disabled={acting}>
+              {t(asksChanges ? 'shell.studio.aiRequest.requestChanges.ok' : 'shell.studio.aiRequest.changePlan.ok')}
             </AxisButton>
-          </span>
-        ))}
+            <AxisButton role="secondary" onClick={() => setReplyOpen(false)}>
+              {t('shell.studio.cancel')}
+            </AxisButton>
+          </AxisActionRow>
+        </Form>
+      )}
       <ActionBar testId="studio-ai-bar">
         <span data-testid="studio-ai-guide">{guide.words}</span>
         {guide.actions.some((action) => action !== null) && (
@@ -1281,8 +1283,9 @@ function ReviewFindings({
       {/* Its tag closes the line, and its summary, a sentence or two, reads under it across the columns. */}
       <Typography.Text style={inside}>{review.summary}</Typography.Text>
       {review.findings.length > 0 && (
-        // The findings are a block of their own, `spacing-md` below the summary.
-        <div style={{ ...inside, marginTop: spacing.xs }}>
+        // Proposed: the findings follow the summary `spacing-sm` below it, the grid's `spacing-xs` and this margin, nearer
+        // than the review's line is to the checks' and farther than a heading is from its list, see the review on #3263.
+        <div style={{ ...inside, marginTop: spacing.sm - spacing.xs }}>
           <FindingList findings={review.findings} resources={resources} onOpen={onOpen} />
         </div>
       )}
