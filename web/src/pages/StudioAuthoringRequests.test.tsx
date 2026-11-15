@@ -972,7 +972,9 @@ describe("a request's guide", () => {
 
     await user.click(within(await screen.findByTestId('studio-ai-bar')).getByRole('button', { name: 'Accept anyway…' }))
     const dialog = await screen.findByRole('dialog', { name: 'Accept without these changes?' })
-    expect(within(dialog).getByTestId('studio-ai-anyway-findings')).toHaveTextContent('Show the column.')
+    // The findings it leaves out read as the review lists them: grouped by resource, each led by Must change.
+    const left = within(dialog).getByTestId('studio-ai-anyway-findings')
+    expect(within(left).getAllByTestId('studio-problem')[0]).toHaveTextContent('Must change Show the column.')
     expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/accept'))).toBe(false)
     await user.click(within(dialog).getByRole('button', { name: 'Accept anyway' }))
     await waitFor(() => {
