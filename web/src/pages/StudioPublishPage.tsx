@@ -168,7 +168,7 @@ export function StudioPublishPage({
               ? t('shell.studio.publish.goesLive').replace('{number}', String((liveNumber ?? 0) + 1))
               : ''}
           </span>
-          <AxisActionRow align="center">
+          <AxisActionRow align="center" fold>
             <AxisButton role="secondary" onClick={() => navigate(-1)}>
               {t('shell.studio.cancel')}
             </AxisButton>

@@ -111,7 +111,13 @@ export function StudioProblemList({
         // and start where the rest of what belongs to the resource starts.
         const bulleted = group.items.every((item) => item.lead === null)
         return (
-          <li key={group.key} data-testid="studio-problem-group">
+          // Proposed: a resource's problems sit half of `spacing-xs` under its name, nearer to it than the groups are to
+          // each other, see the review on #3263.
+          <li
+            key={group.key}
+            data-testid="studio-problem-group"
+            style={{ display: 'flex', flexDirection: 'column', gap: spacing.xs / 2 }}
+          >
             <div>
               <ResourceReference
                 resourceId={group.resourceId}

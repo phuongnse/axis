@@ -203,7 +203,8 @@ describe('a ready request', () => {
     await user.click(
       await within(await screen.findByTestId('studio-ai-bar')).findByRole('button', { name: 'Ask for other changes…' }),
     )
-    const reply = await screen.findByTestId('studio-ai-reply')
+    // Proposed: it opens a dialog, as Drop… and Accept anyway… do.
+    const reply = await screen.findByRole('dialog', { name: 'Ask for other changes' })
     await user.type(
       within(reply).getByRole('textbox', { name: 'What should AI change?' }),
       'Make the cost centre optional.',
@@ -290,6 +291,8 @@ describe('a ready request’s review', () => {
     expect(within(fixPage).getByText('Page')).toBeInTheDocument()
     expect(fixPage).toHaveTextContent('Mails the approver too.')
     // Proposed: a finding is a sentence with no lead, so it takes a bullet, its words at spacing-xl.
+    // Proposed: a resource's findings sit half of spacing-xs under its name.
+    expect(fixPage).toHaveStyle({ gap: '4px' })
     expect(within(fixPage).getByTestId('studio-problem').parentElement).toHaveStyle({
       listStyleType: 'disc',
       paddingInlineStart: '32px',
@@ -474,7 +477,7 @@ describe('a ready request’s page', () => {
 
     const user = userEvent.setup()
     await user.click(within(bar).getByRole('button', { name: 'Change the plan…' }))
-    const reply = screen.getByTestId('studio-ai-reply')
+    const reply = await screen.findByRole('dialog', { name: 'Change the plan' })
     await user.type(within(reply).getByRole('textbox', { name: 'What should the plan do differently?' }), 'No column.')
     await user.click(within(reply).getByRole('button', { name: 'Ask for a new plan' }))
     await waitFor(() => {
@@ -758,7 +761,7 @@ describe('a plan and its review, as a pull request has them', () => {
 
     const user = userEvent.setup()
     await user.click(within(bar).getByRole('button', { name: 'Answer…' }))
-    const reply = screen.getByTestId('studio-ai-reply')
+    const reply = await screen.findByRole('dialog', { name: "Answer the plan's questions" })
     await user.type(within(reply).getByRole('textbox', { name: 'Your answers' }), 'Yes, required.')
     await user.click(within(reply).getByRole('button', { name: 'Ask for a new plan' }))
     await waitFor(() => {

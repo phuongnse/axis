@@ -1,6 +1,19 @@
 import { DownOutlined } from '@ant-design/icons'
-import { Button, Flex, Tooltip, type ButtonProps, type FlexProps } from 'antd'
-import { createContext, useContext, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
+import { Button, Dropdown, Flex, Tooltip, type ButtonProps, type FlexProps } from 'antd'
+import {
+  Children,
+  createContext,
+  isValidElement,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+} from 'react'
 import type { ButtonRole } from './buttonRoles'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -98,22 +111,107 @@ function IconButton(props: IconButtonProps) {
 /**
  * A row of actions that has a solid `finish` button, see docs/reference/actions-and-controls.md#buttons. Beside it,
  * `main`, `secondary` and `destructive` buttons are text buttons in their own colour, so the finish button is the only
- * filled shape.
+ * filled shape. Proposed, see step 20 of the review on #3263: with `fold`, a row whose actions do not fit on one line
+ * folds every action but the `finish` one into a More menu before it, in their order, and shows them again once they
+ * fit, so the main action and the words beside the row never wrap. Its children are then `AxisButton`s with text.
  */
 export function AxisActionRow({
   children,
   justify,
   align,
+  fold = false,
 }: {
   children: ReactNode
   justify?: FlexProps['justify']
   align?: FlexProps['align']
+  fold?: boolean
 }) {
+  if (fold) {
+    return <FoldingActionRow align={align}>{children}</FoldingActionRow>
+  }
   return (
     <ActionRowContext.Provider value={true}>
       <Flex gap="small" wrap justify={justify} align={align}>
         {children}
       </Flex>
+    </ActionRowContext.Provider>
+  )
+}
+
+/** The `fold` row of `AxisActionRow`: it takes the room its row leaves it and measures whether its actions fit. */
+function FoldingActionRow({ children, align }: { children: ReactNode; align?: FlexProps['align'] }) {
+  const t = useText()
+  const room = useRef<HTMLDivElement>(null)
+  const row = useRef<HTMLDivElement>(null)
+  const actions = Children.toArray(children).filter(isValidElement) as ReactElement<
+    AxisButtonProps & { role: Exclude<ButtonRole, 'icon'> }
+  >[]
+  const keys = actions.map((action) => String(action.key)).join('|')
+  // The width the actions took when they last did not fit, kept with the actions it was measured for.
+  const [folded, setFolded] = useState<{ keys: string; width: number }>()
+  const isFolded = folded?.keys === keys
+
+  // The row keeps its actions' own widths, so it is wider than the room it has when they do not fit.
+  useLayoutEffect(() => {
+    const space = room.current
+    const actionsRow = row.current
+    if (space === null || actionsRow === null) {
+      return
+    }
+    const measure = () => {
+      if (!isFolded) {
+        if (actionsRow.offsetWidth > space.clientWidth) {
+          setFolded({ keys, width: actionsRow.offsetWidth })
+        }
+      } else if (space.clientWidth >= folded.width) {
+        setFolded(undefined)
+      }
+    }
+    measure()
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(measure)
+    observer?.observe(space)
+    return () => observer?.disconnect()
+  }, [keys, isFolded, folded])
+
+  const finishing = actions.filter((action) => action.props.role === 'finish')
+  const others = actions.filter((action) => action.props.role !== 'finish')
+  return (
+    <ActionRowContext.Provider value={true}>
+      <div ref={room} style={{ display: 'flex', flex: '1 1 0', minWidth: 0 }}>
+        <Flex
+          ref={row}
+          gap="small"
+          align={align}
+          style={{ flex: 'none', flexWrap: 'nowrap', marginInlineStart: 'auto' }}
+        >
+          {isFolded && others.length > 0 ? (
+            <>
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: others.map((action) => ({
+                    key: String(action.key),
+                    label: action.props.children,
+                    disabled: action.props.disabled,
+                    danger: action.props.role === 'destructive',
+                  })),
+                  onClick: ({ key, domEvent }) =>
+                    others
+                      .find((action) => String(action.key) === key)
+                      ?.props.onClick?.(domEvent as MouseEvent<HTMLElement>),
+                }}
+              >
+                <AxisButton role="secondary" caret data-testid="action-row-more">
+                  {t('shell.actionRow.more')}
+                </AxisButton>
+              </Dropdown>
+              {finishing}
+            </>
+          ) : (
+            actions
+          )}
+        </Flex>
+      </div>
     </ActionRowContext.Provider>
   )
 }

@@ -4,7 +4,7 @@ import { PlusOutlined } from '@ant-design/icons'
 import { ConfigProvider } from 'antd'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AxisActionRow, AxisButton } from './AxisButton'
 import { buttonRoles } from './buttonRoles'
 import { designTokensFor } from './designTokens'
@@ -13,7 +13,7 @@ import { ThemeModeProvider } from './theme'
 import type { ThemeMode } from './themeMode'
 import { withAntdStyles } from '../test/antdStyles'
 
-const texts = { 'test.add': 'Add a row' }
+const texts = { 'test.add': 'Add a row', 'shell.actionRow.more': 'More' }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
 /** Waits past Ant Design's hover delay, so a tooltip that should open has opened. */
@@ -269,6 +269,52 @@ describe.each(['light', 'dark'] as const)('the roles of the button inside an act
     expect(screen.getByRole('button', { name: 'Main' })).toHaveStyle({ color: colour.primaryText })
     expect(screen.getByRole('button', { name: 'Destructive' })).toHaveStyle({ color: colour.dangerText })
     expect(screen.getByRole('button', { name: 'Secondary' }).style.color).toBe('')
+  })
+})
+
+// Proposed: a row that does not fit folds its other actions into a More menu, see step 20 of the review on #3263.
+describe('an action row that folds', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function renderRow(onDrop: () => void) {
+    renderIn(
+      'light',
+      <AxisActionRow fold>
+        <AxisButton key="drop" role="secondary" onClick={onDrop}>
+          Drop…
+        </AxisButton>
+        {null}
+        <AxisButton key="other" role="secondary" disabled>
+          Other…
+        </AxisButton>
+        <AxisButton key="accept" role="finish">
+          Accept
+        </AxisButton>
+      </AxisActionRow>,
+    )
+  }
+
+  it('shows every action while they fit', () => {
+    renderRow(() => {})
+
+    expect(screen.getByRole('button', { name: 'Drop…' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull()
+  })
+
+  it('folds every action but the finish one into a More menu before it when they do not fit', async () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(500)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(300)
+    const onDrop = vi.fn()
+    renderRow(onDrop)
+
+    const buttons = screen.getAllByRole('button').map((button) => button.textContent)
+    expect(buttons).toEqual(['More', 'Accept'])
+    await userEvent.click(screen.getByRole('button', { name: 'More' }))
+    expect(await screen.findByRole('menuitem', { name: 'Other…' })).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Drop…' }))
+    expect(onDrop).toHaveBeenCalledOnce()
   })
 })
 

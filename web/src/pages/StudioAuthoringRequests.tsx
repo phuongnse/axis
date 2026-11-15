@@ -986,12 +986,30 @@ export function StudioAuthoringRequestPage({
             </FeedLast.Provider>
           ))}
       </ol>
-      {replyKind !== null && replyOpen && (
+      {/* Proposed: asking for another plan, answering the plan's questions and asking for other changes each open a
+          dialog, as Drop… and Accept anyway… do, see the review on #3263. */}
+      <Modal
+        open={replyKind !== null && replyOpen}
+        width={size.dialog.medium}
+        title={t(
+          asksChanges
+            ? 'shell.studio.aiRequest.reply.askOther'
+            : questions > 0
+              ? 'shell.studio.aiRequest.reply.answer'
+              : 'shell.studio.aiRequest.reply.changePlan',
+        )}
+        okText={t(asksChanges ? 'shell.studio.aiRequest.requestChanges.ok' : 'shell.studio.aiRequest.changePlan.ok')}
+        cancelText={t('shell.studio.cancel')}
+        confirmLoading={acting}
+        onOk={() => replyForm.submit()}
+        onCancel={() => setReplyOpen(false)}
+        destroyOnHidden
+      >
         <Form
           form={replyForm}
           layout="vertical"
           requiredMark={requiredMark}
-          onFinish={(values) => void act(replyKind, values.comment.trim())}
+          onFinish={(values) => replyKind !== null && void act(replyKind, values.comment.trim())}
           data-testid="studio-ai-reply"
         >
           <AxisField
@@ -1004,25 +1022,19 @@ export function StudioAuthoringRequestPage({
           >
             <Input.TextArea
               aria-label={t(replyLabel)}
-              autoSize={{ minRows: 2, maxRows: 8 }}
+              autoSize={{ minRows: 3, maxRows: 8 }}
               maxLength={2000}
               autoFocus
             />
           </AxisField>
-          <AxisActionRow>
-            <AxisButton role="secondary" htmlType="submit" disabled={acting}>
-              {t(asksChanges ? 'shell.studio.aiRequest.requestChanges.ok' : 'shell.studio.aiRequest.changePlan.ok')}
-            </AxisButton>
-            <AxisButton role="secondary" onClick={() => setReplyOpen(false)}>
-              {t('shell.studio.cancel')}
-            </AxisButton>
-          </AxisActionRow>
         </Form>
-      )}
+      </Modal>
       <ActionBar testId="studio-ai-bar">
         <span data-testid="studio-ai-guide">{guide.words}</span>
         {guide.actions.some((action) => action !== null) && (
-          <AxisActionRow align="center">{guide.actions}</AxisActionRow>
+          <AxisActionRow align="center" fold>
+            {guide.actions}
+          </AxisActionRow>
         )}
       </ActionBar>
       <Modal

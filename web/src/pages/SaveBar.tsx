@@ -68,7 +68,7 @@ export function SaveBar({
             onClick={onRedo}
           />
         </AxisActionRow>
-        <AxisActionRow align="center">
+        <AxisActionRow align="center" fold>
           {unsaved && (
             <AxisButton role="secondary" disabled={busy} onClick={() => setDiscardOpen(true)}>
               {t('shell.studio.discard')}
