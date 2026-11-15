@@ -1222,26 +1222,18 @@ function PlanView({
       {group(
         'shell.studio.aiRequest.decisions',
         'studio-ai-plan-decisions',
-        // Proposed: each choice, then why, muted, so colour and not weight tells them apart, see the review on #3263.
-        plan.decisions.map(({ decision, reason }) => (
-          <>
-            <Typography.Text>{decision}</Typography.Text>{' '}
-            <Typography.Text style={{ color: colour.textMuted }}>{reason}</Typography.Text>
-          </>
-        )),
+        // Proposed: each choice, then why, a sentence of its own in the text colour, as words a person reads to decide
+        // are never muted, see the step 20 rules of the review on #3263.
+        plan.decisions.map(({ decision, reason }) => `${decision} ${reason}`),
       )}
       {group('shell.studio.aiRequest.plan.risks', 'studio-ai-plan-risks', plan.risks)}
       {group('shell.studio.aiRequest.plan.checks', 'studio-ai-plan-checks', plan.checks)}
       {group(
         'shell.studio.aiRequest.plan.checklist',
         'studio-ai-plan-checklist',
-        // Proposed: each item of Axis's checklist, then how the plan answers it, muted, as a decision reads.
-        plan.checklist.map(({ item, answer }) => (
-          <>
-            <Typography.Text>{item}</Typography.Text>{' '}
-            <Typography.Text style={{ color: colour.textMuted }}>{answer}</Typography.Text>
-          </>
-        )),
+        // Proposed: each item of Axis's checklist, a statement that can be met or not, then how the plan meets it, as a
+        // decision reads with its reason.
+        plan.checklist.map(({ item, answer }) => `${item} ${answer}`),
       )}
       {plan.details.length > 0 && (
         <Flex vertical gap={spacing.xs} data-testid="studio-ai-plan-details">
@@ -1371,8 +1363,8 @@ type ReviewMarkKind = StudioReviewFinding['kind'] | StudioReviewOutcome['outcome
 /**
  * Proposed: how the review found each acceptance criterion of the plan or each item of Axis's checklist, see the review
  * on #3263: under its heading in bold, each item led by its outcome as a `ReviewMark`, "Met:", "Not met:" or "Skipped:",
- * as a finding is led by its kind, then its words, with the review's short why, muted, after them on their line for one
- * not met or skipped, as a decision of the plan reads with its reason. Each item is a bullet, the mark after it, as
+ * as a finding is led by its kind, then its words, with the review's short why after them on their line for one not met
+ * or skipped, in the text colour, as a decision of the plan reads with its reason. Each item is a bullet, the mark after it, as
  * every list of sentences is.
  */
 function ReviewOutcomes({
@@ -1385,7 +1377,7 @@ function ReviewOutcomes({
   testId: string
 }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const { spacing } = useDesignTokens()
   const bulletList = useBulletList()
   if (items.length === 0) {
     return null
@@ -1398,12 +1390,7 @@ function ReviewOutcomes({
           <li key={index} data-outcome={item.outcome}>
             <ReviewMark mark={item.outcome} words={t(`shell.studio.aiRequest.review.outcome.${item.outcome}`)} />{' '}
             <Typography.Text>{item.text}</Typography.Text>
-            {item.note !== null && (
-              <>
-                {' '}
-                <Typography.Text style={{ color: colour.textMuted }}>{item.note}</Typography.Text>
-              </>
-            )}
+            {item.note !== null && <> {item.note}</>}
           </li>
         ))}
       </ul>
@@ -1412,10 +1399,11 @@ function ReviewOutcomes({
 }
 
 /**
- * Proposed: a review's findings in one list, see the review on #3263, as `StudioProblemList` lists problems: grouped by
- * the resource they are about, the resource a link, each finding led by its kind as a `ReviewMark`, as a problem is led
- * by its severity, "Blocking:" or "Suggestion:", so a glance tells what holds the draft back. The blocking ones
- * come first. The review's result shows them all, and the Accept anyway dialog the blocking ones alone.
+ * Proposed: a review's findings in one flat list, see the review on #3263, each a bullet led by its kind as a
+ * `ReviewMark`, "Blocking:" or "Suggestion:", then its words and the resource it is about at the end of its line, as a
+ * `ResourceReference`, its title the link that opens it at the finding's path. The blocking ones come first, so a glance
+ * tells what holds the draft back. The review's result shows them all, and the Accept anyway dialog the blocking ones
+ * alone.
  */
 function FindingList({
   findings,
@@ -1432,23 +1420,27 @@ function FindingList({
   only?: 'blocking'
 }) {
   const t = useText()
+  const bulletList = useBulletList()
   const listed = [
     ...findings.filter((finding) => finding.kind === 'blocking'),
     ...(only === undefined ? findings.filter((finding) => finding.kind !== 'blocking') : []),
   ]
   return (
-    <StudioProblemList
-      testId={testId}
-      items={listed.map((finding) => ({
-        lead: <ReviewMark mark={finding.kind} words={t(`shell.studio.aiRequest.review.kind.${finding.kind}`)} />,
-        message: finding.text,
-        resourceId: finding.resourceId,
-        file: finding.file,
-        path: finding.path,
-      }))}
-      resources={resources}
-      onSelect={onOpen}
-    />
+    <ul style={bulletList} data-testid={testId}>
+      {listed.map((finding, index) => (
+        <li key={index} data-testid="studio-ai-finding" data-kind={finding.kind}>
+          <ReviewMark mark={finding.kind} words={t(`shell.studio.aiRequest.review.kind.${finding.kind}`)} />{' '}
+          <Typography.Text>{finding.text}</Typography.Text>{' '}
+          <ResourceReference
+            resourceId={finding.resourceId}
+            file={finding.file}
+            path={finding.path}
+            resources={resources}
+            onSelect={onOpen}
+          />
+        </li>
+      ))}
+    </ul>
   )
 }
 

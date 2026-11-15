@@ -619,12 +619,21 @@ const supplierPlan: StudioPlan = {
   ],
   checklist: [
     {
-      item: 'Who sees it.',
+      item: 'Only the people who should see the change see it.',
       answer: 'Everyone who sees a request sees its supplier; only Purchasing manages suppliers.',
     },
-    { item: 'Data already saved.', answer: 'The 124 saved requests keep no supplier until they are next saved.' },
-    { item: 'Texts.', answer: 'Every new label in English and Vietnamese.' },
-    { item: 'Scenarios.', answer: 'Two new scenarios; the 8 that run today run again.' },
+    {
+      item: 'The records already saved stay valid.',
+      answer: 'The 124 saved requests keep no supplier until they are next saved.',
+    },
+    {
+      item: 'Every new text is written in each language of the application.',
+      answer: 'Every new label in English and Vietnamese.',
+    },
+    {
+      item: 'Test scenarios check the change, and the ones that ran before still pass.',
+      answer: 'Two new scenarios; the 8 that run today run again.',
+    },
   ],
   details: [
     {
@@ -684,9 +693,18 @@ const appPlan: StudioPlan = {
     'The request list shows a Cost centre column.',
   ],
   checklist: [
-    { item: 'Who sees it.', answer: 'Everyone who sees a request sees its cost centre.' },
-    { item: 'Data already saved.', answer: 'Saved requests have no cost centre until someone sets one.' },
-    { item: 'Texts.', answer: 'The new labels in English and Vietnamese.' },
+    {
+      item: 'Only the people who should see the change see it.',
+      answer: 'Everyone who sees a request sees its cost centre.',
+    },
+    {
+      item: 'The records already saved stay valid.',
+      answer: 'Saved requests have no cost centre until someone sets one.',
+    },
+    {
+      item: 'Every new text is written in each language of the application.',
+      answer: 'The new labels in English and Vietnamese.',
+    },
   ],
   details: [
     {
@@ -1230,10 +1248,10 @@ const reviews: Record<string, StudioReview> = {
       },
     ],
     checklist: [
-      { text: 'Who sees it.', outcome: 'met', note: null },
-      { text: 'Data already saved.', outcome: 'met', note: null },
+      { text: 'Only the people who should see the change see it.', outcome: 'met', note: null },
+      { text: 'The records already saved stay valid.', outcome: 'met', note: null },
       {
-        text: 'Texts.',
+        text: 'Every new text is written in each language of the application.',
         outcome: 'skipped',
         note: 'The Vietnamese label could not be checked: the draft has no Vietnamese text resource yet.',
       },

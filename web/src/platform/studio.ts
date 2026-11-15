@@ -1933,8 +1933,9 @@ export interface StudioPlan {
   risks: string[]
   checks: string[]
   /**
-   * Proposed: Axis's authoring checklist, the one the review checks the draft against, each item with how the plan
-   * answers it, such as who may see a new field, the data already saved and the texts of every locale.
+   * Proposed: Axis's authoring checklist, the one the review checks the draft against, each item a statement that can
+   * be met or not, as an acceptance criterion is, such as "The records already saved stay valid.", with how the plan
+   * meets it.
    */
   checklist: { item: string; answer: string }[]
   /** Each resource's edits; `name` and `kind` name a resource the draft adds, which has no id yet. */

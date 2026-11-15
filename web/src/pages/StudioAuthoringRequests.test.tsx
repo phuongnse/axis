@@ -293,34 +293,28 @@ describe('a ready request’s review', () => {
     // by its kind, an icon in the colour it asks for and its word, after the bullet.
     const found = within(review).getByTestId('studio-ai-findings')
     expect(within(found).getByText('Things to look at')).toBeInTheDocument()
-    const [page, loose] = within(found).getAllByTestId('studio-problem-group')
-    expect(within(page).getAllByRole('button', { name: 'Requests' })).toHaveLength(1)
-    expect(within(page).getByText('Page')).toBeInTheDocument()
-    expect(page).toHaveTextContent(/Blocking: Mails the approver too\..*Suggestion: Could say why\./)
+    // Proposed: one flat list, each finding a bullet led by its kind, then its words and the resource at the end.
+    const [mails, why, loose] = within(found).getAllByTestId('studio-ai-finding')
+    expect(found.querySelector('ul')).toHaveStyle({ listStyleType: 'disc', paddingInlineStart: '32px' })
+    expect(mails).toHaveTextContent(/^Blocking: Mails the approver too\. Requests\s*Page$/)
+    expect(why).toHaveTextContent(/^Suggestion: Could say why\. Requests\s*Page$/)
     const { colour } = designTokensFor('light')
     // Only the icon takes the colour; the word reads in the text colour.
-    const blockingMark = within(page).getByText('Blocking:')
+    const blockingMark = within(mails).getByText('Blocking:')
     expect(blockingMark.style.color).toBe('')
     expect(blockingMark.querySelector('.anticon-exclamation-circle')!.parentElement).toHaveStyle({
       color: colour.dangerText,
     })
-    expect(within(page).getByText('Suggestion:').querySelector('.anticon-bulb')!.parentElement).toHaveStyle({
+    expect(within(why).getByText('Suggestion:').querySelector('.anticon-bulb')!.parentElement).toHaveStyle({
       color: colour.warningText,
     })
-    // Proposed: a resource's findings sit half of spacing-xs under its name.
-    expect(page).toHaveStyle({ gap: '4px' })
-    // Proposed: a list of sentences keeps its bullets, the mark after each.
-    expect(within(page).getAllByTestId('studio-problem')[0].parentElement).toHaveStyle({
-      listStyleType: 'disc',
-      paddingInlineStart: '32px',
-    })
-    expect(loose).toHaveTextContent(/misc\.json\s*Suggestion: A loose end\./)
+    expect(loose).toHaveTextContent(/^Suggestion: A loose end\. misc\.json$/)
     expect(within(loose).queryByRole('button')).toBeNull()
 
     const user = userEvent.setup()
-    await user.click(within(page).getByRole('button', { name: 'Requests' }))
+    await user.click(within(mails).getByRole('button', { name: 'Requests' }))
     expect(onOpen).toHaveBeenLastCalledWith('r-1', '/widgets/0')
-    await user.click(within(page).getByRole('button', { name: 'Show' }))
+    await user.click(within(why).getByRole('button', { name: 'Requests' }))
     expect(onOpen).toHaveBeenLastCalledWith('r-1', '/widgets/1')
   })
 
@@ -353,8 +347,9 @@ describe('a ready request’s review', () => {
     expect(within(notMet).getByText('Not met:').querySelector('.anticon-close-circle')!.parentElement).toHaveStyle({
       color: colour.dangerText,
     })
-    expect(within(notMet).getByText('No such column.')).toHaveStyle({ color: colour.textMuted })
+    // Proposed: the why reads in the text colour, as words a person reads to decide are never muted.
     expect(notMet).toHaveTextContent('Not met: It shows a column. No such column.')
+    expect(notMet.querySelector('[style*="color"]:not([data-mark] *)')).toBeNull()
     expect(within(notMet).queryByRole('br')).toBeNull()
     expect(within(criteria).getByRole('list')).toHaveStyle({ listStyleType: 'disc' })
     const checklist = screen.getByTestId('studio-ai-review-checklist')
@@ -757,10 +752,7 @@ describe('a plan and its review, as a pull request has them', () => {
     })
     const decisions = screen.getByTestId('studio-ai-plan-decisions')
     expect(within(decisions).getByText('Decisions to check')).toBeInTheDocument()
-    // Each choice reads as text, and why, muted, after it.
-    expect(within(decisions).getByText('The request did not say.')).toHaveStyle({
-      color: designTokensFor('light').colour.textMuted,
-    })
+    // Each choice reads with why after it, both in the text colour.
     expect(decisions).toHaveTextContent('The field is optional. The request did not say.')
     const risks = screen.getByTestId('studio-ai-plan-risks')
     expect(within(risks).getByText('Risks and limits')).toBeInTheDocument()
@@ -768,12 +760,10 @@ describe('a plan and its review, as a pull request has them', () => {
     const criteria = screen.getByTestId('studio-ai-plan-checks')
     expect(within(criteria).getByText('Acceptance criteria')).toBeInTheDocument()
     expect(criteria).toHaveTextContent('A request saves with a cost centre.')
-    // Proposed: Axis's checklist, each item with how the plan answers it, muted.
+    // Proposed: Axis's checklist, each item with how the plan answers it, in the text colour.
     const checklist = screen.getByTestId('studio-ai-plan-checklist')
     expect(within(checklist).getByText('Checklist')).toBeInTheDocument()
-    expect(within(checklist).getByText('In English and Vietnamese.')).toHaveStyle({
-      color: designTokensFor('light').colour.textMuted,
-    })
+    expect(checklist.querySelector('li')!.querySelector('[style*="color"]')).toBeNull()
     expect(screen.queryByText('A Cost centre column.')).toBeNull()
 
     const user = userEvent.setup()
