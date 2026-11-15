@@ -7,7 +7,8 @@ import {
   CloseOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons'
-import { Badge, Flex, Pagination, Popover, Segmented, Tooltip, Typography } from 'antd'
+import { Flex, Pagination, Popover, Segmented, Tooltip, Typography } from 'antd'
+import { CountBadge } from './CountBadge'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
@@ -290,13 +291,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
         content={list}
         styles={{ container: { padding: 0 } }}
       >
-        <Badge
-          count={unread}
-          overflowCount={9}
-          size="small"
-          offset={[-7, 7]}
-          styles={{ indicator: { fontSize: 10, height: 14, minWidth: 14, lineHeight: '14px', paddingInline: 3 } }}
-        >
+        <CountBadge count={unread}>
           <AxisButton
             ref={bell}
             role="icon"
@@ -306,7 +301,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
             aria-haspopup="dialog"
             aria-expanded={open}
           />
-        </Badge>
+        </CountBadge>
       </Popover>
       <Announcement>{named}</Announcement>
     </>

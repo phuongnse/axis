@@ -1,4 +1,5 @@
-import { EllipsisOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
+import { EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
+import { FoldIcon } from './FoldIcon'
 import { Button, ConfigProvider, Dropdown, Flex, Input, Table, type TableColumnType, type TableProps } from 'antd'
 import {
   useContext,
@@ -614,14 +615,7 @@ export function AxisTable<T extends object>({
                             size="small"
                             nameKey={expanded ? 'shell.table.collapseRow' : 'shell.table.expandRow'}
                             aria-expanded={expanded}
-                            icon={
-                              <RightOutlined
-                                style={{
-                                  transform: expanded ? 'rotate(90deg)' : undefined,
-                                  transition: 'transform 0.2s',
-                                }}
-                              />
-                            }
+                            icon={<FoldIcon open={expanded} />}
                             style={{
                               marginInlineStart: -(foldRoom - tokens.spacing.xs / 2),
                               marginInlineEnd: tokens.spacing.xs / 2,

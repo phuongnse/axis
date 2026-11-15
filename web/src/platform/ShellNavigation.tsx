@@ -1,6 +1,7 @@
 import { Menu, type MenuProps } from 'antd'
 import { useState } from 'react'
 import { Link } from 'react-router'
+import { FoldIcon } from './FoldIcon'
 import { navigationIcon } from './navigationIcons'
 import { useDesignTokens } from './themeMode'
 
@@ -31,6 +32,9 @@ export interface ShellNavigationParent {
   icon?: string | null
   children: readonly ShellNavigationEntry[]
 }
+
+/** The width of Ant Design's own submenu arrow, whose room a parent's end keeps. */
+const menuArrowSize = 10
 
 export type ShellNavigationNode = ShellNavigationEntry | ShellNavigationGroup | ShellNavigationParent
 
@@ -98,6 +102,18 @@ export function ShellNavigation({
       style={{ borderInlineEnd: 'none' }}
       selectedKeys={activeKey ? [activeKey] : []}
       openKeys={collapsed ? undefined : openKeys}
+      // Proposed: a parent opens and folds with the one fold mark and no animation, see FoldIcon.
+      // Ant Design keeps the room of its own arrow at a parent's end, its 10 px arrow and spacing-xs beside its padding,
+      // so the fold mark takes it back and ends spacing-md from the entry's edge, as its words start spacing-md from the
+      // other edge.
+      expandIcon={({ isOpen }) =>
+        collapsed ? null : (
+          <span style={{ display: 'inline-flex', marginInlineEnd: -(menuArrowSize + spacing.xs) }}>
+            <FoldIcon open={isOpen ?? false} />
+          </span>
+        )
+      }
+      motion={{ motionAppear: false, motionEnter: false, motionLeave: false }}
       onOpenChange={(open) => setChoice({ page: activeKey, open })}
       items={items}
     />

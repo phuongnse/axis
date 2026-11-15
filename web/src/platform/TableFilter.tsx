@@ -1,5 +1,6 @@
 import { CloseOutlined, FilterOutlined } from '@ant-design/icons'
-import { Badge, DatePicker, Flex, Input, InputNumber, Modal, Segmented, Select, Tag } from 'antd'
+import { DatePicker, Flex, Input, InputNumber, Modal, Segmented, Select, Tag } from 'antd'
+import { CountBadge } from './CountBadge'
 import dayjs from 'dayjs'
 import { useState } from 'react'
 import { AxisButton } from './AxisButton'
@@ -62,7 +63,7 @@ export function TableFilterButton({
   const count = countConditions(filter)
   return (
     <>
-      <Badge count={count} size="small">
+      <CountBadge count={count}>
         <AxisButton
           role="icon"
           nameKey="shell.table.filter"
@@ -73,7 +74,7 @@ export function TableFilterButton({
             setOpen(true)
           }}
         />
-      </Badge>
+      </CountBadge>
       <Modal
         open={open}
         width={size.dialog.medium}
