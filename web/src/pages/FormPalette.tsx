@@ -10,6 +10,7 @@ import { useText } from '../platform/texts'
 import { insertField } from './formPaletteSupport'
 import { LabelTextsContext } from './labelTextsContext'
 import type { ChangeHandler } from './SchemaForm'
+import { fillText } from '../platform/fillText'
 
 /**
  * The palette of a form: the fields of its entity that no section lists, child collections included, read from
@@ -52,7 +53,7 @@ export function FormPalette({
       onChange('/steps', add.steps)
     }
     onSelect(add.select)
-    onAnnounce(`${t('shell.studio.design.added')} ${add.name}`)
+    onAnnounce(fillText(t('shell.studio.design.added'), { name: add.name }))
   }
 
   return (

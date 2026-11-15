@@ -1,5 +1,6 @@
 import { type ListPart, type PathStep, widgetLists } from '../platform/pageWidgets'
 import { useText } from '../platform/texts'
+import { fillText } from '../platform/fillText'
 
 /** The text key of the reason a page limit gives for a type that cannot be added. */
 export const paletteReasons = {
@@ -16,7 +17,9 @@ export function usePartLabel() {
     if (part.kind === 'section') {
       return undefined
     }
-    return `${t(part.kind === 'column' ? 'shell.studio.page.column' : 'shell.studio.page.tab')} ${part.index + 1}`
+    return fillText(t(part.kind === 'column' ? 'shell.studio.page.column' : 'shell.studio.page.tab'), {
+      number: part.index + 1,
+    })
   }
 }
 
@@ -42,5 +45,5 @@ export function landedText(
 ): string {
   const path = widgetLists(widgets).find((item) => item.pointer === list)?.path ?? []
   const label = [t('shell.studio.page.pageList'), ...path.flatMap((step) => stepLabels(step, partLabel))].join(' › ')
-  return `${t(verbKey)} ${type}, ${label}, ${t('shell.studio.palette.position')} ${index + 1}`
+  return fillText(t(verbKey), { name: type, place: label, position: index + 1 })
 }

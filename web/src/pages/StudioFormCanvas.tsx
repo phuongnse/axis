@@ -24,6 +24,7 @@ import { CanvasAlert } from './CanvasAlert'
 import { FormProperties } from './FormProperties'
 import type { ChangeHandler } from './SchemaForm'
 import { canvasTexts, cancel, debounceMs, diagnosticsAt } from './studioCanvas'
+import { fillText } from '../platform/fillText'
 
 /** The route's latest answer, or `'failed'`. `undefined` before the first. */
 type Answer = StudioFormMetadataAnswer | 'failed' | undefined
@@ -320,7 +321,7 @@ function StepSwitchEntry({
       onClick={onClick}
       style={{ outline: isOver ? `2px solid ${colour.primary}` : undefined, borderRadius: radius.base }}
     >
-      {step.marked ? `${t(step.titleKey)}, ${t('shell.studio.design.hasDiagnostics')}` : t(step.titleKey)}
+      {step.marked ? fillText(t('shell.studio.design.hasDiagnostics'), { name: t(step.titleKey) }) : t(step.titleKey)}
     </span>
   )
 }
@@ -370,7 +371,7 @@ function FormElementFrame({
       data-form-frame=""
       data-path={path}
       data-marked={marked ? 'true' : undefined}
-      aria-label={marked ? `${name}, ${t('shell.studio.design.hasDiagnostics')}` : name}
+      aria-label={marked ? fillText(t('shell.studio.design.hasDiagnostics'), { name }) : name}
       aria-current={selected ? 'true' : undefined}
       tabIndex={path === undefined ? undefined : 0}
       onKeyDown={(event) => {

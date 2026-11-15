@@ -37,6 +37,7 @@ import { WidgetTree } from '../platform/WidgetTree'
 import { PlatformContext } from './context'
 import { CanvasAlert } from './CanvasAlert'
 import { canvasTexts, cancel, debounceMs, diagnosticsAt } from './studioCanvas'
+import { fillText } from '../platform/fillText'
 
 /** The route's latest answer, or `'failed'`, with the draft and the saved version it answers. */
 type Answered = {
@@ -379,7 +380,7 @@ function CanvasWidgetFrame({
       data-path={path}
       data-marked={marked ? 'true' : undefined}
       data-drop-over={droppable.isOver ? 'true' : undefined}
-      aria-label={marked ? `${label}, ${t('shell.studio.design.hasDiagnostics')}` : label}
+      aria-label={marked ? fillText(t('shell.studio.design.hasDiagnostics'), { name: label }) : label}
       aria-current={selected ? 'true' : undefined}
       tabIndex={path === undefined ? undefined : 0}
       onKeyDown={(event) => {

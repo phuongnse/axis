@@ -41,6 +41,7 @@ import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
 import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
 import type { ChangeHandler } from './SchemaForm'
+import { fillText } from '../platform/fillText'
 
 type Content = Record<string, unknown>
 
@@ -1203,7 +1204,7 @@ function ColumnsPanel({
       {columns.map((column, index) => (
         <Card size="small" key={index} data-testid={`studio-column-${index}`}>
           <Flex vertical gap="small">
-            <Typography.Text>{`${t('shell.studio.page.column')} ${index + 1}`}</Typography.Text>
+            <Typography.Text>{fillText(t('shell.studio.page.column'), { number: index + 1 })}</Typography.Text>
             {layer !== undefined && isContent(column) && typeof column.name === 'string' && (
               <LayerMarkTag layer={layer} list={`${base}/columns`} index={index} name={column.name} />
             )}
@@ -1275,7 +1276,7 @@ function TabsPanel({
       {tabs.map((tab, index) => (
         <Card size="small" key={index} data-testid={`studio-tab-${index}`}>
           <Flex vertical gap="small">
-            <Typography.Text>{`${t('shell.studio.page.tab')} ${index + 1}`}</Typography.Text>
+            <Typography.Text>{fillText(t('shell.studio.page.tab'), { number: index + 1 })}</Typography.Text>
             {layer !== undefined && isContent(tab) && typeof tab.name === 'string' && (
               <LayerMarkTag layer={layer} list={`${base}/tabs`} index={index} name={tab.name} />
             )}
