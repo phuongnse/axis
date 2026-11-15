@@ -149,7 +149,7 @@ test('the operator lowers a quota under the use of a tenant, its save is refused
   await operator.getByTestId('cell-tenant-set-quotas').click()
   const dialog = await waitForDialog(operator)
   await expect(dialog).toContainText(full)
-  await dialog.getByRole('radiogroup', { name: 'Storage (bytes)', exact: true }).getByLabel('A value', { exact: true }).check()
+  await dialog.getByRole('radiogroup', { name: 'Storage (bytes)', exact: true }).getByRole('radio', { name: /^A value/ }).check()
   await dialog.getByRole('spinbutton', { name: 'Storage (bytes) value', exact: true }).fill('1000000')
   await confirmDialog(operator, 'Save')
   const storage = operator.getByTestId('cell-tenant-quotas').getByRole('row').filter({ hasText: 'Storage (bytes)' })

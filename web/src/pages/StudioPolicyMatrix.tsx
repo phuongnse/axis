@@ -1,6 +1,6 @@
-import { Button, Checkbox, Flex, Input, Select, Tag, Typography } from 'antd'
+import { Button, Checkbox, Flex, Select, Tag, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { lazy, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { diffPatch, setAt } from '../platform/jsonPatch'
@@ -21,11 +21,8 @@ import {
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
-import { expressionScope } from './expressionScope'
-import { ExpressionInput } from './SchemaForm'
+import { ExpressionField } from './ExpressionField'
 import { newGrant, newPolicy, ownGrantIndexes, targetActions } from './policyMatrixDraft'
-
-const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 type Content = Record<string, unknown>
 
@@ -513,22 +510,14 @@ function OwnGrants({
             {target.kind === 'entity' && (
               <>
                 <AxisField label={t('shell.studio.matrix.filter')} help={t('shell.studio.matrix.filter.help')}>
-                  <ExpressionInput
-                    fallback={
-                      <Input aria-label={t('shell.studio.matrix.filter')} value={filter} readOnly aria-busy="true" />
-                    }
-                  >
-                    <LazyExpressionEditor
-                      application={application}
-                      resourceId={String(draft.id)}
-                      path={filterPath}
-                      name={t('shell.studio.matrix.filter')}
-                      value={filter}
-                      required={false}
-                      options={expressionScope('policy', draft, filterPath, names)}
-                      onChange={(path, next) => edit(path, next)}
-                    />
-                  </ExpressionInput>
+                  <ExpressionField
+                    check={{ application, resourceId: String(draft.id), kind: 'policy', draft, names }}
+                    pointer={filterPath}
+                    name={t('shell.studio.matrix.filter')}
+                    value={filter}
+                    required={false}
+                    onChange={(path, next) => edit(path, next)}
+                  />
                 </AxisField>
                 <Select
                   mode="multiple"

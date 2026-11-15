@@ -80,7 +80,7 @@ test.describe("Studio edits form conditions and steps", () => {
       0,
     );
     await expect(condition.getByTestId("studio-expression-type")).toContainText(
-      "boolean",
+      "Gives yes or no",
     );
 
     await page

@@ -1,13 +1,11 @@
 import { Input } from 'antd'
-import { lazy, Suspense, useContext } from 'react'
+import { useContext } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
+import { ExpressionField } from './ExpressionField'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
-
-const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value : ''
@@ -39,30 +37,16 @@ export function Expression({
 }) {
   const check = useContext(ExpressionCheckContext)
 
-  return check && !readOnly ? (
-    <Suspense
-      fallback={
-        <Input aria-label={name} id={id} aria-describedby={describedBy} value={value} readOnly aria-busy="true" />
-      }
-    >
-      <LazyExpressionEditor
-        application={check.application}
-        resourceId={check.resourceId}
-        path={pointer}
-        name={name}
-        value={value}
-        required={required}
-        options={expressionScope(check.kind, check.draft, pointer, check.names)}
-        onChange={onChange}
-      />
-    </Suspense>
-  ) : (
-    <Input
-      aria-label={name}
+  return (
+    <ExpressionField
+      check={readOnly ? null : check}
+      pointer={pointer}
+      name={name}
       id={id}
       aria-describedby={describedBy}
       value={value}
-      onChange={(event) => onChange(pointer, event.target.value === '' && !required ? undefined : event.target.value)}
+      required={required}
+      onChange={onChange}
     />
   )
 }

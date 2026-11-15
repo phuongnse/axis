@@ -1,13 +1,11 @@
 import { Button, Flex, Input, Select, Typography } from 'antd'
-import { lazy, Suspense, useContext } from 'react'
+import { useContext } from 'react'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
+import { ExpressionField } from './ExpressionField'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
-
-const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 function escapeSegment(segment: string): string {
   return segment.replaceAll('~', '~0').replaceAll('/', '~1')
@@ -112,24 +110,14 @@ export function MappingRows({
                           onChange={(next) => onChange(rowPointer, next ?? '')}
                         />
                       )
-                    ) : check ? (
-                      <Suspense fallback={<Input aria-label={expressionName} value={text} readOnly aria-busy="true" />}>
-                        <LazyExpressionEditor
-                          application={check.application}
-                          resourceId={check.resourceId}
-                          path={rowPointer}
-                          name={expressionName}
-                          value={text}
-                          required
-                          options={expressionScope(check.kind, check.draft, rowPointer, check.names)}
-                          onChange={onChange}
-                        />
-                      </Suspense>
                     ) : (
-                      <Input
-                        aria-label={expressionName}
+                      <ExpressionField
+                        check={check}
+                        pointer={rowPointer}
+                        name={expressionName}
                         value={text}
-                        onChange={(event) => onChange(rowPointer, event.target.value)}
+                        required
+                        onChange={onChange}
                       />
                     )}
                   </div>

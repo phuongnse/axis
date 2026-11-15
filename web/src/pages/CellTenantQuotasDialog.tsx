@@ -1,6 +1,7 @@
-import { Flex, Form, InputNumber, Modal, Radio, Typography } from 'antd'
+import { Flex, Form, InputNumber, Modal } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useState } from 'react'
+import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { setCellTenantQuotas, type CellQuota } from '../platform/cell'
 import { requiredMark } from '../platform/requiredMark'
@@ -86,14 +87,29 @@ export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onC
             const choice = choices[key]!
             return (
               <Flex key={key} vertical gap="small">
-                <Typography.Text strong>{label}</Typography.Text>
-                <Form.Item name={[key, 'kind']} noStyle>
-                  <Radio.Group aria-label={label}>
-                    <Radio value="value">{t('shell.cell.tenant.quota.choice')}</Radio>
-                    <Radio value="none">{t('shell.cell.tenant.quota.noLimit')}</Radio>
-                    <Radio value="default">{t('shell.cell.tenant.quota.default')}</Radio>
-                  </Radio.Group>
-                </Form.Item>
+                <AxisChoiceField
+                  name={[key, 'kind']}
+                  label={label}
+                  help={t('shell.cell.tenant.quota.kindHelp')}
+                  requiredMessage={t('shell.cell.tenant.quota.kindRequired')}
+                  options={[
+                    {
+                      value: 'value',
+                      label: t('shell.cell.tenant.quota.choice'),
+                      help: t('shell.cell.tenant.quota.choiceHelp'),
+                    },
+                    {
+                      value: 'none',
+                      label: t('shell.cell.tenant.quota.noLimit'),
+                      help: t('shell.cell.tenant.quota.noLimitHelp'),
+                    },
+                    {
+                      value: 'default',
+                      label: t('shell.cell.tenant.quota.default'),
+                      help: t('shell.cell.tenant.quota.defaultHelp'),
+                    },
+                  ]}
+                />
                 <AxisField
                   name={[key, 'value']}
                   label={t('shell.cell.tenant.quota.valueLabel').replace('{quota}', label)}

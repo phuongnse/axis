@@ -1,5 +1,6 @@
-import { Flex, Switch, Typography } from 'antd'
+import { Flex } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { useEffect, useState } from 'react'
 import { fetchStudioSettings, saveStudioSettings } from '../platform/studio'
 import { useText } from '../platform/texts'
@@ -8,8 +9,9 @@ import { useDesignTokens } from '../platform/themeMode'
 /**
  * The "Let AI accept its own drafts" switch of an application, in a panel of its own below the manifest's Save row.
  * The setting is kept in the tenant database and not in the manifest, so the switch saves as soon as it is switched,
- * apart from the manifest's Save. It is off until a publisher turns it on. With `publisher` false the switch is
- * disabled and a line says that only a publisher can change it. A failed save puts the value back and shows an
+ * apart from the manifest's Save. It is off until a publisher turns it on. It is drawn by the shared yes-or-no field,
+ * see docs/reference/actions-and-controls.md#fields. With `publisher` false the switch is disabled and its help ends
+ * with that only a publisher can change it. A failed save puts the value back and shows an
  * error, and a failed load shows a warning in place of the switch.
  */
 export function StudioAutoAccept({ application, publisher }: { application: string; publisher: boolean }) {
@@ -61,22 +63,19 @@ export function StudioAutoAccept({ application, publisher }: { application: stri
       }}
     >
       <Flex vertical gap="small">
-        <Flex align="center" gap="small">
-          <Switch
-            aria-label={t('shell.studio.autoAccept.label')}
-            checked={autoAccept === true}
-            disabled={!publisher || autoAccept === undefined}
-            loading={saving}
-            onChange={change}
-          />
-          <Typography.Text strong>{t('shell.studio.autoAccept.label')}</Typography.Text>
-        </Flex>
-        <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.autoAccept.help')}</Typography.Text>
-        {!publisher && (
-          <Typography.Text data-testid="studio-auto-accept-publisher-only" style={{ color: colour.textMuted }}>
-            {t('shell.studio.autoAccept.publisherOnly')}
-          </Typography.Text>
-        )}
+        <AxisCheckboxField
+          kind="switch"
+          label={t('shell.studio.autoAccept.label')}
+          help={
+            publisher
+              ? t('shell.studio.autoAccept.help')
+              : `${t('shell.studio.autoAccept.help')} ${t('shell.studio.autoAccept.publisherOnly')}`
+          }
+          checked={autoAccept === true}
+          disabled={!publisher || autoAccept === undefined}
+          loading={saving}
+          onChange={change}
+        />
         {loadFailed && (
           <AxisAlert
             data-testid="studio-auto-accept-load-error"

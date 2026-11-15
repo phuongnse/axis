@@ -6,6 +6,7 @@ import { QuotaRefusedError } from './quota'
 import {
   changeRows,
   checkStudioExpression,
+  fetchStudioExpressionScope,
   fetchStudioPolicyMatrix,
   fetchStudioRelease,
   fetchStudioResource,
@@ -175,6 +176,34 @@ describe('checkStudioExpression', () => {
     )
 
     await expect(checkStudioExpression('PurchaseRequests', 'r', '/p', 'a')).rejects.toThrow(TypeError)
+  })
+})
+
+describe('fetchStudioExpressionScope', () => {
+  it('posts the resource, the path and the draft and answers the scope', async () => {
+    const scope = { type: 'boolean', fields: [], functions: [] }
+    const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => json(scope))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const answer = await fetchStudioExpressionScope('PurchaseRequests', 'r', '/validations/0/expression', { id: 'r' })
+
+    expect(answer).toEqual(scope)
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/studio/apps/PurchaseRequests/expressions/scope')
+    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toEqual({
+      resourceId: 'r',
+      path: '/validations/0/expression',
+      draft: { id: 'r' },
+    })
+  })
+
+  it.each([400, 401, 404])('answers null for %i and does not ask to sign in', async (status) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status })),
+    )
+
+    await expect(fetchStudioExpressionScope('PurchaseRequests', 'r', '/p', {})).resolves.toBeNull()
+    expect(assignLocation).not.toHaveBeenCalled()
   })
 })
 
