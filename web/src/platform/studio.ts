@@ -1905,12 +1905,13 @@ export interface StudioAuthoringRequestDetail extends StudioAuthoringRequest {
 }
 
 /**
- * Proposed: one finding of a request's review, see the review on #3263. A blocking finding sends the draft to a fix
- * round, and one still open on a ready request is one the fix rounds did not resolve; a note only informs. Each names
- * the resource and the path it is about, with the evidence the reviewer found there.
+ * Proposed: one finding of a request's review, see the review on #3263. Its `kind` says what it asks: a `blocking`
+ * finding sends the draft to a fix round, and one still open on a ready request is one the fix rounds did not resolve;
+ * a `suggestion` asks for no change. Each names the resource and the path it is about, with the evidence the reviewer
+ * found there.
  */
 export interface StudioReviewFinding {
-  blocking: boolean
+  kind: 'blocking' | 'suggestion'
   text: string
   file: string
   path: string
@@ -1947,6 +1948,21 @@ export interface StudioPlan {
 export interface StudioReview {
   summary: string
   findings: StudioReviewFinding[]
+  /** Proposed: how it found each acceptance criterion of the approved plan, one per criterion in the plan's order. */
+  criteria: StudioReviewOutcome[]
+  /** Proposed: how it found each item of Axis's checklist, one per item of the approved plan's checklist, in its order. */
+  checklist: StudioReviewOutcome[]
+}
+
+/**
+ * Proposed: how a review found one acceptance criterion or one checklist item, see the review on #3263: `met`, `notMet`
+ * or `skipped` when it could not check it, with its words as the plan gave them and a short note saying why for one not
+ * met or skipped, `null` otherwise.
+ */
+export interface StudioReviewOutcome {
+  text: string
+  outcome: 'met' | 'notMet' | 'skipped'
+  note: string | null
 }
 
 /**

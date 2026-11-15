@@ -220,7 +220,7 @@ describe('a ready request', () => {
   })
 })
 
-// Proposed: a review's must-change findings and notes, see the review on #3263.
+// Proposed: a review's findings, and how it found the plan's criteria and Axis's checklist, see the review on #3263.
 describe('a ready request’s review', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -245,16 +245,24 @@ describe('a ready request’s review', () => {
       review: {
         summary: 'Mails the approver too.',
         findings: [
-          { blocking: false, text: 'Could say why.', file: 'pages/list.json', path: '/widgets/1', resourceId: 'r-1' },
           {
-            blocking: true,
+            kind: 'suggestion',
+            text: 'Could say why.',
+            file: 'pages/list.json',
+            path: '/widgets/1',
+            resourceId: 'r-1',
+          },
+          {
+            kind: 'blocking',
             text: 'Mails the approver too.',
             file: 'pages/list.json',
             path: '/widgets/0',
             resourceId: 'r-1',
           },
-          { blocking: false, text: 'A loose end.', file: 'misc.json', path: '', resourceId: null },
+          { kind: 'suggestion', text: 'A loose end.', file: 'misc.json', path: '', resourceId: null },
         ],
+        criteria: [],
+        checklist: [],
       },
     })
     const onOpen = vi.fn()
@@ -281,38 +289,67 @@ describe('a ready request’s review', () => {
     const review = await screen.findByTestId('studio-ai-review')
     expect(within(review).getByText('Changes requested')).toHaveAttribute('data-tone', 'attention')
     expect(within(review).queryByText(/Approved/)).toBeNull()
-    // Proposed: the blocking findings, their heading in dangerText, then the non-blocking ones, each group under its heading and by the resource it is about.
-    const toFix = within(review).getByTestId('studio-ai-findings-blocking')
-    expect(within(toFix).getByText('Blocking findings')).toHaveStyle({
-      color: designTokensFor('light').colour.dangerText,
-    })
-    const [fixPage] = within(toFix).getAllByTestId('studio-problem-group')
-    expect(within(fixPage).getAllByRole('button', { name: 'Requests' })).toHaveLength(1)
-    expect(within(fixPage).getByText('Page')).toBeInTheDocument()
-    expect(fixPage).toHaveTextContent('Mails the approver too.')
-    // Proposed: a finding is a sentence with no lead, so it takes a bullet, its words at spacing-xl.
+    // Proposed: Things to look at, the findings in one list by the resource they are about, the blocking first, each led
+    // by its kind, Blocking in dangerText and Suggestion in infoText, so it takes no bullet.
+    const found = within(review).getByTestId('studio-ai-findings')
+    expect(within(found).getByText('Things to look at')).toBeInTheDocument()
+    const [page, loose] = within(found).getAllByTestId('studio-problem-group')
+    expect(within(page).getAllByRole('button', { name: 'Requests' })).toHaveLength(1)
+    expect(within(page).getByText('Page')).toBeInTheDocument()
+    expect(page).toHaveTextContent(/Blocking Mails the approver too\..*Suggestion Could say why\./)
+    const { colour } = designTokensFor('light')
+    expect(within(page).getByText('Blocking')).toHaveStyle({ color: colour.dangerText })
+    expect(within(page).getByText('Suggestion')).toHaveStyle({ color: colour.infoText })
     // Proposed: a resource's findings sit half of spacing-xs under its name.
-    expect(fixPage).toHaveStyle({ gap: '4px' })
-    expect(within(fixPage).getByTestId('studio-problem').parentElement).toHaveStyle({
-      listStyleType: 'disc',
-      paddingInlineStart: '32px',
+    expect(page).toHaveStyle({ gap: '4px' })
+    expect(within(page).getAllByTestId('studio-problem')[0].parentElement).toHaveStyle({
+      listStyleType: 'none',
+      paddingInlineStart: '16px',
     })
-    const notes = within(review).getByTestId('studio-ai-findings-non-blocking')
-    expect(within(notes).getByText('Non-blocking findings')).toBeInTheDocument()
-    const [notePage, loose] = within(notes).getAllByTestId('studio-problem-group')
-    expect(notePage).toHaveTextContent('Could say why.')
-    expect(within(loose).getByText('misc.json')).toBeInTheDocument()
+    expect(loose).toHaveTextContent(/misc\.json\s*Suggestion A loose end\./)
     expect(within(loose).queryByRole('button')).toBeNull()
 
     const user = userEvent.setup()
-    await user.click(within(fixPage).getByRole('button', { name: 'Requests' }))
+    await user.click(within(page).getByRole('button', { name: 'Requests' }))
     expect(onOpen).toHaveBeenLastCalledWith('r-1', '/widgets/0')
-    await user.click(within(notePage).getByRole('button', { name: 'Requests' }))
+    await user.click(within(page).getByRole('button', { name: 'Show' }))
     expect(onOpen).toHaveBeenLastCalledWith('r-1', '/widgets/1')
   })
 
+  it('says how it found each acceptance criterion and checklist item, with why for one not met or skipped', async () => {
+    stub({
+      ...fromApp,
+      aiConnected: true,
+      review: {
+        summary: 'Almost.',
+        findings: [],
+        criteria: [
+          { text: 'It saves.', outcome: 'met', note: null },
+          { text: 'It shows a column.', outcome: 'notMet', note: 'No such column.' },
+        ],
+        checklist: [{ text: 'Texts.', outcome: 'skipped', note: 'No Vietnamese texts yet.' }],
+      },
+    })
+    renderPage()
+
+    const criteria = await screen.findByTestId('studio-ai-review-criteria')
+    expect(within(criteria).getByText('Acceptance criteria')).toBeInTheDocument()
+    const [met, notMet] = within(criteria).getAllByRole('listitem')
+    expect(within(met).getByText('Met')).toHaveAttribute('data-tone', 'success')
+    expect(met).toHaveTextContent('It saves.')
+    expect(within(notMet).getByText('Not met')).toHaveAttribute('data-tone', 'danger')
+    expect(within(notMet).getByText('No such column.')).toHaveStyle({
+      color: designTokensFor('light').colour.textMuted,
+    })
+    const checklist = screen.getByTestId('studio-ai-review-checklist')
+    expect(within(checklist).getByText('Checklist')).toBeInTheDocument()
+    expect(within(checklist).getByText('Skipped')).toHaveAttribute('data-tone', 'muted')
+    expect(checklist).toHaveTextContent('Texts.No Vietnamese texts yet.')
+    expect(screen.queryByTestId('studio-ai-findings')).toBeNull()
+  })
+
   it('says no changes are requested when nothing must change', async () => {
-    stub({ ...fromApp, aiConnected: true, review: { summary: 'All done.', findings: [] } })
+    stub({ ...fromApp, aiConnected: true, review: { summary: 'All done.', findings: [], criteria: [], checklist: [] } })
     renderPage()
 
     const review = await screen.findByTestId('studio-ai-review')
@@ -352,7 +389,7 @@ describe('a ready request’s page', () => {
             ...fromApp,
             aiConnected: true,
             draft: 'd-1',
-            review: { summary: 'All done.', findings: [] },
+            review: { summary: 'All done.', findings: [], criteria: [], checklist: [] },
             changes: [{ file: 'entities/cost-centre.json', summary: 'A cost centre with a name and a code.' }],
             checks: {
               ...fromApp.checks!,
@@ -778,7 +815,12 @@ describe('a plan and its review, as a pull request has them', () => {
     stub({
       ...fromApp,
       aiConnected: true,
-      review: { summary: 'The field is added, but the list shows no column.', findings: [] },
+      review: {
+        summary: 'The field is added, but the list shows no column.',
+        findings: [],
+        criteria: [],
+        checklist: [],
+      },
     })
     renderPage()
 
@@ -1000,9 +1042,11 @@ describe("a request's guide", () => {
       review: {
         summary: 'The list shows no column.',
         findings: [
-          { blocking: true, text: 'Show the column.', file: 'pages/list.json', path: '/widgets/0', resourceId: null },
-          { blocking: false, text: 'Could say why.', file: 'pages/list.json', path: '/widgets/1', resourceId: null },
+          { kind: 'blocking', text: 'Show the column.', file: 'pages/list.json', path: '/widgets/0', resourceId: null },
+          { kind: 'suggestion', text: 'Could say why.', file: 'pages/list.json', path: '/widgets/1', resourceId: null },
         ],
+        criteria: [],
+        checklist: [],
       },
     })
     renderPage()
@@ -1027,9 +1071,11 @@ describe("a request's guide", () => {
       review: {
         summary: 'The list shows no column.',
         findings: [
-          { blocking: true, text: 'Show the column.', file: 'pages/list.json', path: '/widgets/0', resourceId: null },
-          { blocking: false, text: 'Could say why.', file: 'pages/list.json', path: '/widgets/1', resourceId: null },
+          { kind: 'blocking', text: 'Show the column.', file: 'pages/list.json', path: '/widgets/0', resourceId: null },
+          { kind: 'suggestion', text: 'Could say why.', file: 'pages/list.json', path: '/widgets/1', resourceId: null },
         ],
+        criteria: [],
+        checklist: [],
       },
     })
     renderPage()
@@ -1037,12 +1083,10 @@ describe("a request's guide", () => {
 
     await user.click(within(await screen.findByTestId('studio-ai-bar')).getByRole('button', { name: 'Accept anyway…' }))
     const dialog = await screen.findByRole('dialog', { name: 'Accept without these changes?' })
-    // The findings it leaves out read as the review lists them, under Blocking findings, with no non-blocking ones.
+    // The findings it leaves out read as the review lists them, the blocking ones alone.
     const left = within(dialog).getByTestId('studio-ai-anyway-findings')
-    expect(within(left).getByTestId('studio-ai-findings-blocking')).toHaveTextContent(
-      /Blocking findings.*Show the column\./,
-    )
-    expect(within(left).queryByTestId('studio-ai-findings-non-blocking')).toBeNull()
+    expect(left).toHaveTextContent(/Blocking Show the column\./)
+    expect(left).not.toHaveTextContent('Could say why.')
     expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/accept'))).toBe(false)
     await user.click(within(dialog).getByRole('button', { name: 'Accept anyway' }))
     await waitFor(() => {

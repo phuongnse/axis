@@ -35,6 +35,7 @@ import {
   type StudioPlan,
   type StudioReview,
   type StudioReviewFinding,
+  type StudioReviewOutcome,
   type StudioRequest,
   type StudioResourceItem,
   type StudioRevisionChange,
@@ -832,7 +833,7 @@ export function StudioAuthoringRequestPage({
       ? 'shell.studio.aiRequest.answers'
       : 'shell.studio.aiRequest.comment'
   const blockingTexts = (request.review?.findings ?? [])
-    .filter((finding) => finding.blocking)
+    .filter((finding) => finding.kind === 'blocking')
     .map((finding) => finding.text)
   const button = (key: string, role: 'secondary' | 'finish', words: string, onClick: () => void) => (
     <AxisButton key={key} role={role} disabled={acting} onClick={onClick} data-testid={`studio-ai-bar-${key}`}>
@@ -1054,7 +1055,7 @@ export function StudioAuthoringRequestPage({
       >
         <Flex vertical gap={spacing.md}>
           <Typography.Text>{t('shell.studio.aiRequest.acceptAnyway.text')}</Typography.Text>
-          {/* The must-change findings it leaves out, listed as the review lists them; a note asks for no change. */}
+          {/* The blocking findings it leaves out, listed as the review lists them; a suggestion asks for no change. */}
           <FindingList
             testId="studio-ai-anyway-findings"
             only="blocking"
@@ -1260,11 +1261,12 @@ function PlanView({
 }
 
 /**
- * Proposed: the review of a request, see the review on #3263, as cells of the columns of the overview: "Review" in bold, its
- * verdict as a `StatusTag`, "Changes requested" while a finding must change and "No changes requested" otherwise, never
- * "Approved", as only its author approves, by accepting; its summary, a sentence or two, reads under them across the
- * columns. Its findings follow across the columns in a `StudioProblemList`, grouped by the resource they are about, what must change first,
- * each led by "Must change" or "Note". How it checked each plan step shows on the plan.
+ * Proposed: the review of a request, see the review on #3263, as cells of the columns of the result: "Review" in bold,
+ * its verdict as a `StatusTag`, "Changes requested" while a finding is blocking and "No changes requested" otherwise,
+ * never "Approved", as only its author approves, by accepting; its summary, a sentence or two, reads under them across
+ * the columns, flush with them. What it found follows inside the line, `spacing-md` apart: "Things to look at", its
+ * findings in one list; then the plan's "Acceptance criteria" and Axis's "Checklist", each item with how the review
+ * found it. A group with nothing in it does not show.
  */
 function ReviewFindings({
   review,
@@ -1279,7 +1281,8 @@ function ReviewFindings({
   const { spacing } = useDesignTokens()
   const under: CSSProperties = { gridColumn: '1 / -1' }
   const inside: CSSProperties = { ...under, paddingInlineStart: spacing.md }
-  const blocking = review.findings.filter((finding) => finding.blocking)
+  const blocking = review.findings.filter((finding) => finding.kind === 'blocking')
+  const found = review.findings.length > 0 || review.criteria.length > 0 || review.checklist.length > 0
   return (
     <div style={{ display: 'contents' }} data-testid="studio-ai-review">
       {/* The checks' lines come first; a wider gap parts the review's from them than its own lines have. */}
@@ -1297,22 +1300,95 @@ function ReviewFindings({
       </span>
       {/* Its tag closes the line, and its summary, a sentence or two, reads under it across the columns, flush with it. */}
       <Typography.Text style={under}>{review.summary}</Typography.Text>
-      {review.findings.length > 0 && (
-        // Proposed: the findings follow the summary `spacing-sm` below it, the grid's `spacing-xs` and this margin, nearer
-        // than the review's line is to the checks' and farther than a heading is from its list, see the review on #3263.
-        <div style={{ ...inside, marginTop: spacing.sm - spacing.xs }}>
-          <FindingList findings={review.findings} resources={resources} onOpen={onOpen} />
-        </div>
+      {found && (
+        // Proposed: what it found follows the summary `spacing-sm` below it, the grid's `spacing-xs` and this margin,
+        // nearer than the review's line is to the checks' and farther than a heading is from its list.
+        <Flex vertical gap={spacing.md} style={{ ...inside, marginTop: spacing.sm - spacing.xs }}>
+          {review.findings.length > 0 && (
+            <Flex vertical gap={spacing.xs} data-testid="studio-ai-findings">
+              <Typography.Text strong>{t('shell.studio.aiRequest.review.thingsToLookAt')}</Typography.Text>
+              <FindingList findings={review.findings} resources={resources} onOpen={onOpen} />
+            </Flex>
+          )}
+          <ReviewOutcomes
+            heading="shell.studio.aiRequest.plan.checks"
+            items={review.criteria}
+            testId="studio-ai-review-criteria"
+          />
+          <ReviewOutcomes
+            heading="shell.studio.aiRequest.plan.checklist"
+            items={review.checklist}
+            testId="studio-ai-review-checklist"
+          />
+        </Flex>
       )}
     </div>
   )
 }
 
 /**
- * Proposed: a review's findings, see the review on #3263, in two groups each under its heading in bold: "Blocking
- * findings", in dangerText, the must-change ones, as the bar counts them, then "Non-blocking findings". Each group lists
- * its findings as `StudioProblemList` lists problems, grouped by the resource they are about, the resource a link. A
- * group with none does not show. The review's result shows both groups, and the Accept anyway dialog the blocking alone.
+ * Proposed: how the review found each acceptance criterion of the plan or each item of Axis's checklist, see the review
+ * on #3263: under its heading in bold, each item led by its outcome as a `StatusTag`, Met (`success`), Not met
+ * (`danger`) or Skipped (`muted`), in a column of their own so the words start together, with the review's note, muted,
+ * under the words of one not met or skipped. The tag leads each item, so it takes no bullet.
+ */
+function ReviewOutcomes({
+  heading,
+  items,
+  testId,
+}: {
+  heading: string
+  items: readonly StudioReviewOutcome[]
+  testId: string
+}) {
+  const t = useText()
+  const { colour, spacing } = useDesignTokens()
+  if (items.length === 0) {
+    return null
+  }
+  const tone = { met: 'success', notMet: 'danger', skipped: 'muted' } as const
+  return (
+    <Flex vertical gap={spacing.xs} data-testid={testId}>
+      <Typography.Text strong>{t(heading)}</Typography.Text>
+      <ul
+        style={{
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          display: 'grid',
+          gridTemplateColumns: 'max-content minmax(0, 1fr)',
+          columnGap: spacing.sm,
+          rowGap: spacing.xs,
+          alignItems: 'baseline',
+          justifyItems: 'start',
+        }}
+      >
+        {items.map((item, index) => (
+          <li key={index} data-outcome={item.outcome} style={{ display: 'contents' }}>
+            <StatusTag tone={tone[item.outcome]}>
+              {t(`shell.studio.aiRequest.review.outcome.${item.outcome}`)}
+            </StatusTag>
+            <span>
+              <Typography.Text>{item.text}</Typography.Text>
+              {item.note !== null && (
+                <>
+                  <br />
+                  <Typography.Text style={{ color: colour.textMuted }}>{item.note}</Typography.Text>
+                </>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Flex>
+  )
+}
+
+/**
+ * Proposed: a review's findings in one list, see the review on #3263, as `StudioProblemList` lists problems: grouped by
+ * the resource they are about, the resource a link, each finding led by its kind as a problem is led by its severity,
+ * "Blocking" in dangerText and "Suggestion" in infoText, so a glance tells what holds the draft back. The blocking ones
+ * come first. The review's result shows them all, and the Accept anyway dialog the blocking ones alone.
  */
 function FindingList({
   findings,
@@ -1329,44 +1405,29 @@ function FindingList({
   only?: 'blocking'
 }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  const group = (key: string, heading: string, items: readonly StudioReviewFinding[], danger: boolean) =>
-    items.length > 0 && (
-      <Flex vertical gap={spacing.xs} data-testid={key}>
-        {/* A heading sits `spacing-xs` above its list, and the groups `spacing-md` apart. The blocking findings'
-            heading is in dangerText, so a glance tells what holds the draft back. */}
-        <Typography.Text strong style={danger ? { color: colour.dangerText } : undefined}>
-          {t(heading)}
-        </Typography.Text>
-        <StudioProblemList
-          items={items.map((finding) => ({
-            lead: null,
-            message: finding.text,
-            resourceId: finding.resourceId,
-            file: finding.file,
-            path: finding.path,
-          }))}
-          resources={resources}
-          onSelect={onOpen}
-        />
-      </Flex>
-    )
+  const { colour } = useDesignTokens()
+  const ink = { blocking: colour.dangerText, suggestion: colour.infoText }
+  const listed = [
+    ...findings.filter((finding) => finding.kind === 'blocking'),
+    ...(only === undefined ? findings.filter((finding) => finding.kind !== 'blocking') : []),
+  ]
   return (
-    <Flex vertical gap={spacing.md} data-testid={testId}>
-      {group(
-        'studio-ai-findings-blocking',
-        'shell.studio.aiRequest.review.blocking',
-        findings.filter((finding) => finding.blocking),
-        true,
-      )}
-      {only === undefined &&
-        group(
-          'studio-ai-findings-non-blocking',
-          'shell.studio.aiRequest.review.nonBlocking',
-          findings.filter((finding) => !finding.blocking),
-          false,
-        )}
-    </Flex>
+    <StudioProblemList
+      testId={testId}
+      items={listed.map((finding) => ({
+        lead: (
+          <Typography.Text style={{ color: ink[finding.kind] }} data-kind={finding.kind}>
+            {t(`shell.studio.aiRequest.review.kind.${finding.kind}`)}
+          </Typography.Text>
+        ),
+        message: finding.text,
+        resourceId: finding.resourceId,
+        file: finding.file,
+        path: finding.path,
+      }))}
+      resources={resources}
+      onSelect={onOpen}
+    />
   )
 }
 

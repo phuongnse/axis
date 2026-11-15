@@ -679,7 +679,10 @@ const appPlan: StudioPlan = {
   ],
   decisions: [{ decision: 'The Cost centre field is optional.', reason: 'The request did not say it is required.' }],
   risks: ['Requests already saved have no cost centre and keep none until someone sets one.'],
-  checks: ['A purchase request saves with a cost centre, and without one.'],
+  checks: [
+    'A purchase request saves with a cost centre, and without one.',
+    'The request list shows a Cost centre column.',
+  ],
   checklist: [
     { item: 'Who sees it.', answer: 'Everyone who sees a request sees its cost centre.' },
     { item: 'Data already saved.', answer: 'Saved requests have no cost centre until someone sets one.' },
@@ -729,14 +732,17 @@ function planOf(request: StudioAuthoringRequest): StudioPlan {
 }
 
 /**
- * Proposed: the review of a ready request: no finding, unless the preview gives the request a review of its own, see
- * the review on #3263.
+ * Proposed: the review of a ready request: no finding, and every criterion and checklist item of its plan met, unless
+ * the preview gives the request a review of its own, see the review on #3263.
  */
 function reviewOf(request: StudioAuthoringRequest): StudioReview {
+  const plan = planOf(request)
   return (
     reviews[request.id] ?? {
       summary: 'The draft does what the request and the plan ask.',
       findings: [],
+      criteria: plan.checks.map((text) => ({ text, outcome: 'met', note: null })),
+      checklist: plan.checklist.map(({ item }) => ({ text: item, outcome: 'met', note: null })),
     }
   )
 }
@@ -1201,18 +1207,35 @@ const reviews: Record<string, StudioReview> = {
       'The draft adds the Cost centre entity and field as planned, but the request list shows no Cost centre column.',
     findings: [
       {
-        blocking: true,
+        kind: 'blocking',
         text: 'The request list shows no Cost centre column, while the request asked for one: the table lists no costCentre column.',
         file: 'pages/request-list.json',
         path: '/widgets/0/columns',
         resourceId: pageId,
       },
       {
-        blocking: false,
+        kind: 'suggestion',
         text: 'The Cost centre field could be required. The request did not say, so the draft leaves it optional.',
         file: 'entities/Request.json',
         path: '/fields/2',
         resourceId: id(firstEntityId),
+      },
+    ],
+    criteria: [
+      { text: 'A purchase request saves with a cost centre, and without one.', outcome: 'met', note: null },
+      {
+        text: 'The request list shows a Cost centre column.',
+        outcome: 'notMet',
+        note: 'The table of the request list has no costCentre column.',
+      },
+    ],
+    checklist: [
+      { text: 'Who sees it.', outcome: 'met', note: null },
+      { text: 'Data already saved.', outcome: 'met', note: null },
+      {
+        text: 'Texts.',
+        outcome: 'skipped',
+        note: 'The Vietnamese label could not be checked: the draft has no Vietnamese text resource yet.',
       },
     ],
   },
