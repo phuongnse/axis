@@ -61,13 +61,13 @@ import { bulletList } from '../platform/bulletList'
 import { StudioProblemList } from './StudioProblems'
 import { ResourceReference } from './ResourceReference'
 import {
-  BulbFilled,
-  CheckCircleFilled,
+  BulbOutlined,
+  CheckCircleOutlined,
   CheckOutlined,
   ClockCircleOutlined,
-  CloseCircleFilled,
+  CloseCircleOutlined,
   CloseOutlined,
-  ExclamationCircleFilled,
+  ExclamationCircleOutlined,
   LoadingOutlined,
   MinusCircleOutlined,
   MinusOutlined,
@@ -1343,15 +1343,15 @@ function ReviewFindings({
  * docs/reference/actions-and-controls.md#buttons lets an icon go with text for a status or a severity. A finding is
  * Blocking, an exclamation mark in dangerText, or Suggestion, a bulb in warningText; a criterion or a checklist item is
  * Met, a check in successText, Not met, a cross in dangerText, or Skipped, a dash in textMuted. The icon is hidden
- * from assistive technology, which reads the word.
+ * from assistive technology, which reads the word. The icons are outlined, as the feed's marks are.
  */
 function ReviewMark({ mark, words }: { mark: ReviewMarkKind; words: string }) {
   const { colour, spacing } = useDesignTokens()
   const look = {
-    blocking: { icon: <ExclamationCircleFilled />, ink: colour.dangerText },
-    suggestion: { icon: <BulbFilled />, ink: colour.warningText },
-    met: { icon: <CheckCircleFilled />, ink: colour.successText },
-    notMet: { icon: <CloseCircleFilled />, ink: colour.dangerText },
+    blocking: { icon: <ExclamationCircleOutlined />, ink: colour.dangerText },
+    suggestion: { icon: <BulbOutlined />, ink: colour.warningText },
+    met: { icon: <CheckCircleOutlined />, ink: colour.successText },
+    notMet: { icon: <CloseCircleOutlined />, ink: colour.dangerText },
     skipped: { icon: <MinusCircleOutlined />, ink: colour.textMuted },
   }[mark]
   return (
