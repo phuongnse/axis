@@ -298,10 +298,15 @@ describe('a ready request’s review', () => {
     expect(within(page).getByText('Page')).toBeInTheDocument()
     expect(page).toHaveTextContent(/Blocking: Mails the approver too\..*Suggestion: Could say why\./)
     const { colour } = designTokensFor('light')
-    expect(within(page).getByText('Blocking:')).toHaveStyle({ color: colour.dangerText })
-    expect(within(page).getByText('Blocking:').querySelector('[aria-hidden] .anticon-stop')).not.toBeNull()
-    expect(within(page).getByText('Suggestion:')).toHaveStyle({ color: colour.warningText })
-    expect(within(page).getByText('Suggestion:').querySelector('.anticon-bulb')).not.toBeNull()
+    // Only the icon takes the colour; the word reads in the text colour.
+    const blockingMark = within(page).getByText('Blocking:')
+    expect(blockingMark.style.color).toBe('')
+    expect(blockingMark.querySelector('.anticon-exclamation-circle')!.parentElement).toHaveStyle({
+      color: colour.dangerText,
+    })
+    expect(within(page).getByText('Suggestion:').querySelector('.anticon-bulb')!.parentElement).toHaveStyle({
+      color: colour.warningText,
+    })
     // Proposed: a resource's findings sit half of spacing-xs under its name.
     expect(page).toHaveStyle({ gap: '4px' })
     expect(within(page).getAllByTestId('studio-problem')[0].parentElement).toHaveStyle({
@@ -338,18 +343,24 @@ describe('a ready request’s review', () => {
     expect(within(criteria).getByText('Acceptance criteria')).toBeInTheDocument()
     const { colour } = designTokensFor('light')
     const [met, notMet] = within(criteria).getAllByRole('listitem')
-    // Proposed: each led by an icon and its outcome in the colour it asks for, the why muted after the words on their line.
-    expect(within(met).getByText('Met')).toHaveStyle({ color: colour.successText })
-    expect(within(met).getByText('Met').querySelector('.anticon-check-circle')).not.toBeNull()
-    expect(met).toHaveTextContent(/Met\s*It saves\./)
-    expect(within(notMet).getByText('Not met')).toHaveStyle({ color: colour.dangerText })
+    // Proposed: each led by its outcome as a finding is led by its kind, the icon in the colour it asks for, the why
+    // muted after the words on their line.
+    expect(within(met).getByText('Met:').querySelector('.anticon-check-circle')!.parentElement).toHaveStyle({
+      color: colour.successText,
+    })
+    expect(met).toHaveTextContent('Met: It saves.')
+    expect(within(notMet).getByText('Not met:').querySelector('.anticon-close-circle')!.parentElement).toHaveStyle({
+      color: colour.dangerText,
+    })
     expect(within(notMet).getByText('No such column.')).toHaveStyle({ color: colour.textMuted })
-    expect(notMet).toHaveTextContent(/Not met\s*It shows a column\. No such column\./)
+    expect(notMet).toHaveTextContent('Not met: It shows a column. No such column.')
     expect(within(notMet).queryByRole('br')).toBeNull()
     const checklist = screen.getByTestId('studio-ai-review-checklist')
     expect(within(checklist).getByText('Checklist')).toBeInTheDocument()
-    expect(within(checklist).getByText('Skipped')).toHaveStyle({ color: colour.textMuted })
-    expect(checklist).toHaveTextContent(/Skipped\s*Texts\. No Vietnamese texts yet\./)
+    expect(within(checklist).getByText('Skipped:').querySelector('.anticon-minus-circle')!.parentElement).toHaveStyle({
+      color: colour.textMuted,
+    })
+    expect(checklist).toHaveTextContent('Skipped: Texts. No Vietnamese texts yet.')
     expect(screen.queryByTestId('studio-ai-findings')).toBeNull()
   })
 
