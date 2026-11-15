@@ -79,7 +79,7 @@ as the [widget binding](data-sources.md#widget-binding) says.
   page parameter has no value is left out. The chart asks again when a page parameter changes. When `totalCount` is
   over 100, a note under the chart says that only the first 100 groups show. Each row is one category. A `reference`
   category shows its label from `labels`, and a `null` category shows a platform text.
-- **Values.** Decimals arrive as [source text](frontend.md#number-source-text). The SPA turns them into numbers only to
+- **Values.** Decimals arrive as [source text](table-widget.md#number-source-text). The SPA turns them into numbers only to
   draw, and the tooltip and the data table keep the source text.
 - **Look.** The widget draws a card with the chart's title above the chart. The shared chart component in
   `web/src/platform/Chart.tsx` draws bar, line and pie charts from categories and labelled series, with series colours
@@ -119,7 +119,7 @@ A `kpi` widget shows one measure of a data source as a tile, with its label.
 
   `measure` and the comparison's `measure` are the names the data source declares. `comparison` and `navigate` are
   `null` when the widget has none, and `navigate` is `null` too when the user cannot read its page. It has the keys of
-  every `navigate` action, see [navigate](frontend.md#navigate). A user who cannot run the data source gets no widget,
+  every `navigate` action, see [navigate](table-widget.md#navigate). A user who cannot run the data source gets no widget,
   as with a table.
 - **Value.** The SPA reads the one total row of the data source. The request carries each bound page parameter's value
   under the data source parameter's name, and the tile reads again when a page parameter changes. The value is

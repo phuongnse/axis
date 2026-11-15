@@ -28,8 +28,7 @@ The sidebar starts with the application's row, at the height of the band beside 
 meet. The row is a menu of every application, with the open one marked, and New application… after
 them. It has no entry back to the list, because Studio in the header's app switcher leads there. The
 row and the band stay in place while the page scrolls, and only the sidebar's entries scroll, under
-the row. Beside a sidebar the footer sits under the content column only, so the sidebar always runs to
-the bottom of the window.
+the row. Where the footer sits beside the sidebar is in [layout](shell.md#layout).
 
 Under the row come Overview, Releases, History and Settings, which concern the whole application.
 History lists the application's revisions, see [revisions](ai-authoring-in-studio.md#revisions). Then
@@ -94,6 +93,9 @@ The band's errors and warnings open a Problems panel on the right, under the hea
 not modal, so the page stays usable while it is open. It lists every error and then every warning, each
 with its message and where it is. Opening one opens its resource at the place it names and leaves the
 panel open, so an author can fix one problem after another.
+
+- **The shared frame** _(planned for M35)_. The panel is drawn in `StudioSidePanel`, Studio's one side panel frame, see
+  [layout](shell.md#layout).
 
 ## Page heading
 

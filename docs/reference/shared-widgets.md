@@ -53,6 +53,8 @@ Each common job has one shared widget or helper:
 | The application a new tenant or a new application starts from | `StartFromField`, with Blank first and chosen, and a warning `status` when the list does not load |
 | A message that only a screen reader hears      | `Announcement`, a polite status region built on `visuallyHidden`                                       |
 | Asking again until a job ends                  | `useFollowJob`, which `useFollowCellJob` wraps                                                         |
+| A panel on the right of a page                 | `ShellAside`, `sidePanel` wide _(planned for M35)_                                                     |
+| A side panel of Studio, one at a time          | `StudioSidePanel`, in `ShellAside` _(planned for M35)_                                                 |
 
 ## What the build checks
 
