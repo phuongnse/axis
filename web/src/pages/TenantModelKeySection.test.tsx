@@ -129,9 +129,8 @@ describe('TenantModelKeySection', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Set key…' }))
     const dialog = await screen.findByRole('dialog', { name: 'Set the model key' })
-    const field = within(dialog).getByLabelText('Key', { exact: true })
+    const field = within(dialog).getByLabelText(/^Key\*?$/)
     expect(field).toHaveAttribute('type', 'password')
-    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
     await user.type(field, 'sk-test-1234567890')
     expect(changes(fetchMock)).toHaveLength(0)
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
@@ -145,6 +144,27 @@ describe('TenantModelKeySection', () => {
     expect(screen.queryByText('sk-test-1234567890')).toBeNull()
   })
 
+  it('keeps Save on with an empty key, and a click shows what to enter, focuses the field and sends nothing', async () => {
+    const user = userEvent.setup()
+    const fetchMock = stubServer([json(keyNotSet), json(keySet)])
+    renderSection()
+
+    await user.click(await screen.findByRole('button', { name: 'Set key…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Set the model key' })
+    expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled()
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    const message = await within(dialog).findByText('Enter the key.')
+    await vi.waitFor(() => expect(message).toBeVisible())
+    await vi.waitFor(() => expect(within(dialog).getByLabelText(/^Key\*?$/)).toHaveFocus())
+    expect(changes(fetchMock)).toHaveLength(0)
+
+    await user.type(within(dialog).getByLabelText(/^Key\*?$/), 'sk-test-1234567890')
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    expect(await screen.findByTestId('tenant-model-key-masked')).toHaveTextContent(/^••••7890$/)
+    expect(changes(fetchMock)).toHaveLength(1)
+  })
+
   it('names the dialog Change when a key is set and sends nothing on Cancel', async () => {
     const user = userEvent.setup()
     const fetchMock = stubServer([json(keySet)])
@@ -152,7 +172,7 @@ describe('TenantModelKeySection', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Change key…' }))
     const dialog = await screen.findByRole('dialog', { name: 'Change the model key' })
-    await user.type(within(dialog).getByLabelText('Key', { exact: true }), 'abc')
+    await user.type(within(dialog).getByLabelText(/^Key\*?$/), 'abc')
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
     expect(changes(fetchMock)).toHaveLength(0)
@@ -165,7 +185,7 @@ describe('TenantModelKeySection', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Set key…' }))
     const dialog = await screen.findByRole('dialog', { name: 'Set the model key' })
-    await user.type(within(dialog).getByLabelText('Key', { exact: true }), 'sk-test-1234567890')
+    await user.type(within(dialog).getByLabelText(/^Key\*?$/), 'sk-test-1234567890')
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText('The key was not saved.')).toBeVisible()

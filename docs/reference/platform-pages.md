@@ -174,8 +174,8 @@ with no directory row or a preview tenant. A `403` or `404` is not logged, and a
 - **State.** The section says "No key is set." or shows a set key as `••••` followed by its last four characters. A key
   of four characters or fewer shows `••••` alone. The page never holds the whole key after it is saved.
 - **Set and change.** The "Set key…" button, which reads "Change key…" once a key is set, opens a dialog with a password
-  field. Its "Save" button is the only thing that sends the key, as `PUT /api/tenant/model-key`, and it stays disabled
-  while the field is blank. Closing the dialog clears the field. A failed save shows "The key was not saved."
+  field. Its "Save" button is the only thing that sends the key, as `PUT /api/tenant/model-key`, and a click with the
+  field blank shows what to enter under it and sends nothing. Closing the dialog clears the field. A failed save shows "The key was not saved."
 - **Remove.** The "Remove key…" button opens a confirmation titled "Remove the model key?". Only the confirmation's
   "Remove" button sends `DELETE /api/tenant/model-key`. A failed remove shows "The key was not removed."
 - **After a change.** The section reads `GET /api/tenant/model-key` again, so it shows what the server stored.

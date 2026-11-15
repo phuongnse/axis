@@ -1,8 +1,9 @@
-import { Flex, Input, Modal, Typography } from 'antd'
+import { Flex, Form, Input, Modal, Typography } from 'antd'
 import { useEffect, useId, useState } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
+import { requiredMark } from '../platform/requiredMark'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import {
@@ -19,7 +20,8 @@ type Dialog = 'set' | 'remove'
  * nothing unless `GET /api/tenant/model-key` answers `200`, so it stays hidden from a non-administrator, where
  * `Ai:AllowTenantKeys` is off and for a tenant with no directory row. It shows `••••` and the key's last four
  * characters, or says that no key is set. The Set and Change buttons open a dialog with a password field, and only its
- * Save button sends the key. The Remove button asks for a confirmation first. After each change the section reads the
+ * Save button sends the key. A click on Save with the field blank shows what to enter under it, focuses it and sends
+ * nothing, see docs/reference/actions-and-controls.md#fields. The Remove button asks for a confirmation first. After each change the section reads the
  * key again, so it shows what the server stored. See docs/reference/platform-pages.md#model-key.
  */
 export function TenantModelKeySection() {
@@ -28,7 +30,6 @@ export function TenantModelKeySection() {
   const headingId = useId()
   const [modelKey, setModelKey] = useState<TenantModelKey | null>(null)
   const [dialog, setDialog] = useState<Dialog>()
-  const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<'saveFailed' | 'removeFailed'>()
 
@@ -55,7 +56,6 @@ export function TenantModelKeySection() {
 
   function close() {
     setDialog(undefined)
-    setDraft('')
   }
 
   async function change(run: () => Promise<boolean>, notice: 'saveFailed' | 'removeFailed') {
@@ -110,21 +110,14 @@ export function TenantModelKeySection() {
           )}
         </Flex>
       </Flex>
-      <Modal
-        open={dialog === 'set'}
-        width={size.dialog.small}
-        title={t(modelKey.set ? 'shell.users.modelKey.changeTitle' : 'shell.users.modelKey.setTitle')}
-        okText={t('shell.users.modelKey.save')}
-        cancelText={t('shell.users.roles.cancel')}
-        okButtonProps={{ disabled: draft.trim() === '' }}
-        confirmLoading={busy}
-        onOk={() => void change(() => setTenantModelKey(draft), 'saveFailed')}
-        onCancel={close}
-      >
-        <AxisField label={t('shell.users.modelKey.field')} help={t('shell.users.modelKey.help')}>
-          <Input.Password autoComplete="off" value={draft} onChange={(event) => setDraft(event.target.value)} />
-        </AxisField>
-      </Modal>
+      {dialog === 'set' && (
+        <SetKeyDialog
+          title={t(modelKey.set ? 'shell.users.modelKey.changeTitle' : 'shell.users.modelKey.setTitle')}
+          busy={busy}
+          onSave={(key) => void change(() => setTenantModelKey(key), 'saveFailed')}
+          onCancel={close}
+        />
+      )}
       <Modal
         open={dialog === 'remove'}
         width={size.dialog.small}
@@ -138,5 +131,52 @@ export function TenantModelKeySection() {
         <Typography.Text>{t('shell.users.modelKey.removeEffect')}</Typography.Text>
       </Modal>
     </section>
+  )
+}
+
+/** The dialog that takes the key. It renders only while open, so closing it clears the field. */
+function SetKeyDialog({
+  title,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  title: string
+  busy: boolean
+  onSave: (key: string) => void
+  onCancel: () => void
+}) {
+  const t = useText()
+  const { size } = useDesignTokens()
+  const [form] = Form.useForm<{ key: string }>()
+
+  return (
+    <Modal
+      open
+      width={size.dialog.small}
+      title={title}
+      okText={t('shell.users.modelKey.save')}
+      cancelText={t('shell.users.roles.cancel')}
+      confirmLoading={busy}
+      onOk={() => form.submit()}
+      onCancel={onCancel}
+    >
+      <Form
+        form={form}
+        layout="vertical"
+        requiredMark={requiredMark}
+        scrollToFirstError={{ focus: true }}
+        onFinish={({ key }) => onSave(key)}
+      >
+        <AxisField
+          name="key"
+          label={t('shell.users.modelKey.field')}
+          help={t('shell.users.modelKey.help')}
+          requiredMessage={t('shell.users.modelKey.keyRequired')}
+        >
+          <Input.Password autoComplete="off" />
+        </AxisField>
+      </Form>
+    </Modal>
   )
 }

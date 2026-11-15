@@ -36,6 +36,7 @@ import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useUnsavedChanges } from '../platform/unsavedChanges'
+import { focusFirstSeedProblem } from './focusSeedProblem'
 import { EntityDesigner } from './EntityDesigner'
 import type { DesignerLayer } from './LayerMarkViews'
 import { SchemaForm } from './SchemaForm'
@@ -102,6 +103,7 @@ export function StudioModuleEditor({
   const { generation, reconnecting, lost } = useStudioConnection()
   const [loaded, setLoaded] = useState<Loaded>()
   const loadedRef = useRef<Loaded>(undefined)
+  const rootRef = useRef<HTMLDivElement>(null)
   const [draft, setDraft] = useState<Content>({})
   const [loadFailed, setLoadFailed] = useState(false)
   const [conflict, setConflict] = useState(false)
@@ -392,7 +394,7 @@ export function StudioModuleEditor({
   }
 
   return (
-    <Flex vertical gap="middle">
+    <Flex vertical gap="middle" ref={rootRef}>
       {loaded.layer !== null && (
         <Flex gap="small" align="center">
           <Tag data-testid="studio-module-layer">{t('shell.studio.module.layer')}</Tag>
@@ -508,8 +510,14 @@ export function StudioModuleEditor({
         <AxisButton
           role="finish"
           data-testid="studio-save"
-          disabled={patch.length === 0 || problems.size > 0 || conflict || saving || resetting || reconnecting}
-          onClick={() => void save()}
+          disabled={patch.length === 0 || conflict || saving || resetting || reconnecting}
+          onClick={() => {
+            if (problems.size > 0) {
+              focusFirstSeedProblem(rootRef.current, problems)
+            } else {
+              void save()
+            }
+          }}
         >
           {t('shell.studio.save')}
         </AxisButton>

@@ -76,6 +76,7 @@ import { ExpressionCheckContext } from './expressionCheckContext'
 import type { JsonViewHandle } from './JsonView'
 import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
+import { focusFirstSeedProblem } from './focusSeedProblem'
 import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
 import { SaveBar } from './SaveBar'
@@ -197,7 +198,7 @@ export interface StudioEditorHandle {
  * Used by tab, see studio.md#delete. The application manifest has no Delete. When `path` is set, the editor opens the
  * form at the field that holds it and scrolls to that field once the resource has loaded. A path the form cannot
  * show opens the JSON view instead. A seed whose entity is a resource of the folder shows its records as a grid with
- * a column per field, below the form of its other properties, and Save is off while a value would fail seeding. When
+ * a column per field, below the form of its other properties, and a click on Save with a value that would fail seeding focuses the first such cell and sends nothing. When
  * the entity is not in the folder, the seed uses the generic form. A scenario shows a typed editor of its name, users,
  * stubs and steps, and the JSON view edits the same draft. A connector opens in the connector editor, which shows a
  * binding as a name only. An identity provider opens in the identity provider editor, which shows the fields of its type
@@ -212,8 +213,8 @@ export interface StudioEditorHandle {
  * patch.
  * Every kind has Undo and Redo on the save bar, which shows while there is something to save or a step can be redone,
  * and as Ctrl+Z and Ctrl+Shift+Z (Cmd on macOS), for up to 100 steps of its draft on all its tabs. Typing in one box is one
- * step, and a load of the file clears the history. JSON that does not parse is an unsaved change with Save off, and
- * while it has an error the Form and Design tabs are read-only and the editor ignores every edit from them. Discard
+ * step, and a load of the file clears the history. JSON that does not parse is an unsaved change, and a click on Save opens the JSON view at the first problem and sends
+ * nothing. While it has an error the Form and Design tabs are read-only and the editor ignores every edit from them. Discard
  * asks first and puts back the loaded resource. A removed row asks nothing and shows a notice with Undo.
  * A form's Design tab shows a Used on list above its canvas, with the pages and process steps that use the form, and an entry calls `onOpen`.
  * Every resource but the application has a Used by tab, which lists the resources that use it and loads only when it opens.
@@ -321,6 +322,8 @@ export function StudioEditor({
   const handledPath = useRef<string | null>(null)
   // A field to scroll to once the form tab is shown, because a hidden field cannot be scrolled to.
   const pendingField = useRef<HTMLElement | null>(null)
+  // What a click on Save found wrong, until its tab is drawn and the first problem is shown there.
+  const pendingProblem = useRef<'json' | 'seed' | null>(null)
 
   function adopt(resource: Loaded) {
     setLoaded({ content: resource.content, version: resource.version })
@@ -699,6 +702,19 @@ export function StudioEditor({
     }
   })
 
+  /** Shows the problem that a click on Save found, once its tab is drawn. */
+  function showPendingProblem() {
+    if (pendingProblem.current === 'json' && tab === 'json') {
+      jsonViewRef.current?.nextProblem()
+      pendingProblem.current = null
+    } else if (pendingProblem.current === 'seed' && tab === 'form' && formDrawn) {
+      focusFirstSeedProblem(rootRef.current, problems)
+      pendingProblem.current = null
+    }
+  }
+
+  useEffect(showPendingProblem)
+
   if (loadFailed) {
     return (
       <AxisAlert data-testid="studio-resource-load-error" kind="error" message={t('shell.studio.loadResourceFailed')} />
@@ -812,6 +828,22 @@ export function StudioEditor({
     } catch (error) {
       console.warn('Copying the JSON failed', error)
       void messageApi.error(t('shell.studio.json.copyFailed'))
+    }
+  }
+
+  /**
+   * A click on Save. JSON that does not parse is shown first, because the form then shows the last valid draft, whose
+   * seed problems may be stale. A wrong seed cell opens the form at that cell. Nothing is sent while either shows.
+   * See docs/reference/actions-and-controls.md#fields.
+   */
+  function checkAndSave() {
+    if (jsonInvalid || problems.size > 0) {
+      pendingProblem.current = jsonInvalid ? 'json' : 'seed'
+      setTab(jsonInvalid ? 'json' : 'form')
+      // A tab that is open already draws nothing new, so no render follows.
+      showPendingProblem()
+    } else {
+      void save()
     }
   }
 
@@ -1326,14 +1358,7 @@ export function StudioEditor({
               unsaved={unsaved}
               undoable={history.past.length > 0}
               redoable={history.future.length > 0}
-              saveable={
-                (patch.length > 0 || changedTexts.length > 0) &&
-                !jsonInvalid &&
-                problems.size === 0 &&
-                !conflict &&
-                !saving &&
-                !reconnecting
-              }
+              saveable={unsaved && !conflict && !saving && !reconnecting}
               busy={saving}
               onUndo={undo}
               onRedo={redo}
@@ -1341,7 +1366,7 @@ export function StudioEditor({
                 adopt(loaded)
                 messageApi.destroy('studio-removed')
               }}
-              onSave={save}
+              onSave={checkAndSave}
             />
           </Flex>
         </StudioBindingsContext.Provider>

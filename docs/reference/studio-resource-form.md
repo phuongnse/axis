@@ -155,7 +155,7 @@ icons, then Discard and Save on the right. With nothing to save it is not drawn.
 - **While a step can be redone.** The bar stays, reading "No unsaved changes", with Redo on and no
   Discard, as nothing is left to discard. Save is off.
 - **What counts.** JSON that does not parse is an unsaved change, so the bar and its Undo and Discard
-  are there when they are needed, and Save is off. A change that leaves the data as it was, such as a
+  are there when they are needed. A click on Save opens the JSON view at the first problem and sends nothing. A change that leaves the data as it was, such as a
   space or Format, shows no bar, because nothing can be saved.
 - **Every kind.** Every resource kind has the bar. What Undo, Redo and Discard do is in
   [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm).

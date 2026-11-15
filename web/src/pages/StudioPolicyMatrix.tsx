@@ -1,6 +1,6 @@
 import { Button, Checkbox, Flex, Input, Select, Tag, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { lazy, useEffect, useMemo, useState } from 'react'
+import { lazy, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { diffPatch, setAt } from '../platform/jsonPatch'
@@ -316,7 +316,9 @@ function stringsOf(value: unknown): string[] {
 /**
  * The editable grants of one role on one target. They are the grants of the role's own `<Role>Access` policy that name
  * the target, taken from the policy file itself so that every index fits the file that a save patches. A save sends
- * one patch with the version the policy was loaded at, or creates the policy when the role has none.
+ * one patch with the version the policy was loaded at, or creates the policy when the role has none. Save is on while
+ * a grant has no ticked action. A click then shows what to fix under that grant's actions, focuses its first box and
+ * sends nothing, see docs/reference/actions-and-controls.md#fields. A save that succeeds and Reload clear that check.
  */
 function OwnGrants({
   application,
@@ -341,6 +343,9 @@ function OwnGrants({
   const [saving, setSaving] = useState(false)
   const [conflict, setConflict] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [checked, setChecked] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const requiredId = useId()
 
   useEffect(() => {
     if (accessId === null) {
@@ -400,12 +405,27 @@ function OwnGrants({
   function reload() {
     setConflict(false)
     setFailed(false)
+    setChecked(false)
     if (accessId === null) {
       setState(freshPolicy(role))
     } else {
       setState(undefined)
       setReloads((value) => value + 1)
     }
+  }
+
+  /** A click on Save: a grant with no ticked action shows its message and takes the focus, and nothing is sent. */
+  function check() {
+    if (!incomplete) {
+      void save()
+      return
+    }
+    setChecked(true)
+    const position = own.findIndex((index) => stringsOf((grants[index] as Content).actions).length === 0)
+    rootRef.current
+      ?.querySelectorAll('[data-testid="studio-matrix-own-grant"]')
+      [position]?.querySelector<HTMLInputElement>('[data-testid="studio-matrix-actions"] input')
+      ?.focus()
   }
 
   async function save() {
@@ -423,6 +443,7 @@ function OwnGrants({
           return
         }
         setState({ loaded: { id: result.item.id, content: draft, version: result.item.version }, draft })
+        setChecked(false)
         onWritten(result.diagnostics, result.item)
         return
       }
@@ -432,6 +453,7 @@ function OwnGrants({
         return
       }
       setState({ loaded: { id: loaded.id, content: draft, version: result.version }, draft })
+      setChecked(false)
       onWritten(result.diagnostics)
     } catch (error) {
       if (error instanceof ServerUnreachableError) {
@@ -446,7 +468,7 @@ function OwnGrants({
   }
 
   return (
-    <Flex vertical gap="small" data-testid="studio-matrix-own-grants">
+    <Flex vertical gap="small" ref={rootRef} data-testid="studio-matrix-own-grants">
       {own.length === 0 && <Typography.Text type="secondary">{t('shell.studio.matrix.noGrants')}</Typography.Text>}
       {own.map((index) => {
         const grant = grants[index] as Content
@@ -454,6 +476,8 @@ function OwnGrants({
         const unaccepted = actions.filter((action) => !accepted.includes(action))
         const filterPath = `/grants/${index}/filter`
         const filter = typeof grant.filter === 'string' ? grant.filter : ''
+        const missing = checked && stringsOf(grant.actions).length === 0
+        const missingId = `${requiredId}-${index}`
         return (
           <Flex key={index} vertical gap={4} data-testid="studio-matrix-own-grant">
             <Flex gap="small" align="center" wrap>
@@ -465,6 +489,7 @@ function OwnGrants({
               )}
               <Checkbox.Group
                 data-testid="studio-matrix-actions"
+                aria-describedby={missing ? missingId : undefined}
                 options={accepted}
                 value={actions.filter((action) => accepted.includes(action))}
                 onChange={(ticked) => setActions(index, ticked)}
@@ -480,6 +505,11 @@ function OwnGrants({
                 {t('shell.studio.matrix.removeGrant')}
               </Button>
             </Flex>
+            {missing && (
+              <Typography.Text type="danger" id={missingId} data-testid="studio-matrix-actions-required">
+                {t('shell.studio.matrix.actionsRequired')}
+              </Typography.Text>
+            )}
             {target.kind === 'entity' && (
               <>
                 <AxisField label={t('shell.studio.matrix.filter')} help={t('shell.studio.matrix.filter.help')}>
@@ -521,7 +551,7 @@ function OwnGrants({
           {t('shell.studio.matrix.addGrant')}
         </Button>
         {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button type="primary" disabled={!changed || incomplete || saving || reconnecting} onClick={save}>
+        <Button type="primary" disabled={!changed || saving || reconnecting} onClick={check}>
           {t('shell.studio.matrix.save')}
         </Button>
       </Flex>

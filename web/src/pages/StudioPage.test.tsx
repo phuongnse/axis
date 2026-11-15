@@ -531,8 +531,8 @@ describe('StudioPage', () => {
     expect(within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')).toHaveValue('200')
   })
 
-  it('shows an edit in the JSON view in the form, and turns Save off for invalid JSON', async () => {
-    stubServer()
+  it('shows an edit in the JSON view in the form, and keeps Save on for invalid JSON but sends nothing on a click', async () => {
+    const fetchMock = stubServer()
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
     await screen.findByTestId('studio-field-/fields/0/name')
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
@@ -546,7 +546,9 @@ describe('StudioPage', () => {
     await editJson('{ "name": ')
 
     expect(await screen.findByRole('button', { name: '1 problem' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(0)
   })
 
   it('shows each diagnostic with its file and path', async () => {
