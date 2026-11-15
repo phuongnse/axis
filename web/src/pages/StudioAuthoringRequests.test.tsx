@@ -318,6 +318,10 @@ describe('a ready request’s review', () => {
     const review = await screen.findByTestId('studio-ai-review')
     expect(within(review).getByText('No changes requested')).toHaveAttribute('data-tone', 'success')
     expect(within(review).queryByTestId('studio-problem-group')).toBeNull()
+    // Proposed: the summaries of the checks and of the review read under their lines, flush with them.
+    expect(within(review).getByText('All done.')).toHaveStyle({ gridColumn: '1 / -1' })
+    expect(within(review).getByText('All done.').style.paddingInlineStart).toBe('')
+    expect(screen.getByTestId('studio-ai-checks-fold').parentElement!.style.paddingInlineStart).toBe('')
   })
 })
 

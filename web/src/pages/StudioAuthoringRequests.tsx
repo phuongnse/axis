@@ -685,9 +685,11 @@ export function StudioAuthoringRequestPage({
     </FeedItem>
   )
 
-  // Proposed: what belongs to the checks' or the review's line sits inside it, across the columns and indented by
-  // spacing-md, as layout shows structure, see the review on #3263.
-  const inside: CSSProperties = { gridColumn: '1 / -1', paddingInlineStart: spacing.md }
+  // Proposed: a line's summary reads under it across the columns, flush with it, as a heading's paragraph does, and what
+  // the summary opens or lists sits inside the line, indented by spacing-md, as layout shows structure, see the review on
+  // #3263.
+  const under: CSSProperties = { gridColumn: '1 / -1' }
+  const inside: CSSProperties = { ...under, paddingInlineStart: spacing.md }
   const resultItem = hasResult && (
     <FeedItem
       testId="studio-ai-feed-result"
@@ -723,7 +725,7 @@ export function StudioAuthoringRequestPage({
               'shell.studio.aiRequest.feed.hideChecks',
               'studio-ai-checks-fold',
               <Typography.Text>{checksLine.text}</Typography.Text>,
-              inside,
+              under,
             )}
             {checksOpen && (
               <Flex vertical gap="small" style={inside} data-testid="studio-ai-check-details">
@@ -746,7 +748,7 @@ export function StudioAuthoringRequestPage({
             <span style={{ marginTop: spacing.xs }}>
               <StatusTag tone="muted">{t('shell.studio.aiRequest.review.notReviewed')}</StatusTag>
             </span>
-            <Typography.Text style={inside}>
+            <Typography.Text style={under}>
               {t(mine ? 'shell.studio.aiRequest.notReviewedMine' : 'shell.studio.aiRequest.notReviewed')}
             </Typography.Text>
           </div>
@@ -1275,7 +1277,8 @@ function ReviewFindings({
 }) {
   const t = useText()
   const { spacing } = useDesignTokens()
-  const inside: CSSProperties = { gridColumn: '1 / -1', paddingInlineStart: spacing.md }
+  const under: CSSProperties = { gridColumn: '1 / -1' }
+  const inside: CSSProperties = { ...under, paddingInlineStart: spacing.md }
   const blocking = review.findings.filter((finding) => finding.blocking)
   return (
     <div style={{ display: 'contents' }} data-testid="studio-ai-review">
@@ -1292,8 +1295,8 @@ function ReviewFindings({
           )}
         </StatusTag>
       </span>
-      {/* Its tag closes the line, and its summary, a sentence or two, reads under it across the columns. */}
-      <Typography.Text style={inside}>{review.summary}</Typography.Text>
+      {/* Its tag closes the line, and its summary, a sentence or two, reads under it across the columns, flush with it. */}
+      <Typography.Text style={under}>{review.summary}</Typography.Text>
       {review.findings.length > 0 && (
         // Proposed: the findings follow the summary `spacing-sm` below it, the grid's `spacing-xs` and this margin, nearer
         // than the review's line is to the checks' and farther than a heading is from its list, see the review on #3263.
