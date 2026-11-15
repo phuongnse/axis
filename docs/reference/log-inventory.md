@@ -61,7 +61,9 @@ Each entry says when, where, what and, for an audit record, who, so that entries
   [what telemetry never holds](telemetry.md#what-telemetry-never-holds).
 - **Correlation.** The `TraceId` and `SpanId` in the scope, and the `traceId` of a problem details
   answer, see [correlation](telemetry.md#correlation).
-- **Who.** A log entry holds no user id, by design. The audit record holds the actor. The one exception is a
-  refused provisioning call, which names its operator caller, a platform caller and no tenant user.
+- **Who.** A log entry holds no user id, by design, with two exceptions. A refused provisioning call names its
+  operator caller, a platform caller and no tenant user. A notify step or an escalation that finds no
+  email for a user logs that user's id, never the address, see [email](notifications.md#email). The
+  audit record holds the actor.
 - **Clocks.** The operator keeps the clocks of the hosts in sync, for example with NTP, so the
   timestamps of the server, the worker, the database and the collector line up.

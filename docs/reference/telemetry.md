@@ -100,7 +100,7 @@ One trace id joins what a user sees, what the logs hold and what the history sto
 
 `traceId` and `trace_id` hold the same value, the 32-hex W3C trace id. So a user reports a `traceId`,
 and an operator searches the history for it. Finding one user's failed request goes through the stored
-history, not the traces, because telemetry holds no tenant user's id.
+history, not the traces, because telemetry holds a tenant user's id only when a notification finds no email for that user, see [email](notifications.md#email).
 
 ## What telemetry never holds
 
@@ -110,7 +110,7 @@ No span, metric or log of either host holds any of these:
 - Secrets.
 - Binding values.
 - Request and response bodies.
-- User ids, except the id of the operator in a refused provisioning call.
+- User ids, except the id of the operator in a refused provisioning call and the id of a user whose notification finds no email, see [email](notifications.md#email).
 - Npgsql parameter values.
 - Exception messages on Axis spans, which hold the type only.
 
