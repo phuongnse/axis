@@ -376,8 +376,11 @@ describe('a ready request’s page', () => {
     const result = screen.getByTestId('studio-ai-feed-result')
     expect(result).toHaveAttribute('data-mark', 'waiting')
     // What the draft changes, each resource as people read it, with the summary its request wrote.
-    expect(within(result).getByTestId('studio-ai-changed')).toHaveTextContent(
-      /Cost centre\s*Entity\s*A cost centre with a name and a code\./,
+    // The diff, which names a resource only the draft adds, loads after the request.
+    await waitFor(() =>
+      expect(within(result).getByTestId('studio-ai-changed')).toHaveTextContent(
+        /Cost centre\s*Entity\s*A cost centre with a name and a code\./,
+      ),
     )
 
     const user = userEvent.setup()
