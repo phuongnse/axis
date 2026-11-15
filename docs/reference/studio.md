@@ -363,21 +363,22 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
 
 - **Checking.** The editor checks its text once when it first draws, and 300 ms after each keystroke it
   sends the text to the [expression check route](authoring.md#expression-check), and shows only the
-  latest answer. It underlines the range from `start` to `end` and shows the message and error code
-  under the editor, or the result `type` when there is no error. From its first draw or a keystroke
-  until the answer to its latest text arrives or the check fails, and while its code loads, the editor
-  has `aria-busy="true"`. Tests wait on this busy state before they click on the Form tab, see
+  latest answer. An empty text, required or not, is not sent. It underlines the range from `start` to
+  `end` and shows the message and then its error code under the editor, or the result `type` in words
+  when there is no error. From its first draw or a keystroke until the answer to its latest text
+  arrives or the check fails, and while its code loads, the editor has `aria-busy="true"`. An empty
+  text leaves it not busy. Tests wait on this busy state before they click on the Form tab, see
   [flaky tests](../development.md#flaky-tests).
 - **No answer.** The check places the text in the saved resource, so a place inside a field or an item
   that is not saved yet has no answer, while a new property of a saved object has one, see
   [the place](authoring.md#expression-check). With no answer, or an answer of `400` or `401`, the last
   result stays on screen. A `401` does not show the sign-in prompt, so the draft is kept. The editor
   never blocks Save.
-- **What the place needs** _(planned for M33)_. A line under the box says what the place needs, as "Needs to
-  give yes or no", until the expression gives a type, then "Gives yes or no", in the words the designer
-  names types by. A validation, a condition or a filter needs a boolean, and a computed field or a
-  default the field's type.
-- **An error in words** _(planned for M33)_. An error reads first in words, with its code after it, small. An
+- **What the place needs.** A line under the box says what the place needs, as "Needs to
+  give yes or no", until the expression gives a type, then "Gives yes or no", with the type in words.
+  A validation, a condition or a filter needs a boolean, and a computed field or a default the field's
+  type. A place that takes any type shows no "Needs" line.
+- **An error in words.** An error reads first in words, with its code after it, small. An
   empty expression is not sent to be checked. The box wraps long lines and grows with them.
 - **A function's signature** _(planned for M33)_. Inside a call, a line shows the function's signature, with the
   parameter at the cursor in bold, and what it does.
@@ -397,14 +398,15 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
   `is not null`, `and`, `or`, `not`, `in (…)`, the arithmetic and the values `true`, `false`, `null`,
   `'text'` and `date('…')`, each with what it does and an example. A code editor stays the one way to
   write an expression, because an expression gives a value of any type, not only yes or no.
-- **Only what the place allows** _(planned for M33)_. The server answers
+- **Only what the place allows.** The server answers
   [the scope of a place](authoring.md#expression-scope), so the client keeps no list of functions: no
   aggregate in a default, and no `now()`, `today()` or `toDate()` in a computed field (`AXC0086`).
 - **Completion.** Typing a word, or Ctrl+Space, opens a list of the names in scope, and the arrow keys
-  and Enter pick one. The names come from the [names route](authoring.md#names), loaded with the
-  application and again after a save, a delete and a reconnect. When they do not load, the list offers
-  the functions only, and typing and Save keep working. A function or a rule goes in with its brackets
-  and the cursor inside them, while `now()` and `currentUser()` put the cursor after them.
+  and Enter pick one. The fields, parameters and rules come from the [names route](authoring.md#names),
+  loaded with the application and again after a save, a delete and a reconnect. The functions come from
+  the [expression scope](authoring.md#expression-scope), loaded once per place with the draft. Without
+  names the list offers the functions only, and typing and Save keep working. A rule and a function with
+  parameters go in with the cursor inside their brackets, and `now()` puts it after them.
 - **What completion offers:**
   - the fields of the entity at the place: the entity being edited, a policy grant's `entity`, or the
     `entity` of a data source, a process or a data change trigger;
@@ -412,11 +414,9 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
     trigger, offered as a parameter and not as a field, because a path cannot start from it;
   - a data source filter's parameters, a rule's own parameters, and a process's `parameters` when it
     has no subject, with no field;
-  - the application's rules, with module rules as `<module>:<name>`, and the functions and aggregates
-    of the [expression language](expressions.md#functions);
-  - `currentUser()` only in a policy grant's or a data source's filter, not in a measure filter.
-    Expressions in migrations and endpoints, and in a trigger that has no entity, offer the rules and
-    the functions only.
+  - the application's rules, with module rules as `<module>:<name>`;
+  - the functions and aggregates of the [expression language](expressions.md#functions) that the scope
+    answer allows at the place, such as `currentUser()` only in a grant's or a data source's filter.
 
 ## Policy matrix
 

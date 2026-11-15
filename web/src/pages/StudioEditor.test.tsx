@@ -464,8 +464,11 @@ function sentChanges(fetchMock: ReturnType<typeof vi.fn>): SentChanges {
   return JSON.parse(init!.body as string) as SentChanges
 }
 
+/** The requests of a method that change the application. The expression editor's check and scope routes only read. */
 function requests(fetchMock: ReturnType<typeof vi.fn>, method: string): number {
-  return fetchMock.mock.calls.filter(([, call]) => call?.method === method).length
+  return fetchMock.mock.calls.filter(
+    ([input, call]) => call?.method === method && !String(input).includes('/expressions/'),
+  ).length
 }
 
 function sentPatch(fetchMock: ReturnType<typeof vi.fn>): PatchOperation[] {

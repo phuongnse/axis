@@ -38,7 +38,11 @@ function renderValues(data: unknown = values, onChange = vi.fn(), known: string[
 beforeEach(() =>
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => new Response(JSON.stringify({ type: 'text', diagnostics: [] }), { status: 200 })),
+    vi.fn(async (input: RequestInfo | URL) =>
+      String(input).endsWith('/expressions/scope')
+        ? new Response(null, { status: 404 })
+        : new Response(JSON.stringify({ type: 'text', diagnostics: [] }), { status: 200 }),
+    ),
   ),
 )
 

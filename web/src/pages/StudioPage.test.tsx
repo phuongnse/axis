@@ -1056,7 +1056,9 @@ describe('StudioPage', () => {
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
 
     const field = await screen.findByTestId('studio-field-/validations/0/expression')
-    await waitFor(() => expect(within(field).getByTestId('studio-expression-type')).toHaveTextContent('boolean'))
+    await waitFor(() =>
+      expect(within(field).getByTestId('studio-expression-type')).toHaveTextContent('Gives yes or no'),
+    )
 
     const view = EditorView.findFromDOM(within(field).getByRole('textbox'))!
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: 'totalAmount > 1' } })
@@ -1064,7 +1066,7 @@ describe('StudioPage', () => {
       expect(fetchMock.mock.calls.filter(([input]) => input === `${folder}/expressions/check`)).toHaveLength(2),
     )
 
-    expect(within(field).getByTestId('studio-expression-type')).toHaveTextContent('boolean')
+    expect(within(field).getByTestId('studio-expression-type')).toHaveTextContent('Gives yes or no')
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
     expect(screen.queryByTestId('studio-reconnecting')).not.toBeInTheDocument()
   })
