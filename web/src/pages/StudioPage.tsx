@@ -544,11 +544,12 @@ function StudioWorkspace() {
   }
 
   const overviewApp = apps.find((item) => item.name === application)
-  const entries = studioNavigation(application, resources, allModuleGroups, t, askAi)
+  const entries = studioNavigation(application, resources, allModuleGroups, t, askAi, userId)
   const activeKey = studioActiveEntry(
     params,
     resources,
     allModuleGroups.flatMap((group) => group.items),
+    userId,
   )
 
   return (
@@ -646,11 +647,7 @@ function StudioWorkspace() {
                     previewHost={previewHost}
                   />
                 ) : (
-                  <StudioAuthoringRequests
-                    application={application!}
-                    userId={userId}
-                    onAskAi={() => setSidePanel('askAi')}
-                  />
+                  <StudioAuthoringRequests application={application!} userId={userId} />
                 )
               ) : historyView ? (
                 revisionId !== null ? (

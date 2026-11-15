@@ -2123,6 +2123,8 @@
   "shell.studio.aiRequests.who": "Người gửi",
   "shell.studio.aiRequests.when": "Gửi lúc",
   "shell.studio.aiRequests.you": "Bạn",
+  "shell.studio.aiRequests.all": "Tất cả yêu cầu",
+  "shell.studio.aiRequests.needsAction": "Cần xử lý",
   "shell.studio.aiRequests.empty": "Chưa có yêu cầu AI nào. Bấm Hỏi AI để gửi yêu cầu đầu tiên.",
   "shell.studio.aiRequests.noneWaiting": "Không có yêu cầu nào đang chờ bạn. Yêu cầu bạn gửi đang chờ bạn duyệt hoặc chấp nhận sẽ hiện ở đây.",
   "shell.studio.aiRequests.back": "Quay lại Yêu cầu AI",

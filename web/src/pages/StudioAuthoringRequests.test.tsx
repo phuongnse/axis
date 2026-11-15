@@ -7,7 +7,7 @@ import type { StudioAuthoringRequestDetail, StudioAuthoringRequestStep } from '.
 import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
-import { requestTitle } from './authoringRequests'
+import { needsActionAddress, requestTitle } from './authoringRequests'
 import { StudioAuthoringRequestPage, StudioAuthoringRequests } from './StudioAuthoringRequests'
 
 const application = 'Purchases'
@@ -81,9 +81,9 @@ function stub(answer: unknown) {
   return fetchMock
 }
 
-function renderIn(children: React.ReactNode) {
+function renderIn(children: React.ReactNode, entry = '/') {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[entry]}>
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           {children}
@@ -116,15 +116,15 @@ describe('the AI requests table', () => {
   }
   const working = { ...fromApp, id: 'a1e00000-0000-4000-8000-000000000098', title: 'Rename Category', state: 'working' }
 
-  function renderList(onAskAi = vi.fn()) {
+  function renderList(entry = '/') {
     stub({ items: [fromApp, other, working] })
     renderIn(
       <>
-        <StudioAuthoringRequests application={application} userId={userId} onAskAi={onAskAi} />
+        <StudioAuthoringRequests application={application} userId={userId} />
         <Location />
       </>,
+      entry,
     )
-    return onAskAi
   }
 
   it('has search, filter, columns and refresh, and searches the words of the requests', async () => {
@@ -141,24 +141,16 @@ describe('the AI requests table', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('search=requester')
   })
 
-  it('keeps to the requests that wait for the reader under Needs action, in the address', async () => {
-    renderList()
-
-    expect(await screen.findAllByTestId('studio-ai-request-row')).toHaveLength(3)
-    await userEvent.click(screen.getByText('Needs action'))
+  it('shows the Needs action view as its filter, keeping the requests that wait for the reader', async () => {
+    renderList(needsActionAddress(application, userId))
 
     // The reader's own ready request waits for them; another's ready request and their working one do not.
-    const rows = screen.getAllByTestId('studio-ai-request-row')
-    expect(rows.map((row) => row.dataset.id)).toEqual([fromApp.id])
-    expect(screen.getByTestId('location')).toHaveTextContent('show=needsAction')
-  })
-
-  it('leads with Ask AI on its heading, which opens the panel', async () => {
-    const onAskAi = renderList()
-
-    await userEvent.click(await screen.findByTestId('studio-ai-requests-ask'))
-    expect(onAskAi).toHaveBeenCalledOnce()
-    expect(screen.getByTestId('studio-ai-requests-ask')).toHaveTextContent('Ask AI')
+    await waitFor(() =>
+      expect(screen.getAllByTestId('studio-ai-request-row').map((row) => row.dataset.id)).toEqual([fromApp.id]),
+    )
+    // A view is only a filter, so its conditions show as any filter's do and can be changed.
+    expect(screen.getByRole('button', { name: /^Filter/ }).parentElement).toHaveTextContent('3')
+    expect(screen.getByText(/Sent by.*You/)).toBeInTheDocument()
   })
 })
 

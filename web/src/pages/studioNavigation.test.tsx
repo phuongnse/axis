@@ -6,11 +6,17 @@ import { join } from 'node:path'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import { ShellNavigation, type ShellNavigationEntry, type ShellNavigationGroup } from '../platform/ShellNavigation'
+import {
+  ShellNavigation,
+  type ShellNavigationEntry,
+  type ShellNavigationNode,
+  type ShellNavigationParent,
+} from '../platform/ShellNavigation'
 import type { ModuleResourceGroup, ModuleResourceKind, StudioResourceItem } from '../platform/studio'
+import { needsActionAddress } from './authoringRequests'
 import { studioActiveEntry, studioNavigation } from './studioNavigation'
 
-type Node = ShellNavigationEntry | ShellNavigationGroup
+type Node = ShellNavigationNode
 
 const application = 'purchase-requests'
 const t = (key: string) => (platformEnglish as Record<string, string>)[key] ?? key
@@ -28,7 +34,7 @@ function navigationFor(folder: StudioResourceItem[], modules: ModuleResourceGrou
 }
 
 function flatten(nodes: readonly Node[]): ShellNavigationEntry[] {
-  return nodes.flatMap((node) => ('entries' in node ? node.entries : [node]))
+  return nodes.flatMap((node) => ('entries' in node ? node.entries : 'children' in node ? node.children : [node]))
 }
 
 function groupOf(nodes: readonly Node[], key: string): ShellNavigationEntry[] {
@@ -195,6 +201,46 @@ describe('studioNavigation', () => {
     await waitFor(() =>
       expect(screen.getAllByRole('tooltip').map((tooltip) => tooltip.textContent)).toContain('Entities'),
     )
+  })
+})
+
+// Proposed: AI requests is a group of the table's views, see the review on #3263.
+// Proposed: AI requests opens to the views of its table, see the review on #3263.
+describe('the AI requests entry', () => {
+  it('follows History and opens to the whole list and Needs action, for a person who may ask AI', () => {
+    const nav = studioNavigation(application, [resource('request', 'entity')], [], t, true, 'u-1')
+    const keys = nav.map((node) => node.key)
+    expect(keys.indexOf('group:requests')).toBe(keys.indexOf('history') + 1)
+    const requests = nav.find((node) => node.key === 'group:requests') as ShellNavigationParent
+
+    expect(requests.label).toBe('AI requests')
+    expect(requests.children.map((entry) => entry.label)).toEqual(['All requests', 'Needs action'])
+    expect(requests.children[0].path).toBe(`/studio?app=${application}&view=requests`)
+    expect(requests.children[1].path).toBe(needsActionAddress(application, 'u-1'))
+  })
+
+  it('opens by itself while one of its views is the page, and opens and folds on a click', async () => {
+    const nav = studioNavigation(application, [], [], t, true, 'u-1')
+    render(
+      <MemoryRouter>
+        <ShellNavigation entries={nav} activeKey="requests:needsAction" />
+      </MemoryRouter>,
+    )
+
+    const parent = screen.getByRole('menuitem', { name: 'AI requests' })
+    expect(parent).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('link', { name: 'Needs action' })).toHaveAttribute('aria-current', 'page')
+    await userEvent.click(parent)
+    expect(parent).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('marks Needs action while the table shows exactly its filter, and the whole list otherwise', () => {
+    const needsAction = new URLSearchParams(needsActionAddress(application, 'u-1').split('?')[1])
+    expect(studioActiveEntry(needsAction, [], [], 'u-1')).toBe('requests:needsAction')
+
+    needsAction.set('filter', JSON.stringify({ all: [{ field: 'who', op: 'eq', value: 'u-1' }] }))
+    expect(studioActiveEntry(needsAction, [], [], 'u-1')).toBe('requests')
+    expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=requests`), [], [], 'u-1')).toBe('requests')
   })
 })
 

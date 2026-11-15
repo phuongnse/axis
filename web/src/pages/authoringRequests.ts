@@ -1,4 +1,5 @@
 import type { StudioAuthoringRequest, StudioAuthoringRequestState } from '../platform/studio'
+import type { FilterGroup } from '../platform/tableFilter'
 import { useText } from '../platform/texts'
 import type { StatusTone } from '../platform/StatusTag'
 
@@ -7,6 +8,25 @@ export const waitingForAuthor: readonly StudioAuthoringRequestState[] = ['awaiti
 
 /** The states after which nothing more happens without the author. */
 export const settled: readonly StudioAuthoringRequestState[] = [...waitingForAuthor, 'accepted', 'dropped', 'failed']
+
+/**
+ * Proposed: Needs action, a view of the AI requests table that the platform gives, see the review on #3263: the filter
+ * that keeps the reader's own requests that wait for them, in Awaiting approval or Ready. A view is only a filter kept in
+ * the address, so the table shows its conditions as any filter's and the person may change them.
+ */
+export function needsActionFilter(userId: string): FilterGroup {
+  return {
+    all: [
+      { field: 'who', op: 'eq', value: userId },
+      { any: waitingForAuthor.map((state) => ({ field: 'state', op: 'eq' as const, value: state })) },
+    ],
+  }
+}
+
+/** Proposed: the address of the application's AI requests in the Needs action view. */
+export function needsActionAddress(application: string, userId: string): string {
+  return `/studio?${new URLSearchParams({ app: application, view: 'requests', filter: JSON.stringify(needsActionFilter(userId)) })}`
+}
 
 /** Proposed: the address of the application's AI requests, or of one request's page. */
 export function authoringRequestAddress(application: string, id?: string): string {

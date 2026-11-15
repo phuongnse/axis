@@ -1,6 +1,7 @@
-import type { ShellNavigationEntry, ShellNavigationGroup } from '../platform/ShellNavigation'
+import type { ShellNavigationEntry, ShellNavigationNode } from '../platform/ShellNavigation'
 import type { ModuleResourceGroup, ModuleResourceItem, StudioResourceItem } from '../platform/studio'
 import { studioResourceAddress } from '../platform/studioAddress'
+import { needsActionAddress, needsActionFilter } from './authoringRequests'
 import { kindGroup, kindGroupNames, kindName, studioKind, studioKinds } from '../platform/studioKinds'
 
 /**
@@ -13,7 +14,9 @@ export function studioNavigation(
   t: (key: string) => string,
   /** Proposed: whether the person may ask AI, which adds AI requests after History. */
   aiRequests = false,
-): (ShellNavigationEntry | ShellNavigationGroup)[] {
+  /** The signed-in person, whose requests Needs action keeps. */
+  userId: string | null = null,
+): ShellNavigationNode[] {
   const path = (extra: Record<string, string> = {}) => `/studio?${new URLSearchParams({ app: application, ...extra })}`
   const manifest = resources.find((item) => item.kind === 'application')
   const kinds = new Set([
@@ -33,12 +36,38 @@ export function studioNavigation(
     label: t('shell.studio.view.policies'),
   }
 
-  const entries: (ShellNavigationEntry | ShellNavigationGroup)[] = [
+  const entries: ShellNavigationNode[] = [
     { key: 'overview', path: path(), icon: 'dashboard', label: t('shell.studio.nav.overview') },
     { key: 'releases', path: path({ view: 'releases' }), icon: 'tag', label: t('shell.studio.releases') },
     { key: 'history', path: path({ view: 'history' }), icon: 'clock', label: t('shell.studio.history') },
+    // Proposed: AI requests opens to the views of its table, the whole list and Needs action, which the platform gives,
+    // so the sidebar leads a person to what waits for them, see the review on #3263.
     ...(aiRequests
-      ? [{ key: 'requests', path: path({ view: 'requests' }), icon: 'inbox', label: t('shell.studio.aiRequests') }]
+      ? [
+          {
+            key: 'group:requests',
+            icon: 'inbox',
+            label: t('shell.studio.aiRequests'),
+            children: [
+              {
+                key: 'requests',
+                path: path({ view: 'requests' }),
+                icon: 'inbox',
+                label: t('shell.studio.aiRequests.all'),
+              },
+              ...(userId === null
+                ? []
+                : [
+                    {
+                      key: 'requests:needsAction',
+                      path: needsActionAddress(application, userId),
+                      icon: 'tasks',
+                      label: t('shell.studio.aiRequests.needsAction'),
+                    },
+                  ]),
+            ],
+          },
+        ]
       : []),
   ]
   if (manifest !== undefined) {
@@ -74,6 +103,8 @@ export function studioActiveEntry(
   params: URLSearchParams,
   resources: readonly StudioResourceItem[],
   moduleItems: readonly ModuleResourceItem[],
+  /** The signed-in person, whose Needs action view the address may show. */
+  userId: string | null = null,
 ): string {
   const resource = params.get('resource')?.toLowerCase()
   if (resource) {
@@ -97,6 +128,15 @@ export function studioActiveEntry(
   }
   if (view === 'release') {
     return 'releases'
+  }
+  // Proposed: the AI requests table in exactly the Needs action filter is that view; any other filter is the whole list's.
+  if (
+    view === 'requests' &&
+    userId !== null &&
+    params.get('request') === null &&
+    params.get('filter') === JSON.stringify(needsActionFilter(userId))
+  ) {
+    return 'requests:needsAction'
   }
   if (view === 'releases' || view === 'history' || view === 'policies' || view === 'requests') {
     return view
