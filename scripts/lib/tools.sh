@@ -9,6 +9,8 @@ source scripts/lib/trivy.sh
 
 HELM_VERSION=v3.22.1
 KUBECONFORM_VERSION=v0.8.0
+# Prometheus's promtool, which tests the alert rules, see docs/reference/tenant-backup-and-restore.md#daily-backup.
+PROMETHEUS_VERSION=3.16.0
 KUBERNETES_VERSION=1.33.0
 # gVisor, the sandbox runtime of the Compose example's application package host, as a release date.
 GVISOR_VERSION=20260817
@@ -16,14 +18,15 @@ GVISOR_VERSION=20260817
 KUBERNETES_SCHEMAS_COMMIT=93153a1458e24e93f386c50f9980d584fcba574b
 # The Kubernetes kinds the chart renders. A new kind needs its schema file here.
 KUBERNETES_SCHEMA_FILES=(configmap-v1 cronjob-batch-v1 deployment-apps-v1 job-batch-v1 networkpolicy-networking-v1 role-rbac-v1 rolebinding-rbac-v1 service-v1 serviceaccount-v1)
-# A commit of github.com/datreeio/CRDs-catalog, which holds the schemas of cert-manager's kinds.
+# A commit of github.com/datreeio/CRDs-catalog, which holds the schemas of cert-manager's and the Prometheus Operator's kinds.
 CRDS_CATALOG_COMMIT=27233a506de0085e71c7f9702597806a7f95eb24
-# The cert-manager kinds the chart renders, as group/kind_version. A new kind needs its schema file here.
-CRD_SCHEMA_FILES=(cert-manager.io/certificate_v1 cert-manager.io/issuer_v1)
+# The cert-manager and Prometheus Operator kinds the chart renders, as group/kind_version. A new kind needs its schema file here.
+CRD_SCHEMA_FILES=(cert-manager.io/certificate_v1 cert-manager.io/issuer_v1 monitoring.coreos.com/prometheusrule_v1)
 
 # tools_dir and verify_sha256 come from scripts/lib/trivy.sh.
 helm="$tools_dir/helm-$HELM_VERSION/helm"
 kubeconform="$tools_dir/kubeconform-$KUBECONFORM_VERSION/kubeconform"
+promtool="$tools_dir/prometheus-$PROMETHEUS_VERSION/promtool"
 kubernetes_schemas="$tools_dir/kubernetes-schemas-$KUBERNETES_VERSION"
 crd_schemas="$tools_dir/crd-schemas-$CRDS_CATALOG_COMMIT"
 gvisor="$tools_dir/gvisor-$GVISOR_VERSION/runsc"
@@ -82,6 +85,18 @@ install_tools() {
     verify_sha256 "$work/$archive" "$sum"
     tar -xzf "$work/$archive" -C "$work/kubeconform" kubeconform
     mv "$work/kubeconform" "$tools_dir/kubeconform-$KUBECONFORM_VERSION"
+  fi
+
+  if [ ! -x "$promtool" ]; then
+    local archive="prometheus-$PROMETHEUS_VERSION.$os-$arch.tar.gz" sum
+    mkdir "$work/prometheus"
+    retry 4 curl -fsSL --connect-timeout 30 --max-time 300 -o "$work/$archive" \
+      "https://github.com/prometheus/prometheus/releases/download/v$PROMETHEUS_VERSION/$archive"
+    sum="$(retry 4 curl -fsSL --connect-timeout 30 --max-time 300 "https://github.com/prometheus/prometheus/releases/download/v$PROMETHEUS_VERSION/sha256sums.txt" |
+      awk -v name="$archive" '$2 == name { print $1 }')"
+    verify_sha256 "$work/$archive" "$sum"
+    tar -xzf "$work/$archive" -C "$work/prometheus" --strip-components=1 "prometheus-$PROMETHEUS_VERSION.$os-$arch/promtool"
+    mv "$work/prometheus" "$tools_dir/prometheus-$PROMETHEUS_VERSION"
   fi
 
   local file

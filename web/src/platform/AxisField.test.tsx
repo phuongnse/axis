@@ -1,4 +1,4 @@
-import { ConfigProvider, Form, Input, InputNumber, Select, Upload } from 'antd'
+import { Checkbox, ConfigProvider, Form, Input, InputNumber, Select, Upload } from 'antd'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 import userEvent from '@testing-library/user-event'
@@ -186,6 +186,29 @@ describe('AxisField', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
 
     await waitFor(() => expect(screen.queryByText('Choose a state.')).not.toBeInTheDocument())
+  })
+
+  it('counts an unticked box as empty, also after it was ticked', async () => {
+    renderForm(
+      <AxisField
+        label="Agree"
+        help="Tick to agree."
+        name="agree"
+        requiredMessage="Tick the box."
+        valuePropName="checked"
+      >
+        <Checkbox />
+      </AxisField>,
+    )
+    const box = screen.getByRole('checkbox', { name: 'Agree' })
+
+    await userEvent.click(box)
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(screen.queryByText('Tick the box.')).not.toBeInTheDocument()
+
+    await userEvent.click(box)
+
+    expect(await screen.findByText('Tick the box.')).toBeInTheDocument()
   })
 
   it('requires a name for a requiredMessage', () => {

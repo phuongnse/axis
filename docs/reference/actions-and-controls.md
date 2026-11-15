@@ -92,6 +92,7 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   `AxisFieldGroup` draws a titled group of fields with its help, such as an object's fields or a table, as a
   group that its title names and its help describes. A field that holds one input uses `AxisField`, and a
   field that holds several inputs, or rows, uses `AxisFieldGroup`, because a label names only one input.
+  `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` are built on `AxisField` and `AxisFieldGroup`.
 - **A field's status.** A field inside a form takes a `status`, what the screen found about the
   field beyond its rules: a check run while the person types, such as whether a subdomain is free, or
   choices that could not load. Running shows the input busy. A status that passed leaves the field as it

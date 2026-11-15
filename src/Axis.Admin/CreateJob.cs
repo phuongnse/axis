@@ -35,8 +35,10 @@ internal sealed record CreateJobSettings(
 
 /// <summary>
 /// The <c>create</c> job of the publisher: <c>tenant</c>, <c>application</c>, <c>activate</c>, <c>invite</c> and <c>resume</c>, which carry
-/// out creating a tenant with the code of <c>tenant create</c>, <c>activate</c> and Studio's create from a template. The tenant stays
-/// <c>provisioning</c>, so it is never served, until <c>resume</c> sets it <c>active</c>. The <c>tenant</c> step writes the quota rows of the input, if it has any. Each step can run again and reuses what an earlier run
+/// out creating a tenant with the code of <c>tenant create</c>, <c>activate</c> and Studio's create from a template. A job whose input has
+/// no application creates a blank application, the code of Studio's Blank, named by the tenant id. The tenant stays
+/// <c>provisioning</c>, so it is never served, until <c>resume</c> sets it <c>active</c>. The <c>tenant</c> step writes the quota rows of the input, if it has any, and records the
+/// application on the tenant's directory row. Each step can run again and reuses what an earlier run
 /// did. Before its own work a step returns the problem of any setting it needs that is missing, and a missing or unreadable input as a refusal.
 /// </summary>
 internal static class CreateJob
@@ -69,7 +71,8 @@ internal static class CreateJob
         }
 
         var create = settings.Create.Value!;
-        var request = new TenantCreateRequest(id, [$"{id}.{settings.TenantDomain.Value}"], null, [], null, StayProvisioning: true, Quotas: read.Quotas);
+        var request = new TenantCreateRequest(id, [$"{id}.{settings.TenantDomain.Value}"], null, [], null, StayProvisioning: true, Quotas: read.Quotas,
+            Application: read.Application ?? BlankApplications.NameFor(id));
         if (await AdminCommands.ValidateAsync(create, request, cancellationToken) is { } refusal)
         {
             return refusal;
@@ -89,12 +92,12 @@ internal static class CreateJob
 
     private static async Task<string?> ApplicationAsync(CreateJobSettings settings, string id, string? input, CancellationToken cancellationToken)
     {
-        if ((settings.ApplicationsPath.Problem ?? settings.Templates.Problem) is { } problem)
+        if (FolderProblem(settings, input) is { } problem)
         {
             return problem;
         }
 
-        if (Plan(settings, id, input, out var template, out var name, out var target) is { } refusal)
+        if (Plan(settings, id, input, out var name, out var target, out var files) is { } refusal)
         {
             return refusal;
         }
@@ -117,7 +120,7 @@ internal static class CreateJob
         var prefix = temporary + Path.DirectorySeparatorChar;
         try
         {
-            foreach (var (file, bytes) in TemplateApplications.FromTemplate(template, name))
+            foreach (var (file, bytes) in files)
             {
                 var path = Path.GetFullPath(Path.Combine(temporary, file));
                 if (!path.StartsWith(prefix, StringComparison.Ordinal) || !path.EndsWith(".json", StringComparison.Ordinal))
@@ -153,12 +156,12 @@ internal static class CreateJob
         string? input,
         CancellationToken cancellationToken)
     {
-        if ((settings.ApplicationsPath.Problem ?? settings.Templates.Problem) is { } problem)
+        if (FolderProblem(settings, input) is { } problem)
         {
             return problem;
         }
 
-        if (Plan(settings, id, input, out _, out _, out var target) is { } refusal)
+        if (Plan(settings, id, input, out _, out var target, out _) is { } refusal)
         {
             return refusal;
         }
@@ -249,7 +252,7 @@ internal static class CreateJob
         return await TenantStatus.ActivateChangeAsync(connection, id, cancellationToken) == StatusChange.Unknown ? TenantStatus.UnknownMessage : null;
     }
 
-    private sealed record CreateInput(string Application, string Administrator, Dictionary<string, long?>? Quotas = null);
+    private sealed record CreateInput(string? Application, string Administrator, Dictionary<string, long?>? Quotas = null);
 
     private static CreateInput? ReadInput(string? json)
     {
@@ -261,7 +264,7 @@ internal static class CreateJob
         try
         {
             var input = JsonSerializer.Deserialize<CreateInput>(json, _json);
-            return input is { Application.Length: > 0, Administrator.Length: > 0 } ? input : null;
+            return input is { Administrator.Length: > 0, Application: null or { Length: > 0 } } ? input : null;
         }
         catch (JsonException)
         {
@@ -269,31 +272,52 @@ internal static class CreateJob
         }
     }
 
-    // Finds the template, the application's name and its folder in the tenant's Studio folder, or returns the refusal. Every step that needs
+    // The problem with the settings that the application and activate steps read: the applications path always, and the templates only
+    // when the input names an application, because a blank application needs none.
+    private static string? FolderProblem(CreateJobSettings settings, string? input) =>
+        settings.ApplicationsPath.Problem ?? (ReadInput(input)?.Application is null ? null : settings.Templates.Problem);
+
+    // Finds the application's name, its folder in the tenant's Studio folder and its files, or returns the refusal. An input with an
+    // application uses the installed template, and one without creates the blank application of the tenant. Every step that needs
     // the folder recomputes it, so a rerun needs no stored state.
-    private static string? Plan(CreateJobSettings settings, string id, string? input, out InstalledTemplate template, out string name, out string target)
+    private static string? Plan(
+        CreateJobSettings settings,
+        string id,
+        string? input,
+        out string name,
+        out string target,
+        out IReadOnlyList<(string File, byte[] Bytes)> files)
     {
-        template = null!;
         name = "";
         target = "";
+        files = [];
         if (ReadInput(input) is not { } read)
         {
             return NoInput;
         }
 
-        var found = settings.Templates.Value!.Newest.FirstOrDefault(candidate => string.Equals(candidate.Manifest.Id, read.Application, StringComparison.Ordinal));
-        if (found is null)
+        if (read.Application is null)
         {
-            return $"The application template '{read.Application}' is not installed.";
+            name = BlankApplications.NameFor(id);
+            files = BlankApplications.Files(name);
+        }
+        else
+        {
+            var found = settings.Templates.Value!.Newest.FirstOrDefault(candidate => string.Equals(candidate.Manifest.Id, read.Application, StringComparison.Ordinal));
+            if (found is null)
+            {
+                return $"The application template '{read.Application}' is not installed.";
+            }
+
+            if (TemplateApplications.ApplicationName(found) is not { } applicationName)
+            {
+                return $"The application template '{read.Application}' has no application manifest.";
+            }
+
+            name = applicationName;
+            files = TemplateApplications.FromTemplate(found, name);
         }
 
-        if (TemplateApplications.ApplicationName(found) is not { } applicationName)
-        {
-            return $"The application template '{read.Application}' has no application manifest.";
-        }
-
-        template = found;
-        name = applicationName;
         target = Path.Combine(Path.TrimEndingDirectorySeparator(settings.ApplicationsPath.Value!), id, TemplateApplications.Kebab(name));
         return null;
     }

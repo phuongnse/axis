@@ -18,8 +18,11 @@ request then an approval.
   users for them and leaves the roles of the existing users unchanged.
 - **A Playwright journey builds it through Studio only,** from a blank application, with no file
   edit, no JSON view and no `axis-admin` command. It then compares the folder it built with the
-  committed sample, runs the scenarios from Studio, publishes, and takes one ticket through the
-  process on the site.
+  committed sample, except its scenarios, publishes, and takes one ticket through the process on the
+  site.
+- **Another Playwright spec writes its test scenarios in Studio,** in the scenario editor, over a
+  copy of the sample without them. It compares them with the committed sample and runs them from
+  Studio.
 - **The committed folder records what the journey builds,** and CI activates it and runs its
   scenarios as it does for the other samples.
 - **A second, smaller journey starts from a built-in application** instead of a blank one, see
@@ -33,5 +36,5 @@ Its data, flow, security, pages, scenarios and journeys are in the
 - Starting from a blank application proves the most of Studio, and the second journey stays small.
 - Comparing with a committed folder keeps the sample in CI and proves that Studio writes the same
   files.
-- A change to the sample needs the journey to follow.
+- A change to the sample needs the journeys to follow.
 - New users leave the other samples and their tests unchanged.

@@ -48,9 +48,18 @@ internal static class SignUpEndpoints
         // A missing, malformed, wrong, expired or used solution is refused
         // under /altcha, and an accepted one is stored so it works once. The route stores a pending sign-up that holds its subdomain for
         // 24 hours and queues the confirm email in the same transaction. An address that already verified a sign-up gets the trial-used
-        // email instead: nothing is stored and no subdomain is held, and the answer is the same. The answer has no body yet. Without the
+        // email instead: nothing is stored and no subdomain is held, and the answer is the same. An address that already has three
+        // sign-up emails in 24 hours gets none: nothing is stored and no subdomain is held, and the answer is the same, see
+        // docs/reference/sign-up.md#bots-and-abuse. The answer is 202 with { resend }, the opaque token of Send again. Without the
         // key, the documents or the directory the route answers 503.
         endpoints.MapPost("/api/sign-up", SignUpAsync);
+
+        // See docs/reference/sign-up.md#check-your-inbox. It answers 202 for every token, so a caller learns nothing about the sign-ups it
+        // does not hold: an unknown, malformed, changed or expired token queues nothing. A good token queues the trial-used email while
+        // the address has a verified sign-up, else the confirm email while the sign-up is still pending, and either counts toward the three
+        // sign-up emails of the address. The token is never logged. Without the challenge key no token can exist, so the route answers 503,
+        // and a body that is not JSON gets 415 or 400 as the other sign-up routes do.
+        endpoints.MapPost("/api/sign-up/resend", ResendAsync);
 
         // See docs/reference/sign-up.md#the-verify-page. It reports the state of a link and changes nothing. An unknown, malformed or
         // expired token answers expired, so a caller learns nothing about the sign-ups it does not hold.
@@ -219,14 +228,27 @@ internal static class SignUpEndpoints
         {
             await using var connection = await controlPlane.OpenConnectionAsync(cancellationToken);
 
-            // An address that already verified a sign-up gets the trial-used email, as the answer is alike for every address.
+            // An address that already verified a sign-up gets the trial-used email, as the answer is alike for every address. Past the
+            // three emails of the day the transaction rolls back and nothing is queued.
             if (await VerifiedSubdomainAsync(connection, normalisedEmail, cancellationToken) is { } tenantId)
             {
-                await QueueTrialUsedAsync(services, connection, options, templates, tenantId, fullName!, email!, language!, cancellationToken);
-                return Results.StatusCode(StatusCodes.Status202Accepted);
+                await using var trialUsed = await connection.BeginTransactionAsync(cancellationToken);
+                if (await SignUpEmailLimit.TryCountAsync(connection, trialUsed, normalisedEmail, cancellationToken))
+                {
+                    await QueueTrialUsedAsync(services, connection, trialUsed, options, templates, tenantId, fullName!, email!, language!, cancellationToken);
+                    await trialUsed.CommitAsync(cancellationToken);
+                }
+
+                return Accepted(options, clock, email!, fullName!, language!, Guid.Empty);
             }
 
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+            // Past the three emails of the day nothing is stored and no subdomain is held, as an email that is never sent cannot be confirmed.
+            if (!await SignUpEmailLimit.TryCountAsync(connection, transaction, normalisedEmail, cancellationToken))
+            {
+                return Accepted(options, clock, email!, fullName!, language!, Guid.Empty);
+            }
 
             // The hold check ignores an expired sign-up, so one that the expiry job has not reached yet must not block a free name.
             await using (var expire = new NpgsqlCommand(
@@ -270,7 +292,75 @@ internal static class SignUpEndpoints
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["/subdomain"] = [$"signUp.subdomain.{SubdomainCheck.Held}"] });
         }
 
+        return Accepted(options, clock, email!, fullName!, language!, id);
+    }
+
+    private static async Task<IResult> ResendAsync(
+        HttpContext context,
+        IServiceProvider services,
+        ControlPlaneOptions options,
+        EmailTemplates templates,
+        NpgsqlDataSource controlPlane,
+        TimeProvider clock,
+        CancellationToken cancellationToken)
+    {
+        var request = context.Request;
+        if (string.IsNullOrWhiteSpace(options.SignUp.ChallengeKey))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        var (body, refused) = await ReadBodyAsync(request, cancellationToken);
+        if (body is null)
+        {
+            return refused!;
+        }
+
+        if (SignUpResendToken.Read(Convert.FromBase64String(options.SignUp.ChallengeKey), Required(body, "resend"), clock.GetUtcNow()) is { } token)
+        {
+            var normalisedEmail = SignUpEmail.Normalise(token.Email);
+            await using var connection = await controlPlane.OpenConnectionAsync(cancellationToken);
+            var verified = await VerifiedSubdomainAsync(connection, normalisedEmail, cancellationToken);
+            var pending = verified is null && token.SignUpId != Guid.Empty && await PendingAsync(connection, token.SignUpId, cancellationToken);
+            if (verified is not null || pending)
+            {
+                await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+                if (await SignUpEmailLimit.TryCountAsync(connection, transaction, normalisedEmail, cancellationToken))
+                {
+                    if (verified is not null)
+                    {
+                        await QueueTrialUsedAsync(services, connection, transaction, options, templates, verified, token.FullName, token.Email, token.Language, cancellationToken);
+                    }
+                    else
+                    {
+                        await JobQueue.EnqueueAsync(connection, transaction, SignUpConfirmJobHandler.JobKind, new JsonObject { ["signUpId"] = token.SignUpId.ToString() }, null, cancellationToken);
+                    }
+
+                    await transaction.CommitAsync(cancellationToken);
+                }
+            }
+        }
+
         return Results.StatusCode(StatusCodes.Status202Accepted);
+    }
+
+    // The answer of an accepted sign-up: 202 with the token of Send again, which holds the same fields for every kind of email.
+    private static IResult Accepted(ControlPlaneOptions options, TimeProvider clock, string email, string fullName, string language, Guid signUpId) =>
+        Results.Json(
+            new
+            {
+                resend = SignUpResendToken.Create(
+                    Convert.FromBase64String(options.SignUp.ChallengeKey!),
+                    new SignUpResendToken.Payload(email, fullName, language, signUpId, clock.GetUtcNow() + SignUpResendToken.Lifetime)),
+            },
+            statusCode: StatusCodes.Status202Accepted);
+
+    // Whether a sign-up is pending and within its 24 hours.
+    private static async Task<bool> PendingAsync(NpgsqlConnection connection, Guid signUpId, CancellationToken cancellationToken)
+    {
+        await using var read = new NpgsqlCommand("SELECT EXISTS (SELECT 1 FROM control_plane.sign_ups WHERE id = @id AND state = 'pending' AND expires_at > now())", connection);
+        read.Parameters.AddWithValue("id", signUpId);
+        return (bool)(await read.ExecuteScalarAsync(cancellationToken))!;
     }
 
     // The subdomain of the verified sign-up of a normalised email, or null when the address has none.
@@ -286,6 +376,7 @@ internal static class SignUpEndpoints
     private static async Task QueueTrialUsedAsync(
         IServiceProvider services,
         NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
         ControlPlaneOptions options,
         EmailTemplates templates,
         string tenantId,
@@ -302,7 +393,7 @@ internal static class SignUpEndpoints
         var (template, values) = running
             ? ("signUpTrialUsedSignIn", new Dictionary<string, string> { ["name"] = fullName, ["tenantAddress"] = SignUpAddress.Of(options, tenantId) })
             : ("signUpTrialUsedBillingPortal", new Dictionary<string, string> { ["name"] = fullName, ["billingPortalUrl"] = SignUpAddress.BillingPortalOf(options, tenantId) });
-        await EmailJobs.EnqueueAsync(connection, null, templates, template, language, email, values, cancellationToken);
+        await EmailJobs.EnqueueAsync(connection, transaction, templates, template, language, email, values, cancellationToken);
     }
 
     // Stores a solution as used. The conditional insert is atomic, so of two parallel sign-ups with one solution, on any replica, only one inserts.

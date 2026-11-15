@@ -59,3 +59,5 @@ check_chart deploy/helm/axis
 check_chart deploy/helm/axis-controlplane
 # The application package host is off by default, so its objects need a run of their own.
 check_chart deploy/helm/axis --set applicationPackageHost.enabled=true
+# The alert rules are off by default too.
+check_chart deploy/helm/axis --set alerts.enabled=true

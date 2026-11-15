@@ -2,6 +2,7 @@
   "realm": "axis",
   "enabled": true,
   "loginTheme": "axis",
+  "emailTheme": "axis",
   "resetPasswordAllowed": true,
   "smtpServer": {
     "host": "mailpit",

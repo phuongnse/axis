@@ -64,7 +64,7 @@ over a private network with mutual TLS.
   [internal listener](tenant-lifecycle.md#provisioning-api) only a client certificate that the
   region's internal certificate authority issued to the control plane. A cell sets
   `Cell:InternalClientCa` for this, see [host settings](host-settings.md#cell-settings).
-- **The chart's wiring** _(planned for M33)_. The Helm chart mounts the client certificate, the
+- **The chart's wiring.** The Helm chart mounts the client certificate, the
   authority file and the cells' secrets, so that a region's control plane reaches its cells.
 - **Idempotent.** Every `POST` to a cell carries an `Idempotency-Key` that the control plane derives
   from its own record, such as the sign-up id, so a retried call never makes a second tenant. The key
@@ -115,7 +115,7 @@ every business change.
     and not `ControlPlane:` settings.
   - **Recurring jobs.** Every replica runs a schedule that queues the jobs of a kind at an interval,
     such as the directory's correction and the expiry of pending [sign-ups](sign-up.md#verifying-the-email-first)
-    (`expireSignUps`, which also deletes the used [proof-of-work solutions](sign-up.md#bots-and-abuse) past their expiry), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
+    (`expireSignUps`, which also deletes the used [proof-of-work solutions](sign-up.md#bots-and-abuse) past their expiry and the counts of sign-up emails older than 24 hours), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
     (`advanceSubscriptions`) and the [period invoices](payments.md#invoices) (`createPeriodInvoices`) each every hour. When the directory and a cell are set, it also queues the
     [quota sync](plans.md#from-a-plan-to-the-quotas) (`syncQuotas`) every 24 hours. When `ControlPlane:PayOs:Provider` is set, it also queues the [payment links](payments.md#paying-in-vietnam) (`createPaymentLinks`) every 5 minutes and the [payment webhook events](payments.md#webhooks) (`applyPaymentWebhooks`) every minute. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
     [disposable mailbox domains](sign-up.md#bots-and-abuse) (`refreshDisposableDomains`) every 7 days. Under a database lock on the kind, it queues
@@ -256,7 +256,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:TenantDomain` | The domain of the region's tenant subdomains, such as `vn.example.com` | A valid domain name |
 | `ControlPlane:PublicUrl` | The address that the links of the control plane's emails start with. Optional. Default `https://account.<ControlPlane:TenantDomain>` | An absolute URL, and `https` outside Development and Testing |
 | `ControlPlane:ConnectionString` | The connection to the control plane's own PostgreSQL | A valid Npgsql connection string. Outside Development and Testing it must set `SSL Mode=VerifyFull` |
-| `ControlPlane:DirectoryConnectionString` | The connection to the [region directory](region-directory.md)'s own PostgreSQL. Optional | When set, the same checks as `ControlPlane:ConnectionString`, and `ControlPlane:Dns:Provider` is required |
+| `ControlPlane:DirectoryConnectionString` | The connection to the [region directory](region-directory.md)'s own PostgreSQL. Optional | When set, the same checks as `ControlPlane:ConnectionString`, `ControlPlane:Dns:Provider` is required, and ready checks the directory's database |
 | `ControlPlane:MailFrom` | The address every email of the control plane comes from | A valid email address |
 | `ControlPlane:Mail:Host` | The host of the SMTP relay | Not empty |
 | `ControlPlane:Mail:Port` | The SMTP port. Default 587 | 1 to 65535. Port 465 starts with TLS, any other port upgrades with STARTTLS |
@@ -299,7 +299,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Privacy:Version` | The version of the privacy policy that a person accepts. Optional | Not empty, when a document is set |
 | `ControlPlane:SignUp:Privacy:Urls:en` | The English address of the privacy policy | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:Privacy:Urls:vi` | The Vietnamese address of the privacy policy | An absolute `https` URL, when a document is set |
-| `ControlPlane:SignUp:ChallengeKey` | The HMAC-SHA256 key, as base64, that signs the [sign-up page's proof-of-work challenges](sign-up.md#bots-and-abuse). Optional. Without it `GET /api/sign-up/challenge` and `POST /api/sign-up` answer `503`, so nobody can sign up. Comes from the secret `ControlPlane__SignUp__ChallengeKey`, never from a setting file | Base64 of at least 32 bytes, when set. The message never holds the value |
+| `ControlPlane:SignUp:ChallengeKey` | The HMAC-SHA256 key, as base64, that signs the [sign-up page's proof-of-work challenges](sign-up.md#bots-and-abuse). A key derived from it also seals the [resend token](sign-up.md#check-your-inbox). Optional. Without it `GET /api/sign-up/challenge`, `POST /api/sign-up` and `POST /api/sign-up/resend` answer `503`, so nobody can sign up. Comes from the secret `ControlPlane__SignUp__ChallengeKey`, never from a setting file | Base64 of at least 32 bytes, when set. The message never holds the value |
 | `ControlPlane:SignUp:LicencesUrl` | The address of the licences page that the legal line links. Optional | An absolute `https` URL, when a document is set |
 | `ControlPlane:Plans:<n>:Code` | The plan code, such as `team`. The whole `ControlPlane:Plans` list is optional | Lowercase letters and digits, joined by single hyphens |
 | `ControlPlane:Plans:<n>:Version` | The version of the plan. The code and version are unique, and a subscription's pinned version must stay | Plain digits, at least 1, and the code and version not repeated |
@@ -356,16 +356,30 @@ The control plane ships as its own image and Helm chart, beside the platform's.
   `https://api-merchant.payos.vn`. `secrets.payOs` names one Kubernetes Secret with the keys
   `ControlPlane__PayOs__ClientId`, `ControlPlane__PayOs__ApiKey` and `ControlPlane__PayOs__ChecksumKey`,
   which the chart mounts as the files of the same names, and is left out when the provider is empty.
+  `controlPlane.cells` lists the region's cells. Each entry holds `id`, `internalUrl`, `tokenUrl` and
+  `clientId`, which set `ControlPlane:Cells:<n>:Id`, `:InternalUrl`, `:TokenUrl` and `:ClientId`, and
+  `clientSecret`, the name and optionally the key of the Kubernetes Secret that holds the cell's client
+  secret, which the chart mounts as the file `/run/secrets/ControlPlane__CellSecrets__<cell id>`. The
+  schema limits `id` to lowercase letters and digits joined by single hyphens.
+  `secrets.cellClientCertificate` names a Kubernetes TLS Secret, which the chart mounts at
+  `/cell-client-tls` and names in `ControlPlane:CellClientCertificate:Path` and `:KeyPath`.
+  `secrets.cellCertificateAuthority` names a Secret and its key, `ca.crt` by default, which the chart
+  mounts at `/cell-ca/ca.crt` and names in `ControlPlane:CellCertificateAuthorityPath`, and is
+  optional. The certificate and the authority are mounted outside `/run/secrets`, which the service
+  reads as settings. The chart renders none of these without a listed cell.
   `image`, `replicas`, `resources` and `service` are the usual. The chart holds no secret
   value and creates no Secret, and its schema rejects a `value` in a secret reference.
 - **Render failures.** Rendering fails and names the value when `controlPlane.region`,
   `controlPlane.tenantDomain`, `controlPlane.mailFrom`, `controlPlane.mail.host`,
   `secrets.connectionString.name` or `secrets.certificate.name` is not set. It also fails and names
-  `secrets.payOs.name` when `controlPlane.payOs.provider` is `PayOs` and no Secret is named.
+  `secrets.payOs.name` when `controlPlane.payOs.provider` is `PayOs` and no Secret is named,
+  `controlPlane.cells[<n>].clientSecret.name` when a listed cell names no Secret, and
+  `secrets.cellClientCertificate.name` when a cell is listed and no Secret is named.
 - **Checks.** `scripts/lint.sh` lints the chart and checks its rendered manifests against the
   Kubernetes schemas, `scripts/helm-controlplane.test.mjs` tests the render, the image scan covers the
   image, and the `images` smoke suite starts it read-only against PostgreSQL over TLS and runs
-  `sign-ups list` in it.
+  `sign-ups list` in it. The suite also starts it with one cell, from the settings and file paths that
+  the chart renders, with the client certificate and the authority mounted.
 
 ## Health and telemetry
 
@@ -373,10 +387,12 @@ The control plane reports its health and telemetry as the platform's hosts do.
 
 - **Health.** `/health/live` and `/health/ready`, as the platform's hosts answer them. Live runs no
   check. Ready checks its database, which must answer `SELECT 1`, and the mail relay, which must
-  accept a connection (the check signs in with nothing and sends no email). It answers 503
-  `Unhealthy` when either does not, so a relay outage takes every replica out of readiness.
-- **The directory in the ready check** _(planned for M33)_. Ready also checks the
-  [region directory](region-directory.md).
+  accept a connection (the check signs in with nothing and sends no email). Only when
+  `ControlPlane:DirectoryConnectionString` is set, ready also checks the
+  [region directory](region-directory.md)'s database, which must answer `SELECT 1` too. Ready answers
+  503 `Unhealthy` when any check does not pass, so a relay or directory outage takes every replica
+  out of readiness. The answer names no check. The log names the failed one, `directory` for the
+  region directory.
 - **Telemetry.** Logs, metrics and traces as the platform's hosts write them, under the service name
   `axis-controlplane`, and the platform's security headers on every response. A log never holds a
   payment card, a bank account, a tax code or a webhook body.

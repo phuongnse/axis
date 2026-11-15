@@ -116,7 +116,7 @@ internal static class StudioApplicationEndpoints
             }
         }
 
-        var files = template is null ? StudioApplications.Blank(name) : TemplateApplications.FromTemplate(template, name);
+        var files = template is null ? BlankApplications.Files(name) : TemplateApplications.FromTemplate(template, name);
         var outcome = await StudioApplications.CreateAsync(writeLock, writer, options, name, files, httpContext.RequestAborted);
         switch (outcome)
         {

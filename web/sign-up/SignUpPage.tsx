@@ -105,7 +105,9 @@ export function SignUpPage({
   const [answer, setAnswer] = useState<SubdomainAnswer | null>(null)
   const [sending, setSending] = useState(false)
   const [formErrors, setFormErrors] = useState<string[]>([])
-  const [sent, setSent] = useState<{ email: string } | null>(null)
+  const [sent, setSent] = useState<{ email: string; resend: string | undefined } | null>(null)
+  const [resending, setResending] = useState(false)
+  const [resendNotice, setResendNotice] = useState<'sent' | 'failed' | null>(null)
   const formErrorRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLElement>(null)
   const focusEmail = useRef(false)
@@ -291,7 +293,9 @@ export function SignUpPage({
         { promptSignInOnUnauthorized: false },
       )
       if (response.status === 202) {
-        setSent({ email: values.email.trim() })
+        const answer = (await response.json().catch(() => ({}))) as { resend?: unknown }
+        setResendNotice(null)
+        setSent({ email: values.email.trim(), resend: typeof answer.resend === 'string' ? answer.resend : undefined })
       } else {
         // A solved challenge is for one try, so the next try solves a new one.
         proofOfWork.renew()
@@ -313,7 +317,30 @@ export function SignUpPage({
 
   const changeEmail = () => {
     focusEmail.current = true
+    setResendNotice(null)
     setSent(null)
+  }
+
+  // Asks for the email again with the token of the sign-up, see docs/reference/sign-up.md#check-your-inbox. Only a 202 is a sent email.
+  const sendAgain = async () => {
+    setResending(true)
+    setResendNotice(null)
+    try {
+      const response = await apiFetch(
+        '/api/sign-up/resend',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resend: sent?.resend }),
+        },
+        { promptSignInOnUnauthorized: false },
+      )
+      setResendNotice(response.status === 202 ? 'sent' : 'failed')
+    } catch {
+      setResendNotice('failed')
+    } finally {
+      setResending(false)
+    }
   }
 
   return (
@@ -335,9 +362,20 @@ export function SignUpPage({
             {t('signUp.inbox.sent').replace('{email}', sent.email)}
           </Typography.Paragraph>
           <Typography.Paragraph style={{ margin: 0 }}>{t('signUp.inbox.notThere')}</Typography.Paragraph>
-          <AxisButton role="plain" onClick={changeEmail}>
-            {t('signUp.inbox.changeEmail')}
-          </AxisButton>
+          {resendNotice && (
+            <AxisAlert
+              kind={resendNotice === 'sent' ? 'info' : 'error'}
+              message={t(resendNotice === 'sent' ? 'signUp.inbox.sentAgain' : 'signUp.inbox.sendAgainFailed')}
+            />
+          )}
+          <Flex gap={spacing.sm} wrap>
+            <AxisButton role="secondary" loading={resending} onClick={sendAgain}>
+              {t('signUp.inbox.sendAgain')}
+            </AxisButton>
+            <AxisButton role="plain" onClick={changeEmail}>
+              {t('signUp.inbox.changeEmail')}
+            </AxisButton>
+          </Flex>
         </Flex>
       )}
       <div hidden={sent !== null}>

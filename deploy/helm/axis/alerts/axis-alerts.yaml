@@ -1,0 +1,27 @@
+# Axis's alert rules, in the Prometheus rule file format. The Helm chart renders this file as a PrometheusRule when
+# alerts.enabled is on, and an install without the chart loads it in Prometheus's rule_files. The rule of the stale backup
+# is in docs/reference/tenant-backup-and-restore.md#daily-backup, and D110 agrees that alert rules ship with Axis, off by default.
+groups:
+  - name: axis-backup
+    rules:
+      - alert: AxisTenantBackupStale
+        # The newest success is older than 26 hours. cell backup pushes the gauge once at the end of a run, so the rule
+        # reads each tenant's last value from up to 30 days back and keeps firing when no new point arrives. 31 hours
+        # cover two pushes at most about 30 hours apart. A tenant that the newest run no longer reports drops out once
+        # 31 hours have passed since its last point, but only while some tenant is still reported. When none is, the job
+        # has stopped and every tenant fires.
+        expr: |
+          (time() - max by (axis_tenant) (last_over_time(axis_backup_last_success_seconds[30d])) > 26 * 3600)
+          and on (axis_tenant)
+          (
+            max by (axis_tenant) (last_over_time(axis_backup_last_success_seconds[31h]))
+            or on (axis_tenant)
+            (
+              max by (axis_tenant) (last_over_time(axis_backup_last_success_seconds[30d]))
+              unless on () max(last_over_time(axis_backup_last_success_seconds[31h]))
+            )
+          )
+        labels:
+          severity: critical
+        annotations:
+          summary: The newest backup of tenant {{ $labels.axis_tenant }} is more than 26 hours old.

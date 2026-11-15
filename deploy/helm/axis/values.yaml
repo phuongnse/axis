@@ -190,6 +190,14 @@ backup:
   # A Kubernetes resources block: requests and limits.
   resources: {}
 
+# Alert rules. When enabled is true the chart renders a PrometheusRule from alerts/axis-alerts.yaml, which
+# needs the Prometheus Operator's CRDs, see docs/reference/tenant-backup-and-restore.md#daily-backup. An install
+# without the chart loads that file in Prometheus's rule_files. labels go on the PrometheusRule, for an
+# Operator that selects rules by a label such as release.
+alerts:
+  enabled: false
+  labels: {}
+
 # Extension packages, mounted read-only at /extensions. Empty uses the empty
 # folder of the image. Give any Kubernetes volume source, for example:
 #   volume:

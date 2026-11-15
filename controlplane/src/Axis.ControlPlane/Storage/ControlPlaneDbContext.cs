@@ -7,7 +7,7 @@ namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> and <c>billing</c> schemas of the control plane database. They hold the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the <c>subscription_add_ons</c>, the <c>quota_overrides</c>, the append-only <c>billing.ledger_entries</c>, the <c>billing.invoices</c>, the <c>billing.invoice_lines</c>, the <c>billing.payment_links</c>, the <c>billing.webhook_inbox</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>sign_up_emails</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the <c>subscription_add_ons</c>, the <c>quota_overrides</c>, the append-only <c>billing.ledger_entries</c>, the <c>billing.invoices</c>, the <c>billing.invoice_lines</c>, the <c>billing.payment_links</c>, the <c>billing.webhook_inbox</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -30,6 +30,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<DisposableDomainRow> DisposableDomains => Set<DisposableDomainRow>();
 
     public DbSet<SignUpChallengeRow> SignUpChallenges => Set<SignUpChallengeRow>();
+
+    public DbSet<SignUpEmailRow> SignUpEmails => Set<SignUpEmailRow>();
 
     public DbSet<SubscriptionRow> Subscriptions => Set<SubscriptionRow>();
 
@@ -134,6 +136,16 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             challenge.Property(c => c.Challenge).HasColumnName("challenge").HasColumnType("bytea").ValueGeneratedNever();
             challenge.Property(c => c.ExpiresAt).HasColumnName("expires_at");
             challenge.HasIndex(c => c.ExpiresAt, "ix_sign_up_challenges_expires_at");
+        });
+
+        modelBuilder.Entity<SignUpEmailRow>(email =>
+        {
+            email.ToTable("sign_up_emails", table => table.HasCheckConstraint("ck_sign_up_emails_address_hash", "octet_length(address_hash) = 32"));
+            email.HasKey(e => e.Id).HasName("pk_sign_up_emails");
+            email.Property(e => e.Id).HasColumnName("id").ValueGeneratedNever();
+            email.Property(e => e.AddressHash).HasColumnName("address_hash").HasColumnType("bytea");
+            email.Property(e => e.QueuedAt).HasColumnName("queued_at").HasDefaultValueSql("now()");
+            email.HasIndex(e => new { e.AddressHash, e.QueuedAt }, "ix_sign_up_emails_address_hash_queued_at");
         });
 
         modelBuilder.Entity<SubscriptionRow>(subscription =>

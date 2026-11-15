@@ -108,7 +108,7 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_blank_application_is_left_out_of_the_body_and_no_quota_is_sent_as_an_empty_object()
+    public async Task A_sign_up_that_chose_Blank_leaves_the_application_out_of_the_body_sends_no_empty_quotas_and_becomes_a_ready_trial()
     {
         await Execute($"UPDATE control_plane.sign_ups SET application = '' WHERE id = '{_signUpId}'");
         var handler = HandlerWithQuotas(new Dictionary<string, long?>());
@@ -116,6 +116,8 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
         await handler.RunAsync(Job(), TestContext.Current.CancellationToken);
 
         Assert.Equal("""{"id":"acme","administrator":"owner@example.com","quotas":{}}""", Assert.Single(_cells.Posts).Body);
+        Assert.Equal("ready", await Scalar<string>($"SELECT provisioning FROM control_plane.sign_ups WHERE id = '{_signUpId}'"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendEmail' AND payload->>'template' = 'tenantReady'"));
     }
 
     [Fact]

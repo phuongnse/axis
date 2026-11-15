@@ -3,11 +3,15 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Axis.Admin;
+using Axis.Configuration.Templates;
 using Axis.Configuration.Tests;
 using Axis.Data.Storage;
+using Axis.Server.CellApi;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
 using static Axis.Integration.Tests.Polling;
@@ -95,6 +99,7 @@ public sealed class ProvisioningCreateJobTests(KeycloakFixture keycloak, Mailpit
         var row = await scenario.RowAsync(id);
         Assert.Equal("active", row.Status);
         Assert.Equal([$"{id}.vn.example.test"], await scenario.HostsAsync(id));
+        Assert.Equal(Template, await ScalarAsync(scenario, $"SELECT application FROM platform.tenants WHERE id = '{id}'"));
 
         // A job whose input has no quotas leaves the tenant on the cell's defaults.
         Assert.Equal(0L, await ScalarAsync(scenario, $"SELECT count(*) FROM platform.tenant_quotas WHERE tenant_id = '{id}'"));
@@ -196,6 +201,116 @@ public sealed class ProvisioningCreateJobTests(KeycloakFixture keycloak, Mailpit
     }
 
     [Fact]
+    public async Task A_failed_create_job_run_again_skips_the_steps_that_succeeded_and_finishes_the_tenant_with_one_record_that_names_the_second_operator()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        await mailpit.SmtpHostAsync();
+        var id = scenario.NewTenantId();
+        _realms.Add(id);
+        var applications = NewApplicationsFolder();
+        var settings = Settings(applications);
+        using var http = new HttpClient(_handler, disposeHandler: false);
+        var runs = new Dictionary<string, int> { ["tenant"] = 0, ["application"] = 0, ["activate"] = 0 };
+        var inviteBroken = true;
+        var steps = CreateJob.Steps(Read(scenario, settings), http, TextWriter.Null, TextWriter.Null)
+            .Select(step => step with
+            {
+                RunAsync = (jobId, tenantId, input, ct) =>
+                {
+                    if (runs.TryGetValue(step.Name, out var count))
+                    {
+                        runs[step.Name] = count + 1;
+                    }
+
+                    return step.Name == "invite" && inviteBroken
+                        ? throw new InvalidOperationException("The identity provider is down.")
+                        : step.RunAsync(jobId, tenantId, input, ct);
+                },
+            })
+            .ToList();
+        var kinds = new Dictionary<string, IReadOnlyList<JobStep>> { ["create"] = steps };
+        var first = await ProvisioningJobs.QueueAsync(scenario.Platform, kinds, "create", id, "operator-1", null, null, CancellationToken, Input(NewEmail()));
+        var jobs = new ProvisioningJobs(scenario.Platform, kinds, TimeSpan.FromMinutes(5));
+
+        // A job gets three claims, and the invite step throws in each.
+        for (var claim = 0; claim < 3; claim++)
+        {
+            Assert.True(await jobs.RunNextAsync(TextWriter.Null, CancellationToken));
+        }
+
+        Assert.Equal("failed", await ScalarAsync(scenario, $"SELECT state FROM platform.jobs WHERE id = '{first}'"));
+        Assert.Equal("provisioning", (await scenario.RowAsync(id)).Status);
+        await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(scenario.Platform).Options);
+        var failed = await context.Jobs.AsNoTracking().SingleAsync(row => row.Id == first, CancellationToken);
+        var again = CellEndpoints.RunAgainJob(failed, "operator-2", null, null);
+        context.Jobs.Add(again);
+        await context.SaveChangesAsync(CancellationToken);
+        inviteBroken = false;
+
+        Assert.True(await jobs.RunNextAsync(TextWriter.Null, CancellationToken));
+
+        Assert.Equal(1, runs["tenant"]);
+        Assert.Equal(1, runs["application"]);
+        Assert.Equal(1, runs["activate"]);
+        Assert.Equal("succeeded", await ScalarAsync(scenario, $"SELECT state FROM platform.jobs WHERE id = '{again.Id}'"));
+        Assert.Equal("failed", await ScalarAsync(scenario, $"SELECT state FROM platform.jobs WHERE id = '{first}'"));
+        Assert.Equal("active", (await scenario.RowAsync(id)).Status);
+        Assert.Equal([ApplicationFolder], Directory.GetDirectories(Path.Combine(applications, id)).Select(Path.GetFileName));
+        Assert.Single(await RealmNamesAsync(), name => name == id);
+        await using var connection = await TenantConnectionAsync(scenario, id);
+        Assert.Equal(1L, await CountAsync(connection, "SELECT count(*) FROM axis.active_releases"));
+
+        // The failed job keeps its own record, and the new job writes one that names the operator who ran it again.
+        Assert.Equal(2L, await ScalarAsync(scenario, $"SELECT count(*) FROM platform.audit_records WHERE tenant_id = '{id}' AND command = 'tenant create'"));
+        Assert.Equal(1L, await ScalarAsync(scenario, $"SELECT count(*) FROM platform.audit_records WHERE tenant_id = '{id}' AND command = 'tenant create' AND actor = 'operator-1' AND changed = ARRAY['job:{first}']"));
+        Assert.Equal(1L, await ScalarAsync(scenario, $"SELECT count(*) FROM platform.audit_records WHERE tenant_id = '{id}' AND command = 'tenant create' AND actor = 'operator-2' AND changed = ARRAY['job:{again.Id}']"));
+    }
+
+    [Fact]
+    public async Task A_create_job_without_an_application_creates_one_blank_application_named_by_the_tenant_id_activates_it_and_records_it()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        await mailpit.SmtpHostAsync();
+        var id = scenario.NewTenantId();
+        _realms.Add(id);
+        var applications = NewApplicationsFolder();
+        var settings = Settings(applications);
+        using var http = new HttpClient(_handler, disposeHandler: false);
+        var applicationSteps = 0;
+        var steps = CreateJob.Steps(Read(scenario, settings), http, TextWriter.Null, TextWriter.Null)
+            .Select(step => step.Name != "application"
+                ? step
+                : step with
+                {
+                    RunAsync = async (jobId, tenantId, input, ct) =>
+                    {
+                        var result = await step.RunAsync(jobId, tenantId, input, ct);
+                        return ++applicationSteps == 1 ? throw new InvalidOperationException("The application step broke after its work.") : result;
+                    },
+                })
+            .ToList();
+        var kinds = new Dictionary<string, IReadOnlyList<JobStep>> { ["create"] = steps };
+        var job = await ProvisioningJobs.QueueAsync(scenario.Platform, kinds, "create", id, "operator-1", null, null, CancellationToken, Input(NewEmail(), application: null));
+        var jobs = new ProvisioningJobs(scenario.Platform, kinds, TimeSpan.FromMinutes(5));
+        var name = BlankApplications.NameFor(id);
+
+        Assert.True(await jobs.RunNextAsync(TextWriter.Null, CancellationToken));
+        Assert.Equal("running", await ScalarAsync(scenario, $"SELECT state FROM platform.jobs WHERE id = '{job}'"));
+        Assert.Equal([TemplateApplications.Kebab(name)], Directory.GetDirectories(Path.Combine(applications, id)).Select(Path.GetFileName));
+
+        Assert.True(await jobs.RunNextAsync(TextWriter.Null, CancellationToken));
+
+        Assert.Equal("succeeded", await ScalarAsync(scenario, $"SELECT state FROM platform.jobs WHERE id = '{job}'"));
+        Assert.Equal("active", (await scenario.RowAsync(id)).Status);
+        Assert.Equal([TemplateApplications.Kebab(name)], Directory.GetDirectories(Path.Combine(applications, id)).Select(Path.GetFileName));
+        using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(applications, id, TemplateApplications.Kebab(name), "application.json"), CancellationToken));
+        Assert.Equal(name, manifest.RootElement.GetProperty("name").GetString());
+        Assert.Equal(name, await ScalarAsync(scenario, $"SELECT application FROM platform.tenants WHERE id = '{id}'"));
+        await using var connection = await TenantConnectionAsync(scenario, id);
+        Assert.Equal(1L, await CountAsync(connection, "SELECT count(*) FROM axis.active_releases"));
+    }
+
+    [Fact]
     public async Task A_create_job_with_quotas_writes_them_in_its_tenant_step_and_a_rerun_of_the_step_leaves_the_same_rows()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
@@ -269,8 +384,11 @@ public sealed class ProvisioningCreateJobTests(KeycloakFixture keycloak, Mailpit
 
     private static string NewEmail() => $"{Guid.NewGuid():N}@example.test";
 
-    private static string Input(string email, string application = Template, Dictionary<string, long?>? quotas = null) =>
-        JsonSerializer.Serialize(new { application, administrator = email, quotas });
+    private static readonly JsonSerializerOptions _inputOptions = new() { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
+
+    // A null application is left out, as the create request of a blank tenant leaves it out.
+    private static string Input(string email, string? application = Template, Dictionary<string, long?>? quotas = null) =>
+        JsonSerializer.Serialize(new { application, administrator = email, quotas }, _inputOptions);
 
     private static async Task<string[]> StringsAsync(AdminScenario scenario, string sql)
     {
@@ -339,7 +457,7 @@ public sealed class ProvisioningCreateJobTests(KeycloakFixture keycloak, Mailpit
         return AdminCommands.ReadCreateJobSettings(configuration, CellOptions.Load(configuration), activate);
     }
 
-    private static async Task<Guid> QueueAsync(AdminScenario scenario, Dictionary<string, string?> settings, string id, string email, string application = Template)
+    private static async Task<Guid> QueueAsync(AdminScenario scenario, Dictionary<string, string?> settings, string id, string email, string? application = Template)
     {
         using var http = new HttpClient();
         var kinds = new Dictionary<string, IReadOnlyList<JobStep>> { ["create"] = CreateJob.Steps(Read(scenario, settings), http, TextWriter.Null, TextWriter.Null) };

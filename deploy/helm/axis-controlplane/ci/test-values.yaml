@@ -1,5 +1,5 @@
 # Values for the lint, the schema check and the render tests. They set the region and the tenant domain, set the mail sender, relay and user name, pick the PayOS provider, name the
-# connection string, mail password, challenge key, PayOS keys and certificate Secrets, run two replicas and set resources and one image pull Secret, so the
+# connection string, mail password, challenge key, PayOS keys and certificate Secrets, list two cells with the client certificate and the authority, run two replicas and set resources and one image pull Secret, so the
 # checks cover every branch of the templates.
 image:
   pullSecrets:
@@ -20,6 +20,20 @@ controlPlane:
     userName: relay-user
   payOs:
     provider: PayOs
+  cells:
+    - id: vn-1
+      internalUrl: https://cell.vn-1.internal.example.com
+      tokenUrl: https://cell.vn-1.internal.example.com/realms/operator/protocol/openid-connect/token
+      clientId: axis-controlplane
+      clientSecret:
+        name: axis-cell-vn-1
+    - id: vn-2
+      internalUrl: https://cell.vn-2.internal.example.com
+      tokenUrl: https://cell.vn-2.internal.example.com/realms/operator/protocol/openid-connect/token
+      clientId: axis-controlplane
+      clientSecret:
+        name: axis-cell-vn-2
+        key: secret
 secrets:
   connectionString:
     name: axis-controlplane-db
@@ -31,3 +45,7 @@ secrets:
     name: axis-controlplane-payos
   certificate:
     name: axis-controlplane-tls
+  cellClientCertificate:
+    name: axis-controlplane-cell-client
+  cellCertificateAuthority:
+    name: axis-region-ca

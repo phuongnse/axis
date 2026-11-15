@@ -1,5 +1,5 @@
-import { Flex, Radio, Tag, Typography, type FormItemProps } from 'antd'
-import { AxisField } from './AxisField'
+import type { FormItemProps } from 'antd'
+import { AxisChoiceField } from './AxisChoiceField'
 
 /** An application or a template the field offers: its id, its title and description, and an optional mark such as "Built in". */
 export interface StartFromChoice {
@@ -35,28 +35,18 @@ export function StartFromField({
   failedMessage: string
 }) {
   return (
-    <AxisField
+    <AxisChoiceField
       name={name}
       label={label}
       help={help}
       initialValue=""
       status={choices === 'failed' ? { state: 'failed', message: failedMessage } : { state: 'idle' }}
-    >
-      <Radio.Group aria-label={label}>
-        <Flex vertical>
-          <Radio value="">{blank}</Radio>
-          {typeof choices === 'object' &&
-            choices.map((item) => (
-              <Radio key={item.id} value={item.id}>
-                <span>{item.title}</span>
-                {item.mark && <Tag style={{ marginInlineStart: 8 }}>{item.mark}</Tag>}
-                <Typography.Text type="secondary" style={{ display: 'block' }}>
-                  {item.description}
-                </Typography.Text>
-              </Radio>
-            ))}
-        </Flex>
-      </Radio.Group>
-    </AxisField>
+      options={[
+        { value: '', label: blank, help: '' },
+        ...(typeof choices === 'object'
+          ? choices.map((item) => ({ value: item.id, label: item.title, help: item.description, mark: item.mark }))
+          : []),
+      ]}
+    />
   )
 }
