@@ -1,5 +1,13 @@
 import { Flex, Form, Input, Modal, Spin, Typography } from 'antd'
-import { createContext, useContext, useEffect, useState, type HTMLAttributes, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type CSSProperties,
+  type HTMLAttributes,
+  type ReactNode,
+} from 'react'
 import { Link, useNavigate } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
@@ -658,6 +666,9 @@ export function StudioAuthoringRequestPage({
       kind: item === undefined ? (loaded?.kind ?? null) : null,
     }
   })
+  // Proposed: what belongs to the checks' or the review's line sits inside it, across the columns and indented by
+  // spacing-md, as layout shows structure, see the review on #3263.
+  const inside: CSSProperties = { gridColumn: '1 / -1', paddingInlineStart: spacing.md }
   const resultItem = hasResult && (
     <FeedItem
       testId="studio-ai-feed-result"
@@ -703,7 +714,7 @@ export function StudioAuthoringRequestPage({
             <StatusTag tone={checksLine.passed ? 'success' : 'danger'}>
               {t(checksLine.passed ? 'shell.studio.aiRequest.checks.passed' : 'shell.studio.aiRequest.checks.failed')}
             </StatusTag>
-            <span style={{ gridColumn: '1 / -1' }}>
+            <span style={inside}>
               <Typography.Text>{checksLine.text}</Typography.Text>{' '}
               <AxisButton
                 role="link"
@@ -716,7 +727,7 @@ export function StudioAuthoringRequestPage({
               </AxisButton>
             </span>
             {checksOpen && (
-              <Flex vertical gap="small" style={{ gridColumn: '1 / -1' }} data-testid="studio-ai-check-details">
+              <Flex vertical gap="small" style={inside} data-testid="studio-ai-check-details">
                 {problems.length > 0 && (
                   <StudioProblemList items={diagnosticItems(problems)} resources={resources} onSelect={onOpen} />
                 )}
@@ -736,7 +747,7 @@ export function StudioAuthoringRequestPage({
             <span style={{ marginTop: spacing.xs }}>
               <StatusTag tone="muted">{t('shell.studio.aiRequest.review.notReviewed')}</StatusTag>
             </span>
-            <Typography.Text style={{ gridColumn: '1 / -1' }}>
+            <Typography.Text style={inside}>
               {t(mine ? 'shell.studio.aiRequest.notReviewedMine' : 'shell.studio.aiRequest.notReviewed')}
             </Typography.Text>
           </div>
@@ -1259,6 +1270,7 @@ function ReviewFindings({
 }) {
   const t = useText()
   const { spacing } = useDesignTokens()
+  const inside: CSSProperties = { gridColumn: '1 / -1', paddingInlineStart: spacing.md }
   const blocking = review.findings.filter((finding) => finding.blocking)
   return (
     <div style={{ display: 'contents' }} data-testid="studio-ai-review">
@@ -1276,10 +1288,10 @@ function ReviewFindings({
         </StatusTag>
       </span>
       {/* Its tag closes the line, and its summary, a sentence or two, reads under it across the columns. */}
-      <Typography.Text style={{ gridColumn: '1 / -1' }}>{review.summary}</Typography.Text>
+      <Typography.Text style={inside}>{review.summary}</Typography.Text>
       {review.findings.length > 0 && (
         // The findings are a block of their own, `spacing-md` below the summary.
-        <div style={{ gridColumn: '1 / -1', marginTop: spacing.xs }}>
+        <div style={{ ...inside, marginTop: spacing.xs }}>
           <FindingList findings={review.findings} resources={resources} onOpen={onOpen} />
         </div>
       )}
