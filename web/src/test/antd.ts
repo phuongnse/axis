@@ -117,9 +117,12 @@ export async function tabTo(element: HTMLElement): Promise<void> {
   }
 }
 
-/** The description of an empty state that shows `text`. */
-export function emptyDescription(text: string): HTMLElement {
-  return screen.getByText(text, { selector: '.ant-empty-description' })
+/**
+ * The description of an empty state that shows `text`, in `scope` when given. `EmptyState` puts the text in a span
+ * inside Ant Design's description box, and Ant Design's own empty text sits in the box itself.
+ */
+export function emptyDescription(text: string, scope: HTMLElement = document.body): HTMLElement {
+  return within(scope).getByText(text, { selector: '.ant-empty-description, .ant-empty-description span' })
 }
 
 /** The count a badge shows on `element`, or null when it shows none. */

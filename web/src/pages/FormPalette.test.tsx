@@ -8,6 +8,7 @@ import { setAt } from '../platform/jsonPatch'
 import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { TextProvider } from '../platform/TextProvider'
+import { emptyDescription } from '../test/antd'
 import { FormPalette } from './FormPalette'
 import { FormProperties } from './FormProperties'
 
@@ -121,7 +122,7 @@ describe('FormPalette', () => {
     render(<Harness />)
     await userEvent.click(screen.getByTestId('studio-form-palette-notes'))
     await userEvent.click(screen.getByTestId('studio-form-palette-lines'))
-    expect(screen.getByText('Every field of the entity is on the form.')).toBeInTheDocument()
+    expect(emptyDescription('Every field of the entity is on the form.')).toBeInTheDocument()
   })
 
   it('adds a section, selects it and says so', async () => {

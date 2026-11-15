@@ -3,6 +3,7 @@ import { type HTMLAttributes, type ReactNode, useContext, useEffect, useId, useS
 import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { EmptyState } from '../platform/EmptyState'
 import { EmptyDash } from '../platform/EmptyValue'
 import { sortByName } from '../platform/listOrder'
 import { ReleaseOffStandard } from '../platform/ReleaseOffStandard'
@@ -286,9 +287,9 @@ function ReleaseContent({
         ) : (
           <>
             {release.changes.length === 0 && (
-              <Typography.Text>
-                {t('shell.studio.release.changes.none').replace('{previous}', String(release.previous))}
-              </Typography.Text>
+              <EmptyState
+                text={t('shell.studio.release.changes.none').replace('{previous}', String(release.previous))}
+              />
             )}
             <StudioChangeList
               plainChanged
@@ -300,19 +301,15 @@ function ReleaseContent({
         )}
       </ReleaseBlock>
       <ReleaseBlock title={t('shell.studio.release.parts')}>
-        {parts.length === 0 ? (
-          <Typography.Text>{t('shell.studio.release.parts.none')}</Typography.Text>
-        ) : (
-          <AxisTable<PartRow>
-            columns={partColumns}
-            rowKey={(row) => row.key}
-            dataSource={parts}
-            loading={false}
-            emptyText={t('shell.studio.release.parts.none')}
-            pagination={false}
-            toolbar={{}}
-          />
-        )}
+        <AxisTable<PartRow>
+          columns={partColumns}
+          rowKey={(row) => row.key}
+          dataSource={parts}
+          loading={false}
+          emptyText={t('shell.studio.release.parts.none')}
+          pagination={false}
+          toolbar={{}}
+        />
       </ReleaseBlock>
       <ReleaseBlock title={t('shell.studio.release.activations')}>
         <AxisTable<ActivationRow>
@@ -363,7 +360,7 @@ function RelaxedPoints({ relaxed, locale }: { relaxed: StudioRelaxedPoint[]; loc
   const t = useText()
   const { colour, spacing } = useDesignTokens()
   if (relaxed.length === 0) {
-    return <Typography.Text>{t('shell.studio.release.relaxed.none')}</Typography.Text>
+    return <EmptyState text={t('shell.studio.release.relaxed.none')} />
   }
   const groups = new Map<string, StudioRelaxedPoint[]>()
   for (const point of relaxed) {
