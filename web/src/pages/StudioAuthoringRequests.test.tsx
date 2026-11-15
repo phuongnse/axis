@@ -275,15 +275,17 @@ describe('a ready request’s review', () => {
     const review = await screen.findByTestId('studio-ai-review')
     expect(within(review).getByText('Changes requested')).toHaveAttribute('data-tone', 'attention')
     expect(within(review).queryByText(/Approved/)).toBeNull()
-    // Proposed: the findings to fix, then the notes, each group under its heading and by the resource it is about.
-    const toFix = within(review).getByTestId('studio-ai-findings-to-fix')
-    expect(within(toFix).getByText('Findings to fix')).toBeInTheDocument()
+    // Proposed: the blocking findings, their heading in dangerText, then the non-blocking ones, each group under its heading and by the resource it is about.
+    const toFix = within(review).getByTestId('studio-ai-findings-blocking')
+    expect(within(toFix).getByText('Blocking findings')).toHaveStyle({
+      color: designTokensFor('light').colour.dangerText,
+    })
     const [fixPage] = within(toFix).getAllByTestId('studio-problem-group')
     expect(within(fixPage).getAllByRole('button', { name: 'Requests' })).toHaveLength(1)
     expect(within(fixPage).getByText('Page')).toBeInTheDocument()
     expect(fixPage).toHaveTextContent('Mails the approver too.')
-    const notes = within(review).getByTestId('studio-ai-findings-notes')
-    expect(within(notes).getByText('Notes')).toBeInTheDocument()
+    const notes = within(review).getByTestId('studio-ai-findings-non-blocking')
+    expect(within(notes).getByText('Non-blocking findings')).toBeInTheDocument()
     const [notePage, loose] = within(notes).getAllByTestId('studio-problem-group')
     expect(notePage).toHaveTextContent('Could say why.')
     expect(within(loose).getByText('misc.json')).toBeInTheDocument()
@@ -945,7 +947,7 @@ describe("a request's guide", () => {
     renderPage()
 
     const bar = await screen.findByTestId('studio-ai-bar')
-    expect(bar).toHaveTextContent('1 finding to fix')
+    expect(bar).toHaveTextContent('1 blocking finding')
     await userEvent.setup().click(within(bar).getByRole('button', { name: 'Ask AI to fix it' }))
     await waitFor(() => {
       const post = fetchMock.mock.calls.find(
@@ -975,12 +977,12 @@ describe("a request's guide", () => {
 
     await user.click(within(await screen.findByTestId('studio-ai-bar')).getByRole('button', { name: 'Accept anyway…' }))
     const dialog = await screen.findByRole('dialog', { name: 'Accept without these changes?' })
-    // The findings it leaves out read as the review lists them, under Findings to fix, with no notes.
+    // The findings it leaves out read as the review lists them, under Blocking findings, with no non-blocking ones.
     const left = within(dialog).getByTestId('studio-ai-anyway-findings')
-    expect(within(left).getByTestId('studio-ai-findings-to-fix')).toHaveTextContent(
-      /Findings to fix.*Show the column\./,
+    expect(within(left).getByTestId('studio-ai-findings-blocking')).toHaveTextContent(
+      /Blocking findings.*Show the column\./,
     )
-    expect(within(left).queryByTestId('studio-ai-findings-notes')).toBeNull()
+    expect(within(left).queryByTestId('studio-ai-findings-non-blocking')).toBeNull()
     expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/accept'))).toBe(false)
     await user.click(within(dialog).getByRole('button', { name: 'Accept anyway' }))
     await waitFor(() => {

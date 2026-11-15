@@ -1020,7 +1020,7 @@ export function StudioAuthoringRequestPage({
           {/* The must-change findings it leaves out, listed as the review lists them; a note asks for no change. */}
           <FindingList
             testId="studio-ai-anyway-findings"
-            only="toFix"
+            only="blocking"
             findings={request.review?.findings ?? []}
             resources={resources}
             onOpen={(resourceId, path) => {
@@ -1279,10 +1279,10 @@ function ReviewFindings({
 }
 
 /**
- * Proposed: a review's findings, see the review on #3263, in two groups each under its heading in bold: "Findings to
- * fix", the must-change ones, as the bar counts them, then "Notes". Each group lists its findings as `StudioProblemList`
- * lists problems, grouped by the resource they are about, the resource a link. A group with none does not show. The
- * review's result shows both groups, and the Accept anyway dialog the findings to fix alone.
+ * Proposed: a review's findings, see the review on #3263, in two groups each under its heading in bold: "Blocking
+ * findings", in dangerText, the must-change ones, as the bar counts them, then "Non-blocking findings". Each group lists
+ * its findings as `StudioProblemList` lists problems, grouped by the resource they are about, the resource a link. A
+ * group with none does not show. The review's result shows both groups, and the Accept anyway dialog the blocking alone.
  */
 function FindingList({
   findings,
@@ -1295,15 +1295,18 @@ function FindingList({
   resources: readonly StudioResourceItem[]
   onOpen: (resourceId: string, path: string) => void
   testId?: string
-  /** Shows the findings to fix alone. */
-  only?: 'toFix'
+  /** Shows the blocking findings alone. */
+  only?: 'blocking'
 }) {
   const t = useText()
-  const { spacing } = useDesignTokens()
-  const group = (key: string, heading: string, items: readonly StudioReviewFinding[]) =>
+  const { colour, spacing } = useDesignTokens()
+  const group = (key: string, heading: string, items: readonly StudioReviewFinding[], danger: boolean) =>
     items.length > 0 && (
       <Flex vertical gap={spacing.xs} data-testid={key}>
-        <Typography.Text strong>{t(heading)}</Typography.Text>
+        {/* The blocking findings' heading is in dangerText, so a glance tells what holds the draft back. */}
+        <Typography.Text strong style={danger ? { color: colour.dangerText } : undefined}>
+          {t(heading)}
+        </Typography.Text>
         <StudioProblemList
           items={items.map((finding) => ({
             lead: null,
@@ -1320,15 +1323,17 @@ function FindingList({
   return (
     <Flex vertical gap={spacing.sm} data-testid={testId}>
       {group(
-        'studio-ai-findings-to-fix',
-        'shell.studio.aiRequest.review.toFix',
+        'studio-ai-findings-blocking',
+        'shell.studio.aiRequest.review.blocking',
         findings.filter((finding) => finding.blocking),
+        true,
       )}
       {only === undefined &&
         group(
-          'studio-ai-findings-notes',
-          'shell.studio.aiRequest.review.notes',
+          'studio-ai-findings-non-blocking',
+          'shell.studio.aiRequest.review.nonBlocking',
           findings.filter((finding) => !finding.blocking),
+          false,
         )}
     </Flex>
   )
