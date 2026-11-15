@@ -57,7 +57,7 @@ import { StatusTag } from '../platform/StatusTag'
 import { StudioChanges } from './StudioHistory'
 import { ActionBar } from './SaveBar'
 import { StudioPageHeading } from './StudioPageHeading'
-import { bulletList } from '../platform/bulletList'
+import { useBulletList } from '../platform/bulletList'
 import { StudioProblemList } from './StudioProblems'
 import { ResourceReference } from './ResourceReference'
 import {
@@ -206,6 +206,7 @@ export function StudioAuthoringRequestPage({
   const navigate = useNavigate()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { colour, size, spacing } = useDesignTokens()
+  const bulletList = useBulletList()
   const diagnosticItems = useDiagnosticItems()
   const sentTime = useSentTime()
   const stateWords = useRequestStateWords()
@@ -1188,6 +1189,7 @@ function PlanView({
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
+  const bulletList = useBulletList()
   const [details, setDetails] = useState(false)
   const bullets = (items: readonly ReactNode[]) => (
     <ul style={bulletList}>
@@ -1356,7 +1358,7 @@ function ReviewMark({ mark, words }: { mark: ReviewMarkKind; words: string }) {
   }[mark]
   return (
     <span data-mark={mark} style={{ whiteSpace: 'nowrap' }}>
-      <span aria-hidden style={{ color: look.ink, marginInlineEnd: spacing.xs / 2 }}>
+      <span aria-hidden style={{ color: look.ink, marginInlineEnd: spacing.xs }}>
         {look.icon}
       </span>
       {words}:
@@ -1370,7 +1372,8 @@ type ReviewMarkKind = StudioReviewFinding['kind'] | StudioReviewOutcome['outcome
  * Proposed: how the review found each acceptance criterion of the plan or each item of Axis's checklist, see the review
  * on #3263: under its heading in bold, each item led by its outcome as a `ReviewMark`, "Met:", "Not met:" or "Skipped:",
  * as a finding is led by its kind, then its words, with the review's short why, muted, after them on their line for one
- * not met or skipped, as a decision of the plan reads with its reason. The mark leads each item, so it takes no bullet.
+ * not met or skipped, as a decision of the plan reads with its reason. Each item is a bullet, the mark after it, as
+ * every list of sentences is.
  */
 function ReviewOutcomes({
   heading,
@@ -1383,15 +1386,14 @@ function ReviewOutcomes({
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
+  const bulletList = useBulletList()
   if (items.length === 0) {
     return null
   }
   return (
     <Flex vertical gap={spacing.xs} data-testid={testId}>
       <Typography.Text strong>{t(heading)}</Typography.Text>
-      <ul
-        style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: spacing.xs }}
-      >
+      <ul style={bulletList}>
         {items.map((item, index) => (
           <li key={index} data-outcome={item.outcome}>
             <ReviewMark mark={item.outcome} words={t(`shell.studio.aiRequest.review.outcome.${item.outcome}`)} />{' '}

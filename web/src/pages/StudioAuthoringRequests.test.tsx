@@ -290,7 +290,7 @@ describe('a ready request’s review', () => {
     expect(within(review).getByText('Changes requested')).toHaveAttribute('data-tone', 'attention')
     expect(within(review).queryByText(/Approved/)).toBeNull()
     // Proposed: Things to look at, the findings in one list by the resource they are about, the blocking first, each led
-    // by its kind, an icon and its word in the colour it asks for, so it takes no bullet.
+    // by its kind, an icon in the colour it asks for and its word, after the bullet.
     const found = within(review).getByTestId('studio-ai-findings')
     expect(within(found).getByText('Things to look at')).toBeInTheDocument()
     const [page, loose] = within(found).getAllByTestId('studio-problem-group')
@@ -309,9 +309,10 @@ describe('a ready request’s review', () => {
     })
     // Proposed: a resource's findings sit half of spacing-xs under its name.
     expect(page).toHaveStyle({ gap: '4px' })
+    // Proposed: a list of sentences keeps its bullets, the mark after each.
     expect(within(page).getAllByTestId('studio-problem')[0].parentElement).toHaveStyle({
-      listStyleType: 'none',
-      paddingInlineStart: '16px',
+      listStyleType: 'disc',
+      paddingInlineStart: '32px',
     })
     expect(loose).toHaveTextContent(/misc\.json\s*Suggestion: A loose end\./)
     expect(within(loose).queryByRole('button')).toBeNull()
@@ -355,6 +356,7 @@ describe('a ready request’s review', () => {
     expect(within(notMet).getByText('No such column.')).toHaveStyle({ color: colour.textMuted })
     expect(notMet).toHaveTextContent('Not met: It shows a column. No such column.')
     expect(within(notMet).queryByRole('br')).toBeNull()
+    expect(within(criteria).getByRole('list')).toHaveStyle({ listStyleType: 'disc' })
     const checklist = screen.getByTestId('studio-ai-review-checklist')
     expect(within(checklist).getByText('Checklist')).toBeInTheDocument()
     expect(within(checklist).getByText('Skipped:').querySelector('.anticon-minus-circle')!.parentElement).toHaveStyle({

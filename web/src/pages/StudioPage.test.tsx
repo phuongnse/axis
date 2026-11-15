@@ -580,10 +580,10 @@ describe('StudioPage', () => {
     const [entity, application] = within(panel).getAllByTestId('studio-problem-group')
     expect(within(entity).getByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
     expect(entity).toHaveTextContent('Error AXC0101 The field type is unknown.')
-    // Proposed: a problem led by its severity and code takes no bullet, as its lead marks it.
+    // Proposed: a problem keeps its bullet, its severity and code after it.
     expect(within(entity).getByTestId('studio-problem').parentElement).toHaveStyle({
-      listStyleType: 'none',
-      paddingInlineStart: '16px',
+      listStyleType: 'disc',
+      paddingInlineStart: '32px',
     })
     expect(within(application).getByText('application.json')).toBeInTheDocument()
     expect(application).toHaveTextContent('Warning AXC0001 The application has no description.')
