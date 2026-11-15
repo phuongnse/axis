@@ -11,6 +11,7 @@ using Axis.Configuration.Tests;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Npgsql;
 
@@ -369,6 +370,71 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
 
         Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, one.StatusCode);
+    }
+
+    [Fact]
+    public async Task Refused_calls_write_one_warning_with_the_route_the_status_the_reason_and_the_caller_and_no_job_or_audit_record()
+    {
+        var logs = new LogCollector();
+        await using var factory = await StartAsync(logs: logs);
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var operatorId = new JsonWebToken(token).Subject;
+        using var queued = await PostJobAsync(client, "/api/cell/tenants", token, "key-5093817264", CreateBody("d"));
+        Assert.Equal(HttpStatusCode.Accepted, queued.StatusCode);
+        var jobs = await CountAsync("platform.jobs");
+        var audit = await CountAsync("platform.audit_records");
+
+        var calls = new (Func<Task<HttpResponseMessage>> Send, HttpStatusCode Status, string Route, string Reason)[]
+        {
+            (() => PostJobAsync(client, "/api/cell/tenants", token, key: null, CreateBody("f")), HttpStatusCode.BadRequest, "/api/cell/tenants", "Idempotency-Key header"),
+            (() => PostJobAsync(client, "/api/cell/tenants", token, "key-5093817264", CreateBody("e")), HttpStatusCode.UnprocessableEntity, "/api/cell/tenants", "used before with another request"),
+            (() => PostJobAsync(client, "/api/cell/tenants", token, "key-6203948175", CreateBody("BAD-7364519820X")), HttpStatusCode.BadRequest, "/api/cell/tenants", "The tenant id must have"),
+            (() => PostJobAsync(client, "/api/cell/tenants/nobody-4829175036/suspend", token, "key-8172635940"), HttpStatusCode.NotFound, "/api/cell/tenants/{id}/suspend", "No tenant has this id."),
+        };
+        foreach (var (send, status, route, reason) in calls)
+        {
+            var before = logs.Records.Count(record => record.Message.Contains("by operator", StringComparison.Ordinal));
+            using var response = await send();
+            Assert.Equal(status, response.StatusCode);
+            var written = logs.Records.Where(record => record.Message.Contains("by operator", StringComparison.Ordinal)).Skip(before).ToList();
+            var entry = Assert.Single(written);
+            Assert.Equal(LogLevel.Warning, entry.Level);
+            Assert.Contains($"A POST call to {route} by operator {operatorId} was refused with {(int)status}.", entry.Message, StringComparison.Ordinal);
+            Assert.Contains(reason, entry.Message, StringComparison.Ordinal);
+        }
+
+        // The scope of every entry of a request holds the framework's RequestPath, which is not a value of the warning.
+        var texts = logs.Records
+            .Where(record => record.Message.Contains("by operator", StringComparison.Ordinal))
+            .SelectMany(record => record.Scope.Where(pair => pair.Key != "RequestPath").Select(pair => pair.Value?.ToString() ?? "").Append(record.Message))
+            .ToList();
+        foreach (var absent in new[] { token, "Bearer", "Cookie", "5093817264", "6203948175", "8172635940", "7364519820", "4829175036", "admin@example.test" })
+        {
+            Assert.All(texts, text => Assert.DoesNotContain(absent, text, StringComparison.Ordinal));
+        }
+
+        Assert.Equal(jobs, await CountAsync("platform.jobs"));
+        Assert.Equal(audit, await CountAsync("platform.audit_records"));
+    }
+
+    [Fact]
+    public async Task An_anonymous_call_writes_no_refused_entry_and_a_caller_without_the_role_writes_only_the_403_warning()
+    {
+        var logs = new LogCollector();
+        await using var factory = await StartAsync(logs: logs);
+        using var client = CreateClient(factory, _console);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+
+        using var anonymous = await PostJobAsync(client, "/api/cell/tenants/b/suspend", token: null, "key-3958172640");
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+        Assert.DoesNotContain(logs.Entries, entry => entry.Contains("refused", StringComparison.Ordinal));
+
+        using var noRole = await PostJobAsync(client, "/api/cell/tenants/b/suspend", noRoleToken, "key-3958172641");
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+        var refused = Assert.Single(logs.Entries, entry => entry.Contains("refused", StringComparison.Ordinal));
+        Assert.Contains("refused with 403", refused, StringComparison.Ordinal);
+        Assert.DoesNotContain("by operator", refused, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1926,7 +1992,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         return body.GetProperty("access_token").GetString()!;
     }
 
-    private async Task<WebApplicationFactory<Program>> StartAsync(int? tenantCap = null, string? templates = null, bool exportBucket = false)
+    private async Task<WebApplicationFactory<Program>> StartAsync(int? tenantCap = null, string? templates = null, bool exportBucket = false, LogCollector? logs = null)
     {
         var authority = await keycloak.StartAsync();
         var platform = await CellTestPlatform.CreateAsync(database, authority, CancellationToken);
@@ -1953,6 +2019,11 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             builder.UseSetting("Cell:OperatorRole", OperatorRole);
             builder.UseSetting("IdentityProvider:Url", _baseAddress.ToString());
             builder.UseSetting("Templates:Path", templates ?? BuiltInApplications.Path);
+            if (logs is not null)
+            {
+                builder.ConfigureLogging(logging => logging.AddProvider(logs));
+            }
+
             if (_exportStorage is { } storage)
             {
                 builder.UseSetting("Cell:ExportStorage:ServiceUrl", storage.ServiceUrl);

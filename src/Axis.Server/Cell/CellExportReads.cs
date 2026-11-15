@@ -1,6 +1,7 @@
 using System.Net;
 using Amazon.S3;
 using Axis.Administration;
+using Axis.Server.Http;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -32,14 +33,14 @@ internal static class CellExportReads
 
         if (job is null)
         {
-            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No export of this tenant has this id.");
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status404NotFound, "No export of this tenant has this id.");
         }
 
         var succeeded = job.State == "succeeded";
         DateTimeOffset? expiresAt = succeeded && job.FinishedAt is { } finished ? finished + TenantExports.Kept : null;
         if (expiresAt <= DateTimeOffset.UtcNow)
         {
-            return Gone();
+            return Gone(httpContext);
         }
 
         if (!httpContext.Request.GetTypedHeaders().Accept.Any(accept => accept.MediaType.Equals("application/zip", StringComparison.OrdinalIgnoreCase)))
@@ -49,7 +50,7 @@ internal static class CellExportReads
 
         if (!succeeded)
         {
-            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "The export is not ready.");
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status409Conflict, "The export is not ready.");
         }
 
         if (storage.Storage is null)
@@ -66,7 +67,7 @@ internal static class CellExportReads
         }
         catch (AmazonS3Exception exception) when (exception.StatusCode == HttpStatusCode.NotFound || exception.ErrorCode == "NoSuchKey")
         {
-            return Gone();
+            return Gone(httpContext);
         }
 
         httpContext.Response.RegisterForDispose(stored);
@@ -86,7 +87,7 @@ internal static class CellExportReads
 
         return Results.Stream(stored.ResponseStream, "application/zip", $"{tenantId}-{exportId:D}.zip");
 
-        static IResult Gone() =>
-            Results.Problem(statusCode: StatusCodes.Status410Gone, title: "The export was deleted after 7 days.");
+        static IResult Gone(HttpContext httpContext) =>
+            RefusedRequests.Problem(httpContext, StatusCodes.Status410Gone, "The export was deleted after 7 days.");
     }
 }

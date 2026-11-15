@@ -81,6 +81,10 @@ every log.
   or the exception type, never a message or the token.
 - **Refused requests.** A `403` logs a warning with the HTTP method and the route template, never the
   path or the query string.
+- **Refused provisioning calls.** A `4xx` that the provisioning API answers to a signed-in operator, other than
+  `401`, `403` and `429`, logs a warning with the HTTP method, the route template, the status, a fixed reason
+  and the operator's id, never the path, the query string, the body or the `Idempotency-Key`, see
+  [refused calls](tenant-lifecycle.md#provisioning-api).
 - **Line breaks.** The console formatter indents every line of a message after its first, so a value
   with a line break cannot start a new log entry. It also starts each entry with a UTC timestamp.
 
@@ -95,7 +99,7 @@ One trace id joins what a user sees, what the logs hold and what the history sto
 
 `traceId` and `trace_id` hold the same value, the 32-hex W3C trace id. So a user reports a `traceId`,
 and an operator searches the history for it. Finding one user's failed request goes through the stored
-history, not the traces, because telemetry holds no user id.
+history, not the traces, because telemetry holds no tenant user's id.
 
 ## What telemetry never holds
 
@@ -105,7 +109,7 @@ No span, metric or log of either host holds any of these:
 - Secrets.
 - Binding values.
 - Request and response bodies.
-- User ids.
+- User ids, except the id of the operator in a refused provisioning call.
 - Npgsql parameter values.
 - Exception messages on Axis spans, which hold the type only.
 

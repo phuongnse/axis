@@ -104,6 +104,10 @@ namespace Axis.Server.CellApi;
 /// download on a server without the <c>Cell:ExportStorage</c> settings <c>503</c>. A refused call and a read of the JSON write no record.
 /// </para>
 /// <para>
+/// A call that an operator makes and a route refuses with a <c>4xx</c> writes the refused call warning of <see cref="RefusedRequests"/>
+/// and no record, see <c>docs/reference/tenant-lifecycle.md#provisioning-api</c>.
+/// </para>
+/// <para>
 /// <c>POST /api/cell/tenants</c> takes <c>{ "id", "application", "administrator" }</c> and queues a <c>create</c> job with the five
 /// steps <c>tenant</c>, <c>application</c>, <c>activate</c>, <c>invite</c> and <c>resume</c>, all <c>pending</c>, and answers <c>202</c>
 /// as the suspend route does. The checks run in this order: the <c>Idempotency-Key</c> header (<c>400</c>), the replay of the first job
@@ -277,6 +281,7 @@ internal static partial class CellEndpoints
 
     private static async Task<IResult> GetTenantAsync(
         string id,
+        HttpContext httpContext,
         NpgsqlDataSource dataSource,
         QuotaDefaults defaults,
         TenantUsageStore usageStore,
@@ -290,7 +295,7 @@ internal static partial class CellEndpoints
             .SingleOrDefaultAsync(cancellationToken);
         if (tenant is null)
         {
-            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant has this id.");
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status404NotFound, "No tenant has this id.");
         }
 
         var hosts = await ReadHostsAsync(platform, [tenant.Id], cancellationToken);
@@ -315,6 +320,7 @@ internal static partial class CellEndpoints
     // The tenant row, not the tenant catalog, which holds active tenants only. A suspended tenant has no pool, so the read opens one connection.
     private static async Task<IResult> ListAdministratorsAsync(
         string id,
+        HttpContext httpContext,
         NpgsqlDataSource dataSource,
         TenantSecretCipher cipher,
         CellTenantDatabases databases,
@@ -330,12 +336,12 @@ internal static partial class CellEndpoints
 
         if (row is null)
         {
-            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant has this id.");
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status404NotFound, "No tenant has this id.");
         }
 
         if (DirectoryTenantCatalog.RealmUsers(row, cipher) is not { } access)
         {
-            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This tenant has no realm to read its administrators from.");
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status409Conflict, "This tenant has no realm to read its administrators from.");
         }
 
         try
@@ -374,6 +380,7 @@ internal static partial class CellEndpoints
     private static async Task<IResult> SetQuotasAsync(
         string id,
         CellQuotasRequest? request,
+        HttpContext httpContext,
         CellPlatformWriter writer,
         QuotaDefaults defaults,
         CancellationToken cancellationToken)
@@ -383,7 +390,7 @@ internal static partial class CellEndpoints
         var problem = ValidateQuotas(request, set, remove);
         if (problem is not null)
         {
-            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: problem);
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status400BadRequest, problem, "The quotas in the request are not valid.");
         }
 
         var named = set.Keys.Concat(remove).ToHashSet(StringComparer.Ordinal);
@@ -391,7 +398,7 @@ internal static partial class CellEndpoints
         await using var transaction = await platform.Database.BeginTransactionAsync(cancellationToken);
         if (!await platform.Tenants.AnyAsync(row => row.Id == id && row.PreviewOf == null, cancellationToken))
         {
-            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant has this id.");
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status404NotFound, "No tenant has this id.");
         }
 
         foreach (var (quota, value) in set)
@@ -430,16 +437,16 @@ internal static partial class CellEndpoints
         await using var transaction = await platform.Database.BeginTransactionAsync(cancellationToken);
         if (!await platform.Tenants.AnyAsync(row => row.Id == id && row.PreviewOf == null, cancellationToken))
         {
-            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant has this id.");
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status404NotFound, "No tenant has this id.");
         }
 
         if (ReadIdempotencyKey(httpContext) is not { } key)
         {
-            return MissingKey();
+            return MissingKey(httpContext);
         }
 
         var hash = HashRequest(kind, id, await ReadBodyAsync(httpContext, cancellationToken));
-        if (await ReplayAsync(platform, transaction, key, hash, cancellationToken) is { } replay)
+        if (await ReplayAsync(httpContext, platform, transaction, key, hash, cancellationToken) is { } replay)
         {
             return replay;
         }
@@ -463,9 +470,8 @@ internal static partial class CellEndpoints
         var trimmed = request?.Host?.Trim();
         if (trimmed is null || !IsValidHost(trimmed.ToLowerInvariant()))
         {
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "The host must be a DNS name such as approvals.example.com.");
+            return RefusedRequests.Problem(
+                httpContext, StatusCodes.Status400BadRequest, "The host must be a DNS name such as approvals.example.com.");
         }
 
         // Hosts are ASCII, so lower() in the database matches this lower case.
@@ -479,19 +485,19 @@ internal static partial class CellEndpoints
             cancellationToken);
         if (!await platform.Tenants.AnyAsync(row => row.Id == id && row.PreviewOf == null, cancellationToken))
         {
-            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant has this id.");
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status404NotFound, "No tenant has this id.");
         }
 
         // The title names neither the host nor the tenant that holds it.
         if (await platform.TenantHosts.AnyAsync(row => row.Host.ToLower() == host, cancellationToken))
         {
-            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This host already belongs to a tenant.");
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status409Conflict, "This host already belongs to a tenant.");
         }
 
         // The title names neither the host nor the deleted tenant that held it.
         if (await DeletedTenantHolds.IsHostHeldBackAsync(platform, [host], cancellationToken))
         {
-            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This host is held back after a tenant was deleted.");
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status409Conflict, "This host is held back after a tenant was deleted.");
         }
 
         // A request whose expiry has passed is not pending, although its state says so until a later step marks it expired.
@@ -566,7 +572,7 @@ internal static partial class CellEndpoints
     {
         if (ReadIdempotencyKey(httpContext) is not { } key)
         {
-            return MissingKey();
+            return MissingKey(httpContext);
         }
 
         var body = await ReadBodyAsync(httpContext, cancellationToken);
@@ -575,7 +581,7 @@ internal static partial class CellEndpoints
         await using var transaction = await platform.Database.BeginTransactionAsync(cancellationToken);
 
         // The replay comes before every check that a later change can flip, such as the tenant it created or a removed template.
-        if (await ReplayAsync(platform, transaction, key, hash, cancellationToken) is { } replay)
+        if (await ReplayAsync(httpContext, platform, transaction, key, hash, cancellationToken) is { } replay)
         {
             return replay;
         }
@@ -584,12 +590,12 @@ internal static partial class CellEndpoints
         var problem = ValidateCreate(request, templates);
         if (problem is not null)
         {
-            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: problem);
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status400BadRequest, problem);
         }
 
         if (QuotaValueProblem(request!.Quotas ?? []) is { } quotaProblem)
         {
-            return Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: quotaProblem);
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status422UnprocessableEntity, quotaProblem, "A quota in the request is not valid.");
         }
 
         var id = request.Id!;
@@ -604,14 +610,14 @@ internal static partial class CellEndpoints
             || await unfinished.AnyAsync(job => job.TenantId == id, cancellationToken)
             || await DeletedTenantHolds.IsDeletedIdAsync(platform, id, cancellationToken))
         {
-            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "A tenant of the cell already has this id.");
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status409Conflict, "A tenant of the cell already has this id.");
         }
 
         if (cell.TenantCap is { } cap)
         {
             if (await CountTowardsCapAsync(platform, cancellationToken) >= cap)
             {
-                return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This cell is full.");
+                return RefusedRequests.Problem(httpContext, StatusCodes.Status409Conflict, "This cell is full.");
             }
         }
 
@@ -672,10 +678,11 @@ internal static partial class CellEndpoints
             : values[0];
     }
 
-    private static IResult MissingKey() =>
-        Results.Problem(
-            statusCode: StatusCodes.Status400BadRequest,
-            title: $"The request must carry an {IdempotencyKeyHeader} header of 1 to {MaxIdempotencyKeyLength} characters.");
+    private static IResult MissingKey(HttpContext httpContext) =>
+        RefusedRequests.Problem(
+            httpContext,
+            StatusCodes.Status400BadRequest,
+            $"The request must carry an {IdempotencyKeyHeader} header of 1 to {MaxIdempotencyKeyLength} characters.");
 
     private static async Task<byte[]> ReadBodyAsync(HttpContext httpContext, CancellationToken cancellationToken)
     {
@@ -690,6 +697,7 @@ internal static partial class CellEndpoints
 
     // Answers the first job again, or 422 when the key was used with another request, or null when the key is new.
     private static async Task<IResult?> ReplayAsync(
+        HttpContext httpContext,
         PlatformDbContext platform,
         IDbContextTransaction transaction,
         string key,
@@ -712,9 +720,10 @@ internal static partial class CellEndpoints
 
         if (first.RequestHash != hash)
         {
-            return Results.Problem(
-                statusCode: StatusCodes.Status422UnprocessableEntity,
-                title: $"The {IdempotencyKeyHeader} was used before with another request.");
+            return RefusedRequests.Problem(
+                httpContext,
+                StatusCodes.Status422UnprocessableEntity,
+                $"The {IdempotencyKeyHeader} was used before with another request.");
         }
 
         await transaction.CommitAsync(cancellationToken);
@@ -755,7 +764,7 @@ internal static partial class CellEndpoints
         {
             if (!await platform.Tenants.AsNoTracking().AnyAsync(row => row.Id == id && row.PreviewOf == null, cancellationToken))
             {
-                return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No tenant has this id.");
+                return RefusedRequests.Problem(httpContext, StatusCodes.Status404NotFound, "No tenant has this id.");
             }
         }
 
@@ -763,28 +772,29 @@ internal static partial class CellEndpoints
             id, exportId, httpContext.User.FindFirst(CellOperator.IdClaim)!.Value, httpContext, dataSource, writer, storage, cancellationToken);
     }
 
-    private static async Task<IResult> GetJobAsync(Guid id, NpgsqlDataSource dataSource, CancellationToken cancellationToken)
+    private static async Task<IResult> GetJobAsync(Guid id, HttpContext httpContext, NpgsqlDataSource dataSource, CancellationToken cancellationToken)
     {
         await using var platform = Open(dataSource);
         var job = await platform.Jobs.AsNoTracking().SingleOrDefaultAsync(row => row.Id == id, cancellationToken);
         if (job is null)
         {
-            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No job has this id.");
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status404NotFound, "No job has this id.");
         }
 
         return Results.Ok(JobDetail(job));
     }
 
     // Job ids are time-ordered, so the id settles jobs created in the same instant.
-    private static async Task<IResult> ListJobsAsync(string? tenant, string? limit, NpgsqlDataSource dataSource, CancellationToken cancellationToken)
+    private static async Task<IResult> ListJobsAsync(string? tenant, string? limit, HttpContext httpContext, NpgsqlDataSource dataSource, CancellationToken cancellationToken)
     {
         var take = DefaultJobListLimit;
         if (limit is not null
             && (!int.TryParse(limit, NumberStyles.None, CultureInfo.InvariantCulture, out take) || take is < 1 or > MaxJobListLimit))
         {
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: $"The limit must be a whole number from 1 to {MaxJobListLimit}.");
+            return RefusedRequests.Problem(
+                httpContext,
+                StatusCodes.Status400BadRequest,
+                $"The limit must be a whole number from 1 to {MaxJobListLimit}.");
         }
 
         await using var platform = Open(dataSource);
