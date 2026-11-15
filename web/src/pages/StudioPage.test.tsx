@@ -581,7 +581,10 @@ describe('StudioPage', () => {
     expect(within(entity).getByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
     expect(entity).toHaveTextContent('Error AXC0101 The field type is unknown.')
     // Proposed: a problem led by its severity and code takes no bullet, as its lead marks it.
-    expect(within(entity).getByTestId('studio-problem')).toHaveStyle({ listStyleType: 'none' })
+    expect(within(entity).getByTestId('studio-problem').parentElement).toHaveStyle({
+      listStyleType: 'none',
+      paddingInlineStart: '16px',
+    })
     expect(within(application).getByText('application.json')).toBeInTheDocument()
     expect(application).toHaveTextContent('Warning AXC0001 The application has no description.')
   })

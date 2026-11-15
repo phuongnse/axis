@@ -107,6 +107,9 @@ export function StudioProblemList({
     >
       {groups.map((group) => {
         const first = group.items[0]
+        // Problems that are words alone take bullets, and problems led by their lead, such as Error AX0412, take none
+        // and start where the rest of what belongs to the resource starts.
+        const bulleted = group.items.every((item) => item.lead === null)
         return (
           <li key={group.key} data-testid="studio-problem-group">
             <div>
@@ -120,14 +123,9 @@ export function StudioProblemList({
                 onSelect={onSelect}
               />
             </div>
-            <ul style={bulletList}>
+            <ul style={bulleted ? bulletList : { listStyleType: 'none', margin: 0, paddingInlineStart: spacing.md }}>
               {group.items.map((item, index) => (
-                // A problem led by its lead, such as Error AX0412, takes no bullet, and one that is words alone does.
-                <li
-                  key={index}
-                  data-testid="studio-problem"
-                  style={item.lead === null ? undefined : { listStyleType: 'none' }}
-                >
+                <li key={index} data-testid="studio-problem">
                   {item.lead !== null && <>{item.lead} </>}
                   <Typography.Text>{item.message}</Typography.Text>
                   {/* A problem at another place of the resource than its first has a link to its own. */}

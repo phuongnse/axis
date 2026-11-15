@@ -286,10 +286,10 @@ describe('a ready request’s review', () => {
     expect(within(fixPage).getAllByRole('button', { name: 'Requests' })).toHaveLength(1)
     expect(within(fixPage).getByText('Page')).toBeInTheDocument()
     expect(fixPage).toHaveTextContent('Mails the approver too.')
-    // Proposed: a finding is a sentence with no lead, so it takes a bullet, its words at spacing-md.
+    // Proposed: a finding is a sentence with no lead, so it takes a bullet, its words at spacing-xl.
     expect(within(fixPage).getByTestId('studio-problem').parentElement).toHaveStyle({
       listStyleType: 'disc',
-      paddingInlineStart: '16px',
+      paddingInlineStart: '32px',
     })
     const notes = within(review).getByTestId('studio-ai-findings-non-blocking')
     expect(within(notes).getByText('Non-blocking findings')).toBeInTheDocument()
@@ -684,10 +684,10 @@ describe('a plan and its review, as a pull request has them', () => {
 
     await screen.findByTestId('studio-ai-plan')
     expect(within(screen.getByTestId('studio-ai-plan-changes')).getByText('What changes')).toBeInTheDocument()
-    // Proposed: the plan's points are sentences, a bullet each, their words at spacing-md.
+    // Proposed: the plan's points are sentences, a bullet each, their words at spacing-xl.
     expect(within(screen.getByTestId('studio-ai-plan-changes')).getByRole('list')).toHaveStyle({
       listStyleType: 'disc',
-      paddingInlineStart: '16px',
+      paddingInlineStart: '32px',
     })
     const decisions = screen.getByTestId('studio-ai-plan-decisions')
     expect(within(decisions).getByText('Decisions to check')).toBeInTheDocument()
