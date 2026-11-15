@@ -646,7 +646,11 @@ function StudioWorkspace() {
                     previewHost={previewHost}
                   />
                 ) : (
-                  <StudioAuthoringRequests application={application!} userId={userId} />
+                  <StudioAuthoringRequests
+                    application={application!}
+                    userId={userId}
+                    onAskAi={() => setSidePanel('askAi')}
+                  />
                 )
               ) : historyView ? (
                 revisionId !== null ? (

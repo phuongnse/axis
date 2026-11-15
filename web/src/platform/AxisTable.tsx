@@ -510,12 +510,14 @@ export function AxisTable<T extends object>({
       {hasToolbar && (
         <Flex justify="space-between" align="center" gap="small" wrap>
           {(searchable || filterable || arrangeable || toolbar.view !== undefined) && (
-            <Flex gap="small" wrap>
+            // The view controls take the room the actions leave and keep to one line while they fit, and the search box
+            // keeps its own width, so it never squeezes the controls after it onto a line of their own.
+            <Flex gap="small" wrap align="center" style={{ flex: '1 1 auto', minWidth: 0 }}>
               {searchable && (
                 <Input.Search
                   allowClear
                   maxLength={200}
-                  style={{ maxWidth: 320 }}
+                  style={{ width: 320, maxWidth: '100%' }}
                   aria-label={t('shell.table.search')}
                   placeholder={t('shell.table.search')}
                   value={draft}

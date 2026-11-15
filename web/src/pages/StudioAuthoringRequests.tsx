@@ -1,8 +1,9 @@
-import { Flex, Form, Input, Modal, Spin, Typography } from 'antd'
+import { Flex, Form, Input, Modal, Segmented, Spin, Typography } from 'antd'
 import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type CSSProperties,
   type HTMLAttributes,
@@ -52,7 +53,10 @@ import {
   requestTitle,
   settled,
   useRequestStateWords,
+  waitingForAuthor,
 } from './authoringRequests'
+import { recordPageSize, tablePageSizes } from '../platform/tableQuery'
+import { useTableView } from '../platform/useTableView'
 import { StatusTag } from '../platform/StatusTag'
 import { StudioChanges } from './StudioHistory'
 import { ActionBar } from './SaveBar'
@@ -88,12 +92,24 @@ function useSentTime(): (time: string) => string {
  * newest first: its words, which open its page, its state, who sent it and when. A state that waits for the person
  * reading is in bold.
  */
-export function StudioAuthoringRequests({ application, userId }: { application: string; userId: string | null }) {
+export function StudioAuthoringRequests({
+  application,
+  userId,
+  onAskAi,
+}: {
+  application: string
+  userId: string | null
+  /** Opens the Ask AI panel, or `undefined` when the reader may not ask AI. */
+  onAskAi?: () => void
+}) {
   const t = useText()
   const sentTime = useSentTime()
   const stateWords = useRequestStateWords()
   const { generation, lost } = useStudioConnection()
   const [requests, setRequests] = useState<StudioAuthoringRequest[] | 'failed'>()
+  const [reload, setReload] = useState(0)
+  const { view, setView } = useTableView(requestFields, recordPageSize, requestParameters, true, true, true)
+  const needsAction = view.parameters?.show === 'needsAction'
 
   useEffect(() => {
     const controller = new AbortController()
@@ -111,13 +127,29 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
       },
     )
     return () => controller.abort()
-  }, [application, generation, lost])
+  }, [application, generation, lost, reload])
+
+  const who = (row: StudioAuthoringRequest) =>
+    row.author === userId ? t('shell.studio.aiRequests.you') : (row.authorName ?? t('shell.studio.ai.someone'))
+  // A fix round reads as working, so the filter offers the states as the tags name them.
+  const shownState = (row: StudioAuthoringRequest) => (row.state === 'fixing' ? 'working' : row.state)
+  const rows = useMemo(
+    () =>
+      Array.isArray(requests)
+        ? requests.filter((row) => !needsAction || (row.author === userId && waitingForAuthor.includes(row.state)))
+        : [],
+    [requests, needsAction, userId],
+  )
+  const people = Array.isArray(requests)
+    ? [...new Map(requests.map((row) => [row.author, who(row)])).entries()].map(([value, label]) => ({ value, label }))
+    : []
 
   const columns: AxisColumn<StudioAuthoringRequest>[] = [
     {
       key: 'request',
       kind: 'freeText',
       title: t('shell.studio.aiRequests.request'),
+      searchText: (row) => row.text,
       render: (_, row) => (
         <Link
           to={authoringRequestAddress(application, row.id)}
@@ -132,34 +164,87 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
       // A status column is as wide as its tag, see docs/reference/actions-and-controls.md#tables.
       kind: 'fixed',
       title: t('shell.studio.aiRequests.state'),
+      sortValue: (row) => stateOrder.indexOf(shownState(row)),
+      filter: {
+        kind: 'enum',
+        value: shownState,
+        options: stateOrder.map((state) => ({ value: state, label: t(`shell.studio.ai.state.${state}`) })),
+      },
       render: (_, row) => <StatusTag tone={requestStateTone(row.state)}>{stateWords(row)}</StatusTag>,
     },
     {
       key: 'who',
       kind: 'freeText',
       title: t('shell.studio.aiRequests.who'),
-      render: (_, row) =>
-        row.author === userId ? t('shell.studio.aiRequests.you') : (row.authorName ?? t('shell.studio.ai.someone')),
+      sortValue: who,
+      filter: { kind: 'enum', value: (row) => row.author, options: people },
+      render: (_, row) => who(row),
     },
     {
       key: 'when',
       kind: 'fixed',
       title: t('shell.studio.aiRequests.when'),
+      sortValue: (row) => row.sentAt,
+      filter: { kind: 'date', value: (row) => row.sentAt },
       render: (_, row) => sentTime(row.sentAt),
     },
   ]
 
   return (
     <Flex vertical gap="middle">
-      <StudioPageHeading title={t('shell.studio.aiRequests')} />
+      {/* Proposed: the page's main action is to ask AI, which opens the Ask AI panel, see the review on #3263. */}
+      <StudioPageHeading
+        title={t('shell.studio.aiRequests')}
+        actions={
+          onAskAi && (
+            <AxisButton role="finish" onClick={onAskAi} data-testid="studio-ai-requests-ask">
+              {t('shell.studio.ai.open')}
+            </AxisButton>
+          )
+        }
+      />
+      {/* Proposed: every table whose rows grow has the whole toolbar, see the step 20 rules of the review on #3263:
+          search, filter, columns, sort, paging and refresh, each in the address, and Needs action, the requests that
+          wait for the reader, as the notification bell has it. */}
       <AxisTable<StudioAuthoringRequest>
+        testId="studio-ai-requests"
         columns={columns}
         rowKey={(row) => row.id}
-        dataSource={Array.isArray(requests) ? requests : []}
+        dataSource={rows}
         loading={requests === undefined}
-        emptyText={t('shell.studio.aiRequests.empty')}
-        pagination={false}
-        toolbar={{}}
+        emptyText={t(needsAction ? 'shell.studio.aiRequests.noneWaiting' : 'shell.studio.aiRequests.empty')}
+        view={{
+          query: view,
+          onChange: setView,
+          pageSizes: tablePageSizes(recordPageSize),
+          search: true,
+          columns: true,
+        }}
+        toolbar={{
+          view: (
+            <Segmented<'all' | 'needsAction'>
+              value={needsAction ? 'needsAction' : 'all'}
+              onChange={(value) =>
+                setView({
+                  ...view,
+                  page: 1,
+                  parameters: value === 'needsAction' ? { show: 'needsAction' } : {},
+                })
+              }
+              // An empty title, as each choice shows its words already and needs no tooltip.
+              options={(['all', 'needsAction'] as const).map((value) => ({
+                value,
+                label: t(`shell.notifications.filter.${value}`),
+                title: '',
+              }))}
+              data-testid="studio-ai-requests-show"
+            />
+          ),
+          onRefresh: () => {
+            setRequests(undefined)
+            setReload((value) => value + 1)
+          },
+        }}
         failure={
           requests === 'failed' ? <AxisAlert kind="error" message={t('shell.studio.ai.listFailed')} /> : undefined
         }
@@ -170,6 +255,30 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
     </Flex>
   )
 }
+
+/** The fields of the AI requests table, which the address may sort and filter on. */
+const requestFields = [
+  { name: 'request', type: 'text' },
+  { name: 'state', type: 'text' },
+  { name: 'who', type: 'text' },
+  { name: 'when', type: 'date-time' },
+] as const
+
+/** Proposed: Needs action keeps the requests that wait for the reader, as `show=needsAction` in the address. */
+const requestParameters = ['show'] as const
+
+/** The states in the order a request goes through them, as the State column sorts and filters them. */
+const stateOrder = [
+  'planning',
+  'awaitingApproval',
+  'working',
+  'checking',
+  'reviewing',
+  'ready',
+  'accepted',
+  'failed',
+  'dropped',
+] as const
 
 /**
  * Proposed: the page of one AI request, where Send leads. Its heading says who sent it when, then come its words and

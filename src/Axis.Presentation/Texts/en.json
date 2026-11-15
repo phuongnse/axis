@@ -2124,6 +2124,7 @@
   "shell.studio.aiRequests.when": "Sent",
   "shell.studio.aiRequests.you": "You",
   "shell.studio.aiRequests.empty": "No AI requests yet. Use Ask AI to send one.",
+  "shell.studio.aiRequests.noneWaiting": "Nothing waits for you. The requests you sent that wait for your approval or for you to accept show here.",
   "shell.studio.aiRequests.back": "Back to AI requests",
   "shell.studio.aiRequests.notFound": "This request does not exist.",
   "shell.studio.aiRequest.title": "AI request",

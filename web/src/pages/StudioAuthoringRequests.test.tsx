@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { StudioAuthoringRequestDetail, StudioAuthoringRequestStep } from '../platform/studio'
@@ -92,6 +92,75 @@ function renderIn(children: React.ReactNode) {
     </MemoryRouter>,
   )
 }
+
+/** Shows the address, so a test reads what the table keeps in it. */
+function Location() {
+  const location = useLocation()
+  return <span data-testid="location">{location.search}</span>
+}
+
+// Proposed: the AI requests table has the whole toolbar, see the step 20 rules of the review on #3263.
+describe('the AI requests table', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const other = {
+    ...fromApp,
+    id: 'a1e00000-0000-4000-8000-000000000099',
+    author: 'someone-else',
+    authorName: 'Linh Tran',
+    text: 'Email the requester when a request is decided.',
+    title: 'Email the requester',
+    state: 'ready',
+  }
+  const working = { ...fromApp, id: 'a1e00000-0000-4000-8000-000000000098', title: 'Rename Category', state: 'working' }
+
+  function renderList(onAskAi = vi.fn()) {
+    stub({ items: [fromApp, other, working] })
+    renderIn(
+      <>
+        <StudioAuthoringRequests application={application} userId={userId} onAskAi={onAskAi} />
+        <Location />
+      </>,
+    )
+    return onAskAi
+  }
+
+  it('has search, filter, columns and refresh, and searches the words of the requests', async () => {
+    renderList()
+
+    expect(await screen.findAllByTestId('studio-ai-request-row')).toHaveLength(3)
+    for (const name of ['Filter', 'Columns', 'Refresh']) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    }
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'requester{Enter}')
+
+    await waitFor(() => expect(screen.getAllByTestId('studio-ai-request-row')).toHaveLength(1))
+    expect(screen.getByRole('link', { name: 'Email the requester' })).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('search=requester')
+  })
+
+  it('keeps to the requests that wait for the reader under Needs action, in the address', async () => {
+    renderList()
+
+    expect(await screen.findAllByTestId('studio-ai-request-row')).toHaveLength(3)
+    await userEvent.click(screen.getByText('Needs action'))
+
+    // The reader's own ready request waits for them; another's ready request and their working one do not.
+    const rows = screen.getAllByTestId('studio-ai-request-row')
+    expect(rows.map((row) => row.dataset.id)).toEqual([fromApp.id])
+    expect(screen.getByTestId('location')).toHaveTextContent('show=needsAction')
+  })
+
+  it('leads with Ask AI on its heading, which opens the panel', async () => {
+    const onAskAi = renderList()
+
+    await userEvent.click(await screen.findByTestId('studio-ai-requests-ask'))
+    expect(onAskAi).toHaveBeenCalledOnce()
+    expect(screen.getByTestId('studio-ai-requests-ask')).toHaveTextContent('Ask AI')
+  })
+})
 
 describe('an outside AI app’s request', () => {
   afterEach(() => {
