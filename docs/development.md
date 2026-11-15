@@ -34,7 +34,7 @@ from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` 
 ### Setup
 
 `scripts/setup.sh` restores the .NET and npm packages and the Playwright browser, downloads the wheels that the Python sample packages lock into `~/.cache/axis-tools/wheels`, and installs pinned Helm,
-kubeconform and the Kubernetes schemas into `~/.cache/axis-tools`. Each step and download gets up to 4 tries,
+kubeconform, promtool and the Kubernetes schemas into `~/.cache/axis-tools`. Each step and download gets up to 4 tries,
 with waits of 15, 30 and 60 seconds, so a short `403` is retried. A try of a restore or install step stops
 after 10 minutes, or runs with no limit on stock macOS, which lacks `timeout`. A download gives up after 30
 seconds without a connection or 5 minutes. A service that does not answer fails its try in time for the

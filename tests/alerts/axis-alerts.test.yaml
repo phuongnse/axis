@@ -1,0 +1,71 @@
+# Tests of deploy/helm/axis/alerts/axis-alerts.yaml, run by scripts/test.sh with promtool. Each group is one case and feeds
+# one point an hour, and an underscore leaves an hour without a point.
+rule_files:
+  - ../../deploy/helm/axis/alerts/axis-alerts.yaml
+
+evaluation_interval: 1m
+
+tests:
+  # The last success was at time 0.
+  - name: a backup of 25 hours does not fire and one of 26 hours and a minute fires
+    interval: 1h
+    input_series:
+      - series: 'axis_backup_last_success_seconds{axis_tenant="tenant-a"}'
+        values: '0'
+    alert_rule_test:
+      - eval_time: 25h
+        alertname: AxisTenantBackupStale
+        exp_alerts: []
+      - eval_time: 26h1m
+        alertname: AxisTenantBackupStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              axis_tenant: tenant-a
+            exp_annotations:
+              summary: The newest backup of tenant tenant-a is more than 26 hours old.
+
+  # A run that still reports the old success sends the same value again.
+  - name: a run that reports the old success again still fires
+    interval: 1h
+    input_series:
+      - series: 'axis_backup_last_success_seconds{axis_tenant="tenant-a"}'
+        values: '0 _x23 0'
+    alert_rule_test:
+      - eval_time: 26h1m
+        alertname: AxisTenantBackupStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              axis_tenant: tenant-a
+            exp_annotations:
+              summary: The newest backup of tenant tenant-a is more than 26 hours old.
+
+  # The job stopped: no point arrives after the one at time 0.
+  - name: a job that sends no new point keeps firing
+    interval: 1h
+    input_series:
+      - series: 'axis_backup_last_success_seconds{axis_tenant="tenant-a"}'
+        values: '0'
+    alert_rule_test:
+      - eval_time: 3d
+        alertname: AxisTenantBackupStale
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              axis_tenant: tenant-a
+            exp_annotations:
+              summary: The newest backup of tenant tenant-a is more than 26 hours old.
+
+  # tenant-d was deleted: the newest run reports tenant-a and no longer tenant-d.
+  - name: a tenant that the newest run no longer reports does not fire
+    interval: 1h
+    input_series:
+      - series: 'axis_backup_last_success_seconds{axis_tenant="tenant-a"}'
+        values: '0 _x23 86400'
+      - series: 'axis_backup_last_success_seconds{axis_tenant="tenant-d"}'
+        values: '0'
+    alert_rule_test:
+      - eval_time: 32h
+        alertname: AxisTenantBackupStale
+        exp_alerts: []
