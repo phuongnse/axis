@@ -72,7 +72,7 @@ values keeps its rows of inputs.
 
 - **A cell shows content, never a bare count.** A cell shows the value, Yes or No, a label's text, a
   nested list's items one to a line, or a map's entries as `key: value`. A label shows its text in the
-  application's first language, or in the first language that has text.
+  author's language, else in `en`, as [one language rule](studio.md#label-texts) says.
 - **Columns.** A column that would be empty on every row, such as Connectors when no module has any, is
   left out, while the dialog keeps every field. A column of a boolean, a number or a choice is as wide as
   its content.

@@ -1,4 +1,5 @@
 import { createContext } from 'react'
+import { textIn } from './studio'
 import type { StudioBindings, StudioCatalog, StudioCatalogSlot, StudioFolderRelaxedPoint } from './studio'
 
 /** What the installed server offers the resource form, or `undefined` until it loads or when it fails to load. */
@@ -117,7 +118,7 @@ export function timeZoneText(zone: { id: string; offset: number }): string {
   return `(UTC${zone.offset < 0 ? '-' : '+'}${clock}) ${zone.id.replaceAll('_', ' ')}`
 }
 
-/** A slot's title in the locale, else in the first locale that has one, else its name. */
+/** A slot's title in the locale, else in `en`, else its name. */
 export function slotTitle(slot: StudioCatalogSlot, locale: string): string {
-  return slot.titles[locale] || Object.values(slot.titles).find((title) => title !== '') || slot.name
+  return textIn(slot.titles, locale) ?? slot.name
 }

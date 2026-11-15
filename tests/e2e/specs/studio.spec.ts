@@ -215,11 +215,13 @@ test.describe('Studio on a copy of its own', () => {
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const policy = items.find((item) => item.file === 'policies/employee-access.json')!
     const names = (await (await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/names`)).json()) as {
-      entities: { name: string; fields: { name: string }[] }[]
+      entities: { name: string; fields: { name: string; labelKey?: string }[] }[]
+      texts: { key: string; texts: Record<string, string> }[]
     }
+    // The picker names a field by its label in English, else by its name.
     const expected = names.entities
       .find((entity) => entity.name === 'PurchaseRequest')!
-      .fields.map((field) => field.name)
+      .fields.map((field) => names.texts.find((text) => text.key === field.labelKey)?.texts.en || field.name)
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${policy.id}`)
     await openListItem(page, '/grants', 1)

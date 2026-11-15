@@ -284,7 +284,7 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
                             name={field('roles.values.role').label}
                             value={text(role)}
                             required
-                            options={names?.roles.map((declared) => declared.name) ?? []}
+                            options={names?.roles ?? []}
                             onChange={(next) => changeRoleRow(position, claim, next ?? '')}
                           />
                         </AxisField>

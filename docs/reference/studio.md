@@ -304,7 +304,7 @@ picks what exists.
 - **The select** is searchable, ignoring letter case. A module process, page or policy shows as
   `<module id>/<name>`, so a site's navigation can pick a module page and a `startProcess` action a
   module process.
-- **A choice shows its label** _(planned for M33)_. `ReferencePicker` names each choice by its label, from
+- **A choice shows its label**. `ReferencePicker` names each choice by its label, from
   `labelKey` in the [names](authoring.md#names), as the tables do. The name shows only instead of a missing
   label, and in `textMuted` after the label of options that share one. The search finds either, and the
   file keeps the name. Columns, parameters and operations have no label in their format, so they show
@@ -350,7 +350,7 @@ resource, and Undo steps through it.
   answered, and the names and the release history load again.
 - **A shared key.** A label whose key other labels use says how many, from `usedBy` in the names
   answer, so the author knows that the edit changes them too.
-- **One language rule** _(planned for M33)_. A label shows in the author's language, else in `en`, as a
+- **One language rule**. A label shows in the author's language, else in `en`, as a
   resource's title does, so a table and a picker never name one resource two ways. The label editor's own
   rule, a box in the author's language or else the application's first, is about which language is
   edited, and stays.

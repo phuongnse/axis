@@ -62,6 +62,7 @@ test.describe("Studio's pickers offer the pages and processes of a module", () =
     await openListItem(page, "/navigation", 0);
     await pickOption(
       page.getByTestId("studio-field-/navigation/0/page").getByRole("combobox"),
+      "Checklists",
       "checklists/Checklists",
     );
     await doneListItem(page);

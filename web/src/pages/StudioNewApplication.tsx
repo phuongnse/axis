@@ -3,7 +3,13 @@ import { useContext, useEffect, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { requiredMark } from '../platform/requiredMark'
 import { StartFromField } from '../platform/StartFromField'
-import { createStudioApp, fetchStudioTemplates, ServerUnreachableError, type StudioTemplate } from '../platform/studio'
+import {
+  createStudioApp,
+  fetchStudioTemplates,
+  ServerUnreachableError,
+  textIn,
+  type StudioTemplate,
+} from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { isApplicationName } from '../platform/studioStarters'
 import { useText } from '../platform/texts'
@@ -182,5 +188,5 @@ export function StudioNewApplication({
 
 /** The text in the locale, or the `en` text when the template has none in it. */
 function localized(texts: Record<string, string>, locale: string): string {
-  return texts[locale] ?? texts.en
+  return textIn(texts, locale) ?? ''
 }

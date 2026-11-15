@@ -11,6 +11,7 @@ import {
   fetchStudioRelease,
   releasePublisher,
   ServerUnreachableError,
+  textIn,
   type StudioRelaxedPoint,
   type StudioRelease,
   type StudioReleaseItem,
@@ -377,7 +378,7 @@ function RelaxedPoints({ relaxed, locale }: { relaxed: StudioRelaxedPoint[]; loc
         <Flex key={module} vertical gap={spacing.sm}>
           <Typography.Text strong>{module}</Typography.Text>
           {sortByName(points, pointLabel, locale).map((point) => {
-            const entity = point.entityTitles?.[locale] ?? point.point.split('/')[0]
+            const entity = textIn(point.entityTitles, locale) ?? point.point.split('/')[0]
             const label = pointLabel(point)
             const kind =
               point.part === null ? entity : t(`shell.studio.release.part.${point.part}`).replace('{entity}', entity)

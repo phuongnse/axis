@@ -58,13 +58,7 @@ export function EndpointEvent({
         {events === undefined ? (
           <Input aria-label={eventLabel} value={name} onChange={(input) => pick(input.target.value)} />
         ) : (
-          <ReferencePicker
-            name={eventLabel}
-            value={name}
-            required={false}
-            options={events.map((item) => item.name)}
-            onChange={pick}
-          />
+          <ReferencePicker name={eventLabel} value={name} required={false} options={events} onChange={pick} />
         )}
       </div>
       {entry !== undefined && (

@@ -39,7 +39,7 @@ Each common job has one shared widget or helper:
 | A row of actions                               | `AxisActionRow`                                                                                        |
 | A count on a button or a filter                | `CountBadge` _(planned for M35)_, never Ant Design's `Badge` with a count                              |
 | A section of a Studio page                     | `ResourceFormSection`, in `ResourceFormSections`                                                       |
-| A text in the author's language                | `textIn`, else `en` _(planned for M33)_                                                                |
+| A text in the author's language                | `textIn`, else `en`                                                                |
 | The address of a Studio resource               | `studioResourceAddress`                                                                                |
 | Asking before unsaved changes are left         | `useUnsavedChanges`, which `SaveBar` calls                                                            |
 | An expression in an editor                     | `ExpressionEditor`, through `ExpressionField` _(planned for M33)_                                      |

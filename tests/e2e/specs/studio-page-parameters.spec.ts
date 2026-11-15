@@ -62,8 +62,8 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     throw new Error(`No application called ${name} under ${applications}.`);
   }
 
-  async function pick(page: Page, field: string, option: string) {
-    await pickOption(page.getByTestId(field).getByRole("combobox"), option);
+  async function pick(page: Page, field: string, option: string, filter?: string) {
+    await pickOption(page.getByTestId(field).getByRole("combobox"), option, filter);
   }
 
   /** The Add widget picker of the page's own widget list, not of a list inside a container. */
@@ -160,7 +160,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     await page.getByRole("button", { name: "Add parameter", exact: true }).click();
     await page.getByRole("textbox", { name: "Parameter name", exact: true }).fill("department");
     await pick(page, "studio-field-/parameters/0/type", "reference");
-    await pick(page, "studio-field-/parameters/0/target", "organization/Department");
+    await pick(page, "studio-field-/parameters/0/target", "Department", "organization/Department");
     await page.getByRole("switch", { name: "Required", exact: true }).click();
     await save(page);
 
@@ -193,7 +193,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
       .getByRole("button", { name: "Add navigate action", exact: true })
       .click();
     const action = "studio-field-/widgets/1/rowActions/0";
-    await pick(page, `${action}/page`, "DepartmentDetail");
+    await pick(page, `${action}/page`, `Department detail ${stamp}`, "DepartmentDetail");
     await fillTexts(page, `${action}/label`, "Details", "Chi tiết");
     const parameter = page.getByTestId(`${action}/parameters/department`);
     await expect(parameter.getByText("department", { exact: true })).toBeVisible();
