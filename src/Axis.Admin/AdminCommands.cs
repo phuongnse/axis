@@ -2319,6 +2319,7 @@ internal static partial class AdminCommands
 /// <paramref name="PreviewOf"/>, no realm and any <paramref name="Bindings"/>. A main tenant may have an
 /// <paramref name="Administrator"/>, the normalised email of the person to invite as its first administrator.
 /// <paramref name="Quotas"/>, when not null, are the tenant's quota rows, where a null value is no limit.
+/// <paramref name="Application"/>, when not null, is the application a create job records on the tenant's directory row.
 /// </summary>
 internal sealed record TenantCreateRequest(
     string Id,
@@ -2327,7 +2328,8 @@ internal sealed record TenantCreateRequest(
     IReadOnlyList<KeyValuePair<string, string>> Bindings,
     string? Administrator = null,
     bool StayProvisioning = false,
-    IReadOnlyDictionary<string, long?>? Quotas = null);
+    IReadOnlyDictionary<string, long?>? Quotas = null,
+    string? Application = null);
 
 /// <summary><c>tenant oidc set</c>. <paramref name="WithClientKey"/> says that the client key is to be read, and <paramref name="Change"/> does not hold it yet.</summary>
 internal sealed record OidcSetRequest(string Id, bool WithClientKey, TenantSignInChange Change);

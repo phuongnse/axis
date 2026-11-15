@@ -187,6 +187,11 @@ internal sealed class TenantCreate : IAsyncDisposable
             _row.SchemaUser = _schemaRole;
             _row.RuntimeUser = _runtimeRole;
             _row.PreviewOf = _request.PreviewOf;
+            if (_request.Application is not null)
+            {
+                _row.Application = _request.Application;
+            }
+
             _platform.TenantHosts.AddRange(hosts.Select(host => new TenantHostRow { TenantId = _id, Host = host }));
             _platform.TenantBindings.AddRange(_request.Bindings.Select(binding => new TenantBindingRow
             {

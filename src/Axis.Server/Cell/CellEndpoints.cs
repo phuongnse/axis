@@ -53,8 +53,8 @@ namespace Axis.Server.CellApi;
 /// such tenant. Both read the platform tables over the reader role. The <c>failedWork</c> is <c>{ instances, unknownCalls, deadLetters }</c>, the counts of the worker's
 /// latest hourly sample in <c>platform.tenant_usage_latest</c>, and <see langword="null"/> until the worker has counted the tenant. The <c>status</c> is <c>deleting</c> while the tenant has a scheduled deletion, whatever
 /// its stored status, which stays <c>suspended</c>. A preview tenant belongs to its main tenant's Studio and is not a tenant of the
-/// cell, so the list leaves it out and its id is a <c>404</c>. The <c>application</c> is <see langword="null"/> until the
-/// create job records it. The one tenant also answers its <c>quotas</c>: each quota key with its effective <c>value</c> and
+/// cell, so the list leaves it out and its id is a <c>404</c>. The <c>application</c> is the one the create job
+/// recorded on the tenant's row: the template id, or the name of the blank application, and <see langword="null"/> for a tenant that no create job made. The one tenant also answers its <c>quotas</c>: each quota key with its effective <c>value</c> and
 /// whether the tenant <c>overridden</c> it, worked out from its <c>platform.tenant_quotas</c> rows and the cell's defaults.
 /// </para>
 /// <para>
@@ -104,13 +104,13 @@ namespace Axis.Server.CellApi;
 /// download on a server without the <c>Cell:ExportStorage</c> settings <c>503</c>. A refused call and a read of the JSON write no record.
 /// </para>
 /// <para>
-/// <c>POST /api/cell/tenants</c> takes <c>{ "id", "application", "administrator" }</c> and queues a <c>create</c> job with the five
+/// <c>POST /api/cell/tenants</c> takes <c>{ "id", "application", "administrator" }</c>, where the <c>application</c> may be left out for a blank application, and queues a <c>create</c> job with the five
 /// steps <c>tenant</c>, <c>application</c>, <c>activate</c>, <c>invite</c> and <c>resume</c>, all <c>pending</c>, and answers <c>202</c>
 /// as the suspend route does. The checks run in this order: the <c>Idempotency-Key</c> header (<c>400</c>), the replay of the first job
 /// or <c>422</c>, the body (<c>400</c>: the id by the rule of <c>tenant create</c>, an application that is not an installed template, an
 /// administrator that is not an email), then under a cell-wide advisory lock an id that a directory row, an unfinished create job
 /// or a tombstone of a deleted tenant holds (<c>409</c>) and the cell's <see cref="CellOptions.TenantCap"/> (<c>409</c>, "This cell is full."). The job's <c>input</c> holds the
-/// application and the administrator and the job read never returns it.
+/// application, when there is one, and the administrator, and the job read never returns it.
 /// </para>
 /// <para>
 /// <c>POST /api/cell/tenants/{id}/hosts</c> takes <c>{ "host" }</c>, a host of the tenant's own such as <c>approvals.acme.vn</c>, and
@@ -253,7 +253,7 @@ internal static partial class CellEndpoints
         await using var platform = Open(dataSource);
         var tenants = await platform.Tenants.AsNoTracking()
             .Where(tenant => tenant.PreviewOf == null)
-            .Select(tenant => new { tenant.Id, Status = tenant.DeleteAfter != null ? "deleting" : tenant.Status })
+            .Select(tenant => new { tenant.Id, Status = tenant.DeleteAfter != null ? "deleting" : tenant.Status, tenant.Application })
             .ToListAsync(cancellationToken);
         var ids = tenants.Select(tenant => tenant.Id).ToList();
         var hosts = await ReadHostsAsync(platform, ids, cancellationToken);
@@ -268,7 +268,7 @@ internal static partial class CellEndpoints
                 .Select(tenant => new CellTenantResponse(
                     tenant.Id,
                     tenant.Status,
-                    null,
+                    tenant.Application,
                     HostsOf(hosts, tenant.Id),
                     latest.GetValueOrDefault(tenant.Id)?.FailedWork,
                     usage[tenant.Id],
@@ -286,7 +286,7 @@ internal static partial class CellEndpoints
         await using var platform = Open(dataSource);
         var tenant = await platform.Tenants.AsNoTracking()
             .Where(row => row.Id == id && row.PreviewOf == null)
-            .Select(row => new { row.Id, Status = row.DeleteAfter != null ? "deleting" : row.Status })
+            .Select(row => new { row.Id, Status = row.DeleteAfter != null ? "deleting" : row.Status, row.Application })
             .SingleOrDefaultAsync(cancellationToken);
         if (tenant is null)
         {
@@ -302,7 +302,7 @@ internal static partial class CellEndpoints
         return Results.Ok(new CellTenantDetailResponse(
             tenant.Id,
             tenant.Status,
-            null,
+            tenant.Application,
             HostsOf(hosts, tenant.Id),
             latest.GetValueOrDefault(tenant.Id)?.FailedWork,
             quotas[tenant.Id],
@@ -640,7 +640,7 @@ internal static partial class CellEndpoints
     {
         if (request is null)
         {
-            return "The request must be a JSON object with an id, an application and an administrator.";
+            return "The request must be a JSON object with an id, an administrator and, optionally, an application.";
         }
 
         if (request.Id is not { } id
@@ -651,10 +651,10 @@ internal static partial class CellEndpoints
             return $"The tenant id must have 1 to {MaxTenantIdLength} lowercase letters, digits and hyphens, and must not be 'master'.";
         }
 
-        if (request.Application is not { } application
-            || !templates.Newest.Any(template => string.Equals(template.Manifest.Id, application, StringComparison.Ordinal)))
+        if (request.Application is { } application
+            && !templates.Newest.Any(template => string.Equals(template.Manifest.Id, application, StringComparison.Ordinal)))
         {
-            return "The application must be the id of an installed application template.";
+            return "The application, when given, must be the id of an installed application template.";
         }
 
         return request.Administrator is { } administrator
@@ -973,7 +973,7 @@ internal sealed record CellTenantUsageResponse(
     TenantQuotaUseResponse EmailsPerDay);
 
 /// <summary>
-/// One tenant of the cell. <c>Application</c> is null until the create job records it. <c>FailedWork</c> is null until the
+/// One tenant of the cell. <c>Application</c> is the one the create job recorded, and null for a tenant that no create job made. <c>FailedWork</c> is null until the
 /// worker has counted the tenant. <c>NewestArchiveAt</c> is null for a tenant that was never backed up.
 /// </summary>
 internal sealed record CellTenantResponse(
