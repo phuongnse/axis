@@ -5,6 +5,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioRequest, StudioScenarioResult, StudioSkippedScenarioResult } from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
+import { emptyDescription } from '../test/antd'
 import { StudioTestResults } from './StudioTestResults'
 
 const approval: StudioScenarioResult = {
@@ -125,7 +126,7 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     const { section } = renderResults(request({ status: 'failed', scenarios: [] }))
 
     expect(section).toHaveAttribute('data-status', 'failed')
-    expect(section).toHaveTextContent('No scenario ran. See the problems.')
+    expect(emptyDescription('No scenario ran. See the problems.')).toBeInTheDocument()
     expect(screen.queryAllByTestId('studio-test-result')).toHaveLength(0)
   })
 })

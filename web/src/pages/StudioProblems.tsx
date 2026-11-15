@@ -1,6 +1,7 @@
 import { CloseOutlined } from '@ant-design/icons'
 import { Button, Flex, Tag, Typography } from 'antd'
 import { AxisButton } from '../platform/AxisButton'
+import { EmptyState } from '../platform/EmptyState'
 import type { StudioDiagnostic } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -64,7 +65,7 @@ export function StudioProblems({
           />
         </Flex>
         {ordered.length === 0 ? (
-          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.problems.none')}</Typography.Text>
+          <EmptyState text={t('shell.studio.problems.none')} />
         ) : (
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {ordered.map((diagnostic, index) => (

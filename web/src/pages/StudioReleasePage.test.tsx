@@ -13,6 +13,7 @@ import type {
 } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
+import { emptyDescription } from '../test/antd'
 import { StudioReleasePage } from './StudioReleasePage'
 
 const approve: StudioRelaxedPoint = {
@@ -237,7 +238,7 @@ describe('StudioReleasePage', () => {
     await screen.findByRole('heading', { name: 'Release 1' })
     expect(section('Changes').getByText(/nothing to compare with/)).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Relaxed points' })).not.toBeInTheDocument()
-    expect(section('Modules and packages').getByText('This release pins no module or package.')).toBeInTheDocument()
+    expect(emptyDescription('This release pins no module or package.')).toBeInTheDocument()
   })
 
   it('says no file differs when the release has a previous release and no change', async () => {
@@ -245,7 +246,7 @@ describe('StudioReleasePage', () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Release 3' })
-    expect(screen.getByText('No file differs from release 4.')).toBeInTheDocument()
+    expect(emptyDescription('No file differs from release 4.')).toBeInTheDocument()
   })
 
   it('lists the modules first and then the packages, each by label, when the server sends them out of order', async () => {
@@ -333,7 +334,7 @@ describe('StudioReleasePage', () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Release 3' })
-    expect(screen.getByText('No module or package differs.')).toBeInTheDocument()
+    expect(emptyDescription('No module or package differs.')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-change-part')).not.toBeInTheDocument()
   })
 
@@ -355,7 +356,7 @@ describe('StudioReleasePage', () => {
     renderPage()
 
     await screen.findByRole('heading', { name: 'Release 3' })
-    expect(screen.getByText('No file differs from release 4.')).toBeInTheDocument()
+    expect(emptyDescription('No file differs from release 4.')).toBeInTheDocument()
     const rows = screen.getAllByTestId('studio-change-part')
     expect(rows).toHaveLength(1)
     expect(rows[0]).toHaveTextContent('OrganizationModuleUpgraded from 1.1.0 to 1.2.0')
@@ -366,9 +367,7 @@ describe('StudioReleasePage', () => {
     renderPage({ number: '4' })
 
     await screen.findByRole('heading', { name: 'Release 4' })
-    expect(
-      section('Relaxed points').getByText('This release follows every contract of its modules.'),
-    ).toBeInTheDocument()
+    expect(emptyDescription('This release follows every contract of its modules.')).toBeInTheDocument()
   })
 
   it('shows one line and a link to every release for a number the route answers 404 for', async () => {

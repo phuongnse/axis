@@ -9,6 +9,7 @@ import { NotificationBell } from './NotificationBell'
 import { notificationAddress, type NotificationItem, type NotificationPage } from './notifications'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
+import { emptyDescription } from '../test/antd'
 import { withAntdStyles } from '../test/antdStyles'
 
 const path = '/api/apps/E2eApp/notifications'
@@ -220,7 +221,7 @@ describe('NotificationBell', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Notifications' }))
 
-    expect(await screen.findByText('No notifications yet.')).toBeInTheDocument()
+    await waitFor(() => expect(emptyDescription('No notifications yet.')).toBeInTheDocument())
   })
 
   it('has Vietnamese texts for every key it uses', () => {

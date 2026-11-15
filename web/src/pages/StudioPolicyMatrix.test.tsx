@@ -5,7 +5,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioMatrixCell, StudioMatrixRole, StudioNames, StudioPolicyMatrix } from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
-import { removeTag } from '../test/antd'
+import { emptyDescription, removeTag } from '../test/antd'
 import { StudioPolicyMatrixTable } from './StudioPolicyMatrix'
 
 const sharedPolicyId = '3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f'
@@ -275,7 +275,16 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
 
     await userEvent.click(screen.getByTestId('studio-matrix-cell-manager-dataSource-OpenRequests'))
 
-    expect(screen.getByText('No grant.')).toBeInTheDocument()
+    expect(emptyDescription('No grant.')).toBeInTheDocument()
+  })
+
+  it('says an editable role has no own grant on a cell it grants nothing on', async () => {
+    stubFetch()
+    renderMatrix()
+
+    await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-endpoint-Intake'))
+
+    expect(emptyDescription('No grant.', screen.getByTestId('studio-matrix-own-grants'))).toBeInTheDocument()
   })
 
   it('offers only the actions a process takes', async () => {

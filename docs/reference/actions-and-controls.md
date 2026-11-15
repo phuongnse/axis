@@ -265,7 +265,7 @@ one.
   the object's kind or state, or a field the person may not read, is left out.
 - **Loading and failing are never empty.** _(planned for M33)_ A part that is still loading or failed to
   load says so, never Not set.
-- **One empty state.** _(planned for M33)_ `EmptyState` draws every empty table and list: Ant Design's
+- **One empty state.** `EmptyState` draws every empty table and list: Ant Design's
   simple picture and one line in `textMuted`, because Ant Design's own empty text fails 4.5:1. The line
   is "No data yet." unless the emptiness says something the reader needs.
 

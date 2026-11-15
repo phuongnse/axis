@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,6 +8,7 @@ import type { StudioReleaseChange, StudioReleases, StudioResourceItem } from '..
 import { studioKinds } from '../platform/studioKinds'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
+import { emptyDescription } from '../test/antd'
 import { StudioOverview } from './StudioOverview'
 
 vi.mock('../platform/site', async (importOriginal) => ({
@@ -150,7 +151,7 @@ describe('Live', () => {
     vi.mocked(fetchSites).mockResolvedValue([site('leave', 'Leave', 'LeaveRequests')])
     renderOverview({ history: live })
 
-    expect(await section('Live').findByText('This release has no site.')).toBeInTheDocument()
+    await waitFor(() => expect(emptyDescription('This release has no site.')).toBeInTheDocument())
   })
 
   it('shows a warning when the sites do not load', async () => {
@@ -205,7 +206,7 @@ describe('Changes since the live release', () => {
   it('says everything is live when no change is left', () => {
     renderOverview({ history: live })
 
-    expect(section('Changes since the live release').getByText('Everything is live.')).toBeInTheDocument()
+    expect(emptyDescription('Everything is live.')).toBeInTheDocument()
   })
 
   it('lists each change with its kind and a link to a resource that still exists', () => {

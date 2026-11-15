@@ -1,4 +1,5 @@
 import { Button, Flex, Tag, Typography } from 'antd'
+import { EmptyState } from '../platform/EmptyState'
 import type { StudioRequest, StudioScenarioResult, StudioSkippedScenarioResult } from '../platform/studio'
 import { useText } from '../platform/texts'
 
@@ -27,7 +28,7 @@ export function StudioTestResults({
       {pending ? (
         <Typography.Text type="secondary">{t('shell.studio.tests.pending')}</Typography.Text>
       ) : scenarios.length === 0 ? (
-        <Typography.Text type="secondary">{t('shell.studio.tests.none')}</Typography.Text>
+        <EmptyState text={t('shell.studio.tests.none')} />
       ) : (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {scenarios.map((scenario) => (

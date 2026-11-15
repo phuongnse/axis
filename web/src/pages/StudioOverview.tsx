@@ -1,6 +1,7 @@
 import { Flex, Spin, Typography } from 'antd'
 import { useContext, useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { EmptyState } from '../platform/EmptyState'
 import { fetchSites, type SiteListItem } from '../platform/site'
 import { changeRows, type StudioReleases, type StudioResourceItem } from '../platform/studio'
 import { kindName, studioKinds } from '../platform/studioKinds'
@@ -83,7 +84,7 @@ export function StudioOverview({
               {loaded.changes === null ? (
                 <Typography.Text>{t('shell.studio.overview.changes.notPublished')}</Typography.Text>
               ) : loaded.changes.length === 0 ? (
-                <Typography.Text>{t('shell.studio.overview.changes.allLive')}</Typography.Text>
+                <EmptyState text={t('shell.studio.overview.changes.allLive')} />
               ) : (
                 <StudioChangeList rows={changeRows(loaded.changes, resources, locale, t)} application={application} />
               )}
@@ -141,7 +142,7 @@ function LiveSites({ application, locale, releaseId }: { application: string; lo
   }
   const own = sites.filter((site) => site.application.name === application)
   if (own.length === 0) {
-    return <Typography.Text>{t('shell.studio.overview.live.none')}</Typography.Text>
+    return <EmptyState text={t('shell.studio.overview.live.none')} />
   }
   return <SiteTiles sites={own} locale={locale} newTab />
 }
