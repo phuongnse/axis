@@ -583,8 +583,11 @@ const aiRequests: StudioAuthoringRequest[] = [
   authoringRequest(1, 'dropped', 'Add a dashboard of spending by month.', '2026-11-05T09:10:00Z', true),
 ]
 
-// Proposed: the plans AI wrote for the preview's requests, with no summary, as the request's words head its page, as a pull request's plan is written, see the review on #3263.
+// Proposed: the plans AI wrote for the preview's requests, as a pull request's plan is written, see the review on #3263.
 const supplierPlan: StudioPlan = {
+  summary:
+    'Adds a Supplier entity and a required Supplier field on each purchase request, chosen from the active suppliers, and shows it on the form, the detail and the request list.',
+  questions: ['Should a request keep its supplier when that supplier later stops trading, or ask for a new one?'],
   changes: [
     "A new Supplier entity keeps each supplier's name, tax code and email address, and whether it is active.",
     'Each purchase request gets a required Supplier field, chosen from the active suppliers.',
@@ -613,6 +616,15 @@ const supplierPlan: StudioPlan = {
     'A purchase request saves with its supplier.',
     'A purchase request without a supplier is refused, with a message on the Supplier field.',
     'Only active suppliers appear in the Supplier list.',
+  ],
+  checklist: [
+    {
+      item: 'Who sees it.',
+      answer: 'Everyone who sees a request sees its supplier; only Purchasing manages suppliers.',
+    },
+    { item: 'Data already saved.', answer: 'The 124 saved requests keep no supplier until they are next saved.' },
+    { item: 'Texts.', answer: 'Every new label in English and Vietnamese.' },
+    { item: 'Scenarios.', answer: 'Two new scenarios; the 8 that run today run again.' },
   ],
   details: [
     {
@@ -657,6 +669,9 @@ const supplierPlan: StudioPlan = {
 
 // Proposed: the plan an outside AI app proposed from its conversation with its person, see the review on #3263.
 const appPlan: StudioPlan = {
+  summary:
+    'Adds a Cost centre entity, an optional Cost centre field on each purchase request, and a Cost centre column on the request list.',
+  questions: [],
   changes: [
     'Add a Cost centre entity with a name and a code.',
     'Add a Cost centre field to the purchase request, chosen from the cost centres.',
@@ -665,6 +680,11 @@ const appPlan: StudioPlan = {
   decisions: [{ decision: 'The Cost centre field is optional.', reason: 'The request did not say it is required.' }],
   risks: ['Requests already saved have no cost centre and keep none until someone sets one.'],
   checks: ['A purchase request saves with a cost centre, and without one.'],
+  checklist: [
+    { item: 'Who sees it.', answer: 'Everyone who sees a request sees its cost centre.' },
+    { item: 'Data already saved.', answer: 'Saved requests have no cost centre until someone sets one.' },
+    { item: 'Texts.', answer: 'The new labels in English and Vietnamese.' },
+  ],
   details: [
     {
       resourceId: null,
@@ -696,10 +716,13 @@ const plans: Record<string, StudioPlan> = { [aiRequests[0].id]: supplierPlan, [a
 function planOf(request: StudioAuthoringRequest): StudioPlan {
   return (
     plans[request.id] ?? {
+      summary: `Changes the application as asked: ${request.text}`,
+      questions: [],
       changes: ['The application changes as the request asks.'],
       decisions: [],
       risks: [],
       checks: ['One new scenario checks the change.'],
+      checklist: [],
       details: [],
     }
   )

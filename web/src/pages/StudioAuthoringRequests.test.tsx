@@ -25,10 +25,13 @@ const fromApp: StudioAuthoringRequestDetail = {
   coAuthors: ['Claude Code'],
   state: 'ready',
   plan: {
+    summary: 'Adds a Cost centre field to each purchase request.',
+    questions: [],
     changes: ['A Cost centre field on each purchase request.'],
     decisions: [],
     risks: [],
     checks: [],
+    checklist: [],
     details: [],
   },
   aiConnected: false,
@@ -654,10 +657,13 @@ describe('a plan and its review, as a pull request has them', () => {
       review: null,
       aiConnected: true,
       plan: {
+        summary: 'Adds a Cost centre field.',
+        questions: [],
         changes: ['A Cost centre field on each request.'],
         decisions: [{ decision: 'The field is optional.', reason: 'The request did not say.' }],
         risks: ['Saved requests have no cost centre.'],
         checks: ['A request saves with a cost centre.'],
+        checklist: [{ item: 'Texts.', answer: 'In English and Vietnamese.' }],
         details: [
           { resourceId: 'r-1', file: 'pages/list.json', name: null, kind: null, edits: ['A Cost centre column.'] },
           {
@@ -681,12 +687,22 @@ describe('a plan and its review, as a pull request has them', () => {
       color: designTokensFor('light').colour.textMuted,
     })
     expect(decisions).toHaveTextContent('The field is optional. The request did not say.')
-    expect(screen.getByTestId('studio-ai-plan-risks')).toHaveTextContent('Saved requests have no cost centre.')
-    expect(screen.getByTestId('studio-ai-plan-checks')).toHaveTextContent('A request saves with a cost centre.')
+    const risks = screen.getByTestId('studio-ai-plan-risks')
+    expect(within(risks).getByText('Risks and limits')).toBeInTheDocument()
+    expect(risks).toHaveTextContent('Saved requests have no cost centre.')
+    const criteria = screen.getByTestId('studio-ai-plan-checks')
+    expect(within(criteria).getByText('Acceptance criteria')).toBeInTheDocument()
+    expect(criteria).toHaveTextContent('A request saves with a cost centre.')
+    // Proposed: Axis's checklist, each item with how the plan answers it, muted.
+    const checklist = screen.getByTestId('studio-ai-plan-checklist')
+    expect(within(checklist).getByText('Checklist')).toBeInTheDocument()
+    expect(within(checklist).getByText('In English and Vietnamese.')).toHaveStyle({
+      color: designTokensFor('light').colour.textMuted,
+    })
     expect(screen.queryByText('A Cost centre column.')).toBeNull()
 
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Show the technical details' }))
+    await user.click(screen.getByRole('button', { name: 'Show the implementation notes' }))
     // The details list as the review's findings do, each resource once, and one only the draft adds by its name, as text.
     const details = screen.getByTestId('studio-ai-plan-details')
     const [page, added] = within(details).getAllByTestId('studio-problem-group')
@@ -696,6 +712,45 @@ describe('a plan and its review, as a pull request has them', () => {
     expect(within(added).queryByRole('button', { name: 'Cost centre' })).toBeNull()
     expect(within(added).queryByText('entities/cost-centre.json')).toBeNull()
     expect(screen.getByRole('button', { name: 'Approve plan' })).toBeInTheDocument()
+  })
+
+  it("shows the plan's summary in the feed while the plan is folded", async () => {
+    stub({ ...fromApp, aiConnected: true })
+    renderPage()
+
+    const plan = await screen.findByTestId('studio-ai-feed-plan')
+    expect(within(plan).getByTestId('studio-ai-plan-summary')).toHaveTextContent(
+      'Adds a Cost centre field to each purchase request.',
+    )
+    expect(within(plan).queryByTestId('studio-ai-plan')).toBeNull()
+  })
+
+  it('waits for the answers to its questions before it can be approved', async () => {
+    const fetchMock = stub({
+      ...fromApp,
+      state: 'awaitingApproval',
+      checks: null,
+      review: null,
+      aiConnected: true,
+      plan: { ...fromApp.plan!, questions: ['Is the field required?'] },
+    })
+    renderPage()
+
+    const questions = await screen.findByTestId('studio-ai-plan-questions')
+    expect(questions).toHaveTextContent(/Questions.*Is the field required\?/)
+    const bar = screen.getByTestId('studio-ai-bar')
+    expect(bar).toHaveTextContent('1 question to answer')
+    expect(within(bar).queryByRole('button', { name: 'Approve plan' })).toBeNull()
+
+    const user = userEvent.setup()
+    await user.click(within(bar).getByRole('button', { name: 'Answer…' }))
+    const reply = screen.getByTestId('studio-ai-reply')
+    await user.type(within(reply).getByRole('textbox', { name: 'Your answers' }), 'Yes, required.')
+    await user.click(within(reply).getByRole('button', { name: 'Ask for a new plan' }))
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(([url, init]) => init?.method === 'POST' && url.endsWith('/change-plan'))
+      expect(post?.[1]?.body).toBe(JSON.stringify({ comment: 'Yes, required.' }))
+    })
   })
 
   it('sums the review up in the result, and ticks each step of the plan, with the resource where it falls short', async () => {

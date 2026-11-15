@@ -1916,10 +1916,19 @@ export interface StudioReviewFinding {
  * the edits it will make.
  */
 export interface StudioPlan {
+  /** Proposed: what the plan does, in a sentence or two, which the request's feed shows even while the plan is folded. */
+  summary: string
+  /** Proposed: what AI cannot decide alone; a plan with a question waits for its author's answers before approval. */
+  questions: string[]
   changes: string[]
   decisions: { decision: string; reason: string }[]
   risks: string[]
   checks: string[]
+  /**
+   * Proposed: Axis's authoring checklist, the one the review checks the draft against, each item with how the plan
+   * answers it, such as who may see a new field, the data already saved and the texts of every locale.
+   */
+  checklist: { item: string; answer: string }[]
   /** Each resource's edits; `name` and `kind` name a resource the draft adds, which has no id yet. */
   details: { resourceId: string | null; file: string; name: string | null; kind: string | null; edits: string[] }[]
 }

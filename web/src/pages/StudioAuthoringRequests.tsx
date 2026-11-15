@@ -574,6 +574,8 @@ export function StudioAuthoringRequestPage({
         request.state === 'planning' ? 'now' : awaiting ? 'waiting' : approved ? 'done' : failed ? 'stopped' : 'idle'
       }
       title={t('shell.studio.aiRequest.plan')}
+      // Its blocks, the summary, the plan's groups and the fold, are `spacing-md` apart, as the result's are.
+      gap={spacing.md}
       aside={
         awaiting
           ? t(mine ? 'shell.studio.aiRequest.feed.planWaits' : 'shell.studio.aiRequest.feed.planWaitsAuthor')
@@ -590,6 +592,10 @@ export function StudioAuthoringRequestPage({
       ))}
       {request.state === 'planning' && !waitsForApp && nowLine(t('shell.studio.aiRequest.planning'))}
       {failed && !approved && failure}
+      {/* Proposed: the plan's summary shows even while the plan is folded, so the feed says what it does. */}
+      {request.plan !== null && request.plan.summary !== '' && (
+        <Typography.Text data-testid="studio-ai-plan-summary">{request.plan.summary}</Typography.Text>
+      )}
       {request.plan !== null &&
         (awaiting ? (
           <PlanView plan={request.plan} review={request.review} resources={resources} onOpen={onOpen} />
@@ -833,6 +839,13 @@ export function StudioAuthoringRequestPage({
         ? 'request-changes'
         : null
   const asksChanges = replyKind === 'request-changes'
+  const questions = awaiting ? (request.plan?.questions.length ?? 0) : 0
+  // The reply answers the plan's questions while it has some.
+  const replyLabel = asksChanges
+    ? 'shell.studio.aiRequest.changesComment'
+    : questions > 0
+      ? 'shell.studio.aiRequest.answers'
+      : 'shell.studio.aiRequest.comment'
   const blockingTexts = (request.review?.findings ?? [])
     .filter((finding) => finding.blocking)
     .map((finding) => finding.text)
@@ -870,6 +883,18 @@ export function StudioAuthoringRequestPage({
           actions: [dropButton],
         }
       case 'awaitingApproval':
+        // Proposed: a plan with questions waits on its author's answers before it can be approved.
+        if (mine && questions > 0) {
+          return {
+            words: t(
+              questions === 1 ? 'shell.studio.aiRequest.guide.questionOne' : 'shell.studio.aiRequest.guide.questions',
+            ).replace('{count}', String(questions)),
+            actions: [
+              dropButton,
+              button('answer', 'finish', t('shell.studio.aiRequest.answer'), () => setReplyOpen(true)),
+            ],
+          }
+        }
         return mine
           ? {
               words: t('shell.studio.aiRequest.guide.awaiting'),
@@ -975,10 +1000,8 @@ export function StudioAuthoringRequestPage({
           >
             <AxisField
               name="comment"
-              label={t(asksChanges ? 'shell.studio.aiRequest.changesComment' : 'shell.studio.aiRequest.comment')}
-              help={t(
-                asksChanges ? 'shell.studio.aiRequest.changesComment.help' : 'shell.studio.aiRequest.comment.help',
-              )}
+              label={t(replyLabel)}
+              help={t(`${replyLabel}.help`)}
               requiredMessage={t(
                 asksChanges
                   ? 'shell.studio.aiRequest.changesCommentRequired'
@@ -986,7 +1009,7 @@ export function StudioAuthoringRequestPage({
               )}
             >
               <Input.TextArea
-                aria-label={t(asksChanges ? 'shell.studio.aiRequest.changesComment' : 'shell.studio.aiRequest.comment')}
+                aria-label={t(replyLabel)}
                 autoSize={{ minRows: 2, maxRows: 8 }}
                 maxLength={2000}
                 autoFocus
@@ -1174,6 +1197,15 @@ function PlanView({
     )
   return (
     <Flex vertical gap="middle" data-testid="studio-ai-plan">
+      {/* What AI cannot decide alone comes first, as the plan waits on its answers, its heading in warningText. */}
+      {plan.questions.length > 0 && (
+        <Flex vertical gap={spacing.xs} data-testid="studio-ai-plan-questions">
+          <Typography.Text strong style={{ color: colour.warningText }}>
+            {t('shell.studio.aiRequest.plan.questions')}
+          </Typography.Text>
+          {bullets(plan.questions)}
+        </Flex>
+      )}
       {review === null || review.steps.length === 0 ? (
         group('shell.studio.aiRequest.plan.changes', 'studio-ai-plan-changes', plan.changes)
       ) : (
@@ -1222,6 +1254,17 @@ function PlanView({
       )}
       {group('shell.studio.aiRequest.plan.risks', 'studio-ai-plan-risks', plan.risks)}
       {group('shell.studio.aiRequest.plan.checks', 'studio-ai-plan-checks', plan.checks)}
+      {group(
+        'shell.studio.aiRequest.plan.checklist',
+        'studio-ai-plan-checklist',
+        // Proposed: each item of Axis's checklist, then how the plan answers it, muted, as a decision reads.
+        plan.checklist.map(({ item, answer }) => (
+          <>
+            <Typography.Text>{item}</Typography.Text>{' '}
+            <Typography.Text style={{ color: colour.textMuted }}>{answer}</Typography.Text>
+          </>
+        )),
+      )}
       {plan.details.length > 0 && (
         <Flex vertical gap={spacing.xs} data-testid="studio-ai-plan-details">
           <span>
