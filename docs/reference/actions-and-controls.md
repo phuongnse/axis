@@ -259,11 +259,11 @@ one.
 
 - **A field the object always has always shows.** Empty, it reads "Not set" on a form or a detail and
   the muted dash in a table cell, see [text](#text).
-- **A list that is a standing part of the object always shows.** _(planned for M33)_ Empty, it says in
+- **A list that is a standing part of the object always shows.** Empty, it says in
   one line what that means.
-- **Hide only what does not apply or is not allowed.** _(planned for M33)_ A part that does not apply to
+- **Hide only what does not apply or is not allowed.** A part that does not apply to
   the object's kind or state, or a field the person may not read, is left out.
-- **Loading and failing are never empty.** _(planned for M33)_ A part that is still loading or failed to
+- **Loading and failing are never empty.** A part that is still loading or failed to
   load says so, never Not set.
 - **One empty state.** _(planned for M33)_ `EmptyState` draws every empty table and list: Ant Design's
   simple picture and one line in `textMuted`, because Ant Design's own empty text fails 4.5:1. The line

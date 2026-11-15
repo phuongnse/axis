@@ -166,10 +166,10 @@ are `shell.users.usage.*`.
 
 Where `Ai:AllowTenantKeys` is on, the People tab has a "Model key" section below Usage, where an administrator sets,
 changes and removes the tenant's own model key, see [the tenant's model key](user-administration.md#the-tenants-model-key).
-The section is a component of its own. It loads `GET /api/tenant/model-key` and renders nothing unless the route answers
-`200`. That keeps it hidden from a user who is not an administrator, where `Ai:AllowTenantKeys` is off, and for a tenant
-with no directory row or a preview tenant. A `403` or `404` is not logged, and any other failure is logged. Its texts are
-`shell.users.modelKey.*`.
+The section is a component of its own. It loads `GET /api/tenant/model-key`. While it loads, the section shows its heading
+and says so. A `403` or `404` leaves the section out and is not logged. That keeps it hidden from a user who is not an
+administrator, where `Ai:AllowTenantKeys` is off, and for a tenant with no directory row or a preview tenant. Any other
+failure shows "The model key could not be loaded." and is logged. Its texts are `shell.users.modelKey.*`.
 
 - **State.** The section says "No key is set." or shows a set key as `••••` followed by its last four characters. A key
   of four characters or fewer shows `••••` alone. The page never holds the whole key after it is saved.

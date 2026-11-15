@@ -120,11 +120,34 @@ describe('Get started', () => {
 })
 
 describe('Live', () => {
-  it('is left out until the release history loads with a live release', () => {
+  it('says that the releases are loading while the history loads', () => {
+    renderOverview({ history: undefined })
+
+    expect(section('Live').getByText('Loading the releases…')).toBeInTheDocument()
+    expect(screen.queryByText('Not set')).not.toBeInTheDocument()
+    expect(fetchSites).not.toHaveBeenCalled()
+  })
+
+  it('says that the releases did not load when the history fails', () => {
+    renderOverview({ history: 'failed' })
+
+    expect(section('Live').getByText('The releases did not load.')).toBeInTheDocument()
+    expect(screen.queryByText('Not set')).not.toBeInTheDocument()
+    expect(fetchSites).not.toHaveBeenCalled()
+  })
+
+  it('is left out when the loaded history has no live release', () => {
     renderOverview({ history: { ...live, active: null, changes: null } })
 
     expect(screen.queryByRole('region', { name: 'Live' })).not.toBeInTheDocument()
     expect(fetchSites).not.toHaveBeenCalled()
+  })
+
+  it('says that the live sites are loading while they load', () => {
+    vi.mocked(fetchSites).mockReturnValue(new Promise(() => {}))
+    renderOverview({ history: live })
+
+    expect(section('Live').getByText('Loading the live sites…')).toBeInTheDocument()
   })
 
   it('shows the sites of this application as tiles that open in a new tab', async () => {
@@ -170,28 +193,18 @@ describe('Live', () => {
 })
 
 describe('Changes since the live release', () => {
-  it('is left out while the history loads or when it fails', () => {
-    const { unmount } = render(
-      <ThemeModeProvider>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <MemoryRouter>
-            <StudioOverview
-              application="PurchaseRequests"
-              title="Purchase requests"
-              description={null}
-              resources={withEntity}
-              moduleKinds={new Set()}
-              history="failed"
-            />
-          </MemoryRouter>
-        </TextProvider>
-      </ThemeModeProvider>,
-    )
-    expect(screen.queryByRole('region', { name: 'Changes since the live release' })).not.toBeInTheDocument()
-    unmount()
-
+  it('says that the releases are loading while the history loads', () => {
     renderOverview({ history: undefined })
-    expect(screen.queryByRole('region', { name: 'Changes since the live release' })).not.toBeInTheDocument()
+
+    expect(section('Changes since the live release').getByText('Loading the releases…')).toBeInTheDocument()
+    expect(screen.queryByText('Not set')).not.toBeInTheDocument()
+  })
+
+  it('says that the releases did not load when the history fails', () => {
+    renderOverview({ history: 'failed' })
+
+    expect(section('Changes since the live release').getByText('The releases did not load.')).toBeInTheDocument()
+    expect(screen.queryByText('Not set')).not.toBeInTheDocument()
   })
 
   it('says the application is not published yet when there is no release', () => {

@@ -88,7 +88,7 @@ tenant button of the Tenants view and the actions of the Tenant view.
   cap it shows the count alone. It also shows the newest [restore check](tenant-backup-and-restore.md#weekly-restore-check):
   its result, its source tenant and its time, or a dash when no check has run.
 - **Jobs.** The jobs of the cell, newest first. A row shows the time, the kind, the tenant and the state, each
-  step with its state, and the error of a failed job or step. A failed job other than a `purge` job has a Run
+  step with its state, or one line when no step has run yet, and the error of a failed job or step. A failed job other than a `purge` job has a Run
   again button, with a confirmation that names the job and the tenant, see [actions](#actions).
 - **Tenants.** One row per tenant, with a search by id and host, a filter by status and a Create tenant button
   that opens the dialog of [creating a tenant](#actions). The search and the filter run in the browser. A row shows:
