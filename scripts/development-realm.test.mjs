@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { after, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -139,5 +140,17 @@ describe('scripts/lib/development-realm.mjs adds the axis first login flow to th
 
     assert.equal(result.status, 2)
     assert.match(result.stderr, /Usage: node scripts\/lib\/development-realm\.mjs <keycloak url>/)
+  })
+})
+
+// The themes of the development realms, see docs/development.md#the-axis-realm and docs/development.md#the-company-realm.
+describe('the themes of the development realm files', () => {
+  const realm = (name) => JSON.parse(readFileSync(new URL(`../samples/keycloak/${name}-realm.json`, import.meta.url), 'utf8'))
+
+  test('the axis realm names the Axis themes, and the company realm names the sample login theme that exists', () => {
+    assert.equal(realm('axis').loginTheme, 'axis')
+    assert.equal(realm('axis').emailTheme, 'axis')
+    assert.equal(realm('company').loginTheme, 'example-company')
+    assert.ok(existsSync(new URL('../samples/keycloak/themes/example-company/login/theme.properties', import.meta.url)))
   })
 })

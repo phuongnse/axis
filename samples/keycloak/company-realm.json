@@ -1,6 +1,7 @@
 {
   "realm": "company",
   "displayName": "Example Company",
+  "loginTheme": "example-company",
   "enabled": true,
   "sslRequired": "external",
   "groups": [

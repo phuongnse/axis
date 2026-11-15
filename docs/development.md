@@ -670,10 +670,13 @@ The `axis` realm is imported from `samples/keycloak/axis-realm.json`.
   `samples/keycloak/axis-realm.json` names `mailpit:1025`. Keycloak reaches Mailpit by the name
   `mailpit` on the Docker network: Compose has it already, and `scripts/e2e.sh` starts Mailpit and
   Keycloak on a network of their own.
-- **The whole identity provider in the Axis theme** _(planned for M33)_. Every other page of the
-  identity provider is the Axis theme, the realm's `emailTheme` is `axis`, and the realm sets the
-  example legal links and the terms step of [legal](reference/legal.md), so every link and the terms
-  page show.
+- **The whole identity provider in the Axis theme.** Every page of the identity provider is the Axis
+  theme, and the realm's `emailTheme` is `axis`, so its emails look the same. `scripts/dev.sh`, not the
+  realm file, gives the `default` tenant the example legal links `https://example.com/privacy` and
+  `https://example.com/terms` and the terms version `1`, see [legal](reference/legal.md#legal-settings).
+  The realm sync then shows every link of the legal line and turns the terms step on, so each user gets
+  the terms page at the next sign-in. E2E and Docker Compose set no legal links, so they sign in without
+  the terms step.
 - **The first login flow.** `scripts/dev.sh` and `scripts/e2e.sh` add the `axis first login` flow to
   the realm through the admin API, before the server starts. The realm sync names it on every brokered
   provider, see the [identity provider resource](reference/identity-provider.md#identity-provider-resource).
@@ -716,10 +719,11 @@ organization's own identity provider, which the `axis` realm brokers to.
   with the password `axis`.
 - In E2E, Keycloak listens on `AXIS_E2E_KEYCLOAK_PORT` (default 8180) inside and outside its
   container, so the `axis` realm reaches the `company` realm at the address the browser uses.
-- **Its own look** _(planned for M33)_. Its login theme `example-company`, in
-  `samples/keycloak/themes`, looks like another company's sign-in on purpose, so a person sees that
-  they left Axis, and `scripts/dev.sh` copies it beside the Axis theme. It is sample data and never
-  ships.
+- **Its own look.** Its login theme `example-company`, in `samples/keycloak/themes`, looks like
+  another company's sign-in on purpose, so a person sees that they left Axis. It extends Keycloak's own
+  login theme and changes only its styles. `scripts/dev.sh` copies it beside the Axis theme. It is
+  sample data and never ships. Docker Compose's own start and E2E do not copy it, so there the realm
+  falls back to Keycloak's own sign-in page.
 
 ### The operator realm
 
