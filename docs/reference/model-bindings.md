@@ -90,8 +90,9 @@ tenant runs a request.
 Where `Ai:AllowTenantKeys` is on, a tenant may pay for its own model use.
 
 - **No tenant key** _(planned for M35)_. A tenant has no model key. `Ai:AllowTenantKeys`, `Ai:ReviewBinding`,
-  the model key routes, the Model key section and threats P141 to P143 go, because each author's own key pays,
-  see [a person's own key](#a-persons-own-key).
+  the model key routes, the key controls of the Model key section and threats P141 to P143 go, because each
+  author's own key pays, see [a person's own key](#a-persons-own-key). The [Model key section](platform-pages.md#model-key)
+  stays as the AI authoring switch.
 - **The key.** A tenant administrator sets, changes and removes the tenant's own key through the
   [model key routes](user-administration.md#the-tenants-model-key). It is kept as the tenant secret
   `model_key`, encrypted as other tenant secrets are, see
