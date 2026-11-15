@@ -3,6 +3,7 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { EmptyState } from '../platform/EmptyState'
 import { diffPatch, setAt } from '../platform/jsonPatch'
 import {
   createStudioResource,
@@ -221,9 +222,7 @@ function GrantPanel({
       <Typography.Title level={5}>
         {t('shell.studio.matrix.grants')} {role.name}, {target.name}
       </Typography.Title>
-      {!role.editable && cell.grants.length === 0 && (
-        <Typography.Text type="secondary">{t('shell.studio.matrix.noGrants')}</Typography.Text>
-      )}
+      {!role.editable && cell.grants.length === 0 && <EmptyState text={t('shell.studio.matrix.noGrants')} />}
       <Flex vertical gap="small">
         {readOnlyGrants.map((grant) => (
           <ReadOnlyGrant key={`${grant.policyId}/${grant.index}`} grant={grant} onOpenPolicy={onOpenPolicy} />
@@ -466,7 +465,7 @@ function OwnGrants({
 
   return (
     <Flex vertical gap="small" ref={rootRef} data-testid="studio-matrix-own-grants">
-      {own.length === 0 && <Typography.Text type="secondary">{t('shell.studio.matrix.noGrants')}</Typography.Text>}
+      {own.length === 0 && <EmptyState text={t('shell.studio.matrix.noGrants')} />}
       {own.map((index) => {
         const grant = grants[index] as Content
         const actions = stringsOf(grant.actions)

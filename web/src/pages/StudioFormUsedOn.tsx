@@ -1,5 +1,6 @@
 import { Button, Flex, Tag, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { EmptyState } from '../platform/EmptyState'
 import type { StudioReference, StudioReferenceNode } from '../platform/studio'
 import { useText } from '../platform/texts'
 
@@ -27,7 +28,7 @@ export function StudioFormUsedOn({
       {entries === 'failed' ? (
         <AxisAlert kind="error" message={t('shell.studio.referencesFailed')} />
       ) : entries.length === 0 ? (
-        <Typography.Text type="secondary">{t('shell.studio.design.usedOnNone')}</Typography.Text>
+        <EmptyState text={t('shell.studio.design.usedOnNone')} />
       ) : (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {entries.map((entry, index) => (

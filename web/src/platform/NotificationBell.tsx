@@ -4,6 +4,7 @@ import { AxisAlert } from './AxisAlert'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { Announcement } from './Announcement'
+import { EmptyState } from './EmptyState'
 import { formatValue } from './formatValue'
 import {
   fetchNotifications,
@@ -135,7 +136,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
             {t('shell.notifications.markAllRead')}
           </Button>
           {data.items.length === 0 ? (
-            !failed && <Typography.Text type="secondary">{t('shell.notifications.empty')}</Typography.Text>
+            !failed && <EmptyState text={t('shell.notifications.empty')} />
           ) : (
             <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
               {data.items.map((item) => (

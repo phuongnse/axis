@@ -1,6 +1,7 @@
 import { Flex, Select } from 'antd'
 import type { ReactNode } from 'react'
 import { AxisField } from '../platform/AxisField'
+import { EmptyState } from '../platform/EmptyState'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import type { StudioCatalogSlot } from '../platform/studio'
 import { slotTitle, timeZoneText, type RangeOperator } from '../platform/studioCatalog'
@@ -163,13 +164,12 @@ export function ModuleSlots({
   onChange: (pointer: string, next: unknown) => void
 }) {
   const t = useText()
-  const { colour } = useDesignTokens()
   const map =
     typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
   const help = t(control === 'roles' ? 'shell.studio.module.roleSlot.help' : 'shell.studio.module.connectorSlot.help')
   return (
     <Flex vertical gap="small">
-      {noSlots && <span style={{ color: colour.textMuted }}>{t('shell.studio.module.noSlots')}</span>}
+      {noSlots && <EmptyState text={t('shell.studio.module.noSlots')} />}
       {slots.map((slot) => {
         const title = slotTitle(slot, locale)
         const mapped = map[slot.name]
