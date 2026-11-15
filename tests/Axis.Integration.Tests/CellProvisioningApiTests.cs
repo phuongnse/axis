@@ -34,6 +34,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
 
     private static readonly Uri _console = new("http://console.test/");
     private static readonly Uri _tenantHost = new("http://localhost/");
+    private static readonly string[] _createStepNames = ["tenant", "application", "activate", "invite", "resume"];
 
     private readonly HttpClient _http = new();
     private readonly string _realm = $"ops-{Guid.NewGuid():N}"[..16];
@@ -1178,6 +1179,132 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task Running_a_failed_create_job_again_queues_a_job_that_keeps_the_steps_done_and_the_publisher_runs_only_the_rest()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var failed = await SeedJobAsync("create", "b", "failed", CreateSteps("succeeded", "succeeded", "succeeded", "failed", "pending"), """{"administrator":"admin@example.test"}""");
+
+        using var response = await PostJobAsync(client, $"/api/cell/jobs/{failed:D}/run-again", token, "again-1");
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var accepted = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        var id = accepted.GetProperty("id").GetGuid();
+        Assert.NotEqual(failed, id);
+        Assert.Equal(("create", "b", "queued"), (accepted.GetProperty("kind").GetString(), accepted.GetProperty("tenantId").GetString(), accepted.GetProperty("state").GetString()));
+        Assert.Equal($"/api/cell/jobs/{id:D}", response.Headers.Location?.OriginalString);
+        Assert.Equal(2, await CountAsync("platform.jobs"));
+        Assert.Equal("failed", await ScalarAsync($"SELECT state FROM platform.jobs WHERE id = '{failed:D}'"));
+        Assert.Equal("admin@example.test", await ScalarAsync($"SELECT input ->> 'administrator' FROM platform.jobs WHERE id = '{id:D}'"));
+        Assert.Equal(0, await ScalarAsync($"SELECT claims FROM platform.jobs WHERE id = '{id:D}'"));
+        using var read = await GetAsync(client, $"/api/cell/jobs/{id:D}", token);
+        var steps = (await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("steps").EnumerateArray()
+            .Select(step => $"{step.GetProperty("name").GetString()}={step.GetProperty("state").GetString()}:{step.GetProperty("error").ValueKind}").ToArray();
+        Assert.Equal(["tenant=succeeded:Null", "application=succeeded:Null", "activate=succeeded:Null", "invite=pending:Null", "resume=pending:Null"], steps);
+
+        var ran = new List<string>();
+        var kinds = new Dictionary<string, IReadOnlyList<JobStep>>
+        {
+            ["create"] = [.. _createStepNames
+                .Select(name => new JobStep(name, (_, _, _, _) => { ran.Add(name); return Task.FromResult<string?>(null); }))],
+        };
+        Assert.True(await new ProvisioningJobs(_platform, kinds, TimeSpan.FromMinutes(5)).RunNextAsync(TextWriter.Null, CancellationToken));
+
+        Assert.Equal(["invite", "resume"], ran);
+        Assert.Equal("succeeded", await ScalarAsync($"SELECT state FROM platform.jobs WHERE id = '{id:D}'"));
+        var records = await AuditRecordsAsync();
+        var record = Assert.Single(records);
+        Assert.Equal(("tenant create", "b", $"job:{id:D}"), record);
+        Assert.Equal(new JsonWebToken(token).Subject, await ScalarAsync("SELECT actor FROM platform.audit_records"));
+    }
+
+    [Fact]
+    public async Task Running_a_job_again_that_is_not_failed_or_is_a_purge_or_has_a_newer_job_answers_409_and_queues_nothing()
+    {
+        await using var factory = await StartAsync(tenantCap: 4);
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync("INSERT INTO platform.deleted_tenants (id, deleted_at, actor, hosts) VALUES ('gone', now(), 'operator-1', '{}')");
+        var statusStep = """[{"name":"status","state":"failed","error":"The status could not change."}]""";
+        var queued = await SeedJobAsync("suspend", "b", "queued", statusStep);
+        var running = await SeedJobAsync("resume", "c", "running", statusStep);
+        var succeeded = await SeedJobAsync("read-only", "b", "succeeded", statusStep);
+        var purge = await SeedJobAsync("purge", "c", "failed", statusStep);
+        var superseded = await SeedJobAsync("export", "b", "failed", statusStep, createdAgo: TimeSpan.FromMinutes(10));
+        await SeedJobAsync("export", "b", "succeeded", statusStep);
+        var deleted = await SeedJobAsync("create", "gone", "failed", CreateSteps("pending", "pending", "pending", "pending", "pending"));
+        var full = await SeedJobAsync("create", "d", "failed", CreateSteps("pending", "pending", "pending", "pending", "pending"));
+        var before = await CountAsync("platform.jobs");
+
+        var answers = new List<(string Name, HttpStatusCode Status, string? Title)>();
+        foreach (var (name, id) in new[] { ("queued", queued), ("running", running), ("succeeded", succeeded), ("purge", purge), ("superseded", superseded), ("deleted", deleted), ("full", full) })
+        {
+            using var response = await PostJobAsync(client, $"/api/cell/jobs/{id:D}/run-again", token, $"refused-{name}");
+            answers.Add((name, response.StatusCode, (await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("title").GetString()));
+        }
+
+        Assert.All(answers, answer => Assert.Equal(HttpStatusCode.Conflict, answer.Status));
+        Assert.Equal(
+            [
+                "Only a failed job can be run again.",
+                "Only a failed job can be run again.",
+                "Only a failed job can be run again.",
+                "The publisher queues a failed purge job again on its own.",
+                "The tenant has a newer job of this kind.",
+                "A tenant of the cell already has this id.",
+                "This cell is full.",
+            ],
+            answers.Select(answer => answer.Title));
+        Assert.Equal(before, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
+    public async Task Running_a_failed_create_job_again_for_a_tenant_with_a_directory_row_is_allowed_in_a_cell_at_its_cap()
+    {
+        await using var factory = await StartAsync(tenantCap: 4);
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var failed = await SeedJobAsync("create", "b", "failed", CreateSteps("succeeded", "succeeded", "succeeded", "failed", "pending"));
+
+        using var response = await PostJobAsync(client, $"/api/cell/jobs/{failed:D}/run-again", token, "again-b");
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Running_a_job_again_answers_401_without_a_token_403_without_the_role_404_for_an_unknown_job_400_without_a_key_and_replays_the_first_job_for_one_key()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+        var failed = await SeedJobAsync("create", "b", "failed", CreateSteps("succeeded", "failed", "pending", "pending", "pending"));
+        var path = $"/api/cell/jobs/{failed:D}/run-again";
+
+        using var none = await PostJobAsync(client, path, token: null, "again-none");
+        using var noRole = await PostJobAsync(client, path, noRoleToken, "again-norole");
+        using var unknown = await PostJobAsync(client, $"/api/cell/jobs/{Guid.NewGuid():D}/run-again", token, "again-unknown");
+        using var withoutKey = await PostJobAsync(client, path, token, key: null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, withoutKey.StatusCode);
+        Assert.Equal(1, await CountAsync("platform.jobs"));
+
+        using var first = await PostJobAsync(client, path, token, "again-replay");
+        using var replay = await PostJobAsync(client, path, token, "again-replay");
+
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, replay.StatusCode);
+        Assert.Equal(
+            (await first.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid(),
+            (await replay.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid());
+        Assert.Equal(2, await CountAsync("platform.jobs"));
+    }
+
+    [Fact]
     public async Task An_operator_reads_the_cell_with_the_count_the_cap_checks_and_its_cap()
     {
         await using (var factory = await StartAsync())
@@ -1802,6 +1929,34 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
 
         return await client.SendAsync(request, CancellationToken);
     }
+
+    // A job row as the publisher left it, for the run-again routes. Its steps are a JSON array, and the newest job of a tenant and kind is the one made last.
+    private async Task<Guid> SeedJobAsync(string kind, string tenant, string state, string steps, string? input = null, TimeSpan? createdAgo = null)
+    {
+        var id = Guid.CreateVersion7();
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO platform.jobs (id, kind, tenant_id, state, steps, input, error, actor, created_at, claims)
+            VALUES (@id, @kind, @tenant, @state, @steps::jsonb, @input::jsonb, @error, 'operator-1', @createdAt, 3)
+            """,
+            connection);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("kind", kind);
+        command.Parameters.AddWithValue("tenant", tenant);
+        command.Parameters.AddWithValue("state", state);
+        command.Parameters.AddWithValue("steps", steps);
+        command.Parameters.AddWithValue("input", (object?)input ?? DBNull.Value);
+        command.Parameters.AddWithValue("error", state == "failed" ? "A step failed." : DBNull.Value);
+        command.Parameters.AddWithValue("createdAt", DateTimeOffset.UtcNow - (createdAgo ?? TimeSpan.Zero) - TimeSpan.FromMinutes(1));
+        await command.ExecuteNonQueryAsync(CancellationToken);
+        return id;
+    }
+
+    private static string CreateSteps(params string[] states) =>
+        JsonSerializer.Serialize(_createStepNames.Zip(
+            states, (name, state) => new { name, state, error = state == "failed" ? "The step failed." : null }));
 
     private async Task<bool> RunJobAsync() =>
         await new ProvisioningJobs(_platform, ProvisioningJobs.Builtin(_platform), TimeSpan.FromMinutes(5))

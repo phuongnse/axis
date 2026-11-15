@@ -729,8 +729,8 @@ because the provisioning API answers `404` there. The job has five steps, and ea
   code of Studio's Blank, and `activate` activates its first release.
 
 A step that throws ends the claim, and the next claim runs the job again from the first step that has
-not succeeded. A job gets three claims, and running a failed job again is described with the
-[provisioning API](tenant-lifecycle.md#provisioning-api).
+not succeeded. A job gets three claims, and an operator runs a failed job again through a new job, see
+[running a failed job again](tenant-lifecycle.md#jobs).
 
 ### Export job
 
@@ -772,7 +772,8 @@ because the provisioning API answers `404` there, so no `delete` job and no `del
   it needs no backup key.
 - **Failures.** A failed `purge` job is queued again no sooner than an hour after it ended, so a
   lasting fault adds one failed job and one audit record for the tenant each hour until an operator
-  fixes it. A step that throws ends the claim, as for the other jobs.
+  fixes it. An operator cannot run a failed `purge` job again, see
+  [running a failed job again](tenant-lifecycle.md#jobs). A step that throws ends the claim, as for the other jobs.
 
 ## What else to back up
 
