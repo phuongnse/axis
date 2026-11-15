@@ -5,7 +5,8 @@
 # - compose: scripts/compose.test.mjs builds the image and runs the Compose stack on free ports.
 # - images: scripts/images.test.mjs checks the production images axis-server, axis-worker, axis-agent, axis-admin,
 #   axis-controlplane and axis-package-host-dotnet, -node and -python, runs the hosts read-only against a throwaway
-#   PostgreSQL that serves TLS, with SSL Mode=VerifyFull in their connection strings, and builds the test package of each
+#   PostgreSQL that serves TLS, with SSL Mode=VerifyFull in their connection strings, starts the control plane with one
+#   cell from the settings and file paths that its Helm chart renders, and builds the test package of each
 #   language in its package host image.
 # - onprem: scripts/onprem.test.mjs installs deploy/compose/compose.yaml from the production images as
 #   docs/reference/installation.md says, against a test PostgreSQL over TLS and the example's own identity
@@ -45,6 +46,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
+source scripts/lib/tools.sh
 
 shard_variable=AXIS_SMOKE_SHARD
 shard="${AXIS_SMOKE_SHARD:-}"
@@ -88,7 +90,7 @@ if { in_shard images && affected images; } || { in_shard onprem && affected onpr
 fi
 
 if in_shard images; then
-  run_suite_if_affected images . node --test --test-reporter=spec --test-reporter-destination=stdout \
+  run_suite_if_affected images . env HELM="$helm" node --test --test-reporter=spec --test-reporter-destination=stdout \
     --test-reporter=junit --test-reporter-destination="$results_dir/images.xml" scripts/images.test.mjs
 fi
 
