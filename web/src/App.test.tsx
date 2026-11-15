@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, Outlet, RouterProvider, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -491,6 +491,40 @@ async function findShellRoot(mode: 'light' | 'dark') {
 
 describe('App', () => {
   afterEach(() => setHostSite(null))
+
+  it('scrolls to the top at a new address and back to the saved position on Back', async () => {
+    stubServer()
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    const scrollY = Object.getOwnPropertyDescriptor(window, 'scrollY')
+    try {
+      const router = createMemoryRouter(appRoutes(false), { initialEntries: ['/'] })
+      render(
+        <ThemeModeProvider>
+          <RouterProvider router={router} />
+        </ThemeModeProvider>,
+      )
+      await screen.findByRole('heading', { name: 'Applications' })
+
+      Object.defineProperty(window, 'scrollY', { value: 640, configurable: true })
+      scrollTo.mockClear()
+      await act(() => router.navigate('/licences'))
+      await screen.findByRole('heading', { name: 'Open source licences' })
+      expect(scrollTo).toHaveBeenLastCalledWith(0, 0)
+
+      Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
+      scrollTo.mockClear()
+      await act(() => router.navigate(-1))
+      await screen.findByRole('heading', { name: 'Applications' })
+      expect(scrollTo).toHaveBeenLastCalledWith(0, 640)
+    } finally {
+      scrollTo.mockRestore()
+      if (scrollY) {
+        Object.defineProperty(window, 'scrollY', scrollY)
+      } else {
+        delete (window as { scrollY?: number }).scrollY
+      }
+    }
+  })
 
   it('switches between light and dark mode and remembers the choice', async () => {
     stubServer()

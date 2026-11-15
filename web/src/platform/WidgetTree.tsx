@@ -158,7 +158,7 @@ function TabsNode({ widget, renderLeaf }: { widget: TabsWidgetMetadata; renderLe
     } else {
       next.set(name, key)
     }
-    setSearchParams(next)
+    setSearchParams(next, { preventScrollReset: true })
   }
 
   return (

@@ -33,7 +33,7 @@ opens the same view.
   entry, so the browser's Back and Forward step through it. A second Back would be one concern with two
   mechanisms. Where the author is comes from the sidebar's marked entry, which also leads up to the list, and the
   [page heading](studio-workspace.md#page-heading).
-- **Scroll position** _(planned for M33)_. Going Back returns the author to where they were on a long page.
+- **Scroll position.** Going Back returns the author to where they were on a long page, see [routing](frontend.md#routing).
 
 ## New application
 

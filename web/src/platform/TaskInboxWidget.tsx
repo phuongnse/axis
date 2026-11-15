@@ -72,7 +72,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
   useEffect(() => {
     const canonical = writeTableQuery(searchParams, query)
     if (canonical.toString() !== searchParams.toString()) {
-      setSearchParams(canonical, { replace: true })
+      setSearchParams(canonical, { replace: true, preventScrollReset: true })
     }
   }, [searchParams, query, setSearchParams])
 
@@ -84,7 +84,10 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
     }
     const lastPage = Math.max(1, Math.ceil(totalCount / query.pageSize))
     if (query.page > lastPage) {
-      setSearchParams(writeTableQuery(searchParams, { ...query, page: lastPage }), { replace: true })
+      setSearchParams(writeTableQuery(searchParams, { ...query, page: lastPage }), {
+        replace: true,
+        preventScrollReset: true,
+      })
     }
   }, [totalCount, searchParams, query, setSearchParams])
 
@@ -151,7 +154,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
   const onChange: TableProps<TaskListItem>['onChange'] = (pagination) => {
     const pageSize = pagination.pageSize ?? query.pageSize
     const page = pageSize !== query.pageSize ? 1 : (pagination.current ?? 1)
-    setSearchParams(writeTableQuery(searchParams, { page, pageSize, sort: null }))
+    setSearchParams(writeTableQuery(searchParams, { page, pageSize, sort: null }), { preventScrollReset: true })
   }
 
   if (failed || releaseTexts.failed) {

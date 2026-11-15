@@ -467,7 +467,10 @@ below answers `200`.
 
 - **A data router.** The SPA uses `createBrowserRouter`, so `useBlocker` guards Back and Forward with
   [Leave without saving?](studio.md#editor).
-- **Scroll restoration** _(planned for M33)_. `<ScrollRestoration>` returns a person to where they were on a long page.
+- **Scroll restoration.** `<ScrollRestoration>` returns a person to where they were when they go Back or Forward, and
+  a new address opens at the top. A change that stays on the same page keeps the position: a table's search, filter,
+  sort, page or page size, or a tab. Pages load their rows after they open, so after Back the page keeps the height it
+  had until its content is that tall again, and the position still fits.
 
 | Address                                | Shows                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
