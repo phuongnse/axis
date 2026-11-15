@@ -1,7 +1,6 @@
 import { Menu, type MenuProps } from 'antd'
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { FoldIcon } from './FoldIcon'
 import { navigationIcon } from './navigationIcons'
 import { useDesignTokens } from './themeMode'
 
@@ -33,9 +32,6 @@ export interface ShellNavigationParent {
   children: readonly ShellNavigationEntry[]
 }
 
-/** The width of Ant Design's own submenu arrow, whose room a parent's end keeps. */
-const menuArrowSize = 10
-
 export type ShellNavigationNode = ShellNavigationEntry | ShellNavigationGroup | ShellNavigationParent
 
 /**
@@ -43,8 +39,8 @@ export type ShellNavigationNode = ShellNavigationEntry | ShellNavigationGroup | 
  * entry shows its label alone, and an open group shows its label above its entries. A collapsed entry shows its icon
  * alone, and Ant Design gives it the label as a tooltip. A collapsed group gives way to a thin rule above its entries.
  * The collapsed state is passed on, because a page's entries render through a portal and so do not see the Sider's
- * context. No entry shows a count. Proposed: a parent shows its label with a caret, and a click opens or folds its
- * entries, indented one step under it; it opens by itself while one of them is the current page, and a collapsed parent
+ * context. No entry shows a count. Proposed: a parent shows its label with Ant Design's own submenu arrow at its end,
+ * as navigation does, and a click opens or folds its entries, indented one step under it; it opens by itself while one of them is the current page, and a collapsed parent
  * shows its icon, its entries in a menu beside it, see the review on #3263.
  */
 export function ShellNavigation({
@@ -102,18 +98,6 @@ export function ShellNavigation({
       style={{ borderInlineEnd: 'none' }}
       selectedKeys={activeKey ? [activeKey] : []}
       openKeys={collapsed ? undefined : openKeys}
-      // Proposed: a parent opens and folds with the one fold mark and no animation, see FoldIcon.
-      // Ant Design keeps the room of its own arrow at a parent's end, its 10 px arrow and spacing-xs beside its padding,
-      // so the fold mark takes it back and ends spacing-md from the entry's edge, as its words start spacing-md from the
-      // other edge.
-      expandIcon={({ isOpen }) =>
-        collapsed ? null : (
-          <span style={{ display: 'inline-flex', marginInlineEnd: -(menuArrowSize + spacing.xs) }}>
-            <FoldIcon open={isOpen ?? false} />
-          </span>
-        )
-      }
-      motion={{ motionAppear: false, motionEnter: false, motionLeave: false }}
       onOpenChange={(open) => setChoice({ page: activeKey, open })}
       items={items}
     />

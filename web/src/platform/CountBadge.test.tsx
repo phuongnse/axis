@@ -4,7 +4,7 @@ import { CountBadge } from './CountBadge'
 
 // Proposed: one count on an icon button, see the review on #3263.
 describe('CountBadge', () => {
-  it('shows the count in 10 px figures on a 14 px disc', () => {
+  it('shows the count on the small badge of Ant Design', () => {
     render(
       <CountBadge count={3}>
         <button type="button">Filter</button>
@@ -12,7 +12,7 @@ describe('CountBadge', () => {
     )
 
     const count = screen.getByText('3').closest('.ant-badge-count')!
-    expect(count).toHaveStyle({ fontSize: '10px', height: '14px', minWidth: '14px' })
+    expect(count).toHaveClass('ant-badge-count-sm')
   })
 
   it('shows 9+ past nine, and nothing for none', () => {

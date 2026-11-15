@@ -230,13 +230,8 @@ describe('the AI requests entry', () => {
     const parent = screen.getByRole('menuitem', { name: 'AI requests' })
     expect(parent).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('link', { name: 'Needs action' })).toHaveAttribute('aria-current', 'page')
-    // Proposed: the one fold mark, an arrow right that turns down while open, with no animation.
-    const mark = () => parent.querySelector('.anticon-right') as HTMLElement
-    expect(mark().style.transform).toBe('rotate(90deg)')
-    expect(mark().style.transition).toBe('')
     await userEvent.click(parent)
     expect(parent).toHaveAttribute('aria-expanded', 'false')
-    expect(mark().style.transform).toBe('')
   })
 
   it('marks Needs action while the table shows exactly its filter, and the whole list otherwise', () => {
