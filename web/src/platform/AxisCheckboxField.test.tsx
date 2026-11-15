@@ -81,6 +81,25 @@ describe('AxisCheckboxField', () => {
     await waitFor(() => expect(finish).toHaveBeenCalledWith({ active: true }))
   })
 
+  it('draws a switch the caller holds, named by the label and described by the help, with no form', async () => {
+    const onChange = vi.fn()
+    render(
+      <ThemeModeProvider initialMode="light">
+        <TextProvider catalogs={catalogs} development={false}>
+          <AxisCheckboxField kind="switch" label="Active" help="Turn it on." checked={false} onChange={onChange} />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    const toggle = screen.getByRole('switch', { name: 'Active' })
+    expect(toggle).toHaveAccessibleDescription('Turn it on.')
+    expect(toggle).not.toBeChecked()
+
+    await userEvent.click(toggle)
+
+    expect(onChange).toHaveBeenCalledWith(true)
+  })
+
   it('does not take a click when disabled', () => {
     renderForm(<AxisCheckboxField label="Active" help="" name="active" disabled />)
 

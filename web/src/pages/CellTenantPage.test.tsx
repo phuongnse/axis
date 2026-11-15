@@ -8,6 +8,7 @@ import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { CellTenantPage } from './CellTenantPage'
 import { PlatformContext, type Platform } from './context'
+import { hasFieldError, isRequiredLabel } from '../test/antd'
 
 const platform: Platform = {
   site: {
@@ -362,8 +363,12 @@ describe('CellTenantPage', () => {
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Set the quotas of acme')
     // Users is overridden, Applications is the default and Storage has no limit. Storage stays as it is.
-    await user.click(within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByLabelText('Cell default'))
-    await user.click(within(within(dialog).getByRole('radiogroup', { name: 'Applications' })).getByLabelText('A value'))
+    await user.click(
+      within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByRole('radio', { name: /^Cell default/ }),
+    )
+    await user.click(
+      within(within(dialog).getByRole('radiogroup', { name: 'Applications' })).getByRole('radio', { name: /^A value/ }),
+    )
     const applications = within(dialog).getByRole('spinbutton', { name: 'Applications value' })
     await user.clear(applications)
     await user.type(applications, '25')
@@ -388,7 +393,9 @@ describe('CellTenantPage', () => {
 
     await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
     const dialog = await screen.findByRole('dialog')
-    await user.click(within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByLabelText('No limit'))
+    await user.click(
+      within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByRole('radio', { name: /^No limit/ }),
+    )
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(writes).toHaveLength(1))
@@ -404,10 +411,38 @@ describe('CellTenantPage', () => {
     const dialog = await screen.findByRole('dialog')
     const save = within(dialog).getByRole('button', { name: 'Save' })
     expect(save).toBeDisabled()
-    await user.click(within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByLabelText('No limit'))
+    await user.click(
+      within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByRole('radio', { name: /^No limit/ }),
+    )
     expect(save).toBeEnabled()
-    await user.click(within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByLabelText('A value'))
+    await user.click(
+      within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByRole('radio', { name: /^A value/ }),
+    )
     expect(save).toBeDisabled()
+  })
+
+  it('draws each quota choice with a required label, its help and the help of each option', async () => {
+    stubWrites({})
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
+    const dialog = await screen.findByRole('dialog')
+
+    for (const label of ['Users', 'Applications', 'Storage (bytes)']) {
+      const group = within(dialog).getByRole('radiogroup', { name: label })
+      expect(isRequiredLabel(within(dialog).getByText(label))).toBe(true)
+      expect(group).toHaveAccessibleDescription('How this quota is set for this tenant.')
+      const helps = {
+        'A value': 'Use the number in the value field below.',
+        'No limit': 'This tenant has no limit for this quota.',
+        'Cell default': "Use the cell's default, and follow it when it changes.",
+      }
+      for (const [option, help] of Object.entries(helps)) {
+        const radio = within(group).getByRole('radio', { name: new RegExp(`^${option}`) })
+        expect(radio).toHaveAccessibleDescription(help)
+      }
+    }
   })
 
   it('keeps Save on with an empty value and checks it on click', async () => {
@@ -423,7 +458,10 @@ describe('CellTenantPage', () => {
     expect(save).toBeEnabled()
     await user.click(save)
 
-    expect(await within(dialog).findByText('Enter a value.')).toBeInTheDocument()
+    const message = await within(dialog).findByText('Enter a value.')
+    expect(users.closest('.ant-form-item')).toContainElement(message)
+    expect(users.compareDocumentPosition(message) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(hasFieldError(users)).toBe(true)
     await waitFor(() => expect(users).toHaveFocus())
     expect(writes).toHaveLength(0)
   })
@@ -649,7 +687,9 @@ describe('CellTenantPage', () => {
 
     await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
     const dialog = await screen.findByRole('dialog')
-    await user.click(within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByLabelText('No limit'))
+    await user.click(
+      within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByRole('radio', { name: /^No limit/ }),
+    )
     await user.click(within(dialog).getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByTestId('cell-tenant-quotas-error')).toHaveTextContent(

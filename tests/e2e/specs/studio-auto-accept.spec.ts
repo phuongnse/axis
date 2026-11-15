@@ -56,7 +56,7 @@ test.describe('Auto-accept in Studio', () => {
       const autoAccept = page.getByRole('switch', { name: switchName, exact: true })
       await expect(autoAccept).not.toBeChecked()
       await expect(autoAccept).toBeEnabled()
-      await expect(page.getByTestId('studio-auto-accept-publisher-only')).toHaveCount(0)
+      await expect(autoAccept).not.toHaveAccessibleDescription(/Only a publisher/)
 
       await autoAccept.click()
       await expect(autoAccept).toBeChecked()
@@ -76,7 +76,7 @@ test.describe('Auto-accept in Studio', () => {
         const readOnly = page.getByRole('switch', { name: switchName, exact: true })
         await expect(readOnly).toBeChecked()
         await expect(readOnly).toBeDisabled()
-        await expect(page.getByTestId('studio-auto-accept-publisher-only')).toHaveText('Only a publisher can change this.')
+        await expect(readOnly).toHaveAccessibleDescription(/Only a publisher can change this\./)
       } finally {
         await noPublisher.stop()
       }

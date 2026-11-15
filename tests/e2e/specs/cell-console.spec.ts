@@ -143,7 +143,7 @@ test('the platform operator sets a quota of a tenant', async () => {
   await page.getByTestId('cell-tenant-set-quotas').click()
   const dialog = await waitForDialog(page)
   await expect(dialog).toContainText(tenant)
-  await dialog.getByRole('radiogroup', { name: 'Users', exact: true }).getByLabel('A value', { exact: true }).check()
+  await dialog.getByRole('radiogroup', { name: 'Users', exact: true }).getByRole('radio', { name: /^A value/ }).check()
   await dialog.getByRole('spinbutton', { name: 'Users value', exact: true }).fill('25')
   await expectNoViolations(page)
   await confirmDialog(page, 'Save')
