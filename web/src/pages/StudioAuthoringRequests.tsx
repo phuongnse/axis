@@ -1004,7 +1004,7 @@ export function StudioAuthoringRequestPage({
       </ActionBar>
       <Modal
         open={anywayOpen}
-        width={size.dialog.small}
+        width={size.dialog.medium}
         title={t('shell.studio.aiRequest.acceptAnyway.title')}
         okText={t('shell.studio.aiRequest.acceptAnyway.ok')}
         cancelText={t('shell.studio.cancel')}
@@ -1020,7 +1020,8 @@ export function StudioAuthoringRequestPage({
           {/* The must-change findings it leaves out, listed as the review lists them; a note asks for no change. */}
           <FindingList
             testId="studio-ai-anyway-findings"
-            findings={(request.review?.findings ?? []).filter((finding) => finding.blocking)}
+            only="toFix"
+            findings={request.review?.findings ?? []}
             resources={resources}
             onOpen={(resourceId, path) => {
               setAnywayOpen(false)
@@ -1251,7 +1252,6 @@ function ReviewFindings({
   const t = useText()
   const { spacing } = useDesignTokens()
   const blocking = review.findings.filter((finding) => finding.blocking)
-  const notes = review.findings.filter((finding) => !finding.blocking)
   return (
     <div style={{ display: 'contents' }} data-testid="studio-ai-review">
       {/* The checks' lines come first; a wider gap parts the review's from them than its own lines have. */}
@@ -1271,7 +1271,7 @@ function ReviewFindings({
       <Typography.Text style={{ gridColumn: '1 / -1' }}>{review.summary}</Typography.Text>
       {review.findings.length > 0 && (
         <div style={{ gridColumn: '1 / -1' }}>
-          <FindingList findings={[...blocking, ...notes]} resources={resources} onOpen={onOpen} />
+          <FindingList findings={review.findings} resources={resources} onOpen={onOpen} />
         </div>
       )}
     </div>
@@ -1279,44 +1279,58 @@ function ReviewFindings({
 }
 
 /**
- * Proposed: a review's findings, see the review on #3263, as `StudioProblemList` lists problems: grouped by the
- * resource they are about, each led by "Must change" in `dangerText` or "Note" muted. The review's result and the
- * Accept anyway dialog both list them.
+ * Proposed: a review's findings, see the review on #3263, in two groups each under its heading in bold: "Findings to
+ * fix", the must-change ones, as the bar counts them, then "Notes". Each group lists its findings as `StudioProblemList`
+ * lists problems, grouped by the resource they are about, the resource a link. A group with none does not show. The
+ * review's result shows both groups, and the Accept anyway dialog the findings to fix alone.
  */
 function FindingList({
   findings,
   resources,
   onOpen,
   testId,
+  only,
 }: {
   findings: readonly StudioReviewFinding[]
   resources: readonly StudioResourceItem[]
   onOpen: (resourceId: string, path: string) => void
   testId?: string
+  /** Shows the findings to fix alone. */
+  only?: 'toFix'
 }) {
   const t = useText()
-  const { colour } = useDesignTokens()
+  const { spacing } = useDesignTokens()
+  const group = (key: string, heading: string, items: readonly StudioReviewFinding[]) =>
+    items.length > 0 && (
+      <Flex vertical gap={spacing.xs} data-testid={key}>
+        <Typography.Text strong>{t(heading)}</Typography.Text>
+        <StudioProblemList
+          items={items.map((finding) => ({
+            lead: null,
+            message: finding.text,
+            resourceId: finding.resourceId,
+            file: finding.file,
+            path: finding.path,
+          }))}
+          resources={resources}
+          onSelect={onOpen}
+        />
+      </Flex>
+    )
   return (
-    <StudioProblemList
-      testId={testId}
-      items={findings.map((finding) => ({
-        lead: (
-          <Typography.Text style={{ color: finding.blocking ? colour.dangerText : colour.textMuted }}>
-            {t(
-              finding.blocking
-                ? 'shell.studio.aiRequest.review.mustChangeLead'
-                : 'shell.studio.aiRequest.review.noteLead',
-            )}
-          </Typography.Text>
-        ),
-        message: finding.text,
-        resourceId: finding.resourceId,
-        file: finding.file,
-        path: finding.path,
-      }))}
-      resources={resources}
-      onSelect={onOpen}
-    />
+    <Flex vertical gap={spacing.sm} data-testid={testId}>
+      {group(
+        'studio-ai-findings-to-fix',
+        'shell.studio.aiRequest.review.toFix',
+        findings.filter((finding) => finding.blocking),
+      )}
+      {only === undefined &&
+        group(
+          'studio-ai-findings-notes',
+          'shell.studio.aiRequest.review.notes',
+          findings.filter((finding) => !finding.blocking),
+        )}
+    </Flex>
   )
 }
 

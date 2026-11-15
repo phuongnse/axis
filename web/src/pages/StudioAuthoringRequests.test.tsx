@@ -275,22 +275,24 @@ describe('a ready request’s review', () => {
     const review = await screen.findByTestId('studio-ai-review')
     expect(within(review).getByText('Changes requested')).toHaveAttribute('data-tone', 'attention')
     expect(within(review).queryByText(/Approved/)).toBeNull()
-    const groups = within(review).getAllByTestId('studio-problem-group')
-    expect(groups).toHaveLength(2)
-    // The resource shows once, its name the only link and its kind muted after it; what must change comes first.
-    const [page, loose] = groups
-    expect(within(page).getAllByRole('button', { name: 'Requests' })).toHaveLength(1)
-    expect(within(page).getByText('Page')).toBeInTheDocument()
-    const problems = within(page).getAllByTestId('studio-problem')
-    expect(problems[0]).toHaveTextContent('Must change Mails the approver too.')
-    expect(problems[1]).toHaveTextContent('Note Could say why.')
+    // Proposed: the findings to fix, then the notes, each group under its heading and by the resource it is about.
+    const toFix = within(review).getByTestId('studio-ai-findings-to-fix')
+    expect(within(toFix).getByText('Findings to fix')).toBeInTheDocument()
+    const [fixPage] = within(toFix).getAllByTestId('studio-problem-group')
+    expect(within(fixPage).getAllByRole('button', { name: 'Requests' })).toHaveLength(1)
+    expect(within(fixPage).getByText('Page')).toBeInTheDocument()
+    expect(fixPage).toHaveTextContent('Mails the approver too.')
+    const notes = within(review).getByTestId('studio-ai-findings-notes')
+    expect(within(notes).getByText('Notes')).toBeInTheDocument()
+    const [notePage, loose] = within(notes).getAllByTestId('studio-problem-group')
+    expect(notePage).toHaveTextContent('Could say why.')
     expect(within(loose).getByText('misc.json')).toBeInTheDocument()
     expect(within(loose).queryByRole('button')).toBeNull()
 
     const user = userEvent.setup()
-    await user.click(within(page).getByRole('button', { name: 'Requests' }))
+    await user.click(within(fixPage).getByRole('button', { name: 'Requests' }))
     expect(onOpen).toHaveBeenLastCalledWith('r-1', '/widgets/0')
-    await user.click(within(problems[1]).getByRole('button', { name: 'Show' }))
+    await user.click(within(notePage).getByRole('button', { name: 'Requests' }))
     expect(onOpen).toHaveBeenLastCalledWith('r-1', '/widgets/1')
   })
 
@@ -964,6 +966,7 @@ describe("a request's guide", () => {
         steps: [],
         findings: [
           { blocking: true, text: 'Show the column.', file: 'pages/list.json', path: '/widgets/0', resourceId: null },
+          { blocking: false, text: 'Could say why.', file: 'pages/list.json', path: '/widgets/1', resourceId: null },
         ],
       },
     })
@@ -972,9 +975,12 @@ describe("a request's guide", () => {
 
     await user.click(within(await screen.findByTestId('studio-ai-bar')).getByRole('button', { name: 'Accept anyway…' }))
     const dialog = await screen.findByRole('dialog', { name: 'Accept without these changes?' })
-    // The findings it leaves out read as the review lists them: grouped by resource, each led by Must change.
+    // The findings it leaves out read as the review lists them, under Findings to fix, with no notes.
     const left = within(dialog).getByTestId('studio-ai-anyway-findings')
-    expect(within(left).getAllByTestId('studio-problem')[0]).toHaveTextContent('Must change Show the column.')
+    expect(within(left).getByTestId('studio-ai-findings-to-fix')).toHaveTextContent(
+      /Findings to fix.*Show the column\./,
+    )
+    expect(within(left).queryByTestId('studio-ai-findings-notes')).toBeNull()
     expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/accept'))).toBe(false)
     await user.click(within(dialog).getByRole('button', { name: 'Accept anyway' }))
     await waitFor(() => {
