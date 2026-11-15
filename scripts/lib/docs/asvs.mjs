@@ -1,13 +1,13 @@
 // - docs/reference/asvs.md, when it exists, has one row for each requirement of the committed ASVS list
 //   (docs/reference/asvs-5.0.0.json), with no unknown or repeated id, a status from the list and some
-//   evidence. A Met row names only test classes that exist. A Gap row links the GitHub issue that
-//   closes it.
+//   evidence. A Met row names only test classes that exist. A Gap row is refused: the check runs offline,
+//   so it cannot tell whether the issue a Gap links is still open.
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { cellSeparator, issueLinkPattern, lines, testClassLookup, testClassPattern } from './helpers.mjs'
+import { cellSeparator, lines, testClassLookup, testClassPattern } from './helpers.mjs'
 
 export const asvsListFile = 'docs/reference/asvs-5.0.0.json'
-export const asvsStatuses = ['Met', 'Gap', 'Delegated', 'Not applicable']
+export const asvsStatuses = ['Met', 'Delegated', 'Not applicable']
 const asvsFile = 'docs/reference/asvs.md'
 
 /** Checks the requirements table of the ASVS page against the committed list of ASVS ids. */
@@ -37,7 +37,8 @@ export function checkAsvs(root, report) {
     else if (seen.has(id)) report(asvs, line, `${id} has a row already, on line ${seen.get(id)}`)
     else seen.set(id, line)
     const statusName = /^\*\*(.+)\*\*$/.exec(status)?.[1]
-    if (!asvsStatuses.includes(statusName)) {
+    if (statusName === 'Gap') report(asvs, line, `${id} is a Gap: meet it in this change, or wait for the issue that closes it`)
+    else if (!asvsStatuses.includes(statusName)) {
       report(asvs, line, `${id} status '${status}' is not one of ${asvsStatuses.map((name) => `**${name}**`).join(', ')}`)
     }
     const rawEvidence = text[i].split(cellSeparator)[4]
@@ -46,8 +47,6 @@ export function checkAsvs(root, report) {
       for (const match of rawEvidence.matchAll(testClassPattern)) {
         if (!testClasses().has(match[1])) report(asvs, line, `${id} names the test class ${match[1]}, which no .cs file under tests/, controlplane/tests/ or samples/ declares`)
       }
-    } else if (statusName === 'Gap' && !issueLinkPattern.test(rawEvidence)) {
-      report(asvs, line, `${id} is a Gap and links no issue: link the GitHub issue that closes it`)
     }
   }
 
