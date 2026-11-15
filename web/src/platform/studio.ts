@@ -107,6 +107,53 @@ export async function checkStudioExpression(
   return (await response.json()) as ExpressionCheck
 }
 
+/** One function or aggregate that an expression place allows, as the expression scope lists it. */
+export interface ExpressionScopeFunction {
+  name: string
+  parameters: string[]
+  result: string
+  group: string
+  example: string
+  description: string
+}
+
+/**
+ * The answer of an expression scope request: the type the place needs, `null` when any type will do, the fields in
+ * scope and the functions the place allows.
+ */
+export interface ExpressionScope {
+  type: string | null
+  fields: { name: string; labelKey: string | null; type: string | null }[]
+  functions: ExpressionScopeFunction[]
+}
+
+/**
+ * Loads what one expression place offers, for the draft as it stands. Any status other than 200 answers `null`, and
+ * the request does not show the sign-in prompt on a 401. It rejects when the server does not answer.
+ */
+export async function fetchStudioExpressionScope(
+  application: string,
+  resourceId: string,
+  path: string,
+  draft: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<ExpressionScope | null> {
+  const response = await apiFetch(
+    `/api/studio/apps/${encodeURIComponent(application)}/expressions/scope`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resourceId, path, draft }),
+      signal,
+    },
+    { promptSignInOnUnauthorized: false },
+  )
+  if (!response.ok) {
+    return null
+  }
+  return (await response.json()) as ExpressionScope
+}
+
 /**
  * An application in the list of `GET /api/studio/apps`. `id` is the manifest `id`, null when the manifest has none.
  * `titles` and `descriptions` map a locale to a text and are empty when the folder gives none.

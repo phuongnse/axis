@@ -16,10 +16,24 @@ import { withAntdStyles } from '../test/antdStyles'
 
 const resourceId = 'd9ccbf89-5004-4d52-8885-2ee377b7caa5'
 const checkPath = `/api/studio/apps/PurchaseRequests/expressions/check`
+const scopePath = `/api/studio/apps/PurchaseRequests/expressions/scope`
 const path = '/validations/0/expression'
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+}
+
+/**
+ * A fetch that answers the check route with `check` and the scope route with `scope`, or with 404 when the test gives
+ * none, as a place that the server does not know.
+ */
+function routes(check: () => Response | Promise<Response>, scope?: unknown) {
+  return vi.fn(async (input: string) => {
+    if (input === scopePath) {
+      return scope === undefined ? json({}, 404) : json(scope)
+    }
+    return check()
+  })
 }
 
 /** The expressions sent to the check route, in order. */
@@ -52,6 +66,7 @@ function renderEditor(
             name="expression"
             value={value}
             required={required}
+            draft={{}}
             options={options}
             onChange={onChange}
           />
@@ -82,7 +97,7 @@ describe('ExpressionEditor checks', () => {
   beforeEach(() => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => json({ type: 'text', diagnostics: [] })),
+      routes(() => json({ type: 'text', diagnostics: [] })),
     )
   })
 
@@ -91,15 +106,16 @@ describe('ExpressionEditor checks', () => {
   }
 
   /** Stubs the check route so that each answer waits until the test resolves it. */
-  function holdChecks() {
+  function holdChecks(scope?: unknown) {
     const answers: ((response: Response) => void)[] = []
     vi.stubGlobal(
       'fetch',
-      vi.fn(
+      routes(
         () =>
           new Promise<Response>((resolve) => {
             answers.push(resolve)
           }),
+        scope,
       ),
     )
     return answers
@@ -142,7 +158,7 @@ describe('ExpressionEditor checks', () => {
   it('is not busy when a check cannot reach the server', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => {
+      routes(async () => {
         throw new TypeError('Failed to fetch')
       }),
     )
@@ -172,18 +188,11 @@ describe('ExpressionEditor checks', () => {
   })
 
   it('keeps the newer answer when an older one arrives after it', async () => {
-    const answers: ((response: Response) => void)[] = []
-    const fetchMock = vi.fn(
-      () =>
-        new Promise<Response>((resolve) => {
-          answers.push(resolve)
-        }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
+    const answers = holdChecks()
     renderEditor('title > 5')
     await waitFor(() => expect(answers).toHaveLength(1))
     answers[0](json({ type: 'boolean', diagnostics: [] }))
-    await waitFor(() => expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('boolean'))
+    await waitFor(() => expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('Gives yes or no'))
 
     editTo('title > 5 and')
     await waitFor(() => expect(answers).toHaveLength(2))
@@ -191,27 +200,27 @@ describe('ExpressionEditor checks', () => {
     await waitFor(() => expect(answers).toHaveLength(3))
 
     answers[2](json({ type: 'boolean', diagnostics: [] }))
-    await waitFor(() => expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('boolean'))
+    await waitFor(() => expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('Gives yes or no'))
     answers[1](json({ type: null, diagnostics: [{ code: 'AXC0030', message: 'Old.', start: 0, end: 5 }] }))
     await act(() => new Promise((resolve) => setTimeout(resolve, 20)))
 
-    expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('boolean')
+    expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('Gives yes or no')
     expect(screen.queryByTestId('studio-expression-error')).not.toBeInTheDocument()
     expect(underlined()).toHaveLength(0)
   })
 
-  it('underlines the range of a diagnostic and shows its code and message', async () => {
+  it('underlines the range of a diagnostic and shows its message, then its code', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
-        json({ type: null, diagnostics: [{ code: 'AXC0030', message: 'Bad name.', start: 0, end: 5 }] }),
-      ),
+      routes(() => json({ type: null, diagnostics: [{ code: 'AXC0030', message: 'Bad name.', start: 0, end: 5 }] })),
     )
     renderEditor('title > 5')
 
     await waitFor(() => expect(underlined()).toHaveLength(1))
     expect(underlined()[0]).toHaveTextContent('title')
-    await waitFor(() => expect(screen.getByTestId('studio-expression-error')).toHaveTextContent('AXC0030: Bad name.'))
+    await waitFor(() => expect(screen.getByTestId('studio-expression-error')).toHaveTextContent('Bad name. AXC0030'))
+    expect(screen.getByText('Bad name.')).toBeInTheDocument()
+    expect(screen.getByText('AXC0030').tagName).toBe('SMALL')
     expect(screen.queryByTestId('studio-expression-type')).not.toBeInTheDocument()
   })
 
@@ -219,7 +228,7 @@ describe('ExpressionEditor checks', () => {
     let calls = 0
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => {
+      routes(async () => {
         calls++
         if (calls === 1) {
           return json({ type: 'boolean', diagnostics: [] })
@@ -231,37 +240,85 @@ describe('ExpressionEditor checks', () => {
       }),
     )
     const onChange = renderEditor('title > 5')
-    await waitFor(() => expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('boolean'))
+    await waitFor(() => expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('Gives yes or no'))
 
     editTo('title > 50')
     await waitFor(() => expect(calls).toBe(2))
     await act(() => new Promise((resolve) => setTimeout(resolve, 20)))
-    expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('boolean')
+    expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('Gives yes or no')
 
     editTo('title > 500')
     await waitFor(() => expect(calls).toBe(3))
     await act(() => new Promise((resolve) => setTimeout(resolve, 20)))
-    expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('boolean')
+    expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('Gives yes or no')
     expect(onChange).toHaveBeenLastCalledWith(path, 'title > 500')
   })
 
-  it('does not check an empty optional expression, and checks it once it has text', async () => {
-    const fetchMock = vi.mocked(fetch)
-    renderEditor('', vi.fn(), null, false)
-    await act(() => new Promise((resolve) => setTimeout(resolve, 20)))
-    expect(checkedExpressions(fetchMock)).toEqual([])
+  it.each([true, false])(
+    'does not check an empty text when required is %s, and checks it once it has text',
+    async (required) => {
+      const fetchMock = vi.mocked(fetch)
+      renderEditor('', vi.fn(), null, required)
+      await waitFor(() =>
+        expect(screen.getByRole('textbox', { name: 'expression' }).closest('[aria-busy]')).toHaveAttribute(
+          'aria-busy',
+          'false',
+        ),
+      )
+      await act(() => new Promise((resolve) => setTimeout(resolve, 20)))
+      expect(checkedExpressions(fetchMock)).toEqual([])
 
-    editTo('title')
-    await waitFor(() => expect(checkedExpressions(fetchMock)).toEqual(['title']))
+      editTo('title')
+      await waitFor(() => expect(checkedExpressions(fetchMock)).toEqual(['title']))
+    },
+  )
+
+  it('shows what the place needs until the check answers, then what the expression gives', async () => {
+    const answers = holdChecks({ type: 'boolean', fields: [], functions: [] })
+    renderEditor('title > 5')
+
+    await waitFor(() =>
+      expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('Needs to give yes or no'),
+    )
+    await waitFor(() => expect(answers).toHaveLength(1))
+    answers[0](json({ type: 'boolean', diagnostics: [] }))
+    await waitFor(() => expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('Gives yes or no'))
+    expect(screen.getByTestId('studio-expression-type')).not.toHaveTextContent('Needs')
+  })
+
+  it('shows no Needs line for a place that takes any type', async () => {
+    const answers = holdChecks({ type: null, fields: [], functions: [] })
+    renderEditor('title > 5')
+
+    await waitFor(() => expect(answers).toHaveLength(1))
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)))
+    expect(screen.queryByTestId('studio-expression-type')).not.toBeInTheDocument()
+  })
+
+  it('loads the scope once, with the draft as it stands, and not again after an edit', async () => {
+    const fetchMock = routes(() => json({ type: 'text', diagnostics: [] }), { type: null, fields: [], functions: [] })
+    vi.stubGlobal('fetch', fetchMock)
+    renderEditor('title > 5')
+    await waitFor(() => expect(root()).toHaveAttribute('aria-busy', 'false'))
+    editTo('title > 50')
+    await waitFor(() => expect(checkedExpressions(fetchMock)).toEqual(['title > 5', 'title > 50']))
+
+    const scopeCalls = fetchMock.mock.calls.filter(([input]) => input === scopePath)
+    expect(scopeCalls).toHaveLength(1)
+    expect(JSON.parse((scopeCalls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({
+      resourceId,
+      path,
+      draft: {},
+    })
   })
 
   it('does not report the value it was given as an edit', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => json({ type: 'boolean', diagnostics: [] })),
+      routes(() => json({ type: 'boolean', diagnostics: [] })),
     )
     const onChange = renderEditor('title > 5')
-    await waitFor(() => expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('boolean'))
+    await waitFor(() => expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('Gives yes or no'))
     expect(onChange).not.toHaveBeenCalled()
   })
 })
@@ -270,7 +327,7 @@ describe('ExpressionEditor completion', () => {
   beforeEach(() => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => json({ type: 'text', diagnostics: [] })),
+      routes(() => json({ type: 'text', diagnostics: [] })),
     )
   })
 
@@ -294,6 +351,51 @@ describe('ExpressionEditor completion', () => {
     expect(view.state.doc.toString()).toBe('length()')
     expect(view.state.selection.main.head).toBe(7)
   })
+
+  it('offers exactly the functions of the scope, with the cursor inside the brackets of one that takes parameters', async () => {
+    const user = userEvent.setup()
+    const functions = ['length', 'now'].map((name) => ({
+      name,
+      parameters: name === 'length' ? ['text'] : [],
+      result: name === 'length' ? 'integer' : 'date-time',
+      group: 'Text',
+      example: `${name}()`,
+      description: '',
+    }))
+    vi.stubGlobal(
+      'fetch',
+      routes(() => json({ type: 'text', diagnostics: [] }), { type: null, fields: [], functions }),
+    )
+    renderEditor('', vi.fn(), null, false, [{ label: 'amount', type: 'field', cursorInside: false }])
+
+    await user.click(screen.getByRole('textbox', { name: 'expression' }))
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledWith(scopePath, expect.anything()))
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+    await user.keyboard('{Control>}[Space]{/Control}')
+    await screen.findByRole('option', { name: /amount/ })
+
+    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['amount', 'length()', 'now()'])
+    await user.click(screen.getByRole('option', { name: /length/ }))
+    expect(viewOf().state.doc.toString()).toBe('length()')
+    expect(viewOf().state.selection.main.head).toBe(7)
+
+    editTo('')
+    await user.keyboard('{Control>}[Space]{/Control}')
+    await user.click(await screen.findByRole('option', { name: /now/ }))
+    expect(viewOf().state.doc.toString()).toBe('now()')
+    expect(viewOf().state.selection.main.head).toBe(5)
+  })
+
+  it('offers no function when the scope is not answered', async () => {
+    const user = userEvent.setup()
+    renderEditor('', vi.fn(), null, false, [{ label: 'amount', type: 'field', cursorInside: false }])
+
+    await user.click(screen.getByRole('textbox', { name: 'expression' }))
+    await user.keyboard('{Control>}[Space]{/Control}')
+    await screen.findByRole('option', { name: /amount/ })
+
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+  })
 })
 
 describe.each(['light', 'dark'] as const)('ExpressionEditor in %s mode', (mode) => {
@@ -301,7 +403,7 @@ describe.each(['light', 'dark'] as const)('ExpressionEditor in %s mode', (mode) 
     localStorage.setItem('axis.themeMode', mode)
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => json({ type: 'boolean', diagnostics: [] })),
+      routes(() => json({ type: 'boolean', diagnostics: [] })),
     )
   })
 

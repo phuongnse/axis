@@ -7,46 +7,15 @@ export interface ScopeOption {
   cursorInside: boolean
 }
 
-const functionNames = [
-  'length',
-  'contains',
-  'startsWith',
-  'endsWith',
-  'concat',
-  'lower',
-  'upper',
-  'trim',
-  'abs',
-  'round',
-  'floor',
-  'ceiling',
-  'year',
-  'month',
-  'day',
-  'addDays',
-  'daysBetween',
-  'coalesce',
-  'if',
-  'date',
-  'dateTime',
-  'now',
-  'today',
-  'toDate',
-]
-
-const aggregateNames = ['count', 'sum', 'avg', 'min', 'max', 'any', 'all', 'first']
-
-const zeroArgumentFunctions = ['now', 'today', 'currentUser']
-
 const fieldDefault = /^\/fields\/\d+\/default$/
-const grantFilter = /^\/grants\/\d+\/filter$/
 const grantIndex = /^\/grants\/(\d+)\//
 const waitEventWhen = /^\/steps\/(\d+)\/when$/
 const stepInput = /^\/steps\/(\d+)\/input\/(.+)$/
 
 /**
- * The names an expression can use at a JSON Pointer of a resource of the given kind. With no names loaded, only
- * the functions are offered. A field's `default` has no record in scope, so it offers rules and functions only. A malformed draft yields fewer names, never an error.
+ * The names an expression can use at a JSON Pointer of a resource of the given kind, except the functions, which the
+ * server's expression scope lists for the place. With no names loaded, none are offered. A field's `default` has no
+ * record in scope, so it offers rules only. A malformed draft yields fewer names, never an error.
  */
 export function expressionScope(
   kind: string,
@@ -54,23 +23,20 @@ export function expressionScope(
   pointer: string,
   names: StudioNames | null,
 ): ScopeOption[] {
-  const functions = functionOptions(kind, pointer)
   if (names === null) {
-    return functions
+    return []
   }
   const payload = waitEventPayload(kind, draft, pointer, names)
   if (payload !== undefined) {
     return [
       ...payload.map((name) => option(name, 'field', false)),
       ...names.rules.map((rule) => option(`${rule.name}()`, 'rule', true)),
-      ...functions,
     ]
   }
   return [
     ...parameterOptions(kind, draft, pointer),
     ...fieldOptions(kind, draft, pointer, names),
     ...names.rules.map((rule) => option(`${rule.name}()`, 'rule', true)),
-    ...functions,
   ]
 }
 
@@ -196,16 +162,6 @@ function entityOf(kind: string, draft: Record<string, unknown>, pointer: string)
     return stringProperty(draft, 'entity')
   }
   return undefined
-}
-
-function functionOptions(kind: string, pointer: string): ScopeOption[] {
-  // A default sees no child collections, so an aggregate can never be valid in it.
-  const names =
-    kind === 'entity' && fieldDefault.test(pointer) ? [...functionNames] : [...functionNames, ...aggregateNames]
-  if ((kind === 'policy' && grantFilter.test(pointer)) || (kind === 'dataSource' && pointer === '/filter')) {
-    names.push('currentUser')
-  }
-  return names.map((name) => option(`${name}()`, 'function', !zeroArgumentFunctions.includes(name)))
 }
 
 function option(label: string, type: ScopeOption['type'], cursorInside: boolean): ScopeOption {

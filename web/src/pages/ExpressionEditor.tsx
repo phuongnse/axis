@@ -10,7 +10,12 @@ import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
-import { checkStudioExpression, type ExpressionCheck } from '../platform/studio'
+import {
+  checkStudioExpression,
+  fetchStudioExpressionScope,
+  type ExpressionCheck,
+  type ExpressionScope,
+} from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
@@ -31,14 +36,16 @@ export interface ExpressionEditorProps {
   name: string
   value: string
   required: boolean
-  /** The names an author can complete at this place. */
+  /** The resource as the author has it. The scope of the place is loaded for it once. */
+  draft: Record<string, unknown>
+  /** The names an author can complete at this place, apart from the functions, which the expression scope lists. */
   options: ScopeOption[]
   onChange: (path: string, next: string | undefined) => void
 }
 
 interface Result {
   type: string | null
-  error: string | null
+  error: { code: string; message: string } | null
 }
 
 /** A code editor for one expression. It checks the text after the author stops typing and shows the newest answer. */
@@ -49,6 +56,7 @@ export default function ExpressionEditor({
   name,
   value,
   required,
+  draft,
   options,
   onChange,
 }: ExpressionEditorProps) {
@@ -60,11 +68,47 @@ export default function ExpressionEditor({
   const [themeCompartment] = useState(() => new Compartment())
   const [result, setResult] = useState<Result>({ type: null, error: null })
   const [checking, setChecking] = useState(true)
-  const latest = useRef({ onChange, required, options, value, theme: expressionTheme(tokens, mode), themeCompartment })
+  const placeKey = JSON.stringify([application, resourceId, path])
+  const [loaded, setLoaded] = useState<{ placeKey: string; scope: ExpressionScope | null } | null>(null)
+  // An answer for another place is not this place's scope.
+  const scope = loaded?.placeKey === placeKey ? loaded.scope : null
+  const latest = useRef({
+    onChange,
+    required,
+    options,
+    functions: functionOptions(scope),
+    draft,
+    value,
+    theme: expressionTheme(tokens, mode),
+    themeCompartment,
+  })
 
   useEffect(() => {
-    latest.current = { onChange, required, options, value, theme: expressionTheme(tokens, mode), themeCompartment }
+    latest.current = {
+      onChange,
+      required,
+      options,
+      functions: functionOptions(scope),
+      draft,
+      value,
+      theme: expressionTheme(tokens, mode),
+      themeCompartment,
+    }
   })
+
+  // The scope is loaded once per place, with the draft as it stands then, so a keystroke in the draft loads no more.
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchStudioExpressionScope(application, resourceId, path, latest.current.draft, controller.signal).then(
+      (answer) => {
+        if (!controller.signal.aborted) {
+          setLoaded({ placeKey, scope: answer })
+        }
+      },
+      () => {},
+    )
+    return () => controller.abort()
+  }, [application, resourceId, path, placeKey])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -74,7 +118,7 @@ export default function ExpressionEditor({
     const check = (view: EditorView) => {
       const id = counter
       const text = view.state.doc.toString()
-      if (text === '' && !latest.current.required) {
+      if (text === '') {
         show(view, { type: null, diagnostics: [] })
         setChecking(false)
         return
@@ -98,7 +142,8 @@ export default function ExpressionEditor({
     }
 
     const initial = latest.current
-    const complete = (context: CompletionContext) => completeAt(context, latest.current.options)
+    const complete = (context: CompletionContext) =>
+      completeAt(context, [...latest.current.options, ...latest.current.functions])
     const view = new EditorView({
       parent: hostRef.current!,
       state: EditorState.create({
@@ -108,6 +153,7 @@ export default function ExpressionEditor({
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           autocompletion({ override: [complete] }),
+          EditorView.lineWrapping,
           initial.themeCompartment.of(initial.theme),
           EditorView.contentAttributes.of({ 'aria-label': name }),
           EditorView.updateListener.of((update) => {
@@ -152,22 +198,31 @@ export default function ExpressionEditor({
     }
   }, [value])
 
+  const words = (type: string) => t(`shell.studio.expression.type.${type}`)
+  // What the check gave, or until it answers, what the place needs. A place that takes any type shows no line.
+  const line =
+    result.type !== null
+      ? t('shell.studio.expression.gives').replace('{type}', words(result.type))
+      : scope?.type
+        ? t('shell.studio.expression.needs').replace('{type}', words(scope.type))
+        : null
+
   return (
     <div aria-busy={checking}>
       <div ref={hostRef} />
-      {result.error !== null && (
-        <div>
-          <Typography.Text type="danger" data-testid="studio-expression-error">
-            {result.error}
+      {result.error !== null ? (
+        <div data-testid="studio-expression-error">
+          <Typography.Text type="danger">{result.error.message}</Typography.Text>{' '}
+          <Typography.Text type="secondary">
+            <small>{result.error.code}</small>
           </Typography.Text>
         </div>
-      )}
-      {result.type !== null && (
-        <div>
-          <Typography.Text data-testid="studio-expression-type">
-            {t('shell.studio.expressionType')} <code>{result.type}</code>
-          </Typography.Text>
-        </div>
+      ) : (
+        line !== null && (
+          <div>
+            <Typography.Text data-testid="studio-expression-type">{line}</Typography.Text>
+          </div>
+        )
       )}
     </div>
   )
@@ -189,11 +244,21 @@ export default function ExpressionEditor({
           from--
         }
       }
-      return { from, to, severity: 'error', message: `${item.code}: ${item.message}` }
+      return { from, to, severity: 'error', message: item.message }
     })
     view.dispatch(setDiagnostics(view.state, diagnostics))
-    setResult({ type: null, error: diagnostics[0].message })
+    const first = answer.diagnostics[0]
+    setResult({ type: null, error: { code: first.code, message: first.message } })
   }
+}
+
+/** The functions and aggregates that the scope of the place allows. A call with parameters puts the cursor inside its brackets. */
+function functionOptions(scope: ExpressionScope | null): ScopeOption[] {
+  return (scope?.functions ?? []).map((item) => ({
+    label: `${item.name}()`,
+    type: 'function',
+    cursorInside: item.parameters.length > 0,
+  }))
 }
 
 /** Completes the word before the cursor, or opens the list at the cursor when Ctrl+Space asks for it. */
