@@ -602,7 +602,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         await page
           .getByTestId(recipient)
           .locator('label')
-          .filter({ has: page.getByRole('radio', { name: 'Role', exact: true }) })
+          .filter({ has: page.getByRole('radio', { name: /^Role/ }) })
           .click()
         await pickLabelled(page, `${recipient}/role`, 'roles', spec.to.role)
       } else {
@@ -1100,7 +1100,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       await page
         .getByTestId('studio-field-/steps/0/to/0')
         .locator('label')
-        .filter({ has: page.getByRole('radio', { name: 'Role', exact: true }) })
+        .filter({ has: page.getByRole('radio', { name: /^Role/ }) })
         .click()
       await pickLabelled(page, 'studio-field-/steps/0/to/0/role', 'roles', 'service-desk-lead')
       await page

@@ -56,7 +56,7 @@ export function Expression({
 
 /**
  * A field with a picker over the application's names of one kind, or a plain box while the names have not loaded. An
- * empty `help` draws no help line.
+ * empty `help` draws no help line. `required` marks the field, as `AxisField` does, and the screen checks the value.
  */
 export function NamePicker({
   pointer,
@@ -64,6 +64,7 @@ export function NamePicker({
   help,
   kind,
   value,
+  required,
   onPick,
 }: {
   pointer: string
@@ -71,13 +72,14 @@ export function NamePicker({
   help: string
   kind: string
   value: unknown
+  required?: boolean
   onPick: (next: string) => void
 }) {
   const names = useContext(StudioNamesContext)
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <AxisField label={label} help={help}>
+      <AxisField label={label} help={help} required={required}>
         {names === undefined ? (
           <Input value={text(value)} onChange={(event) => onPick(event.target.value)} />
         ) : (
