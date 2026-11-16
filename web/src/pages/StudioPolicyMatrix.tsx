@@ -234,6 +234,7 @@ function GrantPanel({
             target={target}
             names={names}
             saved={saved}
+            othersShown={readOnlyGrants.length > 0}
             onWritten={onWritten}
           />
         )}
@@ -315,6 +316,7 @@ function stringsOf(value: unknown): string[] {
  * one patch with the version the policy was loaded at, or creates the policy when the role has none. Save is on while
  * a grant has no ticked action. A click then shows what to fix under that grant's actions, focuses its first box and
  * sends nothing, see docs/reference/actions-and-controls.md#fields. A save that succeeds and Reload clear that check.
+ * It says the role has no own grant only when the cell shows no grant at all, see docs/reference/studio.md#policy-matrix.
  */
 function OwnGrants({
   application,
@@ -322,6 +324,7 @@ function OwnGrants({
   target,
   names,
   saved,
+  othersShown,
   onWritten,
 }: {
   application: string
@@ -329,6 +332,7 @@ function OwnGrants({
   target: StudioMatrixTarget
   names: StudioNames | null
   saved: boolean
+  othersShown: boolean
   onWritten: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem) => void
 }) {
   const t = useText()
@@ -469,7 +473,7 @@ function OwnGrants({
 
   return (
     <Flex vertical gap="small" ref={rootRef} data-testid="studio-matrix-own-grants">
-      {own.length === 0 && <EmptyState text={t('shell.studio.matrix.noGrants')} />}
+      {own.length === 0 && !othersShown && <EmptyState text={t('shell.studio.matrix.noGrants')} />}
       {own.map((index) => {
         const grant = grants[index] as Content
         const actions = stringsOf(grant.actions)

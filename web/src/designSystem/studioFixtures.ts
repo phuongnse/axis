@@ -499,7 +499,7 @@ function policyMatrix(folder: Folder) {
                   actions: roleActions,
                   filter: null,
                   fields: null,
-                  shared: false,
+                  shared: true,
                   module: null,
                 },
               ]
