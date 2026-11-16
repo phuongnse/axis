@@ -3,7 +3,7 @@ import { ConfigProvider } from 'antd'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, Link, MemoryRouter, RouterProvider, useLocation } from 'react-router'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
 import { isSignInNeeded } from '../platform/signInNeeded'
@@ -1657,6 +1657,54 @@ describe('StudioPage publishing', () => {
     expect(await screen.findByTestId('studio-request-error')).toHaveTextContent(
       'This tenant has reached its storage quota.',
     )
+  })
+
+  // jsdom has no layout, so the band's row is faked 300 px wide for 400 px of content, and it folds.
+  describe('with too little room', () => {
+    beforeEach(() => {
+      const onRow = (element: HTMLElement, width: number) => (element.hasAttribute('data-fold-row') ? width : 0)
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+        return onRow(this, 300)
+      })
+      vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (this: HTMLElement) {
+        return onRow(this, 400)
+      })
+    })
+    afterEach(() => vi.restoreAllMocks())
+
+    it.each([
+      ['an author who may publish', true, ['New resource…', 'Publish…']],
+      ['an author who may not publish', false, ['New resource…']],
+    ])('folds Validate, Preview and Run tests into the More actions menu for %s', async (_name, mayPublish, kept) => {
+      stubPublishing(() =>
+        json({
+          id: 'author',
+          studio: true,
+          studioPublisher: mayPublish,
+          studioTest: true,
+          studioPreviewHost: 'preview.example.test',
+        }),
+      )
+      renderPage()
+
+      const more = await screen.findByRole('button', { name: 'More actions' })
+      const band = within(screen.getByTestId('studio-band'))
+      await waitFor(() =>
+        expect(
+          band
+            .getAllByRole('button')
+            .filter((button) => button.dataset.testid !== 'studio-problems')
+            .map((button) => button.textContent || button.ariaLabel),
+        ).toEqual([kept[0], 'More actions', ...kept.slice(1)]),
+      )
+      await userEvent.click(more)
+
+      expect(
+        within(await screen.findByRole('menu', { name: 'More actions' }))
+          .getAllByRole('menuitem')
+          .map((entry) => entry.textContent),
+      ).toEqual(['Validate', 'Preview', 'Run tests'])
+    })
   })
 
   it.each([

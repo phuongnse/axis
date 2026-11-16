@@ -82,7 +82,8 @@ async function findPreviewLinks(
 
 /**
  * The band of the open application, with the status of the request its buttons send and its release history. The
- * band holds the `newResource` button, Validate, Preview, Run tests and Publish. On its left it shows the application's
+ * band holds the `newResource` button, Validate, Preview, Run tests and Publish. They keep one line: when they do not
+ * fit, Validate, Preview and Run tests fold into one "…" menu, see `AxisActionRow`. On its left it shows the application's
  * state in words, see `StudioBand`: the problems of `diagnostics`, which `onToggleProblems` opens as the `problems`
  * panel beside the page, then the release state. The request status, test results and
  * preview links show at the top of the content, under the band, then `children`, which is called with the release history
@@ -264,36 +265,53 @@ export function StudioPublishing({
         problemsOpen={problemsOpen}
         onToggleProblems={onToggleProblems}
       >
-        <AxisActionRow align="center">
+        <AxisActionRow
+          align="center"
+          justify="flex-end"
+          fold={[
+            {
+              key: 'validate',
+              labelKey: 'shell.studio.validate',
+              disabled: busy,
+              onClick: () => send(() => validateStudioApp(application)),
+            },
+            ...(previewHost !== null
+              ? [
+                  {
+                    key: 'preview',
+                    labelKey: 'shell.studio.preview',
+                    disabled: busy,
+                    onClick: () => send(() => previewStudioApp(application)),
+                    attributes: { 'data-testid': 'studio-preview' },
+                  },
+                ]
+              : []),
+            ...(canTest
+              ? [
+                  {
+                    key: 'run-tests',
+                    labelKey: 'shell.studio.runTests',
+                    disabled: busy,
+                    onClick: () => send(() => testStudioApp(application)),
+                    attributes: { 'data-testid': 'studio-run-tests' },
+                  },
+                ]
+              : []),
+          ]}
+          end={
+            canPublish && (
+              <AxisButton
+                role="finish"
+                data-testid="studio-publish"
+                disabled={busy}
+                onClick={() => setDialogOpen(true)}
+              >
+                {t('shell.studio.publish')}
+              </AxisButton>
+            )
+          }
+        >
           {newResource}
-          <AxisButton role="secondary" disabled={busy} onClick={() => send(() => validateStudioApp(application))}>
-            {t('shell.studio.validate')}
-          </AxisButton>
-          {previewHost !== null && (
-            <AxisButton
-              role="secondary"
-              data-testid="studio-preview"
-              disabled={busy}
-              onClick={() => send(() => previewStudioApp(application))}
-            >
-              {t('shell.studio.preview')}
-            </AxisButton>
-          )}
-          {canTest && (
-            <AxisButton
-              role="secondary"
-              data-testid="studio-run-tests"
-              disabled={busy}
-              onClick={() => send(() => testStudioApp(application))}
-            >
-              {t('shell.studio.runTests')}
-            </AxisButton>
-          )}
-          {canPublish && (
-            <AxisButton role="finish" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>
-              {t('shell.studio.publish')}
-            </AxisButton>
-          )}
         </AxisActionRow>
       </StudioBand>
       <Flex gap="middle" align="flex-start">

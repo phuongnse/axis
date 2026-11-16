@@ -486,6 +486,7 @@
   "shell.notFound.title": "Không tìm thấy trang",
   "shell.notFound.message": "Địa chỉ này không có trang nào.",
   "shell.notFound.home": "Về trang chủ",
+  "shell.actionRow.more": "Thao tác khác",
   "shell.table.yes": "Có",
   "shell.table.no": "Không",
   "shell.table.empty": "Chưa có bản ghi nào.",
