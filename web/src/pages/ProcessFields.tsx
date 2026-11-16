@@ -63,6 +63,7 @@ export function NamePicker({
   label,
   help,
   kind,
+  required = false,
   value,
   onPick,
 }: {
@@ -70,6 +71,8 @@ export function NamePicker({
   label: string
   help: string
   kind: string
+  /** Marks the field required, as for {@link AxisField}. Off unless the schema requires the key. */
+  required?: boolean
   value: unknown
   onPick: (next: string) => void
 }) {
@@ -77,7 +80,7 @@ export function NamePicker({
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <AxisField label={label} help={help}>
+      <AxisField label={label} help={help} required={required}>
         {names === undefined ? (
           <Input value={text(value)} onChange={(event) => onPick(event.target.value)} />
         ) : (

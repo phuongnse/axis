@@ -1071,12 +1071,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     ) {
       await createResource(page, 'process', name)
       await openFormTab(page)
-      await page
-        .locator('label')
-        .filter({
-          has: page.getByRole('radio', { name: 'Parameters', exact: true }),
-        })
-        .click()
+      await page.getByRole('radio', { name: /^Parameters/ }).click()
       await expect(page.getByTestId('studio-field-/entity')).toHaveCount(0)
       for (const [index, [parameter, type]] of parameters.entries()) {
         await page.getByRole('button', { name: 'Add parameter', exact: true }).click()

@@ -73,10 +73,7 @@ test.describe('Studio builds a process without a subject and its triggers in the
 
     await createResource(page, 'process', 'DailyReminder')
     await openFormTab(page)
-    await page
-      .locator('label')
-      .filter({ has: page.getByRole('radio', { name: 'Parameters', exact: true }) })
-      .click()
+    await page.getByRole('radio', { name: /^Parameters/ }).click()
     await expect(page.getByTestId('studio-field-/entity')).toHaveCount(0)
     await page.getByRole('button', { name: 'Add parameter', exact: true }).click()
     await page.getByRole('textbox', { name: 'Parameter name', exact: true }).fill('daysOverdue')
