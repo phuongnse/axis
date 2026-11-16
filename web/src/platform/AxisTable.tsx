@@ -110,12 +110,11 @@ export interface AxisBulkAction<T> {
 }
 
 /**
- * The toolbar of every table, see docs/reference/actions-and-controls.md#tables. The view controls, such as search, sit
- * on the left. On the right come Refresh, the secondary actions such as Import and Export, and the main action last.
- * Each is there only when the table has it.
+ * The toolbar of every table, see docs/reference/actions-and-controls.md#tables. AxisTable draws the view's Search, Filter
+ * and Columns on the left. The toolbar gives the right side: Refresh, the secondary actions such as Import and Export, and
+ * the main action last. Each is there only when the table has it.
  */
 export interface AxisTableToolbar {
-  view?: ReactNode
   onRefresh?: () => void
   secondary?: ReactNode
   main?: ReactNode
@@ -456,7 +455,6 @@ export function AxisTable<T extends object>({
     searchable ||
     filterable ||
     arrangeable ||
-    toolbar.view !== undefined ||
     toolbar.onRefresh !== undefined ||
     toolbar.secondary !== undefined ||
     toolbar.main !== undefined
@@ -501,7 +499,7 @@ export function AxisTable<T extends object>({
     <Flex ref={tableRef} vertical gap="middle" aria-busy={loading} data-testid={testId}>
       {hasToolbar && (
         <Flex justify="space-between" align="center" gap="small" wrap>
-          {(searchable || filterable || arrangeable || toolbar.view !== undefined) && (
+          {(searchable || filterable || arrangeable) && (
             <Flex gap="small" wrap>
               {searchable && (
                 <Input.Search
@@ -528,7 +526,6 @@ export function AxisTable<T extends object>({
                   onApply={onColumns}
                 />
               )}
-              {toolbar.view}
             </Flex>
           )}
           <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
