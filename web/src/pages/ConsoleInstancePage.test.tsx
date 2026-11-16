@@ -120,6 +120,28 @@ describe('ConsoleInstancePage', () => {
     expect(screen.getByRole('link', { name: 'Operator console' })).toHaveAttribute('href', '/console')
   })
 
+  it('shows the instance in parts: details, then each section, with a rule before every part but the first', async () => {
+    stubServer(
+      () => new Response(JSON.stringify(detail), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    renderPage()
+
+    const page = await screen.findByTestId('inspector-instance')
+    const parts = within(page).getAllByRole('region')
+    expect(parts.map((part) => within(part).getByRole('heading', { level: 2 }).textContent)).toEqual([
+      'Details',
+      'Steps',
+      'History',
+      'Tasks',
+      'Calls',
+      'Sub-processes',
+    ])
+    expect(within(page).getAllByRole('separator')).toHaveLength(5)
+    for (const part of parts.slice(1)) {
+      expect(part.previousElementSibling).toHaveAttribute('role', 'separator')
+    }
+  })
+
   it('posts the reason of a retry to the console route and shows the instance read again', async () => {
     const json = (body: unknown) =>
       new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })

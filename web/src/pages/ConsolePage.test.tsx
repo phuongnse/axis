@@ -265,6 +265,24 @@ describe('ConsolePage', () => {
     expect(within(view).queryByText('Active')).toBeNull()
   })
 
+  it('shows each monitor as a part named by its heading, and no card', async () => {
+    stubServer(tenantAndFailedWork)
+    renderPage()
+
+    const monitors = [
+      ['shell.console.tenant.title', 'console-tenant'],
+      ['shell.console.failedWork.title', 'console-failed-work'],
+      ['shell.console.webhooks.title', 'console-webhook-deliveries'],
+      ['shell.console.publishing.title', 'console-publishing'],
+      ['shell.console.deadLetters.title', 'console-dead-letters'],
+      ['shell.console.schedules.title', 'console-schedules'],
+    ] as const
+    for (const [title, testId] of monitors) {
+      expect(await screen.findByRole('region', { name: platformEnglish[title] })).toBe(screen.getByTestId(testId))
+    }
+    expect(document.querySelector('.ant-card')).toBeNull()
+  })
+
   it('shows the forbidden page on a 403', async () => {
     stubServer(() => new Response(null, { status: 403 }))
     renderPage()
@@ -272,6 +290,7 @@ describe('ConsolePage', () => {
     const forbidden = await screen.findByTestId('console-forbidden')
     expect(within(forbidden).getByText('This page is for operators.')).toBeVisible()
     expect(screen.queryByTestId('console-tenant')).toBeNull()
+    expect(screen.queryAllByRole('region')).toHaveLength(0)
   })
 
   it('shows an error when the tenant cannot be loaded', async () => {

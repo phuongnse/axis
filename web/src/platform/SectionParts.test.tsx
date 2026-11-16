@@ -63,6 +63,18 @@ describe('SectionPart', () => {
     expect(screen.queryByRole('region')).toBeNull()
   })
 
+  it('gives a part the test id it names in place of the section test id', () => {
+    renderSections(
+      <SectionPart testId="console-tenant" heading={{ title: 'Tenant' }}>
+        <span>Fields</span>
+      </SectionPart>,
+    )
+
+    const section = screen.getByRole('region', { name: 'Tenant' })
+    expect(section).toBe(screen.getByTestId('console-tenant'))
+    expect(screen.queryByTestId('studio-section-console-tenant')).toBeNull()
+  })
+
   it('shows its action beside the heading', () => {
     renderSections(
       <SectionPart
