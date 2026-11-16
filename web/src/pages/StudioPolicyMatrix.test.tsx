@@ -327,6 +327,18 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(screen.getAllByRole('checkbox').map((box) => (box as HTMLInputElement).value)).toEqual(['invoke'])
   })
 
+  it('says that the grants are loading while the access policy loads', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) => (input === policyUrl ? new Promise<Response>(() => {}) : Promise.resolve(json({})))),
+    )
+    renderMatrix()
+
+    await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-entity-PurchaseRequest'))
+
+    expect(within(await screen.findByTestId('studio-matrix-grants')).getByText('Loading the grants…')).toBeVisible()
+  })
+
   it('sends one patch with the loaded version that changes only the edited grant', async () => {
     const fetchMock = stubFetch()
     const { onWritten } = renderMatrix()

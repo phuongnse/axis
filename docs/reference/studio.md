@@ -440,7 +440,7 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
   not done here.
 - **Editable grants.** In an editable row, the cell's own grants, those of `<Role>Access` that name
   exactly this target, are editable. The panel reads that policy with the resource route, so every
-  edit fits the file that a save patches.
+  edit fits the file that a save patches. While the policy loads, the panel says so.
   - Each grant has a checkbox for each action its target takes, as
     [roles and policies](roles-and-policies.md) lists them, which Studio reads from
     `policy.schema.json`. An action the target does not take stays in the file and shows as a warning

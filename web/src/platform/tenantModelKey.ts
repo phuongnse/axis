@@ -6,14 +6,18 @@ export interface TenantModelKey {
   ending: string | null
 }
 
-/** Reads the model key. Any status but `200` gives `null`, and a status other than `404` or `403` is logged. */
-export async function fetchTenantModelKey(signal?: AbortSignal): Promise<TenantModelKey | null> {
+/**
+ * Reads the model key. A `404` or `403` gives `null`: the part does not apply or is not allowed, and nothing is logged.
+ * Any other status but `200` is logged and gives `'failed'`.
+ */
+export async function fetchTenantModelKey(signal?: AbortSignal): Promise<TenantModelKey | 'failed' | null> {
   const response = await apiFetch('/api/tenant/model-key', { signal }, { promptSignInOnUnauthorized: false })
   if (!response.ok) {
-    if (response.status !== 404 && response.status !== 403) {
-      console.warn(`Reading the model key failed with status ${response.status}.`)
+    if (response.status === 404 || response.status === 403) {
+      return null
     }
-    return null
+    console.warn(`Reading the model key failed with status ${response.status}.`)
+    return 'failed'
   }
   return (await response.json()) as TenantModelKey
 }

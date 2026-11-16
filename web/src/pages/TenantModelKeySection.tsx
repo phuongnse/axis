@@ -1,5 +1,5 @@
 import { Flex, Input, Modal, Typography } from 'antd'
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
@@ -15,9 +15,10 @@ import {
 type Dialog = 'set' | 'remove'
 
 /**
- * The "Model key" section of the users page for an administrator where the installation allows tenant keys. It renders
- * nothing unless `GET /api/tenant/model-key` answers `200`, so it stays hidden from a non-administrator, where
- * `Ai:AllowTenantKeys` is off and for a tenant with no directory row. It shows `••••` and the key's last four
+ * The "Model key" section of the users page for an administrator where the installation allows tenant keys. A `403` or
+ * `404` from `GET /api/tenant/model-key` leaves it out, so it stays hidden from a non-administrator, where
+ * `Ai:AllowTenantKeys` is off and for a tenant with no directory row. While the key loads the section says so, and
+ * when the read fails any other way it says that the key could not be loaded. Once loaded it shows `••••` and the key's last four
  * characters, or says that no key is set. The Set and Change buttons open a dialog with a password field, and only its
  * Save button sends the key. The Remove button asks for a confirmation first. After each change the section reads the
  * key again, so it shows what the server stored. See docs/reference/platform-pages.md#model-key.
@@ -26,7 +27,7 @@ export function TenantModelKeySection() {
   const t = useText()
   const { size } = useDesignTokens()
   const headingId = useId()
-  const [modelKey, setModelKey] = useState<TenantModelKey | null>(null)
+  const [modelKey, setModelKey] = useState<TenantModelKey | 'failed' | null>()
   const [dialog, setDialog] = useState<Dialog>()
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
@@ -43,14 +44,30 @@ export function TenantModelKeySection() {
       (error: unknown) => {
         if (!controller.signal.aborted) {
           console.warn('Loading the model key failed', error)
+          setModelKey('failed')
         }
       },
     )
     return () => controller.abort()
   }, [])
 
-  if (!modelKey) {
+  if (modelKey === null) {
     return null
+  }
+  if (modelKey === undefined || modelKey === 'failed') {
+    return (
+      <ModelKeyShell headingId={headingId}>
+        {modelKey === undefined ? (
+          <Typography.Text>{t('shell.users.modelKey.loading')}</Typography.Text>
+        ) : (
+          <AxisAlert
+            data-testid="tenant-model-key-load-failed"
+            kind="error"
+            message={t('shell.users.modelKey.loadFailed')}
+          />
+        )}
+      </ModelKeyShell>
+    )
   }
 
   function close() {
@@ -82,61 +99,82 @@ export function TenantModelKeySection() {
   }
 
   return (
+    <ModelKeyShell
+      headingId={headingId}
+      dialogs={
+        <>
+          <Modal
+            open={dialog === 'set'}
+            width={size.dialog.small}
+            title={t(modelKey.set ? 'shell.users.modelKey.changeTitle' : 'shell.users.modelKey.setTitle')}
+            okText={t('shell.users.modelKey.save')}
+            cancelText={t('shell.users.roles.cancel')}
+            okButtonProps={{ disabled: draft.trim() === '' }}
+            confirmLoading={busy}
+            onOk={() => void change(() => setTenantModelKey(draft), 'saveFailed')}
+            onCancel={close}
+          >
+            <AxisField label={t('shell.users.modelKey.field')} help={t('shell.users.modelKey.help')}>
+              <Input.Password autoComplete="off" value={draft} onChange={(event) => setDraft(event.target.value)} />
+            </AxisField>
+          </Modal>
+          <Modal
+            open={dialog === 'remove'}
+            width={size.dialog.small}
+            title={t('shell.users.modelKey.removeConfirm')}
+            okText={t('shell.users.modelKey.remove.ok')}
+            cancelText={t('shell.users.roles.cancel')}
+            confirmLoading={busy}
+            onOk={() => void change(removeTenantModelKey, 'removeFailed')}
+            onCancel={close}
+          >
+            <Typography.Text>{t('shell.users.modelKey.removeEffect')}</Typography.Text>
+          </Modal>
+        </>
+      }
+    >
+      {modelKey.set ? (
+        <Typography.Text data-testid="tenant-model-key-masked">{`••••${modelKey.ending ?? ''}`}</Typography.Text>
+      ) : (
+        <Typography.Text>{t('shell.users.modelKey.none')}</Typography.Text>
+      )}
+      {failure && (
+        <AxisAlert data-testid="tenant-model-key-notice" kind="error" message={t(`shell.users.modelKey.${failure}`)} />
+      )}
+      <Flex gap="small">
+        <AxisButton role="secondary" onClick={() => open('set')}>
+          {t(modelKey.set ? 'shell.users.modelKey.change' : 'shell.users.modelKey.set')}
+        </AxisButton>
+        {modelKey.set && (
+          <AxisButton role="secondary" onClick={() => open('remove')}>
+            {t('shell.users.modelKey.remove')}
+          </AxisButton>
+        )}
+      </Flex>
+    </ModelKeyShell>
+  )
+}
+
+/** The section and its heading, which the loading, failed and loaded states share. */
+function ModelKeyShell({
+  headingId,
+  children,
+  dialogs,
+}: {
+  headingId: string
+  children: ReactNode
+  dialogs?: ReactNode
+}) {
+  const t = useText()
+  return (
     <section aria-labelledby={headingId} data-testid="tenant-model-key">
       <Flex vertical gap="small">
         <Typography.Title level={3} id={headingId}>
           {t('shell.users.modelKey.title')}
         </Typography.Title>
-        {modelKey.set ? (
-          <Typography.Text data-testid="tenant-model-key-masked">{`••••${modelKey.ending ?? ''}`}</Typography.Text>
-        ) : (
-          <Typography.Text>{t('shell.users.modelKey.none')}</Typography.Text>
-        )}
-        {failure && (
-          <AxisAlert
-            data-testid="tenant-model-key-notice"
-            kind="error"
-            message={t(`shell.users.modelKey.${failure}`)}
-          />
-        )}
-        <Flex gap="small">
-          <AxisButton role="secondary" onClick={() => open('set')}>
-            {t(modelKey.set ? 'shell.users.modelKey.change' : 'shell.users.modelKey.set')}
-          </AxisButton>
-          {modelKey.set && (
-            <AxisButton role="secondary" onClick={() => open('remove')}>
-              {t('shell.users.modelKey.remove')}
-            </AxisButton>
-          )}
-        </Flex>
+        {children}
       </Flex>
-      <Modal
-        open={dialog === 'set'}
-        width={size.dialog.small}
-        title={t(modelKey.set ? 'shell.users.modelKey.changeTitle' : 'shell.users.modelKey.setTitle')}
-        okText={t('shell.users.modelKey.save')}
-        cancelText={t('shell.users.roles.cancel')}
-        okButtonProps={{ disabled: draft.trim() === '' }}
-        confirmLoading={busy}
-        onOk={() => void change(() => setTenantModelKey(draft), 'saveFailed')}
-        onCancel={close}
-      >
-        <AxisField label={t('shell.users.modelKey.field')} help={t('shell.users.modelKey.help')}>
-          <Input.Password autoComplete="off" value={draft} onChange={(event) => setDraft(event.target.value)} />
-        </AxisField>
-      </Modal>
-      <Modal
-        open={dialog === 'remove'}
-        width={size.dialog.small}
-        title={t('shell.users.modelKey.removeConfirm')}
-        okText={t('shell.users.modelKey.remove.ok')}
-        cancelText={t('shell.users.roles.cancel')}
-        confirmLoading={busy}
-        onOk={() => void change(removeTenantModelKey, 'removeFailed')}
-        onCancel={close}
-      >
-        <Typography.Text>{t('shell.users.modelKey.removeEffect')}</Typography.Text>
-      </Modal>
+      {dialogs}
     </section>
   )
 }

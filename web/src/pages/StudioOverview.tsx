@@ -1,4 +1,4 @@
-import { Flex, Spin, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
 import { useContext, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { EmptyState } from '../platform/EmptyState'
@@ -19,8 +19,9 @@ const getStartedKinds = ['entity', 'page', 'site']
 
 /**
  * The Overview of an open application: Get started while it has no entity, Live with its live sites, the changes since
- * the live release, then More you can add for each kind it lacks. Live and the changes wait for the release history,
- * and show nothing while it loads or when it fails.
+ * the live release, then More you can add for each kind it lacks. Live and the changes wait for the release history.
+ * While it loads or when it fails, both say so. Once it has loaded, Live is left out when no release is live.
+ * See docs/reference/studio-workspace.md#overview.
  */
 export function StudioOverview({
   application,
@@ -73,13 +74,19 @@ export function StudioOverview({
             </ol>
           </ResourceFormSection>
         )}
-        {releaseId !== null && (
+        {(loaded === undefined || releaseId !== null) && (
           <ResourceFormSection testName="live" heading={{ title: t('shell.studio.overview.live') }}>
-            <LiveSites application={application} locale={locale} releaseId={releaseId} />
+            {releaseId === null ? (
+              <ReleasesState failed={history === 'failed'} />
+            ) : (
+              <LiveSites application={application} locale={locale} releaseId={releaseId} />
+            )}
           </ResourceFormSection>
         )}
-        {loaded !== undefined && (
-          <ResourceFormSection testName="changes" heading={{ title: t('shell.studio.overview.changes') }}>
+        <ResourceFormSection testName="changes" heading={{ title: t('shell.studio.overview.changes') }}>
+          {loaded === undefined ? (
+            <ReleasesState failed={history === 'failed'} />
+          ) : (
             <Flex vertical gap={spacing.sm}>
               {loaded.changes === null ? (
                 <Typography.Text>{t('shell.studio.overview.changes.notPublished')}</Typography.Text>
@@ -90,8 +97,8 @@ export function StudioOverview({
               )}
               <Link to={address({ view: 'releases' })}>{t('shell.studio.overview.changes.releases')}</Link>
             </Flex>
-          </ResourceFormSection>
-        )}
+          )}
+        </ResourceFormSection>
         {missing.length > 0 && (
           <ResourceFormSection testName="more" heading={{ title: t('shell.studio.overview.more') }}>
             <Flex vertical gap={spacing.sm}>
@@ -109,6 +116,17 @@ export function StudioOverview({
         )}
       </ResourceFormSections>
     </Flex>
+  )
+}
+
+/** What Live and Changes say while the release history loads, or when it did not load. */
+function ReleasesState({ failed }: { failed: boolean }) {
+  const t = useText()
+  const { colour } = useDesignTokens()
+  return failed ? (
+    <Typography.Text style={{ color: colour.warningText }}>{t('shell.studio.overview.releasesFailed')}</Typography.Text>
+  ) : (
+    <Typography.Text>{t('shell.studio.overview.releasesLoading')}</Typography.Text>
   )
 }
 
@@ -133,7 +151,7 @@ function LiveSites({ application, locale, releaseId }: { application: string; lo
   }, [releaseId])
 
   if (sites === undefined) {
-    return <Spin />
+    return <Typography.Text>{t('shell.studio.overview.live.loading')}</Typography.Text>
   }
   if (sites === 'failed') {
     return (
