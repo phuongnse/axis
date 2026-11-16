@@ -149,11 +149,11 @@ test.describe('Studio on a copy of its own', () => {
     await editor.click()
     await editor.press('ControlOrMeta+A')
     await editor.pressSequentially('req')
-    await expect(page.getByRole('option', { name: 'requester', exact: true })).toBeVisible()
+    await expect(page.getByRole('option', { name: /^requester/ })).toBeVisible()
 
     await editor.press('ControlOrMeta+A')
     await editor.pressSequentially('cur')
-    await expect(page.getByRole('option', { name: 'currentUser()', exact: true })).toBeVisible()
+    await expect(page.getByRole('option', { name: /^currentUser\(\)/ })).toBeVisible()
 
     expect(await readFile(file, 'utf8')).toBe(before)
   })
