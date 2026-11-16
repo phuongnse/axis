@@ -16,6 +16,7 @@ import {
   type KeyedLists,
 } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
+import { SectionParts } from '../platform/SectionParts'
 import { seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
 import {
   deleteStudioResource,
@@ -460,7 +461,7 @@ export function StudioModuleEditor({
         </Suspense>
       ) : item.kind === 'seed' && schema ? (
         seedSchema ? (
-          <Flex vertical gap="middle">
+          <SectionParts>
             <SchemaForm schema={seedSchema} value={draft} onChange={change} readOnlyNames={moduleReadOnlyNames} />
             <SeedGrid
               fields={seedFields!}
@@ -469,7 +470,7 @@ export function StudioModuleEditor({
               onChange={update}
               layer={designerLayer(seedKeyedLists)}
             />
-          </Flex>
+          </SectionParts>
         ) : (
           <SchemaForm schema={schema} value={draft} onChange={change} readOnlyNames={moduleReadOnlyNames} />
         )

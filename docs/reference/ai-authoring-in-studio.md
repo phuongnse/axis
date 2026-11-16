@@ -58,8 +58,8 @@ _(planned for M35)_
 
 Auto-accept lets the agent accept its own drafts in an application, as an automatic merge does.
 
-- **The setting.** "Let AI accept its own drafts" is a switch on the application's Settings page,
-  beside the manifest. It saves on its own, apart from the manifest's Save, through
+- **The setting.** "Let AI accept its own drafts" is a switch that is the last part of the application's
+  Settings form, after File storage. It saves on its own, apart from the manifest's Save, through
   [the authoring API](authoring.md#application-settings). It is off by default.
 - **Who changes it.** Only a person with the publisher role. An author without it sees the value, with
   the switch disabled. Each change writes an audit record with the person, the application and the new

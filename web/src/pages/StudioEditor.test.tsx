@@ -111,6 +111,14 @@ async function openFormTab() {
   await userEvent.click(await screen.findByRole('tab', { name: 'Form' }, slow))
 }
 
+/** A part of a Studio page: a region named by its heading, with the block inside and a rule right before it. */
+async function expectPart(name: string, testName: string, block: string) {
+  const part = await screen.findByRole('region', { name }, slow)
+  expect(part).toHaveAttribute('data-testid', `studio-section-${testName}`)
+  expect(within(part).getByTestId(block)).toBeInTheDocument()
+  expect(part.previousElementSibling).toHaveAttribute('role', 'separator')
+}
+
 // The schema is a chunk of its own. Loading it here keeps the first test from racing its first lookup.
 beforeAll(() =>
   Promise.all([
@@ -309,6 +317,13 @@ describe('StudioEditor for a seed', () => {
     expect(await screen.findByTestId('studio-field-/entity', {}, slow)).toBeInTheDocument()
     expect(within(screen.getByTestId('studio-field-/entity')).getByRole('textbox')).toHaveValue('Missing')
     await waitFor(() => expect(screen.queryByTestId('studio-seed-grid')).not.toBeInTheDocument())
+  })
+
+  it('draws the records as a part headed Records, with a rule before it', async () => {
+    stub(seedContent('order', [{ id: 'a', values: { code: 'X1' } }]))
+    renderEditor()
+
+    await expectPart('Records', 'records', 'studio-field-/records')
   })
 })
 
@@ -616,6 +631,13 @@ describe('StudioEditor for a site', () => {
     const reopened = await openNavigationEntry()
     expect(within(reopened).getByRole('textbox', { name: 'English' })).toHaveValue('Purchase requests')
   })
+
+  it('draws the sign-in providers as a part headed Sign-in providers, with a rule before it', async () => {
+    stubResource(siteItem, siteContent)
+    renderResource(siteItem, siteNames)
+
+    await expectPart('Sign-in providers', 'signIn', 'studio-field-/signIn')
+  })
 })
 
 describe('StudioEditor for a connector', () => {
@@ -783,6 +805,14 @@ describe('StudioEditor for an endpoint', () => {
     expect(sentPatch(fetchMock)).toEqual([
       { op: 'add', path: '/event', value: { name: 'PaymentReceived', fields: { note: 'trim(title)' } } },
     ])
+  })
+
+  it('draws the values and the event as parts headed Values and Event, each with a rule before it', async () => {
+    stubResource(endpointItem, endpointContent)
+    renderResource(endpointItem, namesWithEvent)
+
+    await expectPart('Values', 'values', 'studio-field-/values')
+    await expectPart('Event', 'event', 'studio-field-/event/name')
   })
 })
 
@@ -1994,6 +2024,14 @@ describe('StudioEditor for a form', () => {
     )
   })
 
+  it('draws the steps as a part headed Steps, with a rule before it', async () => {
+    stubForm(steppedContent)
+    renderForm()
+    await openFormTab()
+
+    await expectPart('Steps', 'steps', 'studio-field-/steps')
+  })
+
   it('undoes and redoes the insert of a palette field', async () => {
     stubForm()
     renderForm()
@@ -2744,12 +2782,31 @@ function stubApplication(catalog: unknown) {
       ? Promise.resolve(catalog === null ? new Response(null, { status: 500 }) : json(catalog))
       : input.endsWith('/relaxed')
         ? Promise.resolve(json({ items: [] }))
-        : fetchMock(input, init),
+        : input === `${folder}/settings`
+          ? Promise.resolve(json({ autoAccept: false }))
+          : fetchMock(input, init),
   )
   return fetchMock
 }
 
 describe('StudioEditor for the application settings', () => {
+  it('draws the auto-accept switch as the last part of the Form tab, after File storage, with no panel', async () => {
+    stubApplication({ modules: [], packages: [], timeZones: [] })
+    renderResource(applicationItem)
+
+    const part = await screen.findByTestId('studio-section-autoAccept', undefined, slow)
+    expect(within(part).getByRole('switch', { name: 'Let AI accept its own drafts' })).toBeInTheDocument()
+    expect(part.previousElementSibling).toHaveAttribute('role', 'separator')
+    expect(part.nextElementSibling).toBeNull()
+    const fileStorage = screen.getByTestId('studio-section-fileStorage')
+    expect(fileStorage.compareDocumentPosition(part) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    for (const element of [part, within(part).getByTestId('studio-auto-accept')]) {
+      for (const property of ['background', 'border', 'border-radius', 'padding']) {
+        expect(element.style.getPropertyValue(property)).toBe('')
+      }
+    }
+  })
+
   it('chooses the time zone from the catalog and saves its id', async () => {
     const fetchMock = stubApplication({
       modules: [],

@@ -14,20 +14,24 @@ each say what they hold. Each section is a part with no panel, with its
 heading in `heading5` and a line that says what it holds. The sections sit one above another, with a `divider` rule
 before every one but the first, as [layout](shell.md#layout) says. An Overview block's heading has no line. The application's
 Settings, for example, has General (name, title, description and time zone), Modules, Packages and File
-storage, then the [auto-accept switch](ai-authoring-in-studio.md#auto-accept). A property that no section
-names goes to a last section with no heading.
+storage. Its [auto-accept switch](ai-authoring-in-studio.md#auto-accept) is the last part, after File storage,
+with no heading. A property that no section names goes to a last section with no heading.
 
 - **One field in a section.** A section that holds one field names it in its heading, so the field has
   no label of its own. A section that holds one object shows the object's fields itself.
-- **One list in a section.** A section that holds one list puts the list's Add… on the right of its
-  heading, and the table has no toolbar row.
+- **One list in a section.** In the generic form's sections, a section that holds one list puts the list's Add…
+  on the right of its heading, and the table has no toolbar row.
 - **One rhythm.** There is `spacing-md` on each side of the rule.
 - **One shared part.** The section is `SectionPart`, in `SectionParts`, one shared part that the generic form
   draws and the typed editors draw too.
-- **Used by the generic form, most editors and the Overview.** The generic form, the page, process, connector,
+- **Blocks below the generic form.** A typed editor's block below the generic form is a part of the same list, with
+  a rule before it. A seed's records, an endpoint's values and event, a site's sign-in providers and a form's steps
+  are such parts. Each is headed with its field's title and help, and the auto-accept switch is a part with no heading.
+- **Used by the generic form, most editors and the Overview.** The generic form, the seed, page, process, connector,
   identity provider and scenario editors and the Studio Overview draw their sections through it.
-- **Every Studio form is built from it.** _(planned for M33)_ The entity designer and the seed editor draw their
-  sections through it too.
+- **Add… in the heading of every list part** _(planned for M33)_. The records, values, sign-in providers and steps
+  parts put their Add… on the right of their heading.
+- **Every Studio form is built from it.** _(planned for M33)_ The entity designer draws its sections through it too.
 
 ## Fields
 

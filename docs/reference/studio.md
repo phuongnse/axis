@@ -138,7 +138,7 @@ what changed.
   keys stay as they are.
 - **The form's layout.** The generic form and the typed editors that use [Studio resource form](studio-resource-form.md)
   share its sections, field names, labels, lists and save bar.
-- **Every form's layout** _(planned for M33)_. The entity designer and the seed editor follow it too, see
+- **Every form's layout** _(planned for M33)_. The entity designer follows it too, see
   [sections](entity-designer.md#sections).
 - **A description.** Every kind that may have a
   [`description`](resource-files.md#resource-file-shape) shows it in the form, and each editor of its own
@@ -856,9 +856,9 @@ draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
 
 ## Seed editor
 
-The seed editor's Form tab shows the seed's name, entity and `sync`, then its records as a grid, with a
-row for each record and a column for each field of the seed's `entity`, and the JSON view stays as the
-second view of the same draft.
+The seed editor's Form tab shows the seed's name, entity and `sync`, then its records as a grid in a part
+headed Records, with a rule above it. The grid has a row for each record and a column for each field of the
+seed's `entity`, and the JSON view stays as the second view of the same draft.
 
 - **Columns.** The input fits the field's type: a text box for `text`, `date`, `date-time` and
   `reference`, a text box that stores a number for `integer`, `decimal` and `money`, a true or false
@@ -880,8 +880,8 @@ second view of the same draft.
 
 An endpoint keeps the generic form for its entity, process, input and output, and shows its `values`
 as rows of a field and an expression in the [expression editor](#expression-editor). The rows sit in a
-titled group, with help that says what they are. An endpoint with no values says so in one line, above
-Add mapping.
+part headed Values, with help that says what they are. An endpoint with no values says so in one line, above
+Add mapping. Its `event` sits in a part headed Event, below the values.
 
 The field is picked from the fields of the endpoint's entity, found by name among the application's
 names, and is typed while those are unknown. Add mapping lists the fields that have no row. Renaming a
@@ -893,8 +893,8 @@ A form keeps the generic form for its entity, sections and fields, with an
 [expression editor](#expression-editor) for each `visibleWhen`, `requiredWhen` and `readOnlyWhen`, and
 shows its `steps` as cards. The [form designer](form-designer.md) edits the same draft on a canvas.
 
-Each step card has a title, a section picker, Move up, Move down and Remove, and Add step appends a
-card. The picker lists the sections that have a `name`, so an unnamed section is not offered. Removing
-the last step removes `steps`, and the form goes back to one page. A condition offers the fields that
-the form lists, because a condition reads only those. A `steps` value that is not a list is left to
+The cards sit in a part headed Steps. Each step card has a title, a section picker, Move up, Move down and
+Remove, and Add step appends a card. The picker lists the sections that have a `name`, so an unnamed section is
+not offered. Removing the last step removes `steps`, and the form goes back to one page. A condition offers the
+fields that the form lists, because a condition reads only those. A `steps` value that is not a list is left to
 the JSON view.
