@@ -3,14 +3,17 @@ import type {
   StudioBindings,
   StudioCatalog,
   StudioDiagnostic,
+  StudioFormMetadataAnswer,
   StudioNameEntity,
   StudioNames,
+  StudioPageMetadataAnswer,
   StudioPolicyMatrix,
   StudioReleases,
   StudioResource,
   StudioResourceItem,
+  StudioResourceReferences,
 } from '../platform/studio'
-import { application, locale } from './fixtures'
+import { application, entity as requestEntity, fields, formWidget, locale, tableWidget } from './fixtures'
 
 // The answers of the `studio` preview. Its states answer the same `/api/studio/apps` path, so each state brings its own
 // routes, and the preview shows one state at a time, see docs/reference/widget-previews.md#the-bundle.
@@ -31,6 +34,7 @@ const roleId = id(5)
 const policyId = id(6)
 const approverRoleId = id(7)
 const buyerRoleId = id(8)
+const processId = id(9)
 const firstEntityId = 100
 
 /** What a state's folder holds: its applications, resources and names. */
@@ -54,6 +58,12 @@ function resource(
   return { id: itemId, kind, name, file, version: `v-${itemId.slice(-4)}`, usedBy, titles }
 }
 
+const pageItem = resource(pageId, 'page', 'RequestList', 'pages/request-list.json', { [locale]: 'Requests' }, 1)
+const formItem = resource(formId, 'form', 'RequestForm', 'forms/request-form.json', { [locale]: 'Request' }, 1)
+const processItem = resource(processId, 'process', 'RequestApproval', 'processes/request-approval.json', {
+  [locale]: 'Request approval',
+})
+
 function entityItems(folder: Folder): StudioResourceItem[] {
   return folder.entities.map((entity, index) =>
     resource(
@@ -75,8 +85,9 @@ function items(folder: Folder): StudioResourceItem[] {
     resource(manifestId, 'application', application, 'application.json', {}),
     resource(siteId, 'site', 'Requests', 'sites/requests.json', { [locale]: folder.title }, 0),
     ...entityItems(folder),
-    resource(pageId, 'page', 'RequestList', 'pages/request-list.json', { [locale]: 'Requests' }, 1),
-    resource(formId, 'form', 'RequestForm', 'forms/request-form.json', { [locale]: 'Request' }, 1),
+    pageItem,
+    formItem,
+    processItem,
     resource(roleId, 'role', 'Requester', 'roles/requester.json', { [locale]: 'Requester' }, 1),
     resource(approverRoleId, 'role', 'Approver', 'roles/approver.json', { [locale]: 'Approver' }),
     resource(buyerRoleId, 'role', 'Buyer', 'roles/buyer.json', { [locale]: 'Buyer' }),
@@ -153,13 +164,157 @@ function entityTexts(folder: Folder): StudioNames['texts'] {
   })
 }
 
+/** The texts of the page, form and process that the designers of the Typical folder open. */
+const pageAndProcessTexts: StudioNames['texts'] = [
+  { key: 'requestList.title', texts: { [locale]: 'Requests' }, usedBy: 1 },
+  { key: 'request.sections.details', texts: { [locale]: 'Details' }, usedBy: 1 },
+  { key: 'requestApproval.review', texts: { [locale]: 'Review the request' }, usedBy: 1 },
+  { key: 'task.approve', texts: { [locale]: 'Approve' }, usedBy: 1 },
+  { key: 'task.reject', texts: { [locale]: 'Reject' }, usedBy: 1 },
+]
+
+/** The page of the Typical folder: a table of its Request entity, which the page designer opens. */
+const pageResource: StudioResource = {
+  ...pageItem,
+  content: {
+    id: pageId,
+    kind: 'page',
+    name: 'RequestList',
+    formatVersion: 1,
+    title: { textKey: 'requestList.title' },
+    widgets: [{ type: 'table', name: 'requests', entity: 'Request' }],
+  },
+}
+
+/** The form of the Typical folder: the title and the amount of a request, which the form designer opens. */
+const formResource: StudioResource = {
+  ...formItem,
+  content: {
+    id: formId,
+    kind: 'form',
+    name: 'RequestForm',
+    formatVersion: 1,
+    entity: 'Request',
+    sections: [
+      {
+        name: 'general',
+        title: { textKey: 'request.sections.details' },
+        fields: [{ field: 'title' }, { field: 'amount' }],
+      },
+    ],
+  },
+}
+
+/** The process of the Typical folder: a large request goes to an approver, and a small one ends at once. */
+const processResource: StudioResource = {
+  ...processItem,
+  content: {
+    id: processId,
+    kind: 'process',
+    name: 'RequestApproval',
+    formatVersion: 1,
+    entity: 'Request',
+    start: 'checkAmount',
+    steps: [
+      {
+        name: 'checkAmount',
+        type: 'decision',
+        branches: [{ name: 'large', when: 'amount >= 1000', next: 'review' }],
+        otherwise: 'done',
+      },
+      {
+        name: 'review',
+        type: 'task',
+        label: { textKey: 'requestApproval.review' },
+        assignee: { role: 'Approver' },
+        form: 'RequestForm',
+        outcomes: [
+          { name: 'approve', label: { textKey: 'task.approve' }, next: 'done' },
+          { name: 'reject', label: { textKey: 'task.reject' }, next: 'done' },
+        ],
+      },
+      { name: 'done', type: 'end' },
+    ],
+  },
+}
+
+/** The page designer's canvas of the page: the table, drawn with the site's widgets over placeholder data. */
+const pageMetadata = {
+  page: {
+    name: 'RequestList',
+    titleKey: 'requestList.title',
+    parameters: [],
+    widgets: [{ ...tableWidget, path: '/widgets/0' }],
+  },
+  diagnostics: [],
+} satisfies StudioPageMetadataAnswer
+
+/** The form designer's canvas of the form: the title and the amount, with no action. */
+const formMetadata = {
+  widget: {
+    ...formWidget,
+    actions: [],
+    entity: { ...requestEntity, fields: [fields.text, fields.decimal] },
+    form: {
+      name: 'RequestForm',
+      steps: [],
+      sections: [
+        {
+          name: 'general',
+          titleKey: 'request.sections.details',
+          path: '/sections/0',
+          fields: [
+            { name: 'title', readOnly: false, path: '/sections/0/fields/0' },
+            { name: 'amount', readOnly: false, path: '/sections/0/fields/1' },
+          ],
+        },
+      ],
+    },
+  },
+  diagnostics: [],
+} satisfies StudioFormMetadataAnswer
+
+/** The form's uses: the process's approval task uses it, so the form designer lists the process. */
+const formReferences = {
+  uses: [],
+  usedBy: [
+    {
+      relation: 'task form',
+      file: 'processes/request-approval.json',
+      path: '/steps/1/form',
+      node: {
+        type: 'resource',
+        id: processId,
+        kind: 'process',
+        name: 'RequestApproval',
+        file: 'processes/request-approval.json',
+      },
+    },
+  ],
+} satisfies StudioResourceReferences
+
 function names(folder: Folder): StudioNames {
   const own = folder.bare !== true
   return {
     locales: [locale],
     entities: entityNames(folder),
     dataSources: [],
-    processes: [],
+    processes: own
+      ? [
+          {
+            id: processId,
+            name: 'RequestApproval',
+            module: null,
+            entity: 'Request',
+            parameters: [],
+            steps: [
+              { name: 'checkAmount', type: 'decision', outcomes: [] },
+              { name: 'review', type: 'task', outcomes: ['approve', 'reject'] },
+              { name: 'done', type: 'end', outcomes: [] },
+            ],
+          },
+        ]
+      : [],
     rules: [],
     connectors: [],
     events: [],
@@ -179,6 +334,7 @@ function names(folder: Folder): StudioNames {
       { key: 'application.title', texts: { [locale]: folder.title }, usedBy: 1 },
       { key: 'application.description', texts: { [locale]: 'Request purchases and approve them.' }, usedBy: 1 },
       ...entityTexts(folder),
+      ...(own ? pageAndProcessTexts : []),
     ],
     seeds: [],
     triggers: [],
@@ -375,6 +531,12 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     '/api/studio/bindings': () => bindings,
     [`${folderPath}/relaxed`]: () => ({ items: [] }),
     [`${folderPath}/resources/${manifestId}`]: () => manifest,
+    [`${folderPath}/resources/${pageId}`]: () => pageResource,
+    [`${folderPath}/resources/${pageId}/page-metadata`]: () => pageMetadata,
+    [`${folderPath}/resources/${formId}`]: () => formResource,
+    [`${folderPath}/resources/${formId}/page-metadata`]: () => formMetadata,
+    [`${folderPath}/resources/${formId}/references`]: () => formReferences,
+    [`${folderPath}/resources/${processId}`]: () => processResource,
     [`${folderPath}/releases`]: () => answers.releases,
     [`${folderPath}/settings`]: () => settings,
   }
@@ -448,6 +610,15 @@ const newFolder: Folder = {
 
 /** The id of the Request entity of the Typical folder, which the Entity state opens at `&resource=<id>`. */
 export const typicalEntityId = id(firstEntityId)
+
+/** The id of the RequestList page of the Typical folder, which the page design card opens at `&resource=<id>`. */
+export const typicalPageId = pageId
+
+/** The id of the RequestForm form of the Typical folder, which the form design card opens at `&resource=<id>`. */
+export const typicalFormId = formId
+
+/** The id of the RequestApproval process of the Typical folder, which the process design card opens at `&resource=<id>`. */
+export const typicalProcessId = processId
 
 /** The applications Studio lists in each state, with the routes of the open application where the state opens one. */
 export const studioFixtures = {

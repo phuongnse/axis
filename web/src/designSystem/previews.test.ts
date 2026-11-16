@@ -98,7 +98,7 @@ describe('design-system previews', () => {
     }
   })
 
-  test('the cards have the 27 names of the Design System artifact, in group order', () => {
+  test('the cards have the 30 names of the Design System artifact, in group order', () => {
     expect(cardGroups.flatMap(({ previews: group }) => group).map(cardName)).toEqual([
       'TextField',
       'IntegerField',
@@ -126,8 +126,21 @@ describe('design-system previews', () => {
       'SignIn',
       'IdentitySignIn',
       'Studio',
+      'StudioPageDesign',
+      'StudioFormDesign',
+      'StudioProcessDesign',
       'SignUp',
     ])
+  })
+
+  test('each Studio designer card has one Typical state over the fixtures of the studio preview', () => {
+    for (const name of ['studioPageDesign', 'studioFormDesign', 'studioProcessDesign']) {
+      const states = previews[name]
+      expect(states.map(({ caption }) => caption)).toEqual(['Typical'])
+      expect(states[0].fixtures).toBe(previews.studio[0].fixtures)
+      expect(states[0].entry).toContain('&resource=')
+      expect(states[0].frameHeight).toBeGreaterThan(0)
+    }
   })
 
   test('the studio preview has its eleven states, each with a slug of its own and a frame', () => {

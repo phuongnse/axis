@@ -98,6 +98,19 @@ const previews: Record<string, (page: Page | FrameLocator) => Locator> = {
       exact: true,
       level: 4,
     }),
+  // The page canvas draws the table's columns from the page metadata that the fixtures answer.
+  studioPageDesign: (page) =>
+    figure(page, "Typical")
+      .getByTestId("studio-page-canvas")
+      .getByRole("columnheader", { name: "Title", exact: true }),
+  studioFormDesign: (page) =>
+    figure(page, "Typical")
+      .getByTestId("studio-form-canvas")
+      .getByLabel(fieldLabel("Title")),
+  studioProcessDesign: (page) =>
+    figure(page, "Typical")
+      .getByTestId("studio-process-graph")
+      .getByRole("button", { name: "review, task", exact: true }),
   signUp: (page) =>
     figure(page, "Typical").getByRole("textbox", {
       name: "Full name",
