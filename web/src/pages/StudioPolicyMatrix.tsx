@@ -518,7 +518,7 @@ function OwnGrants({
               <>
                 <AxisField label={t('shell.studio.matrix.filter')} help={t('shell.studio.matrix.filter.help')}>
                   <ExpressionField
-                    check={{ application, resourceId: String(draft.id), kind: 'policy', draft, names }}
+                    check={{ application, resourceId: String(draft.id), kind: 'policy', draft: () => draft, names }}
                     pointer={filterPath}
                     name={t('shell.studio.matrix.filter')}
                     value={filter}

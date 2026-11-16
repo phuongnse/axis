@@ -4,6 +4,12 @@ The entity designer is the Form tab of an `entity` resource in Studio, in place 
 It shows the entity's details, its fields as a table, its validations and its indexes, and the JSON tab
 edits the same draft. The rest of Studio is in [Studio](studio.md).
 
+## Typing
+
+A key redraws the box it went into and what shows its value, such as the save bar. The other field rows
+and validations stay as they are. A resource of a dozen fields stays quick to type in because of this.
+The expression editors read the draft when completion opens, not on each key.
+
 ## Sections
 
 _(planned for M33)_

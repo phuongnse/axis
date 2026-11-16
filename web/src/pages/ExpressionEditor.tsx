@@ -39,10 +39,10 @@ export interface ExpressionEditorProps {
   name: string
   value: string
   required: boolean
-  /** The resource as the author has it. The scope of the place is loaded for it once. */
-  draft: Record<string, unknown>
-  /** The names an author can complete at this place, apart from the functions, which the expression scope lists. */
-  options: ScopeOption[]
+  /** Returns the resource as the author has it now. The scope of the place is loaded for it once. */
+  draft: () => Record<string, unknown>
+  /** Returns the names an author can complete at this place, apart from the functions, which the expression scope lists. */
+  options: () => ScopeOption[]
   /** The application's names, for the labels of the fields in the expanded panel. */
   names?: StudioNames | null
   /** Set for the editor inside the expanded dialog, which has no Expand button of its own. */
@@ -124,7 +124,7 @@ export default function ExpressionEditor({
   // The scope is loaded once per place, with the draft as it stands then, so a keystroke in the draft loads no more.
   useEffect(() => {
     const controller = new AbortController()
-    fetchStudioExpressionScope(application, resourceId, path, latest.current.draft, controller.signal).then(
+    fetchStudioExpressionScope(application, resourceId, path, latest.current.draft(), controller.signal).then(
       (answer) => {
         if (!controller.signal.aborted) {
           setLoaded({ placeKey, scope: answer })
@@ -167,7 +167,8 @@ export default function ExpressionEditor({
     }
 
     const initial = latest.current
-    const complete = (context: CompletionContext) => completeAt(context, latest.current)
+    const complete = (context: CompletionContext) =>
+      completeAt(context, { ...latest.current, options: latest.current.options() })
     const view = new EditorView({
       parent: hostRef.current!,
       state: EditorState.create({
@@ -307,7 +308,7 @@ export default function ExpressionEditor({
             />
             <ExpressionPanel
               scope={scope}
-              rules={options.filter((option) => option.type === 'rule')}
+              rules={options().filter((option) => option.type === 'rule')}
               names={names}
               onPick={(text, cursorInside) => {
                 const view = dialogView.current

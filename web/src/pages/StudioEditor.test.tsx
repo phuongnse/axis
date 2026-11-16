@@ -3,7 +3,8 @@ import { EditorView } from '@codemirror/view'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import type { ComponentProps } from 'react'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
 import { TextProvider } from '../platform/TextProvider'
@@ -18,6 +19,23 @@ import { editJson, jsonText, jsonView } from '../test/jsonView'
 import { buildProcessGraph } from './processGraph'
 import { StudioEditor } from './StudioEditor'
 import { withAntdStyles } from '../test/antdStyles'
+
+// The pointer of each expression editor that draws, in order. The test that counts draws reads it.
+const draws = vi.hoisted(() => [] as string[])
+
+vi.mock('./ProcessFields', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./ProcessFields')>()
+  const { Profiler } = await import('react')
+  // A plain function, not a memo, so a draw of its parent always draws it and a skipped parent never does.
+  return {
+    ...actual,
+    Expression: (props: ComponentProps<typeof actual.Expression>) => (
+      <Profiler id={props.pointer} onRender={(id) => draws.push(id)}>
+        <actual.Expression {...props} />
+      </Profiler>
+    ),
+  }
+})
 
 const folder = '/api/studio/apps/Shop'
 const seedId = '46e28f6b-ce3b-4a17-829e-92fb3a5930ad'
@@ -2062,6 +2080,10 @@ describe('StudioEditor for a form', () => {
 })
 
 describe('StudioEditor for an entity', () => {
+  beforeEach(() => {
+    draws.length = 0
+  })
+
   const designedItem: StudioResourceItem = { ...resources[1], id: 'a4e6d3a1-77a0-4b0d-8b0c-5c1d6f0a9b01' }
   const designed = {
     id: designedItem.id,
@@ -2088,6 +2110,50 @@ describe('StudioEditor for an entity', () => {
       () => expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true'),
       slow,
     )
+  })
+
+  it('draws no other validation when a key goes into one validation expression, and turns Save on', async () => {
+    const validation = (name: string) => ({
+      name,
+      expression: "code = 'a'",
+      message: { textKey: 'validation.code' },
+      field: 'code',
+    })
+    const content = {
+      ...entityContent,
+      fields: [{ name: 'code', type: 'text' }],
+      validations: [validation('first'), validation('second')],
+    }
+    const { fetchMock } = stubResource(resources[1], content)
+    // The expression editors ask for the scope and the check of their place, which the resource stub does not know.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string, init?: RequestInit) =>
+        input.includes('/expressions/')
+          ? json(
+              input.endsWith('/scope') ? { type: 'text', fields: [], functions: [] } : { type: null, diagnostics: [] },
+            )
+          : fetchMock(input, init),
+      ),
+    )
+    renderResource(resources[1])
+
+    // A default and an expression for the one field, and the two validations.
+    await waitFor(() => {
+      expect(screen.getAllByTestId('studio-expression-type')).toHaveLength(4)
+      for (const editor of document.querySelectorAll('.cm-editor')) {
+        expect(editor.closest('[aria-busy]')).toHaveAttribute('aria-busy', 'false')
+      }
+    }, slow)
+    expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
+    draws.length = 0
+
+    const editor = screen.getByTestId('studio-field-/validations/0/expression').querySelector('.cm-editor')!
+    const view = EditorView.findFromDOM(editor as HTMLElement)!
+    act(() => view.dispatch({ changes: { from: view.state.doc.length, insert: 'x' } }))
+
+    expect(await screen.findByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(draws).not.toContain('/validations/1/expression')
   })
 
   it('opens in the designer and keeps the JSON tab with the draft', async () => {

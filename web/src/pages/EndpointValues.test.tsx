@@ -24,7 +24,7 @@ function renderValues(data: unknown = values, onChange = vi.fn(), known: string[
       <ThemeRoot>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <ExpressionCheckContext.Provider
-            value={{ application: 'Shop', resourceId: 'bc241668', kind: 'endpoint', draft: {}, names: null }}
+            value={{ application: 'Shop', resourceId: 'bc241668', kind: 'endpoint', draft: () => ({}), names: null }}
           >
             <EndpointValues fields={known ?? undefined} values={data} onChange={onChange} />
           </ExpressionCheckContext.Provider>

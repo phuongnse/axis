@@ -166,7 +166,7 @@ function renderEditor(known = true, value: Record<string, unknown> = process, on
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           {known ? (
             <ExpressionCheckContext.Provider
-              value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft: value, names }}
+              value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft: () => value, names }}
             >
               {editor}
             </ExpressionCheckContext.Provider>
@@ -187,7 +187,7 @@ function renderStateful() {
     return (
       <>
         <ExpressionCheckContext.Provider
-          value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft, names }}
+          value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft: () => draft, names }}
         >
           <ProcessEditor
             schema={schema}

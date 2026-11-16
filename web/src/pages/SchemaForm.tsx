@@ -945,7 +945,9 @@ function ObjectList({
             return name === undefined ? null : problem(name)
           }
           const fields = (
-            <ExpressionCheckContext.Provider value={check && { ...check, draft: view as Record<string, unknown> }}>
+            <ExpressionCheckContext.Provider
+              value={check && { ...check, draft: () => view as Record<string, unknown> }}
+            >
               <ItemDialogContext.Provider value>
                 <ItemProblemContext.Provider value={problemAt}>
                   <Properties

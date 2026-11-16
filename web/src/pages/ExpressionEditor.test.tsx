@@ -3,7 +3,7 @@ import { EditorView } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ReactNode } from 'react'
+import { Profiler, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
@@ -54,23 +54,26 @@ function renderEditor(
   onChange = vi.fn(),
   extra: ReactNode = null,
   required = true,
-  options: ScopeOption[] = [],
+  options: ScopeOption[] | (() => ScopeOption[]) = [],
+  onRender?: () => void,
 ) {
   render(
     <ThemeModeProvider>
       <ThemeRoot>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <ExpressionEditor
-            application="PurchaseRequests"
-            resourceId={resourceId}
-            path={path}
-            name="expression"
-            value={value}
-            required={required}
-            draft={{}}
-            options={options}
-            onChange={onChange}
-          />
+          <Profiler id="editor" onRender={() => onRender?.()}>
+            <ExpressionEditor
+              application="PurchaseRequests"
+              resourceId={resourceId}
+              path={path}
+              name="expression"
+              value={value}
+              required={required}
+              draft={() => ({})}
+              options={typeof options === 'function' ? options : () => options}
+              onChange={onChange}
+            />
+          </Profiler>
           {extra}
         </TextProvider>
       </ThemeRoot>
@@ -386,6 +389,30 @@ describe('ExpressionEditor completion', () => {
     const view = viewOf()
     expect(view.state.doc.toString()).toBe('length()')
     expect(view.state.selection.main.head).toBe(7)
+  })
+
+  it('offers an option that was added after the editor was drawn, without drawing the editor again', async () => {
+    const user = userEvent.setup()
+    stubScope({ type: null, fields: [], functions: [] })
+    const options: ScopeOption[] = [{ label: 'amount', type: 'field', cursorInside: false }]
+    const drawn = vi.fn()
+    renderEditor('', vi.fn(), null, false, () => options, drawn)
+
+    await user.click(screen.getByRole('textbox', { name: 'expression' }))
+    await scopeLoaded()
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'expression' }).closest('[aria-busy]')).toHaveAttribute(
+        'aria-busy',
+        'false',
+      ),
+    )
+    options.push({ label: 'tax', type: 'field', cursorInside: false })
+    drawn.mockClear()
+    await user.keyboard('{Control>}[Space]{/Control}')
+
+    await screen.findByRole('option', { name: /tax/ })
+    expect(labels()).toContain('amount')
+    expect(drawn).not.toHaveBeenCalled()
   })
 
   it('offers the functions of the scope after the fields and the language’s words, with the cursor inside the brackets of one that takes parameters', async () => {

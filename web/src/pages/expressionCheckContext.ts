@@ -4,13 +4,14 @@ import type { StudioNames } from '../platform/studio'
 /**
  * The resource that a form edits. The expression editor checks an expression against the saved file. It offers the
  * names in scope from the resource's kind and the unsaved draft, and the application's names from `names`, which is
- * null while they are not loaded.
+ * null while they are not loaded. `draft` returns the draft as it is now, so a key does not change the context and
+ * redraw every expression editor under it.
  */
 export interface ExpressionCheckValue {
   application: string
   resourceId: string
   kind: string
-  draft: Record<string, unknown>
+  draft: () => Record<string, unknown>
   names: StudioNames | null
 }
 
