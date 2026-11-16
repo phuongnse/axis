@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -8,6 +8,7 @@ import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import { useUnsavedChanges } from '../platform/unsavedChanges'
 import { renderGuarded } from '../test/leaveGuard'
+import { clickInDialog, pick } from '../test/tableFilter'
 import { StudioUsedBy } from './StudioUsedBy'
 
 const application = 'PurchaseRequests'
@@ -184,7 +185,7 @@ describe('StudioUsedBy', () => {
     expect(labels()[0]).toBe('PurchaseRequestForm')
   })
 
-  it('narrows the rows by search, which applies on Enter, and by kind', async () => {
+  it('narrows the rows by search, which applies on Enter, and shows them all again when it is cleared', async () => {
     stubReferences()
     renderTab()
 
@@ -200,13 +201,33 @@ describe('StudioUsedBy', () => {
 
     await userEvent.clear(screen.getByRole('searchbox', { name: 'Search' }))
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), '{Enter}')
-    await userEvent.click(screen.getByRole('combobox', { name: 'Kind' }))
-    await userEvent.click(await screen.findByRole('option', { name: 'Form' }))
-    expect(
-      within(table)
-        .getAllByRole('link')
-        .map((link) => link.textContent),
-    ).toEqual(['PurchaseRequestForm'])
+    expect(within(table).getAllByRole('link')).toHaveLength(4)
+  })
+
+  it('keeps the rows of one kind through Filter, and keeps the filter in the address', async () => {
+    stubReferences()
+    const router = renderGuarded(
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <StudioUsedBy application={application} resourceId={targetId} resources={resources} />
+      </TextProvider>,
+    )
+
+    const table = await loadedTable()
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Value', 0, 'Form')
+    await clickInDialog('Apply')
+
+    await waitFor(() =>
+      expect(
+        within(table)
+          .getAllByRole('link')
+          .map((link) => link.textContent),
+      ).toEqual(['PurchaseRequestForm']),
+    )
+    expect(JSON.parse(new URLSearchParams(router.state.location.search).get('filter')!)).toEqual({
+      all: [{ field: 'kind', op: 'eq', value: 'form' }],
+    })
+    expect(screen.queryByRole('combobox', { name: 'Kind' })).not.toBeInTheDocument()
   })
 
   it('sorts and searches without asking to leave, though a draft is unsaved', async () => {
@@ -233,6 +254,34 @@ describe('StudioUsedBy', () => {
         .getAllByRole('link')
         .map((link) => link.textContent),
     ).toEqual(['Purchase request totals by department'])
+  })
+
+  it('filters by kind without asking to leave, though a draft is unsaved', async () => {
+    stubReferences()
+    function UnsavedDraft() {
+      useUnsavedChanges(true)
+      return null
+    }
+    renderGuarded(
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <UnsavedDraft />
+        <StudioUsedBy application={application} resourceId={targetId} resources={resources} />
+      </TextProvider>,
+    )
+
+    const table = await loadedTable()
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Value', 0, 'Form')
+    await clickInDialog('Apply')
+
+    await waitFor(() =>
+      expect(
+        within(table)
+          .getAllByRole('link')
+          .map((link) => link.textContent),
+      ).toEqual(['PurchaseRequestForm']),
+    )
+    expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()
   })
 
   it('says that nothing uses the resource when no resource uses it', async () => {

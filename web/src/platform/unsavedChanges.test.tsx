@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { followLink, renderGuarded } from '../test/leaveGuard'
-import { leaveWithoutAsking, useUnsavedChanges } from './unsavedChanges'
+import { leaveWithoutAsking, onlyTableViewChanged, useUnsavedChanges } from './unsavedChanges'
 
 function Editor({ counted = false }: { counted?: boolean }) {
   const [unsaved, setUnsaved] = useState(counted)
@@ -148,5 +148,27 @@ describe('useUnsavedChanges', () => {
 
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
     expect(beforeUnload().defaultPrevented).toBe(false)
+  })
+})
+
+describe('onlyTableViewChanged', () => {
+  const filter = encodeURIComponent(JSON.stringify({ all: [{ field: 'kind', op: 'eq', value: 'form' }] }))
+
+  it('treats a change of only the filter as a change of the table view', () => {
+    expect(
+      onlyTableViewChanged(
+        { pathname: '/studio', search: '?app=A' },
+        { pathname: '/studio', search: `?app=A&filter=${filter}` },
+      ),
+    ).toBe(true)
+  })
+
+  it('does not treat a change of another parameter as a change of the table view', () => {
+    expect(
+      onlyTableViewChanged(
+        { pathname: '/studio', search: '?app=A' },
+        { pathname: '/studio', search: `?app=B&filter=${filter}` },
+      ),
+    ).toBe(false)
   })
 })

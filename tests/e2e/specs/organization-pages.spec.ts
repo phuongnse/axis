@@ -24,7 +24,9 @@ interface Employee {
 async function choose(page: Page, field: string, label: string, name: string) {
   await page.getByTestId(`reference-${field}`).getByRole('button', { name: 'Choose…', exact: true }).click()
   const dialog = await waitForDialog(page)
-  await dialog.getByTestId('reference-lookup-search').fill(name)
+  const search = dialog.getByRole('searchbox', { name: 'Search', exact: true })
+  await search.fill(name)
+  await search.press('Enter')
   await dialog.getByRole('row', { name: new RegExp(name) }).click()
   await expect(dialog).toBeHidden()
   await expect(page.getByLabel(fieldLabel(label))).toHaveValue(name)

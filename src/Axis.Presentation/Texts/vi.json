@@ -711,7 +711,6 @@
   "shell.form.processStarted": "Đã bắt đầu quy trình.",
   "shell.form.processRunning": "Bản ghi này đang có một quy trình chạy.",
   "shell.form.startFailed": "Không bắt đầu được quy trình.",
-  "shell.lookup.search": "Tìm kiếm",
   "shell.history.title": "Lịch sử",
   "shell.history.empty": "Chưa có lịch sử.",
   "shell.history.loadFailed": "Không tải được lịch sử.",
