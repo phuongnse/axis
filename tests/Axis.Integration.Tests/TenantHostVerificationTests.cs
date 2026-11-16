@@ -570,5 +570,7 @@ public sealed class TenantHostVerificationTests(KeycloakFixture keycloak, Postgr
 
             return Fail ? throw new HttpRequestException("The write failed.") : Task.CompletedTask;
         }
+
+        public Task DeleteAsync(string host, CancellationToken cancellationToken) => throw new NotSupportedException("The verification never deletes a route.");
     }
 }

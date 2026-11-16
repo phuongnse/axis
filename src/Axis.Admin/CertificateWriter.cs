@@ -38,5 +38,5 @@ internal sealed class KubernetesCertificateWriter(KubernetesApi api, string issu
     }
 
     public Task DeleteAsync(string host, CancellationToken cancellationToken) =>
-        api.DeleteAsync("apis/cert-manager.io/v1", "certificates", host, "certificate deletion", cancellationToken);
+        api.DeleteAsync("apis/cert-manager.io/v1", "certificates", host, "certificate", cancellationToken);
 }

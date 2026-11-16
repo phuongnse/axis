@@ -347,13 +347,16 @@ A deletion can be undone during its grace window, and not after.
    tombstone of its own.
    1. **`hosts`.** The tenant's hosts from the directory and its realm redirect addresses. This step
       first writes the tombstone, takes the actor from the job input `{ "actor" }`, and refuses a job
-      that has none.
+      that has none. When the publisher writes routes, which means `Cell:HostRouteService` is set,
+      the step then deletes the Ingress of each host that the tombstone holds, by the host's name. A
+      route that is already gone (`404`) counts as done. Any other failure fails the step, and the
+      next run reads the hosts from the tombstone and deletes the routes it missed. The step sends a
+      delete for every host, including a host on the cell's own domain that never had a route.
       - **Certificates.** After it removes the hosts, the step deletes the cert-manager `Certificate`
         named after each host in the tombstone of the tenant and its preview, through the Kubernetes
         API. A `Certificate` that is already gone counts as done. A cell without a host certificate
         issuer, `Cell:HostCertificateIssuer`, deletes none. cert-manager deletes the TLS Secret with its
         Certificate only when it runs with `--enable-certificate-owner-ref`.
-      - **Routes** _(planned for M33)_. The step also removes the Ingress routes of its hosts.
    2. **`database`.** The tenant database, then its schema and runtime roles.
    3. **`realm`.** Its realm in the identity provider.
    4. **`files`.** Its files in object storage, when a storage binding holds them outside the

@@ -6,8 +6,8 @@ namespace Axis.Admin;
 /// The <c>purge</c> job of the publisher in a cell: the eight steps of <see cref="TenantPurge"/>, which the publisher queues for a main tenant whose
 /// deletion window has ended. The purge reads the admin database role and the identity provider admin client of the create job, and
 /// <c>Studio:ApplicationsPath</c>. When one of them is missing, every step refuses with the problem that names the setting, so the first step fails the job and
-/// nothing is removed. A missing <c>Studio:ApplicationsPath</c> is never read as no folder, because in a cell every tenant has one. The <c>hosts</c> step also
-/// uses the certificate writer of the cell, which is none without <c>Cell:HostCertificateIssuer</c>, and then deletes no certificate.
+/// nothing is removed. A missing <c>Studio:ApplicationsPath</c> is never read as no folder, because in a cell every tenant has one.
+/// The route writer and the certificate writer of the publisher, when it has them, let <c>hosts</c> delete the route and the certificate of each host of the tenant.
 /// </summary>
 internal static class PurgeJob
 {
@@ -22,6 +22,7 @@ internal static class PurgeJob
         string platformConnectionString,
         TenantSecretCipher cipher,
         HttpClient http,
+        IRouteWriter? routes,
         ICertificateWriter? certificates = null)
     {
         if ((create.Problem ?? applicationsPath.Problem) is { } problem)
@@ -30,6 +31,6 @@ internal static class PurgeJob
         }
 
         var settings = create.Value!;
-        return new TenantPurge(settings.Admin, platformConnectionString, cipher, http, settings.IdentityProvider!, applicationsPath.Value, certificates).Steps();
+        return new TenantPurge(settings.Admin, platformConnectionString, cipher, http, settings.IdentityProvider!, applicationsPath.Value, routes, certificates).Steps();
     }
 }
