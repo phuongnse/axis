@@ -648,5 +648,37 @@ describe('StudioModuleEditor', () => {
       expect(within(rows[1]).getByRole('note', { name: 'Added r2' })).toBeInTheDocument()
       expect(within(rows[0]).queryByRole('note')).toBeNull()
     })
+
+    it('keeps Save on with a wrong seed cell, and a click focuses that cell and sends nothing until it is fixed', async () => {
+      const sized = { ...entity, fields: [{ name: 'size', type: 'integer' }] }
+      const { fetchMock } = renderEditor(
+        (url, init) =>
+          init?.method === 'PUT'
+            ? new Response(
+                JSON.stringify({ file: 'modules/organization/resource.json', version: 'm2', diagnostics: [] }),
+              )
+            : url.endsWith('/department-id')
+              ? read(null, sized)
+              : readOf('seed', { entity: 'Department', records: [{ id: 'r1', values: { size: 3 } }] }, []),
+        seedItem,
+        moduleNames,
+      )
+      const size = await screen.findByRole('textbox', { name: 'size' })
+
+      await userEvent.clear(size)
+      await userEvent.type(size, 'abc')
+      expect(size).toHaveAttribute('aria-invalid', 'true')
+      expect(screen.getByTestId('studio-save')).toBeEnabled()
+      await userEvent.click(screen.getByTestId('studio-save'))
+
+      expect(size).toHaveFocus()
+      expect(calls(fetchMock, 'PUT')).toHaveLength(0)
+
+      await userEvent.clear(size)
+      await userEvent.type(size, '12')
+      await userEvent.click(screen.getByTestId('studio-save'))
+
+      await waitFor(() => expect(calls(fetchMock, 'PUT')).toHaveLength(1))
+    })
   })
 })

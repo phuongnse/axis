@@ -79,11 +79,14 @@ test.describe('Settings in Studio', () => {
       'Ho Chi Minh',
     )
 
-    // JSON that does not parse turns the form read-only and turns Save off.
+    // JSON that does not parse turns the form read-only. Save stays on, and a click sends nothing and keeps the JSON view.
     await openTab(page, 'JSON')
     const json = page.getByRole('textbox', { name: 'JSON', exact: true })
     await json.fill('{ "name": ')
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+    const save = page.getByRole('button', { name: 'Save', exact: true })
+    await expect(save).toBeEnabled()
+    await save.click()
+    await expect(json).toBeVisible()
     await openTab(page, 'Form')
     await expect(page.getByTestId('studio-form-read-only')).toBeVisible()
 

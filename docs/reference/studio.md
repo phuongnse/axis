@@ -144,8 +144,8 @@ what changed.
   [`description`](resource-files.md#resource-file-shape) shows it in the form, and each editor of its own
   shows it after the name and the label.
 - **The JSON view** shows the draft as text, and a valid edit there updates the form. Invalid JSON
-  shows an error and turns Save off. Its look and its actions are in
-  [JSON view](studio-resource-form.md#json-view).
+  shows an error, and a click on Save opens the JSON view at the first problem and sends nothing. Its
+  look and its actions are in [JSON view](studio-resource-form.md#json-view).
 - **Save** sends only the changes, as a JSON Patch with the version the editor loaded in `If-Match`,
   and stays off while nothing changed. An array whose length changed is replaced whole, and an array of
   the same length is compared item by item. Clearing an optional value removes its key. After a save
@@ -450,11 +450,11 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
   - Add grant adds a grant named after the cell's target with the first free number in the policy,
     ignoring letter case, such as `purchaseRequest1`. A grant shows its name read-only. Remove deletes a
     grant, but not the policy's last one.
-- **Saving.** Save is off while a grant has no ticked action and while nothing changed. It writes one
-  file, with one patch that carries the version the panel loaded and changes only what the author
-  edited. A stale version shows a conflict message, keeps the draft and offers Reload, which discards
-  it. After a save the Problems panel, the matrix and the names load again, and the cell stays open.
-  Opening another cell, or a matrix that loads again after another write, discards an unsaved draft.
+- **Saving.** Save is off while nothing changed. A click with a grant that has no ticked action says so under its
+  actions, focuses them and sends nothing. It writes one file, with one patch that carries the version the panel
+  loaded and changes only what the author edited. A stale version shows a conflict message, keeps the draft and offers
+  Reload, which discards it. After a save the Problems panel, the matrix and the names load again, and the cell stays
+  open. Opening another cell, or a matrix that loads again after another write, discards an unsaved draft.
 
 ## Editors by kind
 
@@ -870,8 +870,8 @@ second view of the same draft.
 - **Rows.** Add record adds a row with a new record id, and Remove deletes the record from the draft.
   Clearing a cell removes its key from the record's `values`, so the grid never writes `null`.
 - **Save.** A cell whose value would fail seeding, because it has the wrong type, is out of bounds or
-  is missing a required value, shows an error and turns Save off, also when the value comes from the
-  JSON view.
+  is missing a required value, shows an error, and a click on Save focuses the first such cell and sends
+  nothing, also when the value comes from the JSON view.
 - **Fallback.** The entity is found by name among the folder's `entity` resources, ignoring letter
   case. When it is not there, as for a module entity or a typo, the seed uses the generic form and the
   JSON view.
