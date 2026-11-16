@@ -37,12 +37,17 @@ A page whose widget is a `processInspector` names one process.
 The page lists the process's instances, newest first in the API's order, with their record, state,
 step, release and times.
 
-- **State filter.** The State column has an enum filter with the five states, platform texts, through
-  the table's Filter, see [tables](actions-and-controls.md#tables). A new filter goes back to page 1. The
-  browser works out which of the five states the filter keeps and sends each one as `state`. With all five
-  kept it sends none, and with none kept it shows the empty list and makes no request. A `state` in the
-  address is not read.
-- **Paging.** `filter`, `page` and `pageSize` live in the URL, as for a table.
+- **Toolbar.** The table has Search, Filter, Columns, a sort on every column and Refresh, see
+  [tables](actions-and-controls.md#tables). Search looks in the record label and the step. Filter has every
+  column: Record and Step as text, State as its five states, Release as a number, and Started and Ended as
+  dates. Columns shows, hides and orders the columns, with Record always first. Refresh loads the list again.
+- **Server.** The widget sends `search`, `filter`, `sort`, `page` and `pageSize` to the instances path as they
+  are, and the server applies them, see [process inspection](process-inspection.md#instance-list). The
+  column keys are the route's field names: `subjectLabel`, `state`, `step`, `releaseNumber`, `createdAt` and
+  `endedAt`. Started and Ended filter by their UTC day and sort by the exact time. The browser does not turn
+  a filter into `state` values.
+- **Paging.** `search`, `filter`, `columns`, `sort`, `page` and `pageSize` live in the URL, as for a table.
+  A new search, filter or sort goes back to page 1. A `state` in the address is not read.
 - **Record.** The first column, headed Record, is the instance's record, named by `subjectLabel`, and
   is the link that opens the instance. When `subjectLabel` is `null` the link reads
   `shell.inspector.noSubject` for an instance without a subject, and `shell.inspector.open` when the
@@ -151,7 +156,8 @@ The widget shows a failure where it happens, and its words come from the platfor
 - **Errors.** With nobody signed in, the API answers `401` and the widget shows the sign-in prompt like
   any other call. A `403` shows a message that the user may not inspect the process. A `404` on the
   instance page shows a message that the instance does not exist, inside the page. Any other failure
-  shows a generic load error.
+  shows a generic load error. On the instance list, that error sits under the toolbar in place of the rows,
+  so the person can clear the search or filter that caused it.
 - **Texts.** The platform texts `shell.inspector.*` hold the column headers, the section titles, the
   instance states, the "hidden" text, the "No subject" text, the Due, Parent, Process and Sub-processes
   labels, the empty texts and the messages. `shell.inspector.deadLetters.*` hold the dead letter
