@@ -310,6 +310,11 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Policy matrix', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=policies` },
     { caption: 'Releases', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=releases` },
     { caption: 'History', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=history` },
+    {
+      caption: 'Release page',
+      fixtures: studioFixtures.releasePage,
+      entry: `/studio?app=${application}&view=release&release=2`,
+    },
   ].map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 })),
   studioPageDesign: studioDesignerStates(typicalPageId),
   studioFormDesign: studioDesignerStates(typicalFormId),

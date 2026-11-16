@@ -9,6 +9,7 @@ import type {
   StudioNames,
   StudioPageMetadataAnswer,
   StudioPolicyMatrix,
+  StudioRelease,
   StudioReleases,
   StudioResource,
   StudioResourceActivity,
@@ -433,6 +434,19 @@ const typicalRevisions = {
   ],
 } satisfies { items: StudioRevision[] }
 
+/** Release 2 of Typical's history, which is live: it pins the Organization module and compares with release 1. */
+const typicalRelease: StudioRelease = {
+  number: 2,
+  previous: 1,
+  previousIsLive: false,
+  live: true,
+  changes: typicalReleases.changes,
+  partChanges: [],
+  modules: [{ id: 'organization', label: 'Organization', version: '1.2.0', previousVersion: '1.0.0' }],
+  packages: [],
+  blockers: [],
+}
+
 /** What a state's folder answers for its diagnostics and its releases. */
 interface StateAnswers {
   diagnostics: StudioDiagnostic[]
@@ -690,5 +704,6 @@ export const studioFixtures = {
   longNames: workspaceRoutes(longFolder),
   withErrors: workspaceRoutes(typicalFolder, errorAnswers),
   newApplication: workspaceRoutes(newFolder, unpublishedAnswers),
+  releasePage: { ...workspaceRoutes(typicalFolder), [`${folderPath}/releases/2`]: () => typicalRelease },
   accessDenied: { [appsPath]: () => new Response(null, { status: 403 }) },
 } satisfies Record<string, Record<string, () => unknown>>

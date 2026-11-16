@@ -165,6 +165,16 @@ describe('StudioReleasePage', () => {
     expect(screen.queryByText('Live')).not.toBeInTheDocument()
     expect(screen.queryByTestId('release-relaxed-point')).not.toBeInTheDocument()
 
+    for (const name of [
+      'Details',
+      'Relaxed points',
+      'If you activate it, compared with live release 4',
+      'Modules and packages',
+      'Activations',
+    ]) {
+      expect(screen.getByRole('region', { name })).toBeInTheDocument()
+    }
+    expect(section('Details').getByText('Label')).toBeInTheDocument()
     expect(fact('Label').getByText('Third')).toBeInTheDocument()
     expect(fact('Status').getByText(`Replaced on ${time('2026-05-05T10:00:00Z')}`)).toBeInTheDocument()
     expect(fact('Published').getByText(time('2026-05-02T10:00:00Z'))).toBeInTheDocument()
