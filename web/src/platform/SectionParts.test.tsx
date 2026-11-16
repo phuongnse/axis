@@ -112,6 +112,16 @@ describe('SectionPart', () => {
     expect(rules[1]).toHaveStyle(rule)
   })
 
+  it('draws no rule for a single part', () => {
+    renderSections(
+      <SectionPart testName="only" heading={{ title: 'Only' }}>
+        <span>Fields</span>
+      </SectionPart>,
+    )
+
+    expect(screen.queryByRole('separator')).toBeNull()
+  })
+
   it('draws no rule for a part that a condition leaves out', () => {
     renderSections([
       false,
