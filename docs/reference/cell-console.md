@@ -103,7 +103,8 @@ tenant button of the Tenants view and the actions of the Tenant view.
   defaults, its usage and its jobs in the same table as the Jobs view. An unknown id shows the not-found page.
   - **Usage.** The tenant's usage of the last 13 months by day, in the same table as the users page's "Usage"
     section, see [the tenant read](tenant-lifecycle.md#routes).
-  - **Host verification** _(planned for M33)_: the verification state of each host.
+  - **Host verification.** Each host that the operator asked for, from the [tenant read](tenant-lifecycle.md#routes)'s
+    `hostRequests`: pending with the date its request expires, verified or expired.
   - **Deletion dates** _(planned for M33)_: the dates of a tenant's deletion.
   - **Actions.** A Suspend, a Resume, an Export, a Delete and a Cancel deletion button, each with a confirmation
     that names the tenant, a Download button once an export has succeeded, and a Set quotas and an Add a host
@@ -153,7 +154,8 @@ Set quotas and Add a host apply at once.
   then shows the quotas that the route answered.
 - **Add a host.** The Tenant view shows Add a host for every status. A dialog that names the tenant asks for a
   host and calls `POST /api/cell/tenants/{id}/hosts`, see [hosts](tenant-lifecycle.md#hosts). It then shows the
-  TXT and CNAME records that the customer must add and when the request expires.
+  TXT and CNAME records that the customer must add and when the request expires. Once the request is answered, the
+  view loads the tenant again, so the host shows as pending under Host verification.
 - **Run again.** The Jobs view shows Run again on a `failed` job that is not a `purge` job, since the publisher
   queues a failed purge again on its own. Its confirmation names the job's kind and its tenant, and says that
   the new job starts at the first step that did not succeed. Confirming it calls

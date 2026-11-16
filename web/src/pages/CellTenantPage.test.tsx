@@ -42,6 +42,7 @@ const acme: CellTenantDetail = {
     storage: { value: null, overridden: true },
   },
   days: [],
+  hostRequests: [],
 }
 const job: CellJob = {
   id: '3',
@@ -216,6 +217,38 @@ describe('CellTenantPage', () => {
     expect(jobRows).toHaveLength(2)
     expect(jobRows[1]).toHaveTextContent('suspend')
     expect(fetchMock).toHaveBeenCalledWith('/api/cell/jobs?tenant=acme', expect.anything())
+  })
+
+  it('lists each requested host as pending with its expiry, verified or expired', async () => {
+    stubRoutes(
+      ok({
+        ...acme,
+        hostRequests: [
+          { host: 'old.acme.test', state: 'expired', expiresAt: '2026-11-01T10:00:00Z' },
+          { host: 'portal.acme.test', state: 'pending', expiresAt: '2026-11-12T10:00:00Z' },
+          { host: 'shop.acme.test', state: 'verified', expiresAt: '2026-11-05T10:00:00Z' },
+        ],
+      }),
+    )
+    renderPage('/tenants/acme')
+
+    const rows = within(await screen.findByTestId('cell-tenant-host-requests'))
+      .getAllByRole('row')
+      .slice(1)
+    expect(rows.map(cellTexts)).toEqual([
+      ['old.acme.test', 'Expired', '—'],
+      ['portal.acme.test', 'Pending', new Date('2026-11-12T10:00:00Z').toLocaleString('en')],
+      ['shop.acme.test', 'Verified', '—'],
+    ])
+  })
+
+  it('says that no host has been requested', async () => {
+    stubRoutes(ok(acme))
+    renderPage('/tenants/acme')
+
+    expect(await screen.findByTestId('cell-tenant-host-requests')).toHaveTextContent(
+      'No host has been requested. Add a host to start its verification.',
+    )
   })
 
   it('lists the days of the tenant read in the usage table', async () => {
@@ -631,6 +664,23 @@ describe('CellTenantPage', () => {
     // The dialog's corner icon is also named Close, and the footer button comes last.
     await user.click(within(dialog).getAllByRole('button', { name: 'Close' }).at(-1)!)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('loads the tenant again once a host is added', async () => {
+    stubWrites({ '/api/cell/tenants/acme/hosts': { status: 201, body: hostRequest } })
+    const tenantReads = () =>
+      vi.mocked(fetch).mock.calls.filter(([input]) => (input as string) === '/api/cell/tenants/acme').length
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-add-host'))
+    const dialog = await screen.findByRole('dialog')
+    expect(tenantReads()).toBe(1)
+    await user.type(within(dialog).getByRole('textbox', { name: 'Host' }), 'portal.acme.test')
+    await user.click(within(dialog).getByRole('button', { name: 'Add' }))
+
+    await within(dialog).findByTestId('cell-tenant-host-records')
+    await waitFor(() => expect(tenantReads()).toBe(2))
   })
 
   it('checks the host on click and sends nothing', async () => {

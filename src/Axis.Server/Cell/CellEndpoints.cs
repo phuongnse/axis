@@ -55,7 +55,9 @@ namespace Axis.Server.CellApi;
 /// its stored status, which stays <c>suspended</c>. A preview tenant belongs to its main tenant's Studio and is not a tenant of the
 /// cell, so the list leaves it out and its id is a <c>404</c>. The <c>application</c> is the one the create job
 /// recorded on the tenant's row: the template id, or the name of the blank application, and <see langword="null"/> for a tenant that no create job made. The one tenant also answers its <c>quotas</c>: each quota key with its effective <c>value</c> and
-/// whether the tenant <c>overridden</c> it, worked out from its <c>platform.tenant_quotas</c> rows and the cell's defaults.
+/// whether the tenant <c>overridden</c> it, worked out from its <c>platform.tenant_quotas</c> rows and the cell's defaults. It also
+/// answers its <c>hostRequests</c>: the newest request of each host the operator asked for, as <c>{ host, state, expiresAt }</c>, ordered
+/// by host. A pending request past its expiry answers <c>expired</c>, and the token is never answered.
 /// </para>
 /// <para>
 /// Both reads answer each tenant's <c>usage</c>: <c>storage</c>, <c>users</c>, <c>applications</c> and <c>emailsPerDay</c>, each as
@@ -317,6 +319,7 @@ internal static partial class CellEndpoints
         var usage = await ReadUsageAsync(platform, [tenant.Id], quotas, latest, Today(time), cancellationToken);
         var archives = await ReadNewestArchivesAsync(platform, [tenant.Id], cancellationToken);
         var days = await usageStore.ListDaysAsync(tenant.Id, Today(time).AddMonths(-TenantUsageStore.RetentionMonths), cancellationToken);
+        var hostRequests = await ReadHostRequestsAsync(platform, tenant.Id, time.GetUtcNow(), cancellationToken);
         return Results.Ok(new CellTenantDetailResponse(
             tenant.Id,
             tenant.Status,
@@ -327,7 +330,24 @@ internal static partial class CellEndpoints
             usage[tenant.Id],
             archives.TryGetValue(tenant.Id, out var archive) ? archive : null,
             [.. days.Select(row => new TenantUsageDayResponse(
-                row.Day, row.DatabaseBytes, row.FileBytes, row.Users, row.Applications, row.EmailsSent, row.ConnectorCalls, row.WorkItemsRun))]));
+                row.Day, row.DatabaseBytes, row.FileBytes, row.Users, row.Applications, row.EmailsSent, row.ConnectorCalls, row.WorkItemsRun))],
+            hostRequests));
+    }
+
+    // The token stays out of the select. A request whose expiry has passed is not pending, as in RequestHostAsync, see docs/reference/tenant-lifecycle.md#hosts.
+    private static async Task<List<CellHostRequestStateResponse>> ReadHostRequestsAsync(
+        PlatformDbContext platform, string tenantId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var rows = await platform.TenantHostRequests.AsNoTracking()
+            .Where(row => row.TenantId == tenantId)
+            .Select(row => new { row.Host, row.State, row.RequestedAt, row.ExpiresAt })
+            .ToListAsync(cancellationToken);
+        return [.. rows
+            .GroupBy(row => row.Host, StringComparer.Ordinal)
+            .Select(group => group.MaxBy(row => row.RequestedAt)!)
+            .OrderBy(row => row.Host, StringComparer.Ordinal)
+            .Select(row => new CellHostRequestStateResponse(
+                row.Host, row.State == "pending" && row.ExpiresAt <= now ? "expired" : row.State, row.ExpiresAt))];
     }
 
     // The tenant row, not the tenant catalog, which holds active tenants only. A suspended tenant has no pool, so the read opens one connection.
@@ -1126,7 +1146,10 @@ internal sealed record CellTenantResponse(
 /// <summary>The tenants of the cell, ordered by id.</summary>
 internal sealed record CellTenantListResponse(IReadOnlyList<CellTenantResponse> Items);
 
-/// <summary>One tenant of the cell with its effective quotas, keyed by quota key, and its day rows of the last 13 months, newest first.</summary>
+/// <summary>
+/// One tenant of the cell with its effective quotas, keyed by quota key, its day rows of the last 13 months, newest first, and the newest
+/// request of each host the operator asked for.
+/// </summary>
 internal sealed record CellTenantDetailResponse(
     string Id,
     string Status,
@@ -1136,7 +1159,11 @@ internal sealed record CellTenantDetailResponse(
     IReadOnlyDictionary<string, CellQuotaResponse> Quotas,
     CellTenantUsageResponse Usage,
     DateTimeOffset? NewestArchiveAt,
-    IReadOnlyList<TenantUsageDayResponse> Days);
+    IReadOnlyList<TenantUsageDayResponse> Days,
+    IReadOnlyList<CellHostRequestStateResponse> HostRequests);
+
+/// <summary>The newest request for one host of a tenant's own: its state and when it expires, with no token.</summary>
+internal sealed record CellHostRequestStateResponse(string Host, string State, DateTimeOffset ExpiresAt);
 
 /// <summary>The category of the logs of the administrators route.</summary>
 internal sealed class CellAdministratorsLog;

@@ -260,6 +260,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         const string bindingUrl = "https://marker-binding.example.test/reports";
         const string userName = "Marker Person";
         const string userEmail = "marker.person@example.test";
+        const string requestToken = "marker-request-token-8317";
         await ExecuteAsync(
             $"""
             INSERT INTO platform.tenant_usage_latest (tenant_id, database_bytes, file_bytes, failed_instances, unknown_calls, open_dead_letters, sampled_at)
@@ -267,7 +268,9 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             INSERT INTO platform.tenant_usage (tenant_id, day, database_bytes, file_bytes, users, applications, emails_sent, connector_calls, work_items_run)
             VALUES ('a', (now() AT TIME ZONE 'UTC')::date - 1, 1, 1, 1, 1, 1, 1, 1);
             INSERT INTO platform.tenant_backups (tenant_id, last_success_at) VALUES ('a', now());
-            INSERT INTO platform.tenant_bindings (tenant_id, name, kind, url) VALUES ('a', 'ReportsUrl', 'url', '{bindingUrl}')
+            INSERT INTO platform.tenant_bindings (tenant_id, name, kind, url) VALUES ('a', 'ReportsUrl', 'url', '{bindingUrl}');
+            INSERT INTO platform.tenant_host_requests (tenant_id, host, token, state, requested_at, expires_at, actor)
+            VALUES ('a', 'shop.a.example.test', '{requestToken}', 'pending', now(), now() + interval '7 days', 'operator-1')
             """);
         var tenantDatabase = new NpgsqlConnectionStringBuilder(_platform)
         {
@@ -280,7 +283,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             VALUES ('marker-user', '{userName}', '{userEmail}', 'en', now(), now())
             """,
             CancellationToken);
-        var forbidden = new List<string> { PostgreSqlServer.RolePassword, KeycloakFixture.ClientSecret, ClientSecret, bindingUrl, userName, userEmail };
+        var forbidden = new List<string> { PostgreSqlServer.RolePassword, KeycloakFixture.ClientSecret, ClientSecret, bindingUrl, userName, userEmail, requestToken };
         await using (var connection = new NpgsqlConnection(_platform))
         {
             await connection.OpenAsync(CancellationToken);
@@ -316,8 +319,49 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         string[] days = ["day", "databaseBytes", "fileBytes", "users", "applications", "emailsSent", "connectorCalls", "workItemsRun"];
         AssertFields(
             await detail.Content.ReadFromJsonAsync<JsonElement>(CancellationToken),
-            [.. tenantFields, "quotas.*.value", "quotas.*.overridden", .. days.Select(field => $"days[].{field}")],
+            [
+                .. tenantFields,
+                "quotas.*.value",
+                "quotas.*.overridden",
+                .. days.Select(field => $"days[].{field}"),
+                "hostRequests[].host",
+                "hostRequests[].state",
+                "hostRequests[].expiresAt",
+            ],
             forbidden);
+    }
+
+    [Fact]
+    public async Task An_operator_reads_the_newest_request_of_each_host_ordered_by_host_and_a_caller_without_the_role_is_refused()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+        await ExecuteAsync(
+            """
+            INSERT INTO platform.tenant_host_requests (tenant_id, host, token, state, requested_at, expires_at, actor)
+            VALUES
+                ('b', 'shop.acme.test', 'token-1', 'expired', now() - interval '20 days', now() - interval '13 days', 'operator-1'),
+                ('b', 'shop.acme.test', 'token-2', 'pending', now(), now() + interval '7 days', 'operator-1'),
+                ('b', 'portal.acme.test', 'token-3', 'verified', now() - interval '2 days', now() + interval '5 days', 'operator-1'),
+                ('b', 'old.acme.test', 'token-4', 'pending', now() - interval '8 days', now() - interval '1 day', 'operator-1'),
+                ('c', 'other.acme.test', 'token-5', 'pending', now(), now() + interval '7 days', 'operator-1')
+            """);
+        var newestExpiry = new DateTimeOffset((DateTime)(await ScalarAsync("SELECT expires_at FROM platform.tenant_host_requests WHERE token = 'token-2'"))!);
+
+        using var response = await GetAsync(client, "/api/cell/tenants/b", token);
+        using var noRole = await GetAsync(client, "/api/cell/tenants/b", noRoleToken);
+        using var anonymous = await GetAsync(client, "/api/cell/tenants/b", null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var requests = (await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("hostRequests");
+        Assert.Equal(
+            ["old.acme.test/expired", "portal.acme.test/verified", "shop.acme.test/pending"],
+            requests.EnumerateArray().Select(item => $"{item.GetProperty("host").GetString()}/{item.GetProperty("state").GetString()}").ToArray());
+        Assert.Equal(newestExpiry, requests[2].GetProperty("expiresAt").GetDateTimeOffset());
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
     }
 
     [Fact]
