@@ -1,6 +1,6 @@
 import { Flex, Form, InputNumber, Modal } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { setCellTenantQuotas, type CellQuota } from '../platform/cell'
@@ -26,7 +26,7 @@ interface CellTenantQuotasDialogProps {
  */
 export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onClose }: CellTenantQuotasDialogProps) {
   const t = useText()
-  const { size } = useDesignTokens()
+  const { size, spacing } = useDesignTokens()
   const [start] = useState<Record<string, QuotaChoice>>(() =>
     Object.fromEntries(Object.entries(quotas).map(([key, quota]) => [key, currentChoice(quota)])),
   )
@@ -81,12 +81,12 @@ export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onC
         onValuesChange={(_changed, all) => setChoices(all)}
         onFinish={() => void save()}
       >
-        <Flex vertical gap="middle">
+        <Flex vertical gap={spacing.lg}>
           {Object.keys(quotas).map((key) => {
             const label = t(`shell.cell.tenant.quota.${key}`)
             const choice = choices[key]!
             return (
-              <Flex key={key} vertical gap="small">
+              <Fragment key={key}>
                 <AxisChoiceField
                   name={[key, 'kind']}
                   label={label}
@@ -118,7 +118,7 @@ export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onC
                 >
                   <InputNumber min={0} precision={0} disabled={choice.kind !== 'value'} />
                 </AxisField>
-              </Flex>
+              </Fragment>
             )
           })}
           {error && <AxisAlert data-testid="cell-tenant-quotas-error" kind="error" message={error} />}

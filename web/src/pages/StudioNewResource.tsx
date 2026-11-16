@@ -1,4 +1,4 @@
-import { Form, Input, Modal, Select } from 'antd'
+import { Flex, Form, Input, Modal, Select } from 'antd'
 import { useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
@@ -48,7 +48,7 @@ export function StudioNewResource({
   onCreated: (item: StudioResourceItem, diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
-  const { size } = useDesignTokens()
+  const { size, spacing } = useDesignTokens()
   const { lost } = useStudioConnection()
   const [open, setOpen] = useState(false)
   const [form] = Form.useForm<Values>()
@@ -136,40 +136,42 @@ export function StudioNewResource({
           onValuesChange={(changed) => 'kind' in changed && form.setFields([{ name: 'value', errors: [] }])}
           onFinish={create}
         >
-          {fixedKind === undefined && (
+          <Flex vertical gap={spacing.lg}>
+            {fixedKind === undefined && (
+              <AxisField
+                name="kind"
+                label={t('shell.studio.newResource.kind')}
+                help={t('shell.studio.newResource.kind.help')}
+                requiredMessage={t('shell.studio.newResource.kindRequired')}
+              >
+                <Select
+                  aria-label={t('shell.studio.newResource.kind')}
+                  // All kinds render, so each one can be reached without scrolling the list, and the author can type to narrow it.
+                  showSearch
+                  optionFilterProp="label"
+                  virtual={false}
+                  options={kindOptions}
+                />
+              </AxisField>
+            )}
             <AxisField
-              name="kind"
-              label={t('shell.studio.newResource.kind')}
-              help={t('shell.studio.newResource.kind.help')}
-              requiredMessage={t('shell.studio.newResource.kindRequired')}
+              name="value"
+              label={label}
+              help={t(isText ? 'shell.studio.newResource.locale.help' : 'shell.studio.newResource.name.help')}
+              requiredMessage={t(
+                isText ? 'shell.studio.newResource.localeRequired' : 'shell.studio.newResource.nameRequired',
+              )}
             >
-              <Select
-                aria-label={t('shell.studio.newResource.kind')}
-                // All kinds render, so each one can be reached without scrolling the list, and the author can type to narrow it.
-                showSearch
-                optionFilterProp="label"
-                virtual={false}
-                options={kindOptions}
+              <Input
+                aria-label={label}
+                // The browser also submits a form with one text box on Enter, so this stops it from creating twice.
+                onPressEnter={(event) => {
+                  event.preventDefault()
+                  form.submit()
+                }}
               />
             </AxisField>
-          )}
-          <AxisField
-            name="value"
-            label={label}
-            help={t(isText ? 'shell.studio.newResource.locale.help' : 'shell.studio.newResource.name.help')}
-            requiredMessage={t(
-              isText ? 'shell.studio.newResource.localeRequired' : 'shell.studio.newResource.nameRequired',
-            )}
-          >
-            <Input
-              aria-label={label}
-              // The browser also submits a form with one text box on Enter, so this stops it from creating twice.
-              onPressEnter={(event) => {
-                event.preventDefault()
-                form.submit()
-              }}
-            />
-          </AxisField>
+          </Flex>
         </Form>
       </Modal>
     </>

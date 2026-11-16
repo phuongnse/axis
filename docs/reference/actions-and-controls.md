@@ -84,8 +84,8 @@ choices.
 These rules hold for every Ant Design form in the SPA and in the identity provider's pages. The shared
 `ConfigProvider` carries the field look, so no widget keeps its own copy, and a Vitest check holds the layout.
 
-- **A field's error keeps the gap.** The message sits just under its control, and the field keeps its
-  own gap below the message: `spacing-lg` in a form, none in a table cell.
+- **A field's error keeps the gap.** The message sits just under its control. In a form, the next field
+  stays `spacing-lg` below the message, the gap the form's layout gives. In a table cell there is none.
 - **A box sits on its label's first line.** A checkbox or a radio keeps its box level with the first
   line of its label, so a label that wraps leaves the box at the top.
 - **An error border keeps 3:1.** An input, number input, select, date picker, mentions, cascader or
@@ -302,6 +302,8 @@ These rules hold for every dialog, through the shared `ConfigProvider`.
 - **Its body scrolls at its edge.** The body reaches the frame's edges and keeps the padding inside
   it, so the thin scrollbar runs at the dialog's right edge and a field's focus ring has room at its
   sides.
+- **The buttons sit `spacing-lg` below the body.** A dialog that ends in a form needs no space of its
+  own, and a list or a table ends the same way.
 - **A dialog holds only what it edits**. A table may show what its row's dialog does not edit, as long
   as the cell leads to where it is edited, so each thing is seen in one place and edited in one place.
 - **It draws on `surface`,** as panels do, so everything inside sits on the colour it was made for,

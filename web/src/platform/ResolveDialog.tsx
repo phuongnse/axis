@@ -38,7 +38,7 @@ const reasonMaxLength = 500
  */
 export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClose, onChanged }: ResolveDialogProps) {
   const t = useText()
-  const { size } = useDesignTokens()
+  const { size, spacing } = useDesignTokens()
   const [form] = Form.useForm<ResolveValues>()
   const outcome = Form.useWatch('outcome', form)
   const [sending, setSending] = useState(false)
@@ -97,59 +97,63 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
     >
       <Flex vertical gap="middle">
         <Form form={form} layout="vertical" requiredMark={requiredMark}>
-          <AxisField
-            name="reason"
-            label={t('shell.inspector.commands.reason')}
-            help={t('shell.inspector.commands.reason.help')}
-            requiredMessage={t('shell.inspector.commands.reasonRequired')}
-            rules={[{ max: reasonMaxLength, message: t('shell.inspector.commands.reasonTooLong') }]}
-          >
-            <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
-          </AxisField>
-          <AxisField
-            name="outcome"
-            label={t('shell.inspector.commands.outcome')}
-            help={t('shell.inspector.commands.outcome.help')}
-            requiredMessage={t('shell.inspector.commands.outcomeRequired')}
-          >
-            <Radio.Group
-              role="radiogroup"
-              aria-label={t('shell.inspector.commands.outcome')}
-              options={[
-                { value: 'succeeded', label: t('shell.inspector.commands.outcomeSucceeded') },
-                { value: 'failed', label: t('shell.inspector.commands.outcomeFailed') },
-              ]}
-            />
-          </AxisField>
-          {outcome === 'succeeded' && outputs.length > 0 && (
-            <AxisFieldGroup
-              title={t('shell.inspector.commands.outputs')}
-              help={t('shell.inspector.commands.outputs.help')}
+          <Flex vertical gap={spacing.lg}>
+            <AxisField
+              name="reason"
+              label={t('shell.inspector.commands.reason')}
+              help={t('shell.inspector.commands.reason.help')}
+              requiredMessage={t('shell.inspector.commands.reasonRequired')}
+              rules={[{ max: reasonMaxLength, message: t('shell.inspector.commands.reasonTooLong') }]}
             >
-              {outputs.map((output) => (
-                <AxisField
-                  key={output.name}
-                  name={['output', output.name]}
-                  label={`${output.name} (${output.type})`}
-                  help={t('shell.inspector.commands.output.help')}
-                  requiredMessage={output.required ? t('shell.inspector.commands.outputRequired') : undefined}
-                >
-                  {output.type === 'boolean' ? (
-                    <Select
-                      allowClear
-                      virtual={false}
-                      options={[
-                        { value: true, label: 'true' },
-                        { value: false, label: 'false' },
-                      ]}
-                    />
-                  ) : (
-                    <Input />
-                  )}
-                </AxisField>
-              ))}
-            </AxisFieldGroup>
-          )}
+              <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
+            </AxisField>
+            <AxisField
+              name="outcome"
+              label={t('shell.inspector.commands.outcome')}
+              help={t('shell.inspector.commands.outcome.help')}
+              requiredMessage={t('shell.inspector.commands.outcomeRequired')}
+            >
+              <Radio.Group
+                role="radiogroup"
+                aria-label={t('shell.inspector.commands.outcome')}
+                options={[
+                  { value: 'succeeded', label: t('shell.inspector.commands.outcomeSucceeded') },
+                  { value: 'failed', label: t('shell.inspector.commands.outcomeFailed') },
+                ]}
+              />
+            </AxisField>
+            {outcome === 'succeeded' && outputs.length > 0 && (
+              <AxisFieldGroup
+                title={t('shell.inspector.commands.outputs')}
+                help={t('shell.inspector.commands.outputs.help')}
+              >
+                <Flex vertical gap={spacing.lg}>
+                  {outputs.map((output) => (
+                    <AxisField
+                      key={output.name}
+                      name={['output', output.name]}
+                      label={`${output.name} (${output.type})`}
+                      help={t('shell.inspector.commands.output.help')}
+                      requiredMessage={output.required ? t('shell.inspector.commands.outputRequired') : undefined}
+                    >
+                      {output.type === 'boolean' ? (
+                        <Select
+                          allowClear
+                          virtual={false}
+                          options={[
+                            { value: true, label: 'true' },
+                            { value: false, label: 'false' },
+                          ]}
+                        />
+                      ) : (
+                        <Input />
+                      )}
+                    </AxisField>
+                  ))}
+                </Flex>
+              </AxisFieldGroup>
+            )}
+          </Flex>
         </Form>
         {error !== undefined && <AxisAlert data-testid="inspector-command-error" kind="error" message={error} />}
       </Flex>

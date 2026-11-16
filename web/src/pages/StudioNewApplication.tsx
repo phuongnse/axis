@@ -1,4 +1,4 @@
-import { Button, Form, Input, Modal } from 'antd'
+import { Button, Flex, Form, Input, Modal } from 'antd'
 import { useContext, useEffect, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { requiredMark } from '../platform/requiredMark'
@@ -43,7 +43,7 @@ export function StudioNewApplication({
   onOpenChange?: (open: boolean) => void
 }) {
   const t = useText()
-  const { size } = useDesignTokens()
+  const { size, spacing } = useDesignTokens()
   const { lost } = useStudioConnection()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const [ownOpen, setOwnOpen] = useState(false)
@@ -139,47 +139,49 @@ export function StudioNewApplication({
           scrollToFirstError={{ focus: true }}
           onFinish={create}
         >
-          <AxisField
-            name="name"
-            label={t('shell.studio.newApplication.name')}
-            help={t('shell.studio.newApplication.name.help')}
-            requiredMessage={t('shell.studio.newApplication.nameRequired')}
-            rules={[
-              {
-                // An empty name has the required message, so this skips it.
-                validator: (_, value: string) =>
-                  value.trim() === '' || isApplicationName(value.trim())
-                    ? Promise.resolve()
-                    : Promise.reject(new Error(t('shell.studio.newApplication.invalid'))),
-              },
-            ]}
-          >
-            <Input
-              aria-label={t('shell.studio.newApplication.name')}
-              // The browser also submits a form with one text box on Enter, so this stops it from creating twice.
-              onPressEnter={(event) => {
-                event.preventDefault()
-                form.submit()
-              }}
+          <Flex vertical gap={spacing.lg}>
+            <AxisField
+              name="name"
+              label={t('shell.studio.newApplication.name')}
+              help={t('shell.studio.newApplication.name.help')}
+              requiredMessage={t('shell.studio.newApplication.nameRequired')}
+              rules={[
+                {
+                  // An empty name has the required message, so this skips it.
+                  validator: (_, value: string) =>
+                    value.trim() === '' || isApplicationName(value.trim())
+                      ? Promise.resolve()
+                      : Promise.reject(new Error(t('shell.studio.newApplication.invalid'))),
+                },
+              ]}
+            >
+              <Input
+                aria-label={t('shell.studio.newApplication.name')}
+                // The browser also submits a form with one text box on Enter, so this stops it from creating twice.
+                onPressEnter={(event) => {
+                  event.preventDefault()
+                  form.submit()
+                }}
+              />
+            </AxisField>
+            <StartFromField
+              name="template"
+              label={t('shell.studio.newApplication.template')}
+              help={t('shell.studio.newApplication.template.help')}
+              blank={t('shell.studio.newApplication.blank')}
+              failedMessage={t('shell.studio.newApplication.templatesFailed')}
+              choices={
+                Array.isArray(templates)
+                  ? templates.map((item) => ({
+                      id: item.id,
+                      title: localized(item.title, locale),
+                      description: localized(item.description, locale),
+                      mark: item.builtIn ? t('shell.studio.newApplication.builtIn') : undefined,
+                    }))
+                  : templates
+              }
             />
-          </AxisField>
-          <StartFromField
-            name="template"
-            label={t('shell.studio.newApplication.template')}
-            help={t('shell.studio.newApplication.template.help')}
-            blank={t('shell.studio.newApplication.blank')}
-            failedMessage={t('shell.studio.newApplication.templatesFailed')}
-            choices={
-              Array.isArray(templates)
-                ? templates.map((item) => ({
-                    id: item.id,
-                    title: localized(item.title, locale),
-                    description: localized(item.description, locale),
-                    mark: item.builtIn ? t('shell.studio.newApplication.builtIn') : undefined,
-                  }))
-                : templates
-            }
-          />
+          </Flex>
         </Form>
       </Modal>
     </>

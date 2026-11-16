@@ -39,7 +39,7 @@ export function InviteUserModal({
   onReload: () => void
 }) {
   const t = useText()
-  const { size } = useDesignTokens()
+  const { size, spacing } = useDesignTokens()
   const [form] = Form.useForm<InviteFields>()
   const [roles, setRoles] = useState<Pick<UserRoles, 'applications' | 'platformRoles'>>()
   const [rolesFailed, setRolesFailed] = useState(false)
@@ -143,23 +143,25 @@ export function InviteUserModal({
             />
           )}
           <Form form={form} layout="vertical" name="invite" requiredMark={false}>
-            <AxisField
-              name="email"
-              label={t('shell.users.invite.email')}
-              help={t('shell.users.invite.email.help')}
-              requiredMessage={t('shell.users.invite.emailRequired')}
-              rules={[{ type: 'email' }]}
-            >
-              <Input type="email" maxLength={200} />
-            </AxisField>
-            <AxisField
-              name="displayName"
-              label={t('shell.users.invite.displayName')}
-              help={t('shell.users.invite.displayName.help')}
-              requiredMessage={t('shell.users.invite.displayNameRequired')}
-            >
-              <Input maxLength={200} />
-            </AxisField>
+            <Flex vertical gap={spacing.lg}>
+              <AxisField
+                name="email"
+                label={t('shell.users.invite.email')}
+                help={t('shell.users.invite.email.help')}
+                requiredMessage={t('shell.users.invite.emailRequired')}
+                rules={[{ type: 'email' }]}
+              >
+                <Input type="email" maxLength={200} />
+              </AxisField>
+              <AxisField
+                name="displayName"
+                label={t('shell.users.invite.displayName')}
+                help={t('shell.users.invite.displayName.help')}
+                requiredMessage={t('shell.users.invite.displayNameRequired')}
+              >
+                <Input maxLength={200} />
+              </AxisField>
+            </Flex>
           </Form>
           {sections.length > 0 && (
             <Flex vertical gap="small">

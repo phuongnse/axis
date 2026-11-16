@@ -146,9 +146,10 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
 
 /**
  * The props every Axis `ConfigProvider` gets, see docs/reference/actions-and-controls.md#dialogs: the theme; every
- * dialog centred, no taller or wider than the window less its `spacing-xl` margins, with a scrolling body; a Cancel of
- * text type for every dialog, so it is a text button beside the solid OK; and checkboxes and radios that sit at the top
- * of their box, level with the first line of a label that wraps.
+ * dialog centred, no taller or wider than the window less its `spacing-xl` margins, with a scrolling body and its
+ * buttons `spacing-lg` below the body; a Cancel of text type for every dialog, so it is a text button beside the solid
+ * OK; and checkboxes and radios that sit at the top of their box, level with the first line of a label that wraps.
+ * See docs/reference/actions-and-controls.md#dialogs.
  */
 export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMotion = false): ConfigProviderProps {
   const config = antThemeFor(mode, page, reducedMotion)
@@ -164,11 +165,12 @@ export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMot
       centered: true,
       style: { maxWidth: `calc(100vw - ${margins}px)` },
       // The padding sits in the header, body and footer, not the frame, so the body's scrollbar runs at the dialog's edge.
+      // The body keeps spacing-xs under its content, so the footer adds the rest of spacing-lg above the buttons.
       styles: {
         container: { display: 'flex', flexDirection: 'column', maxHeight: `calc(100vh - ${margins}px)`, padding: 0 },
         header: { padding: `${spacing.lg}px ${spacing.lg}px 0` },
         body: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: `${spacing.xs}px ${spacing.lg}px` },
-        footer: { padding: `0 ${spacing.lg}px ${spacing.lg}px` },
+        footer: { marginTop: spacing.lg - spacing.xs, padding: `0 ${spacing.lg}px ${spacing.lg}px` },
       },
     },
     checkbox: {
@@ -187,7 +189,7 @@ export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMot
 export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
   const { colour, type } = designTokensFor(mode, page)
   return [
-    // A message sits 4px under its control. The item keeps its own bottom margin under the message.
+    // A message sits 4px under its control. The gap under the message is the form's.
     `.ant-form-item .ant-form-item-explain { margin-top: 4px; font-size: ${type.fontSize}px; line-height: 20px; }`,
     '.ant-form-item-margin-offset { display: none; }',
     `.ant-form-item-has-error .ant-checkbox:not(.ant-checkbox-checked), .ant-form-item-has-error .ant-radio:not(.ant-radio-checked) { border-color: ${colour.dangerText}; }`,

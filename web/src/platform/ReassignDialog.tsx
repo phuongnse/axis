@@ -42,7 +42,7 @@ const reasonMaxLength = 500
  */
 export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDialogProps) {
   const t = useText()
-  const { size } = useDesignTokens()
+  const { size, spacing } = useDesignTokens()
   const [form] = Form.useForm<ReassignValues>()
   const kind = Form.useWatch('kind', form)
   const [users, setUsers] = useState<UserOption[]>([])
@@ -119,55 +119,57 @@ export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDi
       <Flex vertical gap="middle">
         {errors.length > 0 && <AxisAlert data-testid="task-reassign-error" kind="error" message={errors.join(' ')} />}
         <Form form={form} layout="vertical" requiredMark={requiredMark} initialValues={{ kind: 'role' }}>
-          <AxisField name="kind" label={t('shell.task.reassignTarget')} help={t('shell.task.reassignTarget.help')}>
-            <Radio.Group
-              role="radiogroup"
-              aria-label={t('shell.task.reassignTarget')}
-              options={[
-                { value: 'role', label: t('shell.task.reassignRole') },
-                { value: 'user', label: t('shell.task.reassignPerson') },
-              ]}
-            />
-          </AxisField>
-          {kind === 'user' ? (
-            <AxisField
-              name="user"
-              label={t('shell.task.reassignPerson')}
-              help={t('shell.task.reassignPerson.help')}
-              requiredMessage={t('shell.task.reassignTargetRequired')}
-            >
-              <Select
-                showSearch={{ filterOption: false, onSearch: search }}
-                labelInValue
-                virtual={false}
-                options={users.map((user) => ({ value: user.id, label: user.displayName }))}
+          <Flex vertical gap={spacing.lg}>
+            <AxisField name="kind" label={t('shell.task.reassignTarget')} help={t('shell.task.reassignTarget.help')}>
+              <Radio.Group
+                role="radiogroup"
+                aria-label={t('shell.task.reassignTarget')}
+                options={[
+                  { value: 'role', label: t('shell.task.reassignRole') },
+                  { value: 'user', label: t('shell.task.reassignPerson') },
+                ]}
               />
             </AxisField>
-          ) : (
+            {kind === 'user' ? (
+              <AxisField
+                name="user"
+                label={t('shell.task.reassignPerson')}
+                help={t('shell.task.reassignPerson.help')}
+                requiredMessage={t('shell.task.reassignTargetRequired')}
+              >
+                <Select
+                  showSearch={{ filterOption: false, onSearch: search }}
+                  labelInValue
+                  virtual={false}
+                  options={users.map((user) => ({ value: user.id, label: user.displayName }))}
+                />
+              </AxisField>
+            ) : (
+              <AxisField
+                name="role"
+                label={t('shell.task.reassignRole')}
+                help={t('shell.task.reassignRole.help')}
+                requiredMessage={t('shell.task.reassignTargetRequired')}
+              >
+                <Select
+                  virtual={false}
+                  options={roles.map((role) => ({
+                    value: role.name,
+                    label: role.labelKey ? t(role.labelKey) : role.name,
+                  }))}
+                />
+              </AxisField>
+            )}
             <AxisField
-              name="role"
-              label={t('shell.task.reassignRole')}
-              help={t('shell.task.reassignRole.help')}
-              requiredMessage={t('shell.task.reassignTargetRequired')}
+              name="reason"
+              label={t('shell.task.reassignReason')}
+              help={t('shell.task.reassignReason.help')}
+              requiredMessage={t('shell.task.reassignReasonRequired')}
+              rules={[{ max: reasonMaxLength, message: t('shell.task.reassignReasonTooLong') }]}
             >
-              <Select
-                virtual={false}
-                options={roles.map((role) => ({
-                  value: role.name,
-                  label: role.labelKey ? t(role.labelKey) : role.name,
-                }))}
-              />
+              <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
             </AxisField>
-          )}
-          <AxisField
-            name="reason"
-            label={t('shell.task.reassignReason')}
-            help={t('shell.task.reassignReason.help')}
-            requiredMessage={t('shell.task.reassignReasonRequired')}
-            rules={[{ max: reasonMaxLength, message: t('shell.task.reassignReasonTooLong') }]}
-          >
-            <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
-          </AxisField>
+          </Flex>
         </Form>
       </Flex>
     </Modal>
