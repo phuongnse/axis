@@ -301,9 +301,9 @@ describe('CellTenantPage', () => {
     stubRoutes(ok(acme), undefined, undefined, { ...noDays, items: [day], totalCount: 1 })
     renderPage('/tenants/acme')
 
-    const rows = within(await screen.findByTestId('cell-tenant-usage')).getAllByRole('row')
-    expect(rows).toHaveLength(2)
-    expect(rows[1]).toHaveTextContent('4,321')
+    const usage = within(await screen.findByTestId('cell-tenant-usage'))
+    expect(await usage.findByText('4,321')).toBeInTheDocument()
+    expect(usage.getAllByRole('row')).toHaveLength(2)
   })
 
   it('shows the empty text when the usage days route has no days', async () => {
