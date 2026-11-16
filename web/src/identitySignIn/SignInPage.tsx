@@ -45,7 +45,7 @@ function SignInBody({ context }: { context: SignInContext }) {
 
 function AccountForm({ context }: { context: SignInContext }) {
   const { username, error, loginAction, rememberMe, forgotPasswordUrl, texts } = context
-  const { colour } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const formId = useId()
   const labelStyle = { fontWeight: 500, color: colour.textMuted }
   const credentialRef = useRef<HTMLInputElement>(null)
@@ -60,37 +60,42 @@ function AccountForm({ context }: { context: SignInContext }) {
       // Ant Design validates and stops the submit event, so the native post happens here.
       onFinish={() => credentialRef.current?.form?.submit()}
     >
-      <Form.Item
-        name="username"
-        label={<span style={labelStyle}>{texts.username}</span>}
-        rules={[{ required: true, message: texts.usernameRequired }]}
-      >
-        <Input name="username" autoComplete="username" />
-      </Form.Item>
-      {/* The link sits beside the label, not inside it, so the label's name stays "Password". */}
-      <Flex justify="space-between" align="baseline" style={{ paddingBottom: 8 }}>
-        <label htmlFor={`${formId}_password`} style={labelStyle}>
-          {texts.password}
-        </label>
-        {forgotPasswordUrl && <Typography.Link href={forgotPasswordUrl}>{texts.forgotPassword}</Typography.Link>}
-      </Flex>
-      <Form.Item
-        name="password"
-        rules={[{ required: true, message: texts.passwordRequired }]}
-        validateStatus={error ? 'error' : undefined}
-      >
-        <Input.Password name="password" autoComplete="current-password" />
-      </Form.Item>
-      {rememberMe && (
-        <Form.Item name="rememberMe" valuePropName="checked">
-          <Checkbox name="rememberMe">{texts.keepSignedIn}</Checkbox>
+      <Flex vertical gap={spacing.lg}>
+        <Form.Item
+          name="username"
+          label={<span style={labelStyle}>{texts.username}</span>}
+          rules={[{ required: true, message: texts.usernameRequired }]}
+        >
+          <Input name="username" autoComplete="username" />
         </Form.Item>
-      )}
-      <input ref={credentialRef} type="hidden" name="credentialId" value="" />
-      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button type="primary" htmlType="submit" block>
-        {texts.signIn}
-      </Button>
+        {/* The link sits beside the label, not inside it, so the label's name stays "Password". */}
+        {/* The label row and its input stay together, so the form's gap does not come between them. */}
+        <div>
+          <Flex justify="space-between" align="baseline" style={{ paddingBottom: 8 }}>
+            <label htmlFor={`${formId}_password`} style={labelStyle}>
+              {texts.password}
+            </label>
+            {forgotPasswordUrl && <Typography.Link href={forgotPasswordUrl}>{texts.forgotPassword}</Typography.Link>}
+          </Flex>
+          <Form.Item
+            name="password"
+            rules={[{ required: true, message: texts.passwordRequired }]}
+            validateStatus={error ? 'error' : undefined}
+          >
+            <Input.Password name="password" autoComplete="current-password" />
+          </Form.Item>
+        </div>
+        {rememberMe && (
+          <Form.Item name="rememberMe" valuePropName="checked">
+            <Checkbox name="rememberMe">{texts.keepSignedIn}</Checkbox>
+          </Form.Item>
+        )}
+        <input ref={credentialRef} type="hidden" name="credentialId" value="" />
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+        <Button type="primary" htmlType="submit" block>
+          {texts.signIn}
+        </Button>
+      </Flex>
     </Form>
   )
 }

@@ -16,6 +16,7 @@ import { AxisCheckboxField } from './AxisCheckboxField'
 import { AxisField } from './AxisField'
 import { AxisFieldGroup } from './AxisFieldGroup'
 import { AxisFieldRow } from './AxisFieldRow'
+import { AcceptTermsField } from './AcceptTermsField'
 import { AxisTable } from './AxisTable'
 import { CardPage } from './CardPage'
 import { EmptyDash } from './EmptyValue'
@@ -25,7 +26,6 @@ import { StepsBar } from './StepsBar'
 import { TextProvider } from './TextProvider'
 
 // The shared rule: a shared widget keeps no space around itself, see docs/reference/shared-widgets.md#the-rule.
-// AcceptTermsField keeps Ant Design's form item margin, a later part of #4103, so it is not drawn here.
 
 const texts = {
   'shell.empty.noData': 'No data yet.',
@@ -147,6 +147,9 @@ const formWidgets: Record<string, ReactElement> = {
     />
   ),
   'AxisCheckboxField with a name': <AxisCheckboxField name="enabled" label="Enabled" help="Turns the item on" />,
+  'AcceptTermsField with a name': (
+    <AcceptTermsField name="accept" text="I accept" documents={{}} requiredMessage="Tick the box." />
+  ),
 }
 
 function renderWidget(element: ReactElement) {
@@ -169,6 +172,13 @@ const sides = [
   { side: 'left', logical: 'margin-inline' },
 ]
 
+// Ant Design sets some margins through a CSS variable, such as var(--ant-form-item-margin-bottom). A variable that the
+// root does not define makes the margin 0 in a browser too, so an empty value reads as 0px.
+function resolved(value: string, style: CSSStyleDeclaration): string {
+  const variable = /^var\((--[\w-]+)\)$/.exec(value)
+  return variable ? style.getPropertyValue(variable[1]).trim() : value
+}
+
 /** The sides of a root that draw a margin other than 0px, each with its value. An empty list means no space. */
 function marginsOtherThanNone(root: HTMLElement): [string, string][] {
   const style = getComputedStyle(root)
@@ -180,7 +190,8 @@ function marginsOtherThanNone(root: HTMLElement): [string, string][] {
         root.style.getPropertyValue(physical) === '' && logicalValue !== ''
           ? logicalValue
           : style.getPropertyValue(physical)
-      return [side, value === '' || value === '0' ? '0px' : value]
+      const margin = resolved(value, style)
+      return [side, margin === '' || margin === '0' ? '0px' : margin]
     })
     .filter(([, value]) => value !== '0px')
 }

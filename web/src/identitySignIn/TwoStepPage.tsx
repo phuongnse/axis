@@ -1,6 +1,7 @@
 import { Button, Flex, Form, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useId, useRef } from 'react'
+import { useDesignTokens } from '../platform/themeMode'
 import { CodeField } from './CodeField'
 import { IdentityFrame } from './IdentityFrame'
 import type { TwoStepContext } from './signInContext'
@@ -12,6 +13,7 @@ import type { TwoStepContext } from './signInContext'
  */
 export function TwoStepPage({ context }: { context: TwoStepContext }) {
   const { texts, error, loginAction, restartUrl, tryAnotherWay } = context
+  const { spacing } = useDesignTokens()
   const formId = useId()
   const [form] = Form.useForm<{ code?: string }>()
   const submitRef = useRef<HTMLInputElement>(null)
@@ -29,18 +31,20 @@ export function TwoStepPage({ context }: { context: TwoStepContext }) {
         // Ant Design validates and stops the submit event, so the native post happens here.
         onFinish={() => submitRef.current?.form?.submit()}
       >
-        <CodeField
-          form={form}
-          postAs="otp"
-          label={texts.code}
-          requiredMessage={texts.message}
-          invalid={Boolean(error)}
-        />
-        <input ref={submitRef} type="hidden" name="login" value="Sign In" />
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button type="primary" htmlType="submit" block>
-          {texts.verify}
-        </Button>
+        <Flex vertical gap={spacing.lg}>
+          <CodeField
+            form={form}
+            postAs="otp"
+            label={texts.code}
+            requiredMessage={texts.message}
+            invalid={Boolean(error)}
+          />
+          <input ref={submitRef} type="hidden" name="login" value="Sign In" />
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+          <Button type="primary" htmlType="submit" block>
+            {texts.verify}
+          </Button>
+        </Flex>
       </Form>
       <Flex justify={tryAnotherWay ? 'space-between' : 'flex-start'}>
         {tryAnotherWay && (

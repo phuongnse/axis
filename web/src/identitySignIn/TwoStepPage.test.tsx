@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { identityTwoStepContext } from '../designSystem/fixtures'
+import { designTokensFor } from '../platform/designTokens'
 import type { TwoStepContext } from './signInContext'
 import { ThemeModeProvider } from '../platform/theme'
 import { TwoStepPage } from './TwoStepPage'
@@ -27,6 +28,15 @@ describe('TwoStepPage', () => {
     expect(screen.getByRole('button', { name: 'Verify' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Try another way' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute('href', context.restartUrl)
+  })
+
+  it('spaces the code and the Verify button 24px apart', () => {
+    const { container } = render(<TwoStepPage context={context} />, { wrapper: ThemeModeProvider })
+
+    const code = boxes(container)[0].closest<HTMLElement>('.ant-form-item')
+    const verify = screen.getByRole('button', { name: 'Verify' }).parentElement
+    expect(code?.parentElement).toBe(verify)
+    expect(verify).toHaveStyle({ gap: `${designTokensFor('light').spacing.lg}px` })
   })
 
   it('keeps only digits, one in each box', async () => {

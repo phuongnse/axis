@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { designTokensFor } from './designTokens'
 import { formatValue } from './formatValue'
 import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
@@ -297,6 +298,18 @@ describe('TaskPage', () => {
     expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Comments')).not.toHaveAttribute('readonly')
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Approve', 'Return', 'Reject'])
+  })
+
+  it('spaces the form and its buttons 24px apart, from the layout', async () => {
+    stubTaskApi()
+
+    const { container } = renderPage()
+
+    await screen.findByTestId('field-value-title')
+    const form = container.querySelector('form')
+    const buttons = screen.getByRole('button', { name: 'Approve' }).parentElement
+    expect(form?.parentElement).toBe(buttons?.parentElement)
+    expect(form?.parentElement).toHaveStyle({ gap: `${designTokensFor('light').spacing.lg}px` })
   })
 
   it("renders a label from the texts of the task's release when the site texts lack the key", async () => {

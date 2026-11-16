@@ -92,6 +92,17 @@ describe('SignInPage', () => {
     expect(screen.getByText('Password', { exact: true })).toHaveStyle(style)
   })
 
+  it('spaces the username, the password and the Sign in button 24px apart, the password label with its input', () => {
+    render(<SignInPage context={context} />, { wrapper: ThemeModeProvider })
+
+    const username = screen.getByRole('textbox', { name: 'Email or username' }).closest<HTMLElement>('.ant-form-item')
+    const password = screen.getByLabelText('Password', { exact: true }).closest<HTMLElement>('.ant-form-item')
+    const stack = username?.parentElement
+    expect(password?.parentElement?.parentElement).toBe(stack)
+    expect(screen.getByRole('button', { name: 'Sign in' }).parentElement).toBe(stack)
+    expect(stack).toHaveStyle({ gap: `${designTokensFor('light').spacing.lg}px` })
+  })
+
   it('puts "Forgot password?" on the row of the password label, outside the label', () => {
     render(<SignInPage context={context} />, { wrapper: ThemeModeProvider })
 

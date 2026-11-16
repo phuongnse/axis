@@ -1,9 +1,8 @@
 import { CloseOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons'
-import { ConfigProvider, Form, Input, Space } from 'antd'
+import { Form, Input, Space } from 'antd'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { AxisButton } from './AxisButton'
 import { AxisTable, type AxisColumn } from './AxisTable'
-import { compactFormTheme } from './antTheme'
 import { EmptyDash } from './EmptyValue'
 import { FieldInput } from './FieldInput'
 import { FileLink } from './FileInput'
@@ -214,56 +213,53 @@ export function ChildCollectionTable({
 
   return (
     <div ref={container}>
-      {/* A cell's item needs no space below it, as the table rows already space the inputs. */}
-      <ConfigProvider theme={compactFormTheme}>
-        <AxisTable<RecordRow>
-          rowKey={(row) => String(keyOf(row))}
-          columns={columns}
-          dataSource={rows}
-          emptyText={t('shell.table.empty')}
-          toolbar={
-            readOnly
-              ? undefined
-              : {
-                  main: (
-                    <AxisButton role="main" onClick={add}>
-                      {t('shell.form.addRow')}
-                    </AxisButton>
-                  ),
-                }
-          }
-          rowActions={
-            readOnly
-              ? undefined
-              : {
-                  configured: 1,
-                  actions: (row) => {
-                    const index = rows.indexOf(row)
-                    return [
-                      {
-                        key: 'remove',
-                        labelKey: 'shell.form.removeRow',
-                        icon: <DeleteOutlined />,
-                        destructive: true,
-                        onClick: () => remove(index),
-                      },
-                    ]
-                  },
-                }
-          }
-          below={
-            lookup?.field.target && (
-              <ReferenceLookup
-                field={lookup.field}
-                title={lookup.field.labelKey ? t(lookup.field.labelKey) : lookup.field.name}
-                open
-                onPick={(record) => pick(lookup, record)}
-                onClose={() => setLookup(null)}
-              />
-            )
-          }
-        />
-      </ConfigProvider>
+      <AxisTable<RecordRow>
+        rowKey={(row) => String(keyOf(row))}
+        columns={columns}
+        dataSource={rows}
+        emptyText={t('shell.table.empty')}
+        toolbar={
+          readOnly
+            ? undefined
+            : {
+                main: (
+                  <AxisButton role="main" onClick={add}>
+                    {t('shell.form.addRow')}
+                  </AxisButton>
+                ),
+              }
+        }
+        rowActions={
+          readOnly
+            ? undefined
+            : {
+                configured: 1,
+                actions: (row) => {
+                  const index = rows.indexOf(row)
+                  return [
+                    {
+                      key: 'remove',
+                      labelKey: 'shell.form.removeRow',
+                      icon: <DeleteOutlined />,
+                      destructive: true,
+                      onClick: () => remove(index),
+                    },
+                  ]
+                },
+              }
+        }
+        below={
+          lookup?.field.target && (
+            <ReferenceLookup
+              field={lookup.field}
+              title={lookup.field.labelKey ? t(lookup.field.labelKey) : lookup.field.name}
+              open
+              onPick={(record) => pick(lookup, record)}
+              onClose={() => setLookup(null)}
+            />
+          )
+        }
+      />
     </div>
   )
 }

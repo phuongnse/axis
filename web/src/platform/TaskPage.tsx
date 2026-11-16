@@ -22,6 +22,7 @@ import {
 } from './tasks'
 import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
+import { useDesignTokens } from './themeMode'
 import { useReleaseTexts } from './useReleaseTexts'
 import { useFormSteps } from './useFormSteps'
 import { sectionsOf, useRecordForm } from './useRecordForm'
@@ -363,6 +364,7 @@ interface OpenTaskFormProps {
 /** The step's form over the subject record of an open task, and its outcome buttons. */
 function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, onDecided }: OpenTaskFormProps) {
   const t = useText()
+  const { spacing } = useDesignTokens()
   const { entity } = task.form
   const sections = useMemo(() => sectionsOf(entity, task.form), [entity, task.form])
   const conditions = useMemo(() => ({ statePath: `${tasksPath}/${task.id}/form-state` }), [tasksPath, task.id])
@@ -435,37 +437,39 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
     <Flex vertical gap="middle">
       {form.formError}
       {steps.progress}
-      {/* Enter acts as Next on a step before the last, and does nothing on the last. */}
-      <Form id={formId} layout="vertical" requiredMark={requiredMark} onFinish={() => void steps.next()}>
-        {steps.fields}
-      </Form>
-      <Flex gap="small">
-        {!steps.first && (
-          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-          <Button onClick={steps.back} disabled={steps.checking || sending !== null}>
-            {t('shell.form.back')}
-          </Button>
-        )}
-        {/* A quick check shows no spinner, because antd can leave one half removed after a flash. */}
-        {!steps.last && (
-          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-          <Button htmlType="submit" form={formId} type="primary" loading={steps.checking && { delay: 200 }}>
-            {t('shell.form.next')}
-          </Button>
-        )}
-        {steps.last &&
-          task.outcomes.map((outcome, index) => (
+      <Flex vertical gap={spacing.lg}>
+        {/* Enter acts as Next on a step before the last, and does nothing on the last. */}
+        <Form id={formId} layout="vertical" requiredMark={requiredMark} onFinish={() => void steps.next()}>
+          {steps.fields}
+        </Form>
+        <Flex gap="small">
+          {!steps.first && (
             // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-            <Button
-              key={outcome.name}
-              type={index === 0 ? 'primary' : 'default'}
-              loading={sending === outcome.name}
-              disabled={sending !== null && sending !== outcome.name}
-              onClick={() => void complete(outcome.name)}
-            >
-              {t(outcome.labelKey)}
+            <Button onClick={steps.back} disabled={steps.checking || sending !== null}>
+              {t('shell.form.back')}
             </Button>
-          ))}
+          )}
+          {/* A quick check shows no spinner, because antd can leave one half removed after a flash. */}
+          {!steps.last && (
+            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
+            <Button htmlType="submit" form={formId} type="primary" loading={steps.checking && { delay: 200 }}>
+              {t('shell.form.next')}
+            </Button>
+          )}
+          {steps.last &&
+            task.outcomes.map((outcome, index) => (
+              // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
+              <Button
+                key={outcome.name}
+                type={index === 0 ? 'primary' : 'default'}
+                loading={sending === outcome.name}
+                disabled={sending !== null && sending !== outcome.name}
+                onClick={() => void complete(outcome.name)}
+              >
+                {t(outcome.labelKey)}
+              </Button>
+            ))}
+        </Flex>
       </Flex>
     </Flex>
   )

@@ -66,7 +66,7 @@ export function FilterBar({ parameters, values, errors, onChange, locale }: Filt
   const { spacing } = useDesignTokens()
   return (
     <Form layout="vertical" data-testid="filter-bar">
-      <Flex wrap style={{ columnGap: spacing.lg }}>
+      <Flex wrap gap={spacing.lg}>
         {parameters.map((parameter) => {
           const { name } = parameter
           const id = `filter-${name}`

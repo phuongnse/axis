@@ -14,7 +14,7 @@ import type { AddAuthenticatorContext } from './signInContext'
  */
 export function AddAuthenticatorPage({ context }: { context: AddAuthenticatorContext }) {
   const { texts, error, loginAction, qrCode, manualKey, secret, mode, deviceNameRequired, appInitiated } = context
-  const { colour } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const formId = useId()
   const [form] = Form.useForm<{ code?: string; userLabel?: string }>()
   const submitRef = useRef<HTMLInputElement>(null)
@@ -39,26 +39,30 @@ export function AddAuthenticatorPage({ context }: { context: AddAuthenticatorCon
         // Ant Design validates and stops the submit event, so the native post happens here.
         onFinish={() => submitRef.current?.form?.submit()}
       >
-        <CodeField
-          form={form}
-          postAs="totp"
-          label={texts.code}
-          requiredMessage={texts.codeRequired}
-          invalid={Boolean(error)}
-        />
-        <input ref={submitRef} type="hidden" name="totpSecret" value={secret} />
-        {mode && <input type="hidden" name="mode" value={mode} />}
-        <Form.Item
-          name="userLabel"
-          label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{texts.deviceName}</span>}
-          rules={[{ required: deviceNameRequired, whitespace: deviceNameRequired, message: texts.deviceNameRequired }]}
-        >
-          <Input name="userLabel" autoComplete="off" />
-        </Form.Item>
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button type="primary" htmlType="submit" block>
-          {texts.submit}
-        </Button>
+        <Flex vertical gap={spacing.lg}>
+          <CodeField
+            form={form}
+            postAs="totp"
+            label={texts.code}
+            requiredMessage={texts.codeRequired}
+            invalid={Boolean(error)}
+          />
+          <input ref={submitRef} type="hidden" name="totpSecret" value={secret} />
+          {mode && <input type="hidden" name="mode" value={mode} />}
+          <Form.Item
+            name="userLabel"
+            label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{texts.deviceName}</span>}
+            rules={[
+              { required: deviceNameRequired, whitespace: deviceNameRequired, message: texts.deviceNameRequired },
+            ]}
+          >
+            <Input name="userLabel" autoComplete="off" />
+          </Form.Item>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+          <Button type="primary" htmlType="submit" block>
+            {texts.submit}
+          </Button>
+        </Flex>
       </Form>
       {appInitiated && (
         <form method="post" action={loginAction}>

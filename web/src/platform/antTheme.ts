@@ -81,7 +81,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       ...(reducedMotion && { motion: false }),
     },
     components: {
-      Form: { colorError: colour.dangerText, colorWarning: colour.warningText },
+      // A form item keeps no space below itself. The form's layout gives the gap, see docs/reference/shared-widgets.md#the-rule.
+      Form: { colorError: colour.dangerText, colorWarning: colour.warningText, itemMarginBottom: 0 },
       Input: fieldBorder,
       InputNumber: fieldBorder,
       // The arrow takes the muted text colour: Ant Design's quaternary text misses 3:1 on a field.
@@ -206,9 +207,6 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
 export function selectedItemTint(mode: ThemeMode): string {
   return theme.getDesignToken(antThemeFor(mode)).controlItemBgActive
 }
-
-/** Table cells hold form items that need no space below them, as the table rows already space the inputs. */
-export const compactFormTheme: ThemeConfig = { components: { Form: { itemMarginBottom: 0 } } }
 
 /**
  * The cell padding of a table, see docs/reference/actions-and-controls.md#tables. A row is `spacing-xs` above and below

@@ -17,7 +17,7 @@ one.
   that the widget or its data is incomplete. Fix it there, so every caller gets it.
 - If a second mechanism already exists, merge the two in the same change.
 - A new shared widget or helper gets its row in [which widget](#which-widget) in the same change.
-- **A shared widget keeps no space around itself** _(planned for M33)_. It draws no margin outside
+- **A shared widget keeps no space around itself**. It draws no margin outside
   itself, and the screen that places it gives the space, so the widget sits in a card's gap as in a
   form's layout.
 - **Ant Design through its documented API** _(planned for M35)_. Axis uses Ant Design only through its
