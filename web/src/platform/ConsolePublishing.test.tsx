@@ -281,12 +281,25 @@ describe('ConsolePublishing', () => {
     expect(calls.every((call) => call.method === 'GET')).toBe(true)
   })
 
-  it('shows an error in the card when the publishing cannot be loaded', async () => {
+  it.each([
+    ['cannot be loaded', 500],
+    ['is forbidden', 403],
+  ])('shows the error in place of the rows of each table when the publishing %s', async (_, status) => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    stubServer(() => new Response(null, { status: 500 }))
+    stubServer(() => new Response(null, { status }))
     renderView()
 
-    const error = await screen.findByTestId('console-publishing-error')
-    expect(within(error).getByText('The publishing could not be loaded.')).toBeVisible()
+    const releases = await screen.findByTestId('console-publishing-releases')
+    const releasesError = await within(releases).findByTestId('console-publishing-releases-error')
+    expect(releasesError).toHaveTextContent('The publishing could not be loaded.')
+    expect(within(releases).queryByText('Nothing to show.')).toBeNull()
+
+    const requests = screen.getByTestId('console-publishing-requests')
+    const requestsError = within(requests).getByTestId('console-publishing-requests-error')
+    expect(requestsError).toHaveTextContent('The publishing could not be loaded.')
+    expect(within(requests).queryByText('Nothing to show.')).toBeNull()
+    // The toolbar stays, so the person can still search, filter and refresh.
+    expect(within(requests).getByRole('searchbox', { name: 'Search' })).toBeVisible()
+    expect(within(requests).getByRole('button', { name: 'Refresh' })).toBeVisible()
   })
 })

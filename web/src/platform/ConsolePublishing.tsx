@@ -65,7 +65,8 @@ function formatTime(value: string | null, locale: string) {
  * releases table marks the active release and every off-standard release with its relaxed points, and is never paged.
  * The requests table is paged on the server and has the full toolbar, with its view kept in the address under the
  * `publishRequests.` prefix, see docs/reference/operator-console.md#views and docs/reference/actions-and-controls.md#tables.
- * The view has no publish or activate command, because those stay in Studio. A failure shows an error above the tables.
+ * The view has no publish or activate command, because those stay in Studio. A failed load shows an error in each table in
+ * place of its rows, and the requests table keeps its toolbar.
  */
 export function ConsolePublishing({ applications, locale }: ConsolePublishingProps) {
   const t = useText()
@@ -84,6 +85,8 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
   const [load, setLoad] = useState<LoadState>({ failed: false })
   const key = application === undefined ? undefined : `${application}?${query}`
   const loading = key !== undefined && load.key !== key
+  // A failed answer is for the view that asked, so it shows only once that view has loaded.
+  const failed = load.failed && !loading
 
   useEffect(() => {
     if (application === undefined) {
@@ -244,13 +247,6 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
             setView({ ...view, page: 1 })
           }}
         />
-        {load.failed && !loading ? (
-          <AxisAlert
-            data-testid="console-publishing-error"
-            kind="error"
-            message={t('shell.console.publishing.loadFailed')}
-          />
-        ) : undefined}
         <Flex vertical gap="small">
           <Typography.Text strong>{t('shell.console.publishing.releases')}</Typography.Text>
           <AxisTable<ConsoleReleaseItem>
@@ -260,6 +256,15 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
             dataSource={load.publishing?.releases}
             loading={loading}
             emptyText={t('shell.console.publishing.empty')}
+            failure={
+              failed ? (
+                <AxisAlert
+                  data-testid="console-publishing-releases-error"
+                  kind="error"
+                  message={t('shell.console.publishing.loadFailed')}
+                />
+              ) : undefined
+            }
           />
         </Flex>
         <Flex vertical gap="small">
@@ -280,6 +285,15 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
               columns: true,
             }}
             toolbar={{ onRefresh: () => setReload((count) => count + 1) }}
+            failure={
+              failed ? (
+                <AxisAlert
+                  data-testid="console-publishing-requests-error"
+                  kind="error"
+                  message={t('shell.console.publishing.loadFailed')}
+                />
+              ) : undefined
+            }
           />
         </Flex>
       </Flex>

@@ -228,7 +228,8 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   The address keeps the requests view as `publishRequests.search`, `publishRequests.filter`,
   `publishRequests.sort`, `publishRequests.page`, `publishRequests.pageSize` and
   `publishRequests.columns`. Picking another application starts again at page 1 and keeps the rest
-  of the view. It offers no publish or activate button.
+  of the view. A failed load shows the error in each table in place of its rows, and the requests
+  table keeps its toolbar. It offers no publish or activate button.
 - **Tenant.** The tenant's status and each application's active release, as a table with the
   application, the release number and label, and the activation time.
 
