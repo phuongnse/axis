@@ -1483,7 +1483,7 @@ internal static partial class AdminCommands
             jobs = new Dictionary<string, IReadOnlyList<JobStep>>(jobs)
             {
                 ["create"] = CreateJob.Steps(createSettings, http, output, error),
-                [PurgeJob.Kind] = PurgeJob.Steps(createSettings.Create, createSettings.ApplicationsPath, settings.Platform.PlatformConnectionString, settings.Platform.Cipher, http),
+                [PurgeJob.Kind] = PurgeJob.Steps(createSettings.Create, createSettings.ApplicationsPath, settings.Platform.PlatformConnectionString, settings.Platform.Cipher, http, certificates),
             };
         }
 

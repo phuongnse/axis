@@ -348,12 +348,17 @@ A deletion can be undone during its grace window, and not after.
    1. **`hosts`.** The tenant's hosts from the directory and its realm redirect addresses. This step
       first writes the tombstone, takes the actor from the job input `{ "actor" }`, and refuses a job
       that has none.
-      - **Certificates** _(planned for M33)_. The step also removes the tenant's cert-manager
-        certificates and the Ingress routes of its hosts.
+      - **Certificates.** After it removes the hosts, the step deletes the cert-manager `Certificate`
+        named after each host in the tombstone of the tenant and its preview, through the Kubernetes
+        API. A `Certificate` that is already gone counts as done. A cell without a host certificate
+        issuer, `Cell:HostCertificateIssuer`, deletes none. cert-manager deletes the TLS Secret with its
+        Certificate only when it runs with `--enable-certificate-owner-ref`.
+      - **Routes** _(planned for M33)_. The step also removes the Ingress routes of its hosts.
    2. **`database`.** The tenant database, then its schema and runtime roles.
    3. **`realm`.** Its realm in the identity provider.
-   4. **`files`** _(planned for M33)_. Its files in object storage, when a storage binding holds them
-      outside the database.
+   4. **`files`.** Its files in object storage, when a storage binding holds them outside the
+      database. The step removes nothing while `database` is the only `storage` value, see
+      [tenant setting commands](tenant-setting-commands.md).
    5. **`studio`.** Its Studio folder.
    6. **`keys`.** Its data keys, lookup keys and backup key, see
       [crypto-shredding](tenant-backup-and-restore.md#backups-in-a-cell).
