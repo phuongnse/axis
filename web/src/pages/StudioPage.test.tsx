@@ -261,6 +261,10 @@ function stubServer(
             time: '2026-11-01T08:00:00Z',
           },
         ],
+        page: 1,
+        pageSize: 20,
+        totalCount: 2,
+        start: 'r1',
       })
     }
     if (input === `${folder}/names`) {

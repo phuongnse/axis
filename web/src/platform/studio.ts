@@ -1481,14 +1481,30 @@ export interface StudioRevisionDiff {
   resources: StudioRevisionChange[]
 }
 
-/** Loads the revisions of an application, newest first. A 401 shows the sign-in prompt and throws, as any other failure does. */
-export async function fetchStudioRevisions(application: string, signal?: AbortSignal): Promise<StudioRevision[]> {
-  const path = `/api/studio/apps/${encodeURIComponent(application)}/revisions`
+/** One page of an application's revisions, with how many match in all and the id of the start of history, null for none. */
+export interface StudioRevisionList {
+  items: StudioRevision[]
+  totalCount: number
+  start: string | null
+}
+
+/**
+ * Loads one page of the revisions of an application, newest first unless `query` sorts them. `query` is the record API's
+ * `page`, `pageSize`, `sort`, `search` and `filter` as a query string, see docs/reference/authoring-revisions.md#list.
+ * A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function fetchStudioRevisions(
+  application: string,
+  query: string,
+  signal?: AbortSignal,
+): Promise<StudioRevisionList> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/revisions${query ? `?${query}` : ''}`
   const response = await studioFetch(path, { signal })
   if (!response.ok) {
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
-  return ((await response.json()) as { items: StudioRevision[] }).items
+  const { items, totalCount, start } = (await response.json()) as StudioRevisionList
+  return { items, totalCount, start }
 }
 
 /** Loads one revision with its files. A 404 and any other failure throw, as does a 401 after it shows the sign-in prompt. */
