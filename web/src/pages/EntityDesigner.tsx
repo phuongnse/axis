@@ -1,20 +1,10 @@
-import {
-  Button,
-  Checkbox,
-  ConfigProvider,
-  Flex,
-  Input,
-  InputNumber,
-  Radio,
-  Select,
-  Switch,
-  Typography,
-  DatePicker,
-} from 'antd'
+import { Button, Checkbox, ConfigProvider, Flex, Input, InputNumber, Select, Typography, DatePicker } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import dayjs from 'dayjs'
 import { memo, useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react'
+import { AxisCheckboxField } from '../platform/AxisCheckboxField'
+import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
@@ -120,7 +110,7 @@ const Picker = memo(function Picker({
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <AxisField label={label} help={help}>
+      <AxisField label={label} help={help} required={required}>
         {choices === undefined ? (
           <Input
             value={text(value)}
@@ -193,7 +183,7 @@ export function EntityDesigner({
   const designer = (
     <Flex vertical gap="middle" data-testid="studio-entity-designer">
       <div data-testid="studio-field-/name">
-        <AxisField {...fieldTexts(t, 'name')}>
+        <AxisField {...fieldTexts(t, 'name')} required>
           <Input value={text(value.name)} onChange={(event) => onChange('/name', event.target.value)} />
         </AxisField>
       </div>
@@ -400,25 +390,26 @@ const Fields = memo(function Fields({
 
   return (
     <div data-testid="studio-field-/fields">
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.entity.fields')}</Typography.Text>
-        <AxisTable<FieldRow>
-          dataSource={fields.map((field, index) => ({ field, index }))}
-          rowKey={(row) => String(row.index)}
-          emptyText={t('shell.table.empty')}
-          rowAttributes={(row) =>
-            ({ 'data-testid': `studio-field-/fields/${row.index}` }) as React.HTMLAttributes<HTMLElement>
-          }
-          columns={columns}
-        />
-        {readOnly ? null : (
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={addField}>{t('shell.studio.entity.addField')}</Button>
-          </div>
-        )}
-        <RemovedRows layer={layer} list="/fields" />
-      </Flex>
+      <AxisFieldGroup {...groupTexts(t, 'fields')}>
+        <Flex vertical gap="small">
+          <AxisTable<FieldRow>
+            dataSource={fields.map((field, index) => ({ field, index }))}
+            rowKey={(row) => String(row.index)}
+            emptyText={t('shell.table.empty')}
+            rowAttributes={(row) =>
+              ({ 'data-testid': `studio-field-/fields/${row.index}` }) as React.HTMLAttributes<HTMLElement>
+            }
+            columns={columns}
+          />
+          {readOnly ? null : (
+            <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+              <Button onClick={addField}>{t('shell.studio.entity.addField')}</Button>
+            </div>
+          )}
+          <RemovedRows layer={layer} list="/fields" />
+        </Flex>
+      </AxisFieldGroup>
     </div>
   )
 })
@@ -668,15 +659,18 @@ function Settings({
     )
   }
 
-  function flag(setting: 'creator' | 'sensitive' | 'exactLookup') {
+  /** The yes-or-no setting `setting`: a switch for searchable, a checkbox for the others. */
+  function flag(setting: 'creator' | 'sensitive' | 'exactLookup' | 'searchable') {
     return (
-      <Checkbox
+      <AxisCheckboxField
+        {...settingTexts(setting)}
+        kind={setting === 'searchable' ? 'switch' : 'checkbox'}
         checked={field[setting] === true}
-        // Even a false exactLookup is refused on a field that is not sensitive, so unchecking removes it.
-        onChange={(event) =>
+        // Even a false exactLookup is refused on a field that is not sensitive, so unchecking removes it, as it does for searchable.
+        onChange={(checked) =>
           onChange(
             `${pointer}/${setting}`,
-            setting === 'exactLookup' && !event.target.checked ? undefined : event.target.checked,
+            (setting === 'exactLookup' || setting === 'searchable') && !checked ? undefined : checked,
           )
         }
       />
@@ -691,17 +685,6 @@ function Settings({
       case 'scale':
       case 'maxSize':
         return number(setting)
-      case 'creator':
-      case 'sensitive':
-      case 'exactLookup':
-        return flag(setting)
-      case 'searchable':
-        return (
-          <Switch
-            checked={field.searchable === true}
-            onChange={(checked) => onChange(`${pointer}/searchable`, checked ? true : undefined)}
-          />
-        )
       case 'min':
       case 'max':
         return (
@@ -790,7 +773,11 @@ function Settings({
           />
         ) : (
           <div key={setting} data-testid={`studio-field-${pointer}/${setting}`}>
-            {setting === 'valueLabels' ? input(setting) : labelled(setting)}
+            {setting === 'creator' || setting === 'sensitive' || setting === 'exactLookup' || setting === 'searchable'
+              ? flag(setting)
+              : setting === 'valueLabels'
+                ? input(setting)
+                : labelled(setting)}
           </div>
         ),
       )}
@@ -888,17 +875,15 @@ function CurrencySource({
 
   return (
     <Flex vertical gap="small">
-      <AxisField {...source}>
-        <Radio.Group
-          role="radiogroup"
-          aria-label={source.label}
-          value={fromField ? 'field' : 'code'}
-          onChange={(event) => switchTo(event.target.value)}
-        >
-          <Radio value="code">{t('shell.studio.entity.currencyFixed')}</Radio>
-          <Radio value="field">{t('shell.studio.entity.currencyFromField')}</Radio>
-        </Radio.Group>
-      </AxisField>
+      <AxisChoiceField
+        {...source}
+        value={fromField ? 'field' : 'code'}
+        onChange={(next) => switchTo(next === 'field' ? 'field' : 'code')}
+        options={[
+          { value: 'code', ...fieldTexts(t, 'fields.currencySource.code') },
+          { value: 'field', ...fieldTexts(t, 'fields.currencySource.field') },
+        ]}
+      />
       {fromField ? (
         <Picker
           pointer={`${pointer}/currencyField`}
@@ -1036,68 +1021,70 @@ const Indexes = memo(function Indexes({
 
   return (
     <div data-testid="studio-field-/indexes">
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.entity.indexes')}</Typography.Text>
-        {list.map((index, position) => {
-          const pointer = `/indexes/${position}`
-          const content = isContent(index) ? index : {}
-          return (
-            <Flex key={position} gap="small" align="flex-start" wrap data-testid={`studio-field-${pointer}`}>
-              <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
-                {text(content.name)}
-              </Typography.Text>
-              {layer && <LayerMarkTag layer={layer} list="/indexes" index={position} name={text(content.name)} />}
-              <div data-testid={`studio-field-${pointer}/fields`} style={{ flex: 1, minWidth: 240 }}>
-                <AxisField {...fieldTexts(t, 'indexes.fields')}>
-                  <Select
-                    mode="multiple"
-                    virtual={false}
-                    style={{ width: '100%' }}
-                    value={
-                      Array.isArray(content.fields) ? content.fields.filter((item) => typeof item === 'string') : []
-                    }
-                    options={choices.map((name) => ({ value: name, label: name }))}
-                    onChange={(next: string[]) => onChange(`${pointer}/fields`, next)}
-                  />
-                </AxisField>
-              </div>
-              <div data-testid={`studio-field-${pointer}/unique`}>
-                <AxisField {...fieldTexts(t, 'indexes.unique')}>
-                  <Checkbox
-                    checked={content.unique === true}
-                    onChange={(event) => onChange(`${pointer}/unique`, event.target.checked ? true : undefined)}
-                  />
-                </AxisField>
-              </div>
-              {readOnly ? null : (
-                <Flex gap="small">
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button disabled={position === 0} onClick={() => move(position, -1)}>
-                    {t('shell.studio.entity.moveUp')}
-                  </Button>
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button disabled={position === list.length - 1} onClick={() => move(position, 1)}>
-                    {t('shell.studio.entity.moveDown')}
-                  </Button>
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button danger onClick={() => write(list.filter((_, other) => other !== position))}>
-                    {t('shell.studio.entity.removeIndex')}
-                  </Button>
+      <AxisFieldGroup {...groupTexts(t, 'indexes')}>
+        <Flex vertical gap="small">
+          {list.map((index, position) => {
+            const pointer = `/indexes/${position}`
+            const content = isContent(index) ? index : {}
+            return (
+              <Flex key={position} vertical gap="small" data-testid={`studio-field-${pointer}`}>
+                <Flex gap="small" align="center">
+                  <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
+                    {text(content.name)}
+                  </Typography.Text>
+                  {layer && <LayerMarkTag layer={layer} list="/indexes" index={position} name={text(content.name)} />}
                 </Flex>
-              )}
-            </Flex>
-          )
-        })}
-        {readOnly ? null : (
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => write([...list, { name: uniqueStepName(list, 'index'), fields: [] }])}>
-              {t('shell.studio.entity.addIndex')}
-            </Button>
-          </div>
-        )}
-        <RemovedRows layer={layer} list="/indexes" />
-      </Flex>
+                <div data-testid={`studio-field-${pointer}/fields`} style={{ minWidth: 240 }}>
+                  <AxisField {...fieldTexts(t, 'indexes.fields')} required>
+                    <Select
+                      mode="multiple"
+                      virtual={false}
+                      style={{ width: '100%' }}
+                      value={
+                        Array.isArray(content.fields) ? content.fields.filter((item) => typeof item === 'string') : []
+                      }
+                      options={choices.map((name) => ({ value: name, label: name }))}
+                      onChange={(next: string[]) => onChange(`${pointer}/fields`, next)}
+                    />
+                  </AxisField>
+                </div>
+                <div data-testid={`studio-field-${pointer}/unique`}>
+                  <AxisCheckboxField
+                    {...fieldTexts(t, 'indexes.unique')}
+                    checked={content.unique === true}
+                    onChange={(checked) => onChange(`${pointer}/unique`, checked ? true : undefined)}
+                  />
+                </div>
+                {readOnly ? null : (
+                  <Flex gap="small">
+                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                    <Button disabled={position === 0} onClick={() => move(position, -1)}>
+                      {t('shell.studio.entity.moveUp')}
+                    </Button>
+                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                    <Button disabled={position === list.length - 1} onClick={() => move(position, 1)}>
+                      {t('shell.studio.entity.moveDown')}
+                    </Button>
+                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                    <Button danger onClick={() => write(list.filter((_, other) => other !== position))}>
+                      {t('shell.studio.entity.removeIndex')}
+                    </Button>
+                  </Flex>
+                )}
+              </Flex>
+            )
+          })}
+          {readOnly ? null : (
+            <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+              <Button onClick={() => write([...list, { name: uniqueStepName(list, 'index'), fields: [] }])}>
+                {t('shell.studio.entity.addIndex')}
+              </Button>
+            </div>
+          )}
+          <RemovedRows layer={layer} list="/indexes" />
+        </Flex>
+      </AxisFieldGroup>
     </div>
   )
 })
@@ -1129,36 +1116,37 @@ const Validations = memo(function Validations({
 
   return (
     <div data-testid="studio-field-/validations">
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.entity.validations')}</Typography.Text>
-        {list.map((validation, index) => (
-          <ValidationRow
-            key={index}
-            index={index}
-            validation={validation}
-            fieldNames={fieldNames}
-            readOnly={readOnly}
-            layer={layer}
-            onChange={onChange}
-          />
-        ))}
-        {readOnly ? null : (
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button
-              onClick={() =>
-                onChange('/validations', [
-                  ...list,
-                  { name: uniqueStepName(list, 'validation'), expression: '', message: { textKey: '' }, field: '' },
-                ])
-              }
-            >
-              {t('shell.studio.entity.addValidation')}
-            </Button>
-          </div>
-        )}
-        <RemovedRows layer={layer} list="/validations" />
-      </Flex>
+      <AxisFieldGroup {...groupTexts(t, 'validations')}>
+        <Flex vertical gap="small">
+          {list.map((validation, index) => (
+            <ValidationRow
+              key={index}
+              index={index}
+              validation={validation}
+              fieldNames={fieldNames}
+              readOnly={readOnly}
+              layer={layer}
+              onChange={onChange}
+            />
+          ))}
+          {readOnly ? null : (
+            <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+              <Button
+                onClick={() =>
+                  onChange('/validations', [
+                    ...list,
+                    { name: uniqueStepName(list, 'validation'), expression: '', message: { textKey: '' }, field: '' },
+                  ])
+                }
+              >
+                {t('shell.studio.entity.addValidation')}
+              </Button>
+            </div>
+          )}
+          <RemovedRows layer={layer} list="/validations" />
+        </Flex>
+      </AxisFieldGroup>
     </div>
   )
 })
@@ -1184,13 +1172,15 @@ const ValidationRow = memo(function ValidationRow({
   const content = isContent(validation) ? validation : {}
   const expression = fieldTexts(t, 'validations.expression')
   return (
-    <Flex gap="small" align="flex-start" wrap data-testid={`studio-field-${pointer}`}>
-      <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
-        {text(content.name)}
-      </Typography.Text>
-      {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
-      <div data-testid={`studio-field-${pointer}/expression`} style={{ flex: 1, minWidth: 240 }}>
-        <AxisField {...expression}>
+    <Flex vertical gap="small" data-testid={`studio-field-${pointer}`}>
+      <Flex gap="small" align="center">
+        <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
+          {text(content.name)}
+        </Typography.Text>
+        {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
+      </Flex>
+      <div data-testid={`studio-field-${pointer}/expression`} style={{ minWidth: 240 }}>
+        <AxisField {...expression} required>
           <Expression
             pointer={`${pointer}/expression`}
             name={expression.label}

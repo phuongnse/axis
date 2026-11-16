@@ -63,7 +63,12 @@ const drawnPaths = [
   'fields.maxSize',
   'fields.accept',
   'fields.target',
+  'fields',
+  'indexes',
+  'validations',
   'fields.currencySource',
+  'fields.currencySource.code',
+  'fields.currencySource.field',
   'fields.currency',
   'fields.currencyField',
   'fields.values',
@@ -379,6 +384,153 @@ describe('EntityDesigner', () => {
     ).toHaveAccessibleDescription(helpOf('fields.currencyField'))
   })
 
+  it('describes each option of the currency source by its help', async () => {
+    const fields = renderEditing(entity({ fields: [{ name: 'amount', type: 'money', currency: 'USD' }] }))
+    const amount = within(screen.getByTestId('studio-field-/fields/0'))
+
+    for (const [option, label] of [
+      ['code', /^Fixed code/],
+      ['field', /^From a field/],
+    ] as const) {
+      const radio = amount.getByRole('radio', { name: label })
+      const description = radio.getAttribute('aria-describedby')
+      expect(description).not.toBeNull()
+      expect(document.getElementById(description!)).toHaveTextContent(helpOf(`fields.currencySource.${option}`))
+      expect(radio).toHaveAccessibleDescription(helpOf(`fields.currencySource.${option}`))
+    }
+    expect(amount.getByRole('radio', { name: /^Fixed code/ })).toBeChecked()
+    expect(amount.getByText(labelOf('fields.currencySource.field'))).toBeVisible()
+
+    await userEvent.click(amount.getByRole('radio', { name: /^From a field/ }))
+    expect(fields()[0]).toEqual({ name: 'amount', type: 'money', currencyField: '' })
+    expect(amount.getByRole('radio', { name: /^From a field/ })).toBeChecked()
+  })
+
+  it.each([
+    ['searchable', 'switch', 'Searchable', undefined],
+    ['creator', 'checkbox', 'Creator', false],
+    ['sensitive', 'checkbox', 'Sensitive', false],
+    ['exactLookup', 'checkbox', 'Exact lookup', undefined],
+  ] as const)(
+    'draws %s as a field with its help and writes its pointer when it is toggled',
+    async (setting, role, label, off) => {
+      const fields = renderEditing(entity({ fields: [{ name: 'code', type: 'text' }] }))
+      const code = within(screen.getByTestId('studio-field-/fields/0'))
+
+      const input = code.getByRole(role, { name: label })
+      expect(label).toBe(labelOf(`fields.${setting}`))
+      expect(input).toHaveAccessibleDescription(helpOf(`fields.${setting}`))
+      expect(input).not.toBeChecked()
+
+      await userEvent.click(input)
+      expect(fields()[0]).toEqual({ name: 'code', type: 'text', [setting]: true })
+      expect(code.getByRole(role, { name: label })).toBeChecked()
+
+      await userEvent.click(code.getByRole(role, { name: label }))
+      expect(fields()[0]).toEqual({ name: 'code', type: 'text', ...(off === undefined ? {} : { [setting]: off }) })
+    },
+  )
+
+  it('shows Fields, Indexes and Validations as groups named by their title and described by their help', () => {
+    renderDesigner(entity())
+
+    for (const path of ['fields', 'indexes', 'validations']) {
+      const group = screen.getByRole('group', { name: labelOf(path) })
+      expect(group).toHaveAccessibleDescription(helpOf(path))
+      expect(within(group).getByText(helpOf(path))).toBeVisible()
+      expect(screen.getByTestId(`studio-field-/${path}`).contains(group)).toBe(true)
+    }
+  })
+
+  it('marks the keys that the entity schema requires and no others, and announces them as required', () => {
+    renderDesigner(
+      entity({
+        indexes: [{ name: 'index1', fields: ['code'], unique: true }],
+        validations: [
+          { name: 'totalPositive', expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' },
+        ],
+      }),
+    )
+
+    const marked = (testId: string, role: string, label: string) => {
+      const area = within(screen.getByTestId(testId))
+      expect(area.getByText('*'), label).toBeInTheDocument()
+      expect(area.getByRole(role, { name: label }), label).toHaveAttribute('aria-required', 'true')
+    }
+    const unmarked = (testId: string, role: string, label: string) => {
+      const area = within(screen.getByTestId(testId))
+      expect(area.queryByText('*'), label).toBeNull()
+      expect(area.getByRole(role, { name: label }), label).not.toHaveAttribute('aria-required')
+    }
+    marked('studio-field-/name', 'textbox', labelOf('name'))
+    marked('studio-field-/indexes/0/fields', 'combobox', labelOf('indexes.fields'))
+    marked('studio-field-/validations/0/expression', 'textbox', labelOf('validations.expression'))
+    marked('studio-field-/validations/0/message/textKey', 'combobox', labelOf('validations.message'))
+    marked('studio-field-/validations/0/field', 'combobox', labelOf('validations.field'))
+    unmarked('studio-field-/displayField', 'combobox', labelOf('displayField'))
+    unmarked('studio-field-/indexes/0/unique', 'checkbox', labelOf('indexes.unique'))
+  })
+
+  it('marks the target of a reference field and the currency field of a money field as required', () => {
+    renderDesigner(
+      entity({
+        fields: [
+          { name: 'code', type: 'text' },
+          { name: 'supplier', type: 'reference', target: 'Supplier' },
+          { name: 'amount', type: 'money', currencyField: 'code' },
+        ],
+      }),
+    )
+
+    const target = within(screen.getByTestId('studio-field-/fields/1/target'))
+    expect(target.getByText('*')).toBeInTheDocument()
+    expect(target.getByRole('combobox', { name: labelOf('fields.target') })).toHaveAttribute('aria-required', 'true')
+    const currency = within(screen.getByTestId('studio-field-/fields/2/currencyField'))
+    expect(currency.getByText('*')).toBeInTheDocument()
+    expect(currency.getByRole('combobox', { name: labelOf('fields.currencyField') })).toHaveAttribute(
+      'aria-required',
+      'true',
+    )
+  })
+
+  it('lays each index and validation out as a column: its name, one field to a line, then its buttons', () => {
+    renderDesigner(
+      entity({
+        indexes: [{ name: 'index1', fields: ['code'] }],
+        validations: [
+          { name: 'totalPositive', expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' },
+        ],
+      }),
+    )
+
+    const order = (row: HTMLElement, ids: string[]) => {
+      const parts = ids.map((id) => within(row).getByTestId(id))
+      parts.slice(1).forEach((part, position) => expect(follows(parts[position], part)).toBe(true))
+    }
+    order(screen.getByTestId('studio-field-/indexes/0'), [
+      'studio-field-/indexes/0/name',
+      'studio-field-/indexes/0/fields',
+      'studio-field-/indexes/0/unique',
+    ])
+    order(screen.getByTestId('studio-field-/validations/0'), [
+      'studio-field-/validations/0/name',
+      'studio-field-/validations/0/expression',
+      'studio-field-/validations/0/message/textKey',
+      'studio-field-/validations/0/field',
+    ])
+    const index = within(screen.getByTestId('studio-field-/indexes/0'))
+    expect(
+      follows(index.getByTestId('studio-field-/indexes/0/unique'), index.getByRole('button', { name: 'Move up' })),
+    ).toBe(true)
+    const validation = within(screen.getByTestId('studio-field-/validations/0'))
+    expect(
+      follows(
+        validation.getByTestId('studio-field-/validations/0/field'),
+        validation.getByRole('button', { name: 'Remove validation' }),
+      ),
+    ).toBe(true)
+  })
+
   it('names the index inputs by their labels and describes them by their help', () => {
     renderDesigner(entity({ indexes: [{ name: 'index1', fields: ['code'], unique: true }] }))
 
@@ -536,7 +688,7 @@ describe('EntityDesigner', () => {
     )
     const amount = within(screen.getByTestId('studio-field-/fields/2'))
 
-    await userEvent.click(amount.getByRole('radio', { name: 'Field' }))
+    await userEvent.click(amount.getByRole('radio', { name: /^From a field/ }))
     expect(fields()[2]).toEqual({ name: 'amount', type: 'money', currencyField: '' })
 
     await userEvent.click(amount.getByRole('combobox', { name: 'Currency field' }))
@@ -544,7 +696,7 @@ describe('EntityDesigner', () => {
     await chooseOption('code')
     expect(fields()[2]).toEqual({ name: 'amount', type: 'money', currencyField: 'code' })
 
-    await userEvent.click(amount.getByRole('radio', { name: 'Fixed code' }))
+    await userEvent.click(amount.getByRole('radio', { name: /^Fixed code/ }))
     expect(fields()[2]).toEqual({ name: 'amount', type: 'money' })
     await userEvent.type(amount.getByRole('textbox', { name: 'Currency' }), 'vnd')
     expect(fields()[2]).toEqual({ name: 'amount', type: 'money', currency: 'VND' })
@@ -970,7 +1122,7 @@ describe('EntityDesigner', () => {
     ]
     expect(screen.getAllByRole('spinbutton').length).toBeGreaterThan(0)
     expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(0)
-    for (const name of ['Fixed code', 'Field']) {
+    for (const name of [/^Fixed code/, /^From a field/]) {
       expect(screen.getByRole('radio', { name })).toBeDisabled()
     }
     for (const name of ['Max size (bytes)']) {

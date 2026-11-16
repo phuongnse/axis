@@ -255,7 +255,7 @@ test.describe('the author builds the asset management application with Studio on
     await page
       .getByTestId(`studio-field-/fields/${index}`)
       .getByRole('radiogroup', { name: 'Currency source', exact: true })
-      .getByText('Field', { exact: true })
+      .getByText('From a field', { exact: true })
       .click()
   }
 
