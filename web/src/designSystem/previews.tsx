@@ -17,7 +17,7 @@ import { IdentitySignIn } from './IdentitySignIn'
 import { SignUpPreview } from './SignUpPreview'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import { ClickOnMount, ShellPreview } from './ShellPreview'
-import { studioFixtures } from './studioFixtures'
+import { studioFixtures, typicalEntityId } from './studioFixtures'
 import {
   application,
   blankDetailWidget,
@@ -276,6 +276,22 @@ export const previews: Record<string, readonly PreviewState[]> = {
     },
     { caption: 'Long names', fixtures: studioFixtures.longNames, entry: `/studio?app=${application}` },
     { caption: 'Access denied', fixtures: studioFixtures.accessDenied, entry: '/studio' },
+    {
+      caption: 'Overview with errors and changes not live',
+      fixtures: studioFixtures.withErrors,
+      entry: `/studio?app=${application}`,
+    },
+    {
+      caption: 'Overview of a new application',
+      fixtures: studioFixtures.newApplication,
+      entry: `/studio?app=${application}`,
+    },
+    {
+      caption: 'Entity',
+      fixtures: studioFixtures.typical,
+      entry: `/studio?app=${application}&resource=${typicalEntityId}`,
+    },
+    { caption: 'Policy matrix', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=policies` },
   ].map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 })),
   signIn: [
     {

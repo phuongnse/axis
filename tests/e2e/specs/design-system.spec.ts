@@ -836,6 +836,74 @@ for (const [slug, testId] of [
   });
 }
 
+for (const [slug, expectKeyElement] of [
+  [
+    "overview-with-errors-and-changes-not-live",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-problems")).toHaveText(
+        "3 errors, 1 warning",
+      );
+      await expect(state.getByTestId("studio-folder-differs")).toBeVisible();
+    },
+  ],
+  [
+    "overview-of-a-new-application",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-section-get-started")).toBeVisible();
+      await expect(state.getByTestId("studio-section-more")).toBeVisible();
+      await expect(state.getByTestId("studio-section-live")).toHaveCount(0);
+    },
+  ],
+  [
+    "entity",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-entity-designer")).toBeVisible();
+    },
+  ],
+  [
+    "policy-matrix",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-matrix")).toBeVisible();
+      await expect(
+        state.getByTestId("studio-matrix-cell-Requester-entity-Request"),
+      ).toBeVisible();
+    },
+  ],
+] as const) {
+  test(`the studio preview opens its ${slug} state from the address`, async ({
+    page,
+  }) => {
+    const query = `?preview=studio&mode=light&state=${slug}`;
+    const recording = await openHarness(page, query, {
+      sandboxed: true,
+      frameWidth: 992,
+    });
+
+    await expectKeyElement(page.frameLocator("iframe"));
+    expect(recording.errors).toEqual([]);
+    expect(
+      recording.requests.filter((url) => !url.startsWith("data:")),
+    ).toEqual([`${origin}/sandboxed.html`, `${harnessUrl}${query}`, bundleUrl]);
+  });
+}
+
+test("the studio preview replaces the entity designer with the policy matrix picked in the Fixtures control", async ({
+  page,
+}) => {
+  const recording = await openHarness(page, "?preview=studio&mode=light");
+  const fixtures = page.getByRole("radiogroup", {
+    name: "Fixtures",
+    exact: true,
+  });
+
+  await fixtures.getByText("Entity", { exact: true }).click();
+  await expect(page.getByTestId("studio-entity-designer")).toBeVisible();
+  await fixtures.getByText("Policy matrix", { exact: true }).click();
+  await expect(page.getByTestId("studio-matrix")).toBeVisible();
+  await expect(page.getByTestId("studio-entity-designer")).toHaveCount(0);
+  expect(recording.errors).toEqual([]);
+});
+
 test("the studio preview replaces one state's page with the next one picked in the Fixtures control", async ({
   page,
 }) => {
@@ -870,7 +938,7 @@ test("the Fixtures control wraps its captions onto more lines in a narrow frame"
     .getByText("Typical", { exact: true })
     .boundingBox())!;
   const last = (await fixtures
-    .getByText("Access denied", { exact: true })
+    .getByText("Policy matrix", { exact: true })
     .boundingBox())!;
   const group = (await fixtures.boundingBox())!;
   const framed = (await page.locator("iframe").boundingBox())!;
