@@ -234,12 +234,9 @@ function TaskBody({
   // Proposed: a page that shows one thing is headed by its name, with the state the platform keeps of it as tags
   // beside the name and its kind as the line, and the rest of what the platform keeps of it is the page's first part,
   // see the review on #3650.
-  const facts: Term[] = [
-    ...(task.subject.label === null
-      ? []
-      : [{ key: 'subject', term: t('shell.tasks.subject'), value: task.subject.label, width: 4 }]),
-    ...(dueAt === null ? [] : [{ key: 'dueAt', term: t('shell.tasks.dueAt'), value: dueAt, width: 4 }]),
-  ]
+  // The record is the form below, so only what belongs to the task is a fact, each on a row of its own, as
+  // docs/reference/actions-and-controls.md#fields says.
+  const facts: Term[] = dueAt === null ? [] : [{ key: 'dueAt', term: t('shell.tasks.dueAt'), value: dueAt }]
   return (
     <Flex vertical gap="middle">
       <PageHeading
