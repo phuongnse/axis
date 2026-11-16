@@ -247,9 +247,8 @@ These rules hold for every dialog, through the shared `ConfigProvider`.
 - **Its body scrolls at its edge.** The body reaches the frame's edges and keeps the padding inside
   it, so the thin scrollbar runs at the dialog's right edge and a field's focus ring has room at its
   sides.
-- **A dialog holds only what it edits** _(planned for M33)_. A table may show what its row's dialog does not
-  edit, as long as the cell leads to where it is edited, so each thing is seen in one place and edited
-  in one place.
+- **A dialog holds only what it edits**. A table may show what its row's dialog does not edit, as long
+  as the cell leads to where it is edited, so each thing is seen in one place and edited in one place.
 - **It draws on `surface`,** as panels do, so everything inside sits on the colour it was made for,
   and the mask behind sets it apart from the page.
 
