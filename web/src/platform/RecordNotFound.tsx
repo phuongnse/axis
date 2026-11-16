@@ -1,4 +1,4 @@
-import { Flex, Typography } from 'antd'
+import { Typography } from 'antd'
 import { useContext } from 'react'
 import { Link } from 'react-router'
 import { RecordList } from './recordList'
@@ -13,10 +13,16 @@ import { useText } from './texts'
 export function RecordNotFound() {
   const t = useText()
   const list = useContext(RecordList)
+  // The line and its link read as one: what happened, then where to go.
   return (
-    <Flex vertical gap="small" data-testid="record-not-found">
-      <Typography.Text>{t('shell.record.notFound')}</Typography.Text>
-      {list && <Link to={list.to}>{t('shell.record.goToList').replace('{page}', list.label)}</Link>}
-    </Flex>
+    <Typography.Paragraph data-testid="record-not-found" style={{ margin: 0 }}>
+      {t('shell.record.notFound')}
+      {list && (
+        <>
+          {' '}
+          <Link to={list.to}>{t('shell.record.goToList').replace('{page}', list.label)}</Link>
+        </>
+      )}
+    </Typography.Paragraph>
   )
 }
