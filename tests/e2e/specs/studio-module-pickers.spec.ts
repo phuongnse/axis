@@ -56,7 +56,7 @@ test.describe("Studio's pickers offer the pages and processes of a module", () =
     await openKind(page, "site");
     await page
       .getByTestId("studio-group-site")
-      .getByRole("button", { name: "Module app", exact: true })
+      .getByRole('link', { name: "Module app", exact: true })
       .click();
     await openFormTab(page);
     await openListItem(page, "/navigation", 0);
@@ -79,7 +79,7 @@ test.describe("Studio's pickers offer the pages and processes of a module", () =
     await page.goto(`${server.url}/studio?app=ModuleApp`);
 
     await openKind(page, "page");
-    await page.getByTestId("studio-group-page").getByRole("button", { name: "Items", exact: true }).click();
+    await page.getByTestId("studio-group-page").getByRole('link', { name: "Items", exact: true }).click();
     await openFormTab(page);
     await pickOption(
       page.getByTestId("studio-field-/widgets/0/actions/0/process").getByRole("combobox"),

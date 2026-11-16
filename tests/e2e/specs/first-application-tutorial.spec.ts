@@ -123,7 +123,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
     await page.goto(`${journeyURL}/studio?app=${app}`)
 
     await openKind(page, 'text')
-    await page.getByTestId('studio-group-text').getByRole('button').click()
+    await page.getByTestId('studio-group-text').getByRole('link').click()
     await expectForm(page)
 
     const add = page.getByTestId('studio-text-add')
@@ -363,7 +363,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
     await expectForm(page)
 
     await openKind(page, 'site')
-    await page.getByTestId('studio-group-site').getByRole('button').click()
+    await page.getByTestId('studio-group-site').getByRole('link').click()
     await expectForm(page)
     await addListItem(page, '/navigation')
     await pick(page, 'studio-field-/navigation/1/page', 'Expenses')

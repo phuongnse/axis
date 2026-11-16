@@ -214,7 +214,7 @@ test.describe('the author builds the asset management application with Studio on
   // The list names a page by its title, so a page with a title in English takes it as `title`.
   async function openPage(page: Page, name: string, title = name) {
     await openKind(page, 'page')
-    await page.getByTestId('studio-group-page').getByRole('button', { name: title, exact: true }).click()
+    await page.getByTestId('studio-group-page').getByRole('link', { name: title, exact: true }).click()
     await openFormTab(page)
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
   }
@@ -263,7 +263,7 @@ test.describe('the author builds the asset management application with Studio on
   // is not read for that count, because a list that has not drawn yet would look empty.
   async function deleteMigrations(page: Page) {
     const written = async () => (await readdir(path.join(built, 'migrations')).catch(() => [])).length
-    const migrations = page.getByTestId('studio-group-migration').getByRole('button')
+    const migrations = page.getByTestId('studio-group-migration').getByRole('link')
     for (let left = await written(); left > 0; left--) {
       await openKind(page, 'migration')
       await expect(migrations).toHaveCount(left)
@@ -334,11 +334,11 @@ test.describe('the author builds the asset management application with Studio on
 
     const starter = page.getByTestId('studio-group-text')
     await openKind(page, 'text')
-    await starter.getByRole('button').click()
+    await starter.getByRole('link').click()
     await expectForm(page)
 
     await deleteResource(page)
-    await expect(starter.getByRole('button')).toHaveCount(0)
+    await expect(starter.getByRole('link')).toHaveCount(0)
 
     await createResource(page, 'text', 'en')
     await expect(page.getByTestId('studio-resource-details')).toContainText('texts/en.json')
@@ -778,7 +778,7 @@ test.describe('the author builds the asset management application with Studio on
 
     const text = await labelTexts()
     await openKind(page, 'site')
-    await page.getByTestId('studio-group-site').getByRole('button').click()
+    await page.getByTestId('studio-group-site').getByRole('link').click()
     await expectForm(page)
 
     await page.getByTestId('studio-field-/locales/available').getByRole('button', { name: 'Add', exact: true }).click()
@@ -803,12 +803,12 @@ test.describe('the author builds the asset management application with Studio on
     await expectForm(page)
 
     // The sample has no Home page, and nothing points to it now.
-    const home = page.getByTestId('studio-group-page').getByRole('button', { name: 'Home', exact: true })
+    const home = page.getByTestId('studio-group-page').getByRole('link', { name: 'Home', exact: true })
     await openKind(page, 'page')
     await home.click()
     await openFormTab(page)
     await deleteResource(page)
-    await expect(page.getByTestId('studio-group-page').getByRole('button', { name: /Home/i })).toHaveCount(0)
+    await expect(page.getByTestId('studio-group-page').getByRole('link', { name: /Home/i })).toHaveCount(0)
   })
 
   test('the author lays out the AssetDetail page on the Design tab', async ({ page }) => {
@@ -1162,9 +1162,9 @@ test.describe('the author builds the asset management application with Studio on
     await save(page)
 
     await openKind(page, 'event')
-    await page.getByTestId('studio-group-event').getByRole('button', { name: 'Placeholder', exact: true }).click()
+    await page.getByTestId('studio-group-event').getByRole('link', { name: 'Placeholder', exact: true }).click()
     await deleteResource(page)
-    await expect(page.getByTestId('studio-group-event')).toHaveCount(0)
+    await expect(page.getByTestId('studio-group-event').getByRole('link')).toHaveCount(0)
   })
 
   test('the whole built folder matches the sample', async ({ page }) => {

@@ -578,6 +578,30 @@ export async function fetchStudioNames(application: string, signal?: AbortSignal
   return (await response.json()) as StudioNames
 }
 
+/** One resource's status and last write, as `GET .../resource-activity` answers it, see docs/reference/studio-resource-form.md#resource-activity. */
+export interface StudioResourceActivity {
+  id: string
+  module: string | null
+  status: 'new' | 'changed' | 'published' | null
+  titles: Record<string, string> | null
+  descriptions: Record<string, string> | null
+  modifiedBy: string | null
+  modifiedAt: string | null
+}
+
+/** Loads the status and last write of every resource the application uses, as `GET .../resource-activity` answers them. */
+export async function fetchStudioResourceActivity(
+  application: string,
+  signal?: AbortSignal,
+): Promise<StudioResourceActivity[]> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/resource-activity`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return ((await response.json()) as { items: StudioResourceActivity[] }).items
+}
+
 /** A role or connector slot of an installed module, with its label in each locale that has one. */
 export interface StudioCatalogSlot {
   name: string

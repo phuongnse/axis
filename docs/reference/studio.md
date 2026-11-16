@@ -87,7 +87,7 @@ diagnostics as its kind allows. Where the dialogs open, and which kinds they off
 A kind's sidebar entry opens its list, see [workspace](studio-workspace.md#workspace), and picking a
 resource opens it alone, under its [name](studio-workspace.md#names), with its editor below.
 
-- **One list for every kind** _(planned for M33)_. A kind's list is the
+- **One list for every kind**. A kind's list is the
   [standard table](actions-and-controls.md#tables), with the same columns for every kind: Name,
   Description, Status, Last modified by and Last modified at. Every column always shows, and a cell with
   no value shows the dash. Name is a link. A list does not show the inside of a resource, such as its
@@ -97,7 +97,7 @@ resource opens it alone, under its [name](studio-workspace.md#names), with its e
   `<module>/` prefix and with a neutral tag of the module's label beside the name. There is no Module
   column. A kind with no label in its format, such as a policy, keeps its name. A module's resource has a
   status, as a new module version or a layer changes it.
-- **Status** _(planned for M33)_. New, Changed or Published, from the
+- **Status**. New, Changed or Published, from the
   [resource activity route](studio-resource-form.md#resource-activity). While it loads the cell says so, and when it
   fails it says Unavailable.
 - **Its controls** _(planned for M33)_. The list has Refresh and page sizes of 10, 20, 50 and 100, and sorts by
