@@ -170,9 +170,9 @@ public sealed class TaskApiFixture : IAsyncLifetime
     /// <summary>
     /// Inserts a request of <paramref name="tenant"/> titled <see cref="RequestTitle"/> with an
     /// optional <paramref name="department"/>, <paramref name="divisor"/> and <paramref name="amount"/>, and returns its id. The id is
-    /// <paramref name="id"/>, or a new one.
+    /// <paramref name="id"/>, or a new one. The title is <paramref name="title"/> when given.
     /// </summary>
-    public async Task<Guid> InsertRequestAsync(string tenant, Guid? department, Guid? id = null, long? divisor = null, decimal? amount = null)
+    public async Task<Guid> InsertRequestAsync(string tenant, Guid? department, Guid? id = null, long? divisor = null, decimal? amount = null, string? title = null)
     {
         Assert.True(Model.TryGetEntity("Request", out var request));
         var requestId = id ?? Guid.NewGuid();
@@ -182,7 +182,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
             VALUES (@id, @title, @department, @divisor, @amount)
             """);
         command.Parameters.AddWithValue("id", requestId);
-        command.Parameters.AddWithValue("title", RequestTitle(requestId));
+        command.Parameters.AddWithValue("title", title ?? RequestTitle(requestId));
         command.Parameters.Add(new NpgsqlParameter("department", NpgsqlDbType.Uuid) { Value = (object?)department ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("divisor", NpgsqlDbType.Bigint) { Value = (object?)divisor ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("amount", NpgsqlDbType.Numeric) { Value = (object?)amount ?? DBNull.Value });

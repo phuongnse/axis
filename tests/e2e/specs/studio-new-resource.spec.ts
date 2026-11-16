@@ -194,7 +194,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await pick(page, 'studio-field-/fields/1/valueLabels/USD', 'nav.departments')
 
     await addField(page, 2, 'amount', 'money')
-    await page.getByTestId('studio-field-/fields/2').getByRole('radio', { name: 'Field', exact: true }).check()
+    await page.getByTestId('studio-field-/fields/2').getByRole('radio', { name: /^From a field/ }).check()
     await pick(page, 'studio-field-/fields/2/currencyField', 'currencyCode')
 
     await addField(page, 3, 'receipt', 'file')

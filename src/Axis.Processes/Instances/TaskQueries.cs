@@ -1,3 +1,6 @@
+using Axis.Configuration.Model;
+using Axis.Data.Naming;
+using Axis.Data.Records;
 using Axis.Processes.Storage;
 using Npgsql;
 using NpgsqlTypes;
@@ -43,11 +46,28 @@ public static class TaskQueries
     /// pinned to, and counts them. Tasks are ordered by due date with no due date last, then by
     /// creation time, then by id. A page past the last one has no items.
     /// </summary>
+    public static Task<TaskPage> ListOpenAsync(
+        NpgsqlConnection connection,
+        Guid applicationId,
+        string userId,
+        IReadOnlyCollection<string> roles,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default) =>
+        ListOpenAsync(connection, applicationId, userId, roles, new ListSql("TRUE", null, null, null), page, pageSize, cancellationToken);
+
+    /// <summary>
+    /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> open tasks like the overload without a list, and counts
+    /// only those that match <paramref name="list"/>. A sorted list orders by its sort first and breaks ties in the default
+    /// order: due date with no due date last, then creation time, then id. A list with no condition and no sort runs
+    /// <see cref="ListOpenCountSql"/> and <see cref="ListOpenPageSql"/> as they are.
+    /// </summary>
     public static async Task<TaskPage> ListOpenAsync(
         NpgsqlConnection connection,
         Guid applicationId,
         string userId,
         IReadOnlyCollection<string> roles,
+        ListSql list,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
@@ -55,18 +75,31 @@ public static class TaskQueries
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(userId);
         ArgumentNullException.ThrowIfNull(roles);
+        ArgumentNullException.ThrowIfNull(list);
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
+        var plain = list.Condition == "TRUE" && list.Order is null;
+        var countSql = plain ? ListOpenCountSql : $"{ListOpenCountSql} AND {list.Condition}";
+        var pageSql = plain
+            ? ListOpenPageSql
+            : $"""
+              SELECT {Columns} FROM axis.process_tasks WHERE {MayActWhere} AND {list.Condition}
+              ORDER BY {(list.Order is null ? "" : $"{list.Order}, ")}due_at ASC NULLS LAST, created_at, id
+              LIMIT @limit OFFSET @offset
+              """;
+
         long totalCount;
-        await using (var count = new NpgsqlCommand(ListOpenCountSql, connection))
+        await using (var count = new NpgsqlCommand(countSql, connection))
         {
             AddMayActParameters(count, applicationId, userId, roles);
+            list.AddTo(count);
             totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
         }
 
-        await using var command = new NpgsqlCommand(ListOpenPageSql, connection);
+        await using var command = new NpgsqlCommand(pageSql, connection);
         AddMayActParameters(command, applicationId, userId, roles);
+        list.AddTo(command);
         command.Parameters.AddWithValue("limit", pageSize);
         command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
@@ -78,6 +111,57 @@ public static class TaskQueries
         }
 
         return new TaskPage(items, totalCount);
+    }
+
+    /// <summary>
+    /// Reads the distinct pairs of release and subject entity of the open tasks of the application that
+    /// <paramref name="userId"/> may act on, which are the pairs that <see cref="SubjectLabelSql"/> builds its label over.
+    /// </summary>
+    public static async Task<IReadOnlyList<(Guid ReleaseId, Guid SubjectEntityId)>> ListOpenSubjectsAsync(
+        NpgsqlConnection connection,
+        Guid applicationId,
+        string userId,
+        IReadOnlyCollection<string> roles,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(userId);
+        ArgumentNullException.ThrowIfNull(roles);
+
+        await using var command = new NpgsqlCommand(
+            $"SELECT DISTINCT release_id, subject_entity_id FROM axis.process_tasks WHERE {MayActWhere}", connection);
+        AddMayActParameters(command, applicationId, userId, roles);
+        var pairs = new List<(Guid, Guid)>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            pairs.Add((reader.GetGuid(0), reader.GetGuid(1)));
+        }
+
+        return pairs;
+    }
+
+    /// <summary>
+    /// The SQL expression of the subject label of a task in <c>axis.process_tasks</c>, for a list's filter, search and sort.
+    /// <paramref name="labelled"/> holds the (release, entity) pairs whose label the reader may see. The label of a task in
+    /// any other pair is NULL, so a hidden label is never matched, compared or sorted by its value. Throws when an
+    /// entity has no display field. The ids come from the database, never from a request.
+    /// </summary>
+    public static string SubjectLabelSql(IReadOnlyList<(Guid ReleaseId, EntityModel Entity)> labelled)
+    {
+        ArgumentNullException.ThrowIfNull(labelled);
+
+        if (labelled.Count == 0)
+        {
+            return "NULL::text";
+        }
+
+        var branches = labelled.Select(pair =>
+        {
+            return $"WHEN process_tasks.release_id = '{pair.ReleaseId:D}'::uuid AND process_tasks.subject_entity_id = '{pair.Entity.Id:D}'::uuid "
+                + $"THEN {InstanceQueries.SubjectLabelSql(pair.Entity, "process_tasks.subject_id")}";
+        });
+        return $"CASE {string.Join(" ", branches)} END";
     }
 
     /// <summary>Reads the task with <paramref name="id"/> in any state, or <see langword="null"/> when there is none.</summary>
