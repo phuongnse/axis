@@ -424,4 +424,38 @@ describe('AxisField outside a form', () => {
       'Letters and digits. Shown in the list.',
     )
   })
+
+  it('marks a required field with * after its label and aria-required on its input, and the label still names it', () => {
+    renderOutside(
+      <AxisField label="Name" help="Letters and digits." required>
+        <Input value="" onChange={() => {}} />
+      </AxisField>,
+    )
+
+    const input = screen.getByRole('textbox', { name: 'Name' })
+    expect(input).toHaveAttribute('aria-required', 'true')
+    expect(screen.getByText('*')).toBeInTheDocument()
+    expect(screen.getByText('*')).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByText('*').closest('label')).toHaveTextContent(/^Name\*$/)
+  })
+
+  it('marks no field required unless it says so', () => {
+    renderOutside(
+      <AxisField label="Name" help="Letters and digits.">
+        <Input value="" onChange={() => {}} />
+      </AxisField>,
+    )
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).not.toHaveAttribute('aria-required')
+    expect(screen.queryByText('*')).not.toBeInTheDocument()
+  })
+
+  it('leaves the marking of a field in a form to its requiredMessage', () => {
+    expect(
+      // @ts-expect-error A field with a `name` is marked required by its `requiredMessage`, not by `required`.
+      <AxisField label="Name" help="Letters and digits." name="name" required>
+        <Input />
+      </AxisField>,
+    ).toBeDefined()
+  })
 })

@@ -216,12 +216,46 @@ describe('IdentityProviderEditor', () => {
     const onChange = renderEditor({ ...rest, clientKey: { binding: 'CompanyKey' } })
 
     expect(field('clientKey')).toHaveValue('CompanyKey')
-    await userEvent.click(screen.getByRole('radio', { name: texts('clientSecret').label }))
+    await userEvent.click(screen.getByRole('radio', { name: new RegExp(texts('clientCredential.clientSecret').label) }))
 
     expect(onChange.mock.calls).toEqual([
       ['/clientKey', undefined],
       ['/clientSecret', { binding: '' }],
     ])
+  })
+
+  it.each(['clientSecret', 'clientKey'])('shows the %s option with its help tied by aria-describedby', (option) => {
+    renderEditor()
+    const { label, help } = texts(`clientCredential.${option}`)
+
+    const radio = screen.getByRole('radio', { name: new RegExp(label) })
+    const text = within(screen.getByTestId('studio-field-/clientCredential')).getByText(help)
+
+    expect(radio).toHaveAttribute('aria-describedby', text.id)
+    expect(radio).toHaveAccessibleDescription(help)
+  })
+
+  it('writes the client key with an empty binding when it is chosen', async () => {
+    const onChange = renderEditor()
+    expect(screen.getByRole('radio', { name: new RegExp(texts('clientCredential.clientSecret').label) })).toBeChecked()
+
+    await userEvent.click(screen.getByRole('radio', { name: new RegExp(texts('clientCredential.clientKey').label) }))
+
+    expect(onChange.mock.calls).toEqual([
+      ['/clientSecret', undefined],
+      ['/clientKey', { binding: '' }],
+    ])
+  })
+
+  it('marks Name and Type required and no other field', () => {
+    renderEditor()
+
+    expect(field('name')).toHaveAttribute('aria-required', 'true')
+    expect(field('type', 'combobox')).toHaveAttribute('aria-required', 'true')
+    expect(within(screen.getByTestId('studio-field-/name')).getByText('*')).toBeInTheDocument()
+    expect(field('claims.displayName')).not.toHaveAttribute('aria-required')
+    expect(field('issuer')).not.toHaveAttribute('aria-required')
+    expect(within(screen.getByTestId('studio-field-/claims/displayName')).queryByText('*')).toBeNull()
   })
 
   it('lists only the declared roles in the picker of a role row', async () => {
@@ -455,6 +489,8 @@ describe('the texts of the identity provider editor', () => {
     'issuer',
     'clientId',
     'clientCredential',
+    'clientCredential.clientSecret',
+    'clientCredential.clientKey',
     'clientSecret',
     'clientKey',
     'metadata',
