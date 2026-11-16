@@ -82,7 +82,8 @@ changed what and can undo it.
   history, shows System as its author and no client. A revision's summary opens its diff as a page of
   its own, at `&view=history&revision=<id>`, with History still marked in the sidebar. The page shows
   each resource the revision changed with **Added**, **Changed** or **Removed**, and its JSON before
-  and after side by side.
+  and after side by side. A loaded revision has no link back, because the sidebar's marked History
+  entry and the browser's Back lead back. A revision that does not exist shows one line with a link to History.
 - **Undo.** Each revision but the oldest, the start of history, has **Undo**, under the rules of
   [undo](revisions-and-drafts.md#undo). It runs at once, and the undo is itself a revision that can
   be undone. A revision that cannot be undone alone names the later revisions that block it, each with

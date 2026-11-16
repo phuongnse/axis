@@ -4,10 +4,8 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { useContext, useEffect, useState, type HTMLAttributes } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
-import { EmptyDash } from '../platform/EmptyValue'
 import { QuotaRefusedError } from '../platform/quota'
 import {
-  changeRows,
   fetchStudioRevision,
   fetchStudioRevisions,
   revisionAuthor,
@@ -15,16 +13,14 @@ import {
   ServerUnreachableError,
   undoStudioRevision,
   type StudioDiagnostic,
-  type StudioReleaseChange,
   type StudioResourceItem,
   type StudioRevision,
   type StudioRevisionDiff,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
-import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
-import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
+import { StudioChanges } from './StudioChanges'
 import { StudioPageHeading } from './StudioPageHeading'
 
 /** What an undo left on the page: the later revisions that block it, or why it failed. */
@@ -203,20 +199,11 @@ export function StudioHistory({
   )
 }
 
-/** The JSON text of one side of a change, indented when it parses, and as it is when it does not. */
-function prettyJson(text: string): string {
-  try {
-    return JSON.stringify(JSON.parse(text), null, 2)
-  } catch {
-    return text
-  }
-}
-
 /**
  * The page of one revision: its summary as the heading, who made it, when and through which client under it, and then
- * every resource it added, changed or removed with its name, kind and change, and its JSON before and after side by
- * side. A side where the file does not exist shows the em dash. A revision that cannot be loaded shows one line with a
- * link back to History.
+ * every resource it added, changed or removed as `StudioChanges` draws it. A loaded revision has no
+ * link back, because the sidebar's marked History entry and the browser's Back lead back, see docs/reference/studio.md. A revision that
+ * cannot be loaded shows one line with a link to History.
  */
 export function StudioRevisionPage({
   application,
@@ -229,8 +216,6 @@ export function StudioRevisionPage({
 }) {
   const t = useText()
   const time = useRevisionTime()
-  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const { colour, radius, spacing, type } = useDesignTokens()
   const { generation, lost } = useStudioConnection()
   const [diff, setDiff] = useState<{ revisionId: string; value: StudioRevisionDiff | null }>()
 
@@ -268,62 +253,13 @@ export function StudioRevisionPage({
   }
 
   const { revision } = loaded
-  const changes = loaded.resources.map((resource): StudioReleaseChange => ({
-    path: resource.file,
-    change: resource.change,
-    kind: resource.kind,
-    name: resource.name,
-    titles: null,
-    locale: null,
-  }))
-  const byKey = new Map(loaded.resources.map((resource) => [`${resource.change}:${resource.file}`, resource]))
   const line = [revisionAuthor(revision, t), time(revision.time), revisionClient(revision, t)].filter(
     (part): part is string => part !== null,
   )
-  const block = (testId: string, title: string, text: string | null) => (
-    <Flex vertical gap={spacing.xs} style={{ minWidth: 0 }}>
-      <Typography.Text style={{ color: colour.textMuted }}>{title}</Typography.Text>
-      <pre
-        data-testid={testId}
-        style={{
-          margin: 0,
-          padding: spacing.sm,
-          overflow: 'auto',
-          fontFamily: type.codeFontFamily,
-          background: colour.surface,
-          border: `1px solid ${colour.borderSubtle}`,
-          borderRadius: radius.base,
-        }}
-      >
-        {text === null ? <EmptyDash /> : prettyJson(text)}
-      </pre>
-    </Flex>
-  )
-
   return (
     <Flex vertical gap="middle" data-testid="studio-revision">
       <StudioPageHeading title={revision.summary} line={line} />
-      {back}
-      {changeRows(changes, resources, locale, t).map((row) => {
-        const resource = byKey.get(row.key)
-        return (
-          <section key={row.key} data-testid="studio-revision-change" data-file={resource?.file}>
-            <Flex vertical gap="small">
-              <Flex wrap gap="small" align="baseline">
-                <Typography.Text strong>{row.name}</Typography.Text>
-                <Typography.Text style={{ color: colour.textMuted }}>
-                  {row.kind === null ? '—' : kindSingular(row.kind, t)}
-                </Typography.Text>
-                <Typography.Text>{t(`shell.studio.overview.change.${row.change}`)}</Typography.Text>
-              </Flex>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: spacing.md }}>
-                {block('studio-revision-before', t('shell.studio.history.before'), resource?.before ?? null)}
-                {block('studio-revision-after', t('shell.studio.history.after'), resource?.after ?? null)}
-              </div>
-            </Flex>
-          </section>
-        )
-      })}
+      <StudioChanges files={loaded.resources} resources={resources} />
     </Flex>
   )
 }

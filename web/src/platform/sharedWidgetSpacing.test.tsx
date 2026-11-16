@@ -5,9 +5,11 @@ import type { ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { ExpressionField } from '../pages/ExpressionField'
 import { ReferencePicker } from '../pages/ReferencePicker'
+import { StudioChanges } from '../pages/StudioChanges'
 import { SectionPart, SectionParts } from './SectionParts'
 import { withAntdStyles } from '../test/antdStyles'
 import { Announcement } from './Announcement'
+import { ActionBar } from './ActionBar'
 import { antConfigFor } from './antTheme'
 import { AxisActionRow, AxisButton } from './AxisButton'
 import { AxisAlert } from './AxisAlert'
@@ -40,8 +42,14 @@ const texts = {
   'shell.table.columnsMoveUp': 'Move up',
   'shell.table.columnsMoveDown': 'Move down',
   'shell.form.cancel': 'Cancel',
+  'shell.actionRow.more': 'More actions',
+  'test.discard': 'Discard',
   'shell.table.selectRow': 'Select row',
   'row.open': 'Open',
+  'shell.studio.history.before': 'Before',
+  'shell.studio.history.after': 'After',
+  'shell.studio.overview.change.changed': 'Changed',
+  'shell.studio.nav.kindOne.role': 'Role',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -93,6 +101,12 @@ const widgets: Record<string, ReactElement> = {
       <AxisButton role="secondary">Cancel</AxisButton>
     </AxisActionRow>
   ),
+  ActionBar: (
+    <ActionBar
+      fold={[{ key: 'discard', labelKey: 'test.discard', onClick: onChange }]}
+      end={<AxisButton role="finish">Save</AxisButton>}
+    />
+  ),
   'SectionParts with a part with a heading and one without': (
     <SectionParts>
       <SectionPart testName="named" heading={{ title: 'Named' }}>
@@ -111,6 +125,22 @@ const widgets: Record<string, ReactElement> = {
       value=""
       required={false}
       onChange={onChange}
+    />
+  ),
+  'StudioChanges with one changed file': (
+    <StudioChanges
+      files={[
+        {
+          file: 'roles/buyer.json',
+          change: 'changed',
+          id: null,
+          kind: 'role',
+          name: 'Buyer',
+          before: '{"label":"first"}',
+          after: '{"label":"second"}',
+        },
+      ]}
+      resources={[]}
     />
   ),
   CardPage: <CardPage title="Sign in">Body</CardPage>,
