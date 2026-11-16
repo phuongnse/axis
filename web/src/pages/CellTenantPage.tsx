@@ -8,9 +8,11 @@ import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { CellJobTable } from '../platform/CellJobTable'
 import {
   downloadCellTenantExport,
+  fetchCellDeletedTenant,
   fetchCellJobs,
   fetchCellTenant,
   queueCellTenantJob,
+  type CellDeletedTenant,
   type CellHostRequestState,
   type CellJob,
   type CellQuota,
@@ -74,7 +76,9 @@ const actionTexts = {
  * The Tenant view of the cell console, in parts a rule apart, see docs/reference/shell.md#layout: Details with one tenant's
  * status, application, hosts and actions, then Host verification with the state of each host the operator asked for,
  * Quotas with the ones it overrides, Usage of the last 13 months by day in the table of the users page's "Usage" section,
- * and Jobs in the shared job table. An unknown id shows the not-found page. An `active` or `readOnly` tenant offers
+ * and Jobs in the shared job table. A `deleting` tenant shows its purge date after its status. An id that is no tenant
+ * but a purged one shows only Deleted, the date of the purge, the date its deletion is complete and its jobs, with no
+ * action, see docs/reference/cell-console.md#views. An id that is neither shows the not-found page. An `active` or `readOnly` tenant offers
  * Suspend and a `suspended` or `readOnly` one offers Resume. Any tenant but a `provisioning` one offers Export. An `active`,
  * `readOnly` or `suspended` tenant offers Delete, which stays off until the operator types the tenant id exactly, and a
  * `deleting` one offers Cancel deletion in place of Suspend, Resume and Delete. Each action is behind a confirmation. An
@@ -92,6 +96,8 @@ export function CellTenantPage() {
   const { onRefused } = useCellConsole()
   const { id = '' } = useParams()
   const [tenant, setTenant] = useState<CellTenantDetail | null>()
+  // The purged tenant, read only when the id is no tenant. `null` is an id that was never a tenant.
+  const [deleted, setDeleted] = useState<CellDeletedTenant | null>()
   const [tenantFailed, setTenantFailed] = useState(false)
   const [jobs, setJobs] = useState<CellJob[]>()
   const [jobsFailed, setJobsFailed] = useState(false)
@@ -113,21 +119,31 @@ export function CellTenantPage() {
 
   useEffect(() => {
     const controller = new AbortController()
-    fetchCellTenant(id, controller.signal).then(
-      (result) => {
-        if (result.kind === 'ok') {
-          setTenant(result.value)
-        } else {
+    fetchCellTenant(id, controller.signal)
+      .then((result) => {
+        if (result.kind !== 'ok') {
           onRefused(result.kind)
+          return
         }
-      },
-      (error: unknown) => {
+        setTenant(result.value)
+        if (result.value !== null) {
+          setDeleted(undefined)
+          return
+        }
+        return fetchCellDeletedTenant(id, controller.signal).then((purged) => {
+          if (purged.kind === 'ok') {
+            setDeleted(purged.value)
+          } else {
+            onRefused(purged.kind)
+          }
+        })
+      })
+      .catch((error: unknown) => {
         if (!controller.signal.aborted) {
           console.warn('Loading the cell tenant failed', error)
           setTenantFailed(true)
         }
-      },
-    )
+      })
     fetchCellJobs(controller.signal, id).then(
       (result) => {
         if (result.kind === 'ok') {
@@ -155,7 +171,7 @@ export function CellTenantPage() {
     onRefused,
   })
 
-  if (tenant === null) {
+  if (tenant === null && deleted === null) {
     return <NotFoundPage />
   }
 
@@ -229,6 +245,7 @@ export function CellTenantPage() {
     setConfirming(action)
   }
 
+  const when = (time: string) => new Date(time).toLocaleString(locale)
   const quotas: QuotaRow[] = tenant ? Object.entries(tenant.quotas).map(([key, quota]) => ({ key, ...quota })) : []
   const quotaColumns: AxisColumn<QuotaRow>[] = [
     {
@@ -270,7 +287,7 @@ export function CellTenantPage() {
       key: 'expiresAt',
       kind: 'fixed',
       title: t('shell.cell.tenant.hostRequest.expiresAt'),
-      render: (_value, row) => (row.state === 'pending' ? new Date(row.expiresAt).toLocaleString(locale) : null),
+      render: (_value, row) => (row.state === 'pending' ? when(row.expiresAt) : null),
     },
   ]
 
@@ -291,6 +308,15 @@ export function CellTenantPage() {
                   label: t('shell.cell.tenant.status'),
                   children: t(`shell.cell.tenants.status.${tenant.status}`),
                 },
+                ...(tenant.status === 'deleting' && tenant.deleteAfter
+                  ? [
+                      {
+                        key: 'deleteAfter',
+                        label: t('shell.cell.tenant.deleteAfter'),
+                        children: when(tenant.deleteAfter),
+                      },
+                    ]
+                  : []),
                 {
                   key: 'application',
                   label: t('shell.cell.tenant.application'),
@@ -374,6 +400,19 @@ export function CellTenantPage() {
                 {t('shell.cell.tenant.addHost')}
               </AxisButton>
             </Flex>
+          </SectionPart>
+        )}
+        {deleted && (
+          <SectionPart testName="cell-tenant-details" heading={{ title: t('shell.cell.tenant.details') }}>
+            <Descriptions
+              data-testid="cell-tenant-deleted"
+              column={1}
+              items={[
+                { key: 'status', label: t('shell.cell.tenant.status'), children: t('shell.cell.tenant.deleted') },
+                { key: 'purgedAt', label: t('shell.cell.tenant.purgedAt'), children: when(deleted.deletedAt) },
+                { key: 'completeAt', label: t('shell.cell.tenant.completeAt'), children: when(deleted.completeAt) },
+              ]}
+            />
           </SectionPart>
         )}
         {tenant && (

@@ -71,6 +71,8 @@ export interface CellTenant {
   failedWork: CellFailedWork | null
   usage: CellTenantUsage
   newestArchiveAt: string | null
+  /** The scheduled purge time of a `deleting` tenant, and `null` for every other. */
+  deleteAfter: string | null
 }
 
 /** One quota of a tenant. `value` is `null` for no limit, and `overridden` is true when the tenant overrides the cell's default. */
@@ -154,6 +156,26 @@ export async function fetchCellTenants(signal?: AbortSignal): Promise<CellResult
 /** Loads one tenant with its quotas. The value is `null` when the cell has no tenant with that id. */
 export function fetchCellTenant(id: string, signal?: AbortSignal): Promise<CellResult<CellTenantDetail | null>> {
   return fetchCellRoute<CellTenantDetail | null>(`/api/cell/tenants/${encodeURIComponent(id)}`, 'tenant', signal, true)
+}
+
+/** A purged main tenant: when the purge ran, and when its deletion is complete, as the point-in-time recovery no longer holds it. */
+export interface CellDeletedTenant {
+  id: string
+  deletedAt: string
+  completeAt: string
+}
+
+/** Loads a purged tenant. The value is `null` when the cell has no purged main tenant with that id. */
+export function fetchCellDeletedTenant(
+  id: string,
+  signal?: AbortSignal,
+): Promise<CellResult<CellDeletedTenant | null>> {
+  return fetchCellRoute<CellDeletedTenant | null>(
+    `/api/cell/deleted-tenants/${encodeURIComponent(id)}`,
+    'deleted tenant',
+    signal,
+    true,
+  )
 }
 
 /** Loads one job with its steps. */

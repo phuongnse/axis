@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -311,7 +312,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             "usage.storage.limit", "usage.storage.used", "usage.users.limit", "usage.users.used",
             "usage.applications.limit", "usage.applications.used", "usage.emailsPerDay.limit", "usage.emailsPerDay.used",
         ];
-        string[] tenantFields = ["id", "status", "application", "hosts[]", .. failedWork, .. usage, "newestArchiveAt"];
+        string[] tenantFields = ["id", "status", "application", "hosts[]", .. failedWork, .. usage, "newestArchiveAt", "deleteAfter"];
         AssertFields(
             await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken),
             [.. tenantFields.Select(field => $"items[].{field}")],
@@ -388,6 +389,83 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
         Assert.Equal("application/problem+json", unknown.Content.Headers.ContentType?.MediaType);
         Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_list_and_the_detail_answer_the_purge_time_of_a_deleting_tenant_and_null_for_any_other()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync("UPDATE platform.tenants SET delete_after = '2026-12-01T10:30:00Z' WHERE id = 'c'");
+
+        using var list = await GetAsync(client, "/api/cell/tenants", token);
+        using var deleting = await GetAsync(client, "/api/cell/tenants/c", token);
+        using var active = await GetAsync(client, "/api/cell/tenants/a", token);
+
+        var expected = DateTimeOffset.Parse("2026-12-01T10:30:00Z", CultureInfo.InvariantCulture);
+        var items = (await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
+        Assert.Equal(["a", "b", "c"], items.EnumerateArray().Select(item => item.GetProperty("id").GetString()).ToArray());
+        Assert.Equal(JsonValueKind.Null, items[0].GetProperty("deleteAfter").ValueKind);
+        Assert.Equal(JsonValueKind.Null, items[1].GetProperty("deleteAfter").ValueKind);
+        Assert.Equal("deleting", items[2].GetProperty("status").GetString());
+        Assert.Equal(expected, items[2].GetProperty("deleteAfter").GetDateTimeOffset());
+        var deletingTenant = await deleting.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(expected, deletingTenant.GetProperty("deleteAfter").GetDateTimeOffset());
+        Assert.Equal(JsonValueKind.Null, (await active.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("deleteAfter").ValueKind);
+    }
+
+    [Fact]
+    public async Task The_deleted_tenant_read_answers_the_purge_time_and_the_completion_7_days_later_and_nothing_of_the_actor_or_hosts()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync("INSERT INTO platform.deleted_tenants (id, deleted_at, actor, hosts) VALUES ('gone', '2026-11-01T00:00:00Z', 'operator-1', '{gone.vn.example.test}')");
+        await SeedJobAsync("purge", "gone", "succeeded", "[]");
+
+        using var response = await GetAsync(client, "/api/cell/deleted-tenants/gone", token);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(["id", "deletedAt", "completeAt"], body.EnumerateObject().Select(property => property.Name).ToArray());
+        Assert.Equal("gone", body.GetProperty("id").GetString());
+        Assert.Equal(DateTimeOffset.Parse("2026-11-01T00:00:00Z", CultureInfo.InvariantCulture), body.GetProperty("deletedAt").GetDateTimeOffset());
+        Assert.Equal(DateTimeOffset.Parse("2026-11-08T00:00:00Z", CultureInfo.InvariantCulture), body.GetProperty("completeAt").GetDateTimeOffset());
+    }
+
+    [Fact]
+    public async Task The_deleted_tenant_read_answers_404_for_a_preview_tombstone_that_no_purge_job_names_and_for_an_unknown_id()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync("INSERT INTO platform.deleted_tenants (id, deleted_at, actor, hosts) VALUES ('gone-preview', now(), 'operator-1', '{}')");
+
+        using var preview = await GetAsync(client, "/api/cell/deleted-tenants/gone-preview", token);
+        using var unknown = await GetAsync(client, "/api/cell/deleted-tenants/nobody", token);
+        using var live = await GetAsync(client, "/api/cell/deleted-tenants/a", token);
+
+        Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+        Assert.Equal("application/problem+json", preview.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, live.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_deleted_tenant_read_answers_401_without_a_token_and_403_without_the_role()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+        await ExecuteAsync("INSERT INTO platform.deleted_tenants (id, deleted_at, actor, hosts) VALUES ('gone', now(), 'operator-1', '{}')");
+        await SeedJobAsync("purge", "gone", "succeeded", "[]");
+
+        using var none = await GetAsync(client, "/api/cell/deleted-tenants/gone", token: null);
+        using var noRole = await GetAsync(client, "/api/cell/deleted-tenants/gone", noRoleToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
     }
 
     [Fact]
