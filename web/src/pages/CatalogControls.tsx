@@ -245,6 +245,7 @@ export function BindingSelect({
   name,
   id,
   'aria-describedby': describedBy,
+  'aria-required': required,
   names,
   value,
   noBinding = false,
@@ -254,6 +255,7 @@ export function BindingSelect({
   /** The id and description that `AxisField` gives its input. */
   id?: string
   'aria-describedby'?: string
+  'aria-required'?: boolean
   names: string[]
   /** The saved name, `''` for an entry without a name, and `undefined` when the entry is absent. */
   value: string | undefined
@@ -276,6 +278,7 @@ export function BindingSelect({
         aria-label={name}
         id={id}
         aria-describedby={describedBy}
+        aria-required={required}
         showSearch
         optionFilterProp="label"
         virtual={false}

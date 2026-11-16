@@ -788,9 +788,9 @@ Operations heading, and the JSON view stays as the second view of the same draft
   Token URL, a URL binding, a Client ID and a Client secret, both secret bindings, and Scope and
   Audience boxes that remove their key when empty, see [OAuth2 auth](integration-resources.md#oauth2-auth).
 - **Operations.** A card per operation shows its name, method, path and `lookup`, which is picked from
-  the connector's other operations. Its input and output fields are rows of name, type and required.
-  Operations and rows can be added and removed. A `GET` with a body row keeps it and shows a hint, and
-  the compiler reports the error.
+  the connector's other operations. Its input and output fields are rows of name, type and required,
+  one field to a line, and the schema's required keys carry the shared required mark. Operations and rows
+  can be added and removed. A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
 - **Placement and nesting.** A scalar input has a Placement choice of `body`, `path`, `query` or
   `header`, which shows `body` when the file has no `in` key and removes the key when `body` is chosen.
   `object` and `list` inputs show nested field rows instead, down to four levels with the input as
@@ -815,14 +815,15 @@ the Assurance heading, and the JSON view stays as the second view of the same dr
   bindings it requires, with an empty name. An `accounts` provider shows only General, Roles and Assurance.
 - **Bindings.** A binding is a name box, and its help says which kind it is and that only the name is
   stored. No value is shown or stored. `oidc` shows the issuer, the client ID, and a choice of client
-  credential: a client secret, or a client key for `private_key_jwt`. `saml` shows the metadata.
+  credential: a client secret, or a client key for `private_key_jwt`, each option with its own help.
+  `saml` shows the metadata. Name and Type carry the shared required mark.
 - **Label.** The "Continue with" label sits in Sign-in, after the bindings, and has its texts in every locale, see [label texts](#label-texts).
 - **Claims.** The display name, email and locale claims are name boxes that show their defaults,
   `name`, `email` and `locale`, until the author types another name.
 - **Roles.** The roles claim is a name box that shows `roles` by default. `values` are rows of a claim
-  value and a role picked from the application's roles, with add and remove. With no rows, a claim
+  value and a role picked from the application's roles, one field to a line, with add and remove. With no rows, a claim
   value gives the role of the same name, and the editor says so.
-- **Assurance.** `acr` is a list of text rows, and with none the key is removed.
+- **Assurance.** `acr` is a list of text rows, each with Remove below, and with none the key is removed.
 - **Unknown keys.** A key the editor does not show is saved unchanged.
 
 ### A site's sign-in

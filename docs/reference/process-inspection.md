@@ -55,19 +55,33 @@ enough.
 
 ### Instance list
 
-`GET /api/apps/{app}/processes/{process}/instances?state=&subject=&page=&pageSize=`
+`GET /api/apps/{app}/processes/{process}/instances?state=&subject=&page=&pageSize=&sort=&search=&filter=`
 lists the instances of the process, whatever release they are pinned to.
 
 - `page` and `pageSize` follow the record API's
-  [paging rules](record-api.md#paging-and-sorting). There is no `sort` or
-  `search`.
+  [paging rules](record-api.md#paging-and-sorting).
+- `sort`, `search` and `filter` follow the same rules and PostgreSQL applies
+  them. The fields are `subjectLabel` (text), `state` (one of the five states),
+  `step` (text), `releaseNumber` (number), and `createdAt` and `endedAt`
+  (dates). A `search` looks in `subjectLabel` and `step`. The two time fields
+  filter by their UTC day and sort by their instant. A sort or filter on any
+  other field is a `400`, keyed `sort` or `filter`.
+- `subjectLabel` is a field only for a process with a subject whose display
+  field the user's `read` grant covers and the active release does not mark
+  sensitive. Otherwise a sort or filter on it is a `400` and a `search` never
+  matches it. The label that the filter and search read is the record's
+  current value, as the item shows it.
 - `state` is optional and may repeat. Each value is one of `running`, `waiting`,
   `completed`, `failed` and `cancelled`, and the list keeps the instances in any
   of the given states. Without `state`, every state is listed. Any other or
   empty value is a `400` keyed `state`.
 - `subject` is optional. It is a record id in the hyphenated UUID form.
   Anything else is a `400` keyed `subject`.
-- Instances are ordered by `created_at` descending, then by `id` descending.
+- Without a `sort`, instances are ordered by `created_at` descending, then by
+  `id` descending. With a `sort`, they are ordered by it, then by `created_at`
+  descending and `id` descending.
+- `totalCount` counts only the instances that match `filter` and `search`, and
+  leaves out those the read filters hide.
 - The subject entity's read filters of the user's `read` grants go into the
   SQL. An instance whose subject record the user may not read is left out of
   the page and of `totalCount`. A user with no `read` grant on the subject
@@ -441,8 +455,9 @@ titles are fixed and never contain text from the request.
 - **`404`.** An unknown application, process or instance, as the order of
   checks says.
 - **`403`.** The user has no `inspect` grant on the process.
-- **`400`.** A list parameter is invalid: `page`, `pageSize`, `state` or
-  `subject`, keyed by its name. The detail has none.
+- **`400`.** A list parameter is invalid: `page`, `pageSize`, `state`,
+  `subject`, `sort`, `search` or `filter`, keyed by its name. The detail has
+  none.
 - **`409`.** A `read` filter of the user's grants on the subject entity reads a
   [pending field](migrations.md#recomputing-computed-fields). The title is the
   record API's "Your access to this entity cannot be checked while a field is

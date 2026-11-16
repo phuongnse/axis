@@ -19,7 +19,7 @@ widget names a role, never an Ant Design button type.
 | Secondary   | The default grey outline                    | Other actions, such as Cancel and Import                                                                                                                                         |
 | Icon        | A text button with only an icon             | Small actions such as Refresh. Choose and Clear of a `reference` field are bordered and joined                                                                                   |
 | Plain       | A borderless text button in the text colour | Header controls, such as the account button                                                                                                                                      |
-| Link | Text in `primaryText` with no border | An action that reads as a link but goes to no address, such as the first cell of a [list of objects](studio-resource-form.md#lists-of-objects) |
+| Link        | Text in `primaryText` with no border        | An action that reads as a link but goes to no address, such as the first cell of a [list of objects](studio-resource-form.md#lists-of-objects)                                   |
 | Destructive | `dangerText` at any level                   | Actions that remove, such as Delete row and Delete                                                                                                                               |
 
 - **Text colours, not fill colours.** Ant Design writes the text of text, outlined and danger buttons
@@ -101,13 +101,16 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
 - **One field for the platform's screens.** `AxisField` draws a field: its label, its help and its input, as a
   group that its help describes. Inside a vertical form it takes the form's value and checks. Outside an
   Ant Design form, where a screen keeps its draft itself, the caller gives the input its value and change
-  handler, and `AxisField` still ties the label to the input and makes the help its description.
+  handler, and `AxisField` still ties the label to the input and makes the help its description. Such a field
+  takes `required`, which draws the shared required mark after its label and sets `aria-required` on the input,
+  while a field inside a form is marked by its `requiredMessage` alone.
   `AxisFieldGroup` draws a titled group of fields with its help, such as an object's fields or a table, as a
   group that its title names and its help describes. A field that holds one input uses `AxisField`, and a
   field that holds several inputs, or rows, uses `AxisFieldGroup`, because a label names only one input.
   `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` are built on `AxisField` and `AxisFieldGroup`.
-  `AxisCheckboxField` and `AxisChoiceField` take both modes of `AxisField`: a `name` inside a form, or a value
-  and a change handler that the caller holds.
+  `AxisCheckboxField` and `AxisChoiceField` take the same two modes: with a `name` inside a form, or with the
+  value and `onChange` the screen holds. A choice the screen holds gives its radio group a name of its own, so
+  two choices on one panel never join.
 - **A field's status.** A field inside a form takes a `status`, what the screen found about the
   field beyond its rules: a check run while the person types, such as whether a subdomain is free, or
   choices that could not load. Running shows the input busy. A status that passed leaves the field as it

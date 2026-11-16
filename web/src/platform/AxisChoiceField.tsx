@@ -26,6 +26,7 @@ type FormMode = Shared & {
   status?: AxisFieldStatus
   value?: never
   onChange?: never
+  required?: never
 }
 
 type OwnMode = Shared & {
@@ -33,9 +34,11 @@ type OwnMode = Shared & {
   requiredMessage?: never
   initialValue?: never
   status?: never
-  /** The chosen option's value, or none. The screen holds it. */
+  /** The chosen option's value, or `undefined` when nothing is chosen. The screen holds it. */
   value: string | undefined
   onChange: (value: string) => void
+  /** Marks the field required, as for {@link AxisField}. The screen checks the choice. */
+  required?: boolean
 }
 
 function isOwnMode(props: FormMode | OwnMode): props is OwnMode {
@@ -46,11 +49,14 @@ function isOwnMode(props: FormMode | OwnMode): props is OwnMode {
  * A choice among a few options of a platform screen, drawn as radios: the field's label, its help, then each option
  * with its label, its optional mark and its own help, see docs/reference/actions-and-controls.md#fields. The option's
  * help is part of the option's text and also its description. Like {@link AxisField}, it has two modes. With a `name`
- * it belongs inside a vertical form. Without one, the screen holds the value and gives `value` and `onChange`.
+ * it belongs inside a vertical form, and a `requiredMessage` marks the field required and checks it. Without one, the
+ * screen holds the value and gives `value` and `onChange`, and `required` marks the field with the shared
+ * `requiredMark`. Each choice gives its radio group a name of its own, so two choices on one panel never join.
  */
 export function AxisChoiceField(props: FormMode | OwnMode) {
   const { label, help, options } = props
   const optionId = useId()
+  const groupName = useId()
   const radios = (
     <Flex vertical>
       {options.map((option, index) => {
@@ -70,10 +76,15 @@ export function AxisChoiceField(props: FormMode | OwnMode) {
     </Flex>
   )
   if (isOwnMode(props)) {
-    const { value, onChange } = props
+    const { value, onChange, required } = props
     return (
-      <AxisField label={label} help={help}>
-        <Radio.Group aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
+      <AxisField label={label} help={help} required={required}>
+        <Radio.Group
+          aria-label={label}
+          name={groupName}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        >
           {radios}
         </Radio.Group>
       </AxisField>
