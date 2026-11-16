@@ -140,11 +140,20 @@ export function fetchCell(signal?: AbortSignal): Promise<CellResult<Cell>> {
   return fetchCellRoute('/api/cell', 'overview', signal)
 }
 
-/** Loads the newest jobs of the cell, newest first, or the jobs of one `tenant`. */
-export async function fetchCellJobs(signal?: AbortSignal, tenant?: string): Promise<CellResult<CellJob[]>> {
-  const query = tenant === undefined ? '' : `?tenant=${encodeURIComponent(tenant)}`
-  const result = await fetchCellRoute<{ items: CellJob[] }>(`/api/cell/jobs${query}`, 'jobs', signal)
-  return result.kind === 'ok' ? { kind: 'ok', value: result.value.items } : result
+/** One page of the jobs of the cell, as served by `GET /api/cell/jobs`. `totalCount` is the number of jobs that matched before the page was cut. */
+export interface CellJobPage {
+  items: CellJob[]
+  page: number
+  pageSize: number
+  totalCount: number
+}
+
+/**
+ * Loads one page of the jobs of the cell, newest first unless the query sorts. `query` is the record API's paging, sort, search and
+ * filter query string, and may add `tenant` to keep one tenant's jobs.
+ */
+export function fetchCellJobs(query: string, signal?: AbortSignal): Promise<CellResult<CellJobPage>> {
+  return fetchCellRoute<CellJobPage>(`/api/cell/jobs${query ? `?${query}` : ''}`, 'jobs', signal)
 }
 
 /** One page of the tenants of the cell, as served by `GET /api/cell/tenants`. `totalCount` is the number of tenants that matched before the page was cut. */

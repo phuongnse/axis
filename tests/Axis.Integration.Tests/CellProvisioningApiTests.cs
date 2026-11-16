@@ -1572,7 +1572,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
-    public async Task An_operator_lists_the_jobs_newest_first_filtered_by_tenant_and_limited_without_the_actor()
+    public async Task An_operator_lists_the_jobs_newest_first_filtered_by_tenant_and_paged_without_the_actor()
     {
         await using var factory = await StartAsync();
         using var client = CreateClient(factory, _console);
@@ -1603,10 +1603,14 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         using var all = await GetAsync(client, "/api/cell/jobs", token);
         using var ofB = await GetAsync(client, "/api/cell/jobs?tenant=b", token);
         using var ofNobody = await GetAsync(client, "/api/cell/jobs?tenant=nobody", token);
-        using var newest = await GetAsync(client, "/api/cell/jobs?limit=1", token);
+        using var newest = await GetAsync(client, "/api/cell/jobs?pageSize=1", token);
 
         Assert.Equal(HttpStatusCode.OK, all.StatusCode);
-        var items = (await all.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
+        var allPage = await all.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(3, allPage.GetProperty("totalCount").GetInt64());
+        Assert.Equal(1, allPage.GetProperty("page").GetInt32());
+        Assert.Equal(20, allPage.GetProperty("pageSize").GetInt32());
+        var items = allPage.GetProperty("items");
         Assert.Equal(
             [ids[2], ids[1], ids[0]],
             items.EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray());
@@ -1629,16 +1633,77 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             ofBItems.EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray());
         Assert.Equal(HttpStatusCode.OK, ofNobody.StatusCode);
         Assert.Equal(0, (await ofNobody.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items").GetArrayLength());
-        var newestItems = (await newest.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
-        Assert.Equal([ids[2]], newestItems.EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray());
+        var newestPage = await newest.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal([ids[2]], newestPage.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray());
+        Assert.Equal(3, newestPage.GetProperty("totalCount").GetInt64());
+        Assert.Equal(1, newestPage.GetProperty("pageSize").GetInt32());
+    }
 
-        foreach (var limit in new[] { "0", "201", "-1", "abc", "" })
+    [Fact]
+    public async Task The_job_list_answers_a_searched_filtered_sorted_page_with_its_total_and_400_for_an_unknown_field()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var ids = new List<Guid>();
+        foreach (var (path, key) in new[]
         {
-            using var bad = await GetAsync(client, $"/api/cell/jobs?limit={limit}", token);
-
-            Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
-            Assert.Equal("application/problem+json", bad.Content.Headers.ContentType?.MediaType);
+            ("/api/cell/tenants/b/suspend", "page-1"),
+            ("/api/cell/tenants/b/resume", "page-2"),
+            ("/api/cell/tenants/c/suspend", "page-3"),
+        })
+        {
+            using var queued = await PostJobAsync(client, path, token, key);
+            Assert.Equal(HttpStatusCode.Accepted, queued.StatusCode);
+            ids.Add((await queued.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid());
         }
+
+        // The first job is created late on one UTC day, the other two on the next, so a day filter keeps two.
+        await ExecuteAsync($"UPDATE platform.jobs SET created_at = '2026-01-10 23:30:00+00' WHERE id = '{ids[0]:D}'");
+        await ExecuteAsync($"UPDATE platform.jobs SET created_at = '2026-01-11 00:30:00+00' WHERE id = '{ids[1]:D}'");
+        await ExecuteAsync($"UPDATE platform.jobs SET created_at = '2026-01-11 12:00:00+00' WHERE id = '{ids[2]:D}'");
+        await ExecuteAsync(
+            $$"""
+            UPDATE platform.jobs SET state = 'failed', error = 'The tenant is still provisioning.',
+                steps = '[{"name":"status","state":"failed","error":"The tenant is still provisioning."}]'::jsonb
+            WHERE id = '{{ids[1]:D}}'
+            """);
+        var suspends = Uri.EscapeDataString("""{"all":[{"field":"kind","op":"eq","value":"suspend"}]}""");
+        var day = Uri.EscapeDataString("""{"all":[{"field":"createdAt","op":"eq","value":"2026-01-11"}]}""");
+        var undeclared = Uri.EscapeDataString("""{"all":[{"field":"nothing","op":"eq","value":"x"}]}""");
+
+        using var searched = await GetAsync(client, "/api/cell/jobs?search=provisioning", token);
+        using var filtered = await GetAsync(client, $"/api/cell/jobs?filter={suspends}&sort=tenant&pageSize=1", token);
+        using var secondPage = await GetAsync(client, $"/api/cell/jobs?filter={suspends}&sort=tenant&pageSize=1&page=2", token);
+        using var ofDay = await GetAsync(client, $"/api/cell/jobs?filter={day}", token);
+        using var oldestFirst = await GetAsync(client, "/api/cell/jobs?sort=createdAt", token);
+        using var newestFirst = await GetAsync(client, "/api/cell/jobs?sort=-createdAt", token);
+        using var byState = await GetAsync(client, "/api/cell/jobs?sort=state", token);
+        using var ofC = await GetAsync(client, $"/api/cell/jobs?tenant=c&filter={suspends}", token);
+        using var badFilter = await GetAsync(client, $"/api/cell/jobs?filter={undeclared}", token);
+        using var badSort = await GetAsync(client, "/api/cell/jobs?sort=nothing", token);
+        using var badPage = await GetAsync(client, "/api/cell/jobs?pageSize=0", token);
+
+        // The page as the positions of its jobs in the order they were queued, then the total, the page and the page size.
+        async Task<string> ReadAsync(HttpResponseMessage response)
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+            var items = body.GetProperty("items").EnumerateArray().Select(item => ids.IndexOf(item.GetProperty("id").GetGuid()));
+            return $"{string.Join(',', items)} of {body.GetProperty("totalCount").GetInt64()}, page {body.GetProperty("page").GetInt32()}, size {body.GetProperty("pageSize").GetInt32()}";
+        }
+
+        Assert.Equal("1 of 1, page 1, size 20", await ReadAsync(searched));
+        Assert.Equal("0 of 2, page 1, size 1", await ReadAsync(filtered));
+        Assert.Equal("2 of 2, page 2, size 1", await ReadAsync(secondPage));
+        Assert.Equal("2,1 of 2, page 1, size 20", await ReadAsync(ofDay));
+        Assert.Equal("0,1,2 of 3, page 1, size 20", await ReadAsync(oldestFirst));
+        Assert.Equal("2,1,0 of 3, page 1, size 20", await ReadAsync(newestFirst));
+        Assert.Equal("1,2,0 of 3, page 1, size 20", await ReadAsync(byState));
+        Assert.Equal("2 of 1, page 1, size 20", await ReadAsync(ofC));
+        await AssertBadRequestAsync(badFilter, "filter");
+        await AssertBadRequestAsync(badSort, "sort");
+        await AssertBadRequestAsync(badPage, "pageSize");
     }
 
     [Fact]
@@ -1650,7 +1715,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         var operatorToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
         var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
 
-        foreach (var path in new[] { "/api/cell", "/api/cell/jobs" })
+        foreach (var path in new[] { "/api/cell", "/api/cell/jobs", "/api/cell/jobs?sort=nothing" })
         {
             using var none = await GetAsync(client, path, token: null);
             using var noRole = await GetAsync(client, path, noRoleToken);

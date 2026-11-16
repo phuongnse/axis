@@ -144,10 +144,11 @@ export function CellTenantPage() {
           setTenantFailed(true)
         }
       })
-    fetchCellJobs(controller.signal, id).then(
+    // The tenant's 50 newest jobs, see docs/reference/cell-console.md#views.
+    fetchCellJobs(new URLSearchParams({ tenant: id, pageSize: '50' }).toString(), controller.signal).then(
       (result) => {
         if (result.kind === 'ok') {
-          setJobs(result.value)
+          setJobs(result.value.items)
         } else {
           onRefused(result.kind)
         }

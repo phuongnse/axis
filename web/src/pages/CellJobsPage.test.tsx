@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Outlet, Route, Routes } from 'react-router'
+import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { CellJob } from '../platform/cell'
@@ -44,11 +44,35 @@ const succeeded: CellJob = {
   error: null,
 }
 
-function stubJobs(status: number, items: CellJob[] = []) {
+function jobPage(items: CellJob[], totalCount = items.length) {
+  return { items, page: 1, pageSize: 20, totalCount }
+}
+
+/** Answers every job list request, and returns the URLs that were asked. */
+function stubJobs(status: number, items: CellJob[] = [], totalCount = items.length) {
+  const urls: string[] = []
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => new Response(JSON.stringify(status === 200 ? { items } : { status }), { status })),
+    vi.fn(async (input: string) => {
+      urls.push(input)
+      return new Response(JSON.stringify(status === 200 ? jobPage(items, totalCount) : { status }), { status })
+    }),
   )
+  return urls
+}
+
+const queryOf = (url: string) => new URL(url, 'http://localhost').searchParams
+
+function Address() {
+  return <output data-testid="address">{useLocation().search}</output>
+}
+
+const address = () => screen.getByTestId('address').textContent!
+
+async function loadedTable() {
+  const table = await screen.findByTestId('cell-jobs')
+  await waitFor(() => expect(within(table).getAllByRole('row').length).toBeGreaterThan(1))
+  return table
 }
 
 /**
@@ -65,8 +89,8 @@ function stubRunAgain(items: CellJob[], again: { status: number; body?: object }
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = `${init?.method ?? 'GET'} ${String(input)}`
       sent.push(request)
-      if (request === 'GET /api/cell/jobs') {
-        return new Response(JSON.stringify({ items }), { status: 200 })
+      if (request.startsWith('GET /api/cell/jobs') && !request.startsWith('GET /api/cell/jobs/')) {
+        return new Response(JSON.stringify(jobPage(items)), { status: 200 })
       }
       if (request === 'POST /api/cell/jobs/2/run-again') {
         keys.push(new Headers(init?.headers).get('Idempotency-Key'))
@@ -79,9 +103,9 @@ function stubRunAgain(items: CellJob[], again: { status: number; body?: object }
   return { sent, keys }
 }
 
-function renderPage(onRefused = vi.fn()) {
+function renderPage(onRefused = vi.fn(), path = '/') {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <ThemeModeProvider>
         <PlatformContext.Provider value={platform}>
           <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
@@ -93,6 +117,7 @@ function renderPage(onRefused = vi.fn()) {
           </TextProvider>
         </PlatformContext.Provider>
       </ThemeModeProvider>
+      <Address />
     </MemoryRouter>,
   )
   return onRefused
@@ -105,7 +130,7 @@ describe('CellJobsPage', () => {
     stubJobs(200, [failed, succeeded])
     renderPage()
 
-    const table = await screen.findByTestId('cell-jobs')
+    const table = await loadedTable()
     const rows = within(table).getAllByRole('row')
     // The header row comes first.
     expect(rows).toHaveLength(3)
@@ -118,6 +143,61 @@ describe('CellJobsPage', () => {
     expect(within(rows[1]).getByTestId('cell-job-error')).toHaveTextContent('The job stopped at realm.')
     expect(within(rows[1]).getAllByTestId('cell-job-step')).toHaveLength(2)
     expect(within(rows[2]).queryByTestId('cell-job-step-error')).not.toBeInTheDocument()
+  })
+
+  it('keeps the search, filter, sort and page size in the address and the request', async () => {
+    const filter = JSON.stringify({ all: [{ field: 'state', op: 'eq', value: 'failed' }] })
+    const urls = stubJobs(200, [failed], 45)
+    const user = userEvent.setup()
+    renderPage(vi.fn(), `/?${new URLSearchParams({ search: 'acme', filter, sort: '-createdAt' })}`)
+
+    const table = await screen.findByTestId('cell-jobs')
+    await waitFor(() => expect(urls).toHaveLength(1))
+    const first = queryOf(urls[0])
+    expect(first.get('search')).toBe('acme')
+    expect(first.get('filter')).toBe(filter)
+    expect(first.get('sort')).toBe('-createdAt')
+    expect(await within(table).findByText('1–20 of 45')).toBeVisible()
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('acme')
+
+    await user.click(within(table).getByRole('combobox'))
+    await user.click(await screen.findByTitle('50 / page'))
+
+    await waitFor(() => expect(address()).toContain('pageSize=50'))
+    await waitFor(() => expect(urls.some((url) => queryOf(url).get('pageSize') === '50')).toBe(true))
+  })
+
+  it('sorts by a header and keeps the sort in the address', async () => {
+    const urls = stubJobs(200, [failed, succeeded])
+    renderPage()
+
+    await loadedTable()
+    await userEvent.click(screen.getByRole('columnheader', { name: 'Kind' }))
+
+    await waitFor(() => expect(queryOf(urls.at(-1)!).get('sort')).toBe('kind'))
+    expect(queryOf(urls.at(-1)!).has('page')).toBe(false)
+    expect(address()).toBe('?sort=kind')
+  })
+
+  it('has no sort on the steps, which are a list', async () => {
+    const urls = stubJobs(200, [failed])
+    renderPage()
+
+    await loadedTable()
+    await userEvent.click(screen.getByRole('columnheader', { name: 'Steps' }))
+
+    expect(address()).toBe('')
+    expect(urls).toHaveLength(1)
+  })
+
+  it('loads the page again from Refresh', async () => {
+    const urls = stubJobs(200, [failed])
+    renderPage()
+
+    await loadedTable()
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+
+    await waitFor(() => expect(urls).toHaveLength(2))
   })
 
   it('shows the table right under the page heading, with no card', async () => {
@@ -134,7 +214,7 @@ describe('CellJobsPage', () => {
     stubJobs(200, [{ ...succeeded, state: 'queued', steps: [] }, failed])
     renderPage()
 
-    const rows = within(await screen.findByTestId('cell-jobs')).getAllByRole('row')
+    const rows = within(await loadedTable()).getAllByRole('row')
     expect(within(rows[1]).getByTestId('cell-job-no-steps')).toHaveTextContent('No step has run yet.')
     expect(within(rows[1]).queryByTestId('cell-job-step')).not.toBeInTheDocument()
     expect(within(rows[2]).queryByTestId('cell-job-no-steps')).not.toBeInTheDocument()
@@ -167,7 +247,7 @@ describe('CellJobsPage', () => {
     const user = userEvent.setup()
     renderPage()
 
-    const table = await screen.findByTestId('cell-jobs')
+    const table = await loadedTable()
     const rows = within(table).getAllByRole('row')
     expect(within(rows[1]).getByRole('button', { name: 'Run again' })).toBeInTheDocument()
     expect(within(rows[2]).queryByRole('button', { name: 'Run again' })).not.toBeInTheDocument()
@@ -183,7 +263,7 @@ describe('CellJobsPage', () => {
     stubRunAgain([{ ...failed, kind: 'purge' }], [])
     renderPage()
 
-    const table = await screen.findByTestId('cell-jobs')
+    const table = await loadedTable()
     expect(within(table).queryByRole('button', { name: 'Run again' })).not.toBeInTheDocument()
   })
 
@@ -192,7 +272,7 @@ describe('CellJobsPage', () => {
     const user = userEvent.setup()
     renderPage()
 
-    const table = await screen.findByTestId('cell-jobs')
+    const table = await loadedTable()
     await user.click(within(within(table).getAllByRole('row')[1]).getByRole('button', { name: 'Run again' }))
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Run again' }))
 
@@ -217,7 +297,7 @@ describe('CellJobsPage', () => {
     const user = userEvent.setup()
     renderPage()
 
-    const table = await screen.findByTestId('cell-jobs')
+    const table = await loadedTable()
     await user.click(within(within(table).getAllByRole('row')[1]).getByRole('button', { name: 'Run again' }))
     const dialog = await screen.findByRole('dialog')
     await user.click(within(dialog).getByRole('button', { name: 'Run again' }))
