@@ -25,11 +25,14 @@ namespace Axis.Server.Users;
 /// tenant's status and, for an administrator in a cell, the address of the tenant's page in the billing portal. It also says
 /// whether the tenant has exports for the administrator, see <see cref="TenantExportEndpoints.ExportTenant"/>.
 /// <para>
-/// <c>GET /api/users?search=&amp;page=&amp;pageSize=</c> lists the users of the tenant's realm to an administrator. It reads
-/// them through the realm's users client and joins <c>axis.user_profiles</c> for the status and the last sign-in. The search
-/// matches name or email. <c>page</c> starts at 1 and defaults to 1, and <c>pageSize</c> is 1 to 50 and defaults to 50, otherwise
-/// the answer is 400. A request is checked in order: signed-in user (401), administrator role (403), a tenant with a users
-/// client (404), the paging (400). A failure at the identity provider is a 502 with a fixed title, and the log names the step
+/// <c>GET /api/users</c> lists the users of the tenant's realm to an administrator, as
+/// <c>{ "items": [...], "page", "pageSize", "totalCount" }</c>, see <c>docs/reference/user-administration.md#read-routes</c>. It reads every
+/// user through the realm's users client and joins <c>axis.user_profiles</c> for the status and the last sign-in. It reads the record API's
+/// <c>page</c>, <c>pageSize</c>, <c>sort</c>, <c>search</c> and <c>filter</c> through <see cref="ListQuery{T}"/>, over the declared fields
+/// <c>displayName</c>, <c>email</c>, <c>provider</c>, <c>status</c> and <c>lastSignedInAt</c>, and a search looks in <c>displayName</c> and
+/// <c>email</c>. An invalid parameter, and a sort or filter on another field, is a 400 that names the parameter. Without <c>sort</c> the
+/// items are ordered by display name. A request is checked in order: signed-in user (401), administrator role (403), a tenant with a users
+/// client (404), the parameters (400). A failure at the identity provider is a 502 with a fixed title, and the log names the step
 /// and the status code, never a body or a secret.
 /// </para>
 /// <para>
@@ -51,13 +54,21 @@ internal static partial class UserEndpoints
         endpoints.MapGet("/api/users/{id}/roles", GetUserRolesAsync);
     }
 
-    private const int DefaultPageSize = 50;
+    private static readonly IReadOnlyList<ListColumn<UserListItem>> _listColumns =
+    [
+        new("displayName", ListColumnKind.Text, item => item.DisplayName, Searchable: true),
+        new("email", ListColumnKind.Text, item => item.Email, Searchable: true),
+        new("provider", ListColumnKind.Text, item => item.Provider),
+        new("status", ListColumnKind.Enum, item => item.Status, Values: ["invited", "active", "disabled"]),
+        new(
+            "lastSignedInAt",
+            ListColumnKind.Date,
+            item => item.LastSignedInAt is { } at ? DateOnly.FromDateTime(at.UtcDateTime) : (DateOnly?)null,
+            Order: item => item.LastSignedInAt),
+    ];
 
     private static async Task<IResult> ListUsersAsync(
         HttpRequest request,
-        string? search,
-        int? page,
-        int? pageSize,
         UsersSettings users,
         ITenantCatalog catalog,
         ITenantContextAccessor tenants,
@@ -81,18 +92,18 @@ internal static partial class UserEndpoints
             return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "This tenant has no users page.");
         }
 
-        var number = page ?? 1;
-        var size = pageSize ?? DefaultPageSize;
-        if (number < 1 || size < 1 || size > DefaultPageSize)
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var query = ListQuery<UserListItem>.Read(request, _listColumns, errors);
+        if (errors.Count > 0)
         {
-            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "The page must be 1 or more and the page size from 1 to 50.");
+            return Results.ValidationProblem(errors);
         }
 
-        RealmUserPage listed;
+        IReadOnlyList<RealmUser> listed;
         try
         {
             using var client = httpClients.CreateClient(nameof(UserEndpoints));
-            listed = await new RealmUsers(client, access).ListAsync(search, (number - 1) * size, size, cancellationToken);
+            listed = await new RealmUsers(client, access).ListAllAsync(cancellationToken);
         }
         catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
         {
@@ -101,16 +112,18 @@ internal static partial class UserEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var signIns = await UserProfiles.FindLastSignInsAsync(connection, [.. listed.Users.Select(realmUser => realmUser.Id)], cancellationToken);
-        return Results.Ok(new UserListResponse(
-            [.. listed.Users.Select(realmUser => new UserListItem(
+        var signIns = await UserProfiles.FindLastSignInsAsync(connection, [.. listed.Select(realmUser => realmUser.Id)], cancellationToken);
+        var items = listed
+            .Select(realmUser => new UserListItem(
                 realmUser.Id,
                 realmUser.DisplayName,
                 realmUser.Email,
                 realmUser.ProviderAlias,
                 Status(realmUser.Enabled, signIns.ContainsKey(realmUser.Id)),
-                signIns.TryGetValue(realmUser.Id, out var signedInAt) ? signedInAt : null))],
-            listed.TotalCount));
+                signIns.TryGetValue(realmUser.Id, out var signedInAt) ? signedInAt : null))
+            .OrderBy(item => item.DisplayName, StringComparer.InvariantCulture)
+            .ToList();
+        return Results.Ok(query.Apply(items));
     }
 
     private static async Task<IResult> GetUserRolesAsync(
@@ -216,9 +229,6 @@ internal static partial class UserEndpoints
 
 /// <summary>The category of the log lines of the user routes.</summary>
 internal sealed class UserLog;
-
-/// <summary>The answer of <c>GET /api/users</c>: one page of the realm's users and the number of all users that match the search.</summary>
-internal sealed record UserListResponse(IReadOnlyList<UserListItem> Items, int TotalCount);
 
 /// <summary>
 /// The answer of <c>GET /api/users/{id}/roles</c>: the person's display name and email, the roles given to the person, the active
