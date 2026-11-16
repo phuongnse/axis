@@ -31,7 +31,7 @@ header, as the other session routes do. They are checked on the server whatever 
 | --------------------------------------------------------- | ------------------------------------------------------------------------- |
 | `GET /api/console/tenant`                                 | Answers the tenant of the host and its active applications                |
 | `GET /api/console/failed-work`                            | Lists one page of the failed work of the tenant, newest first             |
-| `GET /api/console/webhook-deliveries`                     | Lists one page of the tenant's webhook deliveries, newest first           |
+| `GET /api/console/webhook-deliveries`                     | Lists one page of the tenant's webhook deliveries, searched, filtered and sorted in PostgreSQL |
 | `GET /api/console/instances/{id}`                         | Answers one instance of the tenant, in the process inspection shape       |
 | `POST /api/console/instances/{id}/retry`                  | Runs the retry command of an instance on its active release               |
 | `POST /api/console/instances/{id}/cancel`                 | Runs the cancel command of an instance on its active release              |
@@ -62,16 +62,22 @@ header, as the other session routes do. They are checked on the server whatever 
   instance. The time of a call with an unknown outcome is the finish of its newest attempt, or its
   `created_at` when it has no attempt row, and its error is the call's `last_error`.
 - **`GET /api/console/webhook-deliveries`.** Answers one page of the webhook deliveries of the
-  tenant, newest first. The query parameters are `page` and `pageSize`, read as the other list
-  routes read them, and the optional `application` and `webhook` ids, each a hyphenated UUID. A
-  malformed parameter answers one `400` validation problem. An item has its `id`,
-  `applicationId`, `application`, `webhookId`, `webhook`, `eventId` and `event`, the names of
+  tenant. PostgreSQL filters, searches, sorts and pages them. The route takes `page`, `pageSize`,
+  `sort`, `search` and `filter` in the [record API's format](record-api.md#paging-and-sorting) over
+  the fields `application` (the application id), `webhook` (the webhook id), `event` (the event
+  occurrence id), `state`, `attempts`, `statusCode` and `deliveredAt`. `deliveredAt` filters by its
+  UTC day and sorts by its instant. A search looks in `event`, the occurrence id that a dead letter
+  shows as its event. A sort or filter on another field, and an invalid `page` or `pageSize`, is a
+  `400` that names the parameter. Without `sort` the deliveries are newest first, and a sorted list
+  breaks ties newest first. The optional `application` and `webhook` ids, each a hyphenated UUID,
+  keep one application or one webhook, and a malformed one is a `400` that names it. An item has its
+  `id`, `applicationId`, `application`, `webhookId`, `webhook`, `eventId` and `event`, the names of
   the application, the webhook and the event as the release the delivery was staged with holds
   them (`null` when that release no longer holds the webhook), then the `state`, the `attempts`,
   the last `statusCode`, `createdAt` and `deliveredAt`. The `state` is `delivered`, `pending`,
   `deadLettered` (an open dead letter of the delivery) or `discarded` (a discarded one). A
   redelivered dead letter is queued again and shows as `pending`. The answer also lists
-  `webhooks`, the webhooks of every active release with their application, for the view's
+  `webhooks`, the webhooks of every active release with their application, for the view's Webhook
   filter, and `totalCount`. It never holds a body, a URL, a secret or a binding value.
 - **`GET /api/console/instances/{id}`.** Answers one instance of the tenant, whatever its
   application or process, in the shape of the
@@ -182,8 +188,17 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   `deadLetters.columns`, because Schedules on the same page keeps the plain names. An `open`
   letter offers redeliver and discard.
 - **Webhook deliveries.** Recent deliveries of each webhook, with their status code and attempts.
-  A table under the Tenant view with the application, webhook, event, state, attempts, status
-  code and delivery time, and two filters, one for the application and one for the webhook.
+  The view lists them newest first until it is sorted, and is paged on the server. Each shows the
+  application, the webhook, the event, the state, the attempts, the last status code and the
+  delivery time. Its table has the toolbar of [tables](actions-and-controls.md#tables), with
+  Search, Filter, Columns and Refresh, a sort on State, Attempts, Status code and Delivered, and a
+  pager with a page size. The Application and Webhook columns filter by name, and the view has no
+  pickers above the table. The Webhook filter offers the webhooks of the active releases, so a
+  delivery whose webhook an older release held cannot be picked by name. The Event column has no
+  filter, and search finds the event occurrence id. The address keeps the view as
+  `webhookDeliveries.search`, `webhookDeliveries.filter`, `webhookDeliveries.sort`,
+  `webhookDeliveries.page`, `webhookDeliveries.pageSize` and `webhookDeliveries.columns`, because
+  Schedules keeps the plain names and Dead letters its own prefix.
 - **Schedules.** Each schedule trigger of each active release, with its process, its schedule and
   time zone, and its last and next occurrence, see [schedules](process-events.md#schedules). The
   view is ordered by application and trigger name until it is sorted and is paged on the server.

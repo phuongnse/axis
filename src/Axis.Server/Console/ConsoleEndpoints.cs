@@ -33,11 +33,15 @@ namespace Axis.Server.Console;
 /// error. It never holds a call input, a history input or output, or a record value.
 /// </para>
 /// <para>
-/// <c>GET /api/console/webhook-deliveries</c> answers one page of the webhook deliveries of the tenant, newest first,
-/// filtered by the <c>application</c> and <c>webhook</c> ids. An item names its application, webhook and event from the
+/// <c>GET /api/console/webhook-deliveries</c> answers one page of the webhook deliveries of the tenant. It takes the record
+/// API's <c>page</c>, <c>pageSize</c>, <c>sort</c>, <c>search</c> and <c>filter</c> over the fields <c>application</c>,
+/// <c>webhook</c>, <c>event</c>, <c>state</c>, <c>attempts</c>, <c>statusCode</c> and <c>deliveredAt</c>, which PostgreSQL
+/// applies, see <see cref="ListQuery{T}"/>. A search looks in the event occurrence id, and a sort or filter on another field
+/// is a 400. Without a sort the deliveries are newest first, and a sorted list breaks ties newest first. The optional
+/// <c>application</c> and <c>webhook</c> ids keep one each. An item names its application, webhook and event from the
 /// release the delivery was staged with, or <see langword="null"/> when that release no longer holds the webhook. It
 /// gives the state, the attempts, the last status code and when it was delivered. The answer also lists the webhooks of
-/// every active release for the view's filter. It never holds a body, a URL, a secret or a binding value.
+/// every active release. It never holds a body, a URL, a secret or a binding value.
 /// </para>
 /// <para>
 /// <c>GET /api/console/schedules</c> lists one page of the schedule triggers of every active release with their last and
@@ -171,17 +175,35 @@ internal static class ConsoleEndpoints
         return Results.Ok(new ConsoleFailedWorkResponse(items, pageNumber, size, work.TotalCount));
     }
 
+    // The columns the list's search, filter and sort can name, over the webhook deliveries, see docs/reference/operator-console.md#api.
+    // The deliveredAt column filters by its UTC day and sorts by its instant.
+    private static readonly IReadOnlyList<ListColumn<WebhookDeliveryListRow>> _columns =
+    [
+        new("application", ListColumnKind.Text, row => row.ApplicationId.ToString("D"), Sql: "application_id::text"),
+        new("webhook", ListColumnKind.Text, row => row.WebhookId.ToString("D"), Sql: "webhook_id::text"),
+        new("event", ListColumnKind.Text, row => row.EventId.ToString("D"), Searchable: true, Sql: "event_id::text"),
+        new("state", ListColumnKind.Enum, row => row.State, Values: WebhookDeliveryList.States, Sql: "state"),
+        new("attempts", ListColumnKind.Number, row => row.Attempts, Sql: "attempts"),
+        new("statusCode", ListColumnKind.Number, row => row.StatusCode, Sql: "status_code"),
+        new(
+            "deliveredAt",
+            ListColumnKind.Date,
+            row => row.DeliveredAt is { } at ? DateOnly.FromDateTime(at.UtcDateTime) : null,
+            Order: row => row.DeliveredAt,
+            Sql: "(delivered_at AT TIME ZONE 'UTC')::date",
+            OrderSql: "delivered_at"),
+    ];
+
     private static async Task<IResult> ListWebhookDeliveriesAsync(
         string? application,
         string? webhook,
-        string? page,
-        string? pageSize,
+        HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
+        var query = ListQuery<WebhookDeliveryListRow>.Read(httpContext.Request, _columns, errors);
         var applicationId = ReadId(application, "application", errors);
         var webhookId = ReadId(webhook, "webhook", errors);
         if (errors.Count > 0)
@@ -190,7 +212,8 @@ internal static class ConsoleEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await WebhookDeliveryList.ListAsync(connection, applicationId, webhookId, pageNumber, size, cancellationToken);
+        var result = await WebhookDeliveryList.ListAsync(
+            connection, applicationId, webhookId, query.Sql(), query.Page, query.PageSize, cancellationToken);
 
         // A delivery is named by the release it was staged with. That model is cached, so each release is read once.
         var releases = new Dictionary<(Guid Application, Guid Release), ApplicationModel?>();
@@ -219,7 +242,7 @@ internal static class ConsoleEndpoints
                 .Select(hook => new ConsoleWebhook(hook.Id, hook.Name, model.Manifest.Id, model.Manifest.Name)));
         }
 
-        return Results.Ok(new ConsoleWebhookDeliveryListResponse(items, pageNumber, size, result.TotalCount, webhooks));
+        return Results.Ok(new ConsoleWebhookDeliveryListResponse(items, query.Page, query.PageSize, result.TotalCount, webhooks));
     }
 
     private static Guid? ReadId(string? value, string name, SortedDictionary<string, string[]> errors)

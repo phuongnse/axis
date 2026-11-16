@@ -1,4 +1,4 @@
-import { Flex, Select, Tag } from 'antd'
+import { Tag } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
@@ -9,22 +9,15 @@ import {
   type ConsoleWebhookDeliveryPage,
 } from './console'
 import { SectionPart } from './SectionParts'
+import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { useText } from './texts'
+import { useTableView } from './useTableView'
 
 interface ConsoleWebhookDeliveriesProps {
-  /** The applications of the tenant, for the application filter. */
+  /** The applications of the tenant, which name the applications of the deliveries and fill the Application filter. */
   applications: ConsoleApplication[]
   /** The UI locale, for formatting the times. */
   locale: string
-}
-
-/** The outcome of the last finished request. */
-interface LoadState {
-  /** The request query, so a result for an older request shows as loading. */
-  query?: string
-  /** The last page loaded. It stays while the next page loads. */
-  page?: ConsoleWebhookDeliveryPage
-  failed: boolean
 }
 
 const stateColors: Record<ConsoleWebhookDelivery['state'], string> = {
@@ -34,50 +27,59 @@ const stateColors: Record<ConsoleWebhookDelivery['state'], string> = {
   discarded: 'default',
 }
 
+/** The columns the view's search, filter and sort can name, see docs/reference/operator-console.md#api. */
+const deliveryFields = [
+  { name: 'application', type: 'text' },
+  { name: 'webhook', type: 'text' },
+  { name: 'event', type: 'text' },
+  { name: 'state', type: 'enum' },
+  { name: 'attempts', type: 'integer' },
+  { name: 'statusCode', type: 'integer' },
+  { name: 'deliveredAt', type: 'date' },
+] as const
+// The view has no parameters of its own. A stable empty array keeps useTableView from recomputing on each render.
+const noParameters: readonly string[] = []
+const deliveryStates = ['delivered', 'pending', 'deadLettered', 'discarded']
+
 /**
- * The Webhook deliveries view of the operator console: the recent deliveries of the tenant's webhooks, newest first,
- * with the state, the attempts and the last status code of each. Two filters narrow the list to one application or one
- * webhook. The webhook filter offers the webhooks of the answer, narrowed to the chosen application. A failure shows an
- * error in this part only.
+ * The Webhook deliveries view of the operator console: the recent deliveries of the tenant's webhooks, newest first until
+ * the view sorts them, with the state, the attempts and the last status code of each, paged on the server. The table has
+ * Search, Filter, Columns and Refresh, a sort on State, Attempts, Status code and Delivered, and a pager with a page size,
+ * all kept in the address under the `webhookDeliveries.` prefix, because Schedules and Dead letters keep their own names,
+ * see docs/reference/operator-console.md#views and docs/reference/actions-and-controls.md#tables. The Application and
+ * Webhook columns filter by name, so the view has no pickers above the table. A failure shows an error in this part only.
  */
 export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhookDeliveriesProps) {
   const t = useText()
-  const [application, setApplication] = useState<string>()
-  const [webhook, setWebhook] = useState<string>()
-  const [page, setPage] = useState(1)
-  const [load, setLoad] = useState<LoadState>({ failed: false })
-  const query = new URLSearchParams({
-    ...(application ? { application } : {}),
-    ...(webhook ? { webhook } : {}),
-    ...(page > 1 ? { page: String(page) } : {}),
-  }).toString()
-  const loading = load.query !== query
+  const { view, setView } = useTableView(
+    deliveryFields,
+    recordPageSize,
+    noParameters,
+    true,
+    true,
+    true,
+    'webhookDeliveries.',
+  )
+  const query = recordQuery(view)
+  const [reload, setReload] = useState(0)
+  const [deliveries, setDeliveries] = useState<ConsoleWebhookDeliveryPage | 'failed'>()
 
   useEffect(() => {
     const controller = new AbortController()
     fetchConsoleWebhookDeliveries(query, controller.signal)
-      .then((result) => {
-        if (result.kind === 'forbidden') {
-          setLoad({ query, failed: true })
-          return
-        }
-        // A page past the end becomes the last page once the total is known.
-        setPage((current) => Math.min(current, Math.max(1, Math.ceil(result.page.totalCount / result.page.pageSize))))
-        setLoad({ query, page: result.page, failed: false })
-      })
+      .then((result) => setDeliveries(result.kind === 'forbidden' ? 'failed' : result.page))
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
           return
         }
         console.warn('Loading the console webhook deliveries failed', error)
-        setLoad({ query, failed: true })
+        setDeliveries('failed')
       })
     return () => controller.abort()
-  }, [query])
+  }, [query, reload])
 
-  const webhooks = (load.page?.webhooks ?? []).filter(
-    (candidate) => !application || candidate.applicationId === application,
-  )
+  const page = typeof deliveries === 'object' ? deliveries : undefined
+  const webhooks = page?.webhooks
 
   const columns = useMemo<AxisColumn<ConsoleWebhookDelivery>[]>(
     () => [
@@ -85,12 +87,17 @@ export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhoo
         key: 'application',
         kind: 'freeText',
         title: t('shell.console.webhooks.application'),
+        filter: { kind: 'enum', options: applications.map((row) => ({ value: row.id, label: row.name })) },
         render: (_value, row) => row.application,
       },
       {
         key: 'webhook',
         kind: 'freeText',
         title: t('shell.console.webhooks.webhook'),
+        filter: {
+          kind: 'enum',
+          options: (webhooks ?? []).map((row) => ({ value: row.id, label: `${row.application} / ${row.name}` })),
+        },
         render: (_value, row) => row.webhook,
       },
       {
@@ -103,82 +110,70 @@ export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhoo
         key: 'state',
         kind: 'fixed',
         title: t('shell.console.webhooks.state'),
+        filter: {
+          kind: 'enum',
+          options: deliveryStates.map((value) => ({ value, label: t(`shell.console.webhooks.state.${value}`) })),
+        },
+        sorter: true,
         render: (_value, row) => (
           <Tag color={stateColors[row.state]}>{t(`shell.console.webhooks.state.${row.state}`)}</Tag>
         ),
       },
-      { key: 'attempts', kind: 'fixed', title: t('shell.console.webhooks.attempts'), dataIndex: 'attempts' },
+      {
+        key: 'attempts',
+        kind: 'fixed',
+        title: t('shell.console.webhooks.attempts'),
+        filter: { kind: 'number' },
+        sorter: true,
+        dataIndex: 'attempts',
+      },
       {
         key: 'statusCode',
         kind: 'fixed',
         title: t('shell.console.webhooks.statusCode'),
+        filter: { kind: 'number' },
+        sorter: true,
         render: (_value, row) => row.statusCode,
       },
       {
         key: 'deliveredAt',
         kind: 'fixed',
         title: t('shell.console.webhooks.deliveredAt'),
+        filter: { kind: 'date' },
+        sorter: true,
         render: (_value, row) => (row.deliveredAt === null ? null : new Date(row.deliveredAt).toLocaleString(locale)),
       },
     ],
-    [locale, t],
+    [applications, locale, webhooks, t],
   )
 
   return (
     <SectionPart testId="console-webhook-deliveries" heading={{ title: t('shell.console.webhooks.title') }}>
-      <Flex vertical gap="middle">
-        <Flex gap="small" wrap>
-          <Select
-            allowClear
-            style={{ minWidth: 200 }}
-            aria-label={t('shell.console.webhooks.application')}
-            placeholder={t('shell.console.webhooks.filter.application')}
-            value={application}
-            options={applications.map((candidate) => ({ value: candidate.id, label: candidate.name }))}
-            onChange={(value: string | undefined) => {
-              setApplication(value)
-              setWebhook(undefined)
-              setPage(1)
-            }}
-          />
-          <Select
-            allowClear
-            style={{ minWidth: 200 }}
-            aria-label={t('shell.console.webhooks.webhook')}
-            placeholder={t('shell.console.webhooks.filter.webhook')}
-            value={webhook}
-            options={webhooks.map((candidate) => ({
-              value: candidate.id,
-              label: application ? candidate.name : `${candidate.application} / ${candidate.name}`,
-            }))}
-            onChange={(value: string | undefined) => {
-              setWebhook(value)
-              setPage(1)
-            }}
-          />
-        </Flex>
-        {load.failed && !loading ? (
-          <AxisAlert
-            data-testid="console-webhook-deliveries-error"
-            kind="error"
-            message={t('shell.console.webhooks.loadFailed')}
-          />
-        ) : (
-          <AxisTable<ConsoleWebhookDelivery>
-            rowKey={(row) => row.id}
-            columns={columns}
-            dataSource={load.page?.items}
-            loading={loading}
-            emptyText={t('shell.console.webhooks.empty')}
-            pagination={{
-              current: page,
-              pageSize: load.page?.pageSize ?? 20,
-              total: load.page?.totalCount ?? 0,
-            }}
-            onChange={(pagination) => setPage(pagination.current ?? 1)}
-          />
-        )}
-      </Flex>
+      <AxisTable<ConsoleWebhookDelivery>
+        rowKey={(row) => row.id}
+        columns={columns}
+        dataSource={page?.items ?? []}
+        loading={deliveries === undefined}
+        emptyText={t('shell.console.webhooks.empty')}
+        view={{
+          query: view,
+          onChange: setView,
+          pageSizes: tablePageSizes(),
+          total: page?.totalCount ?? 0,
+          search: true,
+          columns: true,
+        }}
+        toolbar={{ onRefresh: () => setReload((count) => count + 1) }}
+        failure={
+          deliveries === 'failed' ? (
+            <AxisAlert
+              data-testid="console-webhook-deliveries-error"
+              kind="error"
+              message={t('shell.console.webhooks.loadFailed')}
+            />
+          ) : undefined
+        }
+      />
     </SectionPart>
   )
 }

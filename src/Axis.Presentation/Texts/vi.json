@@ -232,8 +232,6 @@
   "shell.console.webhooks.title": "Lần gửi webhook",
   "shell.console.webhooks.application": "Ứng dụng",
   "shell.console.webhooks.webhook": "Webhook",
-  "shell.console.webhooks.filter.application": "Mọi ứng dụng",
-  "shell.console.webhooks.filter.webhook": "Mọi webhook",
   "shell.console.webhooks.event": "Sự kiện",
   "shell.console.webhooks.state": "Trạng thái",
   "shell.console.webhooks.state.delivered": "Đã gửi",

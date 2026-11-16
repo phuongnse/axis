@@ -27,7 +27,8 @@ const pageSize = 20
  * The operator console for the platform operator. It shows the Tenant view: the status of the tenant of the host and a
  * table of its applications with each active release. Below it, the Failed work view lists the failed instances and the
  * calls with an unknown outcome, newest first, with paging and an application filter. Under it, the Webhook deliveries
- * view lists the recent webhook deliveries, then the Publishing view lists the release history and the publish requests of
+ * view lists the recent webhook deliveries, paged on the server with the table toolbar, whose state the address keeps under
+ * the `webhookDeliveries.` names. Then the Publishing view lists the release history and the publish requests of
  * one application, read only, and the Dead letters view lists the dead letters of every application and redelivers or
  * discards each, paged on the server with the table toolbar, whose state the address keeps under the `deadLetters.` names.
  * Under that, the Schedules view lists the schedule triggers of the active releases with their last and
