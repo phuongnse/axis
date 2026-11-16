@@ -1,6 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
+import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { formatValue } from './formatValue'
 import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
@@ -82,7 +84,8 @@ const texts = {
   'noteReview.task': 'Review the note',
   'noteApproval.task': 'Approve the note',
 }
-const catalogs = [{ texts, fallbackTexts: texts }]
+// The platform texts give the toolbar its English names, such as Search and Refresh.
+const catalogs = [{ texts: { ...platformEnglish, ...texts }, fallbackTexts: { ...platformEnglish, ...texts } }]
 
 /**
  * Stubs `fetch` with the task API and the texts of the tasks' release, and returns the requested
@@ -208,14 +211,69 @@ describe('TaskInboxWidget', () => {
     expect(screen.queryByTestId('tasks-sign-in')).not.toBeInTheDocument()
   })
 
-  it('shows an error when the tasks fail to load', async () => {
+  it('shows an error when the tasks fail to load, with no rows and the toolbar still shown', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     stubTasks('', 500)
 
     renderWidget()
 
-    expect(await screen.findByText('The tasks could not be loaded.')).toBeInTheDocument()
-    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(await screen.findByTestId('tasks-error')).toHaveTextContent('The tasks could not be loaded.')
+    expect(screen.queryByRole('row', { name: /Review the note/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument()
+  })
+
+  it('searches, filters on Record, sorts by Due and keeps the view in the address', async () => {
+    const requests = stubTasks()
+    const user = userEvent.setup()
+    const filter = JSON.stringify({ all: [{ field: 'subject', op: 'contains', value: 'paper' }] })
+
+    renderWidget(`?filter=${encodeURIComponent(filter)}`)
+
+    await screen.findByRole('row', { name: /Review the note/ })
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'review{Enter}')
+    await user.click(screen.getByRole('columnheader', { name: 'Due' }))
+
+    const tasksRequests = () => requests().filter((url) => url.startsWith(tasksPath))
+    await waitFor(() =>
+      expect(tasksRequests().at(-1)).toBe(
+        `${tasksPath}?${new URLSearchParams({ search: 'review', filter, sort: 'dueAt' })}`,
+      ),
+    )
+    const address = new URLSearchParams(screen.getByTestId('search').textContent ?? '')
+    expect(address.get('search')).toBe('review')
+    expect(JSON.parse(address.get('filter')!)).toEqual({ all: [{ field: 'subject', op: 'contains', value: 'paper' }] })
+    expect(address.get('sort')).toBe('dueAt')
+    expect(await screen.findByRole('row', { name: /Review the note/ })).toBeInTheDocument()
+  })
+
+  it('hides the Record column through Columns and keeps the choice in the address', async () => {
+    stubTasks()
+    const user = userEvent.setup()
+
+    renderWidget()
+
+    await screen.findByRole('row', { name: /Review the note/ })
+    await user.click(screen.getByRole('button', { name: 'Columns' }))
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Record' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }))
+
+    expect(screen.queryByRole('columnheader', { name: 'Record' })).not.toBeInTheDocument()
+    const address = new URLSearchParams(screen.getByTestId('search').textContent ?? '')
+    expect(address.get('columns')).toBe('task,dueAt')
+  })
+
+  it('loads the same tasks again on Refresh', async () => {
+    const requests = stubTasks()
+    const user = userEvent.setup()
+
+    renderWidget()
+
+    await screen.findByRole('row', { name: /Review the note/ })
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
+
+    await waitFor(() => expect(requests().filter((url) => url.startsWith(tasksPath))).toEqual([tasksPath, tasksPath]))
+    expect(await screen.findByRole('row', { name: /Review the note/ })).toBeInTheDocument()
   })
 
   it('requests the page and page size in the URL', async () => {
@@ -227,10 +285,10 @@ describe('TaskInboxWidget', () => {
     expect(requests()).toContain(`${tasksPath}?page=2&pageSize=10`)
   })
 
-  it('drops invalid parameters and a sort, and requests the default page', async () => {
+  it('drops invalid parameters and requests the default page', async () => {
     const requests = stubTasks()
 
-    renderWidget('?page=0&pageSize=7&sort=dueAt')
+    renderWidget('?page=0&pageSize=7')
 
     await screen.findByRole('row', { name: /Review the note/ })
     await waitFor(() => expect(screen.getByTestId('search').textContent).toBe(''))

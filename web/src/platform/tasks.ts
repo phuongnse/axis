@@ -92,8 +92,8 @@ export type TaskCommandResult = { ok: true; task: TaskItem } | { ok: false; stat
 export const assignedElsewhere = 'assignedElsewhere'
 
 /**
- * Loads one page of the signed-in user's open tasks, in the task API's order. `query` holds the
- * task API's `page` and `pageSize`. A 401 shows the sign-in prompt and throws, as any other failure does.
+ * Loads one page of the signed-in user's open tasks, in the task API's order unless `query` sorts them. `query` holds the
+ * task API's `search`, `filter`, `sort`, `page` and `pageSize`. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function fetchTasks(tasksPath: string, query: string, signal?: AbortSignal): Promise<TaskPage> {
   const response = await apiFetch(`${tasksPath}${query ? `?${query}` : ''}`, { signal })
