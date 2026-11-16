@@ -19,7 +19,8 @@ const getStartedKinds = ['entity', 'page', 'site']
 
 /**
  * The Overview of an open application: Get started while it has no entity, Live with its live sites, the changes since
- * the live release, then More you can add for each kind it lacks. Live and the changes wait for the release history.
+ * the live release, then More you can add for each kind it lacks. The changes are the files that differ, then the modules
+ * and packages that differ. Live and the changes wait for the release history.
  * While it loads or when it fails, both say so. Once it has loaded, Live is left out when no release is live.
  * See docs/reference/studio-workspace.md#overview.
  */
@@ -43,6 +44,7 @@ export function StudioOverview({
   const { colour, spacing } = useDesignTokens()
   const loaded = history === undefined || history === 'failed' ? undefined : history
   const releaseId = loaded?.active?.releaseId ?? null
+  const parts = loaded?.partChanges ?? []
   const present = new Set([...resources.map((item) => item.kind), ...moduleKinds])
   const getStarted = !present.has('entity')
   const missing = studioKinds.filter(
@@ -90,10 +92,14 @@ export function StudioOverview({
             <Flex vertical gap={spacing.sm}>
               {loaded.changes === null ? (
                 <Typography.Text>{t('shell.studio.overview.changes.notPublished')}</Typography.Text>
-              ) : loaded.changes.length === 0 ? (
+              ) : loaded.changes.length === 0 && parts.length === 0 ? (
                 <EmptyState text={t('shell.studio.overview.changes.allLive')} />
               ) : (
-                <StudioChangeList rows={changeRows(loaded.changes, resources, locale, t)} application={application} />
+                <StudioChangeList
+                  rows={changeRows(loaded.changes, resources, locale, t)}
+                  parts={parts.length > 0 ? parts : undefined}
+                  application={application}
+                />
               )}
               <Link to={address({ view: 'releases' })}>{t('shell.studio.overview.changes.releases')}</Link>
             </Flex>

@@ -1138,11 +1138,16 @@ export interface StudioReleaseItem {
  * has errors, so it does not compile. `changes` lists the files that differ from the live release, and is `null` when
  * no release is live.
  */
+/**
+ * The release history: the active release, the folder's content hash, the files that differ from the live release and
+ * the modules and packages that differ from it. `changes` and `partChanges` are `null` when nothing is live.
+ */
 export interface StudioReleases {
   active: { releaseId: string; number: number; contentHash: string } | null
   folderContentHash: string | null
   items: StudioReleaseItem[]
   changes: StudioReleaseChange[] | null
+  partChanges: StudioReleasePartChange[] | null
 }
 
 /** A file that differs from the live release. The other fields are set for a removed file only. */

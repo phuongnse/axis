@@ -51,6 +51,8 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         // A folder identical to the live release has no changes.
         Assert.Equal(JsonValueKind.Array, startup.GetProperty("changes").ValueKind);
         Assert.Equal(0, startup.GetProperty("changes").GetArrayLength());
+        Assert.Equal(JsonValueKind.Array, startup.GetProperty("partChanges").ValueKind);
+        Assert.Equal(0, startup.GetProperty("partChanges").GetArrayLength());
 
         await EditTextAsync(folder.Path, "\"Departments\"", "\"Teams\"");
         var requestId = Guid.NewGuid();
@@ -144,6 +146,81 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
 
         Assert.Equal(JsonValueKind.Null, history.GetProperty("active").ValueKind);
         Assert.Equal(JsonValueKind.Null, history.GetProperty("changes").ValueKind);
+        Assert.Equal(JsonValueKind.Null, history.GetProperty("partChanges").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_module_the_folder_pins_and_the_live_release_lacks_is_an_added_part_change()
+    {
+        const string url = "/api/studio/apps/ModuleContractApp/releases";
+        var fixtureModules = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Modules");
+        var fixtureApp = Path.Combine(AppContext.BaseDirectory, "Fixtures", "ModuleContractApp");
+        using var folder = new TemporaryFolder();
+        CopyDirectory(fixtureApp, folder.Path);
+        var manifestPath = Path.Combine(folder.Path, "application.json");
+        var manifest = JsonNode.Parse(await File.ReadAllTextAsync(manifestPath, CancellationToken))!.AsObject();
+        manifest.Remove("modules");
+        await File.WriteAllTextAsync(manifestPath, manifest.ToJsonString(), CancellationToken);
+        Directory.Delete(Path.Combine(folder.Path, "customizations"), recursive: true);
+        var connectionString = await _database.CreateDatabaseAsync("studio_release_history_added", CancellationToken);
+        await using var factory = CreateFactory(connectionString, folder.Path, fixtureModules);
+
+        // Creating a client starts the server, which activates the folder without the module as release 1. The folder then
+        // pins the module again, and it is not activated.
+        using var author = factory.CreateClient().SignedInAs("author");
+        File.Copy(Path.Combine(fixtureApp, "application.json"), manifestPath, overwrite: true);
+        Directory.CreateDirectory(Path.Combine(folder.Path, "customizations"));
+        CopyDirectory(Path.Combine(fixtureApp, "customizations"), Path.Combine(folder.Path, "customizations"));
+
+        var history = await GetAsync(author, url);
+
+        Assert.NotEqual(JsonValueKind.Null, history.GetProperty("folderContentHash").ValueKind);
+        var added = Assert.Single(history.GetProperty("partChanges").EnumerateArray());
+        Assert.Equal(
+            ("module", "requests", "Requests", "added", "1.0.0"),
+            (added.GetProperty("type").GetString(), added.GetProperty("id").GetString(), added.GetProperty("label").GetString(), added.GetProperty("change").GetString(), added.GetProperty("version").GetString()));
+        Assert.Equal(JsonValueKind.Null, added.GetProperty("previousVersion").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_module_and_a_package_the_folder_drops_are_removed_part_changes_even_with_errors()
+    {
+        using var folder = new TemporaryFolder();
+        CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), folder.Path);
+        var connectionString = await _database.CreateDatabaseAsync("studio_release_history_removed", CancellationToken);
+        await using var factory = CreateFactory(connectionString, folder.Path);
+        using var author = factory.CreateClient().SignedInAs("author");
+        using var requester = factory.CreateClient().SignedInAs("requester");
+        var manifestPath = Path.Combine(folder.Path, "application.json");
+        var manifest = JsonNode.Parse(await File.ReadAllTextAsync(manifestPath, CancellationToken))!;
+        RemoveEntry(manifest["modules"]!, "department-budgets");
+        RemoveEntry(manifest["packages"]!, "payment-terms");
+        await File.WriteAllTextAsync(manifestPath, manifest.ToJsonString(), CancellationToken);
+
+        var history = await GetAsync(author, ReleasesUrl);
+
+        // The folder has errors, so it has no content hash, and its removed parts are still listed, modules first.
+        Assert.Equal(JsonValueKind.Null, history.GetProperty("folderContentHash").ValueKind);
+        var parts = history.GetProperty("partChanges").EnumerateArray().ToList();
+        Assert.Equal(
+            [("module", "department-budgets", "removed"), ("package", "payment-terms", "removed")],
+            parts.Select(part => (part.GetProperty("type").GetString()!, part.GetProperty("id").GetString()!, part.GetProperty("change").GetString()!)));
+        var module = parts[0];
+        Assert.False(string.IsNullOrEmpty(module.GetProperty("label").GetString()));
+        Assert.False(string.IsNullOrEmpty(module.GetProperty("previousVersion").GetString()));
+        Assert.Equal(JsonValueKind.Null, module.GetProperty("version").ValueKind);
+        var package = parts[1];
+        Assert.Equal(("Payment terms", "1.0.0"), (package.GetProperty("label").GetString(), package.GetProperty("previousVersion").GetString()));
+        Assert.Equal(JsonValueKind.Null, package.GetProperty("version").ValueKind);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await requester.SendAsync(RecordApiFixture.Request(ReleasesUrl, Host), CancellationToken)).StatusCode);
+    }
+
+    private static void RemoveEntry(JsonNode entries, string id)
+    {
+        var array = entries.AsArray();
+        var entry = Assert.Single(array, node => node!["id"]!.GetValue<string>() == id);
+        array.Remove(entry);
     }
 
     [Fact]

@@ -150,10 +150,12 @@ and the application's description it shows, in one column:
    and order. A tile opens the running site in a new tab, so Studio stays open, and its accessible name
    says so, as in "Purchasing, opens in a new tab". A live release with no site says so.
 3. **Changes since the live release**: the files that differ from it, from the `changes` of
-   [`GET .../releases`](authoring.md#release-history), in the [change list](#change-list). With no
-   change, one line says that everything is live; with no live release, one line says that Publish
-   makes the application live. A link to every release follows. A row opens the resource as it is now,
-   not the [diff](ai-authoring-in-studio.md#the-diff) of AI authoring.
+   [`GET .../releases`](authoring.md#release-history), in the [change list](#change-list). The modules
+   and packages that differ follow the files, from its `partChanges`, modules first. Each module and
+   package is a plain-text row, as on a [release page](#release-page). With no file and no module or
+   package that differs, one line says that everything is live; with no live release, one line says
+   that Publish makes the application live. A link to every release follows. A row opens the resource
+   as it is now, not the [diff](ai-authoring-in-studio.md#the-diff) of AI authoring.
 4. **More you can add**: each kind the application has no resource of, migrations included, in the
    sidebar's groups. Each kind is a link to its list, with a line on what it is for and, in
    `textMuted`, when one is needed, such as "Handy for lists that must be ready on the first day".
@@ -179,7 +181,8 @@ The Overview's changes and a release's changes share one list.
   package that differs, after the files, modules first and each group by name. A row has its label, its
   type, Module or Package, and its change, such as "Upgraded from 1.1.0 to 1.2.0" or "Removed, was 1.0.0".
   With no difference, one line says so.
-- **Modules and packages on the Overview** _(planned for M33)_. The Overview's list shows them the same way.
+- **Modules and packages on the Overview.** The Overview's list shows them the same way, from
+  `partChanges`. It has no line for none that differs: its all-live line covers that.
 - **Order:** by kind in the sidebar's order, then by name, see
   [list order](actions-and-controls.md#list-order).
 

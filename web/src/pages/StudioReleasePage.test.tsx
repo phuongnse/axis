@@ -63,6 +63,7 @@ const history: StudioReleases = {
   active: { releaseId: 'r4', number: 4, contentHash: 'hash-4' },
   folderContentHash: 'hash-4',
   changes: [],
+  partChanges: [],
   items: [
     item('r1', 1, '2026-05-01T10:00:00Z', { label: 'First' }),
     item('r3', 3, '2026-05-02T10:00:00Z', {

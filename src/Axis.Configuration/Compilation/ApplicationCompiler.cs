@@ -944,6 +944,7 @@ public static partial class ApplicationCompiler
             References = index,
             Names = DefinedNamesBuilder.Build(loaded, allEntities, allSequences, allEvents, moduleResources.Rules, moduleResources.Contracts, texts, allSeeds, moduleResources.Texts, moduleResources.Scenarios, FindEntity, index),
             ModulePins = modules,
+            PackagePins = allPackages,
             PolicyMatrix = PolicyMatrixBuilder.Build(
                 loaded.Roles,
                 [.. loaded.Policies.Select(MapSlots)],

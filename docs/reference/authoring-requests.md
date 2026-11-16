@@ -84,7 +84,7 @@ loses no work.
 
 An author sends, lists, reads, approves, changes, drops and accepts requests through the session routes under
 `/api/studio/apps/{application}/authoring-requests`, with the CSRF header of the other authoring
-routes. The shared answers are in [responses](authoring.md#responses). The accept route only asks for
+routes. The shared answers are in [responses](authoring-responses.md). The accept route only asks for
 an accept, which [accepting](#accepting) describes.
 
 | Route                                                                     | What it does                                                                                            |

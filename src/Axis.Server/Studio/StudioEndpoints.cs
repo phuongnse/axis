@@ -91,10 +91,11 @@ namespace Axis.Server.Studio;
 /// quota (403 <c>quota-exceeded</c>) right after the session, and a delete, a package file delete included, never does, see
 /// <c>docs/reference/tenant-quotas.md#refusals</c>.
 /// <c>GET /api/studio/apps/{application}/releases</c> answers the application's release history in this tenant,
-/// newest first, as <c>{ active, folderContentHash, changes, items }</c>. <c>active</c> is the active release or null, and
+/// newest first, as <c>{ active, folderContentHash, changes, partChanges, items }</c>. <c>active</c> is the active release or null, and
 /// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. <c>changes</c>
 /// lists the files that differ from the active release, see <see cref="StudioReleaseChanges"/>, and is null when nothing
-/// is active. Each item has
+/// is active. <c>partChanges</c> lists the modules and packages that differ from it, compared as the release route does, see
+/// <see cref="StudioReleaseEndpoints"/>, and is null when nothing is active. Each item has
 /// <c>offStandard</c> and <c>relaxed: [{ module, point, reason, moduleTitle, part, entityTitles, titles }]</c>, read from the
 /// <c>application.json</c> stored with that release, with the words that <see cref="StudioRelaxedWords"/> reads from its module
 /// copies. It reads the tenant database and changes nothing.
@@ -685,20 +686,25 @@ internal static class StudioEndpoints
 
         // A folder without a readable manifest id has never been activated, so its history is empty.
         var applicationId = StudioFolder.List(folder).FirstOrDefault(file => file.File == "application.json")?.Id;
-        var folderContentHash = ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules).ContentHash;
+        var compiled = ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules);
         if (applicationId is not { } id)
         {
-            return Results.Ok(new StudioReleaseHistoryResponse(null, folderContentHash, null, []));
+            return Results.Ok(new StudioReleaseHistoryResponse(null, compiled.ContentHash, null, null, []));
         }
 
         var cancellationToken = httpContext.RequestAborted;
         var store = new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken));
         var active = await store.FindByApplicationIdAsync(id, cancellationToken);
         var activations = await store.ListActivationsAsync(id, cancellationToken);
-        var changes = active is not null && await store.GetReleaseAsync(active.ReleaseId, cancellationToken) is { } live
-            ? StudioReleaseChanges.Compare(
-                StudioFolder.Snapshot(folder), [.. live.Resources.Select(resource => new ResourceContent(resource.Path, resource.Content))])
-            : null;
+        var live = active is null ? null : await store.GetReleaseAsync(active.ReleaseId, cancellationToken);
+        var changes = live is null
+            ? null
+            : StudioReleaseChanges.Compare(
+                StudioFolder.Snapshot(folder), [.. live.Resources.Select(resource => new ResourceContent(resource.Path, resource.Content))]);
+        var folderParts = StudioReleaseEndpoints.FolderParts(compiled, modules, packages);
+        var partChanges = live is null
+            ? null
+            : StudioReleaseEndpoints.PartChanges(folderParts.Modules, folderParts.Packages, live, packages);
 
         // A release can be in the history more than once, always with one number, so the first row of it has it.
         var activeRelease = active is null
@@ -718,7 +724,7 @@ internal static class StudioEndpoints
                     relaxed.Count > 0, relaxed);
             })
             .ToList();
-        return Results.Ok(new StudioReleaseHistoryResponse(activeRelease, folderContentHash, changes, items));
+        return Results.Ok(new StudioReleaseHistoryResponse(activeRelease, compiled.ContentHash, changes, partChanges, items));
     }
 
     private static async Task<IResult> PatchAsync(
@@ -1324,10 +1330,15 @@ internal sealed record StudioTextWriteResponse(IReadOnlyList<StudioTextVersion> 
 /// <summary>
 /// The release history of an application, newest first. <c>Active</c> is the active release, or null when there
 /// is none, and <c>FolderContentHash</c> is the hash the folder compiles to now, or null when it has errors.
-/// <c>Changes</c> lists the files that differ from the active release, or is null when none is active.
+/// <c>Changes</c> lists the files that differ from the active release, or is null when none is active. <c>PartChanges</c>
+/// lists the modules and packages that differ from it, see <see cref="StudioReleaseEndpoints"/>, and is null when none is active.
 /// </summary>
 internal sealed record StudioReleaseHistoryResponse(
-    StudioActiveRelease? Active, string? FolderContentHash, IReadOnlyList<StudioReleaseChange>? Changes, IReadOnlyList<StudioReleaseItem> Items);
+    StudioActiveRelease? Active,
+    string? FolderContentHash,
+    IReadOnlyList<StudioReleaseChange>? Changes,
+    IReadOnlyList<StudioReleasePartChange>? PartChanges,
+    IReadOnlyList<StudioReleaseItem> Items);
 
 /// <summary>
 /// A file that differs from the active release. <c>Change</c> is <c>added</c>, <c>changed</c> or <c>removed</c>. The
