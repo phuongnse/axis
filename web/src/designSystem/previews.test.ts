@@ -74,6 +74,7 @@ describe('design-system previews', () => {
       [
         'Sign in',
         'Wrong password',
+        'Fields left empty',
         'Organization sign-in only',
         'Two-step verification',
         'Forgot password',
@@ -81,6 +82,8 @@ describe('design-system previews', () => {
         'Add an authenticator',
         'Choose how to sign in',
         'Update your profile',
+        'Terms and privacy',
+        'Terms not accepted',
         'Sign out',
         'Notice',
         'Error',

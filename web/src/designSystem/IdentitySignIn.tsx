@@ -5,6 +5,7 @@ import { ResetPasswordPage } from '../identitySignIn/ResetPasswordPage'
 import { SelectAuthenticatorPage } from '../identitySignIn/SelectAuthenticatorPage'
 import { SignInPage } from '../identitySignIn/SignInPage'
 import { SignOutPage } from '../identitySignIn/SignOutPage'
+import { TermsPage } from '../identitySignIn/TermsPage'
 import { TwoStepPage } from '../identitySignIn/TwoStepPage'
 import { UpdatePasswordPage } from '../identitySignIn/UpdatePasswordPage'
 import { UpdateProfilePage } from '../identitySignIn/UpdateProfilePage'
@@ -17,6 +18,7 @@ import {
   identitySelectAuthenticatorContext,
   identitySignInContext,
   identitySignOutContext,
+  identityTermsContext,
   identityTwoStepContext,
   identityUpdatePasswordContext,
   identityUpdateProfileContext,
@@ -25,6 +27,7 @@ import {
 export type IdentitySignInPage =
   | 'signIn'
   | 'wrongPassword'
+  | 'fieldsEmpty'
   | 'organizationOnly'
   | 'twoStep'
   | 'resetPassword'
@@ -32,6 +35,7 @@ export type IdentitySignInPage =
   | 'addAuthenticator'
   | 'selectAuthenticator'
   | 'updateProfile'
+  | 'terms'
   | 'signOut'
   | 'notice'
   | 'error'
@@ -43,6 +47,8 @@ export function IdentitySignIn({ page }: { page: IdentitySignInPage }) {
       return <SignInPage context={identitySignInContext} />
     case 'wrongPassword':
       return <SignInPage context={{ ...identitySignInContext, error: identityInvalid }} />
+    case 'fieldsEmpty':
+      return <SignInPage context={{ ...identitySignInContext, username: '' }} />
     case 'organizationOnly':
       return <SignInPage context={{ ...identitySignInContext, accounts: false }} />
     case 'twoStep':
@@ -57,6 +63,8 @@ export function IdentitySignIn({ page }: { page: IdentitySignInPage }) {
       return <SelectAuthenticatorPage context={identitySelectAuthenticatorContext} />
     case 'updateProfile':
       return <UpdateProfilePage context={identityUpdateProfileContext} />
+    case 'terms':
+      return <TermsPage context={identityTermsContext} />
     case 'signOut':
       return <SignOutPage context={identitySignOutContext} />
     case 'notice':

@@ -139,6 +139,8 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
       state.getByLabel("Email or username", { exact: true }),
     "Wrong password": (state) =>
       state.getByText("Invalid email, username or password.", { exact: true }),
+    "Fields left empty": (state) =>
+      state.getByText("Enter your password.", { exact: true }),
     "Organization sign-in only": (state) =>
       state.getByRole("button", {
         name: "Continue with Contoso ID",
@@ -156,6 +158,10 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
       state.getByText("Authenticator app", { exact: true }),
     "Update your profile": (state) =>
       state.getByLabel("First name", { exact: true }),
+    "Terms and privacy": (state) =>
+      state.getByRole("link", { name: "Privacy policy", exact: true }),
+    "Terms not accepted": (state) =>
+      state.getByText("Accept the terms to continue.", { exact: true }),
     "Sign out": (state) =>
       state.getByRole("button", { name: "Sign out", exact: true }),
     Notice: (state) =>
@@ -603,6 +609,48 @@ for (const mode of modes) {
       1,
     );
     expect(recording.errors).toEqual([]);
+  });
+
+  test(`the identitySignIn preview's sign-in and terms states draw their messages and links in ${mode} mode`, async ({
+    page,
+  }) => {
+    const query = `?preview=identitySignIn&mode=${mode}`;
+    const recording = await openHarness(page, query, {
+      sandboxed: true,
+      frameWidth: 992,
+    });
+    const frame = page.frameLocator("iframe");
+
+    const empty = figure(frame, "Fields left empty");
+    await expect(
+      empty.getByText("Enter your email or username.", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      empty.getByText("Enter your password.", { exact: true }),
+    ).toBeVisible();
+
+    const terms = figure(frame, "Terms and privacy");
+    await expect(
+      terms.getByRole("link", { name: "Terms of service", exact: true }),
+    ).toHaveAttribute("href", "#terms-of-service");
+    await expect(
+      terms.getByRole("link", { name: "Privacy policy", exact: true }),
+    ).toHaveAttribute("href", "#privacy-policy");
+    await expect(
+      terms.getByText("Accept the terms to continue.", { exact: true }),
+    ).toHaveCount(0);
+
+    await expect(
+      figure(frame, "Terms not accepted").getByText(
+        "Accept the terms to continue.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    expect(recording.errors).toEqual([]);
+    // The fixtures answer every API call, so nothing but the page, the harness and the bundle is requested.
+    expect(
+      recording.requests.filter((url) => !url.startsWith("data:")),
+    ).toEqual([`${origin}/sandboxed.html`, `${harnessUrl}${query}`, bundleUrl]);
   });
 
   test(`the signIn preview draws the Axis heading above the sign-in card in ${mode} mode`, async ({

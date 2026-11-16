@@ -300,6 +300,15 @@ export const previews: Record<string, readonly PreviewState[]> = {
   identitySignIn: [
     { caption: 'Sign in', draw: () => <IdentitySignIn page="signIn" />, frameHeight: 600 },
     { caption: 'Wrong password', draw: () => <IdentitySignIn page="wrongPassword" />, frameHeight: 600 },
+    {
+      caption: 'Fields left empty',
+      draw: () => (
+        <SubmittedOnMount>
+          <IdentitySignIn page="fieldsEmpty" />
+        </SubmittedOnMount>
+      ),
+      frameHeight: 600,
+    },
     { caption: 'Organization sign-in only', draw: () => <IdentitySignIn page="organizationOnly" />, frameHeight: 600 },
     { caption: 'Two-step verification', draw: () => <IdentitySignIn page="twoStep" />, frameHeight: 600 },
     { caption: 'Forgot password', draw: () => <IdentitySignIn page="resetPassword" />, frameHeight: 600 },
@@ -311,6 +320,16 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 600,
     },
     { caption: 'Update your profile', draw: () => <IdentitySignIn page="updateProfile" />, frameHeight: 720 },
+    { caption: 'Terms and privacy', draw: () => <IdentitySignIn page="terms" />, frameHeight: 600 },
+    {
+      caption: 'Terms not accepted',
+      draw: () => (
+        <SubmittedOnMount>
+          <IdentitySignIn page="terms" />
+        </SubmittedOnMount>
+      ),
+      frameHeight: 600,
+    },
     { caption: 'Sign out', draw: () => <IdentitySignIn page="signOut" />, frameHeight: 600 },
     { caption: 'Notice', draw: () => <IdentitySignIn page="notice" />, frameHeight: 600 },
     { caption: 'Error', draw: () => <IdentitySignIn page="error" />, frameHeight: 600 },
