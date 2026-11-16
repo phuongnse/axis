@@ -16,6 +16,7 @@ import type {
   StudioResourceItem,
   StudioResourceReferences,
   StudioRevision,
+  StudioRevisionDiff,
 } from '../platform/studio'
 import { application, entity as requestEntity, fields, formWidget, locale, tableWidget } from './fixtures'
 
@@ -434,6 +435,50 @@ const typicalRevisions = {
   ],
 } satisfies { items: StudioRevision[] }
 
+/** The newest revision of Typical with the three files it changed, which the Revision state opens. */
+const typicalRevisionDiff = {
+  revision: typicalRevisions.items[0],
+  resources: [
+    {
+      file: 'pages/request-list.json',
+      change: 'changed',
+      id: pageId,
+      kind: 'page',
+      name: 'RequestList',
+      before: JSON.stringify({
+        kind: 'page',
+        name: 'RequestList',
+        title: { textKey: 'requestList.title' },
+        widgets: [],
+      }),
+      after: JSON.stringify({
+        kind: 'page',
+        name: 'RequestList',
+        title: { textKey: 'requestList.title' },
+        widgets: [{ type: 'table', name: 'requests', entity: 'Request' }],
+      }),
+    },
+    {
+      file: 'roles/approver.json',
+      change: 'added',
+      id: approverRoleId,
+      kind: 'role',
+      name: 'Approver',
+      before: null,
+      after: JSON.stringify({ kind: 'role', name: 'Approver', label: { textKey: 'role.approver' } }),
+    },
+    {
+      file: 'forms/old-request.json',
+      change: 'removed',
+      id: null,
+      kind: 'form',
+      name: 'OldRequest',
+      before: JSON.stringify({ kind: 'form', name: 'OldRequest', entity: 'Request', sections: [] }),
+      after: null,
+    },
+  ],
+} satisfies StudioRevisionDiff
+
 /** Release 2 of Typical's history, which is live: it pins the Organization module and compares with release 1. */
 const typicalRelease: StudioRelease = {
   number: 2,
@@ -612,6 +657,7 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     [`${folderPath}/resources/${processId}`]: () => processResource,
     [`${folderPath}/releases`]: () => answers.releases,
     [`${folderPath}/revisions`]: () => typicalRevisions,
+    [`${folderPath}/revisions/${typicalRevisionId}`]: () => typicalRevisionDiff,
     [`${folderPath}/settings`]: () => settings,
   }
 }
@@ -681,6 +727,9 @@ const newFolder: Folder = {
   entities: [],
   bare: true,
 }
+
+/** The id of the newest revision of Typical, which the Revision state opens at `&revision=<id>`. */
+export const typicalRevisionId = typicalRevisions.items[0].id
 
 /** The id of the Request entity of the Typical folder, which the Entity state opens at `&resource=<id>`. */
 export const typicalEntityId = id(firstEntityId)
