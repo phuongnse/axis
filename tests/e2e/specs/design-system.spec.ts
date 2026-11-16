@@ -818,6 +818,7 @@ const framedPreviews: Record<
       "Overview of a new application",
       "Entity",
       "Policy matrix",
+      "Release page",
     ],
     pickedInFixtures: true,
   },
@@ -1011,6 +1012,12 @@ for (const [slug, expectKeyElement] of [
       await expect(
         state.getByTestId("studio-matrix-cell-Requester-entity-Request"),
       ).toBeVisible();
+    },
+  ],
+  [
+    "release-page",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-release")).toBeVisible();
     },
   ],
 ] as const) {

@@ -345,11 +345,12 @@ to the frame shows in every state. How previews work is in
 - **A frame is a screen.** A shell preview draws the shell in a frame exactly as tall as its height, and
   the page scrolls inside it as in a window, so a dialog opens in the middle of what shows.
 - **The Studio group** is the eighth group of cards, after Shell. Its `studio` preview draws Studio
-  through the shell over fixtures of the purchase request sample, in eleven states: Typical, Empty,
+  through the shell over fixtures of the purchase request sample, in twelve states: Typical, Empty,
   Loading, Failed, Many rows, Long names, Access denied, Overview with errors and changes not live,
-  Overview of a new application, Entity and Policy matrix. Clicks in the sidebar move between
+  Overview of a new application, Entity, Policy matrix and Release page. Clicks in the sidebar move between
   Overview, Settings, the kind lists and Releases, all answered from fixtures. Entity opens an entity
-  in the entity designer and Policy matrix the policy matrix, both over the fixtures of Typical.
+  in the entity designer and Policy matrix the policy matrix, both over the fixtures of Typical. Release page opens release 2 over the fixtures of
+  Typical.
 - **Studio's designers** are three previews that follow `studio`: `studioPageDesign`, `studioFormDesign`
   and `studioProcessDesign`. Each draws Studio through the shell with a page, a form or a process open in
   its designer. Each has one state, Typical, over the fixtures of the `studio` preview's Typical state.
