@@ -9,7 +9,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { expressionOperators } from './expressionOperators'
 import type { EntryKind, PanelEntry } from './expressionPanelEntries'
-import { rankEntries } from './expressionPanelEntries'
+import { rankEntries, signatureOf } from './expressionPanelEntries'
 import type { ScopeOption } from './expressionScope'
 
 const kinds: readonly EntryKind[] = ['field', 'operator', 'function']
@@ -61,7 +61,7 @@ export function ExpressionPanel({
       name: `${item.name}()`,
       insert: `${item.name}()`,
       cursorInside: item.parameters.length > 0,
-      description: `${item.name}(${item.parameters.join(', ')}) ${item.description}`,
+      description: `${signatureOf(item.name, item.parameters)} ${item.description}`,
       example: item.example,
     })),
     ...rules.map((rule): PanelEntry => ({

@@ -822,6 +822,7 @@
   "shell.studio.expression.type.reference": "tham chiếu",
   "shell.studio.expression.type.file": "tệp",
   "shell.studio.expression.type.null": "không có giá trị",
+  "shell.studio.expression.type.list": "danh sách bản ghi",
   "shell.studio.expression.expand": "Mở rộng",
   "shell.studio.expression.fields": "Trường",
   "shell.studio.expression.operators": "Toán tử",

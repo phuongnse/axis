@@ -386,27 +386,27 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
   that checks and saves like the box, and a panel of tabs Fields, Operators and Functions, with every rule
   allowed there. A click inserts the name at the cursor. A search looks in all three, best first: a name that
   is the words, then one that starts with them, then one that holds them, then one whose description does.
-- **Completion that explains** _(planned for M33)_. Completion names each choice: a field by its label and type,
-  and a rule or a function by its signature, with what it does and an example beside the list.
-- **Completion knows where the cursor stands** _(planned for M33)_. After a value it offers the operators that
-  value's type takes, the comparisons first, and after a clause that already compares, only `and` and
-  `or`. Inside quotes after an enum field it offers that field's values in their order and closes the
-  quote. Elsewhere it offers the fields, the values, `not`, the rules and the functions, those that give
-  the type the place needs first. It opens by itself after a space that follows a value and after a
-  quote that follows an enum field.
-- **The language's own words** _(planned for M33)_. Completion and the panel offer the comparisons, `is null`,
+- **Completion that explains.** Each choice has a short detail and an info panel while it is selected. A field
+  shows its label and type in words, a function its signature, what it does and an example, and a rule its
+  signature and the type it gives. An operator or value shows its words and an example.
+- **Completion knows where the cursor stands.** After a value it offers that type's operators, the comparisons
+  first, and after a clause that already compares, only `and` and `or`. Inside quotes after an enum field it
+  offers the field's values in their order and closes the quote. Elsewhere it offers the fields, the values,
+  `not`, the rules and the functions, those that give the type the place needs first. It opens by itself after
+  a space that follows a value and after a quote that follows an enum field.
+- **The language's own words.** Completion and the panel offer the comparisons, `is null`,
   `is not null`, `and`, `or`, `not`, `in (…)`, the arithmetic and the values `true`, `false`, `null`,
   `'text'` and `date('…')`, each with what it does and an example. A code editor stays the one way to
   write an expression, because an expression gives a value of any type, not only yes or no.
 - **Only what the place allows.** The server answers
   [the scope of a place](authoring.md#expression-scope), so the client keeps no list of functions: no
   aggregate in a default, and no `now()`, `today()` or `toDate()` in a computed field (`AXC0086`).
-- **Completion.** Typing a word, or Ctrl+Space, opens a list of the names in scope, and the arrow keys
+- **Completion.** Typing a word, or Ctrl+Space, opens a list of what fits at the cursor, and the arrow keys
   and Enter pick one. The fields, parameters and rules come from the [names route](authoring.md#names),
   loaded with the application and again after a save, a delete and a reconnect. The functions come from
   the [expression scope](authoring.md#expression-scope), loaded once per place with the draft. Without
-  names the list offers the functions only, and typing and Save keep working. A rule and a function with
-  parameters go in with the cursor inside their brackets, and `now()` puts it after them.
+  names the list offers the language's words and the functions only, and typing and Save keep working. A rule
+  and a function with parameters go in with the cursor inside their brackets, and `now()` after them.
 - **What completion offers:**
   - the fields of the entity at the place: the entity being edited, a policy grant's `entity`, or the
     `entity` of a data source, a process or a data change trigger;
