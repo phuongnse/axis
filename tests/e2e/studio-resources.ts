@@ -36,6 +36,20 @@ export async function openKind(page: Page, kind: string) {
   await expect(page).toHaveURL(new RegExp(`[?&]kind=${kind}(&|$)`))
 }
 
+/**
+ * Opens a module resource from its kind's list. The row is found by its module's tag, `module` being the module's
+ * label as the tag shows it, and the link by the resource's shown name, `name`, so a row of the application's own with
+ * the same name is not picked.
+ */
+export async function openModuleResource(page: Page, kind: string, module: string, name: string) {
+  await page
+    .getByTestId(`studio-group-${kind}`)
+    .getByRole('row')
+    .filter({ has: page.getByText(module, { exact: true }) })
+    .getByRole('link', { name, exact: true })
+    .click()
+}
+
 /** The English singular name of each kind, as the New resource dialog lists it. */
 const kindNames: Record<string, string> = {
   entity: 'Entity',

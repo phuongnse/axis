@@ -7,7 +7,7 @@ import { confirmDialog, waitForDialog } from '../dialogs'
 import { fieldLabel } from '../fields'
 import { journeyURL } from '../server-settings'
 import { useJourneySession } from '../sessions'
-import { createResource, openKind, openTab } from '../studio-resources'
+import { createResource, openKind, openModuleResource, openTab } from '../studio-resources'
 
 // The journey server is the second server of the run, and a publish request waits behind the ones that other
 // specs queue.
@@ -289,10 +289,7 @@ test.describe('an author publishes a module application on the journey tenant, a
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=${name}`)
     await openKind(page, 'contract')
-    await page
-      .getByTestId('studio-group-module-contracts')
-      .getByRole('button', { name: 'department-budgets/BudgetContract', exact: true })
-      .click()
+    await openModuleResource(page, 'contract', 'Department budgets', 'BudgetContract')
     await page.getByTestId(`studio-contract-relax-${point}`).click()
     const dialog = await waitForDialog(page)
     await dialog.getByRole('textbox', { name: 'Reason', exact: true }).fill(reason)

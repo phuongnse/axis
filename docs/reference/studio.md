@@ -92,11 +92,11 @@ resource opens it alone, under its [name](studio-workspace.md#names), with its e
   Description, Status, Last modified by and Last modified at. Every column always shows, and a cell with
   no value shows the dash. Name is a link. A list does not show the inside of a resource, such as its
   fields or references, a file name, or a count that leads nowhere.
-- **A module's resources** _(planned for M33)_. The resources of the modules that the application uses
-  are in the same list, from the application's [names](authoring.md#names), named without the
-  `<module>/` prefix and with a neutral tag of the module's label beside the name. There is no Module
-  column. A kind with no label in its format, such as a policy, keeps its name. A module's resource has a
-  status, as a new module version or a layer changes it.
+- **A module's resources**. The resources of the modules that the application uses are in the same list, from the
+  application's [names](authoring.md#names). Each is named by its label in the [resource activity](studio-resource-form.md#resource-activity),
+  else without the `<module>/` prefix, and has a neutral tag of its module's label from `GET /api/studio/catalog`, else the module's id.
+  Its description, status and last write come from the activity too. There is no Module column. A kind with no label in its format,
+  such as a policy, keeps its name. A module's resource has a status, as a new module version or a layer changes it.
 - **Status**. New, Changed or Published, from the
   [resource activity route](studio-resource-form.md#resource-activity). While it loads the cell says so, and when it
   fails it says Unavailable.
