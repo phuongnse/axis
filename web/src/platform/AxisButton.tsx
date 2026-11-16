@@ -312,8 +312,8 @@ export interface AxisGroupAction {
 /**
  * Proposed, see the review on #3650: actions of equal weight that together are the main action of a region, such as a
  * task's outcomes, joined in one group in the `main` role, in the order given. The region keeps one main action, and no
- * action of the group stands above another. Each action stays a button of its own, with no selected state, and the
- * group is named by `nameKey`. A group of one action is a plain `main` button.
+ * action of the group stands above another: each takes the width of the widest. Each action stays a button of its own,
+ * with no selected state, and the group is named by `nameKey`. A group of one action is a plain `main` button.
  */
 export function AxisButtonGroup({ nameKey, actions }: { nameKey: string; actions: readonly AxisGroupAction[] }) {
   const t = useText()
@@ -325,8 +325,13 @@ export function AxisButtonGroup({ nameKey, actions }: { nameKey: string; actions
   if (buttons.length < 2) {
     return <>{buttons}</>
   }
+  // An inline grid of equal columns gives every action the width of the widest, so none looks weightier.
   return (
-    <Space.Compact role="group" aria-label={t(nameKey)}>
+    <Space.Compact
+      role="group"
+      aria-label={t(nameKey)}
+      style={{ display: 'inline-grid', gridAutoFlow: 'column', gridAutoColumns: '1fr' }}
+    >
       {buttons}
     </Space.Compact>
   )
