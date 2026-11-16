@@ -12,7 +12,14 @@ import { ShellSidebarContext } from '../platform/shellSidebarContext'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import { LeaveWithoutSaving, UnsavedChangesGuard } from '../platform/UnsavedChangesGuard'
-import type { StudioApplication, StudioDiagnostic, StudioReference, StudioResourceItem } from '../platform/studio'
+import type {
+  StudioApplication,
+  StudioDiagnostic,
+  StudioReference,
+  StudioResourceActivity,
+  StudioResourceItem,
+} from '../platform/studio'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { PlatformContext, type Platform } from './context'
 import { StudioPage } from './StudioPage'
 import { editJson, jsonText } from '../test/jsonView'
@@ -235,6 +242,9 @@ function stubServer(
     if (input === `${folder}/names`) {
       return json(applicationNames)
     }
+    if (input === `${folder}/resource-activity`) {
+      return json({ items: [] })
+    }
     if (input === `${folder}/policy-matrix`) {
       return json({ targets: [], roles: [] })
     }
@@ -357,8 +367,8 @@ describe('StudioPage', () => {
     const entities = screen.getByTestId('studio-group-entity')
     expect(
       within(entities)
-        .getAllByRole('button')
-        .map((button) => button.textContent),
+        .getAllByRole('link')
+        .map((link) => link.textContent),
     ).toEqual(['Department', 'PurchaseRequest'])
     expect(screen.queryByTestId('studio-group-form')).not.toBeInTheDocument()
     expect(screen.queryByTestId(`studio-resource-${formId}`)).not.toBeInTheDocument()
@@ -422,16 +432,151 @@ describe('StudioPage', () => {
       stubNamed()
       renderPage('/studio?app=PurchaseRequests&kind=entity')
 
-      expect(await screen.findByRole('button', { name: 'Purchase request' })).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'PurchaseRequest' })).not.toBeInTheDocument()
+      expect(await screen.findByRole('link', { name: 'Purchase request' })).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'PurchaseRequest' })).not.toBeInTheDocument()
     })
 
     it('lists a text resource by its language, not by its file', async () => {
       stubNamed()
       renderPage('/studio?app=PurchaseRequests&kind=text')
 
-      expect(await screen.findByRole('button', { name: 'Vietnamese' })).toBeInTheDocument()
+      expect(await screen.findByRole('link', { name: 'Vietnamese' })).toBeInTheDocument()
       expect(screen.queryByText('texts/vi.json')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('the kind lists', () => {
+    const requesterId = 'cccccccc-dddd-4eee-8fff-000000000000'
+    const listed: StudioResourceItem[] = [
+      ...resources,
+      { id: requesterId, kind: 'role', name: 'Requester', file: 'roles/requester.json', version: 'f', usedBy: 0 },
+    ]
+    const activity: StudioResourceActivity[] = [
+      {
+        id: departmentId,
+        module: null,
+        status: 'new',
+        titles: null,
+        descriptions: null,
+        modifiedBy: null,
+        modifiedAt: null,
+      },
+      {
+        id: entityId,
+        module: null,
+        status: 'changed',
+        titles: null,
+        descriptions: null,
+        modifiedBy: 'Linh Nguyen',
+        modifiedAt: '2026-11-02T09:30:00Z',
+      },
+      {
+        id: requesterId,
+        module: null,
+        status: 'published',
+        titles: null,
+        descriptions: null,
+        modifiedBy: null,
+        modifiedAt: null,
+      },
+    ]
+
+    /** Stubs the resource list with the role too, and the activity route with `answer`. */
+    function stubLists(answer: () => Response | Promise<Response> = () => json({ items: activity })) {
+      const fetchMock = stubServer()
+      const base = fetchMock.getMockImplementation()!
+      fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+        if (input === `${folder}/resources`) {
+          return json({ items: listed })
+        }
+        if (input === `${folder}/resource-activity`) {
+          return answer()
+        }
+        return base(input, init)
+      })
+      return fetchMock
+    }
+
+    it.each(['entity', 'role'])('shows the %s list as one table with the same five columns', async (kind) => {
+      stubLists()
+      renderPage(`/studio?app=PurchaseRequests&kind=${kind}`)
+
+      const group = await screen.findByTestId(`studio-group-${kind}`)
+      expect(
+        within(group)
+          .getAllByRole('columnheader')
+          .map((header) => header.textContent),
+      ).toEqual(['Name', 'Description', 'Status', 'Last modified by', 'Last modified at'])
+    })
+
+    it('links each name to its resource, and shows the dash in a cell with no value', async () => {
+      stubLists()
+      renderPage('/studio?app=PurchaseRequests&kind=entity')
+
+      const group = await screen.findByTestId('studio-group-entity')
+      const link = within(group).getByRole('link', { name: 'Department' })
+      expect(link).toHaveAttribute('href', studioResourceAddress('PurchaseRequests', departmentId))
+      const cells = within(link.closest('tr')!).getAllByRole('cell')
+      expect(cells[1]).toHaveTextContent('—')
+      expect(cells[3]).toHaveTextContent('—')
+      expect(cells[4]).toHaveTextContent('—')
+    })
+
+    it('shows New or Changed, and the writer and time of the last write, from the activity route', async () => {
+      const fetchMock = stubLists()
+      renderPage('/studio?app=PurchaseRequests&kind=entity')
+
+      const group = await screen.findByTestId('studio-group-entity')
+      const row = (name: string) => within(group).getByRole('link', { name }).closest('tr')!
+      expect(within(row('Department')).getByText('New')).toBeInTheDocument()
+      const changed = within(row('PurchaseRequest'))
+      expect(changed.getByText('Changed')).toBeInTheDocument()
+      expect(changed.getByText('Linh Nguyen')).toBeInTheDocument()
+      const time = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'medium' }).format(
+        new Date('2026-11-02T09:30:00Z'),
+      )
+      expect(changed.getByText(time)).toBeInTheDocument()
+      expect(fetchMock.mock.calls.some(([input]) => input === `${folder}/resource-activity`)).toBe(true)
+    })
+
+    it('shows Published for a resource the release holds unchanged', async () => {
+      stubLists()
+      renderPage('/studio?app=PurchaseRequests&kind=role')
+
+      const group = await screen.findByTestId('studio-group-role')
+      expect(within(group).getByText('Published')).toBeInTheDocument()
+    })
+
+    it('shows Loading in the Status cell while the activity has not answered', async () => {
+      stubLists(() => new Promise<Response>(() => {}))
+      renderPage('/studio?app=PurchaseRequests&kind=entity')
+
+      const group = await screen.findByTestId('studio-group-entity')
+      expect(await within(group).findAllByText('Loading…')).toHaveLength(2)
+      expect(within(group).getByRole('link', { name: 'Department' })).toBeInTheDocument()
+    })
+
+    it('shows Unavailable in the Status cell when the activity route fails, and still links the names', async () => {
+      stubLists(() => json({ title: 'Failed' }, 500))
+      renderPage('/studio?app=PurchaseRequests&kind=entity')
+
+      const group = await screen.findByTestId('studio-group-entity')
+      expect(await within(group).findAllByText('Unavailable')).toHaveLength(2)
+      expect(within(group).getByRole('link', { name: 'Department' })).toBeInTheDocument()
+    })
+
+    it('loads the activity once with the application, and again after a save', async () => {
+      const fetchMock = stubLists()
+      renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+      const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+      const loads = () => fetchMock.mock.calls.filter(([input]) => input === `${folder}/resource-activity`).length
+      await waitFor(() => expect(loads()).toBe(1))
+
+      await userEvent.clear(maxLength)
+      await userEvent.type(maxLength, '250')
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+      await screen.findByTestId('studio-saved')
+      await waitFor(() => expect(loads()).toBe(2))
     })
   })
 

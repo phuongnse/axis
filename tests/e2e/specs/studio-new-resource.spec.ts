@@ -295,7 +295,7 @@ test.describe('Studio creates a resource from a starter', () => {
     const providerDiagnostics = await save(page)
 
     await openKind(page, 'site')
-    await page.getByTestId('studio-group-site').getByRole('button', { name: 'Purchasing', exact: true }).click()
+    await page.getByTestId('studio-group-site').getByRole('link', { name: 'Purchasing', exact: true }).click()
     await openFormTab(page)
     await page.getByRole('button', { name: 'Add provider', exact: true }).click()
     await pickOption(page.getByTestId('studio-field-/signIn/2').getByRole('combobox'), 'Partner')
@@ -398,7 +398,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
     await openKind(page, 'entity')
-    await page.getByTestId('studio-group-entity').getByRole('button', { name: 'Supplier', exact: true }).click()
+    await page.getByTestId('studio-group-entity').getByRole('link', { name: 'Supplier', exact: true }).click()
     // A change shows the save bar, and Undo brings back the saved state, so Save stays on the bar and is off.
     await page.getByTestId('studio-field-/name').getByRole('textbox').fill('SupplierChanged')
     await page.getByRole('button', { name: 'Undo', exact: true }).click()

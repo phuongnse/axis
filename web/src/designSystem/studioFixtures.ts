@@ -11,6 +11,7 @@ import type {
   StudioPolicyMatrix,
   StudioReleases,
   StudioResource,
+  StudioResourceActivity,
   StudioResourceItem,
   StudioResourceReferences,
 } from '../platform/studio'
@@ -94,6 +95,22 @@ function items(folder: Folder): StudioResourceItem[] {
     resource(buyerRoleId, 'role', 'Buyer', 'roles/buyer.json', { [locale]: 'Buyer' }),
     resource(policyId, 'policy', 'RequesterPolicy', 'policies/requester.json', { [locale]: 'Requester' }),
   ]
+}
+
+/** Each resource's activity: a mix of statuses, and a writer and a time on the first resource. */
+function activity(folder: Folder): { items: StudioResourceActivity[] } {
+  const statuses = ['new', 'changed', 'published', null] as const
+  return {
+    items: items(folder).map((item, index) => ({
+      id: item.id,
+      module: null,
+      status: statuses[index % statuses.length],
+      titles: null,
+      descriptions: null,
+      modifiedBy: index === 0 ? 'Linh Nguyen' : null,
+      modifiedAt: index === 0 ? '2026-11-02T09:30:00Z' : null,
+    })),
+  }
 }
 
 const manifest: StudioResource = {
@@ -529,6 +546,7 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     [`${folderPath}/policy-matrix`]: () => policyMatrix(folder),
     [appsPath]: () => ({ items: folder.apps }) satisfies { items: StudioApplication[] },
     [`${folderPath}/resources`]: () => ({ items: items(folder) }) satisfies { items: StudioResourceItem[] },
+    [`${folderPath}/resource-activity`]: () => activity(folder),
     [`${folderPath}/diagnostics`]: () =>
       ({ diagnostics: answers.diagnostics }) satisfies { diagnostics: StudioDiagnostic[] },
     // A field's default has no field in scope, and no state types an expression, so the scope is empty.
