@@ -75,6 +75,39 @@ describe('AxisChoiceField', () => {
     expect(finish).not.toHaveBeenCalled()
   })
 
+  it('draws a choice the caller holds, named by the label and described by the help, with no form', async () => {
+    const onChange = vi.fn()
+    render(
+      <ThemeModeProvider initialMode="light">
+        <TextProvider catalogs={catalogs} development={false}>
+          <AxisChoiceField label="Size" help="Pick one." options={options} value="small" onChange={onChange} />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    const group = screen.getByRole('radiogroup', { name: 'Size' })
+    expect(group).toHaveAccessibleDescription('Pick one.')
+    expect(screen.getByRole('radio', { name: /Small/ })).toBeChecked()
+
+    await userEvent.click(screen.getByRole('radio', { name: /Large/ }))
+
+    expect(onChange).toHaveBeenCalledWith('large')
+  })
+
+  it('requires help in the mode where the caller holds the value', () => {
+    expect(
+      // @ts-expect-error Every platform field has help.
+      <AxisChoiceField label="Size" options={options} value="small" onChange={vi.fn()} />,
+    ).toBeDefined()
+  })
+
+  it('refuses a name together with onChange', () => {
+    expect(
+      // @ts-expect-error A named field sits in a form, which holds the value.
+      <AxisChoiceField label="Size" help="Pick one." name="size" options={options} onChange={vi.fn()} />,
+    ).toBeDefined()
+  })
+
   it('requires help', () => {
     expect(
       // @ts-expect-error Every platform field has help.

@@ -100,10 +100,43 @@ describe('AxisCheckboxField', () => {
     expect(onChange).toHaveBeenCalledWith(true)
   })
 
+  it('draws a checkbox the caller holds, named by the label and described by the help, with no form', async () => {
+    const onChange = vi.fn()
+    render(
+      <ThemeModeProvider initialMode="light">
+        <TextProvider catalogs={catalogs} development={false}>
+          <AxisCheckboxField label="Active" help="An inactive item is hidden." checked={false} onChange={onChange} />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    const box = screen.getByRole('checkbox', { name: 'Active' })
+    expect(box).toHaveAccessibleDescription('An inactive item is hidden.')
+    expect(box).not.toBeChecked()
+
+    await userEvent.click(box)
+
+    expect(onChange).toHaveBeenCalledWith(true)
+  })
+
   it('does not take a click when disabled', () => {
     renderForm(<AxisCheckboxField label="Active" help="" name="active" disabled />)
 
     expect(screen.getByRole('checkbox', { name: 'Active' })).toBeDisabled()
+  })
+
+  it('requires help in the mode where the caller holds the value', () => {
+    expect(
+      // @ts-expect-error Every platform field has help.
+      <AxisCheckboxField label="Active" checked onChange={vi.fn()} />,
+    ).toBeDefined()
+  })
+
+  it('refuses a name together with onChange', () => {
+    expect(
+      // @ts-expect-error A named field sits in a form, which holds the value.
+      <AxisCheckboxField label="Active" help="An inactive item is hidden." name="active" onChange={vi.fn()} />,
+    ).toBeDefined()
   })
 
   it('requires help', () => {

@@ -569,9 +569,9 @@ itself with other parameters.
 The Parameters section sits between General and Widgets. Its Add parameter button sits on the right of the
 heading, and a page with no parameters says so in one line. Each parameter has a name, a type picker over
 `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and `reference`, a Required switch
-and Remove, and Add parameter appends a `text` parameter with an empty name. A `reference` parameter
-also has a target entity picker, and an `enum` parameter its values. A type change removes the `target`
-or the `values` that the new type does not take, and switching Required off removes the `required` key.
+and Remove. The name, type and Required switch sit one to a row. Add parameter appends a `text` parameter
+with an empty name. A `reference` parameter also has a target entity picker, and an `enum` parameter its
+values. A type change removes the `target` or the `values` that the new type does not take, and switching Required off removes the `required` key.
 The names answer lists each page's parameters, which is how a navigate action knows them. A
 `parameters` that is not a list points to the JSON view.
 

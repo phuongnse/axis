@@ -238,6 +238,18 @@ describe('SchemaForm field texts', () => {
     }
   })
 
+  it('writes true at the pointer of a boolean when its checkbox is clicked', async () => {
+    const onChange = vi.fn()
+    renderForm((await loadKindSchema('dataSource'))!, { kind: 'dataSource', name: 'Orders', search: false }, onChange)
+
+    const key = 'shell.studio.field.dataSource.search'
+    const box = screen.getByRole('checkbox', { name: english[key] })
+    expect(box).toHaveAccessibleDescription(english[`${key}.help`])
+    await userEvent.click(box)
+
+    expect(onChange).toHaveBeenCalledWith('/search', true)
+  })
+
   it('sits the fields of an object behind a subtle rule on its start side', async () => {
     renderForm((await loadKindSchema('dataSource'))!, {
       name: 'Orders',
