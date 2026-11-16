@@ -90,7 +90,7 @@ describe('TenantModelKeySection', () => {
 
     const section = await screen.findByTestId('tenant-model-key')
     expect(within(section).getByRole('heading', { name: 'Model key' })).toBeVisible()
-    expect(within(section).getByTestId('tenant-model-key-load-failed')).toHaveTextContent(
+    expect(await within(section).findByTestId('tenant-model-key-load-failed')).toHaveTextContent(
       'The model key could not be loaded.',
     )
     expect(within(section).queryByText('No key is set.')).toBeNull()
