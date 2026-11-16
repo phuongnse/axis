@@ -251,9 +251,10 @@ export default function ExpressionEditor({
       <div style={{ position: 'relative' }}>
         <div ref={hostRef} />
         {!inDialog && (
-          <div style={{ position: 'absolute', top: 1, insetInlineEnd: 1 }}>
+          <div style={{ position: 'absolute', top: 3, insetInlineEnd: 3 }}>
             <AxisButton
               role="icon"
+              size="small"
               nameKey="shell.studio.expression.expand"
               icon={<ExpandAltOutlined />}
               onClick={() => setExpanded(true)}
@@ -369,15 +370,15 @@ function boldParameter(fn: ExpressionScopeFunction, argument: number): number {
   return argument <= last ? argument : fn.parameters[last] === '…' ? last : -1
 }
 
-// Proposed (#3265): an expression is code, so its box shows three lines at least and grows with what is written; the
-// end of each line keeps room for Expand. The box in the Expand dialog shows eight lines at least.
+// Proposed (#3265): the box is one line, as a text field is, and grows as the text wraps; the end of each line keeps
+// room for Expand, which sits inside the box. The box in the Expand dialog shows eight lines at least.
 const lineHeight = 1.4
 
 const expressionTheme = sharedTheme((tokens, mode) => [
   codeEditorTheme(tokens, mode),
   EditorView.theme({
-    '.cm-content': { padding: '4px 0', minHeight: `${3 * lineHeight}em` },
-    '.cm-line': { paddingInlineEnd: `${tokens.spacing.xl + 4}px` },
+    '.cm-content': { padding: '4px 0' },
+    '.cm-line': { paddingInlineEnd: `${tokens.spacing.lg + 4}px` },
     '.cm-completionInfo code': { fontFamily: tokens.type.codeFontFamily },
   }),
 ])
