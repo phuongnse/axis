@@ -1,5 +1,5 @@
 import { Breadcrumb, Flex, Typography } from 'antd'
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { useText } from './texts'
@@ -19,17 +19,16 @@ export interface BreadcrumbStep {
  */
 export function PageLayout({
   title,
-  line,
   breadcrumb,
   children,
 }: {
   title: string
-  /** Proposed, see the review on #3650: a line under the heading, in `textMuted`, that says more about the page. */
-  line?: ReactNode
   breadcrumb?: readonly BreadcrumbStep[]
   children: ReactNode
 }) {
   const [slot, setSlot] = useState<HTMLDivElement | null>(null)
+  const [named, setNamed] = useState<string | null>(null)
+  const [lineSlot, setLineSlot] = useState<HTMLDivElement | null>(null)
   const { colour } = useDesignTokens()
   const heading = (
     // Proposed: the page's own actions sit on the heading's right, as a Studio page's do, see the review on #3650.
@@ -37,9 +36,10 @@ export function PageLayout({
       <Flex vertical style={{ minWidth: 0 }}>
         {/* Level one for the outline, at the 20px and 28px that a level-four heading has. */}
         <Typography.Title level={1} style={{ margin: 0, fontSize: 20, lineHeight: '28px' }}>
-          {title}
+          {named ?? title}
         </Typography.Title>
-        {line !== undefined && <div style={{ color: colour.textMuted }}>{line}</div>}
+        {/* Proposed: the line that gives the thing the page names its context, see the review on #3650. */}
+        <div ref={setLineSlot} style={{ color: colour.textMuted }} />
       </Flex>
       <div ref={setSlot} />
     </Flex>
@@ -47,10 +47,12 @@ export function PageLayout({
 
   return (
     <PageActionsSlot.Provider value={slot}>
-      <Flex vertical gap="middle">
-        {breadcrumb ? <HeaderBand steps={breadcrumb}>{heading}</HeaderBand> : heading}
-        {children}
-      </Flex>
+      <PageHeadingSlot.Provider value={{ name: setNamed, line: lineSlot }}>
+        <Flex vertical gap="middle">
+          {breadcrumb ? <HeaderBand steps={breadcrumb}>{heading}</HeaderBand> : heading}
+          {children}
+        </Flex>
+      </PageHeadingSlot.Provider>
     </PageActionsSlot.Provider>
   )
 }
@@ -95,4 +97,24 @@ export function PageActions({ children }: { children: ReactNode }) {
     return <Flex justify="end">{children}</Flex>
   }
   return slot ? createPortal(children, slot) : null
+}
+
+// Where a widget names what its page shows: the heading's text and the line under it.
+const PageHeadingSlot = createContext<
+  { name: (title: string | null) => void; line: HTMLDivElement | null } | undefined
+>(undefined)
+
+/**
+ * Proposed, see the review on #3650: a page that shows one thing, such as a saved record or a task, is headed by that
+ * thing's name, in place of the page's title, and the line under the heading, in `textMuted`, gives its context: what
+ * kind of thing it is, or what it is about and when it is due. Outside a page layout it draws nothing.
+ */
+export function PageHeading({ title, line }: { title: string; line?: ReactNode }) {
+  const slot = useContext(PageHeadingSlot)
+  const name = slot?.name
+  useLayoutEffect(() => {
+    name?.(title)
+    return () => name?.(null)
+  }, [name, title])
+  return line !== undefined && slot?.line ? createPortal(line, slot.line) : null
 }

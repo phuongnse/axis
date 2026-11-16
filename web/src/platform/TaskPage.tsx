@@ -2,7 +2,7 @@ import { Flex, Form, Space, Tag } from 'antd'
 import { ActionBar } from './ActionBar'
 import { AxisAlert } from './AxisAlert'
 import { AxisActionRow, AxisButton } from './AxisButton'
-import { PageActions, PageLayout } from './PageLayout'
+import { PageActions, PageHeading } from './PageLayout'
 import { RecordNotFound } from './RecordNotFound'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -35,8 +35,6 @@ interface TaskPageProps {
   sitePath: string
   /** The name of the inbox page the task's address is under. */
   pageName: string
-  /** The inbox page's title, which heads the page until the task is read. */
-  pageTitle: string
   /** The task inbox widget of that page. */
   widget: WidgetMetadata
   taskId: string
@@ -73,7 +71,7 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * locale, before the site texts and the platform texts. So a label a newer release reworded or
  * removed keeps its old text. If those texts fail to load, the page shows its load error.
  */
-export function TaskPage({ sitePath, pageName, pageTitle, widget, taskId, locale, fallbackLocale }: TaskPageProps) {
+export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackLocale }: TaskPageProps) {
   const t = useText()
   const navigate = useNavigate()
   // The server sets the path on every task inbox.
@@ -151,25 +149,15 @@ export function TaskPage({ sitePath, pageName, pageTitle, widget, taskId, locale
   // Proposed: a task that does not exist says so under the inbox page's heading, with a link to the inbox, see the
   // review on #3650.
   if (task === null) {
-    return (
-      <PageLayout title={pageTitle}>
-        <RecordNotFound />
-      </PageLayout>
-    )
+    return <RecordNotFound />
   }
   if (task === assignedElsewhere) {
     return (
-      <PageLayout title={pageTitle}>
-        <AxisAlert data-testid="task-assigned-elsewhere" kind="warning" message={t('shell.task.assignedElsewhere')} />
-      </PageLayout>
+      <AxisAlert data-testid="task-assigned-elsewhere" kind="warning" message={t('shell.task.assignedElsewhere')} />
     )
   }
   if (task === 'failed' || releaseTexts.failed) {
-    return (
-      <PageLayout title={pageTitle}>
-        <AxisAlert data-testid="task-load-error" kind="error" message={t('shell.task.loadFailed')} />
-      </PageLayout>
-    )
+    return <AxisAlert data-testid="task-load-error" kind="error" message={t('shell.task.loadFailed')} />
   }
   // The previous release texts stay on screen while a new locale loads, so the form is not remounted.
   if (!releaseCatalog) {
@@ -254,7 +242,8 @@ function TaskBody({
     </Space>
   )
   return (
-    <PageLayout title={t(task.labelKey)} line={line}>
+    <Flex vertical gap="middle">
+      <PageHeading title={t(task.labelKey)} line={line} />
       {task.state === 'expired' ? (
         <AxisAlert data-testid="task-expired" kind="info" message={t('shell.task.expired')} />
       ) : open ? (
@@ -278,7 +267,7 @@ function TaskBody({
       ) : (
         <AxisAlert data-testid="task-completed" kind="info" message={t('shell.task.completed')} />
       )}
-    </PageLayout>
+    </Flex>
   )
 }
 

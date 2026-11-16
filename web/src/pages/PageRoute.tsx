@@ -132,17 +132,17 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
     if (recordId === null || !recordIdPattern.test(recordId)) {
       return <NotFoundPage />
     }
-    // Proposed: a task's page is headed by the task, so it draws its own layout, see the review on #3650.
     return (
-      <TaskPage
-        sitePath={sitePath}
-        pageName={page.name}
-        pageTitle={t(page.titleKey)}
-        widget={taskInbox}
-        taskId={recordId}
-        locale={locale}
-        fallbackLocale={fallbackLocale}
-      />
+      <PageLayout title={t(page.titleKey)}>
+        <TaskPage
+          sitePath={sitePath}
+          pageName={page.name}
+          widget={taskInbox}
+          taskId={recordId}
+          locale={locale}
+          fallbackLocale={fallbackLocale}
+        />
+      </PageLayout>
     )
   }
   // An instance's address is under its inspector page. `new` and an id in the wrong form are no instance.

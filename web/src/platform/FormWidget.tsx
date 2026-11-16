@@ -17,7 +17,7 @@ import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useFormSteps } from './useFormSteps'
 import { useUnsavedChanges } from './unsavedChanges'
-import { PageActions } from './PageLayout'
+import { PageActions, PageHeading } from './PageLayout'
 import { RecordNotFound } from './RecordNotFound'
 import { SaveBar } from './SaveBar'
 import { sectionsOf, useRecordForm } from './useRecordForm'
@@ -298,6 +298,9 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
   // The footer is an action row only where it draws a solid button. Without one, a main action stays outlined.
   // See docs/reference/actions-and-controls.md#buttons.
   const Row = !steps.last || canSave ? AxisActionRow : FooterRow
+  // Proposed: a saved record's page is headed by the record's name, its display field as saved, and the line under the
+  // heading says what kind of record it is, see the review on #3650.
+  const recordName = record && entity.displayField ? record.values[entity.displayField] : null
   // Proposed: an action on the record, such as Submit for approval, is the page's own and sits on its heading's
   // right, apart from what finishes the form, see the review on #3650.
   const recordActions = [
@@ -344,6 +347,9 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
   ]
   return (
     <ConfigProvider locale={antLocaleFor(locale)}>
+      {recordId !== null && typeof recordName === 'string' && recordName !== '' && (
+        <PageHeading title={recordName} line={entity.labelKey ? t(entity.labelKey) : undefined} />
+      )}
       {recordActions.length > 0 && (
         <PageActions>
           <Flex gap="small">{recordActions}</Flex>

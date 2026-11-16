@@ -20,6 +20,7 @@ import {
   type RowLabels,
 } from './records'
 import type { EntityWidgetMetadata, FieldMetadata, NavigateAction, StartProcessAction } from './site'
+import { PageHeading } from './PageLayout'
 import { RecordNotFound } from './RecordNotFound'
 import { PartRule } from './SectionParts'
 import { useText } from './texts'
@@ -229,8 +230,14 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
     )
   }
 
+  // Proposed: a saved record's page is headed by the record's name, its display field as saved, and the line under the
+  // heading says what kind of record it is, see the review on #3650.
+  const recordName = record && entity.displayField ? record.values[entity.displayField] : null
   return (
     <Flex vertical gap="middle" data-testid="detail" aria-busy="false">
+      {typeof recordName === 'string' && recordName !== '' && (
+        <PageHeading title={recordName} line={entity.labelKey ? t(entity.labelKey) : undefined} />
+      )}
       {started && <AxisAlert data-testid="detail-started" kind="success" message={t('shell.form.processStarted')} />}
       {errors.length > 0 && <AxisAlert data-testid="detail-error" kind="error" message={errors.join(' ')} />}
       {sections.map((section, index) => (
