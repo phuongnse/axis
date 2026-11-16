@@ -1,6 +1,7 @@
 import { RedoOutlined } from '@ant-design/icons'
 import { Flex, Tag, Typography } from 'antd'
-import { AxisTable, type AxisColumn } from './AxisTable'
+import type { ReactNode } from 'react'
+import { AxisTable, type AxisColumn, type AxisTableView } from './AxisTable'
 import type { CellJob } from './cell'
 import { EmptyDash } from './EmptyValue'
 import { useText } from './texts'
@@ -9,16 +10,27 @@ import { useEmptyStyle } from './useEmptyStyle'
 
 /**
  * The table of the cell console's jobs, in the order given. The Jobs page shows the cell's, and a tenant's view can show the tenant's.
+ * With a `view`, the table has the full toolbar of a table paged on the server: a header sort on Created, Kind, Tenant and State,
+ * a filter on every column but Steps, Search, Columns and the pager, see `docs/reference/actions-and-controls.md#tables`, and
+ * `loading`, `failure` and `onRefresh` give its loading, load failure and Refresh. Without one, the table shows its rows as given.
  * With `onRunAgain`, a failed job other than a `purge` job has the Run again row action: the publisher queues a failed purge again on its own.
  */
 export function CellJobTable({
   jobs,
   locale,
   onRunAgain,
+  view,
+  loading,
+  failure,
+  onRefresh,
 }: {
   jobs: readonly CellJob[]
   locale: string
   onRunAgain?: (job: CellJob) => void
+  view?: AxisTableView
+  loading?: boolean
+  failure?: ReactNode
+  onRefresh?: () => void
 }) {
   const t = useText()
   const { colour } = useDesignTokens()
@@ -29,19 +41,46 @@ export function CellJobTable({
     succeeded: colour.successText,
     failed: colour.dangerText,
   }
+  const states: CellJob['state'][] = ['queued', 'running', 'succeeded', 'failed']
+  const kinds = ['suspend', 'resume', 'read-only', 'create', 'export', 'delete', 'cancel-deletion', 'purge']
+  // The sorts and filters belong to a table with a view, which the server serves.
+  const sorter = view ? { sorter: true } : {}
   const columns: AxisColumn<CellJob>[] = [
     {
       key: 'createdAt',
       kind: 'fixed',
       title: t('shell.cell.jobs.createdAt'),
+      ...sorter,
+      ...(view && { filter: { kind: 'date' } }),
       render: (_value, job) => new Date(job.createdAt).toLocaleString(locale),
     },
-    { key: 'kind', kind: 'fixed', title: t('shell.cell.jobs.kind'), dataIndex: 'kind' },
-    { key: 'tenant', kind: 'fixed', title: t('shell.cell.jobs.tenant'), dataIndex: 'tenantId' },
+    {
+      key: 'kind',
+      kind: 'fixed',
+      title: t('shell.cell.jobs.kind'),
+      dataIndex: 'kind',
+      ...sorter,
+      ...(view && { filter: { kind: 'enum', options: kinds.map((value) => ({ value, label: value })) } }),
+    },
+    {
+      key: 'tenant',
+      kind: 'fixed',
+      title: t('shell.cell.jobs.tenant'),
+      dataIndex: 'tenantId',
+      ...sorter,
+      ...(view && { filter: { kind: 'text' } }),
+    },
     {
       key: 'state',
       kind: 'fixed',
       title: t('shell.cell.jobs.state'),
+      ...sorter,
+      ...(view && {
+        filter: {
+          kind: 'enum',
+          options: states.map((value) => ({ value, label: t(`shell.cell.jobs.state.${value}`) })),
+        },
+      }),
       render: (_value, job) => (
         <Tag
           variant="outlined"
@@ -84,6 +123,7 @@ export function CellJobTable({
       key: 'error',
       kind: 'freeText',
       title: t('shell.cell.jobs.error'),
+      ...(view && { filter: { kind: 'text' } }),
       render: (_value, job) =>
         job.error ? (
           <Typography.Text data-testid="cell-job-error" style={{ color: colour.dangerText }}>
@@ -102,6 +142,10 @@ export function CellJobTable({
       dataSource={jobs}
       columns={columns}
       emptyText={t('shell.cell.jobs.empty')}
+      view={view}
+      loading={loading}
+      failure={failure}
+      toolbar={onRefresh && { onRefresh }}
       rowActions={
         onRunAgain && {
           configured: 1,

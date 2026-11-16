@@ -87,7 +87,12 @@ tenant button of the Tenants view and the actions of the Tenant view.
 - **Cell.** The cell id, its region, and the number of tenants against [the cap](cells.md#cell-size). With no
   cap it shows the count alone. It also shows the newest [restore check](tenant-backup-and-restore.md#weekly-restore-check):
   its result, its source tenant and its time, or a dash when no check has run.
-- **Jobs.** The jobs of the cell, newest first. A row shows the time, the kind, the tenant and the state, each
+- **Jobs.** The jobs of the cell, newest first until the table is sorted, with AxisTable's Search, which looks in the
+  tenant and the error, its Filter on Created, Kind, Tenant, State and Error, its Columns, Refresh, a sort on the header
+  of Created, Kind, Tenant and State, and a pager with a page size. The server searches, filters, sorts and pages the
+  list, 20 jobs to a page by default, see [the job list](tenant-lifecycle.md#routes). The search, the filter, the
+  columns, the sort, the page and the page size live in the address, see [tables](actions-and-controls.md#tables).
+  A row shows the time, the kind, the tenant and the state, each
   step with its state, or one line when no step has run yet, and the error of a failed job or step. A failed job other than a `purge` job has a Run
   again button, with a confirmation that names the job and the tenant, see [actions](#actions).
 - **Tenants.** One row per tenant, with AxisTable's Search, which looks in the id and the hosts, its Filter on the
@@ -104,7 +109,7 @@ tenant button of the Tenants view and the actions of the Tenant view.
   - the time of the newest daily archive, marked when it is more than 26 hours old, with a dash for a tenant
     that has no archive.
 - **Tenant.** One tenant's status and hosts, its quotas with the rows that override the cell's
-  defaults, its usage and its jobs in the same table as the Jobs view. An id that is neither a tenant nor a purged tenant shows the not-found page.
+  defaults, its usage and its 50 newest jobs in the same table as the Jobs view, without its toolbar. An id that is neither a tenant nor a purged tenant shows the not-found page.
   The view shows its parts in this order: Details, with the status, the application, the hosts and the actions,
   then Host verification, Quotas, Usage and Jobs.
   - **Usage.** The tenant's usage of the last 13 months by day, in the same table as the users page's "Usage"
@@ -175,7 +180,7 @@ Set quotas and Add a host apply at once.
   the new job starts at the first step that did not succeed. Confirming it calls
   `POST /api/cell/jobs/{id}/run-again`, see [running a failed job again](tenant-lifecycle.md#jobs). A refusing
   `4xx`, such as `409` for a job that has a newer one, keeps the confirmation open and shows the server's title.
-  A `202` answer puts the new job first in the list, and the view follows it as [the job](#actions) says.
+  A `202` answer puts the new job first on the shown page, and the view follows it as [the job](#actions) says.
 - **Idempotency key.** Each action that queues a job sends an `Idempotency-Key`. The console keeps the key in the
   page's memory while the request has no final answer: for each tenant and action, for a run again, for each
   job, and for a create, for each request body. A retry after a network error or a `5xx` sends the same key, so it cannot queue a second job. Any
@@ -183,9 +188,9 @@ Set quotas and Add a host apply at once.
   changed gets a new key, because the server hashes the body into the request that a key names.
 - **A failed request.** A network error, a `5xx` or a refusing `4xx` leaves the confirmation or the dialog open with an error. A `401` or `403` goes through
   the console's sign-in and forbidden handling.
-- **The job.** The queued job heads the tenant's jobs, or the Jobs view's list after a run again. The view reads
+- **The job.** The queued job heads the tenant's jobs, or the shown page of the Jobs view after a run again. The view reads
   it at once and then every 2 seconds, and shows its state and steps. When the job succeeds or fails, the view
-  loads the tenant and its jobs, or the list, again. The Suspend, Resume, Export, Delete, Cancel deletion and
+  loads the tenant and its jobs, or the page, again. The Suspend, Resume, Export, Delete, Cancel deletion and
   Download buttons are off while the Tenant view follows a job.
 
 ## What the console never shows

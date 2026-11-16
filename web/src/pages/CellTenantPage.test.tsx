@@ -252,7 +252,7 @@ describe('CellTenantPage', () => {
     const jobRows = within(await screen.findByTestId('cell-jobs')).getAllByRole('row')
     expect(jobRows).toHaveLength(2)
     expect(jobRows[1]).toHaveTextContent('suspend')
-    expect(fetchMock).toHaveBeenCalledWith('/api/cell/jobs?tenant=acme', expect.anything())
+    expect(fetchMock).toHaveBeenCalledWith('/api/cell/jobs?tenant=acme&pageSize=50', expect.anything())
   })
 
   it('lists each requested host as pending with its expiry, verified or expired', async () => {
