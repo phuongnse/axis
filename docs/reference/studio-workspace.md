@@ -160,6 +160,9 @@ and the application's description it shows, in one column:
    Contracts and layers are not offered, and neither are the kinds that Get started leads to while it
    shows. Once the application has every kind, the block is gone and nothing takes its place.
 
+While the release history loads, Live and Changes both say so, and when it fails both say that the releases did not
+load. Once it has loaded, Live is left out when there is no live release. Live also says so while its sites load.
+
 Each block is a panel on `surface`, as a [resource form's sections](studio-resource-form.md#sections) are,
 with its title as its heading and no line under it. The blocks are `spacing-md` apart. The page's
 `canvas` holds only the heading, the description and the gaps between the blocks.

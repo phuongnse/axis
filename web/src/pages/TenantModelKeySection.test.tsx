@@ -83,13 +83,49 @@ describe('TenantModelKeySection', () => {
     await expectHidden(fetchMock)
   })
 
-  it('renders nothing and logs a warning when the route answers 503', async () => {
+  it('says that the key could not be loaded, and logs a warning, when the route answers 503', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const fetchMock = stubServer([new Response(null, { status: 503 })])
+    stubServer([new Response(null, { status: 503 })])
     renderSection()
 
-    await expectHidden(fetchMock)
+    const section = await screen.findByTestId('tenant-model-key')
+    expect(within(section).getByRole('heading', { name: 'Model key' })).toBeVisible()
+    expect(within(section).getByTestId('tenant-model-key-load-failed')).toHaveTextContent(
+      'The model key could not be loaded.',
+    )
+    expect(within(section).queryByText('No key is set.')).toBeNull()
+    expect(within(section).queryByRole('button')).toBeNull()
     expect(warn).toHaveBeenCalledWith('Reading the model key failed with status 503.')
+  })
+
+  it('says that the key could not be loaded when the request is rejected', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('offline')
+      }),
+    )
+    renderSection()
+
+    expect(await screen.findByTestId('tenant-model-key-load-failed')).toHaveTextContent(
+      'The model key could not be loaded.',
+    )
+    expect(screen.queryByText('No key is set.')).toBeNull()
+  })
+
+  it('says that the key is loading before the answer', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => {})),
+    )
+    renderSection()
+
+    const section = await screen.findByTestId('tenant-model-key')
+    expect(within(section).getByRole('heading', { name: 'Model key' })).toBeVisible()
+    expect(within(section).getByText('Loading the model key…')).toBeVisible()
+    expect(within(section).queryByText('No key is set.')).toBeNull()
+    expect(within(section).queryByRole('button')).toBeNull()
   })
 
   it('shows a set key masked with its ending and offers Change and Remove', async () => {

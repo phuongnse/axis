@@ -378,7 +378,11 @@ function OwnGrants({
     return <AxisAlert kind="error" message={t('shell.studio.matrix.loadFailed')} />
   }
   if (state === undefined) {
-    return null
+    return (
+      <Typography.Text type="secondary" data-testid="studio-matrix-own-grants-loading">
+        {t('shell.studio.matrix.grantsLoading')}
+      </Typography.Text>
+    )
   }
   const { loaded, draft } = state
   const grants: unknown[] = Array.isArray(draft.grants) ? draft.grants : []

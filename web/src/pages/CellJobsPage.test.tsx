@@ -120,6 +120,16 @@ describe('CellJobsPage', () => {
     expect(within(rows[2]).queryByTestId('cell-job-step-error')).not.toBeInTheDocument()
   })
 
+  it('says that no step has run yet for a job with no steps', async () => {
+    stubJobs(200, [{ ...succeeded, state: 'queued', steps: [] }, failed])
+    renderPage()
+
+    const rows = within(await screen.findByTestId('cell-jobs')).getAllByRole('row')
+    expect(within(rows[1]).getByTestId('cell-job-no-steps')).toHaveTextContent('No step has run yet.')
+    expect(within(rows[1]).queryByTestId('cell-job-step')).not.toBeInTheDocument()
+    expect(within(rows[2]).queryByTestId('cell-job-no-steps')).not.toBeInTheDocument()
+  })
+
   it('says so when the cell has no jobs', async () => {
     stubJobs(200)
     renderPage()

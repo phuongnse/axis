@@ -5,6 +5,7 @@ import type { CellJob } from './cell'
 import { EmptyDash } from './EmptyValue'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+import { useEmptyStyle } from './useEmptyStyle'
 
 /**
  * The table of the cell console's jobs, in the order given. The Jobs page shows the cell's, and a tenant's view can show the tenant's.
@@ -21,6 +22,7 @@ export function CellJobTable({
 }) {
   const t = useText()
   const { colour } = useDesignTokens()
+  const emptyStyle = useEmptyStyle()
   const stateColours: Record<CellJob['state'], string> = {
     queued: colour.textMuted,
     running: colour.infoText,
@@ -54,7 +56,11 @@ export function CellJobTable({
       kind: 'freeText',
       title: t('shell.cell.jobs.steps'),
       render: (_value, job) =>
-        job.steps.length === 0 ? null : (
+        job.steps.length === 0 ? (
+          <span style={emptyStyle} data-testid="cell-job-no-steps">
+            {t('shell.cell.jobs.noSteps')}
+          </span>
+        ) : (
           <Flex vertical>
             {job.steps.map((step) => (
               <div key={step.name} data-testid="cell-job-step">
