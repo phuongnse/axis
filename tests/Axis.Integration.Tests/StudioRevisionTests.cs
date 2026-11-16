@@ -208,6 +208,11 @@ public sealed class StudioRevisionTests(PostgreSqlFixture database) : IClassFixt
         Assert.All(items, item => Assert.Equal(JsonValueKind.Null, item.GetProperty("request").ValueKind));
         Assert.All(items, item => Assert.True(item.GetProperty("time").GetDateTimeOffset() > DateTimeOffset.UtcNow.AddMinutes(-5)));
         Assert.Equal(CommitShas(RepositoryPath(revisions.Path, folder.Path)).AsEnumerable().Reverse(), items.Select(item => item.GetProperty("id").GetString()));
+        var answer = await ReadAsync(list);
+        Assert.Equal(3, answer.GetProperty("totalCount").GetInt64());
+        Assert.Equal(1, answer.GetProperty("page").GetInt32());
+        Assert.Equal(20, answer.GetProperty("pageSize").GetInt32());
+        Assert.Equal(items[2].GetProperty("id").GetString(), answer.GetProperty("start").GetString());
 
         using var changeDiff = await SendAsync(client, HttpMethod.Get, $"{Url}/revisions/{items[1].GetProperty("id").GetString()}", null);
         Assert.Equal(HttpStatusCode.OK, changeDiff.StatusCode);
@@ -231,6 +236,63 @@ public sealed class StudioRevisionTests(PostgreSqlFixture database) : IClassFixt
         Assert.Equal("Fresh", added.GetProperty("name").GetString());
         Assert.Equal(JsonValueKind.Null, added.GetProperty("before").ValueKind);
         Assert.Equal(File.ReadAllText(Path.Combine(folder.Path, createdFile)), added.GetProperty("after").GetString());
+    }
+
+    [Fact]
+    public async Task The_list_takes_the_page_page_size_sort_search_and_filter_of_the_record_API()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path);
+        using var client = factory.CreateClient().SignedInAs("author");
+        foreach (var name in new[] { "Fresh", "Second", "Third" })
+        {
+            using var create = await SendAsync(
+                client, HttpMethod.Post, $"{Url}/resources", "application/json", $$"""{"id":"{{Guid.NewGuid()}}","kind":"policy","name":"{{name}}"}""");
+            Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        }
+
+        var all = await ListAsync(client, "");
+        Assert.Equal(["Create policy Third", "Create policy Second", "Create policy Fresh", "Start of history"], Summaries(all));
+        var start = all.GetProperty("items")[3].GetProperty("id").GetString();
+        Assert.Equal(start, all.GetProperty("start").GetString());
+
+        var second = await ListAsync(client, "pageSize=2&page=2");
+        Assert.Equal(["Create policy Fresh", "Start of history"], Summaries(second));
+        Assert.Equal(4, second.GetProperty("totalCount").GetInt64());
+        Assert.Equal(2, second.GetProperty("page").GetInt32());
+        Assert.Equal(2, second.GetProperty("pageSize").GetInt32());
+        Assert.Equal(start, second.GetProperty("start").GetString());
+
+        var past = await ListAsync(client, "pageSize=2&page=3");
+        Assert.Empty(past.GetProperty("items").EnumerateArray());
+        Assert.Equal(4, past.GetProperty("totalCount").GetInt64());
+
+        Assert.Equal(
+            ["Create policy Fresh", "Create policy Second", "Create policy Third", "Start of history"],
+            Summaries(await ListAsync(client, "sort=summary")));
+        Assert.Equal("Start of history", Summaries(await ListAsync(client, "sort=-summary"))[0]);
+
+        var searched = await ListAsync(client, "search=Fresh");
+        Assert.Equal(["Create policy Fresh"], Summaries(searched));
+        Assert.Equal(1, searched.GetProperty("totalCount").GetInt64());
+        Assert.Equal(start, searched.GetProperty("start").GetString());
+
+        var contains = await ListAsync(client, $"filter={Uri.EscapeDataString("""{"all":[{"field":"summary","op":"contains","value":"second"}]}""")}");
+        Assert.Equal(["Create policy Second"], Summaries(contains));
+
+        var today = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        var onDay = await ListAsync(client, $"filter={Uri.EscapeDataString($$"""{"all":[{"field":"time","op":"eq","value":"{{today}}"},{"field":"client","op":"eq","value":"studio"}]}""")}");
+        Assert.Equal(3, onDay.GetProperty("totalCount").GetInt64());
+
+        using var undeclared = await SendAsync(
+            client, HttpMethod.Get, $"{Url}/revisions?filter={Uri.EscapeDataString("""{"all":[{"field":"request","op":"empty"}]}""")}", null);
+        Assert.Equal(HttpStatusCode.BadRequest, undeclared.StatusCode);
+        Assert.Contains("filter", (await ReadAsync(undeclared)).GetProperty("errors").EnumerateObject().Select(error => error.Name));
+        using var unsorted = await SendAsync(client, HttpMethod.Get, $"{Url}/revisions?sort=request", null);
+        Assert.Equal(HttpStatusCode.BadRequest, unsorted.StatusCode);
+        using var tooBig = await SendAsync(client, HttpMethod.Get, $"{Url}/revisions?pageSize=101", null);
+        Assert.Equal(HttpStatusCode.BadRequest, tooBig.StatusCode);
     }
 
     [Fact]
@@ -407,6 +469,16 @@ public sealed class StudioRevisionTests(PostgreSqlFixture database) : IClassFixt
         Assert.Equal(HttpStatusCode.BadRequest, badCursor.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, unknownApplication.StatusCode);
     }
+
+    private static async Task<JsonElement> ListAsync(HttpClient client, string query)
+    {
+        using var response = await SendAsync(client, HttpMethod.Get, $"{Url}/revisions?{query}", null);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await ReadAsync(response);
+    }
+
+    private static List<string?> Summaries(JsonElement list) =>
+        [.. list.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("summary").GetString())];
 
     private static async Task<JsonElement> ReadAsync(HttpResponseMessage response)
     {

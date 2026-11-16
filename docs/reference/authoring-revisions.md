@@ -15,10 +15,33 @@ diff and the undo answer `404`.
 
 ## List
 
-`200` with `{ items: [{ id, summary, author, userId, client, request, time }] }`, newest first and not
-paged. `userId` and `client` are `null` for a revision the server made. `request` is the `accept`
-[publish request](authoring.md#the-request) that a revision from an accept names, and `null` for any
-other.
+`200` with `{ items: [{ id, summary, author, userId, client, request, time }], page, pageSize, totalCount,
+start }`: one page of the revisions, newest first unless `sort` says otherwise. `userId` and `client` are
+`null` for a revision the server made. `request` is the `accept` [publish request](authoring.md#the-request)
+that a revision from an accept names, and `null` for any other.
+
+The route takes the record API's `page`, `pageSize`, `sort`, `search` and `filter`, as
+[paging and sorting](record-api.md#paging-and-sorting) defines them. The columns are `summary`, `author`
+and `client`, which are text, and `time`, which is a date.
+
+- **`sort`.** One column, `-` first for descending order. A `sort` on a time orders by the full time.
+  Rows that tie keep the newest-first order. A missing value comes last ascending and first descending.
+- **`search`.** Keeps the revisions whose `summary` or `author` contains the text, ignoring letter case.
+- **`filter`.** The same groups and operators as the record API. A condition on `time` takes a
+  day, `YYYY-MM-DD`, and compares the day of the revision in UTC. A server revision has no `client`, so
+  `empty` matches it. The `author` it compares is the stored one, `Axis` for a revision the server made.
+- **`totalCount`.** How many revisions match, before the page is cut. A page past the end is `200` with
+  empty `items` and the real `totalCount`.
+- **`start`.** The id of the start of history, the oldest revision, whatever the page, the search or the
+  filter. `null` when there is no revision. It is the one revision that [has no undo](#undo), so a client
+  that shows an Undo action on each row hides it on this one.
+
+A `page`, `pageSize`, `sort`, `search` or `filter` that is invalid, including a `sort` or a `filter` on a
+column the list does not hold, is `400` with a problem whose `errors` name the parameter, as the record API
+does. A server without `Studio:RevisionsPath`, or a folder with no history yet, lists no revisions.
+The server reads the folder's whole history for each request and then pages it in memory. The
+[shared list query](shared-widgets.md#which-widget) does that work, so Releases and the lists of each kind
+can use it.
 
 ## Diff
 

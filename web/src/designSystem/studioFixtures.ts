@@ -433,7 +433,11 @@ const typicalRevisions = {
       time: '2026-10-14T08:00:00Z',
     },
   ],
-} satisfies { items: StudioRevision[] }
+  page: 1,
+  pageSize: 20,
+  totalCount: 3,
+  start: 'r1',
+} satisfies { items: StudioRevision[]; page: number; pageSize: number; totalCount: number; start: string }
 
 /** The newest revision of Typical with the three files it changed, which the Revision state opens. */
 const typicalRevisionDiff = {
