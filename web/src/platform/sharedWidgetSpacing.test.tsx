@@ -9,6 +9,7 @@ import { StudioChanges } from '../pages/StudioChanges'
 import { SectionPart, SectionParts } from './SectionParts'
 import { withAntdStyles } from '../test/antdStyles'
 import { Announcement } from './Announcement'
+import { ActionBar } from './ActionBar'
 import { antConfigFor } from './antTheme'
 import { AxisActionRow, AxisButton } from './AxisButton'
 import { AxisAlert } from './AxisAlert'
@@ -41,6 +42,8 @@ const texts = {
   'shell.table.columnsMoveUp': 'Move up',
   'shell.table.columnsMoveDown': 'Move down',
   'shell.form.cancel': 'Cancel',
+  'shell.actionRow.more': 'More actions',
+  'test.discard': 'Discard',
   'shell.table.selectRow': 'Select row',
   'row.open': 'Open',
   'shell.studio.history.before': 'Before',
@@ -97,6 +100,12 @@ const widgets: Record<string, ReactElement> = {
     <AxisActionRow>
       <AxisButton role="secondary">Cancel</AxisButton>
     </AxisActionRow>
+  ),
+  ActionBar: (
+    <ActionBar
+      fold={[{ key: 'discard', labelKey: 'test.discard', onClick: onChange }]}
+      end={<AxisButton role="finish">Save</AxisButton>}
+    />
   ),
   'SectionParts with a part with a heading and one without': (
     <SectionParts>

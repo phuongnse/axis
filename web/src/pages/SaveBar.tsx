@@ -1,14 +1,16 @@
 import { RedoOutlined, UndoOutlined } from '@ant-design/icons'
-import { Flex, Modal } from 'antd'
+import { Modal } from 'antd'
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { ActionBar } from '../platform/ActionBar'
+import { AxisButton } from '../platform/AxisButton'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useUnsavedChanges } from '../platform/unsavedChanges'
 
 /**
  * The save bar of a Studio resource, see docs/reference/studio-resource-form.md#save-bar. It stays at the foot of the
- * window across the content, over the footer, while there is something to save or a step can be redone, and it is not
+ * window across the content, over the footer, and draws through `ActionBar`, so Discard folds into More actions at a
+ * narrow width. It is shown while there is something to save or a step can be redone, and it is not
  * drawn otherwise. Discard asks first, because no Undo brings the changes back, see
  * docs/reference/actions-and-controls.md#undo-rather-than-confirm.
  */
@@ -37,7 +39,7 @@ export function SaveBar({
   onSave: () => void
 }): ReactNode {
   const t = useText()
-  const { size, colour, spacing } = useDesignTokens()
+  const { size } = useDesignTokens()
   const anchorRef = useRef<HTMLDivElement>(null)
   const [frame, setFrame] = useState<{ left: number; width: number }>()
   const [discardOpen, setDiscardOpen] = useState(false)
@@ -71,55 +73,51 @@ export function SaveBar({
   return (
     <>
       <div ref={anchorRef} style={{ height: size.bar }} />
-      <Flex
+      <div
         data-testid="studio-save-bar"
-        align="center"
-        justify="space-between"
-        gap="middle"
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: frame?.left ?? 0,
-          width: frame?.width ?? '100%',
-          minHeight: size.bar,
-          zIndex: 10,
-          boxSizing: 'border-box',
-          paddingBlock: spacing.xs,
-          paddingInline: spacing.lg,
-          background: colour.surface,
-          borderTop: `1px solid ${colour.borderSubtle}`,
-        }}
+        style={{ position: 'fixed', bottom: 0, left: frame?.left ?? 0, width: frame?.width ?? '100%', zIndex: 10 }}
       >
-        <AxisActionRow align="center">
-          <span>{unsaved ? t('shell.studio.saveBar.unsaved') : t('shell.studio.saveBar.noUnsaved')}</span>
-          <AxisButton
-            role="icon"
-            nameKey="shell.studio.undo"
-            icon={<UndoOutlined />}
-            aria-keyshortcuts="Control+Z Meta+Z"
-            disabled={!undoable || busy}
-            onClick={onUndo}
-          />
-          <AxisButton
-            role="icon"
-            nameKey="shell.studio.redo"
-            icon={<RedoOutlined />}
-            aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
-            disabled={!redoable || busy}
-            onClick={onRedo}
-          />
-        </AxisActionRow>
-        <AxisActionRow align="center">
-          {unsaved && (
-            <AxisButton role="secondary" disabled={busy} onClick={() => setDiscardOpen(true)}>
-              {t('shell.studio.discard')}
+        <ActionBar
+          start={
+            <>
+              <span>{unsaved ? t('shell.studio.saveBar.unsaved') : t('shell.studio.saveBar.noUnsaved')}</span>
+              <AxisButton
+                role="icon"
+                nameKey="shell.studio.undo"
+                icon={<UndoOutlined />}
+                aria-keyshortcuts="Control+Z Meta+Z"
+                disabled={!undoable || busy}
+                onClick={onUndo}
+              />
+              <AxisButton
+                role="icon"
+                nameKey="shell.studio.redo"
+                icon={<RedoOutlined />}
+                aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
+                disabled={!redoable || busy}
+                onClick={onRedo}
+              />
+            </>
+          }
+          fold={
+            unsaved
+              ? [
+                  {
+                    key: 'discard',
+                    labelKey: 'shell.studio.discard',
+                    disabled: busy,
+                    onClick: () => setDiscardOpen(true),
+                  },
+                ]
+              : []
+          }
+          end={
+            <AxisButton role="finish" data-testid="studio-save" disabled={!saveable} onClick={onSave}>
+              {t('shell.studio.save')}
             </AxisButton>
-          )}
-          <AxisButton role="finish" data-testid="studio-save" disabled={!saveable} onClick={onSave}>
-            {t('shell.studio.save')}
-          </AxisButton>
-        </AxisActionRow>
-      </Flex>
+          }
+        />
+      </div>
       <Modal
         open={discardOpen}
         width={size.dialog.small}

@@ -151,7 +151,8 @@ says so.
 
 The save bar holds what acts on the whole draft. While there is something to save, it stays at the foot
 of the window across the content, drawn over the footer: "Unsaved changes" on the left, Undo and Redo as
-icons, then Discard and Save on the right. With nothing to save it is not drawn.
+icons, then Discard and Save on the right. With nothing to save it is not drawn. At narrow width Discard
+folds into the More actions menu, as an [action bar](actions-and-controls.md#buttons) does.
 
 - **While a step can be redone.** The bar stays, reading "No unsaved changes", with Redo on and no
   Discard, as nothing is left to discard. Save is off.
