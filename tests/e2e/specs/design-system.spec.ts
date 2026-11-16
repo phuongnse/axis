@@ -820,6 +820,7 @@ const framedPreviews: Record<
       "Policy matrix",
       "Releases",
       "History",
+      "Revision",
       "Release page",
     ],
     pickedInFixtures: true,
@@ -1028,6 +1029,13 @@ for (const [slug, expectKeyElement] of [
     async (state: FrameLocator) => {
       await expect(state.getByTestId("studio-history")).toBeVisible();
       await expect(state.getByTestId("studio-revision-row")).toHaveCount(3);
+    },
+  ],
+  [
+    "revision",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-revision")).toBeVisible();
+      await expect(state.getByTestId("studio-changes-file")).toHaveCount(3);
     },
   ],
   [
