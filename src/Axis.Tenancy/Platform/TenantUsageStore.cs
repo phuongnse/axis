@@ -1,11 +1,12 @@
 using Npgsql;
+using NpgsqlTypes;
 
 namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// Writes the usage of a cell's tenants to <c>platform.tenant_usage_latest</c> and <c>platform.tenant_usage</c>, and the tokens of the
 /// agent host's model calls to <c>platform.tenant_token_usage</c>, over
-/// the platform database, and reads a tenant's latest storage sample and its day rows. It writes counts and sizes only, among them the counts of failed work. The platform
+/// the platform database, and reads a tenant's latest storage sample and its day rows. It also records the day's users, applications and emails sent of a tenant, see <see cref="RecordCountsAsync"/>. It writes counts and sizes only, among them the counts of failed work. The platform
 /// role that the data source connects as has the write grant of <see cref="PlatformRoleGrants"/> on these three tables, see
 /// <c>docs/reference/tenant-quotas.md#usage</c>.
 /// </summary>
@@ -78,6 +79,61 @@ public sealed class TenantUsageStore(NpgsqlDataSource platform)
             retention.Parameters.AddWithValue("tenant", tenantId);
             retention.Parameters.AddWithValue("cutoff", today.AddMonths(-RetentionMonths));
             await retention.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Records the counts of the tenant's day in one transaction. The row of the UTC day of <paramref name="now"/> takes
+    /// <paramref name="users"/> and <paramref name="applications"/>, replacing the day's earlier values, and a count that is
+    /// <c>null</c> keeps the row's earlier value. The row's emails sent become the day's <c>emails</c> counter of
+    /// <see cref="TenantDailyCounterStore"/>. The previous day's existing row also takes that day's counter, so it is final once
+    /// a sample after midnight has run, and no row is created for it. See <c>docs/reference/tenant-quotas.md#usage</c>.
+    /// </summary>
+    public async Task RecordCountsAsync(string tenantId, int? users, int? applications, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        await using var connection = await platform.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        await using (var current = new NpgsqlCommand(
+            """
+            INSERT INTO platform.tenant_usage AS u (tenant_id, day, users, applications, emails_sent)
+            VALUES (@tenant, @today, @users, @applications,
+                COALESCE((SELECT LEAST(value, 2147483647)::integer FROM platform.tenant_daily_counters
+                          WHERE tenant_id = @tenant AND day = @today AND counter = @emails), 0))
+            ON CONFLICT (tenant_id, day) DO UPDATE
+            SET users = COALESCE(EXCLUDED.users, u.users), applications = COALESCE(EXCLUDED.applications, u.applications),
+                emails_sent = EXCLUDED.emails_sent
+            """,
+            connection,
+            transaction))
+        {
+            current.Parameters.AddWithValue("tenant", tenantId);
+            current.Parameters.AddWithValue("today", today);
+            current.Parameters.AddWithValue("emails", TenantDailyCounterStore.Emails);
+            current.Parameters.Add(new NpgsqlParameter("users", NpgsqlDbType.Integer) { Value = (object?)users ?? DBNull.Value });
+            current.Parameters.Add(new NpgsqlParameter("applications", NpgsqlDbType.Integer) { Value = (object?)applications ?? DBNull.Value });
+            await current.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var previous = new NpgsqlCommand(
+            """
+            UPDATE platform.tenant_usage u
+            SET emails_sent = LEAST(c.value, 2147483647)::integer
+            FROM platform.tenant_daily_counters c
+            WHERE u.tenant_id = @tenant AND u.day = @yesterday
+              AND c.tenant_id = u.tenant_id AND c.day = u.day AND c.counter = @emails
+            """,
+            connection,
+            transaction))
+        {
+            previous.Parameters.AddWithValue("tenant", tenantId);
+            previous.Parameters.AddWithValue("yesterday", today.AddDays(-1));
+            previous.Parameters.AddWithValue("emails", TenantDailyCounterStore.Emails);
+            await previous.ExecuteNonQueryAsync(cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);

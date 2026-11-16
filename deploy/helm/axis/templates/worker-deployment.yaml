@@ -46,6 +46,11 @@ spec:
             {{- with include "axis.applicationRunnerEnv" . }}
             {{- . | nindent 12 }}
             {{- end }}
+            {{- if .Values.cell.id }}
+            {{- /* In a cell the worker counts each tenant's applications in its Studio folder, see docs/reference/tenant-quotas.md#usage. */}}
+            - name: Studio__ApplicationsPath
+              value: /studio
+            {{- end }}
           ports:
             - name: health
               containerPort: 5208
@@ -58,5 +63,15 @@ spec:
           {{- end }}
           volumeMounts:
             {{- include "axis.volumeMounts" . | nindent 12 }}
+            {{- if .Values.cell.id }}
+            # Read-only: the worker reads the Studio folders and never creates or writes one.
+            - name: studio
+              mountPath: /studio
+              readOnly: true
+            {{- end }}
       volumes:
         {{- include "axis.volumes" (dict "root" . "entries" (list "platformConnection" "platformSecretKey")) | nindent 8 }}
+        {{- if .Values.cell.id }}
+        - name: studio
+          {{- toYaml .Values.studio.persistence | nindent 10 }}
+        {{- end }}

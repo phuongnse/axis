@@ -10,6 +10,7 @@ using Axis.Admin;
 using Axis.Administration;
 using Axis.Configuration.Tests;
 using Axis.Server.Tests;
+using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Logging;
@@ -235,6 +236,27 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
                 Assert.Equal((1000, 0), Use(tenant, "emailsPerDay"));
                 Assert.Equal(JsonValueKind.Null, tenant.GetProperty("newestArchiveAt").ValueKind);
             });
+    }
+
+    [Fact]
+    public async Task The_detail_answers_the_users_and_applications_that_the_second_of_two_samples_of_the_day_wrote()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var store = new TenantUsageStore(NpgsqlDataSource.Create(PostgreSqlServer.RuntimeConnectionString(_platform)));
+        var now = DateTimeOffset.UtcNow;
+        await store.RecordCountsAsync("a", 3, 2, now, CancellationToken);
+        await store.RecordCountsAsync("a", 5, 4, now.AddMinutes(1), CancellationToken);
+
+        using var tenant = await GetAsync(client, "/api/cell/tenants/a", token);
+        using var anonymous = await GetAsync(client, "/api/cell/tenants/a", null);
+
+        Assert.Equal(HttpStatusCode.OK, tenant.StatusCode);
+        var body = await tenant.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(5, Use(body, "users").Used);
+        Assert.Equal(4, Use(body, "applications").Used);
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
     }
 
     [Fact]

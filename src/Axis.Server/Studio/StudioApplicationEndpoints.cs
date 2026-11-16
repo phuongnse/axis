@@ -133,13 +133,8 @@ internal static class StudioApplicationEndpoints
     }
 
     // The distinct names, ignoring letter case, of the folders in the tenant's Studio folder and of the active releases.
-    internal static async Task<long> CountApplicationsAsync(TenantDatabase database, StudioOptions options, CancellationToken cancellationToken)
-    {
-        var names = new HashSet<string>(StudioFolder.Applications(options), StringComparer.OrdinalIgnoreCase);
-        var releases = await new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken)).ListAsync(cancellationToken);
-        names.UnionWith(releases.Select(release => release.Name));
-        return names.Count;
-    }
+    internal static async Task<long> CountApplicationsAsync(TenantDatabase database, StudioOptions options, CancellationToken cancellationToken) =>
+        await StudioApplicationCount.CountAsync(options, await database.GetConfigurationAsync(cancellationToken), cancellationToken);
 }
 
 /// <summary>The answer of a create: the application's <c>name</c> and the diagnostics of its folder.</summary>
