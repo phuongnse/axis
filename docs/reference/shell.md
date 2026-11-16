@@ -342,9 +342,8 @@ to the frame shows in every state. How previews work is in
 - **The identity provider's pages are the theme's own.** `identitySignIn` is built from fixtures
   through the shared sign-in components in `web/src/identitySignIn/`. Its states from Two-step
   verification to Error are the same components that the theme draws.
-- **A frame holds the whole shell.** A shell preview draws the shell, from the header to the footer, in
-  a frame at least as tall as its height, which grows to hold the whole shell, so several states fit
-  one card.
+- **A frame is a screen.** A shell preview draws the shell in a frame exactly as tall as its height, and
+  the page scrolls inside it as in a window, so a dialog opens in the middle of what shows.
 - **The Studio group** is the eighth group of cards, after Shell. Its `studio` preview draws Studio
   through the shell over fixtures of the purchase request sample, in eleven states: Typical, Empty,
   Loading, Failed, Many rows, Long names, Access denied, Overview with errors and changes not live,

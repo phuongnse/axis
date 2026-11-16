@@ -776,6 +776,8 @@ for (const mode of modes) {
       // The harness wraps the previews in a main landmark, which takes the footer out of the contentinfo role.
       const footer = figure(frame, caption).locator("footer");
       await expect(footer).toBeVisible();
+      // The page scrolls inside its frame, so the footer can lie below the frame's visible part.
+      await footer.scrollIntoViewIfNeeded();
       const figureBox = await figure(frame, caption).boundingBox();
       const footerBox = await footer.boundingBox();
       if (!figureBox || !footerBox) {
@@ -789,6 +791,135 @@ for (const mode of modes) {
     expect(recording.errors).toEqual([]);
   });
 }
+
+// The captions of each framed preview's states. A preview with a Fixtures control draws one state at a time, so its
+// states are picked there.
+const framedPreviews: Record<
+  string,
+  { captions: readonly string[]; pickedInFixtures: boolean }
+> = {
+  shell: { captions: Object.keys(stateKeys.shell), pickedInFixtures: false },
+  signIn: { captions: Object.keys(stateKeys.signIn), pickedInFixtures: false },
+  identitySignIn: {
+    captions: Object.keys(stateKeys.identitySignIn),
+    pickedInFixtures: false,
+  },
+  signUp: { captions: ["Typical"], pickedInFixtures: false },
+  studio: {
+    captions: [
+      "Typical",
+      "Empty",
+      "Loading",
+      "Failed",
+      "Many rows",
+      "Long names",
+      "Access denied",
+      "Overview with errors and changes not live",
+      "Overview of a new application",
+      "Entity",
+      "Policy matrix",
+    ],
+    pickedInFixtures: true,
+  },
+  studioPageDesign: { captions: ["Typical"], pickedInFixtures: true },
+  studioFormDesign: { captions: ["Typical"], pickedInFixtures: true },
+  studioProcessDesign: { captions: ["Typical"], pickedInFixtures: true },
+};
+
+for (const [name, { captions, pickedInFixtures }] of Object.entries(
+  framedPreviews,
+)) {
+  test(`the ${name} preview draws each state in a frame exactly as tall as its height, with the page scrolling inside it, in light mode`, async ({
+    page,
+  }) => {
+    const recording = await openHarness(page, `?preview=${name}&mode=light`, {
+      sandboxed: true,
+      frameWidth: 992,
+    });
+    const frame = page.frameLocator("iframe");
+    const fixtures = frame.getByRole("radiogroup", {
+      name: "Fixtures",
+      exact: true,
+    });
+
+    for (const caption of captions) {
+      if (pickedInFixtures) {
+        await fixtures.getByText(caption, { exact: true }).click();
+      }
+      const state = figure(frame, caption);
+      const screen = state.locator(":scope > div > :first-child");
+      await expect(screen).toBeVisible();
+      // The frame sets its height in --shell-min-height, so the spec reads it rather than copying the heights.
+      const height = await state
+        .locator(":scope > div")
+        .evaluate((element) =>
+          parseFloat(
+            getComputedStyle(element).getPropertyValue("--shell-min-height"),
+          ),
+        );
+      const box = await screen.boundingBox();
+      if (!box) {
+        throw new Error(`The ${caption} state has no screen box`);
+      }
+      expect(Math.abs(box.height - height)).toBeLessThanOrEqual(0.5);
+      expect(
+        await screen.evaluate((element) => getComputedStyle(element).overflowY),
+      ).toBe("auto");
+    }
+    expect(recording.errors).toEqual([]);
+  });
+}
+
+test("a dialog opened in the scrolled entity state of studio shows inside the frame", async ({
+  page,
+}) => {
+  const recording = await openHarness(
+    page,
+    "?preview=studio&mode=light&state=entity",
+  );
+  const screen = figure(page, "Entity").locator(":scope > div > :first-child");
+
+  await expect(page.getByTestId("studio-entity-designer")).toBeVisible();
+  await page
+    .getByTestId("studio-field-/label")
+    .getByRole("textbox", { name: "English", exact: true })
+    .pressSequentially("!");
+  await expect(page.getByTestId("studio-save-bar")).toBeVisible();
+
+  expect(
+    await screen.evaluate((element) => element.scrollHeight > element.clientHeight),
+  ).toBe(true);
+  await screen.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect
+    .poll(() => screen.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+
+  await page
+    .getByTestId("studio-save-bar")
+    .getByRole("button", { name: "Discard", exact: true })
+    .click();
+  const dialog = await waitForDialog(page, "Discard all unsaved changes?");
+
+  const dialogBox = await dialog.boundingBox();
+  const screenBox = await screen.boundingBox();
+  if (!dialogBox || !screenBox) {
+    throw new Error("The dialog or the screen has no box");
+  }
+  expect(dialogBox.x).toBeGreaterThanOrEqual(screenBox.x);
+  expect(dialogBox.y).toBeGreaterThanOrEqual(screenBox.y);
+  expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(
+    screenBox.x + screenBox.width,
+  );
+  expect(dialogBox.y + dialogBox.height).toBeLessThanOrEqual(
+    screenBox.y + screenBox.height,
+  );
+  expect(
+    await screen.evaluate((element) => element.scrollTop),
+  ).toBeGreaterThan(0);
+  expect(recording.errors).toEqual([]);
+});
 
 for (const mode of modes) {
   test(`the studio preview moves between Overview, Settings, a kind list and Releases from the sidebar in ${mode} mode`, async ({

@@ -24,8 +24,9 @@ function Canvas({ children }: { children: ReactNode }) {
 }
 
 /**
- * A frame at least as tall as its height, which the shell fills and which grows to hold the whole shell. Its popups
- * open inside it, and the transform keeps a dialog's mask inside it too, so several states fit one card.
+ * A screen exactly as tall as its height. The page scrolls inside it, as it scrolls in a window, so a dialog opens in
+ * the middle of what shows. The outer box does not scroll. It holds the popups and dialogs, and the transform keeps
+ * them inside it, so several states fit one card.
  */
 function Frame({ height, children }: { height: number; children: ReactNode }) {
   const { colour } = useDesignTokens()
@@ -35,7 +36,8 @@ function Frame({ height, children }: { height: number; children: ReactNode }) {
       ref={setFrame}
       style={
         {
-          minHeight: height,
+          height,
+          boxSizing: 'content-box',
           position: 'relative',
           transform: 'translateZ(0)',
           border: `1px solid ${colour.borderSubtle}`,
@@ -43,7 +45,9 @@ function Frame({ height, children }: { height: number; children: ReactNode }) {
         } as CSSProperties
       }
     >
-      {frame && <ConfigProvider getPopupContainer={() => frame}>{children}</ConfigProvider>}
+      <div style={{ height: '100%', overflow: 'auto' }}>
+        {frame && <ConfigProvider getPopupContainer={() => frame}>{children}</ConfigProvider>}
+      </div>
     </div>
   )
 }
