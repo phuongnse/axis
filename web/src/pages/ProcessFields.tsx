@@ -13,14 +13,15 @@ function text(value: unknown): string {
 
 /**
  * The editor of an expression: the expression editor when the draft can check expressions, a plain box otherwise. The
- * `id` and `aria-describedby` that `AxisField` gives its input reach the plain box only, as the expression editor does
- * not take them yet. It keeps its own name. A `readOnly` expression is always the plain box.
+ * `id`, `aria-describedby` and `aria-required` that `AxisField` gives its input reach the plain box only, as the
+ * expression editor does not take them yet. It keeps its own name. A `readOnly` expression is always the plain box.
  */
 export function Expression({
   pointer,
   name,
   id,
   'aria-describedby': describedBy,
+  'aria-required': ariaRequired,
   value,
   required = true,
   readOnly = false,
@@ -30,6 +31,7 @@ export function Expression({
   name: string
   id?: string
   'aria-describedby'?: string
+  'aria-required'?: boolean
   value: string
   required?: boolean
   readOnly?: boolean
@@ -44,6 +46,7 @@ export function Expression({
       name={name}
       id={id}
       aria-describedby={describedBy}
+      aria-required={ariaRequired}
       value={value}
       required={required}
       onChange={onChange}
@@ -60,6 +63,7 @@ export function NamePicker({
   label,
   help,
   kind,
+  required = false,
   value,
   onPick,
 }: {
@@ -67,6 +71,8 @@ export function NamePicker({
   label: string
   help: string
   kind: string
+  /** Marks the field required, as for {@link AxisField}. Off unless the schema requires the key. */
+  required?: boolean
   value: unknown
   onPick: (next: string) => void
 }) {
@@ -74,7 +80,7 @@ export function NamePicker({
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <AxisField label={label} help={help}>
+      <AxisField label={label} help={help} required={required}>
         {names === undefined ? (
           <Input value={text(value)} onChange={(event) => onPick(event.target.value)} />
         ) : (
