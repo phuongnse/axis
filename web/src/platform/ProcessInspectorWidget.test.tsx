@@ -246,50 +246,76 @@ describe('ProcessInspectorWidget', () => {
 
     await screen.findByRole('row', { name: /managerApproval/ })
     await user.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'State')
     await pick('Value', 0, 'Failed')
     await clickInDialog('Apply')
 
-    await waitFor(() => expect(requests()).toContain(`${instancesPath}?pageSize=10&state=failed`))
+    const filter = JSON.stringify({ all: [{ field: 'state', op: 'eq', value: 'failed' }] })
+    await waitFor(() =>
+      expect(requests()).toContain(`${instancesPath}?${new URLSearchParams({ filter, pageSize: '10' })}`),
+    )
     const address = new URLSearchParams(screen.getByTestId('search').textContent ?? '')
     expect(JSON.parse(address.get('filter')!)).toEqual({ all: [{ field: 'state', op: 'eq', value: 'failed' }] })
     expect(address.has('page')).toBe(false)
     expect(address.get('pageSize')).toBe('10')
   })
 
-  it('sends every state that State is not Running keeps', async () => {
+  it('searches, filters by Step and sorts by Release, keeps the view in the address and sends it as it is', async () => {
     const requests = stubInstances()
     const user = userEvent.setup()
 
     renderWidget()
 
     await screen.findByRole('row', { name: /managerApproval/ })
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'carpet{Enter}')
     await user.click(screen.getByRole('button', { name: 'Filter' }))
-    await pick('Operator', 0, 'is not')
-    await pick('Value', 0, 'Running')
-    await clickInDialog('Apply')
+    await pick('Column', 0, 'Step')
+    await pick('Operator', 0, 'contains')
+    await user.type(within(screen.getByRole('dialog')).getByRole('textbox', { name: 'Value' }), 'manager')
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Apply' }))
+    await user.click(screen.getByRole('columnheader', { name: 'Release' }))
 
+    const filter = JSON.stringify({ all: [{ field: 'step', op: 'contains', value: 'manager' }] })
     await waitFor(() =>
-      expect(requests()).toContain(`${instancesPath}?state=waiting&state=completed&state=failed&state=cancelled`),
+      expect(requests()).toContain(
+        `${instancesPath}?${new URLSearchParams({ search: 'carpet', filter, sort: 'releaseNumber' })}`,
+      ),
     )
+    const address = new URLSearchParams(screen.getByTestId('search').textContent ?? '')
+    expect(address.get('search')).toBe('carpet')
+    expect(JSON.parse(address.get('filter')!)).toEqual({ all: [{ field: 'step', op: 'contains', value: 'manager' }] })
+    expect(address.get('sort')).toBe('releaseNumber')
+    expect(screen.getByRole('row', { name: /managerApproval/ })).toBeInTheDocument()
   })
 
-  it('shows the empty text and makes no request when the filter keeps no state', async () => {
-    const requests = stubInstances()
+  it('hides the Step column through Columns and keeps the choice in the address', async () => {
+    stubInstances()
+    const user = userEvent.setup()
 
-    renderWidget(`?filter=${encodeURIComponent(JSON.stringify({ all: [{ field: 'state', op: 'empty' }] }))}`)
-
-    expect(await screen.findByText('No instances.')).toBeInTheDocument()
-    expect(requests()).toEqual([])
-  })
-
-  it('sends no state when the filter keeps every state', async () => {
-    const requests = stubInstances()
-    const filter = JSON.stringify({ all: [{ field: 'state', op: 'notEmpty' }] })
-
-    renderWidget(`?filter=${encodeURIComponent(filter)}`)
+    renderWidget()
 
     await screen.findByRole('row', { name: /managerApproval/ })
-    expect(requests()).toEqual([instancesPath])
+    await user.click(screen.getByRole('button', { name: 'Columns' }))
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Step' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }))
+
+    expect(screen.queryByRole('columnheader', { name: 'Step' })).not.toBeInTheDocument()
+    const address = new URLSearchParams(screen.getByTestId('search').textContent ?? '')
+    expect(address.get('columns')).toBe('subjectLabel,state,releaseNumber,createdAt,endedAt')
+  })
+
+  it('loads the same instances again on Refresh', async () => {
+    const requests = stubInstances()
+    const user = userEvent.setup()
+
+    renderWidget()
+
+    await screen.findByRole('row', { name: /managerApproval/ })
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
+
+    await waitFor(() => expect(requests()).toEqual([instancesPath, instancesPath]))
+    expect(await screen.findByRole('row', { name: /managerApproval/ })).toBeInTheDocument()
   })
 
   it('does not read an old state parameter and lists every instance', async () => {
@@ -317,7 +343,8 @@ describe('ProcessInspectorWidget', () => {
     renderWidget()
 
     expect(await screen.findByTestId('inspector-error')).toHaveTextContent('The instances could not be loaded.')
-    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.queryByRole('row', { name: /managerApproval/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
   })
 
   it('asks to sign in when nobody is signed in', async () => {
