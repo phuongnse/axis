@@ -1,11 +1,10 @@
 using Axis.Configuration.Model;
 using Axis.Data.Records;
-using Axis.Server.Http;
 
-namespace Axis.Server.Studio;
+namespace Axis.Server.Http;
 
-/// <summary>The kind of a column of a Studio list. It decides which filter operators the column takes.</summary>
-internal enum StudioListKind
+/// <summary>The kind of a column of a list. It decides which filter operators the column takes.</summary>
+internal enum ListColumnKind
 {
     Text,
     Enum,
@@ -14,37 +13,37 @@ internal enum StudioListKind
 }
 
 /// <summary>
-/// One declared column of a Studio list. <paramref name="Value"/> gives a row's value: a string for text and enum, a number
+/// One declared column of a list. <paramref name="Value"/> gives a row's value: a string for text and enum, a number
 /// for number and a <see cref="DateOnly"/> for date, or null for none. <paramref name="Order"/> gives the value that a sort
 /// uses when it differs from the one a filter compares, as a time sorts by its instant and filters by its day.
 /// </summary>
-internal sealed record StudioListColumn<T>(
+internal sealed record ListColumn<T>(
     string Name,
-    StudioListKind Kind,
+    ListColumnKind Kind,
     Func<T, object?> Value,
     bool Searchable = false,
     IReadOnlyList<string>? Values = null,
     Func<T, IComparable?>? Order = null);
 
-/// <summary>One page of a Studio list, with the number of rows that matched before it was cut.</summary>
-internal sealed record StudioListPage<T>(IReadOnlyList<T> Items, int Page, int PageSize, long TotalCount);
+/// <summary>One page of a list, with the number of rows that matched before it was cut.</summary>
+internal sealed record ListPage<T>(IReadOnlyList<T> Items, int Page, int PageSize, long TotalCount);
 
 /// <summary>
-/// The <c>page</c>, <c>pageSize</c>, <c>sort</c>, <c>search</c> and <c>filter</c> of a Studio list, checked against the
+/// The <c>page</c>, <c>pageSize</c>, <c>sort</c>, <c>search</c> and <c>filter</c> of a list, checked against the
 /// columns that the list declares and applied to rows held in memory. The format is the record API's, see
 /// <c>docs/reference/record-api.md#paging-and-sorting</c>. The filter is parsed by <see cref="RecordListFilter"/>, over the
 /// columns turned into an entity, so the operators have one definition. A sort or a filter on a column the list does
 /// not declare is an error, and so is a search on a list with no searchable column.
 /// </summary>
-internal sealed class StudioListQuery<T>
+internal sealed class ListQuery<T>
 {
-    private readonly IReadOnlyList<StudioListColumn<T>> _columns;
+    private readonly IReadOnlyList<ListColumn<T>> _columns;
 
     private readonly int _page;
 
     private readonly int _pageSize;
 
-    private readonly StudioListColumn<T>? _sortColumn;
+    private readonly ListColumn<T>? _sortColumn;
 
     private readonly bool _descending;
 
@@ -52,11 +51,11 @@ internal sealed class StudioListQuery<T>
 
     private readonly RecordListFilter? _filter;
 
-    private StudioListQuery(
-        IReadOnlyList<StudioListColumn<T>> columns,
+    private ListQuery(
+        IReadOnlyList<ListColumn<T>> columns,
         int page,
         int pageSize,
-        StudioListColumn<T>? sortColumn,
+        ListColumn<T>? sortColumn,
         bool descending,
         string? search,
         RecordListFilter? filter)
@@ -74,8 +73,8 @@ internal sealed class StudioListQuery<T>
     /// Reads the five parameters of <paramref name="request"/>. Each invalid one adds its message to <paramref name="errors"/>
     /// under its name, and the query that comes back then must not be applied.
     /// </summary>
-    public static StudioListQuery<T> Read(
-        HttpRequest request, IReadOnlyList<StudioListColumn<T>> columns, SortedDictionary<string, string[]> errors)
+    public static ListQuery<T> Read(
+        HttpRequest request, IReadOnlyList<ListColumn<T>> columns, SortedDictionary<string, string[]> errors)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(columns);
@@ -84,7 +83,7 @@ internal sealed class StudioListQuery<T>
         var entity = Entity(columns);
         PagingQuery.TryRead(request.Query["page"], request.Query["pageSize"], errors, out var page, out var pageSize);
 
-        StudioListColumn<T>? sortColumn = null;
+        ListColumn<T>? sortColumn = null;
         var descending = false;
         if (request.Query["sort"] is { Count: > 0 } sort)
         {
@@ -131,11 +130,11 @@ internal sealed class StudioListQuery<T>
             errors["filter"] = [message];
         }
 
-        return new StudioListQuery<T>(columns, page, pageSize, sortColumn, descending, search, filter);
+        return new ListQuery<T>(columns, page, pageSize, sortColumn, descending, search, filter);
     }
 
     /// <summary>Filters, searches, sorts and pages <paramref name="rows"/>. A page past the end holds no items.</summary>
-    public StudioListPage<T> Apply(IReadOnlyList<T> rows)
+    public ListPage<T> Apply(IReadOnlyList<T> rows)
     {
         ArgumentNullException.ThrowIfNull(rows);
 
@@ -164,15 +163,15 @@ internal sealed class StudioListQuery<T>
         }
 
         var items = matched.Skip((int)Math.Min((long)(_page - 1) * _pageSize, int.MaxValue)).Take(_pageSize).ToList();
-        return new StudioListPage<T>(items, _page, _pageSize, matched.Count);
+        return new ListPage<T>(items, _page, _pageSize, matched.Count);
     }
 
     // The columns as an entity, so the record API's parsers read them. A number is a decimal, which holds every number.
-    private static EntityModel Entity(IReadOnlyList<StudioListColumn<T>> columns) => new()
+    private static EntityModel Entity(IReadOnlyList<ListColumn<T>> columns) => new()
     {
         Id = Guid.Empty,
-        Name = "StudioList",
-        File = "StudioList",
+        Name = "List",
+        File = "List",
         Fields =
         [
             .. columns.Select(column => new FieldModel
@@ -180,12 +179,12 @@ internal sealed class StudioListQuery<T>
                 Name = column.Name,
                 Type = column.Kind switch
                 {
-                    StudioListKind.Text => FieldType.Text,
-                    StudioListKind.Enum => FieldType.Enum,
-                    StudioListKind.Number => FieldType.Decimal,
+                    ListColumnKind.Text => FieldType.Text,
+                    ListColumnKind.Enum => FieldType.Enum,
+                    ListColumnKind.Number => FieldType.Decimal,
                     _ => FieldType.Date,
                 },
-                Values = column.Kind == StudioListKind.Enum ? column.Values : null,
+                Values = column.Kind == ListColumnKind.Enum ? column.Values : null,
             }),
         ],
     };

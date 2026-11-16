@@ -37,7 +37,7 @@ public sealed class ConsoleScheduleTests(ModuleTriggerFixture fixture) : IClassF
 
         Assert.Equal(HttpStatusCode.OK, status);
         using var _ = body;
-        Assert.Equal(["items"], body.RootElement.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["items", "page", "pageSize", "totalCount"], body.RootElement.EnumerateObject().Select(property => property.Name));
         var items = Reminders(body);
         Assert.Equal(2, items.Count);
         var first = items.Single(item => item.GetProperty("applicationId").GetGuid() == ModuleTriggerFixture.AppId);
@@ -77,6 +77,33 @@ public sealed class ConsoleScheduleTests(ModuleTriggerFixture fixture) : IClassF
         var only = Assert.Single(filtered.RootElement.GetProperty("items").EnumerateArray());
         Assert.Equal(ModuleTriggerFixture.OtherAppId, only.GetProperty("applicationId").GetGuid());
         Assert.Equal(TriggerName, only.GetProperty("trigger").GetString());
+    }
+
+    [Fact]
+    public async Task A_search_a_filter_a_sort_and_a_page_size_answer_one_page_and_the_number_that_matched()
+    {
+        var filter = Uri.EscapeDataString($$"""{"all":[{"field":"trigger","op":"eq","value":"{{TriggerName}}"}]}""");
+        var (status, body) = await GetAsync("operator", $"?search=ModuleTrigger&filter={filter}&sort=-application&pageSize=1");
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        using var _ = body;
+        var only = Assert.Single(body.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal(ModuleTriggerFixture.OtherAppId, only.GetProperty("applicationId").GetGuid());
+        Assert.Equal(1, body.RootElement.GetProperty("page").GetInt32());
+        Assert.Equal(1, body.RootElement.GetProperty("pageSize").GetInt32());
+        Assert.Equal(2, body.RootElement.GetProperty("totalCount").GetInt64());
+    }
+
+    [Theory]
+    [InlineData("filter", "{\"all\":[{\"field\":\"missing\",\"op\":\"eq\",\"value\":\"x\"}]}")]
+    [InlineData("sort", "missing")]
+    public async Task A_filter_or_a_sort_on_a_field_the_route_does_not_hold_is_a_400_keyed_by_the_parameter(string key, string value)
+    {
+        var (status, body) = await GetAsync("operator", $"?{key}={Uri.EscapeDataString(value)}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, status);
+        using var _ = body;
+        Assert.Equal([key], body.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
     }
 
     [Fact]

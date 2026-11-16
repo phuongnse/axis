@@ -1,12 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type {
   ConsoleDeadLetterPage,
   ConsoleFailedWorkPage,
-  ConsoleScheduleList,
+  ConsoleSchedulePage,
   ConsoleTenant,
   ConsoleWebhookDelivery,
   ConsoleWebhookDeliveryPage,
@@ -173,7 +173,7 @@ const allLetters: ConsoleDeadLetterPage = {
 
 const schedulesPath = '/api/console/schedules'
 
-const emptySchedules: ConsoleScheduleList = { items: [] }
+const emptySchedules: ConsoleSchedulePage = { items: [], page: 1, pageSize: 20, totalCount: 0 }
 
 /**
  * Answers the dead letter routes with `letters`, the schedules route with `schedules`, the webhook deliveries route with
@@ -211,12 +211,15 @@ function tenantAndFailedWork(url: string) {
   return json(url.startsWith('/api/console/tenant') ? tenant : failedWork)
 }
 
-function renderPage() {
+const Location = () => <output data-testid="location">{useLocation().search}</output>
+
+function renderPage(address = '/console') {
   render(
     <PlatformContext.Provider value={platform}>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[address]}>
           <ConsolePage />
+          <Location />
         </MemoryRouter>
       </TextProvider>
     </PlatformContext.Provider>,
@@ -461,7 +464,10 @@ describe('ConsolePage', () => {
   })
 
   it('lists the schedule triggers with their occurrences and a dash for one that never ran', async () => {
-    const schedules: ConsoleScheduleList = {
+    const schedules: ConsoleSchedulePage = {
+      page: 1,
+      pageSize: 20,
+      totalCount: 2,
       items: [
         {
           applicationId: 'a1',
@@ -506,17 +512,29 @@ describe('ConsolePage', () => {
     expect(within(second).getByText(new Date('2026-11-01T05:00:00Z').toLocaleString('en'))).toBeVisible()
   })
 
-  it('asks for the schedules of the chosen application', async () => {
-    const server = stubServer(tenantAndFailedWork)
+  it('keeps the search, filter, sort and page size of the schedules in the address and the request', async () => {
+    const filter = JSON.stringify({ all: [{ field: 'application', op: 'eq', value: 'Leave' }] })
+    const address = `/console?${new URLSearchParams({ search: 'Leave', filter, sort: '-nextOccurrenceAt' })}`
+    const server = stubServer(tenantAndFailedWork, undefined, () =>
+      json({ ...emptySchedules, totalCount: 33 } satisfies ConsoleSchedulePage),
+    )
     const user = userEvent.setup()
-    renderPage()
+    renderPage(address)
 
     const view = await screen.findByTestId('console-schedules')
-    await waitFor(() => expect(server.requests).toContain(`GET ${schedulesPath}`))
-    await user.click(within(view).getByRole('combobox', { name: 'Application' }))
-    await user.click(await screen.findByTitle('Purchasing'))
+    const requested = () => server.requests.filter((request) => request.startsWith(`GET ${schedulesPath}`))
+    await waitFor(() => expect(requested()).toHaveLength(1))
+    const first = new URL(requested()[0].replace('GET ', ''), 'http://localhost').searchParams
+    expect(first.get('search')).toBe('Leave')
+    expect(first.get('filter')).toBe(filter)
+    expect(first.get('sort')).toBe('-nextOccurrenceAt')
+    expect(await within(view).findByText('1–20 of 33')).toBeVisible()
 
-    await waitFor(() => expect(server.requests).toContain(`GET ${schedulesPath}?application=a2`))
+    await user.click(within(view).getByRole('combobox'))
+    await user.click(await screen.findByTitle('50 / page'))
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('pageSize=50'))
+    await waitFor(() => expect(requested().some((request) => request.includes('pageSize=50'))).toBe(true))
   })
 
   it('shows an error in the card when the schedules cannot be loaded', async () => {
