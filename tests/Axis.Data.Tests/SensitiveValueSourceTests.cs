@@ -123,6 +123,7 @@ public sealed class SensitiveValueSourceTests
         ["Axis.Processes/Instances/InstanceQueries.cs:FindAsync"] = Untouched.Ids,
         ["Axis.Processes/Instances/InstanceQueries.cs:Where"] = Untouched.NeverSensitive,
         ["Axis.Processes/Instances/InstanceQueries.cs:ListPageSql"] = Untouched.NeverSensitive,
+        ["Axis.Processes/Instances/InstanceQueries.cs:SubjectLabelSql"] = Untouched.NeverSensitive,
     };
 
     [Fact]
