@@ -703,7 +703,9 @@ because the provisioning API answers `404` there. The job has five steps, and ea
 1. `tenant`: runs the code of `tenant create` for the host `<id>.<Cell:TenantDomain>`, with no
    administrator and the cell's backup key. The tenant stays `provisioning`, so no host serves it.
    When the job's input has `quotas`, the step writes them as the tenant's quota rows in the entry's
-   transaction, and a rerun replaces the rows with them.
+   transaction, and a rerun replaces the rows with them. The step also records the tenant's
+   application on its `platform.tenants` row in that transaction: the job's `application`, or, when
+   it has none, the name of the blank application.
    The step writes no audit record of its own, because the job writes one when it ends. A rerun on a
    `provisioning` entry reuses the realm, the secrets and the keys. A refusal that `tenant create`
    gives before it does any work, such as a taken host or an id that is already an active tenant,
@@ -712,7 +714,9 @@ because the provisioning API answers `404` there. The job has five steps, and ea
    `<Studio:ApplicationsPath>/<id>/<kebab-case name>`, as Studio creates an application from a
    template. The copy keeps the template's application name and gets new resource ids. It is written
    to a hidden temporary folder and then renamed. The step is skipped when the folder already holds
-   an application with that name. A template that is not installed fails the job at once.
+   an application with that name. A template that is not installed fails the job at once. A job with
+   no `application` writes the blank application of Studio's Blank instead, named as
+   [creating a tenant](tenant-lifecycle.md#creating-a-tenant) says, and needs no template.
 3. `activate`: compiles that folder and activates its release in the tenant, as `activate` does,
    while the tenant is still `provisioning`. It writes no `activate` audit record. A failed activation
    fails the job at once.
@@ -721,11 +725,12 @@ because the provisioning API answers `404` there. The job has five steps, and ea
    invite records name `tenant create` as their actor.
 5. `resume`: sets the tenant `active`. A tenant that is already `active` is ok.
 
-- **No application** _(planned for M33)_. Without an `application`, the `application` step creates a blank one.
+- **No application.** Without an `application`, the `application` step creates a blank one with the
+  code of Studio's Blank, and `activate` activates its first release.
 
 A step that throws ends the claim, and the next claim runs the job again from the first step that has
-not succeeded. A job gets three claims, and running a failed job again is described with the
-[provisioning API](tenant-lifecycle.md#provisioning-api).
+not succeeded. A job gets three claims, and an operator runs a failed job again through a new job, see
+[running a failed job again](tenant-lifecycle.md#jobs).
 
 ### Export job
 
@@ -767,7 +772,8 @@ because the provisioning API answers `404` there, so no `delete` job and no `del
   it needs no backup key.
 - **Failures.** A failed `purge` job is queued again no sooner than an hour after it ended, so a
   lasting fault adds one failed job and one audit record for the tenant each hour until an operator
-  fixes it. A step that throws ends the claim, as for the other jobs.
+  fixes it. An operator cannot run a failed `purge` job again, see
+  [running a failed job again](tenant-lifecycle.md#jobs). A step that throws ends the claim, as for the other jobs.
 
 ## What else to back up
 

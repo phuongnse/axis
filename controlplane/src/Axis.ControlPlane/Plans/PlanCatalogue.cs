@@ -71,7 +71,8 @@ internal static class PlanPrices
 
 /// <summary>
 /// The plan versions of <c>ControlPlane:Plans</c>, checked at start, see <c>docs/reference/plans.md#the-catalogue</c>. A subscription pins
-/// the code and version it bought, so a later version never reaches it, and a pinned version is never removed from the settings.
+/// the code and version it bought, so a later version never reaches it, and a pinned version is never removed from the settings. A new
+/// trial gets the quotas of <see cref="Trial"/>.
 /// </summary>
 public sealed partial class PlanCatalogue
 {
@@ -80,16 +81,26 @@ public sealed partial class PlanCatalogue
     // A yearly price is 10 times the monthly one, so the monthly one must leave room for it.
     private const long MaxMonthlyPrice = long.MaxValue / PlanPeriods.MonthsPerYear;
 
+    // A trial has at most this many users, see docs/reference/plans.md#the-catalogue.
+    private const long MaxTrialUsers = 10;
+
     private readonly Dictionary<(string Code, int Version), PlanVersion> _byKey;
 
     private PlanCatalogue(IReadOnlyList<PlanVersion> versions)
     {
         Versions = versions;
         _byKey = versions.ToDictionary(v => (v.Code, v.Version));
+        Trial = versions.Where(v => v.Trial).MaxBy(v => v.Version);
     }
 
     /// <summary>Every plan version, in the order of the settings.</summary>
     public IReadOnlyList<PlanVersion> Versions { get; }
+
+    /// <summary>
+    /// The plan version that sets the quotas of a new trial: the newest version marked trial, or null when the catalogue has none, see
+    /// <c>docs/reference/plans.md#the-catalogue</c>.
+    /// </summary>
+    public PlanVersion? Trial { get; }
 
     /// <summary>The plan version with this code and version, or null.</summary>
     public PlanVersion? Find(string code, int version) => _byKey.GetValueOrDefault((code, version));
@@ -137,6 +148,7 @@ public sealed partial class PlanCatalogue
     {
         var problems = new List<string>();
         var seen = new HashSet<(string, int)>();
+        string? trialCode = null;
         for (var index = 0; index < plans.Count; index++)
         {
             var plan = plans[index];
@@ -191,6 +203,21 @@ public sealed partial class PlanCatalogue
                 if (plan.AddOns.Count > 0)
                 {
                     problems.Add($"The setting {prefix}:{nameof(PlanOptions.AddOns)}{of} must be empty, because the plan is a trial plan.");
+                }
+
+                if (long.TryParse(plan.IncludedUsers, NumberStyles.None, CultureInfo.InvariantCulture, out var users) && users > MaxTrialUsers)
+                {
+                    problems.Add($"The setting {prefix}:{nameof(PlanOptions.IncludedUsers)}{of} must be at most {MaxTrialUsers.ToString(CultureInfo.InvariantCulture)}, because the plan is a trial plan.");
+                }
+
+                // Every trial plan has one code, so a new trial has one plan to get its quotas from.
+                if (codeIsValid)
+                {
+                    trialCode ??= plan.Code;
+                    if (trialCode != plan.Code)
+                    {
+                        problems.Add($"The setting {prefix}:{nameof(PlanOptions.Trial)}{of} marks a second trial plan code. Every trial plan has the same code.");
+                    }
                 }
 
                 // A trial plan runs no package, see docs/reference/plans.md#the-catalogue. An invalid value has its own problem.

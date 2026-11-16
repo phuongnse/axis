@@ -103,6 +103,8 @@ describe('the Axis control plane Helm chart', () => {
     ['controlPlane.mail.host', 'controlPlane.mail.host is required'],
     ['secrets.connectionString.name', 'secrets.connectionString.name is required'],
     ['secrets.certificate.name', 'secrets.certificate.name is required'],
+    ['secrets.cellClientCertificate.name', 'secrets.cellClientCertificate.name is required'],
+    ['controlPlane.cells[0].clientSecret.name', 'controlPlane.cells[0].clientSecret.name is required'],
   ]) {
     test(`fails to render without ${path}, and names it`, () => {
       const result = render('--set', `${path}=`)
@@ -112,10 +114,93 @@ describe('the Axis control plane Helm chart', () => {
   }
 
   test('rejects a secret value in the values, and never prints it', () => {
-    for (const setting of ['secrets.connectionString.value=leak', 'controlPlane.connectionString=leak', 'secrets.certificate.value=leak', 'secrets.mailPassword.value=leak', 'secrets.challengeKey.value=leak', 'secrets.payOs.value=leak']) {
+    for (const setting of ['secrets.connectionString.value=leak', 'controlPlane.connectionString=leak', 'secrets.certificate.value=leak', 'secrets.mailPassword.value=leak', 'secrets.challengeKey.value=leak', 'secrets.payOs.value=leak', 'controlPlane.cells[0].clientSecret.value=leak', 'secrets.cellClientCertificate.value=leak', 'secrets.cellCertificateAuthority.value=leak']) {
       const result = render('--set', setting)
       assert.notEqual(result.status, 0, setting)
       assert.doesNotMatch(result.stdout, /leak/, setting)
+    }
+  })
+
+  test('sets each cell\'s four settings and mounts its client secret as ControlPlane__CellSecrets__<cell id>', () => {
+    const deployment = find(renderOk(), 'Deployment', 'axis-controlplane')
+    for (const [index, id] of [
+      [0, 'vn-1'],
+      [1, 'vn-2'],
+    ]) {
+      assert.match(deployment, new RegExp(`- name: ControlPlane__Cells__${index}__Id\\n\\s+value: "${id}"\\n`))
+      assert.match(
+        deployment,
+        new RegExp(`- name: ControlPlane__Cells__${index}__InternalUrl\\n\\s+value: "https://cell\\.${id}\\.internal\\.example\\.com"\\n`),
+      )
+      assert.match(
+        deployment,
+        new RegExp(`- name: ControlPlane__Cells__${index}__TokenUrl\\n\\s+value: "https://cell\\.${id}\\.internal\\.example\\.com/realms/operator/protocol/openid-connect/token"\\n`),
+      )
+      assert.match(deployment, new RegExp(`- name: ControlPlane__Cells__${index}__ClientId\\n\\s+value: "axis-controlplane"\\n`))
+    }
+    assert.doesNotMatch(deployment, /- name: ControlPlane__CellSecrets__/)
+    assert.match(
+      deployment,
+      /- secret:\n\s+name: "axis-cell-vn-1"\n\s+items:\n\s+- key: "ControlPlane__CellSecrets__vn-1"\n\s+path: ControlPlane__CellSecrets__vn-1\n/,
+    )
+    assert.match(
+      deployment,
+      /- secret:\n\s+name: "axis-cell-vn-2"\n\s+items:\n\s+- key: "secret"\n\s+path: ControlPlane__CellSecrets__vn-2\n/,
+    )
+  })
+
+  test('mounts the client certificate, its key and the authority file, outside /run/secrets, and sets the settings that name them', () => {
+    const deployment = find(renderOk(), 'Deployment', 'axis-controlplane')
+    assert.match(deployment, /- name: ControlPlane__CellClientCertificate__Path\n\s+value: \/cell-client-tls\/tls\.crt\n/)
+    assert.match(deployment, /- name: ControlPlane__CellClientCertificate__KeyPath\n\s+value: \/cell-client-tls\/tls\.key\n/)
+    assert.match(deployment, /- name: ControlPlane__CellCertificateAuthorityPath\n\s+value: \/cell-ca\/ca\.crt\n/)
+    assert.match(deployment, /- name: cell-client-tls\n\s+mountPath: \/cell-client-tls\n\s+readOnly: true\n/)
+    assert.match(deployment, /- name: cell-ca\n\s+mountPath: \/cell-ca\n\s+readOnly: true\n/)
+    assert.match(
+      deployment,
+      /- name: cell-client-tls\n\s+secret:\n\s+secretName: "axis-controlplane-cell-client"\n(\s+#.*\n)?\s+defaultMode: 292\n\s+items:\n\s+- key: tls\.crt\n\s+path: tls\.crt\n\s+- key: tls\.key\n\s+path: tls\.key\n/,
+    )
+    assert.match(
+      deployment,
+      /- name: cell-ca\n\s+secret:\n\s+secretName: "axis-region-ca"\n(\s+#.*\n)?\s+defaultMode: 292\n\s+items:\n\s+- key: "ca\.crt"\n\s+path: ca\.crt\n/,
+    )
+  })
+
+  test('reads the authority from the key of its Secret that the values name', () => {
+    const deployment = find(renderOk('--set', 'secrets.cellCertificateAuthority.key=authority.pem'), 'Deployment', 'axis-controlplane')
+    assert.match(deployment, /- key: "authority\.pem"\n\s+path: ca\.crt\n/)
+  })
+
+  test('sets no authority setting and mounts no authority when the values name no Secret for it', () => {
+    const deployment = find(renderOk('--set', 'secrets.cellCertificateAuthority.name='), 'Deployment', 'axis-controlplane')
+    assert.doesNotMatch(deployment, /ControlPlane__CellCertificateAuthorityPath|cell-ca/)
+    assert.match(deployment, /ControlPlane__CellClientCertificate__Path/)
+  })
+
+  test('renders no cell setting, cell secret, client certificate or authority when no cell is listed', () => {
+    const deployment = find(renderOk('--set-json', 'controlPlane.cells=[]'), 'Deployment', 'axis-controlplane')
+    assert.doesNotMatch(
+      deployment,
+      /ControlPlane__Cells__|CellSecrets|CellClientCertificate|CellCertificateAuthorityPath|cell-client-tls|cell-ca|axis-cell-|axis-region-ca/,
+    )
+  })
+
+  test('renders no cell piece with no cell, though the Secrets of the certificate and the authority are named', () => {
+    const output = renderOk('--set-json', 'controlPlane.cells=[]')
+    assert.doesNotMatch(output, /axis-controlplane-cell-client|axis-region-ca/)
+  })
+
+  test('refuses a cell id that is not lowercase letters and digits joined by single hyphens', () => {
+    for (const id of ['VN_1', 'vn--1', '-vn', 'vn-', '../vn']) {
+      const result = render('--set', `controlPlane.cells[0].id=${id}`)
+      assert.notEqual(result.status, 0, id)
+    }
+  })
+
+  test('refuses a cell without its addresses or client id', () => {
+    for (const field of ['internalUrl', 'tokenUrl', 'clientId']) {
+      const result = render('--set', `controlPlane.cells[0].${field}=`)
+      assert.notEqual(result.status, 0, field)
     }
   })
 

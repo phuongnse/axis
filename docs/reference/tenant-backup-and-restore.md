@@ -426,7 +426,18 @@ hours 15 minutes, see [the Helm chart](installation.md#settings-and-secrets).
   point. When `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` is set, the command
   exports the gauge over OTLP before it exits, see [telemetry export](host-settings.md#telemetry-export).
   With no endpoint, nothing is exported.
-- **An alert on a stale backup** _(planned for M33)_. An alert fires on a gauge that is too old.
+- **An alert on a stale backup.** The alert `AxisTenantBackupStale` fires for each tenant whose gauge is more
+  than 26 hours old, the age that the cell console marks, and its `axis_tenant` label names the tenant. It reads
+  the gauge as `axis_backup_last_success_seconds`, the name that Prometheus gives an OTLP gauge with the unit `s`,
+  with the label `axis_tenant`. It reads each tenant's last value from up to 30 days back, so it keeps firing
+  when the job stops and sends no new point. A tenant that the newest run no longer reports, a deleted one, drops out 31
+  hours after its last point, but only while the run reports another tenant. The rule is in
+  `deploy/helm/axis/alerts/axis-alerts.yaml`, a Prometheus rule file that an install without the chart loads
+  in Prometheus's `rule_files`. In the chart, `alerts.enabled` renders it as a PrometheusRule, see
+  [values](installation.md#values). It is off by default, see
+  [D110](../decisions/d110-security-alerts-and-a-hardening-checklist-for-the-operator.md). The chart passes the
+  backup job no OTLP endpoint, so the operator must bring the gauge into Prometheus. `tests/alerts/axis-alerts.test.yaml`
+  tests the rule with `promtool`.
 - **Settings.** `Cell:BackupStorage:ServiceUrl`, `:Region`, `:Bucket`, `:AccessKeyId` and
   `:SecretAccessKey` name an S3-compatible service, reached with the AWS SDK and path-style addressing,
   see [host settings](host-settings.md#cell-settings). All five are required. The command's other

@@ -122,8 +122,11 @@ describe('StudioEditor for a seed', () => {
     expect(screen.queryByTestId('studio-process-graph')).not.toBeInTheDocument()
   })
 
-  it('turns Save off while an integer cell holds a wrong value and on again once it is fixed', async () => {
-    stub(seedContent('order', [{ id: 'a', values: { code: 'X1', size: 3 } }]))
+  const patchCalls = (fetchMock: ReturnType<typeof stub>) =>
+    fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')
+
+  it('keeps Save on while an integer cell holds a wrong value, and a click focuses that cell and sends nothing', async () => {
+    const fetchMock = stub(seedContent('order', [{ id: 'a', values: { code: 'X1', size: 3 } }]))
     renderEditor()
     const size = await screen.findByRole('textbox', { name: 'size' }, slow)
     expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
@@ -131,27 +134,51 @@ describe('StudioEditor for a seed', () => {
     await userEvent.clear(size)
     await userEvent.type(size, 'abc')
     expect(size).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(size).toHaveFocus())
+    expect(patchCalls(fetchMock)).toHaveLength(0)
 
     await userEvent.clear(size)
     await userEvent.type(size, '12')
     expect(size).toHaveAttribute('aria-invalid', 'false')
-    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await screen.findByTestId('studio-saved')
+    expect(patchCalls(fetchMock)).toHaveLength(1)
   })
 
-  it('turns Save off for a loaded string "5" in an integer field, also for a change made elsewhere', async () => {
-    stub(seedContent('Order', [{ id: 'a', values: { code: 'X1', size: '5' } }]))
+  it('focuses the first wrong cell of the form when a click on Save finds a wrong seed value on the JSON tab', async () => {
+    const fetchMock = stub(seedContent('Order', [{ id: 'a', values: { code: 'X1', size: 3 } }]))
+    renderEditor()
+    await screen.findByRole('textbox', { name: 'size' }, slow)
+    await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+    await editJson(JSON.stringify(seedContent('Order', [{ id: 'a', values: { code: 5, size: 3 } }])))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true')
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'code' })).toHaveFocus())
+    expect(patchCalls(fetchMock)).toHaveLength(0)
+  })
+
+  it('keeps Save on for a loaded string "5" in an integer field, also for a change made elsewhere', async () => {
+    const fetchMock = stub(seedContent('Order', [{ id: 'a', values: { code: 'X1', size: '5' } }]))
     renderEditor()
     const code = await screen.findByRole('textbox', { name: 'code' }, slow)
 
     await userEvent.type(code, '2')
 
-    expect(screen.getByRole('textbox', { name: 'size' })).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    const size = screen.getByRole('textbox', { name: 'size' })
+    expect(size).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(size).toHaveFocus())
+    expect(patchCalls(fetchMock)).toHaveLength(0)
   })
 
-  it('turns Save off for a wrong value typed in the JSON view', async () => {
-    stub(seedContent('Order', [{ id: 'a', values: { code: 'X1' } }]))
+  it('keeps Save on for a wrong value typed in the JSON view, and a click shows the cell in the form', async () => {
+    const fetchMock = stub(seedContent('Order', [{ id: 'a', values: { code: 'X1' } }]))
     renderEditor()
     await screen.findByRole('textbox', { name: 'code' }, slow)
 
@@ -159,19 +186,28 @@ describe('StudioEditor for a seed', () => {
     const edited = JSON.stringify(seedContent('Order', [{ id: 'a', values: { code: 5 } }]))
     await editJson(edited)
 
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'code' })).toHaveFocus())
+    expect(patchCalls(fetchMock)).toHaveLength(0)
   })
 
-  it('turns Save off for a new row until its required cell is filled', async () => {
-    stub(seedContent('Order', []))
+  it('keeps Save on for a new row until its required cell is filled, and a click focuses that cell', async () => {
+    const fetchMock = stub(seedContent('Order', []))
     renderEditor()
 
     await userEvent.click(await screen.findByRole('button', { name: 'Add record' }, slow))
     const save = screen.getByRole('button', { name: 'Save' })
-    expect(save).toBeDisabled()
+    expect(save).toBeEnabled()
+    await userEvent.click(save)
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'code' })).toHaveFocus())
+    expect(patchCalls(fetchMock)).toHaveLength(0)
 
     await userEvent.type(screen.getByRole('textbox', { name: 'code' }), 'N1')
     expect(save).toBeEnabled()
+    expect(
+      within(screen.getByTestId('studio-field-/records/0/values/code')).queryByTestId('studio-seed-problem'),
+    ).toBeNull()
   })
 
   it('saves a patch that keeps a child collection and an unknown key of the record', async () => {
@@ -464,8 +500,11 @@ function sentChanges(fetchMock: ReturnType<typeof vi.fn>): SentChanges {
   return JSON.parse(init!.body as string) as SentChanges
 }
 
+/** The requests of a method that change the application. The expression editor's check and scope routes only read. */
 function requests(fetchMock: ReturnType<typeof vi.fn>, method: string): number {
-  return fetchMock.mock.calls.filter(([, call]) => call?.method === method).length
+  return fetchMock.mock.calls.filter(
+    ([input, call]) => call?.method === method && !String(input).includes('/expressions/'),
+  ).length
 }
 
 function sentPatch(fetchMock: ReturnType<typeof vi.fn>): PatchOperation[] {
@@ -1772,7 +1811,7 @@ describe('StudioEditor for a page', () => {
       expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
     })
 
-    it('turns Save off again after undoing an invalid edit in the JSON view', async () => {
+    it('keeps Save on for an invalid edit in the JSON view, and off again after undoing it', async () => {
       stubResource(pageItem, pageContent)
       renderResource(pageItem, pageNames)
       await openFormTab()
@@ -1780,7 +1819,7 @@ describe('StudioEditor for a page', () => {
       await screen.findByTestId('studio-page-editor', {}, slow)
       await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
       await editJson('{')
-      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
       expect(await screen.findByRole('button', { name: '1 problem' })).toBeInTheDocument()
 
       await userEvent.click(undoButton())
@@ -2478,10 +2517,29 @@ describe('StudioEditor problems in the JSON view', () => {
     await editJson('{')
     await problemButton('1 problem')
     expect(marked(await jsonView()).map((diagnostic) => diagnostic.message)).toEqual(['This is not valid JSON here.'])
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
 
     await editJson(JSON.stringify(roleContent, null, 2))
     await waitFor(() => expect(screen.queryByRole('button', { name: /problem/ })).not.toBeInTheDocument())
+  })
+
+  it('keeps Save on for JSON that does not parse, and a click opens the JSON tab at the problem and sends nothing', async () => {
+    const fetchMock = stubResource(roleItem, roleContent).fetchMock
+    renderResource(roleItem)
+    await screen.findByTestId('studio-field-/name', {}, slow)
+    await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+    const view = await jsonView()
+    await editJson('{')
+    await problemButton('1 problem')
+    await userEvent.click(screen.getByRole('tab', { name: 'Form' }))
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(screen.getByRole('tab', { name: 'JSON' })).toHaveAttribute('aria-selected', 'true')
+    const [problem] = marked(view)
+    expect(problem.message).toBe('This is not valid JSON here.')
+    await waitFor(() => expect(view.state.selection.main).toMatchObject({ from: problem.from, to: problem.to }))
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(0)
   })
 
   it('counts a missing required property and words it as an addition', async () => {
@@ -2533,7 +2591,7 @@ describe('StudioEditor problems in the JSON view', () => {
     const bar = () => screen.getByTestId('studio-save-bar')
     const nameBox = () => within(screen.getByTestId('studio-field-/name')).getByRole('textbox')
 
-    it('shows the bar for JSON that does not parse, with Undo and Discard on and Save off', async () => {
+    it('shows the bar for JSON that does not parse, with Undo, Discard and Save on', async () => {
       await openJsonTab()
       expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
 
@@ -2542,7 +2600,7 @@ describe('StudioEditor problems in the JSON view', () => {
       expect(await screen.findByTestId('studio-save-bar')).toHaveTextContent('Unsaved changes')
       expect(within(bar()).getByRole('button', { name: 'Undo' })).toBeEnabled()
       expect(within(bar()).getByRole('button', { name: 'Discard' })).toBeEnabled()
-      expect(within(bar()).getByRole('button', { name: 'Save' })).toBeDisabled()
+      expect(within(bar()).getByRole('button', { name: 'Save' })).toBeEnabled()
     })
 
     it('reads "No unsaved changes" after an edit and Undo, with Redo on and no Discard', async () => {

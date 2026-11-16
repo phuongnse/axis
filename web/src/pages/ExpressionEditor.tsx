@@ -1,20 +1,28 @@
-import {
-  autocompletion,
-  type Completion,
-  type CompletionContext,
-  type CompletionResult,
-} from '@codemirror/autocomplete'
+import { autocompletion, type CompletionContext } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
 import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
-import { Typography } from 'antd'
-import { useEffect, useRef, useState } from 'react'
-import { checkStudioExpression, type ExpressionCheck } from '../platform/studio'
+import { ExpandAltOutlined } from '@ant-design/icons'
+import { Flex, Modal, Typography } from 'antd'
+import { Fragment, useContext, useEffect, useRef, useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
+import {
+  checkStudioExpression,
+  fetchStudioExpressionScope,
+  type ExpressionCheck,
+  type ExpressionScope,
+  type ExpressionScopeFunction,
+  type StudioNames,
+} from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
+import { PlatformContext } from './context'
+import { callAt } from './expressionCall'
+import { completeAt, insertAt } from './expressionCompletion'
 import { expressionLanguage } from './expressionLanguage'
+import { ExpressionPanel } from './ExpressionPanel'
 import type { ScopeOption } from './expressionScope'
 
 /** How long the author must stop typing before the expression is checked. */
@@ -31,14 +39,22 @@ export interface ExpressionEditorProps {
   name: string
   value: string
   required: boolean
-  /** The names an author can complete at this place. */
+  /** The resource as the author has it. The scope of the place is loaded for it once. */
+  draft: Record<string, unknown>
+  /** The names an author can complete at this place, apart from the functions, which the expression scope lists. */
   options: ScopeOption[]
+  /** The application's names, for the labels of the fields in the expanded panel. */
+  names?: StudioNames | null
+  /** Set for the editor inside the expanded dialog, which has no Expand button of its own. */
+  inDialog?: boolean
+  /** Called with the editor's view when it is made and with `null` when it is destroyed, so the panel of the dialog can insert at its cursor. */
+  onView?: (view: EditorView | null) => void
   onChange: (path: string, next: string | undefined) => void
 }
 
 interface Result {
   type: string | null
-  error: string | null
+  error: { code: string; message: string } | null
 }
 
 /** A code editor for one expression. It checks the text after the author stops typing and shows the newest answer. */
@@ -49,22 +65,75 @@ export default function ExpressionEditor({
   name,
   value,
   required,
+  draft,
   options,
+  names,
+  inDialog = false,
+  onView,
   onChange,
 }: ExpressionEditorProps) {
   const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { mode } = useThemeMode()
   const tokens = useDesignTokens()
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const dialogView = useRef<EditorView | null>(null)
+  const [expanded, setExpanded] = useState(false)
   const [themeCompartment] = useState(() => new Compartment())
   const [result, setResult] = useState<Result>({ type: null, error: null })
   const [checking, setChecking] = useState(true)
-  const latest = useRef({ onChange, required, options, value, theme: expressionTheme(tokens, mode), themeCompartment })
+  // The text before the cursor, which says whether the cursor is inside a call.
+  const [before, setBefore] = useState('')
+  const placeKey = JSON.stringify([application, resourceId, path])
+  const [loaded, setLoaded] = useState<{ placeKey: string; scope: ExpressionScope | null } | null>(null)
+  // An answer for another place is not this place's scope.
+  const scope = loaded?.placeKey === placeKey ? loaded.scope : null
+  const latest = useRef({
+    onChange,
+    onView,
+    required,
+    options,
+    scope,
+    names,
+    locale,
+    t,
+    draft,
+    value,
+    theme: expressionTheme(tokens, mode),
+    themeCompartment,
+  })
 
   useEffect(() => {
-    latest.current = { onChange, required, options, value, theme: expressionTheme(tokens, mode), themeCompartment }
+    latest.current = {
+      onChange,
+      onView,
+      required,
+      options,
+      scope,
+      names,
+      locale,
+      t,
+      draft,
+      value,
+      theme: expressionTheme(tokens, mode),
+      themeCompartment,
+    }
   })
+
+  // The scope is loaded once per place, with the draft as it stands then, so a keystroke in the draft loads no more.
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchStudioExpressionScope(application, resourceId, path, latest.current.draft, controller.signal).then(
+      (answer) => {
+        if (!controller.signal.aborted) {
+          setLoaded({ placeKey, scope: answer })
+        }
+      },
+      () => {},
+    )
+    return () => controller.abort()
+  }, [application, resourceId, path, placeKey])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -74,7 +143,7 @@ export default function ExpressionEditor({
     const check = (view: EditorView) => {
       const id = counter
       const text = view.state.doc.toString()
-      if (text === '' && !latest.current.required) {
+      if (text === '') {
         show(view, { type: null, diagnostics: [] })
         setChecking(false)
         return
@@ -98,7 +167,7 @@ export default function ExpressionEditor({
     }
 
     const initial = latest.current
-    const complete = (context: CompletionContext) => completeAt(context, latest.current.options)
+    const complete = (context: CompletionContext) => completeAt(context, latest.current)
     const view = new EditorView({
       parent: hostRef.current!,
       state: EditorState.create({
@@ -107,10 +176,14 @@ export default function ExpressionEditor({
           expressionLanguage,
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
-          autocompletion({ override: [complete] }),
+          autocompletion({ override: [complete], compareCompletions: () => 0 }),
+          EditorView.lineWrapping,
           initial.themeCompartment.of(initial.theme),
           EditorView.contentAttributes.of({ 'aria-label': name }),
           EditorView.updateListener.of((update) => {
+            if (update.docChanged || update.selectionSet) {
+              setBefore(update.state.sliceDoc(0, update.state.selection.main.head))
+            }
             if (!update.docChanged) {
               return
             }
@@ -127,14 +200,17 @@ export default function ExpressionEditor({
       }),
     })
     viewRef.current = view
+    latest.current.onView?.(view)
     check(view)
 
     return () => {
       clearTimeout(timer)
       controller.abort()
       setChecking(true)
+      setBefore('')
       view.destroy()
       viewRef.current = null
+      latest.current.onView?.(null)
     }
   }, [application, resourceId, path, name])
 
@@ -152,22 +228,98 @@ export default function ExpressionEditor({
     }
   }, [value])
 
+  const words = (type: string) => t(`shell.studio.expression.type.${type}`)
+  // What the check gave, or until it answers, what the place needs. A place that takes any type shows no line.
+  const line =
+    result.type !== null
+      ? t('shell.studio.expression.gives').replace('{type}', words(result.type))
+      : scope?.type
+        ? t('shell.studio.expression.needs').replace('{type}', words(scope.type))
+        : null
+
+  const call = scope ? callAt(before, scope.functions) : null
+
   return (
     <div aria-busy={checking}>
-      <div ref={hostRef} />
-      {result.error !== null && (
-        <div>
-          <Typography.Text type="danger" data-testid="studio-expression-error">
-            {result.error}
-          </Typography.Text>
+      <Flex gap={tokens.spacing.xs} align="flex-start">
+        <div ref={hostRef} style={{ flex: 1, minWidth: 0 }} />
+        {!inDialog && (
+          <AxisButton
+            role="icon"
+            nameKey="shell.studio.expression.expand"
+            icon={<ExpandAltOutlined />}
+            onClick={() => setExpanded(true)}
+          />
+        )}
+      </Flex>
+      {call !== null && (
+        <div data-testid="studio-expression-signature">
+          <Typography.Text>
+            {call.fn.name}(
+            {call.fn.parameters.map((parameter, index) => (
+              <Fragment key={index}>
+                {index > 0 && ', '}
+                {index === boldParameter(call.fn, call.argument) ? <strong>{parameter}</strong> : parameter}
+              </Fragment>
+            ))}
+            )
+          </Typography.Text>{' '}
+          <Typography.Text type="secondary">{call.fn.description}</Typography.Text>
         </div>
       )}
-      {result.type !== null && (
-        <div>
-          <Typography.Text data-testid="studio-expression-type">
-            {t('shell.studio.expressionType')} <code>{result.type}</code>
+      {result.error !== null ? (
+        <div data-testid="studio-expression-error">
+          <Typography.Text type="danger">{result.error.message}</Typography.Text>{' '}
+          <Typography.Text type="secondary">
+            <small>{result.error.code}</small>
           </Typography.Text>
         </div>
+      ) : (
+        line !== null && (
+          <div>
+            <Typography.Text data-testid="studio-expression-type">{line}</Typography.Text>
+          </div>
+        )
+      )}
+      {expanded && (
+        <Modal
+          open
+          width={tokens.size.dialog.large}
+          title={name}
+          footer={null}
+          onCancel={() => setExpanded(false)}
+          destroyOnHidden
+        >
+          <Flex vertical gap={tokens.spacing.md}>
+            <ExpressionEditor
+              application={application}
+              resourceId={resourceId}
+              path={path}
+              name={name}
+              value={value}
+              required={required}
+              draft={draft}
+              options={options}
+              names={names}
+              inDialog
+              onView={(view) => (dialogView.current = view)}
+              onChange={onChange}
+            />
+            <ExpressionPanel
+              scope={scope}
+              rules={options.filter((option) => option.type === 'rule')}
+              names={names}
+              onPick={(text, cursorInside) => {
+                const view = dialogView.current
+                if (view) {
+                  const { from, to } = view.state.selection.main
+                  insertAt(view, from, to, text, cursorInside)
+                  view.focus()
+                }
+              }}
+            />
+          </Flex>
+        </Modal>
       )}
     </div>
   )
@@ -189,34 +341,24 @@ export default function ExpressionEditor({
           from--
         }
       }
-      return { from, to, severity: 'error', message: `${item.code}: ${item.message}` }
+      return { from, to, severity: 'error', message: item.message }
     })
     view.dispatch(setDiagnostics(view.state, diagnostics))
-    setResult({ type: null, error: diagnostics[0].message })
+    const first = answer.diagnostics[0]
+    setResult({ type: null, error: { code: first.code, message: first.message } })
   }
 }
 
-/** Completes the word before the cursor, or opens the list at the cursor when Ctrl+Space asks for it. */
-function completeAt(context: CompletionContext, options: ScopeOption[]): CompletionResult | null {
-  const word = context.matchBefore(/[A-Za-z][A-Za-z0-9-]*(:[A-Za-z0-9]*)?/)
-  if (!word && !context.explicit) {
-    return null
-  }
-  return { from: word?.from ?? context.pos, options: options.map(toCompletion) }
-}
-
-function toCompletion(option: ScopeOption): Completion {
-  return {
-    label: option.label,
-    type: option.type === 'field' || option.type === 'parameter' ? 'variable' : 'function',
-    apply: (view, completion, from, to) => {
-      const cursor = from + completion.label.length - (option.cursorInside ? 1 : 0)
-      view.dispatch({ changes: { from, to, insert: completion.label }, selection: { anchor: cursor } })
-    },
-  }
+/** The parameter to show in bold for an argument: a repeating last parameter, `…`, takes every argument past the list. */
+function boldParameter(fn: ExpressionScopeFunction, argument: number): number {
+  const last = fn.parameters.length - 1
+  return argument <= last ? argument : fn.parameters[last] === '…' ? last : -1
 }
 
 const expressionTheme = sharedTheme((tokens, mode) => [
   codeEditorTheme(tokens, mode),
-  EditorView.theme({ '.cm-content': { padding: '4px 0' } }),
+  EditorView.theme({
+    '.cm-content': { padding: '4px 0' },
+    '.cm-completionInfo code': { fontFamily: tokens.type.codeFontFamily },
+  }),
 ])

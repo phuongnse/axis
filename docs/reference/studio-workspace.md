@@ -28,8 +28,7 @@ The sidebar starts with the application's row, at the height of the band beside 
 meet. The row is a menu of every application, with the open one marked, and New application… after
 them. It has no entry back to the list, because Studio in the header's app switcher leads there. The
 row and the band stay in place while the page scrolls, and only the sidebar's entries scroll, under
-the row. Beside a sidebar the footer sits under the content column only, so the sidebar always runs to
-the bottom of the window.
+the row. Where the footer sits beside the sidebar is in [layout](shell.md#layout).
 
 Under the row come Overview, Releases, History and Settings, which concern the whole application.
 History lists the application's revisions, see [revisions](ai-authoring-in-studio.md#revisions). Then
@@ -95,6 +94,9 @@ not modal, so the page stays usable while it is open. It lists every error and t
 with its message and where it is. Opening one opens its resource at the place it names and leaves the
 panel open, so an author can fix one problem after another.
 
+- **The shared frame** _(planned for M35)_. The panel is drawn in `StudioSidePanel`, Studio's one side panel frame, see
+  [layout](shell.md#layout).
+
 ## Page heading
 
 Every Studio page heads its content with one level-4 heading, a page padding below the band, as the
@@ -115,7 +117,7 @@ Studio shows words, never an internal code, see [text](actions-and-controls.md#t
   provider by its `label`, a page or a site by its `title`. A text resource is named by its language.
   A resource that only authors see, and so has no label, is named by the name its author gave.
   `GET .../resources` gives each resource's `titles` by locale, and a text resource's `locale`.
-- **A label's language** _(planned for M33)_. A label shows in the author's language, else in `en`, see
+- **A label's language**. A label shows in the author's language, else in `en`, see
   [label texts](studio.md#label-texts).
 - **A kind** has a name for its list, such as Entities, and one for a single resource, such as Entity,
   in the author's language.
@@ -157,6 +159,9 @@ and the application's description it shows, in one column:
    `textMuted`, when one is needed, such as "Handy for lists that must be ready on the first day".
    Contracts and layers are not offered, and neither are the kinds that Get started leads to while it
    shows. Once the application has every kind, the block is gone and nothing takes its place.
+
+While the release history loads, Live and Changes both say so, and when it fails both say that the releases did not
+load. Once it has loaded, Live is left out when there is no live release. Live also says so while its sites load.
 
 Each block is a panel on `surface`, as a [resource form's sections](studio-resource-form.md#sections) are,
 with its title as its heading and no line under it. The blocks are `spacing-md` apart. The page's

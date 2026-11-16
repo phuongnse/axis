@@ -8,7 +8,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Axis.ControlPlane.Jobs;
+using Axis.ControlPlane.SignUp;
 using Axis.Core.Telemetry;
+using Axis.Tenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -319,6 +321,19 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         await AssertNothingStoredAsync();
         Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_challenges"));
+    }
+
+    [Fact]
+    public async Task A_sign_up_without_a_trial_plan_answers_503_and_stores_nothing()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync(trialPlan: false);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, NewAddress(), NewSubdomain()), cancellation);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        await AssertNothingStoredAsync();
     }
 
     [Fact]
@@ -645,7 +660,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, repeat, held, language: "vi"), cancellation);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
-        Assert.Equal(string.Empty, await response.Content.ReadAsStringAsync(cancellation));
+        Assert.False(string.IsNullOrEmpty(await ResendTokenAsync(response)));
         var message = await WaitForMessageAsync(repeat);
         Assert.Equal("Email này đã dùng thử Axis", message.Subject);
         Assert.Contains("Chào An Nguyen,", message.Text, StringComparison.Ordinal);
@@ -908,7 +923,191 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task The_expiry_job_deletes_used_solutions_past_their_expiry_and_keeps_the_others()
+    public async Task A_sign_up_answers_a_resend_token_and_posting_it_sends_the_confirm_email_again_with_a_new_link_so_only_the_latest_works()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var address = NewAddress();
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, address, NewSubdomain()), cancellation);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var resend = await ResendTokenAsync(response);
+        var first = TokenPattern().Match((await WaitForMessageAsync(address)).Text).Groups[1].Value;
+
+        var again = await ResendAsync(client, resend);
+
+        Assert.Equal(HttpStatusCode.Accepted, again.StatusCode);
+        Assert.Equal(string.Empty, await again.Content.ReadAsStringAsync(cancellation));
+        var messages = await WaitForMessagesAsync(address, 2);
+        Assert.All(messages, message => Assert.Equal("Confirm your Axis sign-up", message.Subject));
+        var second = messages.Select(message => TokenPattern().Match(message.Text).Groups[1].Value).Single(token => token != first);
+        Assert.Equal(2, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendSignUpConfirm'"));
+        Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendEmail'"));
+        Assert.Equal(1, await Scalar<long>($"SELECT count(*) FROM control_plane.sign_ups WHERE email = '{address}'"));
+
+        // The older link stops working and the newer one confirms.
+        var old = await client.PostAsJsonAsync("/api/sign-up/confirm", new { token = first }, cancellation);
+        Assert.Equal(HttpStatusCode.Conflict, old.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/sign-up/confirm", new { token = second }, cancellation)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_sign_up_of_a_verified_address_answers_a_resend_token_and_posting_it_sends_the_trial_used_email_again()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (owner, repeat) = NewOwnerAddresses();
+        await VerifyAsync(client, owner, NewSubdomain());
+        var held = NewSubdomain();
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, repeat, held), cancellation);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var resend = await ResendTokenAsync(response);
+        await WaitForMessageAsync(repeat);
+
+        var again = await ResendAsync(client, resend);
+
+        Assert.Equal(HttpStatusCode.Accepted, again.StatusCode);
+        Assert.Equal(string.Empty, await again.Content.ReadAsStringAsync(cancellation));
+        var messages = await WaitForMessagesAsync(repeat, 2);
+        Assert.All(messages, message => Assert.Equal("This email already had an Axis trial", message.Subject));
+        Assert.Equal(2, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendEmail'"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendSignUpConfirm'"));
+        Assert.Equal(0, await Scalar<long>($"SELECT count(*) FROM control_plane.sign_ups WHERE subdomain = '{held}'"));
+    }
+
+    [Fact]
+    public async Task A_resend_of_an_unknown_malformed_or_expired_token_answers_202_as_a_good_one_does_and_queues_no_email()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var address = NewAddress();
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, address, NewSubdomain()), cancellation);
+        var good = await ResendAsync(client, await ResendTokenAsync(response));
+        var id = await Scalar<Guid>($"SELECT id FROM control_plane.sign_ups WHERE email = '{address}'");
+        var expired = SignUpResendToken.Create(_challengeKey, new SignUpResendToken.Payload(address, "An Nguyen", "en", id, DateTimeOffset.UtcNow - TimeSpan.FromHours(1)));
+        var foreign = SignUpResendToken.Create(
+            Enumerable.Range(1, 32).Select(index => (byte)index).ToArray(),
+            new SignUpResendToken.Payload(address, "An Nguyen", "en", id, DateTimeOffset.UtcNow + TimeSpan.FromHours(1)));
+        var unknown = SignUpResendToken.Create(_challengeKey, new SignUpResendToken.Payload(NewAddress(), "An Nguyen", "en", Guid.CreateVersion7(), DateTimeOffset.UtcNow + TimeSpan.FromHours(1)));
+        var jobs = await EmailJobsAsync();
+        var counts = await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_emails");
+        Assert.Equal(HttpStatusCode.Accepted, good.StatusCode);
+        Assert.Equal(2, jobs);
+
+        var goodBody = await good.Content.ReadAsStringAsync(cancellation);
+        foreach (var token in new object?[] { Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32)), "x", 123, null, expired, foreign, unknown })
+        {
+            var bad = await ResendAsync(client, token);
+
+            Assert.Equal(HttpStatusCode.Accepted, bad.StatusCode);
+            Assert.Equal(goodBody, await bad.Content.ReadAsStringAsync(cancellation));
+        }
+
+        // Only the good one queued an email. No refused token was counted either.
+        Assert.Equal(jobs, await EmailJobsAsync());
+        Assert.Equal(counts, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_emails"));
+    }
+
+    [Fact]
+    public async Task A_resend_of_a_token_whose_sign_up_expired_answers_202_and_queues_no_email()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var address = NewAddress();
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, address, NewSubdomain()), cancellation);
+        var resend = await ResendTokenAsync(response);
+        await ControlPlaneDatabase.ExecuteAsync(
+            _controlPlane,
+            $"UPDATE control_plane.sign_ups SET expires_at = now() - interval '1 minute' WHERE email = '{address}'",
+            cancellation);
+        var jobs = await EmailJobsAsync();
+
+        var again = await ResendAsync(client, resend);
+
+        Assert.Equal(HttpStatusCode.Accepted, again.StatusCode);
+        Assert.Equal(jobs, await EmailJobsAsync());
+    }
+
+    [Fact]
+    public async Task A_resend_refuses_a_body_that_is_not_json_and_answers_503_without_the_challenge_key()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using (var factory = await FactoryAsync())
+        {
+            using var client = factory.CreateClient();
+            var notAnObject = await client.PostAsync("/api/sign-up/resend", new StringContent("[1]", System.Text.Encoding.UTF8, "application/json"), cancellation);
+            Assert.Equal(HttpStatusCode.BadRequest, notAnObject.StatusCode);
+            var notJson = await client.PostAsync("/api/sign-up/resend", new StringContent("{", System.Text.Encoding.UTF8, "application/json"), cancellation);
+            Assert.Equal(HttpStatusCode.BadRequest, notJson.StatusCode);
+            var plainText = await client.PostAsync("/api/sign-up/resend", new StringContent("{}", System.Text.Encoding.UTF8, "text/plain"), cancellation);
+            Assert.Equal(HttpStatusCode.UnsupportedMediaType, plainText.StatusCode);
+        }
+
+        using var withoutKey = await FactoryAsync(challengeKey: false);
+        using var keyless = withoutKey.CreateClient();
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await ResendAsync(keyless, "x")).StatusCode);
+    }
+
+    [Fact]
+    public async Task An_address_gets_three_sign_up_emails_in_24_hours_in_any_case_and_tag_and_the_fourth_answers_202_and_sends_nothing()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var part = Guid.NewGuid().ToString("N");
+        var first = await TryAsync(client, "203.0.113.1", $"owner-{part}@example.org");
+        Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
+        var second = await TryAsync(client, "203.0.113.2", $"Owner-{part}+a@Example.org");
+        Assert.Equal(HttpStatusCode.Accepted, second.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, (await ResendAsync(client, await ResendTokenAsync(first))).StatusCode);
+        var jobs = await EmailJobsAsync();
+        Assert.Equal(3, jobs);
+        var heldAddress = $"owner-{part}+b@example.org";
+        var heldSubdomain = NewSubdomain();
+
+        var fourth = await TryAsync(client, "203.0.113.3", form: Form(heldAddress, heldSubdomain));
+
+        Assert.Equal(HttpStatusCode.Accepted, fourth.StatusCode);
+        Assert.False(string.IsNullOrEmpty(await ResendTokenAsync(fourth)));
+        Assert.Equal(jobs, await EmailJobsAsync());
+        Assert.Equal(0, await Scalar<long>($"SELECT count(*) FROM control_plane.sign_ups WHERE subdomain = '{heldSubdomain}'"));
+        Assert.True((await CheckAsync(client, heldSubdomain)).GetProperty("free").GetBoolean());
+
+        // A resend past the limit answers 202 and queues nothing too, and the stored sign-ups keep their emails.
+        Assert.Equal(HttpStatusCode.Accepted, (await ResendAsync(client, await ResendTokenAsync(second))).StatusCode);
+        Assert.Equal(jobs, await EmailJobsAsync());
+        Assert.Equal(3, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_emails"));
+
+        // Another address is not affected, and its emails are counted on their own.
+        var other = NewAddress();
+        Assert.Equal(HttpStatusCode.Accepted, (await TryAsync(client, "203.0.113.4", other)).StatusCode);
+        Assert.Equal("Confirm your Axis sign-up", (await WaitForMessageAsync(other)).Subject);
+        Assert.Equal(jobs + 1, await EmailJobsAsync());
+    }
+
+    [Fact]
+    public async Task The_count_of_an_address_ignores_emails_older_than_24_hours()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var address = NewAddress();
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            Assert.Equal(HttpStatusCode.Accepted, (await TryAsync(client, $"203.0.113.{attempt + 1}", address)).StatusCode);
+        }
+
+        await ControlPlaneDatabase.ExecuteAsync(_controlPlane, "UPDATE control_plane.sign_up_emails SET queued_at = now() - interval '25 hours'", cancellation);
+        Assert.Equal(HttpStatusCode.Accepted, (await TryAsync(client, "203.0.113.10", address)).StatusCode);
+
+        Assert.Equal(4, await EmailJobsAsync());
+    }
+
+    [Fact]
+    public async Task The_expiry_job_deletes_used_solutions_and_email_counts_past_their_time_and_keeps_the_others()
     {
         var cancellation = TestContext.Current.CancellationToken;
         using var factory = await FactoryAsync();
@@ -923,12 +1122,22 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
                 (sha256('future'::bytea), now() + interval '5 minutes')
             """,
             cancellation);
+        await ControlPlaneDatabase.ExecuteAsync(
+            _controlPlane,
+            """
+            INSERT INTO control_plane.sign_up_emails (id, address_hash, queued_at) VALUES
+                (uuidv7(), sha256('old'::bytea), now() - interval '25 hours'),
+                (uuidv7(), sha256('fresh'::bytea), now() - interval '23 hours')
+            """,
+            cancellation);
 
         var expiry = factory.Services.GetServices<IJobHandler>().Single(handler => handler.Kind == "expireSignUps");
         await expiry.RunAsync(new ClaimedJob(Guid.CreateVersion7(), "expireSignUps", [], 1), cancellation);
 
         Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_challenges WHERE challenge = sha256('past'::bytea)"));
         Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_challenges WHERE challenge = sha256('future'::bytea)"));
+        Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_emails WHERE address_hash = sha256('old'::bytea)"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_emails WHERE address_hash = sha256('fresh'::bytea)"));
     }
 
     private string ControlPlaneConnectionString => $"{_container.GetConnectionString()};Timeout=5;Command Timeout=5";
@@ -1069,7 +1278,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         }
     }
 
-    private async Task<WebApplicationFactory<Program>> FactoryAsync(bool documents = true, string termsVersion = TermsVersion, string dpaVersion = DpaVersion, string privacyVersion = PrivacyVersion)
+    private async Task<WebApplicationFactory<Program>> FactoryAsync(bool documents = true, string termsVersion = TermsVersion, string dpaVersion = DpaVersion, string privacyVersion = PrivacyVersion, bool challengeKey = true, bool trialPlan = true)
     {
         var host = await mailpit.SmtpHostAsync();
         var port = await mailpit.SmtpPortAsync();
@@ -1085,7 +1294,11 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
             builder.UseSetting("ControlPlane:Mail:Host", host);
             builder.UseSetting("ControlPlane:Mail:Port", port.ToString(CultureInfo.InvariantCulture));
             builder.UseSetting("ControlPlane:Mail:UseTls", "false");
-            builder.UseSetting("ControlPlane:SignUp:ChallengeKey", Convert.ToBase64String(_challengeKey));
+            if (challengeKey)
+            {
+                builder.UseSetting("ControlPlane:SignUp:ChallengeKey", Convert.ToBase64String(_challengeKey));
+            }
+
             builder.UseSetting("ControlPlane:SignUp:Applications:0:Id", "approvals");
             builder.UseSetting("ControlPlane:SignUp:Applications:0:Titles:en", "Approvals");
             builder.UseSetting("ControlPlane:SignUp:Applications:0:Titles:vi", "Phê duyệt");
@@ -1102,6 +1315,21 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
                 }
 
                 builder.UseSetting("ControlPlane:SignUp:LicencesUrl", "https://example.com/licences");
+            }
+
+            // The trial plan that a new trial's quotas come from. Without one the route answers 503.
+            if (trialPlan)
+            {
+                builder.UseSetting("ControlPlane:Plans:0:Code", "trial");
+                builder.UseSetting("ControlPlane:Plans:0:Version", "1");
+                builder.UseSetting("ControlPlane:Plans:0:Name:en", "Trial");
+                builder.UseSetting("ControlPlane:Plans:0:Name:vi", "Dùng thử");
+                builder.UseSetting("ControlPlane:Plans:0:IncludedUsers", "10");
+                builder.UseSetting("ControlPlane:Plans:0:Trial", "true");
+                foreach (var key in QuotaKeys.All.Where(key => key != QuotaKeys.Users))
+                {
+                    builder.UseSetting($"ControlPlane:Plans:0:Quotas:{key}", key == QuotaKeys.PackageCpuSecondsPerDay ? "0" : "1");
+                }
             }
 
             // The test server has no client address, so the filter gives every request the one proxy the control plane trusts.
@@ -1125,6 +1353,17 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         request.Headers.Add("X-Forwarded-For", clientAddress);
         return await client.SendAsync(request, TestContext.Current.CancellationToken);
     }
+
+    // How many emails of sign-up the control plane has queued: the confirm emails and the trial-used ones.
+    private Task<long> EmailJobsAsync() => Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind IN ('sendSignUpConfirm', 'sendEmail')");
+
+    // The resend token of a sign-up answer.
+    private static async Task<string> ResendTokenAsync(HttpResponseMessage response) =>
+        (await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken)).GetProperty("resend").GetString()!;
+
+    // One resend with the token the test gives, which is put in the body as it is, or left out when it is null.
+    private static async Task<HttpResponseMessage> ResendAsync(HttpClient client, object? resend) =>
+        await client.PostAsJsonAsync("/api/sign-up/resend", resend is null ? new Dictionary<string, object?>() : new Dictionary<string, object?> { ["resend"] = resend }, TestContext.Current.CancellationToken);
 
     // One confirm from the client address that X-Forwarded-For names and with the user agent the test gives.
     private static async Task<HttpResponseMessage> ConfirmAsync(HttpClient client, string token, string clientAddress, string userAgent)

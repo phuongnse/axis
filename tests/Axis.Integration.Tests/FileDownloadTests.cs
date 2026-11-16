@@ -200,15 +200,15 @@ public sealed class FileDownloadTests(RecordApiFixture fixture) : IClassFixture<
     {
         var data = new byte[1_048_576];
         new Random(76).NextBytes(data);
-        "AXIS"u8.CopyTo(data);
+        "%PDF-"u8.CopyTo(data);
         using var requester = fixture.CreateClient().SignedInAs("requester");
         var claim = await CreateClaimAsync(requester, "Shared");
 
         var request = Request(HttpMethod.Post, Attachment, HostA);
         var form = new MultipartFormDataContent();
         var part = new ByteArrayContent(data);
-        part.Headers.TryAddWithoutValidation("Content-Type", "application/octet-stream");
-        form.Add(part, "file", "large.bin");
+        part.Headers.TryAddWithoutValidation("Content-Type", "application/pdf");
+        form.Add(part, "file", "large.pdf");
         request.Content = form;
         Guid file;
         using (var uploaded = await requester.SendAsync(request, CancellationToken))

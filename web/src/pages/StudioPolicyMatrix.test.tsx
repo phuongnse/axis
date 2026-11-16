@@ -5,7 +5,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioMatrixCell, StudioMatrixRole, StudioNames, StudioPolicyMatrix } from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
-import { removeTag } from '../test/antd'
+import { emptyDescription, removeTag } from '../test/antd'
 import { StudioPolicyMatrixTable } from './StudioPolicyMatrix'
 
 const sharedPolicyId = '3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f'
@@ -275,7 +275,16 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
 
     await userEvent.click(screen.getByTestId('studio-matrix-cell-manager-dataSource-OpenRequests'))
 
-    expect(screen.getByText('No grant.')).toBeInTheDocument()
+    expect(emptyDescription('No grant.')).toBeInTheDocument()
+  })
+
+  it('says an editable role has no own grant on a cell it grants nothing on', async () => {
+    stubFetch()
+    renderMatrix()
+
+    await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-endpoint-Intake'))
+
+    expect(emptyDescription('No grant.', screen.getByTestId('studio-matrix-own-grants'))).toBeInTheDocument()
   })
 
   it('offers only the actions a process takes', async () => {
@@ -316,6 +325,18 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(screen.queryByTestId('studio-matrix-actions')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Add grant' }))
     expect(screen.getAllByRole('checkbox').map((box) => (box as HTMLInputElement).value)).toEqual(['invoke'])
+  })
+
+  it('says that the grants are loading while the access policy loads', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string) => (input === policyUrl ? new Promise<Response>(() => {}) : Promise.resolve(json({})))),
+    )
+    renderMatrix()
+
+    await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-entity-PurchaseRequest'))
+
+    expect(within(await screen.findByTestId('studio-matrix-grants')).getByText('Loading the grants…')).toBeVisible()
   })
 
   it('sends one patch with the loaded version that changes only the edited grant', async () => {
@@ -400,23 +421,51 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(JSON.parse(patches(fetchMock)[0][1]!.body as string)).toEqual([{ op: 'remove', path: '/grants/2/fields' }])
   })
 
-  it('disables Save while a grant has no action and Remove on the only grant', async () => {
-    stubFetch({ ...policyContent, grants: [{ process: 'PurchaseApproval', actions: ['start'] }] })
+  it('keeps Save on while a grant has no action, and a click shows what to fix, focuses it and sends nothing', async () => {
+    const fetchMock = stubFetch({ ...policyContent, grants: [{ process: 'PurchaseApproval', actions: ['start'] }] })
     renderMatrix()
 
     await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-process-PurchaseApproval'))
     const group = await screen.findByTestId('studio-matrix-actions')
     expect(screen.getByRole('button', { name: 'Remove grant' })).toBeDisabled()
+    expect(screen.queryByTestId('studio-matrix-actions-required')).toBeNull()
 
     await userEvent.click(within(group).getByRole('checkbox', { name: 'start' }))
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    expect(screen.queryByTestId('studio-matrix-actions-required')).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(screen.getByTestId('studio-matrix-actions-required')).toHaveTextContent('Tick at least one action.')
+    expect(group).toHaveAttribute('aria-describedby', screen.getByTestId('studio-matrix-actions-required').id)
+    expect(within(group).getAllByRole('checkbox')[0]).toHaveFocus()
+    expect(patches(fetchMock)).toHaveLength(0)
 
     await userEvent.click(within(group).getByRole('checkbox', { name: 'retry' }))
+    expect(screen.queryByTestId('studio-matrix-actions-required')).toBeNull()
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
 
+  it('focuses the first grant that has no action, and sends the save once every grant has one', async () => {
+    const fetchMock = stubFetch({ ...policyContent, grants: [{ process: 'PurchaseApproval', actions: ['start'] }] })
+    renderMatrix()
+
+    await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-process-PurchaseApproval'))
+    await screen.findByTestId('studio-matrix-actions')
     await userEvent.click(screen.getByRole('button', { name: 'Add grant' }))
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    const grants = screen.getAllByTestId('studio-matrix-own-grant')
+    expect(grants).toHaveLength(2)
+    expect(within(grants[0]).queryByTestId('studio-matrix-actions-required')).toBeNull()
+    expect(within(grants[1]).getByTestId('studio-matrix-actions-required')).toBeVisible()
+    expect(within(grants[1]).getAllByRole('checkbox')[0]).toHaveFocus()
+    expect(patches(fetchMock)).toHaveLength(0)
     expect(screen.getAllByRole('button', { name: 'Remove grant' })[0]).toBeEnabled()
+
+    await userEvent.click(within(grants[1]).getAllByRole('checkbox')[0])
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(patches(fetchMock)).toHaveLength(1))
   })
 
   it('shows the conflict message on a 409, keeps the draft and reloads on request', async () => {

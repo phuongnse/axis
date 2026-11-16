@@ -33,7 +33,7 @@ opens the same view.
   entry, so the browser's Back and Forward step through it. A second Back would be one concern with two
   mechanisms. Where the author is comes from the sidebar's marked entry, which also leads up to the list, and the
   [page heading](studio-workspace.md#page-heading).
-- **Scroll position** _(planned for M33)_. Going Back returns the author to where they were on a long page.
+- **Scroll position.** Going Back returns the author to where they were on a long page, see [routing](frontend.md#routing).
 
 ## New application
 
@@ -144,8 +144,8 @@ what changed.
   [`description`](resource-files.md#resource-file-shape) shows it in the form, and each editor of its own
   shows it after the name and the label.
 - **The JSON view** shows the draft as text, and a valid edit there updates the form. Invalid JSON
-  shows an error and turns Save off. Its look and its actions are in
-  [JSON view](studio-resource-form.md#json-view).
+  shows an error, and a click on Save opens the JSON view at the first problem and sends nothing. Its
+  look and its actions are in [JSON view](studio-resource-form.md#json-view).
 - **Save** sends only the changes, as a JSON Patch with the version the editor loaded in `If-Match`,
   and stays off while nothing changed. An array whose length changed is replaced whole, and an array of
   the same length is compared item by item. Clearing an optional value removes its key. After a save
@@ -304,7 +304,7 @@ picks what exists.
 - **The select** is searchable, ignoring letter case. A module process, page or policy shows as
   `<module id>/<name>`, so a site's navigation can pick a module page and a `startProcess` action a
   module process.
-- **A choice shows its label** _(planned for M33)_. `ReferencePicker` names each choice by its label, from
+- **A choice shows its label**. `ReferencePicker` names each choice by its label, from
   `labelKey` in the [names](authoring.md#names), as the tables do. The name shows only instead of a missing
   label, and in `textMuted` after the label of options that share one. The search finds either, and the
   file keeps the name. Columns, parameters and operations have no label in their format, so they show
@@ -350,7 +350,7 @@ resource, and Undo steps through it.
   answered, and the names and the release history load again.
 - **A shared key.** A label whose key other labels use says how many, from `usedBy` in the names
   answer, so the author knows that the edit changes them too.
-- **One language rule** _(planned for M33)_. A label shows in the author's language, else in `en`, as a
+- **One language rule**. A label shows in the author's language, else in `en`, as a
   resource's title does, so a table and a picker never name one resource two ways. The label editor's own
   rule, a box in the author's language or else the application's first, is about which language is
   edited, and stays.
@@ -363,48 +363,50 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
 
 - **Checking.** The editor checks its text once when it first draws, and 300 ms after each keystroke it
   sends the text to the [expression check route](authoring.md#expression-check), and shows only the
-  latest answer. It underlines the range from `start` to `end` and shows the message and error code
-  under the editor, or the result `type` when there is no error. From its first draw or a keystroke
-  until the answer to its latest text arrives or the check fails, and while its code loads, the editor
-  has `aria-busy="true"`. Tests wait on this busy state before they click on the Form tab, see
+  latest answer. An empty text, required or not, is not sent. It underlines the range from `start` to
+  `end` and shows the message and then its error code under the editor, or the result `type` in words
+  when there is no error. From its first draw or a keystroke until the answer to its latest text
+  arrives or the check fails, and while its code loads, the editor has `aria-busy="true"`. An empty
+  text leaves it not busy. Tests wait on this busy state before they click on the Form tab, see
   [flaky tests](../development.md#flaky-tests).
 - **No answer.** The check places the text in the saved resource, so a place inside a field or an item
   that is not saved yet has no answer, while a new property of a saved object has one, see
   [the place](authoring.md#expression-check). With no answer, or an answer of `400` or `401`, the last
   result stays on screen. A `401` does not show the sign-in prompt, so the draft is kept. The editor
   never blocks Save.
-- **What the place needs** _(planned for M33)_. A line under the box says what the place needs, as "Needs to
-  give yes or no", until the expression gives a type, then "Gives yes or no", in the words the designer
-  names types by. A validation, a condition or a filter needs a boolean, and a computed field or a
-  default the field's type.
-- **An error in words** _(planned for M33)_. An error reads first in words, with its code after it, small. An
+- **What the place needs.** A line under the box says what the place needs, as "Needs to
+  give yes or no", until the expression gives a type, then "Gives yes or no", with the type in words.
+  A validation, a condition or a filter needs a boolean, and a computed field or a default the field's
+  type. A place that takes any type shows no "Needs" line.
+- **An error in words.** An error reads first in words, with its code after it, small. An
   empty expression is not sent to be checked. The box wraps long lines and grows with them.
-- **A function's signature** _(planned for M33)_. Inside a call, a line shows the function's signature, with the
-  parameter at the cursor in bold, and what it does.
-- **Expand** _(planned for M33)_. An icon beside the box opens the expression in a large dialog, with a panel of
-  three tabs, Fields, Operators and Functions, and every rule allowed there. A click inserts the name at
-  the cursor. A search looks in all three and lists what it finds best first: a name that is the words,
-  then one that starts with them, then one that holds them, then one whose description does.
-- **Completion that explains** _(planned for M33)_. Completion names each choice: a field by its label and type,
-  and a rule or a function by its signature, with what it does and an example beside the list.
-- **Completion knows where the cursor stands** _(planned for M33)_. After a value it offers the operators that
-  value's type takes, the comparisons first, and after a clause that already compares, only `and` and
-  `or`. Inside quotes after an enum field it offers that field's values in their order and closes the
-  quote. Elsewhere it offers the fields, the values, `not`, the rules and the functions, those that give
-  the type the place needs first. It opens by itself after a space that follows a value and after a
-  quote that follows an enum field.
-- **The language's own words** _(planned for M33)_. Completion and the panel offer the comparisons, `is null`,
+- **A function's signature.** In a call to an allowed function, a line shows `contains(text, text)` and what it does,
+  with the parameter at the cursor in bold, counted by the commas at the call's own level. Outside a call, none.
+- **Expand.** An icon beside the box, next in Tab order, opens the expression in a large dialog, with an editor
+  that checks and saves like the box, and a panel of tabs Fields, Operators and Functions, with every rule
+  allowed there. A click inserts the name at the cursor. A search looks in all three, best first: a name that
+  is the words, then one that starts with them, then one that holds them, then one whose description does.
+- **Completion that explains.** Each choice has a short detail and an info panel while it is selected. A field
+  shows its label and type in words, a function its signature, what it does and an example, and a rule its
+  signature and the type it gives. An operator or value shows its words and an example.
+- **Completion knows where the cursor stands.** After a value it offers that type's operators, the comparisons
+  first, and after a clause that already compares, only `and` and `or`. Inside quotes after an enum field it
+  offers the field's values in their order and closes the quote. Elsewhere it offers the fields, the values,
+  `not`, the rules and the functions, those that give the type the place needs first. It opens by itself after
+  a space that follows a value and after a quote that follows an enum field.
+- **The language's own words.** Completion and the panel offer the comparisons, `is null`,
   `is not null`, `and`, `or`, `not`, `in (…)`, the arithmetic and the values `true`, `false`, `null`,
   `'text'` and `date('…')`, each with what it does and an example. A code editor stays the one way to
   write an expression, because an expression gives a value of any type, not only yes or no.
-- **Only what the place allows** _(planned for M33)_. The server answers
+- **Only what the place allows.** The server answers
   [the scope of a place](authoring.md#expression-scope), so the client keeps no list of functions: no
   aggregate in a default, and no `now()`, `today()` or `toDate()` in a computed field (`AXC0086`).
-- **Completion.** Typing a word, or Ctrl+Space, opens a list of the names in scope, and the arrow keys
-  and Enter pick one. The names come from the [names route](authoring.md#names), loaded with the
-  application and again after a save, a delete and a reconnect. When they do not load, the list offers
-  the functions only, and typing and Save keep working. A function or a rule goes in with its brackets
-  and the cursor inside them, while `now()` and `currentUser()` put the cursor after them.
+- **Completion.** Typing a word, or Ctrl+Space, opens a list of what fits at the cursor, and the arrow keys
+  and Enter pick one. The fields, parameters and rules come from the [names route](authoring.md#names),
+  loaded with the application and again after a save, a delete and a reconnect. The functions come from
+  the [expression scope](authoring.md#expression-scope), loaded once per place with the draft. Without
+  names the list offers the language's words and the functions only, and typing and Save keep working. A rule
+  and a function with parameters go in with the cursor inside their brackets, and `now()` after them.
 - **What completion offers:**
   - the fields of the entity at the place: the entity being edited, a policy grant's `entity`, or the
     `entity` of a data source, a process or a data change trigger;
@@ -412,11 +414,9 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
     trigger, offered as a parameter and not as a field, because a path cannot start from it;
   - a data source filter's parameters, a rule's own parameters, and a process's `parameters` when it
     has no subject, with no field;
-  - the application's rules, with module rules as `<module>:<name>`, and the functions and aggregates
-    of the [expression language](expressions.md#functions);
-  - `currentUser()` only in a policy grant's or a data source's filter, not in a measure filter.
-    Expressions in migrations and endpoints, and in a trigger that has no entity, offer the rules and
-    the functions only.
+  - the application's rules, with module rules as `<module>:<name>`;
+  - the functions and aggregates of the [expression language](expressions.md#functions) that the scope
+    answer allows at the place, such as `currentUser()` only in a grant's or a data source's filter.
 
 ## Policy matrix
 
@@ -440,7 +440,7 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
   not done here.
 - **Editable grants.** In an editable row, the cell's own grants, those of `<Role>Access` that name
   exactly this target, are editable. The panel reads that policy with the resource route, so every
-  edit fits the file that a save patches.
+  edit fits the file that a save patches. While the policy loads, the panel says so.
   - Each grant has a checkbox for each action its target takes, as
     [roles and policies](roles-and-policies.md) lists them, which Studio reads from
     `policy.schema.json`. An action the target does not take stays in the file and shows as a warning
@@ -450,11 +450,11 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
   - Add grant adds a grant named after the cell's target with the first free number in the policy,
     ignoring letter case, such as `purchaseRequest1`. A grant shows its name read-only. Remove deletes a
     grant, but not the policy's last one.
-- **Saving.** Save is off while a grant has no ticked action and while nothing changed. It writes one
-  file, with one patch that carries the version the panel loaded and changes only what the author
-  edited. A stale version shows a conflict message, keeps the draft and offers Reload, which discards
-  it. After a save the Problems panel, the matrix and the names load again, and the cell stays open.
-  Opening another cell, or a matrix that loads again after another write, discards an unsaved draft.
+- **Saving.** Save is off while nothing changed. A click with a grant that has no ticked action says so under its
+  actions, focuses them and sends nothing. It writes one file, with one patch that carries the version the panel
+  loaded and changes only what the author edited. A stale version shows a conflict message, keeps the draft and offers
+  Reload, which discards it. After a save the Problems panel, the matrix and the names load again, and the cell stays
+  open. Opening another cell, or a matrix that loads again after another write, discards an unsaved draft.
 
 ## Editors by kind
 
@@ -870,8 +870,8 @@ second view of the same draft.
 - **Rows.** Add record adds a row with a new record id, and Remove deletes the record from the draft.
   Clearing a cell removes its key from the record's `values`, so the grid never writes `null`.
 - **Save.** A cell whose value would fail seeding, because it has the wrong type, is out of bounds or
-  is missing a required value, shows an error and turns Save off, also when the value comes from the
-  JSON view.
+  is missing a required value, shows an error, and a click on Save focuses the first such cell and sends
+  nothing, also when the value comes from the JSON view.
 - **Fallback.** The entity is found by name among the folder's `entity` resources, ignoring letter
   case. When it is not there, as for a module entity or a typo, the seed uses the generic form and the
   JSON view.

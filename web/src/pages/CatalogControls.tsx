@@ -1,9 +1,11 @@
 import { Flex, Select } from 'antd'
 import type { ReactNode } from 'react'
 import { AxisField } from '../platform/AxisField'
+import { EmptyState } from '../platform/EmptyState'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import type { StudioCatalogSlot } from '../platform/studio'
 import { slotTitle, timeZoneText, type RangeOperator } from '../platform/studioCatalog'
+import type { ReferenceOption } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { ReferencePicker } from './ReferencePicker'
@@ -155,20 +157,19 @@ export function ModuleSlots({
   /** Whether to say that the module has no roles or connectors. */
   noSlots: boolean
   /** The application's roles or connectors that the slots take. */
-  names: string[]
+  names: ReferenceOption[]
   value: unknown
   pointer: string
   locale: string
   onChange: (pointer: string, next: unknown) => void
 }) {
   const t = useText()
-  const { colour } = useDesignTokens()
   const map =
     typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
   const help = t(control === 'roles' ? 'shell.studio.module.roleSlot.help' : 'shell.studio.module.connectorSlot.help')
   return (
     <Flex vertical gap="small">
-      {noSlots && <span style={{ color: colour.textMuted }}>{t('shell.studio.module.noSlots')}</span>}
+      {noSlots && <EmptyState text={t('shell.studio.module.noSlots')} />}
       {slots.map((slot) => {
         const title = slotTitle(slot, locale)
         const mapped = map[slot.name]

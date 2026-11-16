@@ -161,7 +161,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await field.getByRole('textbox').fill('length(name)')
     await expect(field.locator('.cm-lintRange-error')).toHaveCount(0)
     await expect(field.getByTestId('studio-expression-error')).toHaveCount(0)
-    await expect(field.getByTestId('studio-expression-type')).toContainText('integer')
+    await expect(field.getByTestId('studio-expression-type')).toContainText('Gives a whole number')
   })
 
   test('an author builds money, file, references and labelled enum fields in the designer', async ({ page }) => {
@@ -291,7 +291,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await page.getByRole('button', { name: 'Add role', exact: true }).click()
     const row = page.getByTestId('studio-role-row-0')
     await row.getByRole('textbox').fill('managers')
-    await pickOption(row.getByRole('combobox'), 'department-manager')
+    await pickOption(row.getByRole('combobox'), 'Department manager', 'department-manager')
     const providerDiagnostics = await save(page)
 
     await openKind(page, 'site')

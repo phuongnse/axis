@@ -32,11 +32,13 @@ namespace Axis.Server.Records;
 /// read, because an upload has no record yet.
 /// A body is checked in order: a missing, extra or malformed part, a part without a file name and an empty file
 /// are 400, a media type that the field's <c>accept</c> refuses is 415, a declared <c>image/svg+xml</c> is 415
-/// whatever <c>accept</c> says because an SVG can carry scripts, a file over the field's <c>maxSize</c> or
-/// the host's <c>Files:MaxSize</c> is 413 as soon as the limit is passed, and a file that starts like an
-/// executable, or does not start as its declared PDF, PNG, JPEG, GIF, WebP or ZIP type does, is 415. A part
-/// without a content type is stored as <c>application/octet-stream</c>, and the parameters of a media type are dropped.
-/// The stored name is the last path segment of the file name, without control characters, cut to 255 characters.
+/// whatever <c>accept</c> says because an SVG can carry scripts, and a media type that <c>FileSignatures</c> cannot
+/// check is 415, a file name whose extension does not belong to the declared media type is 415 before the body is
+/// read, a file over the field's <c>maxSize</c> or the host's <c>Files:MaxSize</c> is 413 as soon as the limit is
+/// passed, and a file that starts like an executable, or does not start as its declared type does, is 415. A part
+/// without a content type is <c>application/octet-stream</c>, which is refused, and the parameters of a media type are dropped.
+/// The stored name is the last path segment of the file name, without control characters, cut to 255 characters
+/// before its extension.
 /// The problem titles never contain text from the request.
 /// The download route, <c>GET /api/apps/{app}/files/{id}</c>, sends the bytes of an attached file to a session user
 /// or a service account that could read the field on the owner record. A request is checked in order: session or
@@ -52,6 +54,7 @@ namespace Axis.Server.Records;
 internal static class FileEndpoints
 {
     private const int MaxNameLength = 255;
+    private const int MaxExtensionLength = 16;
     private const int ChunkSize = 81920;
     private const long RequestSizeMargin = 1_048_576;
     private const string OctetStream = "application/octet-stream";
@@ -308,9 +311,15 @@ internal static class FileEndpoints
                 return UploadedPart.Fail(BadPart("The request must hold one part named file, with a file name."));
             }
 
-            if (MediaType(section.ContentType) is not { } mediaType || mediaType == Svg || !Accepts(field.Accept, mediaType))
+            if (MediaType(section.ContentType) is not { } mediaType || mediaType == Svg
+                || !FileSignatures.IsChecked(mediaType) || !Accepts(field.Accept, mediaType))
             {
                 return UploadedPart.Fail(Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "The file's media type is not accepted."));
+            }
+
+            if (!FileSignatures.HasExtension(mediaType, name))
+            {
+                return UploadedPart.Fail(Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "The file name's extension does not match its media type."));
             }
 
             var content = TemporaryFile.Create("axis-upload");
@@ -385,6 +394,7 @@ internal static class FileEndpoints
         Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "The file is larger than the limit for this field.");
 
     // The last path segment of the file name, with no control characters and at most 255 characters, or null for no name.
+    // A long name is cut before its extension.
     private static string? CleanName(ContentDispositionHeaderValue disposition)
     {
         var raw = disposition.FileNameStar.HasValue ? disposition.FileNameStar : disposition.FileName;
@@ -397,9 +407,14 @@ internal static class FileEndpoints
         var name = new string(text[(text.LastIndexOfAny(['/', '\\']) + 1)..].Where(character => !char.IsControl(character)).ToArray()).Trim();
         if (name.Length > MaxNameLength)
         {
+            // Cut before the extension, so the stored name keeps the extension that was checked.
+            var extension = Path.GetExtension(name);
+            var keep = extension.Length is >= 1 and <= MaxExtensionLength ? extension : string.Empty;
+            var stem = MaxNameLength - keep.Length;
+
             // Never cut between the two halves of a surrogate pair.
-            var length = char.IsHighSurrogate(name[MaxNameLength - 1]) ? MaxNameLength - 1 : MaxNameLength;
-            name = name[..length];
+            var length = char.IsHighSurrogate(name[stem - 1]) ? stem - 1 : stem;
+            name = name[..length] + keep;
         }
 
         return name.Length == 0 ? null : name;

@@ -619,61 +619,30 @@ public sealed class ControlPlaneOptionsTests
     }
 
     [Fact]
-    public void Valid_trial_quotas_load()
-    {
-        var settings = new Dictionary<string, string?>
-        {
-            ["ControlPlane:SignUp:TrialQuotas:users"] = "10",
-            ["ControlPlane:SignUp:TrialQuotas:authoringRequests"] = null,
-        };
-        using var factory = ControlPlaneFactory.Create(settings: settings);
-
-        using var client = factory.CreateClient();
-
-        var quotas = factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.TrialQuotas;
-        Assert.Equal(2, quotas.Count);
-        Assert.Equal(10, quotas["users"]);
-        Assert.Null(quotas["authoringRequests"]);
-    }
-
-    [Fact]
-    public void A_trial_quota_with_an_unknown_key_stops_the_start_and_the_message_names_the_setting()
+    public void The_retired_trial_quotas_setting_is_not_read()
     {
         using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
         {
             ["ControlPlane:SignUp:TrialQuotas:seats"] = "5",
         });
 
-        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+        using var client = factory.CreateClient();
 
-        Assert.Contains("ControlPlane:SignUp:TrialQuotas:seats", exception.Message, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData("-1")]
-    [InlineData("2.5")]
-    [InlineData("ten")]
-    public void A_trial_quota_that_is_not_a_whole_number_of_zero_or_more_stops_the_start_and_the_message_names_the_setting(string value)
-    {
-        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
-        {
-            ["ControlPlane:SignUp:TrialQuotas:users"] = value,
-        });
-
-        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
-
-        Assert.Contains("ControlPlane:SignUp:TrialQuotas:users", exception.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain(value, exception.Message, StringComparison.Ordinal);
+        Assert.NotNull(factory.Services.GetRequiredService<ControlPlaneOptions>());
     }
 
     [Fact]
-    public void With_no_trial_quotas_the_service_starts_with_none()
+    public void A_trial_plan_with_more_than_ten_included_users_stops_the_start_and_the_message_names_the_plan_and_the_setting_and_not_the_value()
     {
-        using var factory = ControlPlaneFactory.Create();
+        var settings = ControlPlaneFactory.TrialPlanSettings("12345678901");
 
-        using var client = factory.CreateClient();
+        using var factory = ControlPlaneFactory.Create(settings: settings);
 
-        Assert.Empty(factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.TrialQuotas);
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:Plans:0:IncludedUsers", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("version 1", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("12345678901", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

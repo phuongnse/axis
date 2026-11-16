@@ -7,6 +7,7 @@ import { parseTableQuery, recordPageSize, writeTableQuery, type TableQuery } fro
  * A table's view, its search, filter, columns, sort, page, page size and data source parameter values, kept in the address, see
  * docs/reference/actions-and-controls.md#tables. An invalid, empty, repeated or out-of-order value, or a search the
  * table cannot make or a filter that is not valid for `fields`, is rewritten without a history entry. `setView` adds a history entry unless `replace` is set.
+ * A view change keeps the scroll position, see docs/reference/frontend.md#routing.
  * `fields` and `parameterNames` must be stable between renders.
  */
 export function useTableView(
@@ -27,13 +28,16 @@ export function useTableView(
   useEffect(() => {
     const canonical = writeTableQuery(searchParams, view, defaultPageSize, parameterNames)
     if (canonical.toString() !== searchParams.toString()) {
-      setSearchParams(canonical, { replace: true })
+      setSearchParams(canonical, { replace: true, preventScrollReset: true })
     }
   }, [searchParams, view, defaultPageSize, parameterNames, setSearchParams])
 
   const setView = useCallback(
     (next: TableQuery, options?: { replace?: boolean }) =>
-      setSearchParams(writeTableQuery(searchParams, next, defaultPageSize, parameterNames), options),
+      setSearchParams(writeTableQuery(searchParams, next, defaultPageSize, parameterNames), {
+        ...options,
+        preventScrollReset: true,
+      }),
     [searchParams, defaultPageSize, parameterNames, setSearchParams],
   )
   return { view, setView }

@@ -805,7 +805,7 @@ trusted code, so the platform gives it more limits than an installation's packag
 - **By an agent.** An agent writes the package's adapter, manifest and tests over a library that the
   author names. It does so only through an [authoring request](authoring-requests.md#states) and the
   [MCP server's tools](mcp-server.md#tools), under the plan, review and accept of
-  [D125](../decisions/d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md), and it never
+  [D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md), and it never
   publishes.
 
 ## Sample and test packages

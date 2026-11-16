@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   moduleIndex,
   relaxedManifest,
+  relaxedPointLabel,
   relaxEntries,
   relaxPatch,
   relaxReasonValid,
@@ -78,5 +79,17 @@ describe('relaxEntries', () => {
     expect(unrelaxedManifest(two, 'checklists', point)).toEqual({
       modules: [{ id: 'checklists', relax: [{ point: 'Checklist/transitions/close', reason: 'Old' }] }],
     })
+  })
+})
+
+describe('relaxedPointLabel', () => {
+  const t = (key: string) => (key === 'shell.studio.release.relaxed.others' ? 'Other roles' : key)
+
+  it('follows the one language rule: the locale, else en, else the others text or the point', () => {
+    const titles = { en: 'Check', vi: 'Kiểm tra' }
+    expect(relaxedPointLabel({ point, titles }, 'vi', t)).toBe('Kiểm tra')
+    expect(relaxedPointLabel({ point, titles }, 'fr', t)).toBe('Check')
+    expect(relaxedPointLabel({ point: 'Checklist/ceiling/others', titles: null }, 'en', t)).toBe('Other roles')
+    expect(relaxedPointLabel({ point, titles: null }, 'en', t)).toBe(point)
   })
 })

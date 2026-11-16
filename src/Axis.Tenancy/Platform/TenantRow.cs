@@ -124,6 +124,12 @@ public sealed class TenantRow
     /// </summary>
     public bool ApplicationPackages { get; set; }
 
+    /// <summary>
+    /// The application the create job made the tenant with: the template id, or the name of the blank application. <c>null</c> for a
+    /// tenant made outside a create job. See <c>docs/reference/tenant-lifecycle.md#routes</c>.
+    /// </summary>
+    public string? Application { get; set; }
+
     /// <summary>The time after which the purge removes the tenant. <c>null</c> when no deletion is scheduled.</summary>
     public DateTimeOffset? DeleteAfter { get; set; }
 

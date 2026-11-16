@@ -166,19 +166,23 @@ are `shell.users.usage.*`.
 
 Where `Ai:AllowTenantKeys` is on, the People tab has a "Model key" section below Usage, where an administrator sets,
 changes and removes the tenant's own model key, see [the tenant's model key](user-administration.md#the-tenants-model-key).
-The section is a component of its own. It loads `GET /api/tenant/model-key` and renders nothing unless the route answers
-`200`. That keeps it hidden from a user who is not an administrator, where `Ai:AllowTenantKeys` is off, and for a tenant
-with no directory row or a preview tenant. A `403` or `404` is not logged, and any other failure is logged. Its texts are
-`shell.users.modelKey.*`.
+The section is a component of its own. It loads `GET /api/tenant/model-key`. While it loads, the section shows its heading
+and says so. A `403` or `404` leaves the section out and is not logged. That keeps it hidden from a user who is not an
+administrator, where `Ai:AllowTenantKeys` is off, and for a tenant with no directory row or a preview tenant. Any other
+failure shows "The model key could not be loaded." and is logged. Its texts are `shell.users.modelKey.*`.
 
 - **State.** The section says "No key is set." or shows a set key as `••••` followed by its last four characters. A key
   of four characters or fewer shows `••••` alone. The page never holds the whole key after it is saved.
 - **Set and change.** The "Set key…" button, which reads "Change key…" once a key is set, opens a dialog with a password
-  field. Its "Save" button is the only thing that sends the key, as `PUT /api/tenant/model-key`, and it stays disabled
-  while the field is blank. Closing the dialog clears the field. A failed save shows "The key was not saved."
+  field. Its "Save" button is the only thing that sends the key, as `PUT /api/tenant/model-key`, and a click with the
+  field blank shows what to enter under it and sends nothing. Closing the dialog clears the field. A failed save shows "The key was not saved."
 - **Remove.** The "Remove key…" button opens a confirmation titled "Remove the model key?". Only the confirmation's
   "Remove" button sends `DELETE /api/tenant/model-key`. A failed remove shows "The key was not removed."
 - **After a change.** The section reads `GET /api/tenant/model-key` again, so it shows what the server stored.
+- **The switch** _(planned for M35)_. The section is the AI authoring switch, see
+  [AI authoring](user-administration.md#ai-authoring). It shows to an administrator without `Ai:AllowTenantKeys`,
+  and it does not depend on `GET /api/tenant/model-key`. Each person sets their own key on the
+  [account page](#account-page), not here.
 
 ### Application packages
 

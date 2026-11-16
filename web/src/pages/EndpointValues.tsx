@@ -1,14 +1,12 @@
 import { Button, Flex, Input, Select, Typography } from 'antd'
-import { lazy, Suspense, useContext } from 'react'
+import { useContext } from 'react'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { EmptyState } from '../platform/EmptyState'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
+import { ExpressionField } from './ExpressionField'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
-
-const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 function escapeSegment(segment: string): string {
   return segment.replaceAll('~', '~0').replaceAll('/', '~1')
@@ -86,35 +84,14 @@ export function EndpointValues({
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 240 }}>
-                  {check ? (
-                    <Suspense
-                      fallback={
-                        <Input
-                          aria-label={t('shell.studio.endpoint.expression')}
-                          value={text}
-                          readOnly
-                          aria-busy="true"
-                        />
-                      }
-                    >
-                      <LazyExpressionEditor
-                        application={check.application}
-                        resourceId={check.resourceId}
-                        path={pointer}
-                        name={t('shell.studio.endpoint.expression')}
-                        value={text}
-                        required
-                        options={expressionScope(check.kind, check.draft, pointer, check.names)}
-                        onChange={onChange}
-                      />
-                    </Suspense>
-                  ) : (
-                    <Input
-                      aria-label={t('shell.studio.endpoint.expression')}
-                      value={text}
-                      onChange={(event) => onChange(pointer, event.target.value)}
-                    />
-                  )}
+                  <ExpressionField
+                    check={check}
+                    pointer={pointer}
+                    name={t('shell.studio.endpoint.expression')}
+                    value={text}
+                    required
+                    onChange={onChange}
+                  />
                 </div>
                 {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button onClick={() => onChange(pointer, undefined)}>{t('shell.studio.endpoint.removeMapping')}</Button>

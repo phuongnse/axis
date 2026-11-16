@@ -12,6 +12,7 @@ import {
   DatePicker,
 } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisButton } from '../platform/AxisButton'
 import dayjs from 'dayjs'
 import { useContext } from 'react'
 import { AxisField } from '../platform/AxisField'
@@ -26,7 +27,7 @@ import {
 } from '../platform/entityFields'
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
-import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
+import { referenceOptions, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { LabelTexts } from './LabelTexts'
 import { type DesignerLayer, LayerMarkTag, RemovedRows } from './LayerMarkViews'
@@ -104,7 +105,7 @@ function Picker({
   label: string
   help: string
   kind?: string
-  options?: string[]
+  options?: (string | ReferenceOption)[]
   value: unknown
   required: boolean
   onPick: (next: string | undefined) => void
@@ -419,10 +420,9 @@ function Fields({
                 <Button disabled={index === fields.length - 1} onClick={() => move(index, 1)}>
                   {t('shell.studio.entity.moveDown')}
                 </Button>
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button danger onClick={() => removeField(index)}>
+                <AxisButton role="destructive" onClick={() => removeField(index)}>
                   {t('shell.studio.entity.removeField')}
-                </Button>
+                </AxisButton>
               </Flex>
             ),
           },

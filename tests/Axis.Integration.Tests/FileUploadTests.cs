@@ -102,18 +102,19 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
     }
 
     [Fact]
-    public async Task A_part_without_a_content_type_is_stored_as_octet_stream_and_the_name_is_cleaned()
+    public async Task A_long_name_is_cut_before_its_extension_and_a_path_is_dropped()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
         var longName = new string('a', 300);
 
-        using var response = await requester.SendAsync(Upload(Attachment, [1, 2, 3], null, $"../etc/{longName}"), CancellationToken);
+        using var response = await requester.SendAsync(Upload(Attachment, "a note"u8.ToArray(), "text/plain", $"../etc/{longName}.txt"), CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
-        Assert.Equal("application/octet-stream", body.RootElement.GetProperty("mediaType").GetString());
-        Assert.Equal(255, body.RootElement.GetProperty("name").GetString()!.Length);
-        Assert.All(body.RootElement.GetProperty("name").GetString()!, character => Assert.Equal('a', character));
+        var name = body.RootElement.GetProperty("name").GetString()!;
+        Assert.Equal(255, name.Length);
+        Assert.EndsWith(".txt", name, StringComparison.Ordinal);
+        Assert.DoesNotContain("../etc/", name, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -253,17 +254,18 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
     }
 
     [Theory]
-    [InlineData(new byte[] { 0x4D, 0x5A, 0x90, 0x00 }, "application/pdf")]
-    [InlineData(new byte[] { 0x7F, 0x45, 0x4C, 0x46, 0x02 }, "text/plain")]
-    [InlineData(new byte[] { 0xCF, 0xFA, 0xED, 0xFE, 0x07 }, "application/octet-stream")]
-    [InlineData(new byte[] { 0x47, 0x49, 0x46, 0x38 }, "application/pdf")]
-    public async Task A_file_that_starts_like_an_executable_or_not_like_its_type_gets_415(byte[] bytes, string mediaType)
+    [InlineData(new byte[] { 0x4D, 0x5A, 0x90, 0x00 }, "application/pdf", "invoice.pdf")]
+    [InlineData(new byte[] { 0x7F, 0x45, 0x4C, 0x46, 0x02 }, "text/plain", "note.txt")]
+    [InlineData(new byte[] { 0xCF, 0xFA, 0xED, 0xFE, 0x07 }, "application/zip", "archive.zip")]
+    [InlineData(new byte[] { 0x47, 0x49, 0x46, 0x38 }, "application/pdf", "invoice.pdf")]
+    [InlineData(new byte[] { 0x61, 0x00, 0x62 }, "text/plain", "note.txt")]
+    public async Task A_file_that_starts_like_an_executable_or_not_like_its_type_gets_415(byte[] bytes, string mediaType, string fileName)
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
         var before = await FileCountAsync();
 
         // An executable is refused for any declared type, and the attachment field accepts any type.
-        using var attachment = await requester.SendAsync(Upload(Attachment, bytes, mediaType, "invoice.pdf"), CancellationToken);
+        using var attachment = await requester.SendAsync(Upload(Attachment, bytes, mediaType, fileName), CancellationToken);
         using var receipt = await requester.SendAsync(Upload(Receipt, bytes, "application/pdf", "invoice.pdf"), CancellationToken);
 
         using (await ReadProblemAsync(attachment, HttpStatusCode.UnsupportedMediaType))
@@ -271,6 +273,41 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
         }
 
         using (await ReadProblemAsync(receipt, HttpStatusCode.UnsupportedMediaType))
+        {
+        }
+
+        Assert.Equal(before, await FileCountAsync());
+    }
+
+    [Theory]
+    [InlineData("invoice.png")]
+    [InlineData("invoice")]
+    public async Task A_file_name_whose_extension_does_not_match_its_type_gets_415_and_nothing_is_stored(string fileName)
+    {
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var before = await FileCountAsync();
+
+        using var response = await requester.SendAsync(Upload(Attachment, Pdf(10), "application/pdf", fileName), CancellationToken);
+
+        using (await ReadProblemAsync(response, HttpStatusCode.UnsupportedMediaType))
+        {
+        }
+
+        Assert.Equal(before, await FileCountAsync());
+    }
+
+    [Theory]
+    [InlineData("application/octet-stream", "data.bin")]
+    [InlineData(null, "data.bin")]
+    [InlineData("application/x-unknown", "data.bin")]
+    public async Task A_type_that_Axis_cannot_check_gets_415_and_nothing_is_stored(string? mediaType, string fileName)
+    {
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var before = await FileCountAsync();
+
+        using var response = await requester.SendAsync(Upload(Attachment, [1, 2, 3], mediaType, fileName), CancellationToken);
+
+        using (await ReadProblemAsync(response, HttpStatusCode.UnsupportedMediaType))
         {
         }
 

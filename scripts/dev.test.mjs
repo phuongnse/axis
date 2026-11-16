@@ -269,6 +269,8 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       recursive: true,
       filter: (source) => !excluded.has(path.basename(source)),
     })
+    // The copy does not exclude the licences list of a build, and the case checks that dev.sh writes it.
+    fs.rmSync(path.join(copy, 'src/Axis.Server/licences.json'), { force: true })
     await pickServicePorts()
   })
 
@@ -323,6 +325,40 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     const keycloakStart = run.stdout.indexOf('Keycloak on port')
     assert.ok(keycloakStart >= 0, run.stdout)
     assert.ok(keycloakStart < run.stdout.indexOf('[server]'), `Server output before Keycloak started:\n${run.stdout}`)
+
+    // The sample themes are copied beside the Axis theme, and the company realm's sign-in page loads the sample theme.
+    assert.ok(fs.existsSync(path.join(copy, 'artifacts/keycloak-theme/example-company/login/theme.properties')))
+    const brokerRedirect = encodeURIComponent(`http://localhost:${ports.keycloak}/realms/axis/broker/oidc-companyissuer/endpoint`)
+    const companySignIn = await fetch(
+      `http://localhost:${ports.keycloak}/realms/company/protocol/openid-connect/auth?client_id=axis-broker&response_type=code&scope=openid&redirect_uri=${brokerRedirect}`,
+    )
+    assert.equal(companySignIn.status, 200)
+    assert.match(await companySignIn.text(), /login\/example-company\//)
+
+    // The open source licences list is written before the server starts, and the SPA's server answers it signed out.
+    assert.ok(fs.existsSync(path.join(copy, 'src/Axis.Server/licences.json')))
+    const licences = await fetch(`http://localhost:${ports.web}/licences.json`)
+    assert.equal(licences.status, 200)
+    const licenceList = await licences.json()
+    assert.ok(licenceList.npm.length > 0 && licenceList.nuget.length > 0, 'A licences list is empty')
+    for (const entry of [...licenceList.npm, ...licenceList.nuget]) assert.equal('version' in entry, false)
+
+    // The default tenant has the example legal links, and the axis realm has the email theme and the terms version.
+    const site = await fetch(`http://localhost:${ports.server}/api/site`)
+    assert.equal(site.status, 200)
+    assert.deepEqual((await site.json()).legal, { privacyUrl: 'https://example.com/privacy', termsUrl: 'https://example.com/terms' })
+    const token = await fetch(`http://localhost:${ports.keycloak}/realms/master/protocol/openid-connect/token`, {
+      method: 'POST',
+      body: new URLSearchParams({ grant_type: 'password', client_id: 'admin-cli', username: 'admin', password: 'admin' }),
+    })
+    assert.equal(token.status, 200)
+    const realm = await fetch(`http://localhost:${ports.keycloak}/admin/realms/axis`, {
+      headers: { Authorization: `Bearer ${(await token.json()).access_token}` },
+    })
+    assert.equal(realm.status, 200)
+    const axisRealm = await realm.json()
+    assert.equal(axisRealm.emailTheme, 'axis')
+    assert.equal(axisRealm.attributes['axis.termsVersion'], '1')
 
     // The purchasing system stub answers on its port.
     const purchasing = await fetch(`http://localhost:${ports.purchasing}/health`)

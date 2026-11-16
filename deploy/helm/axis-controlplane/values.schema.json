@@ -71,6 +71,21 @@
             "baseUrl": { "type": "string" }
           },
           "additionalProperties": false
+        },
+        "cells": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+              "internalUrl": { "type": "string", "minLength": 1 },
+              "tokenUrl": { "type": "string", "minLength": 1 },
+              "clientId": { "type": "string", "minLength": 1 },
+              "clientSecret": { "$ref": "#/definitions/secretReference" }
+            },
+            "required": ["id", "internalUrl", "tokenUrl", "clientId"],
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false
@@ -82,7 +97,9 @@
         "mailPassword": { "$ref": "#/definitions/secretReference" },
         "challengeKey": { "$ref": "#/definitions/secretReference" },
         "certificate": { "$ref": "#/definitions/tlsSecretReference" },
-        "payOs": { "$ref": "#/definitions/namedSecretReference" }
+        "payOs": { "$ref": "#/definitions/namedSecretReference" },
+        "cellClientCertificate": { "$ref": "#/definitions/tlsSecretReference" },
+        "cellCertificateAuthority": { "$ref": "#/definitions/secretReference" }
       },
       "additionalProperties": false
     }

@@ -1172,4 +1172,25 @@ describe('the Axis Helm chart', () => {
     assert.notEqual(result.status, 0)
     assert.match(result.stderr, /backup\.timeZone/)
   })
+
+  test('the chart renders no alert rule by default', () => {
+    assert.equal(documents(renderOk()).filter((document) => /^kind: PrometheusRule$/m.test(document)).length, 0)
+  })
+
+  test('with alerts on, one PrometheusRule holds the rule file of installs without the chart and carries the alerts labels', () => {
+    const output = renderOk('--set', 'alerts.enabled=true', '--set', 'alerts.labels.release=kube-prometheus')
+    const rules = documents(output).filter((document) => /^kind: PrometheusRule$/m.test(document))
+    assert.equal(rules.length, 1)
+    const rule = find(output, 'PrometheusRule', 'axis-alerts')
+    assert.match(rule, /^apiVersion: monitoring\.coreos\.com\/v1$/m)
+    assert.match(rule, /^  labels:\n(?:    .+\n)*    release: kube-prometheus$/m)
+    const file = readFileSync(new URL('../deploy/helm/axis/alerts/axis-alerts.yaml', import.meta.url), 'utf8')
+    assert.match(file, /^ {6}- alert: AxisTenantBackupStale$/m)
+    const spec = rule
+      .slice(rule.indexOf('\nspec:\n') + '\nspec:\n'.length)
+      .split('\n')
+      .map((line) => line.replace(/^ {2}/, ''))
+      .join('\n')
+    assert.equal(spec.trim(), file.trim())
+  })
 })

@@ -1,14 +1,28 @@
+import { RedoOutlined } from '@ant-design/icons'
 import { Flex, Tag, Typography } from 'antd'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import type { CellJob } from './cell'
 import { EmptyDash } from './EmptyValue'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+import { useEmptyStyle } from './useEmptyStyle'
 
-/** The table of the cell console's jobs, in the order given. The Jobs page shows the cell's, and a tenant's view can show the tenant's. */
-export function CellJobTable({ jobs, locale }: { jobs: readonly CellJob[]; locale: string }) {
+/**
+ * The table of the cell console's jobs, in the order given. The Jobs page shows the cell's, and a tenant's view can show the tenant's.
+ * With `onRunAgain`, a failed job other than a `purge` job has the Run again row action: the publisher queues a failed purge again on its own.
+ */
+export function CellJobTable({
+  jobs,
+  locale,
+  onRunAgain,
+}: {
+  jobs: readonly CellJob[]
+  locale: string
+  onRunAgain?: (job: CellJob) => void
+}) {
   const t = useText()
   const { colour } = useDesignTokens()
+  const emptyStyle = useEmptyStyle()
   const stateColours: Record<CellJob['state'], string> = {
     queued: colour.textMuted,
     running: colour.infoText,
@@ -42,7 +56,11 @@ export function CellJobTable({ jobs, locale }: { jobs: readonly CellJob[]; local
       kind: 'freeText',
       title: t('shell.cell.jobs.steps'),
       render: (_value, job) =>
-        job.steps.length === 0 ? null : (
+        job.steps.length === 0 ? (
+          <span style={emptyStyle} data-testid="cell-job-no-steps">
+            {t('shell.cell.jobs.noSteps')}
+          </span>
+        ) : (
           <Flex vertical>
             {job.steps.map((step) => (
               <div key={step.name} data-testid="cell-job-step">
@@ -84,6 +102,22 @@ export function CellJobTable({ jobs, locale }: { jobs: readonly CellJob[]; local
       dataSource={jobs}
       columns={columns}
       emptyText={t('shell.cell.jobs.empty')}
+      rowActions={
+        onRunAgain && {
+          configured: 1,
+          actions: (job) =>
+            job.state === 'failed' && job.kind !== 'purge'
+              ? [
+                  {
+                    key: 'runAgain',
+                    labelKey: 'shell.cell.jobs.runAgain',
+                    icon: <RedoOutlined />,
+                    onClick: () => onRunAgain(job),
+                  },
+                ]
+              : null,
+        }
+      }
     />
   )
 }

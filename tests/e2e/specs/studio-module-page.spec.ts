@@ -73,6 +73,7 @@ test.describe("Studio edits a module page as a layer", () => {
       page
         .getByTestId("studio-field-/widgets/0/actions/0/page")
         .getByRole("combobox"),
+      "Purchase requests",
       "PurchaseRequests",
     );
     await page

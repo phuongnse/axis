@@ -101,8 +101,6 @@ does `POST /api/sign-up`.
 
 ### Sending the form
 
-_(planned for M33)_
-
 `POST /api/sign-up` takes `fullName`, `email`, `businessName`, `subdomain`, `language`, `application`,
 the three document versions and the `altcha` solution of the [proof of work](#bots-and-abuse), and
 answers `202` with `{ resend }` when it is accepted, see
@@ -200,9 +198,12 @@ cost something.
   - **The client address** is read by the rules of the
     [forwarded headers](control-plane.md#settings), and each refusal counts in the
     [metric](headers-and-rate-limits.md#a-refused-request) `axis.rate_limits.refused` with the partition `sign_up`.
-- **Three emails a day for an address.** _(planned for M33)_ Each email address, compared as below, gets at most 3 sign-up
+- **Three emails a day for an address.** Each email address, compared as below, gets at most 3 sign-up
   emails of either kind in 24 hours, resends included, so the form cannot fill someone else's inbox. A
-  sign-up past that answers `202` and sends nothing, so the limit tells nothing either.
+  sign-up past that answers `202` and sends nothing, so the limit tells nothing either. It stores no
+  sign-up and holds no subdomain, as an email that is never sent cannot be confirmed. The count is kept in
+  the control plane's database, as the SHA-256 of the address and the time of each email, so it holds
+  across replicas and restarts. The job `expireSignUps` deletes the counts older than 24 hours.
 - **One trial for each email.** Each sign-up stores its email in lower case and without a `+tag`, so
   `Owner+Test@Example.com` is `owner@example.com`. A unique index lets only one sign-up of that address be
   verified. A second pending sign-up of it that is confirmed after the first answers `409` with
@@ -226,8 +227,6 @@ cost something.
 
 ## Verifying the email first
 
-_(planned for M33)_
-
 No tenant exists until the person proves the email is theirs.
 
 1. **Pending.** `POST /api/sign-up` checks the challenge, then the limits, then the form, stores a pending
@@ -248,12 +247,19 @@ An unverified sign-up expires after 24 hours with nothing created, and its subdo
 Once the sign-up is accepted, the card's title becomes "Check your inbox", in `vi` "Kiểm tra hộp thư".
 The card is the same for a new email and for one that already had a trial.
 
-- **What it says** _(planned for M33)_. It names the address the email went to, says to look in the spam folder, wait a
+- **What it says**. It names the address the email went to, says to look in the spam folder, wait a
   minute or send it again, and offers Send again, a secondary button, and Change email, a plain one. The
   focus moves into the new step.
 - **Change email** brings the form back with every value kept and the focus on the email.
-- **Send again** _(planned for M33)_. `POST /api/sign-up/resend` takes `{ resend }` and answers `202`, alike for every
-  token, and a resend counts toward the address's [three sign-up emails a day](#bots-and-abuse). A sent
+- **Send again**. `POST /api/sign-up/resend` takes `{ resend }` and answers `202`, alike for every
+  token, and a resend counts toward the address's [three sign-up emails a day](#bots-and-abuse). The
+  token holds the email, the name, the language, the id of the pending sign-up and its expiry, sealed
+  with AES-GCM under a key derived from `ControlPlane:SignUp:ChallengeKey`, and it works for 24 hours. It
+  holds the same fields for a new email and for one that already had a trial, so it does not tell
+  them apart. A good token sends the trial-used email while the address has a verified sign-up, else the
+  confirm email while the sign-up is pending. An unknown, malformed, changed or expired token sends
+  nothing. A resend of the confirm email makes a new link, so only the link of the latest email works.
+  The token is never logged and never stored. Without the key the route answers `503`. A sent
   resend shows a notice that the email was sent again in an info `AxisAlert`, and a failed one an error
   `AxisAlert`. Every error `AxisAlert` of the sign-up pages carries its icon, in the text colour of its
   kind.
@@ -386,10 +392,10 @@ sign-up's `provisioning`, which is `queued`, `creating`, `ready` or `delayed`. I
 1. Pick a cell, see [picking a cell](region-directory.md#picking-a-cell). A tenant that the directory
    holds already goes to its own cell again, so a run after a crash never creates a second tenant.
 2. Call `POST /api/cell/tenants` on it with the subdomain as the tenant id, the built-in application,
-   the person's email as the administrator, and the trial's quotas, see
+   the person's email as the administrator, and the quotas of the region's trial plan with `users`
+   set to its included users, see [the catalogue](plans.md#the-catalogue) and
    [creating a tenant](tenant-lifecycle.md#creating-a-tenant). The application is left out when the
-   sign-up chose a blank one. The quotas go in key order, and as `{}` when none are set, so every run
-   sends the same body.
+   sign-up chose a blank one. The quotas go in key order, so every run sends the same body.
 3. When the cell accepts, write the tenant and its host to the [directory](region-directory.md), and
    its `CNAME` record.
 4. Poll the cell job until it ends.

@@ -58,15 +58,17 @@ function challengeOf(n: number) {
 
 function stubServer(
   subdomain: (name: string) => Response = () => answer({ free: true, reason: null }),
-  signUp: () => Response = () => new Response(null, { status: 202 }),
+  signUp: () => Response = () => answer({ resend: 'token-1' }, 202),
   {
     applicationsAnswer = () => answer(applications),
     documentsAnswer = () => answer(documents),
     regionAnswer = () => answer(region),
+    resendAnswer = () => new Response(null, { status: 202 }),
   }: {
     applicationsAnswer?: () => Response
     documentsAnswer?: () => Response
     regionAnswer?: () => Response
+    resendAnswer?: () => Response
   } = {},
 ) {
   let challenges = 0
@@ -87,6 +89,9 @@ function stubServer(
     if (input === '/api/sign-up' && init?.method === 'POST') {
       return signUp()
     }
+    if (input === '/api/sign-up/resend' && init?.method === 'POST') {
+      return resendAnswer()
+    }
     return subdomain(decodeURIComponent(input.replace('/api/sign-up/subdomains/', '')))
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -104,6 +109,10 @@ function altchaOf(call: ReturnType<typeof signUpCalls>[number]) {
 
 function signUpCalls(fetchMock: ReturnType<typeof stubServer>) {
   return fetchMock.mock.calls.filter(([input, init]) => input === '/api/sign-up' && init?.method === 'POST')
+}
+
+function resendCalls(fetchMock: ReturnType<typeof stubServer>) {
+  return fetchMock.mock.calls.filter(([input, init]) => input === '/api/sign-up/resend' && init?.method === 'POST')
 }
 
 function subdomainStatus(name = 'Subdomain') {
@@ -469,6 +478,64 @@ describe('SignUpEntry', () => {
     expect(screen.getByRole('textbox', { name: 'Full name' })).toHaveValue('Ana Nguyen')
     expect(screen.getByRole('textbox', { name: 'Work email' })).toHaveValue('ana@example.com')
     expect(screen.getByRole('textbox', { name: 'Work email' })).toHaveFocus()
+  })
+
+  it('offers Send again on Check your inbox, and shows an info alert for a sent resend and an error alert for a failed one', async () => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US')
+    let resends = 0
+    const fetchMock = stubServer(undefined, undefined, {
+      resendAnswer: () => {
+        resends += 1
+        if (resends === 2) {
+          return answer({}, 500)
+        }
+        if (resends === 3) {
+          throw new TypeError('Failed to fetch')
+        }
+        return new Response(null, { status: 202 })
+      },
+    })
+    const user = userEvent.setup()
+    render(<SignUpEntry />)
+    await fillForm(user)
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+    await screen.findByRole('heading', { name: 'Check your inbox' })
+
+    expect(
+      screen.getByText('If it is not there, look in the spam folder, wait a minute or send it again.'),
+    ).toBeInTheDocument()
+    const sendAgain = screen.getByRole('button', { name: 'Send again' })
+    expect(sendAgain).toHaveClass('ant-btn-color-default', 'ant-btn-variant-outlined')
+    expect(screen.getByRole('button', { name: 'Change email' })).toHaveClass('ant-btn-variant-text')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    await user.click(sendAgain)
+
+    const sent = await screen.findByRole('alert')
+    expect(sent).toHaveTextContent('We sent the email again.')
+    expect(sent).toHaveClass('ant-alert-info')
+    expect(within(sent).getByRole('img', { name: 'info-circle', hidden: true })).toBeInTheDocument()
+    expect(resendCalls(fetchMock)).toHaveLength(1)
+    expect(JSON.parse(String(resendCalls(fetchMock)[0][1]?.body))).toEqual({ resend: 'token-1' })
+
+    await user.click(screen.getByRole('button', { name: /Send again/ }))
+
+    const refused = await screen.findByText('The email could not be sent again. Try again.')
+    const refusedAlert = refused.closest('[role="alert"]') as HTMLElement
+    expect(refusedAlert).toHaveClass('ant-alert-error')
+    expect(within(refusedAlert).getByRole('img', { name: 'close-circle', hidden: true })).toBeInTheDocument()
+    expect(screen.queryByText('We sent the email again.')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /Send again/ }))
+    await waitFor(() => expect(resendCalls(fetchMock)).toHaveLength(3))
+
+    const thrown = await screen.findByText('The email could not be sent again. Try again.')
+    expect(thrown.closest('[role="alert"]')).toHaveClass('ant-alert-error')
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: 'Change email' }))
+    await screen.findByRole('heading', { name: 'Sign up' })
+    expect(screen.queryByText('The email could not be sent again. Try again.')).not.toBeInTheDocument()
   })
 
   it('sends the solved challenge as altcha and solves a new one after a refusal', async () => {

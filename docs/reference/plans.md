@@ -54,7 +54,8 @@ The numbers above show the shape only. They are not prices.
   in the middle of what they agreed. A plan version that a subscription pins is never removed.
 - **The start check.** The control plane checks `ControlPlane:Plans` at start and stops on a bad
   catalogue. It refuses a number that is not plain digits, such as a decimal price, a missing
-  currency or quota key, a repeated code and version, and a trial plan with a price. The message
+  currency or quota key, a repeated code and version, a trial plan with a price, a trial plan with more than 10 included
+  users, and a second trial plan code. The message
   names the plan code, version and setting, and never holds a value. The quota keys it requires are
   the platform's own list of quotas except `users`, so a new quota makes every catalogue invalid
   until its plans set it. An empty catalogue is valid.
@@ -63,11 +64,16 @@ The numbers above show the shape only. They are not prices.
   migrations the start reads every pinned version, and it stops when `ControlPlane:Plans` no longer
   lists one, naming each missing plan code and version.
 - **The trial's plan.** A plan marked `"trial": true` has no price and no add-ons.
+- **No AI requests** _(planned for M35)_. A plan sets no `authoringRequests`, because each author's own key
+  pays for the author's requests, see [a person's own key](model-bindings.md#a-persons-own-key).
 - **Package run time**. Each plan sets `packageCpuSecondsPerDay`, see
   [package run time a day](tenant-quotas.md#package-run-time-a-day). The start check refuses a trial
   plan whose value is not 0, so only a paid plan runs an application's packages.
-- **The trial's quotas** _(planned for M33)_. The trial plan sets a trial's quotas: those of a mid
-  plan, with at most 10 users.
+- **The trial's quotas.** The trial plan sets a trial's quotas: those of a mid plan, with at most
+  10 users. Every plan marked trial has one code, and the newest version of it, the highest version
+  number, applies to a new trial. A trial pins no plan, so a new version reaches the next trial.
+  [Provisioning](sign-up.md#provisioning) sends the quotas of that version, with `users` set to its
+  included users. A region with no trial plan answers `503` to `POST /api/sign-up`.
 
 ## From a plan to the quotas
 

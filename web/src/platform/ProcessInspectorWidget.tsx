@@ -79,7 +79,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
   useEffect(() => {
     const canonical = writeTableQuery(searchParams, query, undefined, parameterNames)
     if (canonical.toString() !== searchParams.toString()) {
-      setSearchParams(canonical, { replace: true })
+      setSearchParams(canonical, { replace: true, preventScrollReset: true })
     }
   }, [searchParams, query, setSearchParams])
 
@@ -93,6 +93,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
     if (query.page > lastPage) {
       setSearchParams(writeTableQuery(searchParams, { ...query, page: lastPage }, undefined, parameterNames), {
         replace: true,
+        preventScrollReset: true,
       })
     }
   }, [totalCount, searchParams, query, setSearchParams])
@@ -166,7 +167,9 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
   const onChange: AxisTableProps<InstanceListItem>['onChange'] = (pagination) => {
     const pageSize = pagination.pageSize ?? query.pageSize
     const page = pageSize !== query.pageSize ? 1 : (pagination.current ?? 1)
-    setSearchParams(writeTableQuery(searchParams, { ...query, page, pageSize }, undefined, parameterNames))
+    setSearchParams(writeTableQuery(searchParams, { ...query, page, pageSize }, undefined, parameterNames), {
+      preventScrollReset: true,
+    })
   }
 
   const onStateChange = (value: string | undefined) =>
@@ -177,6 +180,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
         undefined,
         parameterNames,
       ),
+      { preventScrollReset: true },
     )
 
   if (load.forbidden && !loading) {

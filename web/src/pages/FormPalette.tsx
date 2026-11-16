@@ -2,6 +2,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { Button, Flex, Typography } from 'antd'
 import { useContext, type PointerEventHandler } from 'react'
 import { Announcement } from '../platform/Announcement'
+import { EmptyState } from '../platform/EmptyState'
 import { addSection, addStep, insertionPlace, paletteFields } from '../platform/formLayout'
 import type { LayoutAdd } from '../platform/formLayout'
 import type { StudioNameField } from '../platform/studio'
@@ -61,7 +62,7 @@ export function FormPalette({
       <Flex vertical gap="small">
         <Typography.Text strong>{t('shell.studio.design.fields')}</Typography.Text>
         {fields.length === 0 ? (
-          <Typography.Text type="secondary">{t('shell.studio.design.allFieldsPlaced')}</Typography.Text>
+          <EmptyState text={t('shell.studio.design.allFieldsPlaced')} />
         ) : (
           <Flex gap="small" wrap>
             {fields.map((field) => (

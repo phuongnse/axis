@@ -48,7 +48,7 @@ function labelsOf(options: ReturnType<typeof expressionScope>) {
 }
 
 describe('expressionScope', () => {
-  it('offers an entity validation its own fields and the rules, but not currentUser()', () => {
+  it('offers an entity validation its own fields and the rules', () => {
     const draft = {
       fields: [
         { name: 'title', type: 'text' },
@@ -60,11 +60,9 @@ describe('expressionScope', () => {
     expect(labels).toContain('title')
     expect(labels).toContain('total')
     expect(labels).toContain('departments:IsManager()')
-    expect(labels).toContain('length()')
-    expect(labels).not.toContain('currentUser()')
   })
 
-  it('offers a data source filter its parameters, its entity fields and currentUser()', () => {
+  it('offers a data source filter its parameters and its entity fields', () => {
     const draft = {
       entity: 'purchaserequest',
       parameters: [{ name: 'statusFilter', type: 'enum' }],
@@ -76,18 +74,9 @@ describe('expressionScope', () => {
     expect(labels).toContain('requester')
     expect(labels).toContain('title')
     expect(labels).not.toContain('code')
-    expect(labels).toContain('currentUser()')
   })
 
-  it('does not offer currentUser() in the filter of a measure', () => {
-    const draft = { entity: 'purchaserequest', aggregate: { measures: [{ name: 'total', function: 'count' }] } }
-    const labels = labelsOf(expressionScope('dataSource', draft, '/aggregate/measures/0/filter', names))
-
-    expect(labels).toContain('requester')
-    expect(labels).not.toContain('currentUser()')
-  })
-
-  it('offers a field default the rules and functions but no field and no aggregate', () => {
+  it('offers a field default the rules but no field', () => {
     const draft = {
       fields: [
         { name: 'title', type: 'text' },
@@ -97,23 +86,16 @@ describe('expressionScope', () => {
     const labels = labelsOf(expressionScope('entity', draft, '/fields/1/default', names))
 
     expect(labels).toContain('departments:IsManager()')
-    expect(labels).toContain('now()')
-    expect(labels).toContain('length()')
     expect(labels).not.toContain('title')
     expect(labels).not.toContain('total')
-    for (const aggregate of ['count()', 'sum()', 'avg()', 'min()', 'max()', 'any()', 'all()']) {
-      expect(labels).not.toContain(aggregate)
-    }
-    expect(labelsOf(expressionScope('entity', draft, '/fields/1/default', null))).not.toContain('count()')
-    expect(labelsOf(expressionScope('entity', draft, '/fields/1/expression', names))).toContain('count()')
+    expect(labelsOf(expressionScope('entity', draft, '/fields/1/expression', names))).toContain('title')
   })
 
-  it('offers a policy grant filter the grant entity fields and currentUser()', () => {
+  it('offers a policy grant filter the grant entity fields', () => {
     const draft = { grants: [{ entity: 'PurchaseRequest', actions: ['read'] }] }
     const labels = labelsOf(expressionScope('policy', draft, '/grants/0/filter', names))
 
     expect(labels).toContain('requester')
-    expect(labels).toContain('currentUser()')
   })
 
   it('offers a form condition only the fields the form lists', () => {
@@ -126,7 +108,6 @@ describe('expressionScope', () => {
     expect(labels).toContain('title')
     expect(labels).not.toContain('requester')
     expect(labels).not.toContain('code')
-    expect(labels).toContain('length()')
   })
 
   it('offers a form condition no field while the form lists none', () => {
@@ -151,7 +132,6 @@ describe('expressionScope', () => {
 
     expect(options.find((option) => option.label === 'daysOverdue')?.type).toBe('parameter')
     expect(labels).toContain('departments:IsManager()')
-    expect(labels).toContain('length()')
     expect(labels).not.toContain('id')
     expect(labels).not.toContain('title')
     expect(labels).not.toContain('code')
@@ -173,7 +153,6 @@ describe('expressionScope', () => {
     expect(labels).toContain('amount')
     expect(labels).toContain('reference')
     expect(labels).toContain('departments:IsManager()')
-    expect(labels).toContain('length()')
     expect(labels).not.toContain('title')
     expect(labels).not.toContain('id')
   })
@@ -187,7 +166,6 @@ describe('expressionScope', () => {
 
     expect(labels).not.toContain('amount')
     expect(labels).not.toContain('title')
-    expect(labels).toContain('length()')
   })
 
   it('offers a data change trigger the fields and id of its entity', () => {
@@ -205,34 +183,16 @@ describe('expressionScope', () => {
     expect(labels).toContain('departments:IsManager()')
   })
 
-  it('offers only the functions and aggregates when no names are loaded', () => {
+  it('offers nothing when no names are loaded', () => {
     const options = expressionScope('policy', { grants: [{ entity: 'PurchaseRequest' }] }, '/grants/0/filter', null)
 
-    expect(options.every((option) => option.type === 'function')).toBe(true)
-    expect(labelsOf(options)).toContain('count()')
-    expect(labelsOf(options)).toContain('avg()')
-    expect(labelsOf(options)).toContain('currentUser()')
-  })
-
-  it('keeps a call with no argument outside its brackets', () => {
-    const options = expressionScope('entity', {}, '/validations/0/expression', names)
-
-    expect(options.find((option) => option.label === 'now()')?.cursorInside).toBe(false)
-    expect(options.find((option) => option.label === 'length()')?.cursorInside).toBe(true)
-  })
-
-  it('offers today() with the cursor after the brackets and toDate() with it inside', () => {
-    const options = expressionScope('entity', {}, '/validations/0/expression', names)
-
-    expect(options.find((option) => option.label === 'today()')?.cursorInside).toBe(false)
-    expect(options.find((option) => option.label === 'toDate()')?.cursorInside).toBe(true)
+    expect(options).toEqual([])
   })
 
   it('ignores a draft that is malformed', () => {
     const options = expressionScope('policy', { grants: 'nope' }, '/grants/0/filter', names)
 
     expect(labelsOf(options)).not.toContain('requester')
-    expect(labelsOf(options)).toContain('length()')
   })
 
   describe('in the input of a callConnector step', () => {
@@ -283,7 +243,75 @@ describe('expressionScope', () => {
 
       expect(labels).not.toContain('status')
       expect(labels).not.toContain('sku')
-      expect(labels).toContain('length()')
+    })
+  })
+
+  describe('what completion needs to know of a name', () => {
+    it('gives a draft field its expression type, label key and values', () => {
+      const draft = {
+        fields: [
+          { name: 'price', type: 'money', label: { textKey: 'price.label' } },
+          { name: 'state', type: 'enum', values: ['Open', 'Closed', 3] },
+          { name: 'lines', type: 'child-collection' },
+          { name: 'plain' },
+        ],
+      }
+      const options = expressionScope('entity', draft, '/validations/0/expression', names)
+      const found = (label: string) => options.find((option) => option.label === label)
+
+      expect(found('price')).toMatchObject({ valueType: 'decimal', labelKey: 'price.label' })
+      expect(found('state')).toMatchObject({ valueType: 'enum', values: ['Open', 'Closed'] })
+      expect(found('lines')?.valueType).toBe('list')
+      expect(found('plain')?.valueType).toBeNull()
+    })
+
+    it('gives a field of the names route its type, label key and values, and id the reference type', () => {
+      const withValues = {
+        ...names,
+        entities: [
+          {
+            name: 'Ticket',
+            module: null,
+            fields: [
+              { name: 'severity', labelKey: 'ticket.severity', type: 'enum', target: null, values: ['Low', 'High'] },
+              { name: 'owner', type: 'references', target: 'User', values: null },
+            ],
+          },
+        ],
+      } as unknown as StudioNames
+      const options = expressionScope('process', { entity: 'Ticket' }, '/steps/0/branches/0/when', withValues)
+      const found = (label: string) => options.find((option) => option.label === label)
+
+      expect(found('id')?.valueType).toBe('reference')
+      expect(found('severity')).toMatchObject({
+        valueType: 'enum',
+        labelKey: 'ticket.severity',
+        values: ['Low', 'High'],
+      })
+      expect(found('owner')?.valueType).toBe('list')
+    })
+
+    it('gives a rule its parameters and the type it gives, and an event field its type', () => {
+      const withRule = {
+        ...names,
+        rules: [
+          {
+            name: 'Discount',
+            module: null,
+            parameters: [{ name: 'amount', type: 'money' }],
+            resultType: 'money',
+          },
+        ],
+      } as unknown as StudioNames
+      const found = expressionScope('entity', { fields: [] }, '/validations/0/expression', withRule).find(
+        (option) => option.label === 'Discount()',
+      )
+
+      expect(found).toMatchObject({ valueType: 'decimal', parameters: [{ name: 'amount', type: 'money' }] })
+
+      const draft = { steps: [{ type: 'waitEvent', event: 'PaymentReceived' }] }
+      const payload = expressionScope('process', draft, '/steps/0/when', names)
+      expect(payload.find((option) => option.label === 'amount')?.valueType).toBe('decimal')
     })
   })
 })

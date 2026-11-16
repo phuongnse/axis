@@ -151,6 +151,44 @@ public sealed class PlanCatalogueTests
     }
 
     [Fact]
+    public void A_trial_plan_with_more_than_ten_included_users_is_refused_naming_the_plan_and_the_setting_and_not_the_value()
+    {
+        var plans = Bind($"[{Plan(1)}, {Plan(2, prices: "\"prices\": []", trial: true, addOns: "\"addOns\": []", includedUsers: 12345678901)}]");
+
+        var problem = Assert.Single(PlanCatalogue.Problems(plans));
+
+        Assert.Contains("ControlPlane:Plans:1:IncludedUsers", problem, StringComparison.Ordinal);
+        Assert.Contains("team version 2", problem, StringComparison.Ordinal);
+        Assert.DoesNotContain("12345678901", problem, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_second_trial_plan_code_is_refused_naming_the_plan_and_the_setting()
+    {
+        var plans = Bind($"[{TrialPlan(1, "starter")}, {TrialPlan(1, "pilot")}]");
+
+        var problem = Assert.Single(PlanCatalogue.Problems(plans));
+
+        Assert.Contains("ControlPlane:Plans:1:Trial", problem, StringComparison.Ordinal);
+        Assert.Contains("pilot version 1", problem, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_trial_plan_is_the_newest_version_of_the_trial_code()
+    {
+        var catalogue = PlanCatalogue.Create(Bind($"[{TrialPlan(3, "starter")}, {Plan(9)}, {TrialPlan(1, "starter")}]"));
+
+        Assert.Equal(3, catalogue.Trial!.Version);
+    }
+
+    [Fact]
+    public void A_catalogue_with_no_trial_plan_has_no_trial()
+    {
+        Assert.Null(PlanCatalogue.Create(Bind($"[{Plan(1)}]")).Trial);
+        Assert.Null(PlanCatalogue.Create(Bind("[]")).Trial);
+    }
+
+    [Fact]
     public void A_yearly_price_is_ten_times_the_monthly_price_for_a_plan_and_for_an_add_on()
     {
         var catalogue = PlanCatalogue.Create(Bind($"[{Plan(2)}]"));
@@ -198,12 +236,19 @@ public sealed class PlanCatalogueTests
         catalogue.CheckPinned([]);
     }
 
-    private static string Plan(int version, string? quotas = null, string? prices = null, bool trial = false, string? addOns = null) => $$"""
+    private static string Plan(
+        int version,
+        string? quotas = null,
+        string? prices = null,
+        bool trial = false,
+        string? addOns = null,
+        string code = "team",
+        long? includedUsers = null) => $$"""
         {
-          "code": "team",
+          "code": "{{code}}",
           "version": {{version}},
           "name": { "en": "Team", "vi": "Nhóm" },
-          "includedUsers": 25,
+          "includedUsers": {{includedUsers ?? (trial ? 10 : 25)}},
           "trial": {{(trial ? "true" : "false")}},
           {{quotas ?? (trial ? _trialQuotas : Quotas)}},
           {{prices ?? Prices}},
@@ -214,6 +259,9 @@ public sealed class PlanCatalogueTests
           """}}
         }
         """;
+
+    private static string TrialPlan(int version, string code) =>
+        Plan(version, prices: "\"prices\": []", trial: true, addOns: "\"addOns\": []", code: code);
 
     // The shape of the docs example, bound as the host binds it.
     private static List<PlanOptions> Bind(string plansJson)

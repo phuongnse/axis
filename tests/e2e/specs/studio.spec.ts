@@ -120,7 +120,7 @@ test.describe('Studio on a copy of its own', () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${entity.id}`)
     const field = page.getByTestId('studio-field-/validations/0/expression')
     const editor = field.getByRole('textbox')
-    await expect(field.getByTestId('studio-expression-type')).toContainText('boolean')
+    await expect(field.getByTestId('studio-expression-type')).toContainText('Gives yes or no')
 
     await editor.fill('title > 5')
     await expect(field.locator('.cm-lintRange-error')).toBeVisible()
@@ -128,7 +128,7 @@ test.describe('Studio on a copy of its own', () => {
 
     await editor.fill('totalAmount > 0')
     await expect(field.locator('.cm-lintRange-error')).toHaveCount(0)
-    await expect(field.getByTestId('studio-expression-type')).toContainText('boolean')
+    await expect(field.getByTestId('studio-expression-type')).toContainText('Gives yes or no')
 
     expect(await readFile(file, 'utf8')).toBe(before)
   })
@@ -144,16 +144,16 @@ test.describe('Studio on a copy of its own', () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${policy.id}`)
     await openListItem(page, '/grants', 0)
     const field = page.getByTestId('studio-field-/grants/0/filter')
-    await expect(field.getByTestId('studio-expression-type')).toContainText('boolean')
+    await expect(field.getByTestId('studio-expression-type')).toContainText('Gives yes or no')
     const editor = field.getByRole('textbox')
     await editor.click()
     await editor.press('ControlOrMeta+A')
     await editor.pressSequentially('req')
-    await expect(page.getByRole('option', { name: 'requester', exact: true })).toBeVisible()
+    await expect(page.getByRole('option', { name: /^requester/ })).toBeVisible()
 
     await editor.press('ControlOrMeta+A')
     await editor.pressSequentially('cur')
-    await expect(page.getByRole('option', { name: 'currentUser()', exact: true })).toBeVisible()
+    await expect(page.getByRole('option', { name: /^currentUser\(\)/ })).toBeVisible()
 
     expect(await readFile(file, 'utf8')).toBe(before)
   })
@@ -215,11 +215,13 @@ test.describe('Studio on a copy of its own', () => {
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const policy = items.find((item) => item.file === 'policies/employee-access.json')!
     const names = (await (await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/names`)).json()) as {
-      entities: { name: string; fields: { name: string }[] }[]
+      entities: { name: string; fields: { name: string; labelKey?: string }[] }[]
+      texts: { key: string; texts: Record<string, string> }[]
     }
+    // The picker names a field by its label in English, else by its name.
     const expected = names.entities
       .find((entity) => entity.name === 'PurchaseRequest')!
-      .fields.map((field) => field.name)
+      .fields.map((field) => names.texts.find((text) => text.key === field.labelKey)?.texts.en || field.name)
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${policy.id}`)
     await openListItem(page, '/grants', 1)

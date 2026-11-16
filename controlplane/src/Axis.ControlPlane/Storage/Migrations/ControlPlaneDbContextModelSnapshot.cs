@@ -369,6 +369,34 @@ namespace Axis.ControlPlane.Storage.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.ControlPlane.SignUp.SignUpEmailRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<byte[]>("AddressHash")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("address_hash");
+
+                    b.Property<DateTimeOffset>("QueuedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("queued_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sign_up_emails");
+
+                    b.HasIndex(new[] { "AddressHash", "QueuedAt" }, "ix_sign_up_emails_address_hash_queued_at");
+
+                    b.ToTable("sign_up_emails", "control_plane", t =>
+                        {
+                            t.HasCheckConstraint("ck_sign_up_emails_address_hash", "octet_length(address_hash) = 32");
+                        });
+                });
+
             modelBuilder.Entity("Axis.ControlPlane.SignUp.SignUpRow", b =>
                 {
                     b.Property<Guid>("Id")

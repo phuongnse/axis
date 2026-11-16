@@ -1,15 +1,18 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Jobs;
+using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.RegionDirectory;
 using Axis.ControlPlane.SignUp;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -32,6 +35,7 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
     private ILoggerFactory _loggers = null!;
     private CellClients _clients = null!;
     private ProvisionTenantJobHandler _handler = null!;
+    private ControlPlaneOptions _controlPlane = null!;
 
     public async ValueTask InitializeAsync()
     {
@@ -58,7 +62,6 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
             PublicUrl = "https://account.vn.example.com",
             MailFrom = "no-reply@vn.example.com",
         };
-        controlPlane.SignUp.TrialQuotas = new Dictionary<string, long?> { ["users"] = 5, ["storage"] = null };
         foreach (var id in new[] { "vn-1", "vn-2" })
         {
             controlPlane.Cells.Add(new CellOptions { Id = id, InternalUrl = $"https://{id}.test", TokenUrl = $"https://{id}.test/token", ClientId = "axis-controlplane" });
@@ -67,15 +70,8 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
 
         _clients = new CellClients(controlPlane, new HandlerFactory(_cells), new CellClientOptions { PollDelay = TimeSpan.FromMilliseconds(10) }, TimeProvider.System);
         _loggers = LoggerFactory.Create(builder => builder.AddProvider(_logs));
-        _handler = new ProvisionTenantJobHandler(
-            _dataSource,
-            _dataSource,
-            new CellPicker(_dataSource, _dataSource, _loggers.CreateLogger<CellPicker>()),
-            _clients,
-            EmailTemplates.LoadEmbedded(),
-            controlPlane,
-            TimeProvider.System,
-            _loggers.CreateLogger<ProvisionTenantJobHandler>());
+        _controlPlane = controlPlane;
+        _handler = HandlerWith(TrialCatalogue(1));
     }
 
     public async ValueTask DisposeAsync()
@@ -88,14 +84,14 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_confirmed_sign_up_is_created_in_the_least_full_cell_with_the_trials_quotas_and_the_directory_rows_and_the_cname_are_written()
+    public async Task A_confirmed_sign_up_is_created_in_the_least_full_cell_with_the_trial_plans_quotas_and_the_directory_rows_and_the_cname_are_written()
     {
         await RunAsync();
 
         var post = Assert.Single(_cells.Posts);
         Assert.Equal("vn-1.test", post.Host);
         Assert.Equal($"tenant-create:{_signUpId:D}", post.Key);
-        Assert.Equal("""{"id":"acme","administrator":"owner@example.com","application":"approvals","quotas":{"storage":null,"users":5}}""", post.Body);
+        Assert.Equal("""{"id":"acme","administrator":"owner@example.com","application":"approvals","quotas":{"applications":11,"authoringRequests":12,"concurrentConnectorCalls":13,"concurrentImports":14,"concurrentQueries":15,"emailsPerDay":16,"packageCpuSecondsPerDay":0,"storage":17,"users":7,"workerWeight":18}}""", post.Body);
         Assert.Equal("vn-1", await Scalar<string>("SELECT cell_id FROM directory.tenants WHERE id = 'acme'"));
         Assert.Equal("vn-1", await Scalar<string>("SELECT cell_id FROM directory.hosts WHERE host = 'acme.vn.example.com'"));
         Assert.Equal("acme", await Scalar<string>("SELECT tenant_id FROM directory.hosts WHERE host = 'acme.vn.example.com'"));
@@ -108,14 +104,17 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_blank_application_is_left_out_of_the_body_and_no_quota_is_sent_as_an_empty_object()
+    public async Task A_sign_up_that_chose_Blank_leaves_the_application_out_of_the_body_sends_the_trial_plans_quotas_and_becomes_a_ready_trial()
     {
         await Execute($"UPDATE control_plane.sign_ups SET application = '' WHERE id = '{_signUpId}'");
-        var handler = HandlerWithQuotas(new Dictionary<string, long?>());
 
-        await handler.RunAsync(Job(), TestContext.Current.CancellationToken);
+        await RunAsync();
 
-        Assert.Equal("""{"id":"acme","administrator":"owner@example.com","quotas":{}}""", Assert.Single(_cells.Posts).Body);
+        Assert.Equal(
+            """{"id":"acme","administrator":"owner@example.com","quotas":{"applications":11,"authoringRequests":12,"concurrentConnectorCalls":13,"concurrentImports":14,"concurrentQueries":15,"emailsPerDay":16,"packageCpuSecondsPerDay":0,"storage":17,"users":7,"workerWeight":18}}""",
+            Assert.Single(_cells.Posts).Body);
+        Assert.Equal("ready", await Scalar<string>($"SELECT provisioning FROM control_plane.sign_ups WHERE id = '{_signUpId}'"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendEmail' AND payload->>'template' = 'tenantReady'"));
     }
 
     [Fact]
@@ -229,24 +228,74 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
         Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendEmail' AND payload->>'template' = 'tenantReady'"));
     }
 
+    [Fact]
+    public async Task With_several_trial_versions_the_body_carries_the_newest_versions_quotas()
+    {
+        await HandlerWith(TrialCatalogue(1, 2)).RunAsync(Job(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            """{"id":"acme","administrator":"owner@example.com","application":"approvals","quotas":{"applications":12,"authoringRequests":13,"concurrentConnectorCalls":14,"concurrentImports":15,"concurrentQueries":16,"emailsPerDay":17,"packageCpuSecondsPerDay":0,"storage":18,"users":7,"workerWeight":19}}""",
+            Assert.Single(_cells.Posts).Body);
+    }
+
+    [Fact]
+    public async Task A_catalogue_with_no_trial_plan_fails_the_job_and_calls_no_cell()
+    {
+        var handler = HandlerWith(PlanCatalogue.Create([]));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.RunAsync(Job(), TestContext.Current.CancellationToken));
+
+        Assert.Empty(_cells.Posts);
+        Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM directory.tenants"));
+    }
+
     private Task RunAsync() => _handler.RunAsync(Job(), TestContext.Current.CancellationToken);
 
     private ClaimedJob Job() => new(Guid.CreateVersion7(), ProvisionTenantJobHandler.JobKind, new JsonObject { ["signUpId"] = _signUpId.ToString() }, 1);
 
-    // The same handler on options with other quotas: the options are read when the job runs.
-    private ProvisionTenantJobHandler HandlerWithQuotas(IReadOnlyDictionary<string, long?> quotas)
+    // The same handler on another catalogue: the catalogue is read when the job runs.
+    private ProvisionTenantJobHandler HandlerWith(PlanCatalogue catalogue) => new(
+        _dataSource,
+        _dataSource,
+        new CellPicker(_dataSource, _dataSource, _loggers.CreateLogger<CellPicker>()),
+        _clients,
+        catalogue,
+        EmailTemplates.LoadEmbedded(),
+        _controlPlane,
+        TimeProvider.System,
+        _loggers.CreateLogger<ProvisionTenantJobHandler>());
+
+    // The trial plan of each version, with a quota value that differs for each key and each version, and 7 included users.
+    private static PlanCatalogue TrialCatalogue(params int[] versions)
     {
-        var controlPlane = new ControlPlaneOptions { Region = "vn", TenantDomain = "vn.example.com", PublicUrl = "https://account.vn.example.com", MailFrom = "no-reply@vn.example.com" };
-        controlPlane.SignUp.TrialQuotas = quotas;
-        return new ProvisionTenantJobHandler(
-            _dataSource,
-            _dataSource,
-            new CellPicker(_dataSource, _dataSource, _loggers.CreateLogger<CellPicker>()),
-            _clients,
-            EmailTemplates.LoadEmbedded(),
-            controlPlane,
-            TimeProvider.System,
-            _loggers.CreateLogger<ProvisionTenantJobHandler>());
+        var plans = string.Join(",", versions.Select(version => $$"""
+            {
+              "code": "trial",
+              "version": {{version}},
+              "name": { "en": "Trial", "vi": "Dùng thử" },
+              "includedUsers": 7,
+              "trial": true,
+              "quotas": {
+                "applications": {{10 + version}},
+                "authoringRequests": {{11 + version}},
+                "concurrentConnectorCalls": {{12 + version}},
+                "concurrentImports": {{13 + version}},
+                "concurrentQueries": {{14 + version}},
+                "emailsPerDay": {{15 + version}},
+                "packageCpuSecondsPerDay": 0,
+                "storage": {{16 + version}},
+                "workerWeight": {{17 + version}}
+              },
+              "prices": [],
+              "addOns": []
+            }
+            """));
+        var configuration = new ConfigurationBuilder()
+            .AddJsonStream(new MemoryStream(Encoding.UTF8.GetBytes($$"""{ "ControlPlane": { "plans": [{{plans}}] } }""")))
+            .Build();
+        var options = new ControlPlaneOptions();
+        configuration.GetSection(ControlPlaneOptions.SectionName).Bind(options);
+        return PlanCatalogue.Create(options.Plans);
     }
 
     private Task<int> SeedSignUpAsync() => Execute($"""

@@ -6,10 +6,12 @@ import type { StudioNames } from '../platform/studio'
  * names in scope from the resource's kind and the unsaved draft, and the application's names from `names`, which is
  * null while they are not loaded.
  */
-export const ExpressionCheckContext = createContext<{
+export interface ExpressionCheckValue {
   application: string
   resourceId: string
   kind: string
   draft: Record<string, unknown>
   names: StudioNames | null
-} | null>(null)
+}
+
+export const ExpressionCheckContext = createContext<ExpressionCheckValue | null>(null)

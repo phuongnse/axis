@@ -5,6 +5,7 @@ import type {
   StudioDiagnostic,
   StudioNameEntity,
   StudioNames,
+  StudioPolicyMatrix,
   StudioReleases,
   StudioResource,
   StudioResourceItem,
@@ -28,6 +29,8 @@ const pageId = id(3)
 const formId = id(4)
 const roleId = id(5)
 const policyId = id(6)
+const approverRoleId = id(7)
+const buyerRoleId = id(8)
 const firstEntityId = 100
 
 /** What a state's folder holds: its applications, resources and names. */
@@ -36,6 +39,8 @@ interface Folder {
   /** The title of the open application, which the application list shows too. */
   title: string
   entities: { name: string; title: string }[]
+  /** Set for a folder that holds only its manifest, as a new application does. */
+  bare?: boolean
 }
 
 function resource(
@@ -63,6 +68,9 @@ function entityItems(folder: Folder): StudioResourceItem[] {
 }
 
 function items(folder: Folder): StudioResourceItem[] {
+  if (folder.bare) {
+    return [resource(manifestId, 'application', application, 'application.json', {})]
+  }
   return [
     resource(manifestId, 'application', application, 'application.json', {}),
     resource(siteId, 'site', 'Requests', 'sites/requests.json', { [locale]: folder.title }, 0),
@@ -70,6 +78,8 @@ function items(folder: Folder): StudioResourceItem[] {
     resource(pageId, 'page', 'RequestList', 'pages/request-list.json', { [locale]: 'Requests' }, 1),
     resource(formId, 'form', 'RequestForm', 'forms/request-form.json', { [locale]: 'Request' }, 1),
     resource(roleId, 'role', 'Requester', 'roles/requester.json', { [locale]: 'Requester' }, 1),
+    resource(approverRoleId, 'role', 'Approver', 'roles/approver.json', { [locale]: 'Approver' }),
+    resource(buyerRoleId, 'role', 'Buyer', 'roles/buyer.json', { [locale]: 'Buyer' }),
     resource(policyId, 'policy', 'RequesterPolicy', 'policies/requester.json', { [locale]: 'Requester' }),
   ]
 }
@@ -88,7 +98,7 @@ const manifest: StudioResource = {
   },
 }
 
-const diagnostics = [
+const typicalDiagnostics = [
   {
     code: 'AX0412',
     severity: 'warning',
@@ -98,6 +108,27 @@ const diagnostics = [
     resourceId: policyId,
   },
 ] satisfies StudioDiagnostic[]
+
+/** An entity with the content the entity designer opens. It has plain fields only, so the designer asks for no expression scope. */
+function entityResource(folder: Folder, index: number): StudioResource {
+  const entity = folder.entities[index]
+  const key = entity.name.toLowerCase()
+  return {
+    ...entityItems(folder)[index],
+    content: {
+      id: id(firstEntityId + index),
+      kind: 'entity',
+      name: entity.name,
+      formatVersion: 1,
+      label: { textKey: `${key}.label` },
+      displayField: 'title',
+      fields: [
+        { name: 'title', type: 'text', maxLength: 200, label: { textKey: `${key}.title` } },
+        { name: 'amount', type: 'decimal', precision: 12, scale: 2, label: { textKey: `${key}.amount` } },
+      ],
+    },
+  }
+}
 
 function entityNames(folder: Folder): StudioNameEntity[] {
   return folder.entities.map((entity, index) => ({
@@ -111,7 +142,19 @@ function entityNames(folder: Folder): StudioNameEntity[] {
   }))
 }
 
+function entityTexts(folder: Folder): StudioNames['texts'] {
+  return folder.entities.flatMap((entity) => {
+    const key = entity.name.toLowerCase()
+    return [
+      { key: `${key}.label`, texts: { [locale]: entity.title }, usedBy: 1 },
+      { key: `${key}.title`, texts: { [locale]: 'Title' }, usedBy: 1 },
+      { key: `${key}.amount`, texts: { [locale]: 'Amount' }, usedBy: 1 },
+    ]
+  })
+}
+
 function names(folder: Folder): StudioNames {
+  const own = folder.bare !== true
   return {
     locales: [locale],
     entities: entityNames(folder),
@@ -120,15 +163,22 @@ function names(folder: Folder): StudioNames {
     rules: [],
     connectors: [],
     events: [],
-    roles: [{ id: roleId, name: 'Requester' }],
+    roles: own
+      ? [
+          { id: roleId, name: 'Requester' },
+          { id: approverRoleId, name: 'Approver' },
+          { id: buyerRoleId, name: 'Buyer' },
+        ]
+      : [],
     sequences: [],
-    forms: [{ id: formId, name: 'RequestForm', module: null }],
-    pages: [{ id: pageId, name: 'RequestList', module: null, parameters: [] }],
-    policies: [{ id: policyId, name: 'RequesterPolicy', module: null }],
+    forms: own ? [{ id: formId, name: 'RequestForm', module: null }] : [],
+    pages: own ? [{ id: pageId, name: 'RequestList', module: null, parameters: [] }] : [],
+    policies: own ? [{ id: policyId, name: 'RequesterPolicy', module: null }] : [],
     contracts: [],
     texts: [
       { key: 'application.title', texts: { [locale]: folder.title }, usedBy: 1 },
       { key: 'application.description', texts: { [locale]: 'Request purchases and approve them.' }, usedBy: 1 },
+      ...entityTexts(folder),
     ],
     seeds: [],
     triggers: [],
@@ -137,7 +187,7 @@ function names(folder: Folder): StudioNames {
   } satisfies StudioNames
 }
 
-const releases = {
+const typicalReleases = {
   active: { releaseId: '7c1d0000-0000-4000-8000-000000000002', number: 2, contentHash: 'c2' },
   folderContentHash: 'c3',
   items: [
@@ -171,6 +221,65 @@ const releases = {
   changes: [{ path: 'pages/request-list.json', change: 'changed', kind: null, name: null, titles: null, locale: null }],
 } satisfies StudioReleases
 
+/** What a state's folder answers for its diagnostics and its releases. */
+interface StateAnswers {
+  diagnostics: StudioDiagnostic[]
+  releases: StudioReleases
+}
+
+const typicalAnswers: StateAnswers = { diagnostics: typicalDiagnostics, releases: typicalReleases }
+
+const errorAnswers: StateAnswers = {
+  diagnostics: [
+    {
+      code: 'AX0101',
+      severity: 'error',
+      message: 'The display field does not name a field of the entity.',
+      file: 'entities/Request.json',
+      path: '/displayField',
+      resourceId: id(firstEntityId),
+    },
+    {
+      code: 'AX0207',
+      severity: 'error',
+      message: 'The page lists an entity that does not exist.',
+      file: 'pages/request-list.json',
+      path: '/content/entity',
+      resourceId: pageId,
+    },
+    {
+      code: 'AX0233',
+      severity: 'error',
+      message: 'The form binds a field that the entity does not have.',
+      file: 'forms/request-form.json',
+      path: '/fields/2/field',
+      resourceId: formId,
+    },
+    ...typicalDiagnostics,
+  ],
+  releases: {
+    ...typicalReleases,
+    changes: [
+      { path: 'entities/Request.json', change: 'changed', kind: null, name: null, titles: null, locale: null },
+      { path: 'pages/request-list.json', change: 'changed', kind: null, name: null, titles: null, locale: null },
+      { path: 'roles/approver.json', change: 'added', kind: null, name: null, titles: null, locale: null },
+      {
+        path: 'forms/old-request.json',
+        change: 'removed',
+        kind: 'form',
+        name: 'OldRequestForm',
+        titles: { [locale]: 'Old request' },
+        locale,
+      },
+    ],
+  },
+}
+
+const unpublishedAnswers: StateAnswers = {
+  diagnostics: [],
+  releases: { active: null, folderContentHash: 'n1', items: [], changes: null },
+}
+
 const catalog = {
   modules: [
     {
@@ -197,17 +306,76 @@ const bindings = {
 const settings = { autoAccept: false } satisfies { autoAccept: boolean }
 
 /** The routes of the open application, with the state's own applications, resources and names. */
-function workspaceRoutes(folder: Folder): Record<string, () => unknown> {
+function policyMatrix(folder: Folder) {
+  const actions = ['read', 'create', 'update', 'delete', 'export', 'import']
+  const granted: Record<string, string[]> = {
+    Requester: ['read', 'create'],
+    Approver: ['read', 'update'],
+    Buyer: ['read', 'export'],
+  }
   return {
+    targets: folder.entities.map((entity, index) => ({
+      kind: 'entity' as const,
+      id: id(firstEntityId + index),
+      name: entity.name,
+      module: null,
+      actions,
+      entity: null,
+    })),
+    roles: Object.entries(granted).map(([name, roleActions], row) => ({
+      id: [roleId, approverRoleId, buyerRoleId][row],
+      name,
+      accessPolicy: { name: `${name}Access`, id: null },
+      editable: true,
+      readOnlyReason: null,
+      cells: folder.entities.map((entity, index) => ({
+        kind: 'entity',
+        target: entity.name,
+        actions: index === 0 ? roleActions : roleActions.slice(0, 1),
+        missingEntityRead: null,
+        grants:
+          name === 'Requester' && index === 0
+            ? [
+                {
+                  policyId,
+                  policy: 'RequesterPolicy',
+                  index: 0,
+                  actions: roleActions,
+                  filter: null,
+                  fields: null,
+                  shared: false,
+                  module: null,
+                },
+              ]
+            : [],
+      })),
+    })),
+  } satisfies StudioPolicyMatrix
+}
+
+/**
+ * The routes of the open application, with the state's own applications, resources and names. `answers` holds the
+ * diagnostics and releases of the state, and Typical's by default.
+ */
+function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers): Record<string, () => unknown> {
+  return {
+    ...Object.fromEntries(
+      folder.entities.map((_, index) => [
+        `${folderPath}/resources/${id(firstEntityId + index)}`,
+        () => entityResource(folder, index),
+      ]),
+    ),
+    [`${folderPath}/policy-matrix`]: () => policyMatrix(folder),
     [appsPath]: () => ({ items: folder.apps }) satisfies { items: StudioApplication[] },
     [`${folderPath}/resources`]: () => ({ items: items(folder) }) satisfies { items: StudioResourceItem[] },
-    [`${folderPath}/diagnostics`]: () => ({ diagnostics }) satisfies { diagnostics: StudioDiagnostic[] },
+    [`${folderPath}/diagnostics`]: () =>
+      ({ diagnostics: answers.diagnostics }) satisfies { diagnostics: StudioDiagnostic[] },
     [`${folderPath}/names`]: () => names(folder),
     '/api/studio/catalog': () => catalog,
     '/api/studio/bindings': () => bindings,
     [`${folderPath}/relaxed`]: () => ({ items: [] }),
     [`${folderPath}/resources/${manifestId}`]: () => manifest,
-    [`${folderPath}/releases`]: () => releases,
+    [`${folderPath}/releases`]: () => answers.releases,
     [`${folderPath}/settings`]: () => settings,
   }
 }
@@ -271,6 +439,16 @@ const longFolder: Folder = {
   ],
 }
 
+const newFolder: Folder = {
+  apps: [app(application, 'Equipment loans', null), app('LeaveRequests', 'Leave requests', null)],
+  title: 'Equipment loans',
+  entities: [],
+  bare: true,
+}
+
+/** The id of the Request entity of the Typical folder, which the Entity state opens at `&resource=<id>`. */
+export const typicalEntityId = id(firstEntityId)
+
 /** The applications Studio lists in each state, with the routes of the open application where the state opens one. */
 export const studioFixtures = {
   typical: workspaceRoutes(typicalFolder),
@@ -279,5 +457,7 @@ export const studioFixtures = {
   failed: { [appsPath]: () => new Response(null, { status: 500 }) },
   manyRows: workspaceRoutes(manyFolder),
   longNames: workspaceRoutes(longFolder),
+  withErrors: workspaceRoutes(typicalFolder, errorAnswers),
+  newApplication: workspaceRoutes(newFolder, unpublishedAnswers),
   accessDenied: { [appsPath]: () => new Response(null, { status: 403 }) },
 } satisfies Record<string, Record<string, () => unknown>>

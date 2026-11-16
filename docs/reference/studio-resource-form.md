@@ -72,7 +72,7 @@ values keeps its rows of inputs.
 
 - **A cell shows content, never a bare count.** A cell shows the value, Yes or No, a label's text, a
   nested list's items one to a line, or a map's entries as `key: value`. A label shows its text in the
-  application's first language, or in the first language that has text.
+  author's language, else in `en`, as [one language rule](studio.md#label-texts) says.
 - **Columns.** A column that would be empty on every row, such as Connectors when no module has any, is
   left out, while the dialog keeps every field. A column of a boolean, a number or a choice is as wide as
   its content.
@@ -155,7 +155,7 @@ icons, then Discard and Save on the right. With nothing to save it is not drawn.
 - **While a step can be redone.** The bar stays, reading "No unsaved changes", with Redo on and no
   Discard, as nothing is left to discard. Save is off.
 - **What counts.** JSON that does not parse is an unsaved change, so the bar and its Undo and Discard
-  are there when they are needed, and Save is off. A change that leaves the data as it was, such as a
+  are there when they are needed. A click on Save opens the JSON view at the first problem and sends nothing. A change that leaves the data as it was, such as a
   space or Format, shows no bar, because nothing can be saved.
 - **Every kind.** Every resource kind has the bar. What Undo, Redo and Discard do is in
   [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm).

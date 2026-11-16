@@ -551,6 +551,33 @@ describe('SchemaForm lists of objects', () => {
     expect(within(rowOf(1)).getByText('No')).toBeVisible()
   })
 
+  it("shows a label in a list cell in the author's language, else English, not the application's first language", () => {
+    const viFirst = {
+      ...namesWithTexts,
+      locales: ['vi', 'en'],
+      texts: [
+        { key: 'k.budget', texts: { en: 'Budget', vi: 'Ngân sách' }, usedBy: 1 },
+        { key: 'k.leave', texts: { vi: 'Nghỉ phép' }, usedBy: 1 },
+      ],
+    } as unknown as StudioNames
+    renderForm(
+      listSchema,
+      {
+        kind: 'example',
+        rows: [
+          { name: 'budget', label: { textKey: 'k.budget' } },
+          { name: 'leave', label: { textKey: 'k.leave' } },
+        ],
+      },
+      vi.fn(),
+      { names: viFirst },
+    )
+
+    expect(within(rowOf(0)).getByText('Budget')).toBeVisible()
+    expect(within(rowOf(0)).queryByText('Ngân sách')).toBeNull()
+    expect(within(rowOf(1)).queryByText('Nghỉ phép')).toBeNull()
+  })
+
   it('keeps a list of plain values as inline rows of inputs', () => {
     renderForm(listSchema, { kind: 'example', rows: [], plain: ['x', 'y'] })
 
@@ -798,6 +825,41 @@ describe('SchemaForm controls that know what they hold', () => {
       version: '^1.2.0',
       roles: { approver: 'DepartmentManager' },
       connectors: { mail: 'Smtp' },
+    })
+  })
+
+  it('lists the roles of a module role slot by their labels, and writes the name', async () => {
+    const onChange = vi.fn()
+    const labelled = {
+      ...catalogNames,
+      roles: [
+        { name: 'DepartmentManager', labelKey: 'roles.departmentManager.label' },
+        { name: 'Clerk', labelKey: 'roles.clerk.label' },
+      ],
+      texts: [
+        { key: 'roles.departmentManager.label', texts: { en: 'Department manager' }, usedBy: 1 },
+        { key: 'roles.clerk.label', texts: { en: 'Clerk on duty' }, usedBy: 1 },
+      ],
+    } as unknown as StudioNames
+    renderForm(
+      (await loadKindSchema('application'))!,
+      { name: 'Shop', modules: [{ id: 'sales', version: '^1.2.0' }] },
+      onChange,
+      { catalog, names: labelled },
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Sales' }))
+    const dialog = await findDialog('Edit module')
+
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Budget approver' }))
+    expect(screen.getByRole('option', { name: 'Clerk on duty' })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'Clerk' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('option', { name: 'Department manager' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    expect(onChange).toHaveBeenCalledWith('/modules/0', {
+      id: 'sales',
+      version: '^1.2.0',
+      roles: { approver: 'DepartmentManager' },
     })
   })
 

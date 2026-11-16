@@ -26,7 +26,7 @@ import {
   widgetSummary,
   widgetTypes,
 } from '../platform/pageWidgets'
-import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
+import { referenceOptions, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
 import type { StudioNamePage, StudioNames } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -556,7 +556,7 @@ function NameField({
   /** A name the picker leaves out, ignoring letter case. */
   without?: string
   /** The names the picker lists instead of every name of the kind. */
-  choices?: string[]
+  choices?: (string | ReferenceOption)[]
   onPick: (next: string | undefined) => void
 }) {
   const { field } = useFieldTexts('page')
@@ -567,7 +567,10 @@ function NameField({
     names === undefined
       ? []
       : (choices ?? referenceOptions(names, kind, undefined, pointer)).filter(
-          (option) => without === undefined || without === '' || option.toLowerCase() !== without.toLowerCase(),
+          (option) =>
+            without === undefined ||
+            without === '' ||
+            (typeof option === 'string' ? option : option.name).toLowerCase() !== without.toLowerCase(),
         )
 
   return (

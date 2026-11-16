@@ -294,6 +294,67 @@ test('the control plane starts read-only with its connection string in /run/secr
   assert.ok(list.startsWith('id'), 'sign-ups list printed no header')
 })
 
+// The chart's own render is the source of the settings and paths, so a wrong path in the chart fails here.
+// scripts/smoke.sh sets HELM to the pinned binary that scripts/setup.sh installs.
+const renderControlPlane = () => {
+  const settings = {
+    'controlPlane.region': 'vn',
+    'controlPlane.tenantDomain': 'vn.example.com',
+    'controlPlane.mailFrom': 'no-reply@vn.example.com',
+    'controlPlane.mail.host': 'mail.invalid',
+    'controlPlane.cells[0].id': 'vn-1',
+    'controlPlane.cells[0].internalUrl': 'https://vn-1.invalid',
+    'controlPlane.cells[0].tokenUrl': 'https://vn-1.invalid/token',
+    'controlPlane.cells[0].clientId': 'axis-controlplane',
+    'controlPlane.cells[0].clientSecret.name': 'cell-vn-1',
+    'secrets.connectionString.name': 'db',
+    'secrets.certificate.name': 'tls',
+    'secrets.cellClientCertificate.name': 'client',
+    'secrets.cellCertificateAuthority.name': 'ca',
+  }
+  const chart = join(root, 'deploy/helm/axis-controlplane')
+  const result = spawnSync(
+    process.env.HELM ?? 'helm',
+    ['template', 'axis-controlplane', chart, ...Object.entries(settings).flatMap(([key, value]) => ['--set', `${key}=${value}`])],
+    { encoding: 'utf8' },
+  )
+  assert.equal(result.status, 0, result.stderr)
+  return result.stdout
+}
+
+test('the control plane starts with one cell from the settings that its chart renders', { timeout }, async () => {
+  const rendered = renderControlPlane()
+  const env = [...rendered.matchAll(/- name: (ControlPlane__\w+)\n\s+value: "?([^"\n]*)"?\n/g)].map(([, name, value]) => [name, value])
+  assert.ok(env.some(([name]) => name === 'ControlPlane__Cells__0__Id'), 'the chart rendered no cell')
+  const mountPath = (volume) => rendered.match(new RegExp(`- name: ${volume}\\n\\s+mountPath: (\\S+)\\n`))[1]
+  const cellSecretFile = rendered.match(/path: (ControlPlane__CellSecrets__vn-1)\n/)[1]
+
+  const clientDir = join(folder, 'cell-client')
+  mkdirSync(clientDir)
+  chmodSync(clientDir, 0o755)
+  const openssl = spawnSync(
+    'openssl',
+    ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', '-subj', '/CN=axis-controlplane', '-keyout', join(clientDir, 'tls.key'), '-out', join(clientDir, 'tls.crt')],
+    { encoding: 'utf8' },
+  )
+  assert.equal(openssl.status, 0, openssl.stderr)
+  for (const file of ['tls.key', 'tls.crt']) chmodSync(join(clientDir, file), 0o644)
+
+  const secrets = writeSecrets('controlplane-cell', {
+    ControlPlane__ConnectionString: `Host=${postgres};Database=axis;Username=axis;Password=images-test${verifyFull('/run/test-ca/ca.crt')}`,
+    [cellSecretFile]: 'cell-client-secret',
+  })
+  await waitLive(
+    startReadOnly('axis-controlplane', secrets, 8080, [
+      ...env.flatMap(([name, value]) => ['-e', `${name}=${value}`]),
+      '-v',
+      `${clientDir}:${mountPath('cell-client-tls')}:ro`,
+      '-v',
+      `${trustDir}:${mountPath('cell-ca')}:ro`,
+    ]),
+  )
+})
+
 test('the admin tool prints its version and has the PostgreSQL 18 tools', { timeout }, () => {
   assert.equal(run(['run', '--rm', '--read-only', image('axis-admin'), 'version']), version)
   const dump = run(['run', '--rm', '--read-only', '--entrypoint', 'pg_dump', image('axis-admin'), '--version'])

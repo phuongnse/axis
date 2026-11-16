@@ -90,7 +90,7 @@ and its core rules still hold on every write.
 
 The reasons are in [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md),
 [D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) and
-[D119](decisions/d119-ai-authoring-in-studio.md).
+[D150](decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
 
 ## Ways to run Axis
 

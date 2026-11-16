@@ -44,14 +44,21 @@ has one implementation.
 - **Idempotency.** Each `POST` that queues a job needs an `Idempotency-Key` header of 1 to 255
   characters, and the answer is `400` without one, with no job queued. The same key with the same
   request answers the first job again for 24 hours. The request is the kind, the tenant and the body,
-  hashed with SHA-256, so the body must match byte for byte. The same key with another request
-  answers `422`. A key is shared across the cell, not kept for each caller, and a lock on the key
-  keeps two parallel retries from queuing two jobs.
+  hashed with SHA-256, so the body must match byte for byte. For the run again route it is the job id and
+  the body. The same key with another request answers `422`. A key is shared across the cell, not kept
+  for each caller, and a lock on the key keeps two parallel retries from queuing two jobs.
 - **Audit.** Each job writes one platform audit record when it ends, whether it succeeded or failed,
   in the same transaction as the job's final state. The record names the operator or the machine
   caller as actor, the tenant, the command name of the matching `Axis.Admin` command and `job:<id>`
   in `changed`, and holds no secret.
-- **Refused calls** _(planned for M33)_. A refused call writes a log event and no audit record.
+- **Refused calls.** A call that a signed-in operator or machine caller makes, and the API refuses
+  with a `4xx` other than `401`, `403` and `429`, writes one warning. It names the HTTP method, the
+  route template, the status, a fixed reason and the caller's id, the same id a job stores as its
+  actor. The message never holds a token, a cookie, the request body, a value from the path or the
+  query, or the `Idempotency-Key`. Its scope holds only what every entry of a request holds, the
+  framework's `RequestPath` among it. A refused call writes no audit record and no job. An anonymous
+  `401` and a `403` write what [security events](log-inventory.md#security-events) says. Test:
+  `CellProvisioningApiTests`.
 
 ### Jobs
 
@@ -71,8 +78,18 @@ over the schema role.
 - **Waiting for a lease.** A step may take a lease of the tenant first, as the `export` step does. A
   wait for a lease uses no claim: it adds to the job's `waits` count, and the limit of three is
   `claims` minus `waits`.
-- **Running a failed job again** _(planned for M33)_. A failed job can be run again, and it skips the
-  steps already done, as `tenant create` does.
+- **Running a failed job again.** `POST /api/cell/jobs/{id}/run-again` queues a new job from a `failed` one
+  and answers `202` as the other job routes do. The new job has the kind, the tenant and the input of the
+  failed job, and `claims` of 0. It keeps the steps that succeeded, so the publisher skips them, and starts
+  the others `pending`. A half-created tenant is finished and not created again, as `tenant create` does. The
+  failed job stays `failed` and keeps its audit record. The new job writes a record of its own when it ends,
+  and it names the operator who ran the job again. The route refuses with `409` and queues nothing for a job
+  that is `queued`, `running` or `succeeded`, for a `purge` job, which the publisher queues again on its own,
+  and for a job that is not the tenant's newest of its kind. So a failed job is run again once, and an old
+  failed job cannot override later work. A new job that fails can itself be run again. A `create` job also
+  answers `409` for the id of a deleted tenant and, while the tenant has no directory row, for a cell at its
+  cap, because a create whose `tenant` step never ran has not met the checks of
+  [creating a tenant](#creating-a-tenant) yet. An unknown job answers `404`.
 
 | Kind | Queued by | Steps |
 | --- | --- | --- |
@@ -81,7 +98,7 @@ over the schema role.
 | `export` | `POST /api/cell/tenants/{id}/exports` or `POST /api/tenant/exports` | One `export` step, see [exporting a tenant](#exporting-a-tenant) |
 | `delete` | `DELETE /api/cell/tenants/{id}` | One `schedule` step |
 | `cancel-deletion` | `POST /api/cell/tenants/{id}/deletion/cancel` | One `cancel` step |
-| `purge` | The publisher, never a route | The eight steps of [deleting a tenant](#deleting-a-tenant), see the [purge job](administration.md#purge-job) |
+| `purge` | The publisher, never a route. An operator does not run a failed one again | The eight steps of [deleting a tenant](#deleting-a-tenant), see the [purge job](administration.md#purge-job) |
 
 ### Routes
 
@@ -105,15 +122,20 @@ over the schema role.
 | `DELETE /api/cell/tenants/{id}` | Schedules the deletion through a `delete` job, see [deleting a tenant](#deleting-a-tenant). It answers `202` as `suspend` does. |
 | `POST /api/cell/tenants/{id}/deletion/cancel` | Cancels a deletion in its grace window through a `cancel-deletion` job. It answers as `suspend` does. |
 | `GET /api/cell/jobs` | Lists the cell's jobs as `{ "items": [...] }`, newest first by `createdAt`, then by id. Each item is a job as the job read answers it, with its `steps` and `error`. The `actor` and the `input` of a job are never returned. `tenant` keeps one tenant's jobs, and an unknown tenant answers an empty list. `limit` is a whole number from 1 to 200 and is 50 when missing. Any other value answers `400`. There is no paging past `limit`. |
+| `POST /api/cell/jobs/{id}/run-again` | Runs a failed job again through a new job, see [running a failed job again](#jobs). It answers `202` with the new job and a `Location` header, `404` for an unknown id, then `400` without a valid `Idempotency-Key`, and `409` for a job that cannot be run again. |
 | `GET /api/cell/jobs/{id}` | Answers a job as the `202` does, with its `steps`, each `{ name, state, error }`, and the `error` of a failed job. An unknown id answers `404`. |
 
-- **A tenant's application** _(planned for M33)_. The create job records the tenant's application,
-  which the tenant reads answer as `application`.
+- **A tenant's application.** The create job records the tenant's application on its row in
+  `platform.tenants`, and the tenant reads answer it as `application`. It is the template id, such as
+  `approvals`, for a tenant created from a template. For a tenant created without an `application` it is
+  the name of the blank application, see [creating a tenant](#creating-a-tenant). A tenant that no
+  create job made, such as one that `tenant create` made, answers `null`, and so does a tenant created
+  before the job recorded it.
 
 ## Creating a tenant
 
 `POST /api/cell/tenants` takes `{ "id", "application", "administrator", "quotas" }` and queues a
-`create` job with five steps, all `pending`. `quotas` is optional. The job keeps the request's
+`create` job with five steps, all `pending`. `application` and `quotas` are optional. The job keeps the request's
 `application`, `administrator` and `quotas`, when the request has them, in its `input`, which the job
 read never returns.
 
@@ -125,9 +147,14 @@ read never returns.
   [application template](modules-and-templates.md#application-templates), such as the built-in
   `approvals`. An id that is not an installed template answers `400`. The job keeps the id, and its
   `application` step takes the newest version.
-- **Without an `application`** _(planned for M33)_. The request may leave `application` out. The
-  `application` step then creates a blank application named by the tenant id, as Studio's Blank does,
-  and `activate` activates its first release.
+- **Without an `application`**, the request creates a blank application, as Studio's Blank does, from
+  the same code. The `application` step creates it, and `activate` activates its first release. Its
+  name is the tenant id made into an application name: each hyphen is dropped and the letter after it
+  is upper-cased, so `acme-corp` becomes `acmeCorp`. A name that does not start with a letter, or whose
+  site path is one of the [reserved path](modules-and-templates.md#blank-application), gets the prefix `app`, as
+  `app1acme` and `appApi`. The site path is the kebab-case name, so it equals the tenant id for a
+  plain id. A person who signs up and chooses Blank gets this tenant, see
+  [provisioning](sign-up.md#provisioning).
 - **`administrator`** is the email of the person invited as the tenant's first administrator. A value
   that is not an email answers `400`.
 - **`quotas`** is optional and has the shape of the `set` object of
@@ -152,10 +179,11 @@ The publisher runs the job's steps in order, see the [create job](administration
 
 1. `tenant`: create the tenant as `tenant create` does, with the host `<id>.<Cell:TenantDomain>`, its
    realm, its keys and its backup key, see
-   [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell), and write the quota rows of
-   the job's `quotas`.
+   [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell), write the quota rows of
+   the job's `quotas`, and record the tenant's application on its row.
 2. `application`: copy the application into the tenant's Studio folder,
-   `<Studio:ApplicationsPath>/<tenant id>/`, as Studio creates one from a template.
+   `<Studio:ApplicationsPath>/<tenant id>/`, as Studio creates one from a template. Without an
+   `application` in the input it writes the blank application instead.
 3. `activate`: activate the application's first release in the tenant.
 4. `invite`: invite the administrator, as `tenant create --administrator` does.
 5. `resume`: set the tenant `active`.

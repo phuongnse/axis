@@ -139,6 +139,8 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
       state.getByLabel("Email or username", { exact: true }),
     "Wrong password": (state) =>
       state.getByText("Invalid email, username or password.", { exact: true }),
+    "Fields left empty": (state) =>
+      state.getByText("Enter your password.", { exact: true }),
     "Organization sign-in only": (state) =>
       state.getByRole("button", {
         name: "Continue with Contoso ID",
@@ -156,6 +158,10 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
       state.getByText("Authenticator app", { exact: true }),
     "Update your profile": (state) =>
       state.getByLabel("First name", { exact: true }),
+    "Terms and privacy": (state) =>
+      state.getByRole("link", { name: "Privacy policy", exact: true }),
+    "Terms not accepted": (state) =>
+      state.getByText("Accept the terms to continue.", { exact: true }),
     "Sign out": (state) =>
       state.getByRole("button", { name: "Sign out", exact: true }),
     Notice: (state) =>
@@ -605,6 +611,48 @@ for (const mode of modes) {
     expect(recording.errors).toEqual([]);
   });
 
+  test(`the identitySignIn preview's sign-in and terms states draw their messages and links in ${mode} mode`, async ({
+    page,
+  }) => {
+    const query = `?preview=identitySignIn&mode=${mode}`;
+    const recording = await openHarness(page, query, {
+      sandboxed: true,
+      frameWidth: 992,
+    });
+    const frame = page.frameLocator("iframe");
+
+    const empty = figure(frame, "Fields left empty");
+    await expect(
+      empty.getByText("Enter your email or username.", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      empty.getByText("Enter your password.", { exact: true }),
+    ).toBeVisible();
+
+    const terms = figure(frame, "Terms and privacy");
+    await expect(
+      terms.getByRole("link", { name: "Terms of service", exact: true }),
+    ).toHaveAttribute("href", "#terms-of-service");
+    await expect(
+      terms.getByRole("link", { name: "Privacy policy", exact: true }),
+    ).toHaveAttribute("href", "#privacy-policy");
+    await expect(
+      terms.getByText("Accept the terms to continue.", { exact: true }),
+    ).toHaveCount(0);
+
+    await expect(
+      figure(frame, "Terms not accepted").getByText(
+        "Accept the terms to continue.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    expect(recording.errors).toEqual([]);
+    // The fixtures answer every API call, so nothing but the page, the harness and the bundle is requested.
+    expect(
+      recording.requests.filter((url) => !url.startsWith("data:")),
+    ).toEqual([`${origin}/sandboxed.html`, `${harnessUrl}${query}`, bundleUrl]);
+  });
+
   test(`the signIn preview draws the Axis heading above the sign-in card in ${mode} mode`, async ({
     page,
   }) => {
@@ -788,6 +836,74 @@ for (const [slug, testId] of [
   });
 }
 
+for (const [slug, expectKeyElement] of [
+  [
+    "overview-with-errors-and-changes-not-live",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-problems")).toHaveText(
+        "3 errors, 1 warning",
+      );
+      await expect(state.getByTestId("studio-folder-differs")).toBeVisible();
+    },
+  ],
+  [
+    "overview-of-a-new-application",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-section-get-started")).toBeVisible();
+      await expect(state.getByTestId("studio-section-more")).toBeVisible();
+      await expect(state.getByTestId("studio-section-live")).toHaveCount(0);
+    },
+  ],
+  [
+    "entity",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-entity-designer")).toBeVisible();
+    },
+  ],
+  [
+    "policy-matrix",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-matrix")).toBeVisible();
+      await expect(
+        state.getByTestId("studio-matrix-cell-Requester-entity-Request"),
+      ).toBeVisible();
+    },
+  ],
+] as const) {
+  test(`the studio preview opens its ${slug} state from the address`, async ({
+    page,
+  }) => {
+    const query = `?preview=studio&mode=light&state=${slug}`;
+    const recording = await openHarness(page, query, {
+      sandboxed: true,
+      frameWidth: 992,
+    });
+
+    await expectKeyElement(page.frameLocator("iframe"));
+    expect(recording.errors).toEqual([]);
+    expect(
+      recording.requests.filter((url) => !url.startsWith("data:")),
+    ).toEqual([`${origin}/sandboxed.html`, `${harnessUrl}${query}`, bundleUrl]);
+  });
+}
+
+test("the studio preview replaces the entity designer with the policy matrix picked in the Fixtures control", async ({
+  page,
+}) => {
+  const recording = await openHarness(page, "?preview=studio&mode=light");
+  const fixtures = page.getByRole("radiogroup", {
+    name: "Fixtures",
+    exact: true,
+  });
+
+  await fixtures.getByText("Entity", { exact: true }).click();
+  await expect(page.getByTestId("studio-entity-designer")).toBeVisible();
+  await fixtures.getByText("Policy matrix", { exact: true }).click();
+  await expect(page.getByTestId("studio-matrix")).toBeVisible();
+  await expect(page.getByTestId("studio-entity-designer")).toHaveCount(0);
+  expect(recording.errors).toEqual([]);
+});
+
 test("the studio preview replaces one state's page with the next one picked in the Fixtures control", async ({
   page,
 }) => {
@@ -822,7 +938,7 @@ test("the Fixtures control wraps its captions onto more lines in a narrow frame"
     .getByText("Typical", { exact: true })
     .boundingBox())!;
   const last = (await fixtures
-    .getByText("Access denied", { exact: true })
+    .getByText("Policy matrix", { exact: true })
     .boundingBox())!;
   const group = (await fixtures.boundingBox())!;
   const framed = (await page.locator("iframe").boundingBox())!;

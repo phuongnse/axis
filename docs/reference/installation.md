@@ -705,6 +705,7 @@ The values of the chart, with their defaults:
 | `agent.replicas` | 1 | Agent host replicas. |
 | `packageHost.dotnet.replicas`, `packageHost.dotnet.resources`, `packageHost.node.replicas`, `packageHost.node.resources`, `packageHost.python.replicas`, `packageHost.python.resources`, `applicationPackageHost.replicas`, `applicationPackageHost.resources` | 1, limits of 1 CPU and `1Gi` | Replicas and resources of the C#, the Node.js, the Python and, when it is on, the application package host. Rendering fails, naming the value, without `limits.cpu` or `limits.memory`. |
 | `applicationPackageHost.enabled`, `applicationPackageHost.runtimeClassName` | `false`, `gvisor` | Runs the application package host and gives the worker and the publisher `Extensions__Runners__Application`, see [an application's packages](extension-packages.md#an-applications-packages). The RuntimeClass of gVisor that its pod runs under must exist in the cluster. With the host on, an empty `runtimeClassName` fails rendering and names the value. |
+| `alerts.enabled`, `alerts.labels` | `false`, none | Renders a PrometheusRule with the alert rules of `alerts/axis-alerts.yaml`, and gives it `labels` for a Prometheus Operator that selects rules by a label such as `release`. It needs the Prometheus Operator's CRDs, so it fails on a cluster without them. An install without the chart loads the same file in Prometheus, see [the stale backup alert](tenant-backup-and-restore.md#daily-backup). |
 | `studio.folders` | none | The Studio folders, as paths relative to `/studio`. Each renders as `Studio__Folders__N` with the value `/studio/<path>` on the server and on the publisher. Setting it turns Studio on. |
 | `studio.authorRole`, `studio.publisherRole` | empty | Server only. `Studio__AuthorRole` and `Studio__PublisherRole`. Rendered only when set. Without one, nobody may author or publish. |
 | `studio.persistence` | none | A Kubernetes volume source for the Studio folders, mounted read-write at `/studio` on every server replica and on the publisher. In a cell the server and the publisher use `/studio` as `Studio:ApplicationsPath`. It is required when `studio.folders` is set and in a cell, and rendering fails with a message that names it when it is missing. Outside a cell, on its own it does nothing. The chart creates no claim. With several replicas, and in a cell, it needs a `ReadWriteMany` storage class. |
@@ -801,11 +802,11 @@ restore check. It has no Job for tenants and releases.
 ### Checks of the chart
 
 `scripts/lint.sh` runs `helm lint --strict` and validates the rendered manifests against the Kubernetes schemas and the pinned cert-manager
-schemas with kubeconform. It renders the Axis chart with the application package host off and on. `scripts/helm.test.mjs` renders the chart
+and PrometheusRule schemas with kubeconform. It renders the Axis chart with the application package host and the alerts off and on. `scripts/helm.test.mjs` renders the chart
 and checks the rules of this section: the probes and HTTPS endpoints, the objects that render and that do not render inside and outside a
-cell, which pod gets which secret and setting, that secrets are files and never env entries, that a secret value in a reference is rejected,
-and that rendering fails, naming the value, without each required value. `scripts/setup.sh` installs the pinned Helm, kubeconform,
-Kubernetes schemas and cert-manager schemas into `~/.cache/axis-tools`, and downloads any schema file that a cached folder lacks. Axis has
+cell, that the PrometheusRule renders only with `alerts.enabled` and holds the rule file, which pod gets which secret and setting, that secrets are files and never env entries, that a secret value in a reference is rejected,
+and that rendering fails, naming the value, without each required value. `scripts/test.sh` runs the alert rules through `promtool test rules`. `scripts/setup.sh` installs the pinned Helm, kubeconform, promtool,
+Kubernetes schemas and cert-manager and PrometheusRule schemas into `~/.cache/axis-tools`, and downloads any schema file that a cached folder lacks. Axis has
 no test against a live cluster, so no test runs PgBouncer, the identity provider or a package host, or checks that a cluster enforces its
 NetworkPolicy.
 

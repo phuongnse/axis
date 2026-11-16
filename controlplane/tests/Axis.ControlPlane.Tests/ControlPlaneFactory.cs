@@ -1,4 +1,5 @@
 using Axis.ControlPlane.Storage;
+using Axis.Tenancy;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -12,6 +13,26 @@ internal static class ControlPlaneFactory
 {
     /// <summary>A connection to a port nothing listens on, so the database is unreachable and fails fast.</summary>
     public const string UnreachableConnectionString = "Host=127.0.0.1;Port=1;Database=axis_controlplane;Username=u;Password=secret-password;Timeout=2";
+
+    /// <summary>The settings of a trial plan with <paramref name="includedUsers"/> users, and every other quota set to 1, so a new trial has quotas.</summary>
+    public static Dictionary<string, string?> TrialPlanSettings(string includedUsers = "10")
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["ControlPlane:Plans:0:Code"] = "trial",
+            ["ControlPlane:Plans:0:Version"] = "1",
+            ["ControlPlane:Plans:0:Name:en"] = "Trial",
+            ["ControlPlane:Plans:0:Name:vi"] = "Dùng thử",
+            ["ControlPlane:Plans:0:IncludedUsers"] = includedUsers,
+            ["ControlPlane:Plans:0:Trial"] = "true",
+        };
+        foreach (var key in QuotaKeys.All.Where(key => key != QuotaKeys.Users))
+        {
+            settings[$"ControlPlane:Plans:0:Quotas:{key}"] = key == QuotaKeys.PackageCpuSecondsPerDay ? "0" : "1";
+        }
+
+        return settings;
+    }
 
     /// <summary>
     /// A factory in <paramref name="environment"/> with valid settings, except where <paramref name="settings"/> sets a

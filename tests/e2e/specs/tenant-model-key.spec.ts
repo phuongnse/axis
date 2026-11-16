@@ -2,6 +2,7 @@ import { chromium } from '@playwright/test'
 import { expect, test } from '../test'
 import { runAdmin } from '../admin-tool'
 import { waitForDialog } from '../dialogs'
+import { fieldLabel } from '../fields'
 import { startDirectoryServer } from '../directory-server'
 import { addAuthenticator, submitPassword } from '../keycloak'
 import { setRealmPassword } from '../tenant-realm'
@@ -39,7 +40,7 @@ test('an administrator sets the tenant model key and sees it masked with only it
 
     await section.getByRole('button', { name: 'Set key…', exact: true }).click()
     const dialog = await waitForDialog(page, 'Set the model key')
-    const field = dialog.getByLabel('Key', { exact: true })
+    const field = dialog.getByLabel(fieldLabel('Key'))
     await expect(field).toHaveAttribute('type', 'password')
     await field.fill(key)
     await dialog.getByRole('button', { name: 'Save', exact: true }).click()

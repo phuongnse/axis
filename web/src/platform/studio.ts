@@ -107,6 +107,53 @@ export async function checkStudioExpression(
   return (await response.json()) as ExpressionCheck
 }
 
+/** One function or aggregate that an expression place allows, as the expression scope lists it. */
+export interface ExpressionScopeFunction {
+  name: string
+  parameters: string[]
+  result: string
+  group: string
+  example: string
+  description: string
+}
+
+/**
+ * The answer of an expression scope request: the type the place needs, `null` when any type will do, the fields in
+ * scope and the functions the place allows.
+ */
+export interface ExpressionScope {
+  type: string | null
+  fields: { name: string; labelKey: string | null; type: string | null }[]
+  functions: ExpressionScopeFunction[]
+}
+
+/**
+ * Loads what one expression place offers, for the draft as it stands. Any status other than 200 answers `null`, and
+ * the request does not show the sign-in prompt on a 401. It rejects when the server does not answer.
+ */
+export async function fetchStudioExpressionScope(
+  application: string,
+  resourceId: string,
+  path: string,
+  draft: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<ExpressionScope | null> {
+  const response = await apiFetch(
+    `/api/studio/apps/${encodeURIComponent(application)}/expressions/scope`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resourceId, path, draft }),
+      signal,
+    },
+    { promptSignInOnUnauthorized: false },
+  )
+  if (!response.ok) {
+    return null
+  }
+  return (await response.json()) as ExpressionScope
+}
+
 /**
  * An application in the list of `GET /api/studio/apps`. `id` is the manifest `id`, null when the manifest has none.
  * `titles` and `descriptions` map a locale to a text and are empty when the folder gives none.
@@ -120,12 +167,12 @@ export interface StudioApplication {
 
 /** The title of an application in `locale`, then in `en`, then its `name`. */
 export function studioAppTitle(app: StudioApplication, locale: string): string {
-  return app.titles[locale] ?? app.titles.en ?? app.name
+  return textIn(app.titles, locale) ?? app.name
 }
 
 /** The description of an application in `locale`, then in `en`, or null when it has none. */
 export function studioAppDescription(app: StudioApplication, locale: string): string | null {
-  return app.descriptions[locale] ?? app.descriptions.en ?? null
+  return textIn(app.descriptions, locale) ?? null
 }
 
 /**
@@ -312,6 +359,8 @@ export function relationTextKey(relation: string): string {
 /** A field of an entity in `GET .../names`. `target` and `values` are `null` when the field has none. */
 export interface StudioNameField {
   name: string
+  /** The key of the field's label in `texts`, or `null` when it has none. */
+  labelKey?: string | null
   type: string
   target: string | null
   values: string[] | null
@@ -321,6 +370,7 @@ export interface StudioNameField {
 export interface StudioNameEntity {
   id: string
   name: string
+  labelKey?: string | null
   module: string | null
   fields: StudioNameField[]
 }
@@ -332,6 +382,7 @@ export interface StudioNameEntity {
 export interface StudioNameDataSource {
   id: string
   name: string
+  labelKey?: string | null
   module: string | null
   parameters: { name: string; type: string }[]
   columns: { name: string; type: string | null }[]
@@ -341,6 +392,7 @@ export interface StudioNameDataSource {
 /** A process step in `GET .../names`. `outcomes` is empty for a step that is not a task. */
 export interface StudioNameStep {
   name: string
+  labelKey?: string | null
   type: string
   outcomes: string[]
 }
@@ -349,6 +401,7 @@ export interface StudioNameStep {
 export interface StudioNameResource {
   id: string
   name: string
+  labelKey?: string | null
 }
 
 /**
@@ -358,6 +411,7 @@ export interface StudioNameResource {
 export interface StudioNameModuleResource {
   id: string
   name: string
+  labelKey?: string | null
   module: string | null
 }
 
@@ -365,6 +419,7 @@ export interface StudioNameModuleResource {
 export interface StudioNamePage {
   id: string
   name: string
+  labelKey?: string | null
   module: string | null
   parameters: { name: string; type: string; required: boolean }[]
 }
@@ -373,6 +428,7 @@ export interface StudioNamePage {
 export interface StudioNamePolicy {
   id: string
   name: string
+  labelKey?: string | null
   module: string | null
 }
 
@@ -391,6 +447,7 @@ export interface StudioNames {
   processes: {
     id: string
     name: string
+    labelKey?: string | null
     module: string | null
     entity: string | null
     parameters: { name: string; type: string }[]
@@ -399,14 +456,16 @@ export interface StudioNames {
   rules: {
     id: string
     name: string
+    labelKey?: string | null
     module: string | null
     parameters: { name: string; type: string }[]
     resultType: string
   }[]
-  connectors: { id: string; name: string; operations: { name: string }[] }[]
+  connectors: { id: string; name: string; labelKey?: string | null; operations: { name: string }[] }[]
   events: {
     id: string
     name: string
+    labelKey?: string | null
     module: string | null
     entity: string
     fields: { name: string; type: string }[]
@@ -416,7 +475,7 @@ export interface StudioNames {
   forms: StudioNameModuleResource[]
   pages: StudioNamePage[]
   policies: StudioNamePolicy[]
-  contracts: { id: string; name: string; module: string }[]
+  contracts: { id: string; name: string; labelKey?: string | null; module: string }[]
   texts: StudioNameText[]
   seeds: StudioNameModuleResource[]
   triggers: StudioNameModuleResource[]
@@ -1553,8 +1612,21 @@ export function resourceTitle(item: StudioResourceItem, locale: string, t: (key:
   if (item.kind === 'text' && typeof item.locale === 'string') {
     return languageName(item.locale, locale)
   }
-  const titles = item.titles ?? {}
-  return titles[locale] ?? titles.en ?? item.name ?? kindSingular(item.kind, t)
+  return textIn(item.titles, locale) ?? item.name ?? kindSingular(item.kind, t)
+}
+
+/**
+ * The text in the author's language, else in `en`, else `undefined`. A blank text counts as missing. This is the one
+ * rule for a label's language in Studio, see [label texts](docs/reference/studio.md#label-texts).
+ */
+export function textIn(texts: Readonly<Record<string, string>> | null | undefined, locale: string): string | undefined {
+  for (const language of [locale, 'en']) {
+    const text = texts?.[language]
+    if (text !== undefined && text.trim() !== '') {
+      return text
+    }
+  }
+  return undefined
 }
 
 /** The name of the language `tag` in `locale`, such as "Vietnamese", or the tag itself when it has no name. */

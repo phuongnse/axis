@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
 import { useState, type ReactNode } from 'react'
@@ -777,15 +777,24 @@ describe('EntityDesigner', () => {
   })
 
   it('checks a default at /fields/{i}/default, offers no field name and shows the unknown name error', async () => {
-    const fetcher = vi.fn(
-      async (_input: string, _init?: RequestInit) =>
-        new Response(
-          JSON.stringify({
-            type: null,
-            diagnostics: [{ code: 'AXC0046', message: "Unknown field 'total'", start: 0, end: 5 }],
-          }),
-          { status: 200 },
-        ),
+    // The scope of a default lists the functions but no aggregate.
+    const scope = {
+      type: null,
+      fields: [],
+      functions: [
+        { name: 'length', parameters: ['text'], result: 'integer', group: 'Text', example: '', description: '' },
+      ],
+    }
+    const fetcher = vi.fn(async (input: string, _init?: RequestInit) =>
+      input.endsWith('/expressions/scope')
+        ? new Response(JSON.stringify(scope), { status: 200 })
+        : new Response(
+            JSON.stringify({
+              type: null,
+              diagnostics: [{ code: 'AXC0046', message: "Unknown field 'total'", start: 0, end: 5 }],
+            }),
+            { status: 200 },
+          ),
     )
     vi.stubGlobal('fetch', fetcher)
     const draft = entity({
@@ -810,12 +819,14 @@ describe('EntityDesigner', () => {
       expect(screen.getByTestId('studio-field-/fields/1/default').querySelector('.cm-editor')).not.toBeNull(),
     )
     const editor = row.getByRole('textbox', { name: 'Default' })
-    // The completions are the rules and the functions: no field of the entity and no aggregate.
+    // The completions are the rules and the functions of the scope: no field of the entity and no aggregate.
+    await waitFor(() => expect(fetcher.mock.calls.some(([input]) => input.endsWith('/expressions/scope'))).toBe(true))
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)))
     await userEvent.click(editor)
     await userEvent.keyboard('{Control>}[Space]{/Control}')
     const completions = (await screen.findAllByRole('option')).map((option) => option.textContent ?? '')
     expect(completions.some((text) => text.includes('length()'))).toBe(true)
-    for (const name of ['total', 'tax', 'count()', 'sum()']) {
+    for (const name of ['total', 'tax', 'count()', 'sum()', 'now()']) {
       expect(
         completions.some((text) => text.startsWith(name)),
         name,
@@ -826,7 +837,9 @@ describe('EntityDesigner', () => {
     await userEvent.type(editor, 'total')
 
     await waitFor(() => expect(screen.getByTestId('studio-expression-error')).toHaveTextContent('AXC0046'))
-    const bodies = fetcher.mock.calls.map(([, init]) => JSON.parse(init!.body as string))
+    const bodies = fetcher.mock.calls
+      .filter(([input]) => input.endsWith('/expressions/check'))
+      .map(([, init]) => JSON.parse(init!.body as string))
     expect(bodies.at(-1)).toMatchObject({ path: '/fields/1/default', expression: 'total' })
     expect(bodies.every((body) => body.path === '/fields/1/default')).toBe(true)
   })

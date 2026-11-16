@@ -92,6 +92,7 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   `AxisFieldGroup` draws a titled group of fields with its help, such as an object's fields or a table, as a
   group that its title names and its help describes. A field that holds one input uses `AxisField`, and a
   field that holds several inputs, or rows, uses `AxisFieldGroup`, because a label names only one input.
+  `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` are built on `AxisField` and `AxisFieldGroup`.
 - **A field's status.** A field inside a form takes a `status`, what the screen found about the
   field beyond its rules: a check run while the person types, such as whether a subdomain is free, or
   choices that could not load. Running shows the input busy. A status that passed leaves the field as it
@@ -114,11 +115,12 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   [required mark](form-widget.md#field-look), in every form and dialog, even where every field is
   required, such as New resource. Only the sign-in page marks none, as everyone knows both its fields are
   needed. A field never says "(optional)".
-- **A field is checked on click** _(planned for M33)_. A finish button is never disabled because the
+- **A field is checked on click**. A finish button is never disabled because the
   input is not valid: that says nothing of what is missing, has low contrast and cannot be focused. A
   click checks the fields, shows under each one that is wrong what to do, such as "Enter a name.", and
   focuses the first. A message goes once the field is put right. A button is disabled only while its
-  action runs. This holds for every form and dialog, as it does for the form widget's Save. A confirmation
+  action runs, while there is nothing to save, or while the screen cannot send it, as during
+  [Studio's reconnect](studio.md#reconnect). This holds for every form and dialog, as it does for the form widget's Save. A confirmation
   that asks the user to type a name before a destructive action keeps its button off until the name
   matches, as [the cell console's Delete](cell-console.md#actions) does.
 
@@ -245,9 +247,8 @@ These rules hold for every dialog, through the shared `ConfigProvider`.
 - **Its body scrolls at its edge.** The body reaches the frame's edges and keeps the padding inside
   it, so the thin scrollbar runs at the dialog's right edge and a field's focus ring has room at its
   sides.
-- **A dialog holds only what it edits** _(planned for M33)_. A table may show what its row's dialog does not
-  edit, as long as the cell leads to where it is edited, so each thing is seen in one place and edited
-  in one place.
+- **A dialog holds only what it edits**. A table may show what its row's dialog does not edit, as long
+  as the cell leads to where it is edited, so each thing is seen in one place and edited in one place.
 - **It draws on `surface`,** as panels do, so everything inside sits on the colour it was made for,
   and the mask behind sets it apart from the page.
 
@@ -258,13 +259,13 @@ one.
 
 - **A field the object always has always shows.** Empty, it reads "Not set" on a form or a detail and
   the muted dash in a table cell, see [text](#text).
-- **A list that is a standing part of the object always shows.** _(planned for M33)_ Empty, it says in
+- **A list that is a standing part of the object always shows.** Empty, it says in
   one line what that means.
-- **Hide only what does not apply or is not allowed.** _(planned for M33)_ A part that does not apply to
+- **Hide only what does not apply or is not allowed.** A part that does not apply to
   the object's kind or state, or a field the person may not read, is left out.
-- **Loading and failing are never empty.** _(planned for M33)_ A part that is still loading or failed to
+- **Loading and failing are never empty.** A part that is still loading or failed to
   load says so, never Not set.
-- **One empty state.** _(planned for M33)_ `EmptyState` draws every empty table and list: Ant Design's
+- **One empty state.** `EmptyState` draws every empty table and list: Ant Design's
   simple picture and one line in `textMuted`, because Ant Design's own empty text fails 4.5:1. The line
   is "No data yet." unless the emptiness says something the reader needs.
 

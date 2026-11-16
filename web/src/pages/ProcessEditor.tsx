@@ -856,9 +856,7 @@ function WaitEvent({
               name={field('steps.event').label}
               value={text(step.event)}
               required
-              options={studioNames.events
-                .filter((event) => event.entity.toLowerCase() === entity.toLowerCase())
-                .map((event) => event.name)}
+              options={studioNames.events.filter((event) => event.entity.toLowerCase() === entity.toLowerCase())}
               onChange={(next) => onChange(`${pointer}/event`, next ?? '')}
             />
           )}

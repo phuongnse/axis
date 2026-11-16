@@ -1,5 +1,3 @@
-using System.Text.Json.Nodes;
-using Axis.Configuration.Templates;
 using Axis.Studio;
 
 namespace Axis.Server.Studio;
@@ -30,76 +28,6 @@ internal enum StudioCreateOutcome
 /// </summary>
 internal static class StudioApplications
 {
-    /// <summary>
-    /// The files of a blank application named <paramref name="name"/>: the manifest, one site, an <c>accounts</c> identity
-    /// provider, a <c>Home</c> page and an <c>en</c> text resource, each with a new id. It compiles with no diagnostic.
-    /// </summary>
-    public static IReadOnlyList<(string File, byte[] Bytes)> Blank(string name)
-    {
-        var kebab = StudioFileNames.Kebab(name);
-        return
-        [
-            ("application.json", StudioWrites.Serialize(new JsonObject
-            {
-                ["id"] = TemplateApplications.NewId(),
-                ["kind"] = "application",
-                ["name"] = name,
-                ["formatVersion"] = 1,
-            })),
-            ($"sites/{kebab}.json", StudioWrites.Serialize(new JsonObject
-            {
-                ["id"] = TemplateApplications.NewId(),
-                ["kind"] = "site",
-                ["name"] = name,
-                ["formatVersion"] = 1,
-                ["path"] = kebab,
-                ["title"] = new JsonObject { ["textKey"] = "site.title" },
-                ["locales"] = new JsonObject
-                {
-                    ["default"] = "en",
-                    ["fallback"] = "en",
-                    ["available"] = new JsonArray("en"),
-                },
-                ["navigation"] = new JsonArray(new JsonObject
-                {
-                    ["page"] = "Home",
-                    ["label"] = new JsonObject { ["textKey"] = "nav.home" },
-                }),
-            })),
-            ("identity-providers/accounts.json", StudioWrites.Serialize(new JsonObject
-            {
-                ["id"] = TemplateApplications.NewId(),
-                ["kind"] = "identityProvider",
-                ["name"] = "accounts",
-                ["formatVersion"] = 1,
-                ["type"] = "accounts",
-            })),
-            ("pages/home.json", StudioWrites.Serialize(new JsonObject
-            {
-                ["id"] = TemplateApplications.NewId(),
-                ["kind"] = "page",
-                ["name"] = "Home",
-                ["formatVersion"] = 1,
-                ["title"] = new JsonObject { ["textKey"] = "pages.home.title" },
-                ["widgets"] = new JsonArray(new JsonObject { ["type"] = "taskInbox", ["name"] = "taskInbox1" }),
-            })),
-            ("texts/en.json", StudioWrites.Serialize(new JsonObject
-            {
-                ["id"] = TemplateApplications.NewId(),
-                ["kind"] = "text",
-                ["name"] = "TextsEn",
-                ["formatVersion"] = 1,
-                ["locale"] = "en",
-                ["texts"] = new JsonObject
-                {
-                    ["site.title"] = name,
-                    ["pages.home.title"] = "Home",
-                    ["nav.home"] = "Home",
-                },
-            })),
-        ];
-    }
-
     /// <summary>
     /// Creates the folder of <paramref name="name"/> from <paramref name="files"/>. It answers
     /// <see cref="StudioCreateOutcome.Exists"/> and writes nothing when an application already has the name, ignoring

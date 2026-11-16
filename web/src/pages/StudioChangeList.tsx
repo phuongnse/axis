@@ -1,6 +1,7 @@
 import { Typography } from 'antd'
 import { useContext } from 'react'
 import { Link } from 'react-router'
+import { EmptyState } from '../platform/EmptyState'
 import type { StudioChangeRow, StudioReleasePartChange } from '../platform/studio'
 import { sortByName } from '../platform/listOrder'
 import { studioResourceAddress } from '../platform/studioAddress'
@@ -70,9 +71,9 @@ export function StudioChangeList({
         </div>
       ))}
       {parts?.length === 0 && (
-        <Typography.Text data-testid="studio-change-parts-none" style={{ gridColumn: '1 / -1' }}>
-          {t('shell.studio.overview.change.parts.none')}
-        </Typography.Text>
+        <div data-testid="studio-change-parts-none" style={{ gridColumn: '1 / -1' }}>
+          <EmptyState text={t('shell.studio.overview.change.parts.none')} />
+        </div>
       )}
     </div>
   )

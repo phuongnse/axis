@@ -54,6 +54,26 @@ spec:
             - name: ControlPlane__PayOs__BaseUrl
               value: {{ .Values.controlPlane.payOs.baseUrl | quote }}
             {{- end }}
+            {{- if .Values.controlPlane.cells }}
+            {{- range $index, $cell := .Values.controlPlane.cells }}
+            - name: ControlPlane__Cells__{{ $index }}__Id
+              value: {{ $cell.id | quote }}
+            - name: ControlPlane__Cells__{{ $index }}__InternalUrl
+              value: {{ $cell.internalUrl | quote }}
+            - name: ControlPlane__Cells__{{ $index }}__TokenUrl
+              value: {{ $cell.tokenUrl | quote }}
+            - name: ControlPlane__Cells__{{ $index }}__ClientId
+              value: {{ $cell.clientId | quote }}
+            {{- end }}
+            - name: ControlPlane__CellClientCertificate__Path
+              value: /cell-client-tls/tls.crt
+            - name: ControlPlane__CellClientCertificate__KeyPath
+              value: /cell-client-tls/tls.key
+            {{- if .Values.secrets.cellCertificateAuthority.name }}
+            - name: ControlPlane__CellCertificateAuthorityPath
+              value: /cell-ca/ca.crt
+            {{- end }}
+            {{- end }}
             # HTTPS only: a Kestrel endpoint list replaces the plain HTTP port of the image.
             - name: Kestrel__Endpoints__Https__Url
               value: https://+:8443
@@ -102,6 +122,16 @@ spec:
             - name: controlplane-tls
               mountPath: /controlplane-tls
               readOnly: true
+            {{- if .Values.controlPlane.cells }}
+            - name: cell-client-tls
+              mountPath: /cell-client-tls
+              readOnly: true
+            {{- if .Values.secrets.cellCertificateAuthority.name }}
+            - name: cell-ca
+              mountPath: /cell-ca
+              readOnly: true
+            {{- end }}
+            {{- end }}
       volumes:
         - name: secrets
           projected:
@@ -138,6 +168,13 @@ spec:
                     - key: ControlPlane__PayOs__ChecksumKey
                       path: ControlPlane__PayOs__ChecksumKey
               {{- end }}
+              {{- range $index, $cell := .Values.controlPlane.cells }}
+              - secret:
+                  name: {{ required (printf "controlPlane.cells[%d].clientSecret.name is required: the Kubernetes Secret that holds the client secret of cell %s (ControlPlane__CellSecrets__%s)" $index $cell.id $cell.id) (dig "clientSecret" "name" "" $cell) | quote }}
+                  items:
+                    - key: {{ dig "clientSecret" "key" "" $cell | default (printf "ControlPlane__CellSecrets__%s" $cell.id) | quote }}
+                      path: ControlPlane__CellSecrets__{{ $cell.id }}
+              {{- end }}
         - name: tmp
           emptyDir: {}
         - name: controlplane-tls
@@ -150,3 +187,25 @@ spec:
                 path: tls.crt
               - key: tls.key
                 path: tls.key
+      {{- if .Values.controlPlane.cells }}
+        - name: cell-client-tls
+          secret:
+            secretName: {{ required "secrets.cellClientCertificate.name is required when controlPlane.cells lists a cell: the Kubernetes TLS Secret (tls.crt, tls.key) of the client certificate that the control plane presents to every cell" .Values.secrets.cellClientCertificate.name | quote }}
+            # Readable by the non-root user of the image.
+            defaultMode: 292
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+        {{- with .Values.secrets.cellCertificateAuthority.name }}
+        - name: cell-ca
+          secret:
+            secretName: {{ . | quote }}
+            # Readable by the non-root user of the image.
+            defaultMode: 292
+            items:
+              - key: {{ $.Values.secrets.cellCertificateAuthority.key | default "ca.crt" | quote }}
+                path: ca.crt
+        {{- end }}
+      {{- end }}

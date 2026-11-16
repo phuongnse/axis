@@ -6,6 +6,7 @@ import { QuotaRefusedError } from './quota'
 import {
   changeRows,
   checkStudioExpression,
+  fetchStudioExpressionScope,
   fetchStudioPolicyMatrix,
   fetchStudioRelease,
   fetchStudioResource,
@@ -23,6 +24,7 @@ import {
   ServerUnreachableError,
   studioAppDescription,
   studioAppTitle,
+  textIn,
   undoStudioRevision,
   type StudioReleaseChange,
   type StudioRevision,
@@ -177,6 +179,34 @@ describe('checkStudioExpression', () => {
   })
 })
 
+describe('fetchStudioExpressionScope', () => {
+  it('posts the resource, the path and the draft and answers the scope', async () => {
+    const scope = { type: 'boolean', fields: [], functions: [] }
+    const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => json(scope))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const answer = await fetchStudioExpressionScope('PurchaseRequests', 'r', '/validations/0/expression', { id: 'r' })
+
+    expect(answer).toEqual(scope)
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/studio/apps/PurchaseRequests/expressions/scope')
+    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toEqual({
+      resourceId: 'r',
+      path: '/validations/0/expression',
+      draft: { id: 'r' },
+    })
+  })
+
+  it.each([400, 401, 404])('answers null for %i and does not ask to sign in', async (status) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status })),
+    )
+
+    await expect(fetchStudioExpressionScope('PurchaseRequests', 'r', '/p', {})).resolves.toBeNull()
+    expect(assignLocation).not.toHaveBeenCalled()
+  })
+})
+
 describe('waitForServer', () => {
   it('resolves once /api/me answers, after a request without an answer and a 503', async () => {
     const fetchMock = vi
@@ -210,6 +240,31 @@ const items = [
   resource('cccc0003-0000-4000-8000-000000000000', 'entity', 'Department', 'entities/department.json'),
   resource('dddd0004-0000-4000-8000-000000000000', 'application', null, 'application.json'),
 ]
+
+describe('textIn', () => {
+  const texts = { en: 'Purchase request', vi: 'Yêu cầu mua hàng' }
+
+  it('takes the text in the author language', () => {
+    expect(textIn(texts, 'vi')).toBe('Yêu cầu mua hàng')
+  })
+
+  it('falls back to the en text when the author language has none', () => {
+    expect(textIn(texts, 'fr')).toBe('Purchase request')
+  })
+
+  it('gives nothing when neither language has a text', () => {
+    expect(textIn({ vi: 'Yêu cầu mua hàng' }, 'fr')).toBeUndefined()
+    expect(textIn({}, 'en')).toBeUndefined()
+    expect(textIn(null, 'en')).toBeUndefined()
+    expect(textIn(undefined, 'en')).toBeUndefined()
+  })
+
+  it('counts a blank text as missing', () => {
+    expect(textIn({ en: 'Purchase request', vi: '' }, 'vi')).toBe('Purchase request')
+    expect(textIn({ en: 'Purchase request', vi: '   ' }, 'vi')).toBe('Purchase request')
+    expect(textIn({ en: ' ', vi: '' }, 'vi')).toBeUndefined()
+  })
+})
 
 describe('resourceTitle', () => {
   const entity = {

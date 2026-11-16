@@ -38,7 +38,11 @@ function renderValues(data: unknown = values, onChange = vi.fn(), known: string[
 beforeEach(() =>
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => new Response(JSON.stringify({ type: 'text', diagnostics: [] }), { status: 200 })),
+    vi.fn(async (input: RequestInfo | URL) =>
+      String(input).endsWith('/expressions/scope')
+        ? new Response(null, { status: 404 })
+        : new Response(JSON.stringify({ type: 'text', diagnostics: [] }), { status: 200 }),
+    ),
   ),
 )
 
@@ -52,7 +56,8 @@ describe.each(['light', 'dark'])('EndpointValues in %s mode', (mode) => {
 
   it('renders inside the theme root with a row per mapping', async () => {
     renderValues()
-    await screen.findAllByTestId('studio-expression-type')
+    // The first check waits for the lazy editor chunk, which can take long on a cold, busy machine.
+    await screen.findAllByTestId('studio-expression-type', undefined, { timeout: 5000 })
 
     const root = screen.getByTestId('studio-field-/values')
     expect(root.closest(`[data-theme-mode=${mode}]`)).not.toBeNull()
@@ -92,7 +97,9 @@ describe('EndpointValues', () => {
   it('removes a mapping by its key', async () => {
     const onChange = renderValues()
 
-    await userEvent.click(within(screen.getByTestId('studio-field-/values/department')).getByRole('button'))
+    await userEvent.click(
+      within(screen.getByTestId('studio-field-/values/department')).getByRole('button', { name: 'Remove' }),
+    )
     expect(onChange).toHaveBeenLastCalledWith('/values/department', undefined)
   })
 

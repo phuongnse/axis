@@ -123,6 +123,16 @@ public sealed class RecordImportXlsxTests
     }
 
     [Fact]
+    public void A_workbook_that_unpacks_to_more_than_100_MiB_gives_the_header_error_and_no_rows()
+    {
+        var xlsx = RecordImportXlsx.Open(ImportFuzzInputs.SheetBomb());
+
+        Assert.Equal("Unpacks to more than the import limit.", xlsx.HeaderError);
+        Assert.Null(xlsx.Header);
+        Assert.Empty(xlsx.Rows());
+    }
+
+    [Fact]
     public void A_sheet_that_breaks_after_the_header_ends_with_one_row_error()
     {
         var sheet = XlsxFiles.Sheet("""<row r="1"><c r="A1" t="inlineStr"><is><t>a</t></is></c></row><row r="2"><c r="A2"><v>1</v></c></row><row r="3"><c r="A3"><v>2</v></c></row""");

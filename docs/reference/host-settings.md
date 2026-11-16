@@ -547,6 +547,9 @@ because the worker shares its time the same way everywhere.
   `Cell:Region` and `Cell:TenantDomain`. The id is the region, a hyphen and a number, such as
   `vn-1`, and the region uses lowercase letters and digits. A wrong value stops the start and the
   message names the setting, and `Axis.Admin` refuses every command with exit code 2.
+- **Object storage.** Axis checks no scheme of `Cell:BackupStorage:ServiceUrl` or
+  `Cell:ExportStorage:ServiceUrl`. The access key goes with every request, so use `https` unless the
+  storage runs on a network that you trust.
 - **Runtime database address.** Only the server and the worker read and check
   `Cell:RuntimeDatabaseHost` and `Cell:RuntimeDatabasePort`, and only with `Cell:Id` set. A port that
   is not a whole number from 1 to 65535, or a port with no host, stops their start and the message

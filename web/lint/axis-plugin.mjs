@@ -197,7 +197,14 @@ const antdInputs = new Set([
   'TreeSelect',
   'Upload',
 ])
-const axisInputs = new Set(['ReferencePicker', 'ExpressionEditor', 'LazyExpressionEditor', 'FieldInput', 'FileInput'])
+const axisInputs = new Set([
+  'ReferencePicker',
+  'ExpressionEditor',
+  'LazyExpressionEditor',
+  'ExpressionField',
+  'FieldInput',
+  'FileInput',
+])
 const textElements = new Set(['span', 'div', 'p', 'strong'])
 const typographyTexts = new Set(['Text', 'Title', 'Paragraph'])
 const bareTexts = new Set(['Text', 'Title'])

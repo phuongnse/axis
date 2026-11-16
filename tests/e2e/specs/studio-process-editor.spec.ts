@@ -95,10 +95,11 @@ test.describe("Studio edits a process in the process editor", () => {
     ).json();
   }
 
-  async function pick(page: Page, field: string, name: string) {
+  async function pick(page: Page, field: string, option: string, filter?: string) {
     await pickOption(
       page.getByTestId(`studio-field-${field}`).getByRole("combobox"),
-      name,
+      option,
+      filter,
     );
   }
 
@@ -864,7 +865,12 @@ test.describe("Studio edits a process in the process editor", () => {
         .locator("label")
         .filter({ has: page.getByRole("radio", { name: "Role", exact: true }) })
         .click();
-      await pick(page, `${notify}/to/0/role`, "finance-reviewer");
+      await pick(
+        page,
+        `${notify}/to/0/role`,
+        "Finance reviewer",
+        "finance-reviewer",
+      );
       await page
         .getByTestId(`studio-field-${notify}/channels`)
         .getByRole("checkbox", { name: "In-app", exact: true })
@@ -951,7 +957,12 @@ test.describe("Studio edits a process in the process editor", () => {
         .getByRole("radio", { name: "List", exact: true })
         .locator("xpath=ancestor::label")
         .click();
-      await pick(page, `/steps/${index}/input/lines/from`, "lineItems");
+      await pick(
+        page,
+        `/steps/${index}/input/lines/from`,
+        "Line items",
+        "lineItems",
+      );
 
       const nested = page.getByTestId(
         `studio-field-/steps/${index}/input/lines/fields`,

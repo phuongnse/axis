@@ -14,6 +14,7 @@ import {
   identitySelectAuthenticatorContext,
   identitySignInContext,
   identitySignOutContext,
+  identityTermsContext,
   identityTwoStepContext,
   identityUpdatePasswordContext,
   identityUpdateProfileContext,
@@ -23,6 +24,15 @@ import type { IdentityContext } from '../src/identitySignIn/signInContext'
 import { ThemeModeProvider } from '../src/platform/theme'
 import { readSignInContext } from './readSignInContext'
 import { SignInEntry } from './signInEntry'
+
+/** The state of the identitySignIn preview with the given caption, so a new state does not shift the others. */
+function previewOf(caption: string) {
+  const state = previews.identitySignIn.find((preview) => preview.caption === caption)
+  if (!state) {
+    throw new Error(`The identitySignIn preview has no ${caption} state.`)
+  }
+  return state
+}
 
 function writeContextBlock(context: IdentityContext = identitySignInContext) {
   const block = document.createElement('script')
@@ -122,7 +132,7 @@ describe('the Keycloak theme entry', () => {
 
     const preview = render(
       <ThemeModeProvider>
-        <MemoryRouter>{previews.identitySignIn[0].draw()}</MemoryRouter>
+        <MemoryRouter>{previewOf('Sign in').draw()}</MemoryRouter>
       </ThemeModeProvider>,
     )
     expectSignInPage(preview.container)
@@ -136,7 +146,7 @@ describe('the Keycloak theme entry', () => {
 
     const preview = render(
       <ThemeModeProvider>
-        <MemoryRouter>{previews.identitySignIn[3].draw()}</MemoryRouter>
+        <MemoryRouter>{previewOf('Two-step verification').draw()}</MemoryRouter>
       </ThemeModeProvider>,
     )
     expectTwoStepPage(preview.container)
@@ -150,7 +160,7 @@ describe('the Keycloak theme entry', () => {
 
     const preview = render(
       <ThemeModeProvider>
-        <MemoryRouter>{previews.identitySignIn[4].draw()}</MemoryRouter>
+        <MemoryRouter>{previewOf('Forgot password').draw()}</MemoryRouter>
       </ThemeModeProvider>,
     )
     expectResetPasswordPage(preview.container)
@@ -164,7 +174,7 @@ describe('the Keycloak theme entry', () => {
 
     const preview = render(
       <ThemeModeProvider>
-        <MemoryRouter>{previews.identitySignIn[5].draw()}</MemoryRouter>
+        <MemoryRouter>{previewOf('Set password').draw()}</MemoryRouter>
       </ThemeModeProvider>,
     )
     expectUpdatePasswordPage(preview.container)
@@ -178,7 +188,7 @@ describe('the Keycloak theme entry', () => {
 
     const preview = render(
       <ThemeModeProvider>
-        <MemoryRouter>{previews.identitySignIn[6].draw()}</MemoryRouter>
+        <MemoryRouter>{previewOf('Add an authenticator').draw()}</MemoryRouter>
       </ThemeModeProvider>,
     )
     expectAddAuthenticatorPage(preview.container)
@@ -192,7 +202,7 @@ describe('the Keycloak theme entry', () => {
 
     const preview = render(
       <ThemeModeProvider>
-        <MemoryRouter>{previews.identitySignIn[7].draw()}</MemoryRouter>
+        <MemoryRouter>{previewOf('Choose how to sign in').draw()}</MemoryRouter>
       </ThemeModeProvider>,
     )
     expectSelectAuthenticatorPage(preview.container)
@@ -206,10 +216,37 @@ describe('the Keycloak theme entry', () => {
 
     const preview = render(
       <ThemeModeProvider>
-        <MemoryRouter>{previews.identitySignIn[8].draw()}</MemoryRouter>
+        <MemoryRouter>{previewOf('Update your profile').draw()}</MemoryRouter>
       </ThemeModeProvider>,
     )
     expectUpdateProfilePage(preview.container)
+  })
+
+  it('draws the same terms page as the identitySignIn preview', () => {
+    const expectTermsPage = (container: HTMLElement) => {
+      const form = container.querySelector('form') as HTMLFormElement
+      expect(form).toHaveAttribute('action', identityTermsContext.loginAction)
+      expect(form).toHaveAttribute('method', 'post')
+      expect(screen.getByRole('link', { name: 'Terms of service' })).toHaveAttribute(
+        'href',
+        identityTermsContext.termsUrl,
+      )
+      expect(screen.getByRole('link', { name: 'Privacy policy' })).toHaveAttribute(
+        'href',
+        identityTermsContext.privacyUrl,
+      )
+    }
+    writeContextBlock(identityTermsContext)
+    const theme = render(<SignInEntry context={readSignInContext(document)} />)
+    expectTermsPage(theme.container)
+    cleanup()
+
+    const preview = render(
+      <ThemeModeProvider>
+        <MemoryRouter>{previewOf('Terms and privacy').draw()}</MemoryRouter>
+      </ThemeModeProvider>,
+    )
+    expectTermsPage(preview.container)
   })
 
   it('draws the review profile page with its own title', () => {
@@ -235,7 +272,7 @@ describe('the Keycloak theme entry', () => {
 
     const preview = render(
       <ThemeModeProvider>
-        <MemoryRouter>{previews.identitySignIn[9].draw()}</MemoryRouter>
+        <MemoryRouter>{previewOf('Sign out').draw()}</MemoryRouter>
       </ThemeModeProvider>,
     )
     expectSignOutPage(preview.container)
@@ -256,7 +293,7 @@ describe('the Keycloak theme entry', () => {
 
     render(
       <ThemeModeProvider>
-        <MemoryRouter>{previews.identitySignIn[10].draw()}</MemoryRouter>
+        <MemoryRouter>{previewOf('Notice').draw()}</MemoryRouter>
       </ThemeModeProvider>,
     )
     expectNoticePage()
@@ -270,7 +307,7 @@ describe('the Keycloak theme entry', () => {
 
     render(
       <ThemeModeProvider>
-        <MemoryRouter>{previews.identitySignIn[11].draw()}</MemoryRouter>
+        <MemoryRouter>{previewOf('Error').draw()}</MemoryRouter>
       </ThemeModeProvider>,
     )
     expect(screen.getByRole('alert')).toHaveTextContent(identityErrorMessage)

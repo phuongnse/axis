@@ -278,7 +278,11 @@ beforeAll(async () => {
 beforeEach(() =>
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => new Response(JSON.stringify({ type: 'text', diagnostics: [] }), { status: 200 })),
+    vi.fn(async (input: RequestInfo | URL) =>
+      String(input).endsWith('/expressions/scope')
+        ? new Response(null, { status: 404 })
+        : new Response(JSON.stringify({ type: 'text', diagnostics: [] }), { status: 200 }),
+    ),
   ),
 )
 
@@ -725,17 +729,18 @@ describe('A callConnector step', () => {
         ? { ...candidate, input: { lines: { from: 'lines', fields: { quantity: 'sku' } } } }
         : candidate,
     )
-    const fetchMock = vi.fn(
-      async (_input: RequestInfo | URL, _init?: RequestInit) =>
-        new Response(
-          JSON.stringify({
-            type: null,
-            diagnostics: [
-              { code: 'AXC0048', message: 'The value is text, but quantity is integer.', start: 0, end: 4 },
-            ],
-          }),
-          { status: 200 },
-        ),
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) =>
+      String(input).endsWith('/expressions/scope')
+        ? new Response(null, { status: 404 })
+        : new Response(
+            JSON.stringify({
+              type: null,
+              diagnostics: [
+                { code: 'AXC0048', message: 'The value is text, but quantity is integer.', start: 0, end: 4 },
+              ],
+            }),
+            { status: 200 },
+          ),
     )
     vi.stubGlobal('fetch', fetchMock)
     renderEditor(true, { ...process, steps })
@@ -748,7 +753,9 @@ describe('A callConnector step', () => {
     expect(await row.findByTestId('studio-expression-error')).toHaveTextContent(
       'The value is text, but quantity is integer.',
     )
-    const paths = fetchMock.mock.calls.map(([, init]) => (JSON.parse(init!.body as string) as { path: string }).path)
+    const paths = fetchMock.mock.calls
+      .filter(([input]) => String(input).endsWith('/expressions/check'))
+      .map(([, init]) => (JSON.parse(init!.body as string) as { path: string }).path)
     expect(paths).toContain('/steps/1/input/lines/fields/quantity')
   })
 

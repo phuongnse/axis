@@ -338,6 +338,7 @@ platform tools they may open.
 | `studioPreviewHost` | The host of the tenant's served preview tenant, or null for a user who may not use Studio and for a tenant without a preview tenant                          |
 | `studioTest`        | True when `studio` is true and `Studio:Tests` is true                                                                                                       |
 | `studioCreate`      | True when `studio` is true and `Studio:ApplicationsPath` is set                                                                                             |
+| `studioAi` _(planned for M35)_ | True when `studio` is true, `Ai:DefaultBinding` is set and the tenant's AI authoring setting is on, see [AI authoring](user-administration.md#ai-authoring) |
 | `tenantStatus`      | `readOnly` while the tenant is [read-only](subscriptions.md#the-read-only-tenant), otherwise `active`. A suspended tenant is never served                   |
 | `billingUrl`        | `https://account.<Cell:TenantDomain>/tenants/<tenant id>` for a user who holds the administrator role in a tenant of a cell, see [billing portal](billing-portal.md#where). Otherwise null, also in a preview tenant |
 | `tenantExports`     | True for a user who holds the administrator role in a tenant of a cell that is not a preview tenant, the tenants whose [export routes](tenant-lifecycle.md#exports-by-a-tenant-administrator) answer. Otherwise false |

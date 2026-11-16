@@ -28,7 +28,7 @@ import {
   type StepType,
 } from '../platform/scenarioSteps'
 import type { SeedField } from '../platform/seedValues'
-import { StudioNamesContext } from '../platform/studioNames'
+import { StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useFieldTexts } from './fieldTexts'
@@ -220,7 +220,7 @@ export function ScenarioStep({
   const groupText = (path: string) => texts.group(`steps.${path}`)
   const entities = names?.entities ?? []
   const processes = names?.processes ?? []
-  const roles = names?.roles.map((role) => role.name) ?? []
+  const roles = names?.roles ?? []
   const exclusive = type === 'expectTask'
   const fields = findNamed(entities, recordEntity(steps, index))?.fields.filter(
     (field) => field.type !== 'child-collection',
@@ -232,7 +232,7 @@ export function ScenarioStep({
     onChange('/steps', moved)
   }
 
-  function pickerField(name: StepProperty, options: string[]): ReactNode {
+  function pickerField(name: StepProperty, options: (string | ReferenceOption)[]): ReactNode {
     const own = fieldText(name)
     return (
       <AxisField {...own}>
@@ -459,10 +459,7 @@ export function ScenarioStep({
   function control(name: StepProperty): ReactNode {
     switch (name) {
       case 'entity':
-        return pickerField(
-          name,
-          entities.map((entity) => entity.name),
-        )
+        return pickerField(name, entities)
       case 'record':
         return pickerField(name, recordAliases(steps, index))
       case 'save':
@@ -478,10 +475,7 @@ export function ScenarioStep({
       case 'as':
         return pickerField(name, users)
       case 'process':
-        return pickerField(
-          name,
-          processes.map((process) => process.name),
-        )
+        return pickerField(name, processes)
       case 'step':
         return pickerField(
           name,

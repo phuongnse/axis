@@ -1,0 +1,47 @@
+/* The sample company's own look: forest green and amber, a serif title, underlined fields and a pill button. */
+body {
+  font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  color: #1f2a24;
+  background: #fbfaf7;
+}
+.login-pf body {
+  background: linear-gradient(160deg, #0b3d2e 0%, #14532d 100%);
+}
+#kc-header-wrapper,
+#kc-page-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  color: #f4f1e8;
+}
+.card-pf {
+  border-top: 4px solid #f5b301;
+  border-radius: 12px;
+  background: #fbfaf7;
+}
+.form-control,
+.pf-c-form-control {
+  border: 0;
+  border-bottom: 2px solid #6b8577;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.form-control:focus,
+.pf-c-form-control:focus {
+  border-bottom-color: #0b3d2e;
+}
+.btn-primary,
+.pf-c-button.pf-m-primary {
+  color: #1f2a24;
+  font-weight: 700;
+  background: #f5b301;
+  border: 0;
+  border-radius: 999px;
+}
+.btn-primary:hover,
+.btn-primary:focus,
+.pf-c-button.pf-m-primary:hover {
+  background: #e0a400;
+}
+a {
+  color: #0b3d2e;
+}
