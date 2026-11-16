@@ -699,6 +699,12 @@ function expressionEntity(folder: Folder): StudioResource {
           field: 'amount',
         },
         {
+          name: 'newValidation',
+          expression: '',
+          message: { textKey: '' },
+          field: '',
+        },
+        {
           name: 'supplierNamed',
           expression: 'length(supplier.name) > 2',
           message: { textKey: 'request.supplierNamed' },
@@ -766,6 +772,23 @@ function checkAnswer(folder: Folder, body: string) {
   return { type: placeType(folder, body) ?? 'boolean', diagnostics: [] }
 }
 
+/** A few of the functions the server lists for a place, with their words. */
+const scopeFunctions = [
+  ['today', [], 'date', 'Dates', 'today()', "Today's date."],
+  ['addDays', ['date', 'days'], 'date', 'Dates', 'addDays(today(), 7)', 'The date some days after another.'],
+  ['round', ['number', 'places'], 'decimal', 'Numbers', 'round(amount, 2)', 'A number rounded to some decimals.'],
+  ['coalesce', ['value', '…'], 'any', 'Logic', 'coalesce(amount, 0)', 'The first value that is not null.'],
+  ['concat', ['text', '…'], 'text', 'Text', "concat(title, ' ', code)", 'Texts put together.'],
+  ['length', ['text'], 'integer', 'Text', 'length(title)', 'The number of characters in a text.'],
+].map(([name, parameters, result, group, example, description]) => ({
+  name,
+  parameters,
+  result,
+  group,
+  example,
+  description,
+}))
+
 function expressionRoutes(folder: Folder): Record<string, () => unknown> {
   const routes = workspaceRoutes(folder)
   const typicalNames = names(folder)
@@ -787,8 +810,14 @@ function expressionRoutes(folder: Folder): Record<string, () => unknown> {
     }),
     [`${folderPath}/expressions/scope`]: (init?: RequestInit) => ({
       type: placeType(folder, String(init?.body ?? '{}')),
-      fields: [],
-      functions: [],
+      fields: (
+        expressionEntity(folder).content.fields as { name: string; type: string; label: { textKey: string } }[]
+      ).map((field) => ({
+        name: field.name,
+        labelKey: field.label.textKey,
+        type: fieldTypes[field.type] ?? field.type,
+      })),
+      functions: scopeFunctions,
     }),
     [`${folderPath}/expressions/check`]: (init?: RequestInit) => checkAnswer(folder, String(init?.body ?? '{}')),
   }

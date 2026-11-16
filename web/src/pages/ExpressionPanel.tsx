@@ -11,6 +11,9 @@ import { expressionOperators } from './expressionOperators'
 import type { EntryKind, PanelEntry } from './expressionPanelEntries'
 import { rankEntries, signatureOf } from './expressionPanelEntries'
 import type { ScopeOption } from './expressionScope'
+import { readExpression, type ReadingSources } from './expressionReading'
+import { readingInline } from './ExpressionReadingLine'
+import type { ExpressionStart } from './expressionStarts'
 
 const kinds: readonly EntryKind[] = ['field', 'operator', 'function']
 const kindTexts: Record<EntryKind, string> = {
@@ -25,11 +28,18 @@ const kindTexts: Record<EntryKind, string> = {
  * functions are followed by the application's `rules`.
  */
 export function ExpressionPanel({
+  starts = [],
+  sources,
+  onStart,
   scope,
   rules,
   names,
   onPick,
 }: {
+  /** Proposed (#3265): the starting points of the place, in a first tab, each read in words. */
+  starts?: ExpressionStart[]
+  sources?: ReadingSources
+  onStart?: (start: ExpressionStart) => void
   scope: ExpressionScope | null
   rules: ScopeOption[]
   names: StudioNames | null | undefined
@@ -92,17 +102,28 @@ export function ExpressionPanel({
         />
       ) : (
         <Tabs
-          items={kinds.map((kind) => ({
-            key: kind,
-            label: t(kindTexts[kind]),
-            children: (
-              <EntryList
-                label={t(kindTexts[kind])}
-                entries={entries.filter((entry) => entry.kind === kind)}
-                onPick={onPick}
-              />
-            ),
-          }))}
+          items={[
+            ...(starts.length > 0 && sources && onStart
+              ? [
+                  {
+                    key: 'start',
+                    label: t('shell.studio.expression.startTab'),
+                    children: <StartList starts={starts} sources={sources} onStart={onStart} />,
+                  },
+                ]
+              : []),
+            ...kinds.map((kind) => ({
+              key: kind,
+              label: t(kindTexts[kind]),
+              children: (
+                <EntryList
+                  label={t(kindTexts[kind])}
+                  entries={entries.filter((entry) => entry.kind === kind)}
+                  onPick={onPick}
+                />
+              ),
+            })),
+          ]}
         />
       )}
     </Flex>
@@ -152,6 +173,46 @@ function EntryList({
           </Flex>
         </li>
       ))}
+    </ul>
+  )
+}
+
+/** Proposed (#3265): the starting points, each read in words, with its expression under it. */
+function StartList({
+  starts,
+  sources,
+  onStart,
+}: {
+  starts: ExpressionStart[]
+  sources: ReadingSources
+  onStart: (start: ExpressionStart) => void
+}) {
+  const t = useText()
+  const { colour, spacing, type } = useDesignTokens()
+  return (
+    <ul aria-label={t('shell.studio.expression.startTab')} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      {starts.map((start) => {
+        const words = readExpression(start.text, sources)
+        return (
+          <li
+            key={start.text}
+            style={{ padding: `${spacing.xs}px 0`, borderBottom: `1px solid ${colour.borderSubtle}` }}
+          >
+            <Flex vertical>
+              <AxisButton
+                role="link"
+                style={{ height: 'auto', whiteSpace: 'normal', textAlign: 'start', alignSelf: 'flex-start' }}
+                onClick={() => onStart(start)}
+              >
+                <span>{words ? readingInline(words, sources.locale) : start.text}</span>
+              </AxisButton>
+              <Typography.Text type="secondary">
+                <code style={{ fontFamily: type.codeFontFamily }}>{start.text}</code>
+              </Typography.Text>
+            </Flex>
+          </li>
+        )
+      })}
     </ul>
   )
 }
