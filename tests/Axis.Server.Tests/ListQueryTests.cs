@@ -1,5 +1,6 @@
 using Axis.Server.Http;
 using Microsoft.AspNetCore.Http;
+using Npgsql;
 
 namespace Axis.Server.Tests;
 
@@ -183,6 +184,60 @@ public sealed class ListQueryTests
         ListQuery<Row>.Read(Request("search=a"), columns, errors);
 
         Assert.Equal(["search"], errors.Keys);
+    }
+
+    [Fact]
+    public void Sql_renders_the_filter_search_and_sort_over_the_declared_expressions_with_every_value_a_parameter()
+    {
+        IReadOnlyList<ListColumn<Row>> columns =
+        [
+            new("name", ListColumnKind.Text, row => row.Name, Searchable: true, Sql: "t.name"),
+            new("count", ListColumnKind.Number, row => row.Count, Sql: "t.n"),
+            new("day", ListColumnKind.Date, row => row.Day, Sql: "(t.at AT TIME ZONE 'UTC')::date", OrderSql: "t.at"),
+        ];
+        var filter = """{"all":[{"field":"count","op":"gte","value":7},{"field":"day","op":"eq","value":"2026-01-20"}]}""";
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+
+        var sql = ListQuery<Row>.Read(Request($"search=secret&sort=-day&filter={Uri.EscapeDataString(filter)}"), columns, errors).Sql();
+
+        Assert.Empty(errors);
+        Assert.Equal("(t.n >= @lf0::numeric AND (t.at AT TIME ZONE 'UTC')::date = @lf1) AND (lower(t.name) LIKE lower(@search))", sql.Condition);
+        Assert.Equal("t.at DESC", sql.Order);
+        Assert.DoesNotContain("secret", sql.Condition);
+        Assert.DoesNotContain("2026", sql.Condition);
+        using var command = new NpgsqlCommand();
+        sql.AddTo(command);
+        Assert.Equal(["lf0", "lf1", "search"], command.Parameters.Select(parameter => parameter.ParameterName));
+        Assert.Equal(7m, Convert.ToDecimal(command.Parameters["lf0"].Value, System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Equal(new DateOnly(2026, 1, 20), command.Parameters["lf1"].Value);
+        Assert.Contains("secret", (string)command.Parameters["search"].Value!);
+    }
+
+    [Fact]
+    public void Sql_of_an_unfiltered_and_unsorted_query_is_true_with_no_order()
+    {
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        IReadOnlyList<ListColumn<Row>> columns = [new("name", ListColumnKind.Text, row => row.Name, Sql: "t.name")];
+
+        var sql = ListQuery<Row>.Read(Request("sort=name"), columns, errors).Sql();
+        var none = ListQuery<Row>.Read(Request(""), columns, errors).Sql();
+
+        Assert.Equal("t.name ASC", sql.Order);
+        Assert.Equal("TRUE", none.Condition);
+        Assert.Null(none.Order);
+        using var command = new NpgsqlCommand();
+        none.AddTo(command);
+        Assert.Empty(command.Parameters);
+    }
+
+    [Fact]
+    public void Sql_refuses_a_named_column_that_declares_no_expression()
+    {
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+
+        var query = Read("sort=name", errors);
+
+        Assert.Throws<InvalidOperationException>(query.Sql);
     }
 
     private static string Ids(ListPage<Row> page) => string.Concat(page.Items.Select(row => row.Id));

@@ -269,7 +269,6 @@
   "shell.console.publishing.empty": "Nothing to show.",
   "shell.console.publishing.loadFailed": "The publishing could not be loaded.",
   "shell.console.deadLetters.title": "Dead letters",
-  "shell.console.deadLetters.allApplications": "All applications",
   "shell.console.deadLetters.application": "Application",
   "shell.console.deadLetters.event": "Event",
   "shell.console.deadLetters.target": "Trigger or webhook",
