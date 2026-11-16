@@ -496,6 +496,8 @@
   "shell.notFound.title": "Page not found",
   "shell.notFound.message": "There is nothing at this address.",
   "shell.notFound.home": "Go to the home page",
+  "shell.record.notFound": "This record does not exist, or you cannot open it.",
+  "shell.record.goToList": "Go to {page}",
   "shell.actionRow.more": "More actions",
   "shell.table.yes": "Yes",
   "shell.table.no": "No",

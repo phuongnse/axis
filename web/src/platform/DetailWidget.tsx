@@ -2,7 +2,6 @@ import { Flex, Tag, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { NotFoundPage } from '../pages/NotFoundPage'
 import { AxisButton } from './AxisButton'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { useCanvasActions } from './canvasActions'
@@ -21,6 +20,7 @@ import {
   type RowLabels,
 } from './records'
 import type { EntityWidgetMetadata, FieldMetadata, NavigateAction, StartProcessAction } from './site'
+import { RecordNotFound } from './RecordNotFound'
 import { PartRule } from './SectionParts'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -151,7 +151,7 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
     return <AxisAlert data-testid="detail-load-error" kind="error" message={t('shell.form.loadFailed')} />
   }
   if (load === 'missing' || record === null) {
-    return <NotFoundPage />
+    return <RecordNotFound />
   }
 
   // A refused read on the path of an expression opens nothing and shows a message.

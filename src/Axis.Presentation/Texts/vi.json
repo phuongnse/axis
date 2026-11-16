@@ -496,6 +496,8 @@
   "shell.notFound.title": "Không tìm thấy trang",
   "shell.notFound.message": "Địa chỉ này không có trang nào.",
   "shell.notFound.home": "Về trang chủ",
+  "shell.record.notFound": "Bản ghi này không tồn tại hoặc bạn không có quyền mở.",
+  "shell.record.goToList": "Đi tới {page}",
   "shell.actionRow.more": "Thao tác khác",
   "shell.table.yes": "Có",
   "shell.table.no": "Không",

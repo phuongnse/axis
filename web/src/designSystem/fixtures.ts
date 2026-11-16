@@ -70,6 +70,8 @@ const notificationsPath = `${apiPath}/notifications`
 export const noRowsPath = `${apiPath}/data-sources/NoRequests/rows`
 
 export const requestId = '6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7'
+/** Proposed, see the review on #3650: a well-formed id the fixture application has no request for. */
+export const missingRequestId = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d'
 const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
 const releaseId = '3d2c1b0a-9f8e-4d7c-8b6a-5f4e3d2c1b0a'
 
@@ -1269,6 +1271,7 @@ export const routes: Record<string, () => unknown> = {
   [requestsPath]: () => recordPage,
   [`${requestsPath}/${requestId}`]: () => savedRecord,
   [`${requestsPath}/${requestId}/history`]: () => history,
+  [`${requestsPath}/${missingRequestId}`]: () => new Response(null, { status: 404 }),
   [categoriesPath]: () => categoryPage,
   [tasksPath]: () => taskPage,
   [instancesPath]: () => instancePage,

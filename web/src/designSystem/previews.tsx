@@ -42,6 +42,7 @@ import {
   manyActionsTableWidget,
   manyStepsFormRoutes,
   manyStepsRequestForm,
+  missingRequestId,
   loadingRoutes,
   loadingTableWidget,
   noRowsPath,
@@ -265,6 +266,13 @@ export const previews: Record<string, readonly PreviewState[]> = {
       caption: 'Saved record',
       draw: () => <ShellPreview />,
       entry: { pathname: `/sample/request/${requestId}`, state: { from: '/sample/requests' } },
+      frameHeight: 600,
+    },
+    // Proposed: a request that does not exist, opened from Requests, see the review on #3650.
+    {
+      caption: 'Record not found',
+      draw: () => <ShellPreview />,
+      entry: { pathname: `/sample/request/${missingRequestId}`, state: { from: '/sample/requests' } },
       frameHeight: 600,
     },
     {

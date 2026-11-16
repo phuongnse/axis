@@ -2,7 +2,6 @@ import { ConfigProvider, Flex, Form } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { NotFoundPage } from '../pages/NotFoundPage'
 import { antLocaleFor } from './antLocale'
 import { AxisActionRow, AxisButton } from './AxisButton'
 import { useCanvasActions } from './canvasActions'
@@ -19,6 +18,7 @@ import { useDesignTokens } from './themeMode'
 import { useFormSteps } from './useFormSteps'
 import { useUnsavedChanges } from './unsavedChanges'
 import { PageActions } from './PageLayout'
+import { RecordNotFound } from './RecordNotFound'
 import { SaveBar } from './SaveBar'
 import { sectionsOf, useRecordForm } from './useRecordForm'
 
@@ -289,7 +289,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     return null
   }
   if (load === 'missing') {
-    return <NotFoundPage />
+    return <RecordNotFound />
   }
   if (load === 'failed') {
     return <AxisAlert data-testid="form-load-error" kind="error" message={t('shell.form.loadFailed')} />

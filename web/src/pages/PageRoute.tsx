@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
 import { PageLayout } from '../platform/PageLayout'
+import { activeNavigationItem } from '../platform/activeNavigation'
 import { PageLeaf, type PageLeafProps } from '../platform/PageLeaf'
+import { RecordList } from '../platform/recordList'
 import { detailRecordId, readPageParameters } from '../platform/pageParameters'
 import { ProcessInstancePage } from '../platform/ProcessInstancePage'
 import { fetchPage, type PageMetadata } from '../platform/site'
@@ -39,19 +41,35 @@ export function PageRoute({ form }: { form?: FormMode }) {
   const returnTo =
     typeof from === 'string' && from.startsWith(siteAddress(site.path, '')) ? from : siteAddress(site.path)
   const pages = useMemo(() => site.navigation.map((entry) => entry.page), [site.navigation])
+  const t = useText()
+  // Proposed: the list a record's page leads back to when its record does not exist: the navigation entry of the
+  // address it returns to, or the site's first page, which the site's own address opens. See the review on #3650.
+  const listEntry =
+    activeNavigationItem(
+      site.navigation.map((entry) => ({
+        key: entry.page,
+        path: siteAddress(site.path, entry.page.toLowerCase()),
+        labelKey: entry.labelKey,
+      })),
+      returnTo.split(/[?#]/, 1)[0],
+    ) ??
+    (site.navigation[0] && { labelKey: site.navigation[0].labelKey })
+  const recordList = listEntry ? { to: returnTo, label: t(listEntry.labelKey) } : undefined
   // A new page or record starts from a clean state rather than showing the previous one meanwhile.
   return (
-    <SitePage
-      key={`${site.path}/${page}/${mode ?? ''}/${isModulePage ? '' : id}`}
-      sitePath={site.path}
-      pages={pages}
-      name={page}
-      locale={locale}
-      fallbackLocale={site.locales.fallback}
-      form={mode}
-      recordId={mode === 'edit' ? id : null}
-      returnTo={returnTo}
-    />
+    <RecordList.Provider value={recordList}>
+      <SitePage
+        key={`${site.path}/${page}/${mode ?? ''}/${isModulePage ? '' : id}`}
+        sitePath={site.path}
+        pages={pages}
+        name={page}
+        locale={locale}
+        fallbackLocale={site.locales.fallback}
+        form={mode}
+        recordId={mode === 'edit' ? id : null}
+        returnTo={returnTo}
+      />
+    </RecordList.Provider>
   )
 }
 
