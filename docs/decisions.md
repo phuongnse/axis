@@ -162,3 +162,5 @@ the files agree, title and status included.
 | [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md) | Packages in C#, TypeScript or Python run in runners that Axis or the customer hosts | **Agreed** |
 | [D149](decisions/d149-a-persons-secrets-are-sealed-for-the-host-that-uses-them-and-every-secret-rests-on-a-key-service.md) | A person's secrets are sealed for the host that uses them, and every secret rests on a key service | **Agreed** |
 | [D150](decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md) | Each author's own AI, with Axis counting no requests | **Agreed** |
+| [D151](decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md) | Tables whose rows grow have the full toolbar, and a view is a filter kept in the address | **Agreed** |
+| [D152](decisions/d152-every-screen-says-where-things-stand-with-at-most-one-main-action.md) | Every screen says where things stand, with at most one main action | **Agreed** |

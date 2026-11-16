@@ -31,6 +31,9 @@ widget names a role, never an Ant Design button type.
   Design dialog's Cancel this way, and `AxisActionRow`, the action row of `AxisButton`, draws the
   other rows. A main action with no solid button beside it, such as a table's first toolbar action,
   stays outlined.
+- **An action bar folds into More** _(planned for M35)_. An `ActionBar`, the bar of actions above a
+  footer, folds its actions into one More menu through `AxisActionRow`'s `fold`, as a table's row
+  actions fold at narrow width.
 - **Text or an icon, never both.** An action shows its text or its icon. An icon goes with text only
   where it does what text cannot: navigation that collapses to icons, a status or a severity, and the
   mark that identifies an application or a site.
@@ -66,6 +69,12 @@ choices.
   icon-only trigger has none.
 - **Actions come after the choices.** In a menu that holds both, such as the
   application menu, the choices come first and an action, such as New application…, follows them.
+- **One look for a list's items** _(planned for M35)_. Every list of things to pick or open draws its
+  items one way, whether Ant Design draws the list or the page does, such as the sidebar's menu, a select
+  or the notification bell. An item sits inset from its list's edge, with rounded corners. Groups are set
+  apart by their heading, with no divider between them.
+- **A menu's minimum width** _(planned for M35)_. Every dropdown menu is at least as wide as the `menu`
+  size token, and wider when an item needs the room.
 
 ## Fields
 
@@ -144,6 +153,36 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
   shows "Not set", see the [empty values](frontend.md#shown-values). It never shows nothing, which
   cannot tell "not given" from "not loaded", and never N/A, which says "does not apply" and does not
   translate. A No is a value, so it reads No, never a dash.
+- **Muted is for facts only** _(planned for M35)_. Muted text, `textMuted`, marks a fact, such as the dash
+  of a value that is not there. A heading, a hint or a message takes the ordinary text colour.
+- **A reference is a link, and only the reference** _(planned for M35)_. A reference to another resource
+  shows as a link, named as people read it, and no other text in it is a link.
+- **A status is a `StatusTag` with five tones, and any other enum value is text** _(planned for M35)_. A
+  status shows as a tag in one of five tones. Any other value of an enum shows as plain text.
+
+## What comes next
+
+_(planned for M35)_
+
+Every screen says where things stand in a few plain words, and has at most one main action.
+
+- **Where things stand.** A screen names its state in a short sentence, such as "Release 7 is live.", so a
+  person reads it before any control.
+- **One main action.** A screen has at most one solid Finish action, as [buttons](#buttons) says. Every
+  other action beside it is a text button.
+
+The reasons are in [D152](../decisions/d152-every-screen-says-where-things-stand-with-at-most-one-main-action.md).
+
+## Layout shows structure
+
+_(planned for M35)_
+
+How a list is drawn shows what it is: its items, its groups and its order.
+
+- **A list is drawn as a list.** Items that a person reads one by one sit in a list, not in a line joined
+  by a middle dot, as [text](#text) says.
+- **Bulleted lists use one component.** `useBulletList` draws every bulleted list, so each keeps one look.
+- **Order.** A list keeps the order that [list order](#list-order) gives it.
 
 ## Tables
 
@@ -161,7 +200,8 @@ be kept right.
   [page heading](studio-workspace.md#page-heading), not the toolbar. A `table` widget keeps the toolbar
   actions its author configures.
 - **Every control in one table.** `AxisTable` has every control below, and each view
-  turns on what it needs. Search, filter, sort, page and columns live in the address.
+  turns on what it needs. Search, filter, sort, page and columns live in the address. A view is only a
+  filter kept there, so a link opens the same rows for anyone who follows it.
 - **Sort.** A column sorts from its header when its values have an order a person uses: names, people,
   statuses, dates and numbers. Long text, files, lists and actions do not. A header only sorts, as there is
   one place to filter. A table that holds all its rows sorts them by the value its column gives through
@@ -216,6 +256,20 @@ be kept right.
 - **Bulk actions**. Selecting rows is for bulk actions alone: a table shows checkboxes only when it has a
   bulk action. Selecting rows of the page shows an "N selected" bar above the rows that holds the bulk
   actions, and running one clears the selection. An action on one row stays on the row.
+- **The growth test** _(planned for M35)_. A table whose rows grow as people use the application, such as
+  records, requests or releases, has the full standard toolbar above. A table whose rows do not grow may
+  show fewer of its controls, as the toolbar bullet says.
+- **Named exceptions** _(planned for M35)_. A table that is part of one thing is the exception to the growth
+  test. Its rows belong to that one thing, such as the lines of a child collection on a form, so a search or
+  a filter of its own would split them from it.
+- **No control of its own** _(planned for M35)_. A table gets no control for one view. A view is a filter
+  kept in the address, so the page offers it beside the table and a link opens the same rows.
+- **View controls on one line** _(planned for M35)_. The view controls sit on one line beside the search box,
+  which keeps its own width.
+- **Group rows.** A row that heads a group shows its heading and leaves its other cells blank, with no dash,
+  as `AxisTable`'s `blankRow` draws them.
+
+The reasons for the table standard are in [D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md).
 
 ## Opening things
 
