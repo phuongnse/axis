@@ -226,6 +226,10 @@ const functionsWithWords = new Set([
   'contains',
   'startsWith',
   'endsWith',
+  'concat',
+  'round',
+  'coalesce',
+  'if',
 ])
 
 /**
@@ -356,7 +360,12 @@ class Reader {
   private call(node: Extract<Node, { t: 'call' }>): ReadingPart[] {
     const args = node.args.map((arg) => this.value(arg))
     if (functionsWithWords.has(node.name)) {
-      return this.fill(`shell.studio.expression.reads.fn.${node.name}`, { a: args[0] ?? [], b: args[1] ?? [] })
+      return this.fill(`shell.studio.expression.reads.fn.${node.name}`, {
+        a: args[0] ?? [],
+        b: args[1] ?? [],
+        c: args[2] ?? [],
+        list: this.list(args, 'conjunction'),
+      })
     }
     const rule = this.option(node.name, 'rule')
     const label = rule ? labelOf(this.sources, rule) : undefined

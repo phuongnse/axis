@@ -645,8 +645,27 @@ function expressionEntity(folder: Folder): StudioResource {
           label: { textKey: 'request.status' },
         },
         { name: 'urgent', type: 'boolean', label: { textKey: 'request.urgent' } },
-        { name: 'dueDate', type: 'date', label: { textKey: 'request.dueDate' } },
+        {
+          name: 'dueDate',
+          type: 'date',
+          default: 'addDays(today(), 7)',
+          label: { textKey: 'request.dueDate' },
+        },
         { name: 'supplier', type: 'reference', target: 'Supplier', label: { textKey: 'request.supplier' } },
+        {
+          name: 'total',
+          type: 'decimal',
+          precision: 12,
+          scale: 2,
+          expression: 'amount * 1.1',
+          label: { textKey: 'request.total' },
+        },
+        {
+          name: 'summary',
+          type: 'text',
+          expression: "concat(title, ' – ', supplier.name)",
+          label: { textKey: 'request.summary' },
+        },
       ],
       validations: [
         {
@@ -674,6 +693,12 @@ function expressionEntity(folder: Folder): StudioResource {
           field: 'amount',
         },
         {
+          name: 'withTypo',
+          expression: 'amout > 0 and urgent',
+          message: { textKey: 'request.positiveAmount' },
+          field: 'amount',
+        },
+        {
           name: 'supplierNamed',
           expression: 'length(supplier.name) > 2',
           message: { textKey: 'request.supplierNamed' },
@@ -694,6 +719,8 @@ const expressionTexts: StudioNames['texts'] = Object.entries({
   'request.urgent': ['Urgent', 'Gấp'],
   'request.dueDate': ['Due date', 'Hạn chót'],
   'request.supplier': ['Supplier', 'Nhà cung cấp'],
+  'request.total': ['Total', 'Tổng tiền'],
+  'request.summary': ['Summary', 'Tóm tắt'],
   'supplier.name': ['Name', 'Tên'],
   'request.positiveAmount': ['The amount must be more than zero.', 'Số tiền phải lớn hơn 0.'],
   'request.urgentNeedsDate': ['An urgent request needs a due date.', 'Yêu cầu gấp cần có hạn chót.'],
@@ -701,6 +728,43 @@ const expressionTexts: StudioNames['texts'] = Object.entries({
   'request.supplierNamed': ['The supplier needs a name.', 'Nhà cung cấp cần có tên.'],
   'request.notTooLarge': ['An approved request cannot change.', 'Yêu cầu đã duyệt không thể sửa.'],
 }).map(([key, [en, vi]]) => ({ key, texts: { en, vi }, usedBy: 1 }))
+
+/** The expression type of a field type, as the server answers it. */
+const fieldTypes: Record<string, string> = { money: 'decimal', reference: 'reference' }
+
+/**
+ * The type the place of a check or scope request needs, as the server answers it: a validation yes or no, a computed
+ * field or a default the field's type, and any type elsewhere.
+ */
+function placeType(folder: Folder, body: string): string | null {
+  const path = (JSON.parse(body) as { path?: string }).path ?? ''
+  if (path.startsWith('/validations/')) {
+    return 'boolean'
+  }
+  const match = /^\/fields\/(\d+)\/(expression|default)$/.exec(path)
+  const fields = expressionEntity(folder).content.fields as { type: string }[]
+  const type = match ? fields[Number(match[1])]?.type : undefined
+  return type === undefined ? null : (fieldTypes[type] ?? type)
+}
+
+const knownNames = new Set(['amount', 'title', 'status', 'urgent', 'duedate', 'supplier', 'name', 'total', 'summary'])
+const languageWords = new Set(['and', 'or', 'not', 'is', 'in', 'null', 'true', 'false'])
+
+/** The answer of a check: an unknown name is AXC0046, as the server says it, and any other expression is well typed. */
+function checkAnswer(folder: Folder, body: string) {
+  const expression = (JSON.parse(body) as { expression?: string }).expression ?? ''
+  for (const match of expression.matchAll(/'(?:[^']|'')*'|([A-Za-z][A-Za-z0-9]*)(\s*\()?/g)) {
+    const name = match[1]
+    if (name && !match[2] && !languageWords.has(name.toLowerCase()) && !knownNames.has(name.toLowerCase())) {
+      const start = match.index
+      return {
+        type: null,
+        diagnostics: [{ code: 'AXC0046', message: `Unknown field '${name}'`, start, end: start + name.length }],
+      }
+    }
+  }
+  return { type: placeType(folder, body) ?? 'boolean', diagnostics: [] }
+}
 
 function expressionRoutes(folder: Folder): Record<string, () => unknown> {
   const routes = workspaceRoutes(folder)
@@ -721,13 +785,12 @@ function expressionRoutes(folder: Folder): Record<string, () => unknown> {
       ),
       texts: [...typicalNames.texts, ...expressionTexts],
     }),
-    // A validation needs yes or no; the field boxes, which take the field's type, are left empty here.
     [`${folderPath}/expressions/scope`]: (init?: RequestInit) => ({
-      type: String(init?.body ?? '').includes('"/validations/') ? 'boolean' : null,
+      type: placeType(folder, String(init?.body ?? '{}')),
       fields: [],
       functions: [],
     }),
-    [`${folderPath}/expressions/check`]: () => ({ type: 'boolean', diagnostics: [] }),
+    [`${folderPath}/expressions/check`]: (init?: RequestInit) => checkAnswer(folder, String(init?.body ?? '{}')),
   }
 }
 

@@ -102,7 +102,7 @@ export default function ExpressionEditor({
     t,
     draft,
     value,
-    theme: expressionTheme(tokens, mode),
+    theme: (inDialog ? expressionDialogTheme : expressionTheme)(tokens, mode),
     themeCompartment,
   })
 
@@ -118,7 +118,7 @@ export default function ExpressionEditor({
       t,
       draft,
       value,
-      theme: expressionTheme(tokens, mode),
+      theme: (inDialog ? expressionDialogTheme : expressionTheme)(tokens, mode),
       themeCompartment,
     }
   })
@@ -217,8 +217,10 @@ export default function ExpressionEditor({
   }, [application, resourceId, path, name])
 
   useEffect(() => {
-    viewRef.current?.dispatch({ effects: themeCompartment.reconfigure(expressionTheme(tokens, mode)) })
-  }, [themeCompartment, tokens, mode])
+    viewRef.current?.dispatch({
+      effects: themeCompartment.reconfigure((inDialog ? expressionDialogTheme : expressionTheme)(tokens, mode)),
+    })
+  }, [themeCompartment, tokens, mode, inDialog])
 
   useEffect(() => {
     const view = viewRef.current
@@ -245,17 +247,20 @@ export default function ExpressionEditor({
 
   return (
     <div aria-busy={checking}>
-      <Flex gap={tokens.spacing.xs} align="flex-start">
-        <div ref={hostRef} style={{ flex: 1, minWidth: 0 }} />
+      {/* Proposed (#3265): Expand sits inside the box, at its end, and the box keeps room for it. */}
+      <div style={{ position: 'relative' }}>
+        <div ref={hostRef} />
         {!inDialog && (
-          <AxisButton
-            role="icon"
-            nameKey="shell.studio.expression.expand"
-            icon={<ExpandAltOutlined />}
-            onClick={() => setExpanded(true)}
-          />
+          <div style={{ position: 'absolute', top: 1, insetInlineEnd: 1 }}>
+            <AxisButton
+              role="icon"
+              nameKey="shell.studio.expression.expand"
+              icon={<ExpandAltOutlined />}
+              onClick={() => setExpanded(true)}
+            />
+          </div>
         )}
-      </Flex>
+      </div>
       {call !== null && (
         <div data-testid="studio-expression-signature">
           <Typography.Text>
@@ -364,10 +369,23 @@ function boldParameter(fn: ExpressionScopeFunction, argument: number): number {
   return argument <= last ? argument : fn.parameters[last] === '…' ? last : -1
 }
 
+// Proposed (#3265): an expression is code, so its box shows three lines at least and grows with what is written; the
+// end of each line keeps room for Expand. The box in the Expand dialog shows eight lines at least.
+const lineHeight = 1.4
+
 const expressionTheme = sharedTheme((tokens, mode) => [
   codeEditorTheme(tokens, mode),
   EditorView.theme({
-    '.cm-content': { padding: '4px 0' },
+    '.cm-content': { padding: '4px 0', minHeight: `${3 * lineHeight}em` },
+    '.cm-line': { paddingInlineEnd: `${tokens.spacing.xl + 4}px` },
+    '.cm-completionInfo code': { fontFamily: tokens.type.codeFontFamily },
+  }),
+])
+
+const expressionDialogTheme = sharedTheme((tokens, mode) => [
+  codeEditorTheme(tokens, mode),
+  EditorView.theme({
+    '.cm-content': { padding: '4px 0', minHeight: `${8 * lineHeight}em` },
     '.cm-completionInfo code': { fontFamily: tokens.type.codeFontFamily },
   }),
 ])
