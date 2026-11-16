@@ -1,4 +1,5 @@
 import type {
+  ExpressionScope,
   StudioApplication,
   StudioBindings,
   StudioCatalog,
@@ -120,7 +121,10 @@ const typicalDiagnostics = [
   },
 ] satisfies StudioDiagnostic[]
 
-/** An entity with the content the entity designer opens. It has plain fields only, so the designer asks for no expression scope. */
+/**
+ * An entity with the content the entity designer opens. Its fields have plain types and no default, so the designer asks
+ * for the scope of each Default editor and checks no expression.
+ */
 function entityResource(folder: Folder, index: number): StudioResource {
   const entity = folder.entities[index]
   const key = entity.name.toLowerCase()
@@ -527,6 +531,8 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     [`${folderPath}/resources`]: () => ({ items: items(folder) }) satisfies { items: StudioResourceItem[] },
     [`${folderPath}/diagnostics`]: () =>
       ({ diagnostics: answers.diagnostics }) satisfies { diagnostics: StudioDiagnostic[] },
+    // A field's default has no field in scope, and no state types an expression, so the scope is empty.
+    [`${folderPath}/expressions/scope`]: () => ({ type: null, fields: [], functions: [] }) satisfies ExpressionScope,
     [`${folderPath}/names`]: () => names(folder),
     '/api/studio/catalog': () => catalog,
     '/api/studio/bindings': () => bindings,
