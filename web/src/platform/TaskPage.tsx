@@ -1,7 +1,9 @@
-import { Flex, Form, Space, Tag } from 'antd'
+import { Flex, Form, Tag } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisActionRow, AxisButton, AxisButtonGroup } from './AxisButton'
 import { PageActions, PageHeading } from './PageLayout'
+import { PartRule } from './SectionParts'
+import { TermList, type Term } from './TermList'
 import { RecordNotFound } from './RecordNotFound'
 import { SaveBar } from './SaveBar'
 import { useEffect, useId, useMemo, useState } from 'react'
@@ -227,29 +229,35 @@ function TaskBody({
   onReassign,
 }: TaskBodyProps) {
   const t = useText()
-  const subject = task.subject.label ?? ''
+  const { spacing } = useDesignTokens()
   const dueAt = task.dueAt === null ? null : (formatValue(dueAtField, task.dueAt, {}, { locale, text: t }) as string)
-  // Proposed: a page that shows one thing is headed by its name, and the line under it starts with its kind, then what
-  // it is about and when, then its state as a tag. A task's line is "Task on <subject>, due <date>", see the review on
-  // #3650.
-  const about =
-    subject === ''
-      ? dueAt === null
-        ? t('shell.task.kind')
-        : t('shell.task.lineDue').replace('{dueAt}', dueAt)
-      : dueAt === null
-        ? t('shell.task.lineSubject').replace('{subject}', subject)
-        : t('shell.task.line').replace('{subject}', subject).replace('{dueAt}', dueAt)
-  const line = (
-    <Space size="small" wrap>
-      <span>{about}</span>
-      {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-      {task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>}
-    </Space>
-  )
+  // Proposed: a page that shows one thing is headed by its name, with the state the platform keeps of it as tags
+  // beside the name and its kind as the line, and the rest of what the platform keeps of it is the page's first part,
+  // see the review on #3650.
+  const facts: Term[] = [
+    ...(task.subject.label === null
+      ? []
+      : [{ key: 'subject', term: t('shell.tasks.subject'), value: task.subject.label, width: 4 }]),
+    ...(dueAt === null ? [] : [{ key: 'dueAt', term: t('shell.tasks.dueAt'), value: dueAt, width: 4 }]),
+  ]
   return (
     <Flex vertical gap="middle">
-      <PageHeading title={t(task.labelKey)} line={line} />
+      <PageHeading
+        title={t(task.labelKey)}
+        line={t('shell.task.kind')}
+        tags={
+          // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
+          task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>
+        }
+      />
+      {facts.length > 0 && (
+        <>
+          <div style={{ paddingBottom: spacing.sm }}>
+            <TermList terms={facts} />
+          </div>
+          <PartRule />
+        </>
+      )}
       {task.state === 'expired' ? (
         <AxisAlert data-testid="task-expired" kind="info" message={t('shell.task.expired')} />
       ) : open ? (

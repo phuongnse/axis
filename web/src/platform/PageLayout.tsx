@@ -29,16 +29,22 @@ export function PageLayout({
   const [slot, setSlot] = useState<HTMLDivElement | null>(null)
   const [named, setNamed] = useState<string | null>(null)
   const [lineSlot, setLineSlot] = useState<HTMLDivElement | null>(null)
+  const [tagSlot, setTagSlot] = useState<HTMLDivElement | null>(null)
   const { colour, spacing } = useDesignTokens()
   const heading = (
     // Proposed: the page's own actions sit on the heading's right, as a Studio page's do, see the review on #3650.
     <Flex justify="space-between" align="center" gap="middle">
       <Flex vertical style={{ minWidth: 0 }}>
-        {/* Level one for the outline, at the 20px and 28px that a level-four heading has. */}
-        <Typography.Title level={1} style={{ margin: 0, fontSize: 20, lineHeight: '28px' }}>
-          {named ?? title}
-        </Typography.Title>
-        {/* Proposed: the line that gives the thing the page names its context, see the review on #3650. */}
+        <Flex align="center" gap={spacing.sm} wrap>
+          {/* Level one for the outline, at the 20px and 28px that a level-four heading has. */}
+          <Typography.Title level={1} style={{ margin: 0, fontSize: 20, lineHeight: '28px' }}>
+            {named ?? title}
+          </Typography.Title>
+          {/* Proposed: the state the platform keeps of the thing the page names, as tags beside its name, see the
+              review on #3650. */}
+          <div ref={setTagSlot} style={{ display: 'contents' }} />
+        </Flex>
+        {/* Proposed: the line that says what kind of thing the page names, see the review on #3650. */}
         <div ref={setLineSlot} style={{ color: colour.textMuted }} />
       </Flex>
       {/* The page's own actions of every widget sit in one row, in the order the widgets draw them. */}
@@ -48,7 +54,7 @@ export function PageLayout({
 
   return (
     <PageActionsSlot.Provider value={slot}>
-      <PageHeadingSlot.Provider value={{ name: setNamed, line: lineSlot }}>
+      <PageHeadingSlot.Provider value={{ name: setNamed, line: lineSlot, tags: tagSlot }}>
         <Flex vertical gap="middle">
           {breadcrumb ? <HeaderBand steps={breadcrumb}>{heading}</HeaderBand> : heading}
           {children}
@@ -102,20 +108,26 @@ export function PageActions({ children }: { children: ReactNode }) {
 
 // Where a widget names what its page shows: the heading's text and the line under it.
 const PageHeadingSlot = createContext<
-  { name: (title: string | null) => void; line: HTMLDivElement | null } | undefined
+  { name: (title: string | null) => void; line: HTMLDivElement | null; tags: HTMLDivElement | null } | undefined
 >(undefined)
 
 /**
  * Proposed, see the review on #3650: a page that shows one thing, such as a saved record or a task, is headed by that
- * thing's name, in place of the page's title, and the line under the heading, in `textMuted`, gives its context: what
- * kind of thing it is, or what it is about and when it is due. Outside a page layout it draws nothing.
+ * thing's name, in place of the page's title. `line`, under the heading in `textMuted`, says what kind of thing it is
+ * and nothing more, such as Request or Task. `tags`, beside the name, give the state the platform keeps of it, such as
+ * a task's Overdue. Everything else about the thing is the page's content. Outside a page layout it draws nothing.
  */
-export function PageHeading({ title, line }: { title: string; line?: ReactNode }) {
+export function PageHeading({ title, line, tags }: { title: string; line?: string; tags?: ReactNode }) {
   const slot = useContext(PageHeadingSlot)
   const name = slot?.name
   useLayoutEffect(() => {
     name?.(title)
     return () => name?.(null)
   }, [name, title])
-  return line !== undefined && slot?.line ? createPortal(line, slot.line) : null
+  return (
+    <>
+      {line !== undefined && slot?.line && createPortal(line, slot.line)}
+      {tags !== undefined && slot?.tags && createPortal(tags, slot.tags)}
+    </>
+  )
 }
