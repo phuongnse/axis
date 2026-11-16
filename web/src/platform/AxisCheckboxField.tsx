@@ -16,6 +16,7 @@ type FormMode = Shared & {
   requiredMessage?: string
   initialValue?: boolean
   status?: AxisFieldStatus
+  required?: never
   checked?: never
   onChange?: never
   loading?: never
@@ -29,6 +30,8 @@ type OwnMode = Shared & {
   /** Whether the box is ticked or the switch is on. The screen holds it. */
   checked: boolean
   onChange: (checked: boolean) => void
+  /** Marks the field required, as for {@link AxisField}. The screen checks the box. */
+  required?: boolean
   /** Shows a switch as busy, such as while its change is saved. */
   loading?: boolean
 }
@@ -42,14 +45,14 @@ function isOwnMode(props: FormMode | OwnMode): props is OwnMode {
  * the input, see docs/reference/actions-and-controls.md#fields. The field label names the input, so the input has no
  * text of its own. Like {@link AxisField}, it has two modes. With a `name` it belongs inside a vertical form, and a
  * `requiredMessage` marks the field required and refuses an unticked box. Without one, the screen holds the value and
- * gives `checked` and `onChange`.
+ * gives `checked` and `onChange`, and `required` marks the field with the shared `requiredMark`.
  */
 export function AxisCheckboxField(props: FormMode | OwnMode) {
   const { label, help, kind = 'checkbox', disabled } = props
   if (isOwnMode(props)) {
-    const { checked, onChange, loading } = props
+    const { checked, onChange, loading, required } = props
     return (
-      <AxisField label={label} help={help}>
+      <AxisField label={label} help={help} required={required}>
         {kind === 'switch' ? (
           <Switch checked={checked} disabled={disabled} loading={loading} onChange={(value) => onChange(value)} />
         ) : (

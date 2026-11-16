@@ -100,6 +100,53 @@ describe('AxisCheckboxField', () => {
     expect(onChange).toHaveBeenCalledWith(true)
   })
 
+  it('draws a checkbox the caller holds, with no form, and tells the screen the new state', async () => {
+    const onChange = vi.fn()
+    render(
+      <ThemeModeProvider initialMode="light">
+        <TextProvider catalogs={catalogs} development={false}>
+          <AxisCheckboxField label="Active" help="Turn it on." checked={false} onChange={onChange} />
+          <AxisCheckboxField label="Visible" help="Show it." checked onChange={vi.fn()} />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    expect(screen.getByRole('checkbox', { name: 'Visible' })).toBeChecked()
+    const box = screen.getByRole('checkbox', { name: 'Active' })
+    expect(box).not.toBeChecked()
+    expect(box).toHaveAccessibleDescription('Turn it on.')
+
+    await userEvent.click(box)
+
+    expect(onChange).toHaveBeenCalledWith(true)
+  })
+
+  it('marks a required box the caller holds with * and aria-required, and an unmarked one with neither', () => {
+    render(
+      <ThemeModeProvider initialMode="light">
+        <TextProvider catalogs={catalogs} development={false}>
+          <AxisCheckboxField label="Active" help="Turn it on." checked={false} onChange={vi.fn()} required />
+          <AxisCheckboxField label="Visible" help="Show it." checked={false} onChange={vi.fn()} />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    expect(screen.getByRole('checkbox', { name: 'Active' })).toHaveAttribute('aria-required', 'true')
+    expect(screen.getByRole('checkbox', { name: 'Visible' })).not.toHaveAttribute('aria-required')
+    expect(screen.getAllByText('*')).toHaveLength(1)
+  })
+
+  it('refuses a name together with checked or onChange, and required in a form', () => {
+    expect([
+      // @ts-expect-error A field with a `name` is in a form, which holds the value, so it takes no `checked`.
+      <AxisCheckboxField key="checked" label="Active" help="" name="active" checked />,
+      // @ts-expect-error A field with a `name` is in a form, which holds the value, so it takes no `onChange`.
+      <AxisCheckboxField key="change" label="Active" help="" name="active" onChange={() => {}} />,
+      // @ts-expect-error A field with a `name` is marked required by its `requiredMessage`, not by `required`.
+      <AxisCheckboxField key="required" label="Active" help="" name="active" required />,
+    ]).toHaveLength(3)
+  })
+
   it('does not take a click when disabled', () => {
     renderForm(<AxisCheckboxField label="Active" help="" name="active" disabled />)
 

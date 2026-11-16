@@ -1,6 +1,7 @@
 import { Form, type FormItemProps } from 'antd'
 import { cloneElement, forwardRef, useId, type ReactElement, type Ref } from 'react'
 import { Announcement } from './Announcement'
+import { requiredMark } from './requiredMark'
 import { useDesignTokens } from './themeMode'
 
 type FieldInput = ReactElement<{ id?: string; 'aria-describedby'?: string; onChange?: (...args: never[]) => void }>
@@ -26,6 +27,8 @@ type FormFieldProps = {
   initialValue?: FormItemProps['initialValue']
   /** What the screen found about the field, such as whether a name is free. It takes the place of the field's own errors while shown. */
   status?: AxisFieldStatus
+  /** A field in a form is marked required by its `requiredMessage`, the one way to mark it. */
+  required?: never
   /** The input, such as an `Input` or a `Select`. Ant Design's form gives it its value and its change handler. */
   children: FieldInput
 }
@@ -41,6 +44,8 @@ type OwnFieldProps = {
   getValueFromEvent?: never
   initialValue?: never
   status?: never
+  /** Marks the field required: the shared `requiredMark` after the label and `aria-required` on the input. The screen checks the value. */
+  required?: boolean
   /** The input, such as an `Input` or a `Select`. The caller gives it its `value` and its change handler. */
   children: FieldInput
 }
@@ -73,7 +78,8 @@ function isEmpty(value: unknown): boolean {
  *   checks it, so the mark and the check never part. The check holds for text, numbers, lists and boxes, and blank text and an unticked box are
  *   empty.
  * - Without a `name`, the field needs no form: the caller gives the input its `value` and change handler, and the
- *   label still names the input.
+ *   label still names the input. `required` draws the shared `requiredMark` after the label and sets `aria-required`
+ *   on the input, and the screen checks the value.
  *
  * A `status` on a field with a `name` shows a check's result under the input: busy while it runs, a message a screen
  * reader hears when it passed, and an error or a warning when it refused or failed.
@@ -111,16 +117,16 @@ function statusItemProps(
 }
 
 /** A field the caller holds the value of: a label tied to the input, then the help and the input. */
-function OwnField({ label, help, children }: OwnFieldProps) {
+function OwnField({ label, help, required, children }: OwnFieldProps) {
   const { colour } = useDesignTokens()
   const ownId = useId()
   const id = children.props.id ?? ownId
   return (
     <div>
       <label htmlFor={id} style={{ display: 'block', paddingBottom: 8, fontWeight: 500, color: colour.textMuted }}>
-        {label}
+        {requiredMark(label, { required: required === true })}
       </label>
-      <HelpedInput help={help} input={children} id={id} />
+      <HelpedInput help={help} input={children} id={id} {...(required === true ? { 'aria-required': true } : {})} />
     </div>
   )
 }
@@ -181,6 +187,7 @@ type HelpedInputProps = {
   status?: AxisFieldStatus
   id?: string
   'aria-describedby'?: string
+  'aria-required'?: boolean
   onChange?: (...args: never[]) => void
 }
 

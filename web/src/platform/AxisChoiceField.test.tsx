@@ -1,5 +1,5 @@
 import { ConfigProvider, Form } from 'antd'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { AxisChoiceField } from './AxisChoiceField'
@@ -73,6 +73,69 @@ describe('AxisChoiceField', () => {
 
     expect(await screen.findByText('Choose a size.')).toBeInTheDocument()
     expect(finish).not.toHaveBeenCalled()
+  })
+
+  it('draws the value the caller holds, with no form, and tells the screen the option clicked', async () => {
+    const onChange = vi.fn()
+    render(
+      <ThemeModeProvider initialMode="light">
+        <TextProvider catalogs={catalogs} development={false}>
+          <AxisChoiceField label="Size" help="Pick one." options={options} value="small" onChange={onChange} />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+    expect(screen.getByRole('radiogroup', { name: 'Size' })).toHaveAccessibleDescription('Pick one.')
+    expect(screen.getByRole('radio', { name: /Small/ })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /Large/ })).not.toBeChecked()
+
+    await userEvent.click(screen.getByRole('radio', { name: /Large/ }))
+
+    expect(onChange).toHaveBeenCalledWith('large')
+  })
+
+  it('gives each choice the caller holds a radio group name of its own, so two never join', () => {
+    render(
+      <ThemeModeProvider initialMode="light">
+        <TextProvider catalogs={catalogs} development={false}>
+          <AxisChoiceField label="Size" help="" options={options} value="small" onChange={vi.fn()} />
+          <AxisChoiceField label="Plan" help="" options={options} value="large" onChange={vi.fn()} />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    const size = within(screen.getByRole('radiogroup', { name: 'Size' })).getAllByRole('radio')
+    const plan = within(screen.getByRole('radiogroup', { name: 'Plan' })).getAllByRole('radio')
+    expect(new Set(size.map((radio) => radio.getAttribute('name'))).size).toBe(1)
+    expect(size[0].getAttribute('name')).not.toBe('')
+    expect(size[0].getAttribute('name')).not.toBe(plan[0].getAttribute('name'))
+    expect(size[0]).toBeChecked()
+    expect(plan[1]).toBeChecked()
+  })
+
+  it('marks a required choice the caller holds with * and aria-required on its group', () => {
+    render(
+      <ThemeModeProvider initialMode="light">
+        <TextProvider catalogs={catalogs} development={false}>
+          <AxisChoiceField label="Size" help="" options={options} value={undefined} onChange={vi.fn()} required />
+          <AxisChoiceField label="Plan" help="" options={options} value={undefined} onChange={vi.fn()} />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    expect(screen.getByRole('radiogroup', { name: 'Size' })).toHaveAttribute('aria-required', 'true')
+    expect(screen.getByRole('radiogroup', { name: 'Plan' })).not.toHaveAttribute('aria-required')
+    expect(screen.getAllByText('*')).toHaveLength(1)
+  })
+
+  it('refuses a name together with value or onChange, and required in a form', () => {
+    expect([
+      // @ts-expect-error A field with a `name` is in a form, which holds the value, so it takes no `value`.
+      <AxisChoiceField key="value" label="Size" help="" name="size" options={options} value="small" />,
+      // @ts-expect-error A field with a `name` is in a form, which holds the value, so it takes no `onChange`.
+      <AxisChoiceField key="change" label="Size" help="" name="size" options={options} onChange={() => {}} />,
+      // @ts-expect-error A field with a `name` is marked required by its `requiredMessage`, not by `required`.
+      <AxisChoiceField key="required" label="Size" help="" name="size" options={options} required />,
+    ]).toHaveLength(3)
   })
 
   it('requires help', () => {
