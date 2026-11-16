@@ -48,7 +48,12 @@ namespace Axis.Server.CellApi;
 /// answers <c>400</c>.
 /// </para>
 /// <para>
-/// <c>GET /api/cell/tenants</c> answers <c>{ "items": [...] }</c>, ordered by id, with each tenant's <c>id</c>,
+/// <c>GET /api/cell/tenants</c> answers one page as <c>{ items, page, pageSize, totalCount }</c>, 20 tenants by default, from the
+/// <c>page</c>, <c>pageSize</c>, <c>sort</c>, <c>search</c> and <c>filter</c> of the shared <see cref="ListQuery{T}"/>, in the record API's format.
+/// The fields are <c>id</c>, <c>status</c>, <c>application</c>, <c>hosts</c>, <c>instances</c>, <c>unknownCalls</c>, <c>deadLetters</c>,
+/// <c>storage</c>, <c>users</c>, <c>applications</c>, <c>emailsPerDay</c> and <c>newestArchiveAt</c>, and the search looks in the id and the hosts.
+/// An undeclared field, an invalid page or an invalid page size answers <c>400</c> keyed by the parameter, after the checks of the operator
+/// policy. Without <c>sort</c> the tenants stay ordered by id, see <c>docs/reference/tenant-lifecycle.md#routes</c>. Each tenant has its <c>id</c>,
 /// <c>status</c>, <c>application</c>, <c>hosts</c>, <c>failedWork</c>, <c>usage</c>, <c>newestArchiveAt</c> and <c>deleteAfter</c>, the scheduled purge time of a
 /// <c>deleting</c> tenant and <see langword="null"/> for every other. <c>GET /api/cell/tenants/{id}</c> answers one
 /// such tenant. Both read the platform tables over the reader role. The <c>failedWork</c> is <c>{ instances, unknownCalls, deadLetters }</c>, the counts of the worker's
@@ -274,12 +279,45 @@ internal static partial class CellEndpoints
         return Results.Ok(new CellResponse(cell.Id!, cell.Region!, tenants, cell.TenantCap, restoreCheck));
     }
 
+    // The fields of the tenant list, see docs/reference/tenant-lifecycle.md#routes. A usage field holds its used value.
+    private static readonly IReadOnlyList<ListColumn<CellTenantResponse>> _tenantColumns =
+    [
+        new("id", ListColumnKind.Text, tenant => tenant.Id, Searchable: true),
+        new(
+            "status",
+            ListColumnKind.Enum,
+            tenant => tenant.Status,
+            Values: ["active", "readOnly", "suspended", "provisioning", "deleting"]),
+        new("application", ListColumnKind.Text, tenant => tenant.Application),
+        new("hosts", ListColumnKind.Text, tenant => string.Join(' ', tenant.Hosts), Searchable: true),
+        new("instances", ListColumnKind.Number, tenant => tenant.FailedWork?.Instances),
+        new("unknownCalls", ListColumnKind.Number, tenant => tenant.FailedWork?.UnknownCalls),
+        new("deadLetters", ListColumnKind.Number, tenant => tenant.FailedWork?.DeadLetters),
+        new("storage", ListColumnKind.Number, tenant => tenant.Usage.Storage.Used),
+        new("users", ListColumnKind.Number, tenant => tenant.Usage.Users.Used),
+        new("applications", ListColumnKind.Number, tenant => tenant.Usage.Applications.Used),
+        new("emailsPerDay", ListColumnKind.Number, tenant => tenant.Usage.EmailsPerDay.Used),
+        new(
+            "newestArchiveAt",
+            ListColumnKind.Date,
+            tenant => tenant.NewestArchiveAt is { } at ? DateOnly.FromDateTime(at.UtcDateTime) : (DateOnly?)null,
+            Order: tenant => tenant.NewestArchiveAt),
+    ];
+
     private static async Task<IResult> ListTenantsAsync(
+        HttpContext httpContext,
         NpgsqlDataSource dataSource,
         QuotaDefaults defaults,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var query = ListQuery<CellTenantResponse>.Read(httpContext.Request, _tenantColumns, errors);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
         await using var platform = Open(dataSource);
         var tenants = await platform.Tenants.AsNoTracking()
             .Where(tenant => tenant.PreviewOf == null)
@@ -292,7 +330,7 @@ internal static partial class CellEndpoints
         var usage = await ReadUsageAsync(platform, ids, quotas, latest, Today(time), cancellationToken);
         var archives = await ReadNewestArchivesAsync(platform, ids, cancellationToken);
 
-        return Results.Ok(new CellTenantListResponse(
+        IReadOnlyList<CellTenantResponse> rows =
             [.. tenants
                 .OrderBy(tenant => tenant.Id, StringComparer.Ordinal)
                 .Select(tenant => new CellTenantResponse(
@@ -303,7 +341,9 @@ internal static partial class CellEndpoints
                     latest.GetValueOrDefault(tenant.Id)?.FailedWork,
                     usage[tenant.Id],
                     archives.TryGetValue(tenant.Id, out var archive) ? archive : null,
-                    tenant.DeleteAfter))]));
+                    tenant.DeleteAfter))];
+        var page = query.Apply(rows);
+        return Results.Ok(new CellTenantListResponse(page.Items, page.Page, page.PageSize, page.TotalCount));
     }
 
     private static async Task<IResult> GetTenantAsync(
@@ -1187,8 +1227,8 @@ internal sealed record CellTenantResponse(
 /// <summary>A purged main tenant: when the purge removed its hosts and when its deletion is complete, 7 days later.</summary>
 internal sealed record CellDeletedTenantResponse(string Id, DateTimeOffset DeletedAt, DateTimeOffset CompleteAt);
 
-/// <summary>The tenants of the cell, ordered by id.</summary>
-internal sealed record CellTenantListResponse(IReadOnlyList<CellTenantResponse> Items);
+/// <summary>One page of the tenants of the cell, with the number of tenants that matched before the page was cut.</summary>
+internal sealed record CellTenantListResponse(IReadOnlyList<CellTenantResponse> Items, int Page, int PageSize, long TotalCount);
 
 /// <summary>
 /// One tenant of the cell with its effective quotas, keyed by quota key, its day rows of the last 13 months, newest first, and the newest

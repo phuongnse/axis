@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Web;
 using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Jobs;
@@ -271,7 +273,17 @@ public sealed class DirectoryCorrectionTests : IAsyncLifetime
                     return Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
                 }
 
-                return Task.FromResult(Json(new { items = list.Select(t => new { id = t.Id, status = "active", application = (string?)null, hosts = t.Hosts, failedWork = (object?)null }) }));
+                var query = HttpUtility.ParseQueryString(uri.Query);
+                var page = int.Parse(query["page"] ?? "1", CultureInfo.InvariantCulture);
+                var size = int.Parse(query["pageSize"] ?? "20", CultureInfo.InvariantCulture);
+                return Task.FromResult(Json(new
+                {
+                    items = list.Skip((page - 1) * size).Take(size)
+                        .Select(t => new { id = t.Id, status = "active", application = (string?)null, hosts = t.Hosts, failedWork = (object?)null }),
+                    page,
+                    pageSize = size,
+                    totalCount = list.Length,
+                }));
             }
 
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
