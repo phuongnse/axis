@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -231,6 +232,8 @@ export function AxisTable<T extends object>({
     tableRef.current?.querySelector('.ant-table-content')?.setAttribute('tabindex', '0')
   })
   const tokens = useDesignTokens()
+  // The same theme object between draws, so the cells under the table are not drawn again for nothing.
+  const theme = useMemo(() => tableTheme(tokens), [tokens])
   const narrow = useNarrowWidth()
   // The widths the columns need when drawn and not stretched. A moved column is not drawn, so it is remembered.
   const naturalWidths = useRef(new Map<string, number>())
@@ -566,7 +569,7 @@ export function AxisTable<T extends object>({
               ))}
             </Flex>
           )}
-          <ConfigProvider theme={tableTheme(tokens)}>
+          <ConfigProvider theme={theme}>
             <Table<T>
               rowKey={rowKey}
               rowSelection={

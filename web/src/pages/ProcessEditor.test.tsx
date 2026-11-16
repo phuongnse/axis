@@ -112,8 +112,14 @@ const drawnPaths = [
 
 // The expression editor is CodeMirror. The mock shows the names it is offered, which is what these tests check.
 vi.mock('./ExpressionEditor', () => ({
-  default: ({ name, options }: { name: string; options: { label: string }[] }) => (
-    <div role="group" aria-label={name} data-options={options.map((option) => option.label).join(',')} />
+  default: ({ name, options }: { name: string; options: () => { label: string }[] }) => (
+    <div
+      role="group"
+      aria-label={name}
+      data-options={options()
+        .map((option) => option.label)
+        .join(',')}
+    />
   ),
 }))
 
@@ -224,7 +230,7 @@ function renderEditor(value: Record<string, unknown> = process, checked = false)
     )
     return checked ? (
       <ExpressionCheckContext.Provider
-        value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft, names }}
+        value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft: () => draft, names }}
       >
         {editor}
       </ExpressionCheckContext.Provider>

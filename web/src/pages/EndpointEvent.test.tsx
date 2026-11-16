@@ -36,7 +36,7 @@ function renderEvent(data: unknown, { names = true, onChange = vi.fn() } = {}) {
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
         <ExpressionCheckContext.Provider
-          value={{ application: 'Shop', resourceId: 'bc241668', kind: 'endpoint', draft: {}, names: null }}
+          value={{ application: 'Shop', resourceId: 'bc241668', kind: 'endpoint', draft: () => ({}), names: null }}
         >
           <EndpointEvent events={names ? events : undefined} value={data} onChange={onChange} />
         </ExpressionCheckContext.Provider>
