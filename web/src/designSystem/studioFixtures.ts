@@ -14,6 +14,7 @@ import type {
   StudioResourceActivity,
   StudioResourceItem,
   StudioResourceReferences,
+  StudioRevision,
 } from '../platform/studio'
 import { application, entity as requestEntity, fields, formWidget, locale, tableWidget } from './fixtures'
 
@@ -399,6 +400,39 @@ const typicalReleases = {
   partChanges: [],
 } satisfies StudioReleases
 
+/** The revisions of Typical, newest first: a person in Studio, a command-line client, and the server's own start of history. */
+const typicalRevisions = {
+  items: [
+    {
+      id: 'r3',
+      summary: 'Added the approval step',
+      author: 'Alex Morgan',
+      userId: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
+      client: 'studio',
+      request: null,
+      time: '2026-10-21T09:30:00Z',
+    },
+    {
+      id: 'r2',
+      summary: 'Added the supplier entity',
+      author: 'Alex Morgan',
+      userId: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
+      client: 'cli',
+      request: null,
+      time: '2026-10-18T14:05:00Z',
+    },
+    {
+      id: 'r1',
+      summary: 'Created the application',
+      author: '',
+      userId: null,
+      client: null,
+      request: null,
+      time: '2026-10-14T08:00:00Z',
+    },
+  ],
+} satisfies { items: StudioRevision[] }
+
 /** What a state's folder answers for its diagnostics and its releases. */
 interface StateAnswers {
   diagnostics: StudioDiagnostic[]
@@ -563,6 +597,7 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     [`${folderPath}/resources/${formId}/references`]: () => formReferences,
     [`${folderPath}/resources/${processId}`]: () => processResource,
     [`${folderPath}/releases`]: () => answers.releases,
+    [`${folderPath}/revisions`]: () => typicalRevisions,
     [`${folderPath}/settings`]: () => settings,
   }
 }
