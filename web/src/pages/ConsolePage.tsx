@@ -30,7 +30,7 @@ const pageSize = 20
  * view lists the recent webhook deliveries, then the Publishing view lists the release history and the publish requests of
  * one application, read only, and the Dead letters view lists the dead letters of every application and redelivers or
  * discards each. Under that, the Schedules view lists the schedule triggers of the active releases with their last and
- * next occurrence. A user without the operator role sees the forbidden page.
+ * next occurrence, paged on the server with the table toolbar, whose state the address keeps. A user without the operator role sees the forbidden page.
  */
 export function ConsolePage() {
   const t = useText()
@@ -228,7 +228,7 @@ export function ConsolePage() {
           <ConsoleWebhookDeliveries applications={tenant.applications} locale={locale} />
           <ConsolePublishing applications={tenant.applications} locale={locale} />
           <ConsoleDeadLetters applications={tenant.applications} locale={locale} />
-          <ConsoleSchedules applications={tenant.applications} locale={locale} />
+          <ConsoleSchedules locale={locale} />
         </SectionParts>
       )}
     </PageLayout>

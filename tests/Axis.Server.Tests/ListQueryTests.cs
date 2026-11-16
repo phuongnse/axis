@@ -1,24 +1,24 @@
-using Axis.Server.Studio;
+using Axis.Server.Http;
 using Microsoft.AspNetCore.Http;
 
 namespace Axis.Server.Tests;
 
 /// <summary>
-/// The list query of Studio reads <c>page</c>, <c>pageSize</c>, <c>sort</c>, <c>search</c> and <c>filter</c> against the columns
+/// The list query reads <c>page</c>, <c>pageSize</c>, <c>sort</c>, <c>search</c> and <c>filter</c> against the columns
 /// a list declares and applies them to rows in memory, with the operators of the record API, see
 /// <c>docs/reference/record-api.md#paging-and-sorting</c>.
 /// </summary>
-public sealed class StudioListQueryTests
+public sealed class ListQueryTests
 {
     private sealed record Row(string Id, string? Name, string? Status, int? Count, decimal? Amount, DateOnly? Day, DateTimeOffset? At);
 
-    private static readonly IReadOnlyList<StudioListColumn<Row>> _columns =
+    private static readonly IReadOnlyList<ListColumn<Row>> _columns =
     [
-        new("name", StudioListKind.Text, row => row.Name, Searchable: true),
-        new("status", StudioListKind.Enum, row => row.Status, Values: ["open", "closed"]),
-        new("count", StudioListKind.Number, row => row.Count),
-        new("amount", StudioListKind.Number, row => row.Amount),
-        new("day", StudioListKind.Date, row => row.Day, Order: row => row.At),
+        new("name", ListColumnKind.Text, row => row.Name, Searchable: true),
+        new("status", ListColumnKind.Enum, row => row.Status, Values: ["open", "closed"]),
+        new("count", ListColumnKind.Number, row => row.Count),
+        new("amount", ListColumnKind.Number, row => row.Amount),
+        new("day", ListColumnKind.Date, row => row.Day, Order: row => row.At),
     ];
 
     private static readonly IReadOnlyList<Row> _rows =
@@ -178,20 +178,20 @@ public sealed class StudioListQueryTests
     public void A_search_on_a_list_with_no_searchable_column_is_an_error()
     {
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        StudioListColumn<Row>[] columns = [new("count", StudioListKind.Number, row => row.Count)];
+        ListColumn<Row>[] columns = [new("count", ListColumnKind.Number, row => row.Count)];
 
-        StudioListQuery<Row>.Read(Request("search=a"), columns, errors);
+        ListQuery<Row>.Read(Request("search=a"), columns, errors);
 
         Assert.Equal(["search"], errors.Keys);
     }
 
-    private static string Ids(StudioListPage<Row> page) => string.Concat(page.Items.Select(row => row.Id));
+    private static string Ids(ListPage<Row> page) => string.Concat(page.Items.Select(row => row.Id));
 
-    private static StudioListPage<Row> Apply(string query) => Read(query).Apply(_rows);
+    private static ListPage<Row> Apply(string query) => Read(query).Apply(_rows);
 
-    private static StudioListQuery<Row> Read(string query, SortedDictionary<string, string[]>? errors = null)
+    private static ListQuery<Row> Read(string query, SortedDictionary<string, string[]>? errors = null)
     {
-        return StudioListQuery<Row>.Read(Request(query), _columns, errors ?? new SortedDictionary<string, string[]>(StringComparer.Ordinal));
+        return ListQuery<Row>.Read(Request(query), _columns, errors ?? new SortedDictionary<string, string[]>(StringComparer.Ordinal));
     }
 
     private static HttpRequest Request(string query)

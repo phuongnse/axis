@@ -38,7 +38,7 @@ header, as the other session routes do. They are checked on the server whatever 
 | `POST /api/console/instances/{id}/calls/{callId}/resolve` | Runs the resolve command of a call of an instance                         |
 | `GET /api/console/applications/{id}/publishing`           | Answers one application's release history and publish requests, read-only |
 | `GET /api/console/dead-letters`                           | Lists one page of the tenant's dead letters, newest first                 |
-| `GET /api/console/schedules`                              | Lists the schedule triggers of the active release of each application     |
+| `GET /api/console/schedules`                              | Lists one page of the schedule triggers of the active release of each application |
 | `POST /api/console/dead-letters/{id}/redeliver`           | Redelivers an open dead letter                                            |
 | `POST /api/console/dead-letters/{id}/discard`             | Discards an open dead letter                                              |
 
@@ -123,8 +123,14 @@ header, as the other session routes do. They are checked on the server whatever 
   a [process's dead letter](process-events.md#dead-letters) with its `applicationId` and
   `processId` (null for a letter with no process). Its `commands` are `redeliver` and `discard`
   while the letter is `open` and empty otherwise.
-- **`GET /api/console/schedules`.** Answers `{ "items": [...] }`, not paged, with each schedule
-  trigger of the active release of every application, ordered by application name and then by
+- **`GET /api/console/schedules`.** Answers one page, `{ "items": [...], "page", "pageSize",
+  "totalCount" }`, of the schedule triggers of the active release of every application. It takes
+  `page`, `pageSize`, `sort`, `search` and `filter` in the
+  [record API's format](record-api.md#paging-and-sorting) over the fields `application`,
+  `trigger`, `process`, `schedule`, `timeZone`, `lastOccurrenceAt` and `nextOccurrenceAt`. A time
+  filters by its UTC day and sorts by its instant. A search looks in `application`, `trigger` and
+  `process`. A sort or filter on another field, and an invalid `page` or `pageSize`, is a `400`
+  that names the parameter. Without `sort` the items are ordered by application name and then by
   trigger name. An optional `application` (an application id) keeps one application. One that is
   not a hyphenated UUID is a `400` keyed `application`. A module's schedule trigger is listed
   once for each application that uses the module. A trigger that the active release no longer
@@ -166,7 +172,10 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   code and delivery time, and two filters, one for the application and one for the webhook.
 - **Schedules.** Each schedule trigger of each active release, with its process, its schedule and
   time zone, and its last and next occurrence, see [schedules](process-events.md#schedules). The
-  view is ordered by application and trigger name, is not paged and has an application filter.
+  view is ordered by application and trigger name until it is sorted and is paged on the server.
+  Its table has the toolbar of [tables](actions-and-controls.md#tables), with Search, Filter,
+  Columns and Refresh, a sort on every column but Schedule, and a pager with a page size. The
+  address keeps the view as `search`, `filter`, `sort`, `page`, `pageSize` and `columns`.
 - **Publishing.** Publish requests and the [release history](studio.md) of each application,
   read-only. Publishing and activating a release stay in Studio. A part under the Webhook
   deliveries view with a picker of the applications of the Tenant view, which starts on the first one. A releases table
