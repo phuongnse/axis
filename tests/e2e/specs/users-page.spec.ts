@@ -264,8 +264,9 @@ test.describe("invitations", () => {
     await page.goto("/users");
 
     const row = await findRow(page, email);
-    await row
-      .getByRole("button", { name: "Resend invitation", exact: true })
+    await row.getByRole("button", { name: "Actions", exact: true }).click();
+    await page
+      .getByRole("menuitem", { name: "Resend invitation", exact: true })
       .click();
     const confirmation = await waitForDialog(page, "Resend the invitation?");
     await expect(confirmation).toContainText(email);
@@ -304,7 +305,8 @@ test.describe("invitations", () => {
       await page.goto("/users");
 
       const row = await findRow(page, email);
-      await row.getByRole("button", { name: "Disable", exact: true }).click();
+      await row.getByRole("button", { name: "Actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Disable", exact: true }).click();
       const disableDialog = await waitForDialog(page, "Disable this person?");
       await expect(disableDialog).toContainText(email);
       await disableDialog
@@ -318,8 +320,9 @@ test.describe("invitations", () => {
       await (
         await findRow(page, email)
       )
-        .getByRole("button", { name: "Enable", exact: true })
+        .getByRole("button", { name: "Actions", exact: true })
         .click();
+      await page.getByRole("menuitem", { name: "Enable", exact: true }).click();
       const enableDialog = await waitForDialog(page, "Enable this person?");
       await expect(enableDialog).toContainText(email);
       await enableDialog

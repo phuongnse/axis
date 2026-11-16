@@ -35,7 +35,7 @@ public sealed class UserListTests(KeycloakFixture keycloak) : IAsyncLifetime
         using var author = factory.CreateClient().SignedInAs("author");
 
         // Creating the client starts the server, which migrates the tenant database.
-        await InsertProfileAsync(main, "administrator");
+        await InsertProfileAsync(main, "administrator", "Administrator", "administrator@axis.local");
 
         using var all = await GetAsync(author, "/api/users?pageSize=50", HostA);
 
@@ -79,11 +79,64 @@ public sealed class UserListTests(KeycloakFixture keycloak) : IAsyncLifetime
         Assert.True(total > 4);
     }
 
+    [Fact]
+    public async Task A_search_a_filter_a_sort_and_a_page_size_answer_one_page_and_the_number_that_matched()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var main = await _database.CreateDatabaseAsync("user_list_query", CancellationToken);
+        await using var factory = await NewFactoryAsync(folder.Path, main);
+        using var author = factory.CreateClient().SignedInAs("author");
+
+        // Creating the client starts the server, which migrates the tenant database.
+        await InsertProfileAsync(main, "manager", "Manager User", "manager@axis.local");
+        await InsertProfileAsync(main, "asset-manager", "Asset Manager User", "asset-manager@axis.local");
+        var filter = Uri.EscapeDataString("""{"all":[{"field":"status","op":"eq","value":"active"}]}""");
+
+        using var page = await GetAsync(author, $"/api/users?search=manager&filter={filter}&sort=-displayName&pageSize=1", HostA);
+
+        var only = Assert.Single(page.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal("manager", only.GetProperty("id").GetString());
+        Assert.Equal(1, page.RootElement.GetProperty("page").GetInt32());
+        Assert.Equal(1, page.RootElement.GetProperty("pageSize").GetInt32());
+        Assert.Equal(2, page.RootElement.GetProperty("totalCount").GetInt64());
+    }
+
+    [Fact]
+    public async Task Without_a_sort_the_users_are_ordered_by_display_name()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var main = await _database.CreateDatabaseAsync("user_list_order", CancellationToken);
+        await using var factory = await NewFactoryAsync(folder.Path, main);
+        using var author = factory.CreateClient().SignedInAs("author");
+
+        using var page = await GetAsync(author, "/api/users?pageSize=100", HostA);
+
+        var names = page.RootElement.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("displayName").GetString()!).ToList();
+        Assert.Equal([.. names.Order(StringComparer.InvariantCulture)], names);
+    }
+
+    [Theory]
+    [InlineData("filter", "{\"all\":[{\"field\":\"username\",\"op\":\"eq\",\"value\":\"x\"}]}")]
+    [InlineData("sort", "username")]
+    public async Task A_filter_or_a_sort_on_a_field_the_route_does_not_hold_is_a_400_keyed_by_the_parameter(string key, string value)
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var main = await _database.CreateDatabaseAsync("user_list_unknown_field", CancellationToken);
+        await using var factory = await NewFactoryAsync(folder.Path, main);
+        using var author = factory.CreateClient().SignedInAs("author");
+
+        using var response = await StudioPublishTests.SendAsync(author, HttpMethod.Get, $"/api/users?{key}={Uri.EscapeDataString(value)}", HostA);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal([key], problem.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
+    }
+
     [Theory]
     [InlineData("page=0")]
     [InlineData("page=-1")]
     [InlineData("pageSize=0")]
-    [InlineData("pageSize=51")]
+    [InlineData("pageSize=101")]
     public async Task A_page_or_page_size_out_of_range_answers_400(string query)
     {
         using var folder = StudioPublishTests.NewFolder();
@@ -105,7 +158,9 @@ public sealed class UserListTests(KeycloakFixture keycloak) : IAsyncLifetime
         using var requester = factory.CreateClient().SignedInAs("requester");
         using var nobody = factory.CreateClient();
 
-        using var forbidden = await StudioPublishTests.SendAsync(requester, HttpMethod.Get, "/api/users", HostA);
+        // The role is checked before the parameters, so an invalid filter does not change the answer.
+        var invalid = Uri.EscapeDataString("""{"all":[{"field":"username","op":"eq","value":"x"}]}""");
+        using var forbidden = await StudioPublishTests.SendAsync(requester, HttpMethod.Get, $"/api/users?filter={invalid}", HostA);
         using var unauthorized = await StudioPublishTests.SendAsync(nobody, HttpMethod.Get, "/api/users", HostA);
 
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
@@ -142,11 +197,11 @@ public sealed class UserListTests(KeycloakFixture keycloak) : IAsyncLifetime
         });
     }
 
-    private static async Task InsertProfileAsync(string connectionString, string userId)
+    private static async Task InsertProfileAsync(string connectionString, string userId, string displayName, string email)
     {
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(CancellationToken);
-        await UserProfiles.UpsertAsync(connection, userId, "Administrator", "administrator@axis.local", null, CancellationToken);
+        await UserProfiles.UpsertAsync(connection, userId, displayName, email, null, CancellationToken);
     }
 
     private static List<string> Ids(JsonDocument page) =>
