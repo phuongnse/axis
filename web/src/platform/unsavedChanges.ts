@@ -20,10 +20,10 @@ export function leavesWithoutAsking(state: unknown): boolean {
   )
 }
 
-const viewParameters = ['search', 'sort', 'page', 'pageSize']
+const viewParameters = ['search', 'filter', 'sort', 'page', 'pageSize']
 
 /**
- * Whether two addresses differ only in a table's view, its `search`, `sort`, `page` and `pageSize`, see
+ * Whether two addresses differ only in a table's view, its `search`, `filter`, `sort`, `page` and `pageSize`, see
  * docs/reference/actions-and-controls.md#tables. Such a move keeps the editor on screen, so the guard does not ask.
  */
 export function onlyTableViewChanged(
