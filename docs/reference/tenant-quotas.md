@@ -252,21 +252,31 @@ user name.
   its [operator console](operator-console.md) lists, and stores the three counts in that row, which
   the provisioning API answers as `failedWork`. The same pass brings the deny step of each tenant
   with realm details in step with its `users` quota, and skips a tenant without realm details, such
-  as a preview tenant. A failure for one tenant is logged as a warning that names it, and the pass
-  goes on with the other tenants.
+  as a preview tenant. The same pass counts the tenant's users and applications and copies its emails
+  sent into the day's row, see below. A failure for one tenant is logged as a warning that names it,
+  and the pass goes on with the other tenants.
 - **Database bytes and file bytes.** File bytes are the on-disk size of the stored file contents, the
   table `axis.file_contents` with its indexes and TOAST data. Database bytes are `pg_database_size`
   of the tenant database minus the file bytes. A stored file sits inside the tenant database, so this
   split counts each byte once. A size on disk does not shrink after a delete until PostgreSQL vacuums
   the table.
 - **Daily rows.** `platform.tenant_usage` holds one row per tenant and day (UTC): the largest storage
-  sample of the day, split into database and file bytes, the users and applications at the end of
-  the day, the emails sent, the connector and package calls, and the work items run. A sample
+  sample of the day, split into database and file bytes, the users and applications of the day's last
+  sample, the emails sent, the connector and package calls, and the work items run. A sample
   replaces the day's pair of sizes only when its total is larger. Rows are kept for 13 months, and
   the sampling job deletes the tenant's rows older than that.
-- **Users, applications and emails sent** _(planned for M33)_. The daily row's users, applications
-  and emails-sent columns are filled from the counts of their quotas, see [quotas](#quotas) and
-  [emails a day](#emails-a-day).
+- **Users, applications and emails sent.** Each hourly sample writes the daily row's users,
+  applications and emails-sent columns. Users are the realm's enabled users, counted as the `users`
+  quota counts them, for a tenant with realm details. A tenant without realm details, such as a
+  preview tenant, keeps its users empty. Applications are counted as the `applications` quota counts
+  them: the names of the folders in the tenant's Studio folder and of its active releases, ignoring
+  letter case. The worker reads the folder `Studio:ApplicationsPath/<tenant id>` and creates nothing,
+  and a worker without `Studio:ApplicationsPath` counts the active releases only. Each sample
+  replaces the day's users and applications, and a count that fails keeps the row's earlier value and
+  is logged as a warning that names the tenant. Emails sent are the day's `emails` counter, see
+  [emails a day](#emails-a-day). Each sample also copies the previous day's counter into that day's
+  existing row, so that row is final after the first sample past midnight, and it creates no row.
+  See [quotas](#quotas) for how the quotas count.
 - **Tokens.** `platform.tenant_token_usage` holds the tokens of the agent host's model calls: one
   row per tenant, UTC day, binding, model and `own_key`, which is true for tokens that the tenant's
   own key paid, see [a tenant's own key](model-bindings.md#a-tenants-own-key), so own-key tokens

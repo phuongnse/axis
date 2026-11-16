@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Storage;
 using Axis.Core.Telemetry;
 using Axis.Core.Tenancy;
 using Axis.Data.Files;
@@ -10,9 +11,11 @@ using Axis.Hosting;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
+using Axis.Studio;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Axis.Tenancy.Realms;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace Axis.Worker;
@@ -49,7 +52,7 @@ namespace Axis.Worker;
 /// Once a tenant is ready, the poll also deletes its expired sessions and sweeps its deleted and abandoned files,
 /// and clears the files of its imports uploaded more than 24 hours ago, each at most every five minutes by its own clock,
 /// and deletes its old in-app notifications every 24 hours. In a cell it also measures the storage of each ready tenant and counts its failed work every
-/// hour and records both in the platform database as the tenant's usage, and brings the users quota step of the tenant's realm in step
+/// hour and records both in the platform database as the tenant's usage, counts its enabled realm users and its applications and copies its emails sent into the day's row, and brings the users quota step of the tenant's realm in step
 /// with its <c>users</c> quota. That housekeeping is outside the rounds.
 /// </summary>
 internal sealed partial class WorkerService(
@@ -71,7 +74,8 @@ internal sealed partial class WorkerService(
     WorkerPollMetrics metrics,
     ILogger<WorkerService> logger,
     TenantUsageStore? usage = null,
-    IHttpClientFactory? httpClients = null) : BackgroundService
+    IHttpClientFactory? httpClients = null,
+    StudioOptions? studio = null) : BackgroundService
 {
     // Tenants whose database was migrated. A new schema arrives with a new release, which restarts
     // the worker, so a ready tenant is not checked again. A tenant whose database settings change, or that
@@ -774,8 +778,9 @@ internal sealed partial class WorkerService(
 
     /// <summary>
     /// In a cell, at most once per hour, measures the storage of the tenant database and counts its failed work, and records both in the platform database,
+    /// then records the day's users, applications and emails sent, see <c>docs/reference/tenant-quotas.md#usage</c>,
     /// then brings the users quota step of the tenant's realm in step with its <c>users</c> quota. The time comes from the worker's clock.
-    /// A failure of either part is logged and does not hold back the other part or the work items. Self-hosted installations do neither.
+    /// A failure of a part is logged and does not hold back the other parts or the work items. Self-hosted installations do none of it.
     /// </summary>
     private async Task SampleUsageAsync(string tenantId, CancellationToken cancellationToken)
     {
@@ -785,7 +790,67 @@ internal sealed partial class WorkerService(
         }
 
         await SampleStorageAsync(tenantId, usage, now, cancellationToken);
+        await SampleCountsAsync(tenantId, usage, now, cancellationToken);
         await RefreshUsersQuotaAsync(tenantId, cancellationToken);
+    }
+
+    // The enabled users of the tenant's realm and its applications, counted as their quotas count them, and the day's emails sent.
+    // A count that fails is logged and left out, so the day's row keeps its earlier value.
+    private async Task SampleCountsAsync(string tenantId, TenantUsageStore store, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var users = await CountUsersAsync(tenantId, cancellationToken);
+        var applications = await CountApplicationsAsync(tenantId, cancellationToken);
+        try
+        {
+            await store.RecordCountsAsync(tenantId, users, applications, now, cancellationToken);
+        }
+        catch (NpgsqlException exception)
+        {
+            LogCountsRecordFailed(exception, tenantId);
+        }
+    }
+
+    // Only a tenant with realm details has users to count.
+    private async Task<int?> CountUsersAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        if (httpClients is null || tenants.Find(tenantId) is not { RealmUsers: { } access })
+        {
+            return null;
+        }
+
+        try
+        {
+            using var client = httpClients.CreateClient(nameof(RealmUsersQuota));
+            return await new RealmUsers(client, access).CountEnabledAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            LogUsersCountFailed(exception, tenantId);
+            return null;
+        }
+    }
+
+    // Without Studio:ApplicationsPath only the active releases count, as the server counts them.
+    private async Task<int?> CountApplicationsAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        var previous = accessor.Current;
+        accessor.Current = new TenantContext(tenantId);
+        try
+        {
+            await using var connection = await connections.OpenConnectionAsync(cancellationToken);
+            await using var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(connection).Options);
+            return await StudioApplicationCount.CountAsync(
+                (studio ?? new StudioOptions([], null, null)).ForTenant(tenantId, create: false), configuration, cancellationToken);
+        }
+        catch (Exception exception) when (exception is NpgsqlException or IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            LogApplicationsCountFailed(exception, tenantId);
+            return null;
+        }
+        finally
+        {
+            accessor.Current = previous;
+        }
     }
 
     // A database without the file table yet counts no file bytes.
@@ -989,6 +1054,15 @@ internal sealed partial class WorkerService(
 
     [LoggerMessage(LogLevel.Warning, "Measuring the storage of tenant {TenantId} failed.")]
     private partial void LogUsageSampleFailed(Exception exception, string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "Counting the users of tenant {TenantId} failed, so its usage row keeps the earlier count.")]
+    private partial void LogUsersCountFailed(Exception exception, string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "Counting the applications of tenant {TenantId} failed, so its usage row keeps the earlier count.")]
+    private partial void LogApplicationsCountFailed(Exception exception, string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "Recording the users, applications and emails sent of tenant {TenantId} failed.")]
+    private partial void LogCountsRecordFailed(Exception exception, string tenantId);
 
     [LoggerMessage(LogLevel.Debug, "Measured {DatabaseBytes} database byte(s) and {FileBytes} file byte(s) of tenant {TenantId}.")]
     private partial void LogUsageSampled(long databaseBytes, long fileBytes, string tenantId);

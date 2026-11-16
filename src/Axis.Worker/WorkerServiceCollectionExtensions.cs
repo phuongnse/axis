@@ -7,6 +7,7 @@ using Axis.Hosting;
 using Axis.Processes;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
+using Axis.Studio;
 using Axis.Tenancy;
 using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
@@ -34,7 +35,7 @@ public static class WorkerServiceCollectionExtensions
     /// replaces whole. With no <c>Email:Smtp:Host</c> it sends none, and only a worker that runs in Development sends email
     /// with <c>Email:Smtp:UseTls</c> off. Only a worker that runs in Development exports telemetry to an endpoint that is not <c>https</c>. With <c>Extensions:Isolation</c> <c>process</c>, the default, the worker reads package manifests only and sends each attempt of a C# package to a runner of the package host at <c>Extensions:Runners:Dotnet</c>, whose network route is the worker's egress proxy on <c>Extensions:Runners:ProxyPort</c>, which defaults to 5311, and with <c>inProcess</c> it loads the C# packages itself. Either way it sends each attempt of a <c>node</c> package to a runner of the Node.js package host at <c>Extensions:Runners:Node</c>, because it cannot load JavaScript, and each attempt of a <c>python</c> package to a runner of the Python package host at <c>Extensions:Runners:Python</c>. It sends each attempt of an application's own package, in any language, to a runner of the application package host at <c>Extensions:Runners:Application</c>, with the built files of the call's release and the call's tenant. With <c>Extensions:ApplicationPackages</c> <c>true</c> the worker first asks the application package host at <c>Extensions:Runners:Application</c> whether it runs under gVisor, and stops when the answer is no or does not come within 10 seconds, see docs/reference/extension-packages.md#an-applications-packages.
     /// With <c>Cell:Id</c> set the worker is part of a cell and needs <c>Tenancy:Source=directory</c>, <c>Cell:Region</c> and <c>Cell:TenantDomain</c>.
-    /// A worker in a cell also measures the storage of each tenant every hour and counts the work items it runs and the emails it sends for each tenant per UTC day, in the platform database over <c>ConnectionStrings:Platform</c>. It also brings the first-login deny step of each tenant's realm in step with its <c>users</c> quota every hour. An email past the tenant's <c>emailsPerDay</c> quota waits until 00:00 UTC. The dry run or commit of an import waits for a <c>concurrentImports</c> lease of the tenant, and is due again in one second when none is free.
+    /// A worker in a cell also measures the storage of each tenant every hour and counts the work items it runs and the emails it sends for each tenant per UTC day, in the platform database over <c>ConnectionStrings:Platform</c>. It also counts each tenant's enabled realm users and applications and copies its emails sent into the day's usage row every hour, reading the tenant's Studio folder under <c>Studio:ApplicationsPath</c> and creating none, and brings the first-login deny step of each tenant's realm in step with its <c>users</c> quota every hour. An email past the tenant's <c>emailsPerDay</c> quota waits until 00:00 UTC. The dry run or commit of an import waits for a <c>concurrentImports</c> lease of the tenant, and is due again in one second when none is free.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Worker:IdlePollCeiling</c> is below <c>Worker:PollInterval</c>, <c>Worker:Concurrency</c> or <c>Worker:Quantum</c> is below 1, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Data:TenantPoolMaxSize</c>, <c>Data:TenantPoolMinSize</c> or <c>Data:TenantPoolIdleLifetime</c> is invalid, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
@@ -151,6 +152,9 @@ public static class WorkerServiceCollectionExtensions
                 services.AddSingleton<ICallLeases, CellCallLeases>();
                 services.AddSingleton<IWorkItemUsage, CellWorkItemUsage>();
                 services.AddHttpClient(nameof(RealmUsersQuota), client => client.Timeout = TimeSpan.FromSeconds(30));
+
+                // Counts each tenant's applications in its Studio folder, see docs/reference/tenant-quotas.md#usage. The worker reads the folder and never creates or writes one.
+                services.AddSingleton(StudioOptions.Load(configuration, environment.ContentRootPath, cell));
             }
         }
         else

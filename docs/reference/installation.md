@@ -474,7 +474,7 @@ The chart has these objects:
   startup, liveness and readiness probe, see [health checks](health-checks.md). The server's probes use
   HTTPS and the worker's use plain HTTP, and the chart sets `Health__Urls` to `http://0.0.0.0:5208` for
   the worker so that the kubelet can reach it. The server mounts the Studio volume and gets the Studio
-  settings. The server and the identity provider get the forwarded headers settings.
+  settings. In a cell the worker mounts it read-only at `/studio` with `Studio:ApplicationsPath`, to count applications for the [usage](tenant-quotas.md#usage). The server and the identity provider get the forwarded headers settings.
 - **The agent host.** A Deployment with a startup, liveness and readiness probe over plain HTTP on port
   5209, and the chart sets `Health__Urls` to `http://0.0.0.0:5209` so that the kubelet can reach it. It
   has no Service. It mounts only `platformConnection` and `platformSecretKey`, which it reads with AI authoring on.

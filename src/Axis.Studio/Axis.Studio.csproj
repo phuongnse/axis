@@ -14,6 +14,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Axis.Server" />
     <InternalsVisibleTo Include="Axis.Admin" />
+    <InternalsVisibleTo Include="Axis.Worker" />
     <InternalsVisibleTo Include="Axis.Server.Tests" />
     <InternalsVisibleTo Include="Axis.Integration.Tests" />
     <InternalsVisibleTo Include="Axis.OpenApiDocument" />
