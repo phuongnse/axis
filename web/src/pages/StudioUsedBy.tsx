@@ -1,4 +1,3 @@
-import { Select } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useContext, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
@@ -76,7 +75,7 @@ function usedByRows(
 
 /**
  * The Used by tab of a resource: the resources that use it, each by its label as a link that opens it at the path of
- * the reference, with search and a kind filter. It loads when the tab mounts.
+ * the reference, with search and Filter on Kind. It loads when the tab mounts.
  */
 export function StudioUsedBy({
   application,
@@ -92,7 +91,6 @@ export function StudioUsedBy({
   const { generation, lost } = useStudioConnection()
   const [usedBy, setUsedBy] = useState<StudioReference[]>()
   const [failed, setFailed] = useState(false)
-  const [kind, setKind] = useState<string>()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -121,8 +119,7 @@ export function StudioUsedBy({
     () => [...new Set(rows.map((row) => row.kind))].sort((left, right) => sidebarRank(left) - sidebarRank(right)),
     [rows],
   )
-  const shown = useMemo(() => rows.filter((row) => kind === undefined || row.kind === kind), [rows, kind])
-  const { view, setView } = useTableView(usedByFields, recordPageSize, [], true)
+  const { view, setView } = useTableView(usedByFields, recordPageSize, [], true, true)
 
   const columns: AxisColumn<UsedByRow>[] = [
     {
@@ -139,6 +136,11 @@ export function StudioUsedBy({
       title: t('shell.studio.kind'),
       sortValue: (row) => sidebarRank(row.kind),
       render: (_value, row) => kindSingular(row.kind, t),
+      filter: {
+        kind: 'enum',
+        value: (row) => row.kind,
+        options: kinds.map((item) => ({ value: item, label: kindSingular(item, t) })),
+      },
     },
     {
       key: 'how',
@@ -153,25 +155,11 @@ export function StudioUsedBy({
       testId="studio-used-by"
       columns={columns}
       rowKey={(row) => row.key}
-      dataSource={shown}
+      dataSource={rows}
       view={{ query: view, onChange: setView }}
       loading={usedBy === undefined && !failed}
       emptyText={t('shell.studio.usedBy.none')}
       failure={failed ? <AxisAlert kind="error" message={t('shell.studio.referencesFailed')} /> : undefined}
-      toolbar={{
-        view: (
-          <Select
-            allowClear
-            virtual={false}
-            aria-label={t('shell.studio.kind')}
-            placeholder={t('shell.studio.kind')}
-            style={{ minWidth: 160 }}
-            value={kind}
-            onChange={(value: string | undefined) => setKind(value)}
-            options={kinds.map((item) => ({ value: item, label: kindSingular(item, t) }))}
-          />
-        ),
-      }}
     />
   )
 }
