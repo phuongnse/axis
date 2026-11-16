@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { AppSwitcher } from './AppSwitcher'
+import { ShellBarSlot } from './shellBar'
 import { AxisButton } from './AxisButton'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import { NotificationBell } from './NotificationBell'
@@ -96,6 +97,7 @@ export function Shell({
     activeNavigationKey(navigation, pathname) ??
     (typeof from === 'string' ? activeNavigationKey(navigation, from.split(/[?#]/, 1)[0]) : undefined)
   const narrow = useNarrowWidth()
+  const [barSlot, setBarSlot] = useState<HTMLDivElement | null>(null)
   // The panel is open for the path it was opened on, so following a link or leaving narrow width closes it.
   const [openOn, setOpenOn] = useState<{ pathname: string; narrow: boolean } | null>(null)
   const open = narrow && openOn?.pathname === pathname && openOn.narrow
@@ -254,8 +256,12 @@ export function Shell({
               {!hasAccount && <ReadOnlyBanner />}
               {/* Proposed: a page draws on surface, flush with the header and the sidebar, see the review on #3650. */}
               <Layout.Content style={{ padding: claimed ? spacing.md : spacing.lg, background: colour.surface }}>
-                <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
+                <ShellSidebarContext.Provider value={sidebarContext}>
+                  <ShellBarSlot.Provider value={barSlot}>{children}</ShellBarSlot.Provider>
+                </ShellSidebarContext.Provider>
               </Layout.Content>
+              {/* Proposed: the save bar's place, right above the footer, see the review on #3650. */}
+              <div ref={setBarSlot} style={{ position: 'sticky', bottom: 0, zIndex: 10 }} />
               {sidebar && <ShellFooter legal={legal} />}
             </Layout>
           </Layout>
