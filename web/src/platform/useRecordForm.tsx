@@ -244,6 +244,10 @@ export function useRecordForm(
     [clearErrors, asking, ask],
   )
 
+  // Proposed: after a save that keeps the page open, such as a task's, the values become what the form started from,
+  // with the record's new version, see the review on #3650.
+  const saved = (version: number) => setSnapshot((current) => ({ ...current, initial: values, version }))
+
   // Proposed: Discard on the save bar puts the values back as the form started, see the review on #3650.
   const discard = () => {
     setValues(snapshot.initial)
@@ -740,6 +744,7 @@ export function useRecordForm(
     start,
     changed,
     discard,
+    saved,
     version: snapshot.version,
     showProblem,
     clearErrors,

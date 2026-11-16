@@ -150,6 +150,32 @@ export async function completeTask(tasksPath: string, id: string, body: string):
   throw new Error(`Completing the task '${id}' of '${tasksPath}' failed with status ${response.status}.`)
 }
 
+/** The record's new version after a task's save, or the problem the server reported. */
+export type SaveTaskResult = { ok: true; version: number } | { ok: false; problem: RecordProblem }
+
+/**
+ * Proposed, see the review on #3650: saves a task's changed values on its subject record without completing it, as
+ * `POST .../tasks/{id}/save` answers: `{ version }` on success, and a `400`, `403` or `409` problem as complete does.
+ */
+export async function saveTask(tasksPath: string, id: string, body: string): Promise<SaveTaskResult> {
+  const response = await apiFetch(`${tasksPath}/${id}/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  })
+  if (response.ok) {
+    return { ok: true, version: ((await response.json()) as { version: number }).version }
+  }
+  if (response.status === 400 || response.status === 403 || response.status === 409) {
+    const problem = JSON.parse(await response.text()) as Partial<RecordProblem>
+    return {
+      ok: false,
+      problem: { status: response.status, title: problem.title ?? '', errors: problem.errors ?? {} },
+    }
+  }
+  throw new Error(`Saving the task '${id}' of '${tasksPath}' failed with status ${response.status}.`)
+}
+
 /**
  * Claims or releases a task and returns the task as the route answers it. A 403 or 409 comes back
  * as the status. A 401 shows the sign-in prompt and throws, as any other failure does.

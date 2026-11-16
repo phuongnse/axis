@@ -102,9 +102,12 @@ export function TypedOnMount({ selector, text, children }: { selector: string; t
         return false
       }
       typed.current = true
-      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
-      setValue?.call(input, `${input.value}${text}`)
-      input.dispatchEvent(new Event('input', { bubbles: true }))
+      // The typing waits until React has drawn, as a person's would, so React does not flush inside an effect.
+      setTimeout(() => {
+        const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+        setValue?.call(input, `${input.value}${text}`)
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      })
       return true
     }
     if (type()) {

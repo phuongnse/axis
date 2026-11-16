@@ -1,13 +1,13 @@
 import { Flex, Form, Space, Tag } from 'antd'
-import { ActionBar } from './ActionBar'
 import { AxisAlert } from './AxisAlert'
 import { AxisActionRow, AxisButton } from './AxisButton'
 import { PageActions, PageHeading } from './PageLayout'
 import { RecordNotFound } from './RecordNotFound'
+import { SaveBar } from './SaveBar'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { formatValue } from './formatValue'
-import { buildCompleteBody } from './recordBody'
+import { buildCompleteBody, buildRecordBody } from './recordBody'
 import { fetchRecord, type RecordProblem } from './records'
 import { ReassignDialog } from './ReassignDialog'
 import { requiredMark } from './requiredMark'
@@ -18,6 +18,7 @@ import {
   fetchTask,
   reassignTask,
   runTaskCommand,
+  saveTask,
   usersPath,
   type ReassignBody,
   type ReassignRole,
@@ -403,6 +404,33 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
     return () => controller.abort()
   }, [entity.recordsPath, entity.name, task.subject.id, start])
 
+  const unsaved = Object.keys(form.changed()).length > 0
+  const [saving, setSaving] = useState(false)
+  const save = async () => {
+    if (saving || sending !== null) {
+      return
+    }
+    setSaving(true)
+    form.clearErrors()
+    try {
+      const result = await saveTask(tasksPath, task.id, buildRecordBody(entity.fields, form.changed(), form.version))
+      if (result.ok) {
+        form.saved(result.version)
+        return
+      }
+      if (result.problem.status === 403) {
+        onAssignedElsewhere()
+      } else {
+        steps.openFirstWith(form.showProblem(result.problem))
+      }
+    } catch (error) {
+      console.warn(`Saving the task '${task.id}' failed`, error)
+      setFormErrors([t('shell.task.saveFailed')])
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const complete = async (outcome: string) => {
     if (sending !== null) {
       return
@@ -464,25 +492,35 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
             )}
           </AxisActionRow>
         )}
-        {/* Proposed: the outcomes finish the task, so they sit in the page's action bar, always shown on the last step,
-            the first outcome last as the finishing action, see the review on #3650. */}
+        {/* Proposed: the outcomes act on the task, so they are the page's own actions on its heading's right, as a
+            record's Submit for approval is, the first outcome last as the main one; an outcome sends the changed
+            values with it. See the review on #3650. */}
         {steps.last && (
-          <ActionBar testId="task-outcomes">
-            <AxisActionRow align="center">
+          <PageActions>
+            <Flex gap="small">
               {[...task.outcomes].reverse().map((outcome) => (
                 <AxisButton
-                  role={outcome === task.outcomes[0] ? 'finish' : 'secondary'}
+                  role={outcome === task.outcomes[0] ? 'main' : 'secondary'}
                   key={outcome.name}
                   loading={sending === outcome.name}
-                  disabled={sending !== null && sending !== outcome.name}
+                  disabled={(sending !== null && sending !== outcome.name) || saving}
                   onClick={() => void complete(outcome.name)}
                 >
                   {t(outcome.labelKey)}
                 </AxisButton>
               ))}
-            </AxisActionRow>
-          </ActionBar>
+            </Flex>
+          </PageActions>
         )}
+        {/* Proposed: a change to the task's form saves through the save bar, as every form's does, with the task's own
+            save route, see the review on #3650. */}
+        <SaveBar
+          unsaved={unsaved}
+          saveable={unsaved && !saving && sending === null}
+          busy={saving || sending !== null}
+          onDiscard={form.discard}
+          onSave={() => void save()}
+        />
       </Flex>
     </Flex>
   )

@@ -1308,6 +1308,7 @@ export const routes: Record<string, () => unknown> = {
   [tasksPath]: () => taskPage,
   [`${tasksPath}/${openTaskId}`]: () => openTask,
   [`${tasksPath}/${openTaskId}/form-state`]: noStateAnswer,
+  [`${tasksPath}/${openTaskId}/save`]: () => ({ version: 2 }),
   [`${tasksPath}/${missingTaskId}`]: () => new Response(null, { status: 404 }),
   [instancesPath]: () => instancePage,
   [deadLettersPath]: () => deadLetterPage,

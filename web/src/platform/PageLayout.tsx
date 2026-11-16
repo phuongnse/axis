@@ -29,7 +29,7 @@ export function PageLayout({
   const [slot, setSlot] = useState<HTMLDivElement | null>(null)
   const [named, setNamed] = useState<string | null>(null)
   const [lineSlot, setLineSlot] = useState<HTMLDivElement | null>(null)
-  const { colour } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const heading = (
     // Proposed: the page's own actions sit on the heading's right, as a Studio page's do, see the review on #3650.
     <Flex justify="space-between" align="center" gap="middle">
@@ -41,7 +41,8 @@ export function PageLayout({
         {/* Proposed: the line that gives the thing the page names its context, see the review on #3650. */}
         <div ref={setLineSlot} style={{ color: colour.textMuted }} />
       </Flex>
-      <div ref={setSlot} />
+      {/* The page's own actions of every widget sit in one row, in the order the widgets draw them. */}
+      <div ref={setSlot} style={{ display: 'flex', gap: spacing.sm, flexWrap: 'wrap', justifyContent: 'end' }} />
     </Flex>
   )
 

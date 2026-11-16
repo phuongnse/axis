@@ -80,7 +80,9 @@ export function SaveBar({
     >
       <AxisActionRow align="center">
         {unsaved && (
-          <AxisButton role="secondary" disabled={busy} onClick={() => setDiscardOpen(true)}>
+          // Proposed: Discard throws the changes away, so it is a destructive action in `dangerText`, see the review on
+          // #3650.
+          <AxisButton role="destructive" disabled={busy} onClick={() => setDiscardOpen(true)}>
             {t('shell.studio.discard')}
           </AxisButton>
         )}
