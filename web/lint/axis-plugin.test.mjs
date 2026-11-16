@@ -210,6 +210,70 @@ describe('axis/no-antd-alert', () => {
   })
 })
 
+describe('axis/no-card-panel', () => {
+  const rules = { 'axis/no-card-panel': 'error' }
+
+  it('reports each full-size Card imported from antd, also under another name', () => {
+    const source = [
+      "import { Card, Card as Panel } from 'antd'",
+      'const a = <Card title="a" />',
+      'const b = <Card size="default" />',
+      'const c = <Panel />',
+      '',
+    ].join('\n')
+    expect(lint(source, { rules })).toEqual(['axis(no-card-panel):2', 'axis(no-card-panel):3', 'axis(no-card-panel):4'])
+  })
+
+  it('reports a size that is not the literal small, or that a spread may override', () => {
+    const source = [
+      "import { Card } from 'antd'",
+      'const a = <Card size={size} />',
+      'const b = <Card {...props} />',
+      'const c = <Card size="small" {...props} />',
+      "const d = <Card size={on ? 'small' : 'default'} />",
+      '',
+    ].join('\n')
+    expect(lint(source, { rules })).toEqual([
+      'axis(no-card-panel):2',
+      'axis(no-card-panel):3',
+      'axis(no-card-panel):4',
+      'axis(no-card-panel):5',
+    ])
+  })
+
+  it('allows a small card, written as a string or in braces, on a later line, or after a spread', () => {
+    const source = [
+      "import { Card } from 'antd'",
+      'const a = <Card size="small" title="a" />',
+      "const b = <Card size={'small'} />",
+      'const c = (',
+      '  <Card',
+      '    title="c"',
+      '    size="small"',
+      '  />',
+      ')',
+      'const d = <Card {...props} size="small" />',
+      '',
+    ].join('\n')
+    expect(lint(source, { rules })).toEqual([])
+  })
+
+  it('allows Card.Meta and Card.Grid, which are parts inside a card', () => {
+    const source = 'import { Card } from \'antd\'\nconst a = <Card.Meta title="a" />\nconst b = <Card.Grid />\n'
+    expect(lint(source, { rules })).toEqual([])
+  })
+
+  it('allows a Card from another source', () => {
+    const source = 'import { Card } from \'./elsewhere\'\nconst a = <Card title="a" />\n'
+    expect(lint(source, { rules })).toEqual([])
+  })
+
+  it('does not report a comment or a string that names a Card', () => {
+    const source = "import { Card } from 'antd'\n// <Card title=\"a\" />\nconst a = '<Card>'\n"
+    expect(lint(source, { rules })).toEqual([])
+  })
+})
+
 describe('axis/field-label-through-axis-field', () => {
   const rules = { 'axis/field-label-through-axis-field': 'error' }
   const rule = 'axis(field-label-through-axis-field)'
@@ -439,6 +503,27 @@ describe('the rules of web/.oxlintrc.json', () => {
       ).diagnostics.map((diagnostic) => diagnostic.code)
     expect(run('src/pages/Editor.tsx')).toEqual(['axis(field-label-through-axis-field)'])
     expect(run('src/identitySignIn/SignIn.tsx')).toEqual([])
+  })
+
+  it('refuses a full-size card in a page or a console monitor and allows it in a page test or elsewhere', () => {
+    const copy = path.join(folder, 'real-config-cards')
+    mkdirSync(path.join(copy, 'src/pages'), { recursive: true })
+    mkdirSync(path.join(copy, 'src/platform'), { recursive: true })
+    const configFile = path.join(copy, '.oxlintrc.json')
+    const source = 'import { Card } from \'antd\'\nexport function Panel() {\n  return <Card title="x" />\n}\n'
+    writeFileSync(configFile, JSON.stringify(realConfig))
+    writeFileSync(path.join(copy, 'src/pages/Panel.tsx'), source)
+    writeFileSync(path.join(copy, 'src/pages/Panel.test.tsx'), source)
+    writeFileSync(path.join(copy, 'src/platform/ConsoleMonitor.tsx'), source)
+    writeFileSync(path.join(copy, 'src/platform/Chart.tsx'), source)
+    const run = (file) =>
+      JSON.parse(
+        spawnSync(oxlint, ['-c', configFile, '--format', 'json', file], { cwd: copy, encoding: 'utf8' }).stdout,
+      ).diagnostics.map((diagnostic) => diagnostic.code)
+    expect(run('src/pages/Panel.tsx')).toEqual(['axis(no-card-panel)'])
+    expect(run('src/pages/Panel.test.tsx')).toEqual([])
+    expect(run('src/platform/ConsoleMonitor.tsx')).toEqual(['axis(no-card-panel)'])
+    expect(run('src/platform/Chart.tsx')).toEqual([])
   })
 
   it('reports Object.assign, DOMParser and a Table imported from antd', () => {

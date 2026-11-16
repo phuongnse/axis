@@ -79,6 +79,12 @@ files are not checked. The plugin's rule for the end-to-end tests is on in `test
   file that may use it.
 - **`axis/no-antd-alert`** refuses an `<Alert>` imported from `antd`. `AxisAlert.tsx` is the one file
   that may use it.
+- **`axis/no-card-panel`** refuses a `<Card>` imported from `antd` in a page under `src/pages/` or a `Console*`
+  file in `src/platform/`, unless it has `size="small"`. A page's parts sit a rule apart, see
+  [Parts a rule apart](shell.md#layout), so a page draws its panels through `SectionParts`. A small card is an item
+  in a list, such as a Studio step. It accepts only the literal `small`, so a size from a variable, a spread or a
+  condition is refused. It leaves `Card.Meta` and `Card.Grid` alone, and it does not see an import from a deep path
+  such as `antd/es/card`, an import through `import * as`, or a full card drawn by a widget that a page renders.
 - **`no-restricted-imports`** refuses a named `Table` import from `antd`. `AxisTable.tsx` is the one
   file that may use it. It does not see an import from a deep path such as `antd/es/table`.
 - **`axis/field-label-through-axis-field`** refuses a hand-drawn field label: a `label` on Ant Design's
