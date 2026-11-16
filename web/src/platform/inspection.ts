@@ -160,6 +160,8 @@ export interface SubProcess {
 export interface InstanceDetail {
   id: string
   process: string
+  /** Proposed, see the review on #3650: the text key of the process's title, from the instance's release. */
+  processTitleKey?: string | null
   /** The subject the instance runs for, or `null` when its process has no subject. */
   subjectId: string | null
   /**

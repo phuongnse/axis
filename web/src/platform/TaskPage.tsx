@@ -2,6 +2,7 @@ import { Flex, Form, Tag } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisActionRow, AxisButton, AxisButtonGroup } from './AxisButton'
 import { PageActions, PageHeading } from './PageLayout'
+import { NotSet } from './EmptyValue'
 import { PartRule } from './SectionParts'
 import { RecordLink } from './RecordLink'
 import { TermList, type Term } from './TermList'
@@ -237,22 +238,20 @@ function TaskBody({
   // beside the name and its kind as the line, and the rest of what the platform keeps of it is the page's first part,
   // see the review on #3650.
   // The record the task is about opens on its own page, named Record as in the Tasks inbox, and each fact takes a row
-  // of its own, as docs/reference/actions-and-controls.md#fields says.
+  // of its own, as docs/reference/actions-and-controls.md#fields says. Every task has both facts, so both always show:
+  // a record with no display field by its id, and no due date as Not set, as
+  // docs/reference/actions-and-controls.md#showing-what-is-empty says.
   const facts: Term[] = [
-    ...(task.subject.label === null
-      ? []
-      : [
-          {
-            key: 'subject',
-            term: t('shell.tasks.subject'),
-            value: (
-              <RecordLink entity={task.subject.entity} id={task.subject.id}>
-                {task.subject.label}
-              </RecordLink>
-            ),
-          },
-        ]),
-    ...(dueAt === null ? [] : [{ key: 'dueAt', term: t('shell.tasks.dueAt'), value: dueAt }]),
+    {
+      key: 'subject',
+      term: t('shell.tasks.subject'),
+      value: (
+        <RecordLink entity={task.subject.entity} id={task.subject.id}>
+          {task.subject.label ?? task.subject.id}
+        </RecordLink>
+      ),
+    },
+    { key: 'dueAt', term: t('shell.tasks.dueAt'), value: dueAt ?? <NotSet /> },
   ]
   return (
     <Flex vertical gap="middle">

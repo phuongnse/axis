@@ -725,6 +725,7 @@ export const instanceId = 'be6b7f80-92a3-4eb5-bfc6-e708192a3b4c'
 const instanceDetail: InstanceDetail = {
   id: instanceId,
   process: 'Approve',
+  processTitleKey: 'process.approve.title',
   subjectId: requestId,
   subject: { entity: 'Request', id: requestId, label: 'Standing desks for the new office' },
   releaseId,
@@ -1306,6 +1307,7 @@ export const siteTexts: Record<string, string> = {
   'request.delete': 'Delete',
   'request.submit': 'Submit for approval',
   'request.task.review': 'Review the request',
+  'process.approve.title': 'Request approval',
   'chart.requestsByStatus': 'Requests by status',
   'chart.requests': 'Requests',
   'chart.urgentRequests': 'Urgent requests',

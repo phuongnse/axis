@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { EmptyState } from './EmptyState'
+import { NotSet } from './EmptyValue'
 import { formatValue } from './formatValue'
 import {
   fetchInstance,
@@ -331,6 +332,10 @@ export function InstanceDetailView({
   // Proposed, see the review on #3650: the instance is headed by its process, its state a tag beside it and its kind the
   // line; what the platform keeps of it is the first part, each fact on a row of its own, and each part after it is a
   // part with a rule above it.
+  // A fact every instance has always shows, and reads Not set when empty. Only what does not apply is left out: the
+  // record of a process with no subject, and the due time of an instance not waiting at a timer, as
+  // docs/reference/actions-and-controls.md#showing-what-is-empty says. Started and Ended belong together, so they share
+  // a row.
   const subject = instance.subject ?? null
   const facts: Term[] = [
     ...(subject === null
@@ -347,26 +352,27 @@ export function InstanceDetailView({
           },
         ]),
     { key: 'step', term: t('shell.inspector.step'), value: stepLabel(instance.step) },
-    ...(instance.parent === null
-      ? []
-      : [
-          {
-            key: 'parent',
-            term: t('shell.inspector.parent'),
-            value:
-              parentPage === undefined ? (
-                instance.parent.process
-              ) : (
-                <Link to={inspectorPath(sitePath, parentPage, instance.parent.id)} data-testid="inspector-parent-link">
-                  {instance.parent.process}
-                </Link>
-              ),
-          },
-        ]),
-    { key: 'createdAt', term: t('shell.inspector.createdAt'), value: time('createdAt', instance.createdAt) },
-    ...(instance.endedAt === null
-      ? []
-      : [{ key: 'endedAt', term: t('shell.inspector.endedAt'), value: time('endedAt', instance.endedAt) }]),
+    {
+      key: 'parent',
+      term: t('shell.inspector.parent'),
+      value:
+        instance.parent === null ? (
+          <NotSet />
+        ) : parentPage === undefined ? (
+          instance.parent.process
+        ) : (
+          <Link to={inspectorPath(sitePath, parentPage, instance.parent.id)} data-testid="inspector-parent-link">
+            {instance.parent.process}
+          </Link>
+        ),
+    },
+    { key: 'createdAt', term: t('shell.inspector.createdAt'), value: time('createdAt', instance.createdAt), width: 6 },
+    {
+      key: 'endedAt',
+      term: t('shell.inspector.endedAt'),
+      value: instance.endedAt === null ? <NotSet /> : time('endedAt', instance.endedAt),
+      width: 6,
+    },
     ...(due === null ? [] : [{ key: 'dueAt', term: t('shell.inspector.dueAt'), value: time('dueAt', due) }]),
     { key: 'release', term: t('shell.inspector.release'), value: instance.releaseNumber ?? instance.releaseId },
   ]
@@ -380,7 +386,8 @@ export function InstanceDetailView({
   return (
     <Flex vertical gap="middle" data-testid="inspector-instance">
       <PageHeading
-        title={instance.process}
+        // Proposed: a process is named by its title in each language, see the review on #3650.
+        title={instance.processTitleKey ? t(instance.processTitleKey) : instance.process}
         line={t('shell.inspector.process')}
         tags={
           // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
