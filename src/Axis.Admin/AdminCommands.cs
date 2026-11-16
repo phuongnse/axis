@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Reflection;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Axis.Administration;
 using Axis.Configuration.Diagnostics;
@@ -40,6 +41,12 @@ internal static partial class AdminCommands
     public const string HostCheckIntervalSetting = "Cell:HostCheckInterval";
 
     public const string HostCertificateIssuerSetting = "Cell:HostCertificateIssuer";
+
+    public const string HostRouteServiceSetting = "Cell:HostRouteService";
+
+    public const string HostRouteIngressClassSetting = "Cell:HostRouteIngressClass";
+
+    public const string HostRouteAnnotationsSetting = "Cell:HostRouteAnnotations";
 
     public static readonly TimeSpan DefaultHostCheckInterval = TimeSpan.FromMinutes(10);
 
@@ -128,7 +135,7 @@ internal static partial class AdminCommands
         CancellationToken cancellationToken) =>
         RunAsync(args, configuration, input, output, error, Publisher.DefaultLeaseDuration, Publisher.DefaultTestLimit, null, cancellationToken);
 
-    // The publisher lease, the test limit, the identity provider handler, the DNS resolver and the certificate writer are parameters so that tests can use short ones and a stub.
+    // The publisher lease, the test limit, the identity provider handler, the DNS resolver, the certificate writer and the route writer are parameters so that tests can use short ones and a stub.
     // The product has no setting for them.
     internal static async Task<int> RunAsync(
         string[] args,
@@ -141,7 +148,8 @@ internal static partial class AdminCommands
         HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken,
         IDnsTxtResolver? dnsResolver = null,
-        ICertificateWriter? certificateWriter = null)
+        ICertificateWriter? certificateWriter = null,
+        IRouteWriter? routeWriter = null)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -183,7 +191,7 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        return await command.RunAsync(new AdminRun(command, args, configuration, cell, input, output, error, publisherLease, publisherTestLimit, identityProviderHandler, cancellationToken, dnsResolver, certificateWriter));
+        return await command.RunAsync(new AdminRun(command, args, configuration, cell, input, output, error, publisherLease, publisherTestLimit, identityProviderHandler, cancellationToken, dnsResolver, certificateWriter, routeWriter));
     }
 
     /// <summary>
@@ -222,7 +230,7 @@ internal static partial class AdminCommands
         new("cell operator client add", AuditMark.OnePerRun, CellOperatorClient.AddAsync),
         new("cell backup", AuditMark.OnePerTenant, CellBackup.BackupAsync),
         new("cell restore-check", AuditMark.OnePerTenant, CellRestoreCheck.RunAsync),
-        new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.DnsResolver, run.CertificateWriter, run.CancellationToken)),
+        new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.DnsResolver, run.CertificateWriter, run.RouteWriter, run.CancellationToken)),
         new("version", AuditMark.None, VersionAsync),
     ];
 
@@ -1288,6 +1296,7 @@ internal static partial class AdminCommands
         HttpMessageHandler? identityProviderHandler,
         IDnsTxtResolver? dnsResolver,
         ICertificateWriter? certificateWriter,
+        IRouteWriter? routeWriter,
         CancellationToken cancellationToken)
     {
         if (args.Length != 1)
@@ -1349,7 +1358,7 @@ internal static partial class AdminCommands
                 studioPlatform is null ? null : new PlatformStudioWriteLock(studioPlatform, NullLogger<PlatformStudioWriteLock>.Instance));
 
         return source == TenancySource.Directory
-            ? await DirectoryPublisherAsync(configuration, cell, studio, builds, output, error, lease, testLimit, identityProviderHandler, dnsResolver, certificateWriter, cancellationToken)
+            ? await DirectoryPublisherAsync(configuration, cell, studio, builds, output, error, lease, testLimit, identityProviderHandler, dnsResolver, certificateWriter, routeWriter, cancellationToken)
             : await ConfigurationPublisherAsync(configuration, studio, builds, output, error, lease, testLimit, identityProviderHandler, cancellationToken);
     }
 
@@ -1365,6 +1374,7 @@ internal static partial class AdminCommands
         HttpMessageHandler? identityProviderHandler,
         IDnsTxtResolver? dnsResolver,
         ICertificateWriter? certificateWriter,
+        IRouteWriter? routeWriter,
         CancellationToken cancellationToken)
     {
         TimeSpan refreshInterval;
@@ -1396,14 +1406,38 @@ internal static partial class AdminCommands
         }
 
         // A blank issuer is no certificate. A set one needs the service account of the pod, so a publisher outside a cluster stops here.
+        // The certificate writer and the route writer share one client of the cluster.
         var certificateIssuer = configuration[HostCertificateIssuerSetting]?.Trim();
+        KubernetesApi? cluster = null;
         ICertificateWriter? certificates = null;
         if (!string.IsNullOrEmpty(certificateIssuer))
         {
-            certificates = certificateWriter ?? KubernetesCertificateWriter.InCluster(certificateIssuer);
+            certificates = certificateWriter ?? ((cluster ??= KubernetesApi.InCluster()) is { } api ? new KubernetesCertificateWriter(api, certificateIssuer) : null);
             if (certificates is null)
             {
                 error.WriteLine($"The setting {HostCertificateIssuerSetting} is set, but the publisher has no Kubernetes service account.");
+                return 2;
+            }
+        }
+
+        // A blank service is no route, see docs/reference/cells.md#hosts-and-certificates. The annotations are read first, so a wrong value is
+        // named whatever the cluster is.
+        var routeService = configuration[HostRouteServiceSetting]?.Trim();
+        IRouteWriter? routes = null;
+        if (!string.IsNullOrEmpty(routeService))
+        {
+            if (!TryReadRouteAnnotations(configuration, error, out var routeAnnotations))
+            {
+                return 2;
+            }
+
+            var ingressClass = configuration[HostRouteIngressClassSetting]?.Trim();
+            routes = routeWriter ?? ((cluster ??= KubernetesApi.InCluster()) is { } api
+                ? new KubernetesRouteWriter(api, routeService, string.IsNullOrEmpty(ingressClass) ? null : ingressClass, routeAnnotations)
+                : null);
+            if (routes is null)
+            {
+                error.WriteLine($"The setting {HostRouteServiceSetting} is set, but the publisher has no Kubernetes service account.");
                 return 2;
             }
         }
@@ -1470,10 +1504,34 @@ internal static partial class AdminCommands
                 http,
                 dnsResolver ?? new DnsClientTxtResolver(),
                 hostCheckInterval,
-                certificates),
+                certificates,
+                routes),
             storage is null ? null : new TenantExportSweep(storage),
             studio,
             builds).RunAsync();
+    }
+
+    // A blank setting is no annotations. The value is a JSON object of strings and is never echoed.
+    private static bool TryReadRouteAnnotations(IConfiguration configuration, TextWriter error, out Dictionary<string, string> annotations)
+    {
+        annotations = [];
+        var value = configuration[HostRouteAnnotationsSetting];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        try
+        {
+            annotations = JsonSerializer.Deserialize<Dictionary<string, string>>(value) ?? throw new JsonException();
+            return true;
+        }
+        catch (JsonException)
+        {
+            annotations = [];
+            error.WriteLine($"The setting {HostRouteAnnotationsSetting} must be a JSON object of strings.");
+            return false;
+        }
     }
 
     // A blank setting is the default. A setting's own value is never echoed, so the message says only which setting is wrong.

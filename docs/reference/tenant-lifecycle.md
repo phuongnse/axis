@@ -225,11 +225,12 @@ The [publisher](administration.md#publisher) checks the customer's DNS records, 
   also across restarts and several publishers.
 - **Verified.** When a `TXT` record of `_axis-verify.<host>` equals the token, the host joins the
   tenant, the realm's redirect addresses gain it, the publisher creates the host's cert-manager
-  `Certificate` when the cell has certificates on, and the request becomes `verified`. The
+  `Certificate` and its Ingress route when the cell has certificates on, and the request becomes
+  `verified`. The
   [platform audit record](tenant-setting-commands.md#platform-audit-records) is named
   `tenant host verify` and names the operator who asked for the host as its actor. The request is
-  marked last, so a stop, a failed realm update or a failed certificate write is retried in the next
-  round (a `Certificate` that exists counts as written), and a host that the tenant already holds is
+  marked last, so a stop, a failed realm update, a failed certificate write or a failed route write is
+  retried in the next round (a `Certificate` or an Ingress that exists counts as written), and a host that the tenant already holds is
   not added or audited twice. A host is never verified without a matching record.
 - **Pending.** A wrong token, no record or a DNS failure leaves the request pending, and the failure
   only writes a line. The request also stays pending when another tenant holds the host.
@@ -348,7 +349,7 @@ A deletion can be undone during its grace window, and not after.
       first writes the tombstone, takes the actor from the job input `{ "actor" }`, and refuses a job
       that has none.
       - **Certificates** _(planned for M33)_. The step also removes the tenant's cert-manager
-        certificates.
+        certificates and the Ingress routes of its hosts.
    2. **`database`.** The tenant database, then its schema and runtime roles.
    3. **`realm`.** Its realm in the identity provider.
    4. **`files`** _(planned for M33)_. Its files in object storage, when a storage binding holds them

@@ -766,6 +766,49 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(output, /^kind: (ClusterRole|ClusterRoleBinding)$/m)
   })
 
+  test('the publisher may only create ingresses.networking.k8s.io in the release namespace', () => {
+    const output = renderOk('--namespace', 'axis')
+    const role = find(output, 'Role', 'axis-publisher-routes')
+    assert.match(role, /namespace: axis\n/)
+    assert.match(role, /rules:\n\s+- apiGroups:\n\s+- networking\.k8s\.io\n\s+resources:\n\s+- ingresses\n\s+verbs:\n\s+- create\n/)
+    assert.equal(role.match(/- apiGroups:/g).length, 1)
+    assert.equal(role.match(/verbs:/g).length, 1)
+    const binding = find(output, 'RoleBinding', 'axis-publisher-routes')
+    assert.match(binding, /namespace: axis\n/)
+    assert.match(binding, /roleRef:\n\s+apiGroup: rbac\.authorization\.k8s\.io\n\s+kind: Role\n\s+name: axis-publisher-routes\n/)
+    assert.match(binding, /subjects:\n\s+- kind: ServiceAccount\n\s+name: axis-publisher\n\s+namespace: axis\n/)
+    assert.doesNotMatch(output, /^kind: (ClusterRole|ClusterRoleBinding)$/m)
+  })
+
+  test('with the certificate on, the publisher gets the route settings and no other pod does', () => {
+    const output = renderOk()
+    const publisher = find(output, 'Deployment', 'axis-publisher')
+    assert.match(publisher, /- name: Cell__HostRouteService\n\s+value: "axis-server"\n/)
+    assert.match(publisher, /- name: Cell__HostRouteIngressClass\n\s+value: "nginx"\n/)
+    assert.match(publisher, /- name: Cell__HostRouteAnnotations\n\s+value: "\{\}"\n/)
+    for (const name of ['axis-server', 'axis-worker', 'axis-identity']) {
+      assert.doesNotMatch(find(output, 'Deployment', name), /Cell__HostRoute/, name)
+    }
+  })
+
+  test('the route annotations go to the publisher as a JSON object, and a blank ingress class leaves the class setting out', () => {
+    const annotated = renderOk('--set-json', 'cell.certificate.route.annotations={"nginx.ingress.kubernetes.io/backend-protocol":"HTTPS"}')
+    assert.match(
+      find(annotated, 'Deployment', 'axis-publisher'),
+      /- name: Cell__HostRouteAnnotations\n\s+value: "\{\\"nginx\.ingress\.kubernetes\.io\/backend-protocol\\":\\"HTTPS\\"\}"\n/,
+    )
+
+    const unclassed = find(renderOk('--set', 'cell.certificate.http01.ingressClassName='), 'Deployment', 'axis-publisher')
+    assert.match(unclassed, /- name: Cell__HostRouteService\n/)
+    assert.doesNotMatch(unclassed, /Cell__HostRouteIngressClass/)
+  })
+
+  test('a route annotation that is not a string fails rendering', () => {
+    const result = render('--set-json', 'cell.certificate.route.annotations={"a":1}')
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /annotations/)
+  })
+
   test('with the certificate on, the publisher runs as its own service account with the token and the issuer name, and no other pod does', () => {
     const output = renderOk()
     const publisher = find(output, 'Deployment', 'axis-publisher')
@@ -802,6 +845,8 @@ describe('the Axis Helm chart', () => {
     for (const name of ['axis-server', 'axis-worker']) {
       assert.doesNotMatch(find(output, 'Deployment', name), /Cell__HostCertificateIssuer/, name)
     }
+
+    assert.doesNotMatch(output, /axis-publisher-routes|Cell__HostRoute/)
   })
 
   test('with the certificate on, an empty cell.tenantDomain fails and names it', () => {
