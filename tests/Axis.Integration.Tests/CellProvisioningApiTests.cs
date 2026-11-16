@@ -133,6 +133,40 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task The_tenant_list_answers_a_searched_filtered_sorted_page_with_its_total_and_400_for_an_unknown_field()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var active = Uri.EscapeDataString("""{"all":[{"field":"status","op":"eq","value":"active"}]}""");
+        var undeclared = Uri.EscapeDataString("""{"all":[{"field":"nothing","op":"eq","value":"x"}]}""");
+
+        using var bare = await GetAsync(client, "/api/cell/tenants", token);
+        using var searched = await GetAsync(client, "/api/cell/tenants?search=example&sort=-id&pageSize=1", token);
+        using var filtered = await GetAsync(client, $"/api/cell/tenants?search=example&sort=-id&pageSize=1&filter={active}", token);
+        using var badFilter = await GetAsync(client, $"/api/cell/tenants?filter={undeclared}", token);
+        using var badSort = await GetAsync(client, "/api/cell/tenants?sort=nothing", token);
+        using var badPage = await GetAsync(client, "/api/cell/tenants?pageSize=0", token);
+
+        var all = await bare.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(3, all.GetProperty("totalCount").GetInt64());
+        Assert.Equal(20, all.GetProperty("pageSize").GetInt32());
+        Assert.Equal(1, all.GetProperty("page").GetInt32());
+        Assert.Equal(["a", "b", "c"], all.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetString()).ToArray());
+        var first = await searched.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(["c"], first.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetString()).ToArray());
+        Assert.Equal(1, first.GetProperty("page").GetInt32());
+        Assert.Equal(1, first.GetProperty("pageSize").GetInt32());
+        Assert.Equal(2, first.GetProperty("totalCount").GetInt64());
+        var narrowed = await filtered.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(["b"], narrowed.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetString()).ToArray());
+        Assert.Equal(1, narrowed.GetProperty("totalCount").GetInt64());
+        await AssertBadRequestAsync(badFilter, "filter");
+        await AssertBadRequestAsync(badSort, "sort");
+        await AssertBadRequestAsync(badPage, "pageSize");
+    }
+
+    [Fact]
     public async Task The_list_and_the_detail_answer_the_failed_work_counts_of_the_last_sample_and_null_for_a_tenant_without_one()
     {
         await using var factory = await StartAsync();
@@ -315,7 +349,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         string[] tenantFields = ["id", "status", "application", "hosts[]", .. failedWork, .. usage, "newestArchiveAt", "deleteAfter"];
         AssertFields(
             await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken),
-            [.. tenantFields.Select(field => $"items[].{field}")],
+            [.. tenantFields.Select(field => $"items[].{field}"), "page", "pageSize", "totalCount"],
             forbidden);
         string[] days = ["day", "databaseBytes", "fileBytes", "users", "applications", "emailsSent", "connectorCalls", "workItemsRun"];
         AssertFields(
@@ -479,11 +513,13 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         using var tenantRealm = await GetAsync(client, "/api/cell/tenants", tenantRealmToken);
         using var tenantRealmOne = await GetAsync(client, "/api/cell/tenants/a", tenantRealmToken);
         using var garbage = await GetAsync(client, "/api/cell/tenants", "not-a-token");
+        using var noTokenBadSort = await GetAsync(client, "/api/cell/tenants?sort=nothing", token: null);
 
         Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, tenantRealm.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, tenantRealmOne.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, garbage.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, noTokenBadSort.StatusCode);
     }
 
     [Fact]
@@ -495,9 +531,11 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
 
         using var list = await GetAsync(client, "/api/cell/tenants", token);
         using var one = await GetAsync(client, "/api/cell/tenants/a", token);
+        using var badSort = await GetAsync(client, "/api/cell/tenants?sort=nothing", token);
 
         Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, one.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, badSort.StatusCode);
     }
 
     [Fact]
@@ -2286,6 +2324,13 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
 
     private static HttpClient CreateClient(WebApplicationFactory<Program> factory, Uri address) =>
         factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = address, AllowAutoRedirect = false });
+
+    private static async Task AssertBadRequestAsync(HttpResponseMessage response, string key)
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal([key], body.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
+    }
 
     private static async Task<HttpResponseMessage> GetAsync(HttpClient client, string path, string? token)
     {

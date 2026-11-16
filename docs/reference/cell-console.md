@@ -90,9 +90,11 @@ tenant button of the Tenants view and the actions of the Tenant view.
 - **Jobs.** The jobs of the cell, newest first. A row shows the time, the kind, the tenant and the state, each
   step with its state, or one line when no step has run yet, and the error of a failed job or step. A failed job other than a `purge` job has a Run
   again button, with a confirmation that names the job and the tenant, see [actions](#actions).
-- **Tenants.** One row per tenant, 20 to a page, with AxisTable's Search, which looks in the id and the hosts,
-  and its Filter on the status, and a Create tenant button that opens the dialog of [creating a tenant](#actions).
-  The search and the filter run in the browser and live in the address, see [tables](actions-and-controls.md#tables).
+- **Tenants.** One row per tenant, with AxisTable's Search, which looks in the id and the hosts, its Filter on the
+  status, its Columns, a sort on the header of every column but Hosts, a pager with a page size, and a Create tenant
+  button that opens the dialog of [creating a tenant](#actions). The server searches, filters, sorts and pages the
+  list, 20 tenants to a page by default, see [the tenant list](tenant-lifecycle.md#routes). The search, the filter,
+  the columns, the sort, the page and the page size live in the address, see [tables](actions-and-controls.md#tables).
   A row shows:
   - the id, the status (`active`, `readOnly`, `suspended`, `provisioning` or `deleting`) and the hosts;
   - the counts of failed instances, calls with an unknown outcome and open dead letters, with a dash for a

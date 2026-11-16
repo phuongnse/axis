@@ -147,10 +147,17 @@ export async function fetchCellJobs(signal?: AbortSignal, tenant?: string): Prom
   return result.kind === 'ok' ? { kind: 'ok', value: result.value.items } : result
 }
 
-/** Loads every tenant of the cell, ordered by id. */
-export async function fetchCellTenants(signal?: AbortSignal): Promise<CellResult<CellTenant[]>> {
-  const result = await fetchCellRoute<{ items: CellTenant[] }>('/api/cell/tenants', 'tenants', signal)
-  return result.kind === 'ok' ? { kind: 'ok', value: result.value.items } : result
+/** One page of the tenants of the cell, as served by `GET /api/cell/tenants`. `totalCount` is the number of tenants that matched before the page was cut. */
+export interface CellTenantPage {
+  items: CellTenant[]
+  page: number
+  pageSize: number
+  totalCount: number
+}
+
+/** Loads one page of the tenants of the cell. `query` is the record API's paging, sort, search and filter query string. */
+export function fetchCellTenants(query: string, signal?: AbortSignal): Promise<CellResult<CellTenantPage>> {
+  return fetchCellRoute<CellTenantPage>(`/api/cell/tenants${query ? `?${query}` : ''}`, 'tenants', signal)
 }
 
 /** Loads one tenant with its quotas. The value is `null` when the cell has no tenant with that id. */

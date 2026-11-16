@@ -63,12 +63,22 @@ const gamma: CellTenant = {
   deleteAfter: null,
 }
 
-function stubTenants(status: number, items: CellTenant[] = []) {
+const tenantPage = (items: CellTenant[], totalCount = items.length) => ({ items, page: 1, pageSize: 20, totalCount })
+
+/** Answers every tenant list read with one page of `items`, and returns the addresses it was asked for. */
+function stubTenants(status: number, items: CellTenant[] = [], totalCount = items.length) {
+  const urls: string[] = []
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => new Response(JSON.stringify(status === 200 ? { items } : { status }), { status })),
+    vi.fn(async (input: string) => {
+      urls.push(input)
+      return new Response(JSON.stringify(status === 200 ? tenantPage(items, totalCount) : { status }), { status })
+    }),
   )
+  return urls
 }
+
+const queryOf = (url: string) => new URL(url, 'http://localhost').searchParams
 
 function Address() {
   return <output data-testid="address">{useLocation().search}</output>
@@ -140,7 +150,7 @@ function stubCreate(posts: { status: number; body: unknown }[], reads: CellJob[]
         return new Response(JSON.stringify(job), { status: 200 })
       }
       counts.lists += 1
-      return new Response(JSON.stringify({ items: [acme] }), { status: 200 })
+      return new Response(JSON.stringify(tenantPage([acme])), { status: 200 })
     }),
   )
   return { sent, counts }
@@ -168,12 +178,14 @@ function dataRows() {
   return within(screen.getByTestId('cell-tenants')).getAllByRole('row').slice(1)
 }
 
-function rowIds() {
-  return dataRows().map((row) => within(row).getAllByRole('cell')[0].textContent)
+/** The table is there at once, so a test waits for its first row. */
+async function loadedTable() {
+  const table = await screen.findByTestId('cell-tenants')
+  await waitFor(() => expect(dataRows().length).toBeGreaterThan(0))
+  return table
 }
 
 const address = () => screen.getByTestId('address').textContent!
-const filterInAddress = () => JSON.parse(new URLSearchParams(address()).get('filter')!) as unknown
 
 describe('CellTenantsPage', () => {
   afterEach(() => vi.unstubAllGlobals())
@@ -182,7 +194,7 @@ describe('CellTenantsPage', () => {
     stubTenants(200, [acme, beta, gamma])
     renderPage()
 
-    await screen.findByTestId('cell-tenants')
+    await loadedTable()
     const rows = dataRows()
     expect(rows).toHaveLength(3)
     expect(rows[0]).toHaveTextContent('Active')
@@ -207,7 +219,7 @@ describe('CellTenantsPage', () => {
     stubTenants(200, [acme, beta])
     renderPage()
 
-    await screen.findByTestId('cell-tenants')
+    await loadedTable()
     const rows = dataRows()
     expect(
       within(rows[0])
@@ -227,7 +239,7 @@ describe('CellTenantsPage', () => {
     stubTenants(200, [acme, beta, gamma])
     renderPage()
 
-    await screen.findByTestId('cell-tenants')
+    await loadedTable()
     const rows = dataRows()
     expect(within(rows[0]).getByTestId('cell-tenants-archive-stale')).toHaveTextContent('Overdue')
     expect(within(rows[1]).queryByTestId('cell-tenants-archive-stale')).toBeNull()
@@ -236,53 +248,78 @@ describe('CellTenantsPage', () => {
     expect(within(rows[2]).getAllByRole('cell')[11]).not.toHaveTextContent('—')
   })
 
-  it('searches the ids on Enter, ignoring case, and keeps the search in the address', async () => {
-    stubTenants(200, [acme, beta, gamma])
+  it('sends the search on Enter, and not on each key, and keeps it in the address', async () => {
+    const urls = stubTenants(200, [acme, beta, gamma])
     renderPage()
 
-    await screen.findByTestId('cell-tenants')
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'BETA{Enter}')
-
-    expect(rowIds()).toEqual(['beta'])
-    expect(address()).toBe('?search=BETA')
-  })
-
-  it('searches the hosts on Enter and does not search on each key', async () => {
-    stubTenants(200, [acme, beta, gamma])
-    renderPage()
-
-    await screen.findByTestId('cell-tenants')
+    await loadedTable()
     const search = screen.getByRole('searchbox', { name: 'Search' })
     await userEvent.type(search, 'portal')
-    expect(rowIds()).toEqual(['acme', 'beta', 'gamma'])
+    expect(urls.some((url) => queryOf(url).has('search'))).toBe(false)
 
     await userEvent.type(search, '{Enter}')
-    expect(rowIds()).toEqual(['acme'])
-    expect(address()).toContain('search=portal')
+
+    await waitFor(() => expect(queryOf(urls.at(-1)!).get('search')).toBe('portal'))
+    expect(address()).toBe('?search=portal')
   })
 
-  it('keeps only the tenants with the chosen status, through Filter, and keeps the filter in the address', async () => {
-    stubTenants(200, [acme, beta, gamma])
+  it('sends the status filter after Apply and keeps it in the address', async () => {
+    const urls = stubTenants(200, [acme, beta, gamma])
     renderPage()
 
-    await screen.findByTestId('cell-tenants')
+    await loadedTable()
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
     await pick('Value', 0, 'Suspended')
     await clickInDialog('Apply')
 
-    await waitFor(() => expect(rowIds()).toEqual(['beta']))
-    expect(filterInAddress()).toEqual({ all: [{ field: 'status', op: 'eq', value: 'suspended' }] })
+    const filter = { all: [{ field: 'status', op: 'eq', value: 'suspended' }] }
+    await waitFor(() => expect(queryOf(urls.at(-1)!).get('filter')).toBe(JSON.stringify(filter)))
+    expect(JSON.parse(new URLSearchParams(address()).get('filter')!)).toEqual(filter)
   })
 
-  it('opens at an address with a search and a filter and shows the same rows', async () => {
-    stubTenants(200, [acme, beta, gamma])
-    const filter = JSON.stringify({ all: [{ field: 'status', op: 'eq', value: 'suspended' }] })
-    renderPage(vi.fn(), `/?${new URLSearchParams({ search: 'example', filter })}`)
+  it('sends the sort of a header, starting again at page 1, and keeps it in the address', async () => {
+    const urls = stubTenants(200, [acme, beta, gamma])
+    renderPage(vi.fn(), '/?page=2')
 
-    await screen.findByTestId('cell-tenants')
-    expect(rowIds()).toEqual(['beta'])
+    await loadedTable()
+    await userEvent.click(screen.getByRole('columnheader', { name: 'ID' }))
+
+    await waitFor(() => expect(queryOf(urls.at(-1)!).get('sort')).toBe('id'))
+    expect(queryOf(urls.at(-1)!).has('page')).toBe(false)
+    expect(address()).toBe('?sort=id')
+  })
+
+  it('has no sort on the hosts, which are a list', async () => {
+    const urls = stubTenants(200, [acme])
+    renderPage()
+
+    await loadedTable()
+    await userEvent.click(screen.getByRole('columnheader', { name: 'Hosts' }))
+
+    expect(address()).toBe('')
+    expect(urls).toHaveLength(1)
+  })
+
+  it('keeps the search, filter, sort and page size in the address and the request', async () => {
+    const filter = JSON.stringify({ all: [{ field: 'status', op: 'eq', value: 'suspended' }] })
+    const urls = stubTenants(200, [acme], 45)
+    const user = userEvent.setup()
+    renderPage(vi.fn(), `/?${new URLSearchParams({ search: 'example', filter, sort: '-newestArchiveAt' })}`)
+
+    const table = await screen.findByTestId('cell-tenants')
+    await waitFor(() => expect(urls).toHaveLength(1))
+    const first = queryOf(urls[0])
+    expect(first.get('search')).toBe('example')
+    expect(first.get('filter')).toBe(filter)
+    expect(first.get('sort')).toBe('-newestArchiveAt')
+    expect(await within(table).findByText('1–20 of 45')).toBeVisible()
     expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('example')
-    expect(screen.getByText('Status is Suspended')).toBeInTheDocument()
+
+    await user.click(within(table).getByRole('combobox'))
+    await user.click(await screen.findByTitle('50 / page'))
+
+    await waitFor(() => expect(address()).toContain('pageSize=50'))
+    await waitFor(() => expect(urls.some((url) => queryOf(url).get('pageSize') === '50')).toBe(true))
   })
 
   it('shows the table right under the page heading, with no card', async () => {
