@@ -232,8 +232,6 @@
   "shell.console.webhooks.title": "Webhook deliveries",
   "shell.console.webhooks.application": "Application",
   "shell.console.webhooks.webhook": "Webhook",
-  "shell.console.webhooks.filter.application": "All applications",
-  "shell.console.webhooks.filter.webhook": "All webhooks",
   "shell.console.webhooks.event": "Event",
   "shell.console.webhooks.state": "State",
   "shell.console.webhooks.state.delivered": "Delivered",

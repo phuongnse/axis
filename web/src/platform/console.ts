@@ -103,7 +103,7 @@ export interface ConsoleWebhookDelivery {
   deliveredAt: string | null
 }
 
-/** A webhook of an active release, for the filter of the webhook deliveries. */
+/** A webhook of an active release, for the Webhook column's filter of the webhook deliveries. */
 export interface ConsoleWebhook {
   id: string
   name: string
@@ -123,7 +123,10 @@ export interface ConsoleWebhookDeliveryPage {
 /** The answer of the webhook deliveries route: a page, or the refusal that the page shows. */
 export type ConsoleWebhookDeliveriesResult = { kind: 'ok'; page: ConsoleWebhookDeliveryPage } | { kind: 'forbidden' }
 
-/** Loads one page of webhook deliveries. `query` holds the `page`, `application` and `webhook` parameters. */
+/**
+ * Loads one page of webhook deliveries. `query` is the record API's paging, sort, search and filter query string, which the
+ * view keeps under `webhookDeliveries.` in the address, and may hold the optional `application` and `webhook` ids.
+ */
 export async function fetchConsoleWebhookDeliveries(
   query: string,
   signal?: AbortSignal,

@@ -1,3 +1,4 @@
+using Axis.Data.Records;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -22,8 +23,12 @@ public static class WebhookDeliveryList
     /// <summary>The delivery failed too many times and an operator closed its dead letter.</summary>
     public const string Discarded = "discarded";
 
+    /// <summary>The states a delivery has.</summary>
+    public static IReadOnlyList<string> States { get; } = [Delivered, Pending, DeadLettered, Discarded];
+
     // The worker leaves a dead-lettered delivery 'pending', so the newest dead letter of the occurrence and the webhook
-    // decides. A redelivered dead letter is queued again and shows as pending.
+    // decides, and ListAsync joins those dead letters once for both its queries. A redelivered dead letter is queued again
+    // and shows as pending.
     private const string StateSql =
         """
         CASE
@@ -34,49 +39,57 @@ public static class WebhookDeliveryList
         END
         """;
 
-    private const string Where =
-        "WHERE (@application::uuid IS NULL OR d.application_id = @application) AND (@webhook::uuid IS NULL OR d.webhook_id = @webhook)";
+    // Each delivery with its state, which the count and the page both filter and sort on. The dead letters are joined once,
+    // where a lateral join per delivery would scan them once for every row.
+    private static readonly string _deliveries =
+        $"""
+        (SELECT d.id, d.application_id, d.release_id, d.webhook_id, d.event_id, {StateSql} AS state,
+                d.attempts, d.status_code, d.created_at, d.delivered_at
+         FROM axis.webhook_deliveries d
+         LEFT JOIN (SELECT DISTINCT ON (event_id, webhook_id) event_id, webhook_id, state
+                    FROM axis.dead_letters WHERE kind = @kind
+                    ORDER BY event_id, webhook_id, created_at DESC, id DESC) dl
+           ON dl.event_id = d.event_id AND dl.webhook_id = d.webhook_id) w
+        """;
 
     /// <summary>
-    /// Reads one page of the webhook deliveries, newest first, and the number of them on every page.
-    /// <paramref name="applicationId"/> and <paramref name="webhookId"/> each keep one value, or every value when
-    /// they are <see langword="null"/>.
+    /// Reads one page of the webhook deliveries, and the number of them on every page. <paramref name="list"/> adds a filter,
+    /// a search and a sort over the columns of a delivery. The order is newest first when it has no sort, and a sort breaks
+    /// its ties newest first. <paramref name="applicationId"/> and <paramref name="webhookId"/> each keep one value, or every
+    /// value when they are <see langword="null"/>.
     /// </summary>
     public static async Task<WebhookDeliveryPage> ListAsync(
         NpgsqlConnection connection,
         Guid? applicationId,
         Guid? webhookId,
+        ListSql list,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(list);
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
+        var where = $"WHERE (@application::uuid IS NULL OR application_id = @application) AND (@webhook::uuid IS NULL OR webhook_id = @webhook) AND {list.Condition}";
+        var order = list.Order is null ? "created_at DESC, id DESC" : $"{list.Order}, created_at DESC, id DESC";
+
         long totalCount;
-        await using (var count = new NpgsqlCommand($"SELECT count(*) FROM axis.webhook_deliveries d {Where}", connection))
+        await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {_deliveries} {where}", connection))
         {
             AddFilter(count, applicationId, webhookId);
+            count.Parameters.AddWithValue("kind", DeliveryFailures.WebhookDeliverKind);
+            list.AddTo(count);
             totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
         }
 
         await using var command = new NpgsqlCommand(
-            $"""
-            SELECT d.id, d.application_id, d.release_id, d.webhook_id, d.event_id, {StateSql}, d.attempts, d.status_code, d.created_at, d.delivered_at
-            FROM axis.webhook_deliveries d
-            LEFT JOIN LATERAL (
-                SELECT l.state FROM axis.dead_letters l
-                WHERE l.kind = @kind AND l.event_id = d.event_id AND l.webhook_id = d.webhook_id
-                ORDER BY l.created_at DESC
-                LIMIT 1) dl ON true
-            {Where}
-            ORDER BY d.created_at DESC, d.id DESC
-            LIMIT @limit OFFSET @offset
-            """,
+            $"SELECT id, application_id, release_id, webhook_id, event_id, state, attempts, status_code, created_at, delivered_at FROM {_deliveries} {where} ORDER BY {order} LIMIT @limit OFFSET @offset",
             connection);
         AddFilter(command, applicationId, webhookId);
         command.Parameters.AddWithValue("kind", DeliveryFailures.WebhookDeliverKind);
+        list.AddTo(command);
         command.Parameters.AddWithValue("limit", pageSize);
         command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
