@@ -1,4 +1,5 @@
 import { Input, Typography } from 'antd'
+import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import type { StudioNames } from '../platform/studio'
 import { useFieldTexts } from './fieldTexts'
@@ -8,8 +9,8 @@ import type { ChangeHandler } from './SchemaForm'
 
 /**
  * The `event` of an endpoint: the event it raises and the `fields` that give each payload field of the event its value.
- * The picker clears the whole `event` when it is empty, and a picked event keeps the rows of `fields`. A value that is
- * not an object is left to the JSON view.
+ * The picker clears the whole `event` when it is empty, and a picked event keeps the rows of `fields`. The part is
+ * headed with the event's title and help. A value that is not an object is left to the JSON view.
  */
 export function EndpointEvent({
   events,
@@ -23,15 +24,17 @@ export function EndpointEvent({
   const t = useText()
   const { group } = useFieldTexts('endpoint')
   const eventLabel = t('shell.studio.process.event')
+  const heading = { title: t('shell.studio.field.endpoint.event'), line: t('shell.studio.field.endpoint.event.help') }
 
   if (value !== undefined && (typeof value !== 'object' || value === null || Array.isArray(value))) {
     return (
-      <div data-testid="studio-field-/event">
-        <div>{eventLabel}</div>
-        <Typography.Text type="secondary" data-testid="studio-json-only">
-          {t('shell.studio.editInJson')}
-        </Typography.Text>
-      </div>
+      <SectionPart testName="event" heading={heading}>
+        <div data-testid="studio-field-/event">
+          <Typography.Text type="secondary" data-testid="studio-json-only">
+            {t('shell.studio.editInJson')}
+          </Typography.Text>
+        </div>
+      </SectionPart>
     )
   }
 
@@ -52,7 +55,7 @@ export function EndpointEvent({
   }
 
   return (
-    <>
+    <SectionPart testName="event" heading={heading}>
       <div data-testid="studio-field-/event/name">
         <div>{eventLabel}</div>
         {events === undefined ? (
@@ -72,6 +75,6 @@ export function EndpointEvent({
           onChange={onChange}
         />
       )}
-    </>
+    </SectionPart>
   )
 }
