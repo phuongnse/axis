@@ -18,7 +18,7 @@ import type {
   SiteMetadata,
   WidgetMetadata,
 } from '../platform/site'
-import type { TaskPage } from '../platform/tasks'
+import type { TaskItem, TaskPage } from '../platform/tasks'
 import type {
   AddAuthenticatorContext,
   AddAuthenticatorTexts,
@@ -640,6 +640,36 @@ const taskPage: TaskPage = {
 
 const emptyTaskPage: TaskPage = { items: [], page: 1, pageSize: 20, totalCount: 0 }
 
+// Proposed, see the review on #3650: the first task of the inbox, open, claimed by the signed-in person, overdue, with
+// its form over the request and two outcomes, and a well-formed task id the task API has no task for.
+export const openTaskId = taskPage.items[0].id
+export const missingTaskId = '7e6d5c4b-3a29-4f18-9e07-d6c5b4a39281'
+const openTask: TaskItem = {
+  ...taskPage.items[0],
+  instanceId: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+  state: 'open',
+  assignee: { user: null, role: 'Approver' },
+  form: { ...form, entity },
+  outcomes: [
+    { name: 'approve', labelKey: 'request.outcome.approve' },
+    { name: 'reject', labelKey: 'request.outcome.reject' },
+  ],
+  claimedBy: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
+  commands: ['release', 'reassign'],
+  reassignRoles: [],
+  completedAt: null,
+  completedBy: null,
+  outcome: null,
+}
+
+/** The task inbox page of the fixture site, which its Tasks entry opens. */
+const tasksPage: PageMetadata = {
+  name: 'Tasks',
+  titleKey: 'nav.tasks',
+  parameters: [],
+  widgets: [taskInboxWidget],
+}
+
 const instancePage: InstancePage = {
   items: [
     {
@@ -1218,6 +1248,8 @@ export const siteTexts: Record<string, string> = {
   'site.title': 'Purchase requests',
   'nav.requests': 'Requests',
   'nav.tasks': 'Tasks',
+  'request.outcome.approve': 'Approve',
+  'request.outcome.reject': 'Reject',
   'page.requests': 'Requests',
 }
 
@@ -1274,6 +1306,9 @@ export const routes: Record<string, () => unknown> = {
   [`${requestsPath}/${missingRequestId}`]: () => new Response(null, { status: 404 }),
   [categoriesPath]: () => categoryPage,
   [tasksPath]: () => taskPage,
+  [`${tasksPath}/${openTaskId}`]: () => openTask,
+  [`${tasksPath}/${openTaskId}/form-state`]: noStateAnswer,
+  [`${tasksPath}/${missingTaskId}`]: () => new Response(null, { status: 404 }),
   [instancesPath]: () => instancePage,
   [deadLettersPath]: () => deadLetterPage,
   [requestsByStatusPath]: () => requestsByStatusPage,
@@ -1286,6 +1321,7 @@ export const routes: Record<string, () => unknown> = {
   [`/api/sites/${sitePath}`]: () => applicationSite,
   [`/api/sites/${sitePath}/pages/requests`]: () => requestsPage,
   [`/api/sites/${sitePath}/pages/request`]: () => requestPage,
+  [`/api/sites/${sitePath}/pages/tasks`]: () => tasksPage,
   [formStatePath('RequestForm')]: noStateAnswer,
   [notificationsPath]: () => notificationPage,
   '/api/sites': () => ({ sites: listedSites }),

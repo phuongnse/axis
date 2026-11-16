@@ -590,6 +590,7 @@
   "shell.tasks.overdue": "Overdue",
   "shell.tasks.claimedByYou": "Claimed by you",
   "shell.task.assignedElsewhere": "This task is assigned to someone else.",
+  "shell.task.line": "{subject}, due {dueAt}",
   "shell.task.completed": "This task is already done.",
   "shell.task.loadFailed": "The task could not be loaded.",
   "shell.task.completeFailed": "The decision could not be saved.",

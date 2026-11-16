@@ -19,21 +19,28 @@ export interface BreadcrumbStep {
  */
 export function PageLayout({
   title,
+  line,
   breadcrumb,
   children,
 }: {
   title: string
+  /** Proposed, see the review on #3650: a line under the heading, in `textMuted`, that says more about the page. */
+  line?: ReactNode
   breadcrumb?: readonly BreadcrumbStep[]
   children: ReactNode
 }) {
   const [slot, setSlot] = useState<HTMLDivElement | null>(null)
+  const { colour } = useDesignTokens()
   const heading = (
     // Proposed: the page's own actions sit on the heading's right, as a Studio page's do, see the review on #3650.
     <Flex justify="space-between" align="center" gap="middle">
-      {/* Level one for the outline, at the 20px and 28px that a level-four heading has. */}
-      <Typography.Title level={1} style={{ margin: 0, fontSize: 20, lineHeight: '28px' }}>
-        {title}
-      </Typography.Title>
+      <Flex vertical style={{ minWidth: 0 }}>
+        {/* Level one for the outline, at the 20px and 28px that a level-four heading has. */}
+        <Typography.Title level={1} style={{ margin: 0, fontSize: 20, lineHeight: '28px' }}>
+          {title}
+        </Typography.Title>
+        {line !== undefined && <div style={{ color: colour.textMuted }}>{line}</div>}
+      </Flex>
       <div ref={setSlot} />
     </Flex>
   )

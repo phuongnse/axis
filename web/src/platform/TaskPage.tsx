@@ -1,8 +1,11 @@
-import { Button, Descriptions, Flex, Form, Space, Tag, Typography } from 'antd'
+import { Flex, Form, Space, Tag } from 'antd'
+import { ActionBar } from './ActionBar'
 import { AxisAlert } from './AxisAlert'
+import { AxisActionRow, AxisButton } from './AxisButton'
+import { PageActions, PageLayout } from './PageLayout'
+import { RecordNotFound } from './RecordNotFound'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { NotFoundPage } from '../pages/NotFoundPage'
 import { formatValue } from './formatValue'
 import { buildCompleteBody } from './recordBody'
 import { fetchRecord, type RecordProblem } from './records'
@@ -32,6 +35,8 @@ interface TaskPageProps {
   sitePath: string
   /** The name of the inbox page the task's address is under. */
   pageName: string
+  /** The inbox page's title, which heads the page until the task is read. */
+  pageTitle: string
   /** The task inbox widget of that page. */
   widget: WidgetMetadata
   taskId: string
@@ -68,7 +73,7 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * locale, before the site texts and the platform texts. So a label a newer release reworded or
  * removed keeps its old text. If those texts fail to load, the page shows its load error.
  */
-export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackLocale }: TaskPageProps) {
+export function TaskPage({ sitePath, pageName, pageTitle, widget, taskId, locale, fallbackLocale }: TaskPageProps) {
   const t = useText()
   const navigate = useNavigate()
   // The server sets the path on every task inbox.
@@ -143,16 +148,28 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackL
   if (task === undefined) {
     return null
   }
+  // Proposed: a task that does not exist says so under the inbox page's heading, with a link to the inbox, see the
+  // review on #3650.
   if (task === null) {
-    return <NotFoundPage />
+    return (
+      <PageLayout title={pageTitle}>
+        <RecordNotFound />
+      </PageLayout>
+    )
   }
   if (task === assignedElsewhere) {
     return (
-      <AxisAlert data-testid="task-assigned-elsewhere" kind="warning" message={t('shell.task.assignedElsewhere')} />
+      <PageLayout title={pageTitle}>
+        <AxisAlert data-testid="task-assigned-elsewhere" kind="warning" message={t('shell.task.assignedElsewhere')} />
+      </PageLayout>
     )
   }
   if (task === 'failed' || releaseTexts.failed) {
-    return <AxisAlert data-testid="task-load-error" kind="error" message={t('shell.task.loadFailed')} />
+    return (
+      <PageLayout title={pageTitle}>
+        <AxisAlert data-testid="task-load-error" kind="error" message={t('shell.task.loadFailed')} />
+      </PageLayout>
+    )
   }
   // The previous release texts stay on screen while a new locale loads, so the form is not remounted.
   if (!releaseCatalog) {
@@ -221,26 +238,23 @@ function TaskBody({
   onReassign,
 }: TaskBodyProps) {
   const t = useText()
+  const subject = task.subject.label ?? ''
+  // Proposed: the task heads its page, and its subject and due date are the heading's line, see the review on #3650.
+  const line = (
+    <Space size="small" wrap>
+      <span>
+        {task.dueAt === null
+          ? subject
+          : t('shell.task.line')
+              .replace('{subject}', subject)
+              .replace('{dueAt}', formatValue(dueAtField, task.dueAt, {}, { locale, text: t }) as string)}
+      </span>
+      {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
+      {task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>}
+    </Space>
+  )
   return (
-    <Flex vertical gap="middle">
-      <Typography.Title level={4}>{t(task.labelKey)}</Typography.Title>
-      <Descriptions
-        column={1}
-        items={[
-          { key: 'subject', label: t('shell.tasks.subject'), children: task.subject.label ?? '' },
-          {
-            key: 'dueAt',
-            label: t('shell.tasks.dueAt'),
-            children: (
-              <Space size="small">
-                {formatValue(dueAtField, task.dueAt, {}, { locale, text: t })}
-                {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-                {task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>}
-              </Space>
-            ),
-          },
-        ]}
-      />
+    <PageLayout title={t(task.labelKey)} line={line}>
       {task.state === 'expired' ? (
         <AxisAlert data-testid="task-expired" kind="info" message={t('shell.task.expired')} />
       ) : open ? (
@@ -264,7 +278,7 @@ function TaskBody({
       ) : (
         <AxisAlert data-testid="task-completed" kind="info" message={t('shell.task.completed')} />
       )}
-    </Flex>
+    </PageLayout>
   )
 }
 
@@ -318,28 +332,31 @@ function TaskCommands({ commands, reassignRoles, usersPath, onCommand, onReassig
   if (listed.length === 0 && !canReassign && message === null) {
     return null
   }
+  // Proposed: claiming, releasing and reassigning act on the task, so they are the page's own actions on its heading's
+  // right, see the review on #3650.
   return (
-    <Flex vertical gap="small">
+    <>
       {message !== null && <AxisAlert data-testid="task-command-message" kind={message.type} message={message.text} />}
-      <Flex gap="small">
-        {listed.map((command) => (
-          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-          <Button
-            key={command}
-            loading={pending === command}
-            disabled={pending !== null && pending !== command}
-            onClick={() => void run(command)}
-          >
-            {t(`shell.task.${command}`)}
-          </Button>
-        ))}
-        {canReassign && (
-          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-          <Button disabled={pending !== null} onClick={() => setReassigning(true)}>
-            {t('shell.task.reassign')}
-          </Button>
-        )}
-      </Flex>
+      <PageActions>
+        <Flex gap="small">
+          {listed.map((command) => (
+            <AxisButton
+              role="secondary"
+              key={command}
+              loading={pending === command}
+              disabled={pending !== null && pending !== command}
+              onClick={() => void run(command)}
+            >
+              {t(`shell.task.${command}`)}
+            </AxisButton>
+          ))}
+          {canReassign && (
+            <AxisButton role="secondary" disabled={pending !== null} onClick={() => setReassigning(true)}>
+              {t('shell.task.reassign')}
+            </AxisButton>
+          )}
+        </Flex>
+      </PageActions>
       {reassigning && (
         <ReassignDialog
           roles={reassignRoles}
@@ -348,7 +365,7 @@ function TaskCommands({ commands, reassignRoles, usersPath, onCommand, onReassig
           onClose={() => setReassigning(false)}
         />
       )}
-    </Flex>
+    </>
   )
 }
 
@@ -442,34 +459,41 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
         <Form id={formId} layout="vertical" requiredMark={requiredMark} onFinish={() => void steps.next()}>
           {steps.fields}
         </Form>
-        <Flex gap="small">
-          {!steps.first && (
-            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-            <Button onClick={steps.back} disabled={steps.checking || sending !== null}>
-              {t('shell.form.back')}
-            </Button>
-          )}
-          {/* A quick check shows no spinner, because antd can leave one half removed after a flash. */}
-          {!steps.last && (
-            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-            <Button htmlType="submit" form={formId} type="primary" loading={steps.checking && { delay: 200 }}>
-              {t('shell.form.next')}
-            </Button>
-          )}
-          {steps.last &&
-            task.outcomes.map((outcome, index) => (
-              // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-              <Button
-                key={outcome.name}
-                type={index === 0 ? 'primary' : 'default'}
-                loading={sending === outcome.name}
-                disabled={sending !== null && sending !== outcome.name}
-                onClick={() => void complete(outcome.name)}
-              >
-                {t(outcome.labelKey)}
-              </Button>
-            ))}
-        </Flex>
+        {/* A wizard's Back and Next move between its steps, so they stay under the step's fields. */}
+        {!(steps.first && steps.last) && (
+          <AxisActionRow>
+            {!steps.first && (
+              <AxisButton role="secondary" onClick={steps.back} disabled={steps.checking || sending !== null}>
+                {t('shell.form.back')}
+              </AxisButton>
+            )}
+            {/* A quick check shows no spinner, because antd can leave one half removed after a flash. */}
+            {!steps.last && (
+              <AxisButton role="finish" htmlType="submit" form={formId} loading={steps.checking && { delay: 200 }}>
+                {t('shell.form.next')}
+              </AxisButton>
+            )}
+          </AxisActionRow>
+        )}
+        {/* Proposed: the outcomes finish the task, so they sit in the page's action bar, always shown on the last step,
+            the first outcome last as the finishing action, see the review on #3650. */}
+        {steps.last && (
+          <ActionBar testId="task-outcomes">
+            <AxisActionRow align="center">
+              {[...task.outcomes].reverse().map((outcome) => (
+                <AxisButton
+                  role={outcome === task.outcomes[0] ? 'finish' : 'secondary'}
+                  key={outcome.name}
+                  loading={sending === outcome.name}
+                  disabled={sending !== null && sending !== outcome.name}
+                  onClick={() => void complete(outcome.name)}
+                >
+                  {t(outcome.labelKey)}
+                </AxisButton>
+              ))}
+            </AxisActionRow>
+          </ActionBar>
+        )}
       </Flex>
     </Flex>
   )

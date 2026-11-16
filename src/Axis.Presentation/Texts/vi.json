@@ -590,6 +590,7 @@
   "shell.tasks.overdue": "Quá hạn",
   "shell.tasks.claimedByYou": "Bạn đã nhận",
   "shell.task.assignedElsewhere": "Công việc này đã giao cho người khác.",
+  "shell.task.line": "{subject}, hạn {dueAt}",
   "shell.task.completed": "Công việc này đã xong.",
   "shell.task.loadFailed": "Không tải được công việc.",
   "shell.task.completeFailed": "Không lưu được quyết định.",

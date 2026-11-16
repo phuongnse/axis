@@ -1,10 +1,9 @@
 import { RedoOutlined, UndoOutlined } from '@ant-design/icons'
-import { Flex, Modal } from 'antd'
-import { useContext, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { Modal } from 'antd'
+import { useState, type ReactNode } from 'react'
+import { ActionBar } from './ActionBar'
 import { AxisActionRow, AxisButton } from './AxisButton'
 import { useText } from './texts'
-import { ShellBarSlot } from './shellBar'
 import { useDesignTokens } from './themeMode'
 import { useUnsavedChanges } from './unsavedChanges'
 
@@ -41,8 +40,7 @@ export function SaveBar({
   onSave: () => void
 }): ReactNode {
   const t = useText()
-  const { size, colour, spacing } = useDesignTokens()
-  const slot = useContext(ShellBarSlot)
+  const { size } = useDesignTokens()
   const [discardOpen, setDiscardOpen] = useState(false)
   const shown = unsaved || redoable
   useUnsavedChanges(unsaved)
@@ -52,43 +50,34 @@ export function SaveBar({
   }
 
   const bar = (
-    <Flex
-      data-testid="studio-save-bar"
-      align="center"
-      justify="space-between"
-      gap="middle"
-      style={{
-        minHeight: size.bar,
-        boxSizing: 'border-box',
-        paddingBlock: spacing.xs,
-        paddingInline: spacing.lg,
-        background: colour.surface,
-        borderTop: `1px solid ${colour.borderSubtle}`,
-      }}
+    <ActionBar
+      testId="studio-save-bar"
+      start={
+        <AxisActionRow align="center">
+          <span>{unsaved ? t('shell.studio.saveBar.unsaved') : t('shell.studio.saveBar.noUnsaved')}</span>
+          {onUndo && (
+            <>
+              <AxisButton
+                role="icon"
+                nameKey="shell.studio.undo"
+                icon={<UndoOutlined />}
+                aria-keyshortcuts="Control+Z Meta+Z"
+                disabled={!undoable || busy}
+                onClick={onUndo}
+              />
+              <AxisButton
+                role="icon"
+                nameKey="shell.studio.redo"
+                icon={<RedoOutlined />}
+                aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
+                disabled={!redoable || busy}
+                onClick={onRedo}
+              />
+            </>
+          )}
+        </AxisActionRow>
+      }
     >
-      <AxisActionRow align="center">
-        <span>{unsaved ? t('shell.studio.saveBar.unsaved') : t('shell.studio.saveBar.noUnsaved')}</span>
-        {onUndo && (
-          <>
-            <AxisButton
-              role="icon"
-              nameKey="shell.studio.undo"
-              icon={<UndoOutlined />}
-              aria-keyshortcuts="Control+Z Meta+Z"
-              disabled={!undoable || busy}
-              onClick={onUndo}
-            />
-            <AxisButton
-              role="icon"
-              nameKey="shell.studio.redo"
-              icon={<RedoOutlined />}
-              aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
-              disabled={!redoable || busy}
-              onClick={onRedo}
-            />
-          </>
-        )}
-      </AxisActionRow>
       <AxisActionRow align="center">
         {unsaved && (
           <AxisButton role="secondary" disabled={busy} onClick={() => setDiscardOpen(true)}>
@@ -99,13 +88,12 @@ export function SaveBar({
           {t('shell.studio.save')}
         </AxisButton>
       </AxisActionRow>
-    </Flex>
+    </ActionBar>
   )
 
   return (
     <>
-      {/* Proposed: the bar draws in the shell's place for it, right above the footer, see the review on #3650. */}
-      {slot ? createPortal(bar, slot) : bar}
+      {bar}
       <Modal
         open={discardOpen}
         width={size.dialog.small}

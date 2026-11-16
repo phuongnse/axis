@@ -43,6 +43,8 @@ import {
   manyStepsFormRoutes,
   manyStepsRequestForm,
   missingRequestId,
+  missingTaskId,
+  openTaskId,
   loadingRoutes,
   loadingTableWidget,
   noRowsPath,
@@ -266,6 +268,19 @@ export const previews: Record<string, readonly PreviewState[]> = {
       caption: 'Saved record',
       draw: () => <ShellPreview />,
       entry: { pathname: `/sample/request/${requestId}`, state: { from: '/sample/requests' } },
+      frameHeight: 600,
+    },
+    // Proposed: an open task, and a task that does not exist, opened from the Tasks inbox, see the review on #3650.
+    {
+      caption: 'Task',
+      draw: () => <ShellPreview />,
+      entry: { pathname: `/sample/tasks/${openTaskId}`, state: { from: '/sample/tasks' } },
+      frameHeight: 600,
+    },
+    {
+      caption: 'Task not found',
+      draw: () => <ShellPreview />,
+      entry: { pathname: `/sample/tasks/${missingTaskId}`, state: { from: '/sample/tasks' } },
       frameHeight: 600,
     },
     // Proposed: a request that does not exist, opened from Requests, see the review on #3650.
