@@ -22,6 +22,8 @@ import { PlatformContext } from './context'
 import { callAt } from './expressionCall'
 import { completeAt, insertAt } from './expressionCompletion'
 import { expressionLanguage } from './expressionLanguage'
+import { readExpression } from './expressionReading'
+import { ExpressionReadingLine } from './ExpressionReadingLine'
 import { ExpressionPanel } from './ExpressionPanel'
 import type { ScopeOption } from './expressionScope'
 
@@ -238,6 +240,8 @@ export default function ExpressionEditor({
         : null
 
   const call = scope ? callAt(before, scope.functions) : null
+  // Proposed (#3265): the expression read back in words, under the box, while it has no error.
+  const reading = result.error === null ? readExpression(value, { options, names, locale, t }) : null
 
   return (
     <div aria-busy={checking}>
@@ -275,11 +279,14 @@ export default function ExpressionEditor({
           </Typography.Text>
         </div>
       ) : (
-        line !== null && (
-          <div>
-            <Typography.Text data-testid="studio-expression-type">{line}</Typography.Text>
-          </div>
-        )
+        <>
+          {reading !== null && <ExpressionReadingLine reading={reading} locale={locale} />}
+          {line !== null && (
+            <div>
+              <Typography.Text data-testid="studio-expression-type">{line}</Typography.Text>
+            </div>
+          )}
+        </>
       )}
       {expanded && (
         <Modal

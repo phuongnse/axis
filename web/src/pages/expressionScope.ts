@@ -13,6 +13,10 @@ export interface ScopeOption {
   labelKey?: string | null
   values?: string[] | null
   parameters?: { name: string; type: string }[]
+  /** Proposed (#3265): the entity a reference field points to, so a path reads by the labels of its fields. */
+  target?: string | null
+  /** Proposed (#3265): the label key of each enum value, so a value reads by its label. */
+  valueLabels?: Record<string, string | null> | null
 }
 
 /** The expression type of a field type, see [types](docs/reference/expressions.md#types). Any other type is its own. */
@@ -124,6 +128,7 @@ function fieldOptions(
           valueType: expressionType(field.type),
           labelKey: field.labelKey,
           values: field.values,
+          target: field.target,
         }),
       ),
   ]
@@ -191,7 +196,7 @@ function option(
   label: string,
   type: ScopeOption['type'],
   cursorInside: boolean,
-  about: Pick<ScopeOption, 'valueType' | 'labelKey' | 'values' | 'parameters'> = {},
+  about: Pick<ScopeOption, 'valueType' | 'labelKey' | 'values' | 'parameters' | 'target' | 'valueLabels'> = {},
 ): ScopeOption {
   return { label, type, cursorInside, ...about }
 }
@@ -211,6 +216,12 @@ function draftOption(item: Record<string, unknown>, type: 'field' | 'parameter')
     valueType: fieldType === undefined ? null : expressionType(fieldType),
     labelKey: stringProperty(item.label, 'textKey'),
     values,
+    target: stringProperty(item, 'target') ?? null,
+    valueLabels: isRecord(item.valueLabels)
+      ? Object.fromEntries(
+          Object.entries(item.valueLabels).map(([value, label]) => [value, stringProperty(label, 'textKey') ?? null]),
+        )
+      : null,
   })
 }
 

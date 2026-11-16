@@ -620,6 +620,105 @@ export const typicalFormId = formId
 /** The id of the RequestApproval process of the Typical folder, which the process design card opens at `&resource=<id>`. */
 export const typicalProcessId = processId
 
+// Proposed (#3265, step 1): an entity whose validations are expressions, so the entity designer
+// shows the expression editor with the line that reads each expression back in words.
+
+/** The Request entity with an enum, a date, a yes-or-no and a reference field, and validations that use them. */
+function expressionEntity(folder: Folder): StudioResource {
+  const plain = entityResource(folder, 0)
+  return {
+    ...plain,
+    content: {
+      ...plain.content,
+      fields: [
+        { name: 'title', type: 'text', maxLength: 200, label: { textKey: 'request.title' } },
+        { name: 'amount', type: 'decimal', precision: 12, scale: 2, label: { textKey: 'request.amount' } },
+        {
+          name: 'status',
+          type: 'enum',
+          values: ['draft', 'submitted', 'approved'],
+          valueLabels: {
+            draft: { textKey: 'request.status.draft' },
+            submitted: { textKey: 'request.status.submitted' },
+            approved: { textKey: 'request.status.approved' },
+          },
+          label: { textKey: 'request.status' },
+        },
+        { name: 'urgent', type: 'boolean', label: { textKey: 'request.urgent' } },
+        { name: 'dueDate', type: 'date', label: { textKey: 'request.dueDate' } },
+        { name: 'supplier', type: 'reference', target: 'Supplier', label: { textKey: 'request.supplier' } },
+      ],
+      validations: [
+        {
+          name: 'positiveAmount',
+          expression: 'amount is null or amount > 0',
+          message: { textKey: 'request.positiveAmount' },
+          field: 'amount',
+        },
+        {
+          name: 'urgentNeedsDate',
+          expression: "not urgent or dueDate is not null and status in ('submitted', 'approved')",
+          message: { textKey: 'request.urgentNeedsDate' },
+          field: 'dueDate',
+        },
+        {
+          name: 'dueAfterToday',
+          expression: "(status == 'draft' and amount >= 1000) or dueDate >= today()",
+          message: { textKey: 'request.dueAfterToday' },
+          field: 'dueDate',
+        },
+        {
+          name: 'supplierNamed',
+          expression: 'length(supplier.name) > 2',
+          message: { textKey: 'request.supplierNamed' },
+          field: 'supplier',
+        },
+      ],
+    },
+  }
+}
+
+const expressionTexts: StudioNames['texts'] = Object.entries({
+  'request.title': ['Title', 'Tiêu đề'],
+  'request.amount': ['Amount', 'Số tiền'],
+  'request.status': ['Status', 'Trạng thái'],
+  'request.status.draft': ['Draft', 'Nháp'],
+  'request.status.submitted': ['Submitted', 'Đã gửi'],
+  'request.status.approved': ['Approved', 'Đã duyệt'],
+  'request.urgent': ['Urgent', 'Gấp'],
+  'request.dueDate': ['Due date', 'Hạn chót'],
+  'request.supplier': ['Supplier', 'Nhà cung cấp'],
+  'supplier.name': ['Name', 'Tên'],
+  'request.positiveAmount': ['The amount must be more than zero.', 'Số tiền phải lớn hơn 0.'],
+  'request.urgentNeedsDate': ['An urgent request needs a due date.', 'Yêu cầu gấp cần có hạn chót.'],
+  'request.dueAfterToday': ['The due date has passed.', 'Hạn chót đã qua.'],
+  'request.supplierNamed': ['The supplier needs a name.', 'Nhà cung cấp cần có tên.'],
+}).map(([key, [en, vi]]) => ({ key, texts: { en, vi }, usedBy: 1 }))
+
+function expressionRoutes(folder: Folder): Record<string, () => unknown> {
+  const routes = workspaceRoutes(folder)
+  const typicalNames = names(folder)
+  return {
+    ...routes,
+    [`${folderPath}/resources/${id(firstEntityId)}`]: () => expressionEntity(folder),
+    [`${folderPath}/names`]: () => ({
+      ...typicalNames,
+      locales: ['en', 'vi'],
+      entities: typicalNames.entities.map((entity) =>
+        entity.name === 'Supplier'
+          ? {
+              ...entity,
+              fields: [{ name: 'name', labelKey: 'supplier.name', type: 'text', target: null, values: null }],
+            }
+          : entity,
+      ),
+      texts: [...typicalNames.texts, ...expressionTexts],
+    }),
+    [`${folderPath}/expressions/scope`]: () => ({ type: null, fields: [], functions: [] }),
+    [`${folderPath}/expressions/check`]: () => ({ type: 'boolean', diagnostics: [] }),
+  }
+}
+
 /** The applications Studio lists in each state, with the routes of the open application where the state opens one. */
 export const studioFixtures = {
   typical: workspaceRoutes(typicalFolder),
@@ -630,5 +729,6 @@ export const studioFixtures = {
   longNames: workspaceRoutes(longFolder),
   withErrors: workspaceRoutes(typicalFolder, errorAnswers),
   newApplication: workspaceRoutes(newFolder, unpublishedAnswers),
+  expressions: expressionRoutes(typicalFolder),
   accessDenied: { [appsPath]: () => new Response(null, { status: 403 }) },
 } satisfies Record<string, Record<string, () => unknown>>

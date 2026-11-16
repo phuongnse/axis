@@ -308,6 +308,12 @@ export const previews: Record<string, readonly PreviewState[]> = {
       entry: `/studio?app=${application}&resource=${typicalEntityId}`,
     },
     { caption: 'Policy matrix', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=policies` },
+    // Proposed (#3265, step 1): the entity designer's expressions, each read back in words.
+    {
+      caption: 'Entity with expressions',
+      fixtures: studioFixtures.expressions,
+      entry: `/studio?app=${application}&resource=${typicalEntityId}`,
+    },
   ].map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 })),
   studioPageDesign: studioDesignerStates(typicalPageId),
   studioFormDesign: studioDesignerStates(typicalFormId),
