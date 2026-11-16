@@ -39,7 +39,7 @@ import { stepLabels, usePartLabel } from './pagePaletteSupport'
 import { Expression } from './ProcessFields'
 import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
-import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import type { ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -118,8 +118,8 @@ export function PageEditor({
 
   return (
     <div data-testid="studio-page-editor">
-      <ResourceFormSections>
-        <ResourceFormSection testName="general" heading={heading('general')}>
+      <SectionParts>
+        <SectionPart testName="general" heading={heading('general')}>
           <Flex vertical gap="small">
             <div data-testid="studio-field-/name">
               <AxisField {...field('name')}>
@@ -137,9 +137,9 @@ export function PageEditor({
               </AxisFieldGroup>
             </div>
           </Flex>
-        </ResourceFormSection>
+        </SectionPart>
         <PageParameters value={value.parameters} onChange={onChange} />
-        <ResourceFormSection testName="widgets" heading={heading('widgets')}>
+        <SectionPart testName="widgets" heading={heading('widgets')}>
           <PageWidgets
             named
             value={value}
@@ -147,8 +147,8 @@ export function PageEditor({
             onSelect={onSelect ?? setPicked}
             onChange={onChange}
           />
-        </ResourceFormSection>
-      </ResourceFormSections>
+        </SectionPart>
+      </SectionParts>
     </div>
   )
 }
@@ -234,7 +234,7 @@ function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeH
   const editable = value === undefined || Array.isArray(value)
 
   return (
-    <ResourceFormSection
+    <SectionPart
       testName="parameters"
       heading={{
         title: t('shell.studio.section.page.parameters'),
@@ -272,7 +272,7 @@ function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeH
           </Flex>
         )}
       </div>
-    </ResourceFormSection>
+    </SectionPart>
   )
 }
 

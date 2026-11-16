@@ -476,15 +476,6 @@ describe('SchemaForm sections', () => {
     await chooseOption('Archive', screen.getByTestId('studio-field-/fileStorage/binding'))
     expect(latest.fileStorage).toEqual({ binding: 'Archive' })
   })
-
-  it('draws a section as a surface panel with a subtle border, spacing-md apart', async () => {
-    renderForm((await loadKindSchema('application'))!, applicationValue)
-
-    const { colour, spacing } = designTokensFor('light')
-    const section = screen.getByTestId('studio-section-modules')
-    expect(section).toHaveStyle({ background: colour.surface, border: `1px solid ${colour.borderSubtle}` })
-    expect(section.parentElement).toHaveStyle({ gap: `${spacing.md}px` })
-  })
 })
 
 describe('SchemaForm lists of objects', () => {

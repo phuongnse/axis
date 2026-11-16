@@ -34,7 +34,7 @@ import { LabelTextsContext } from './labelTextsContext'
 import { ObjectListTable, type ObjectListColumn } from './ObjectListTable'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { ReferencePicker } from './ReferencePicker'
-import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { SchemaLayerContext } from './schemaLayerContext'
 import { sectionsByKind } from './schemaFormSections'
 
@@ -120,7 +120,7 @@ function Sections({
     { name: undefined, properties: shown.filter((name) => !named.has(name)) },
   ].filter((group) => group.properties.length > 0)
   return (
-    <ResourceFormSections>
+    <SectionParts>
       {groups.map((group) => {
         const single = group.name !== undefined && group.properties.length === 1 ? group.properties[0] : undefined
         const singleSchema = single === undefined ? undefined : resolveSchema(schema.properties![single], schema)
@@ -153,14 +153,14 @@ function Sections({
         )
         if (group.name === undefined) {
           return (
-            <ResourceFormSection key="rest" testName="rest">
+            <SectionPart key="rest" testName="rest">
               {fieldsIn(undefined)}
-            </ResourceFormSection>
+            </SectionPart>
           )
         }
         const prefix = `shell.studio.section.${String(kind)}.${group.name}`
         return (
-          <ResourceFormSection
+          <SectionPart
             key={group.name}
             testName={group.name}
             heading={{ title: t(prefix), line: t(`${prefix}.line`) }}
@@ -181,10 +181,10 @@ function Sections({
             }
           >
             {tableInHeading ? fieldsIn : fieldsIn(undefined)}
-          </ResourceFormSection>
+          </SectionPart>
         )
       })}
-    </ResourceFormSections>
+    </SectionParts>
   )
 }
 
