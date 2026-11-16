@@ -103,6 +103,8 @@ tenant button of the Tenants view and the actions of the Tenant view.
     that has no archive.
 - **Tenant.** One tenant's status and hosts, its quotas with the rows that override the cell's
   defaults, its usage and its jobs in the same table as the Jobs view. An unknown id shows the not-found page.
+  The view shows its parts in this order: Details, with the status, the application, the hosts and the actions,
+  then Host verification, Quotas, Usage and Jobs.
   - **Usage.** The tenant's usage of the last 13 months by day, in the same table as the users page's "Usage"
     section, see [the tenant read](tenant-lifecycle.md#routes).
   - **Host verification.** Each host that the operator asked for, from the [tenant read](tenant-lifecycle.md#routes)'s

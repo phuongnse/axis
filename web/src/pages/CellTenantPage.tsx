@@ -1,4 +1,4 @@
-import { Card, Descriptions, Flex, Input, Modal, Typography } from 'antd'
+import { Descriptions, Flex, Input, Modal, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
@@ -21,6 +21,7 @@ import { EmptyDash } from '../platform/EmptyValue'
 import { saveFile } from '../platform/exports'
 import { PageLayout } from '../platform/PageLayout'
 import { newIdempotencyKey } from '../platform/processes'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { TenantUsageDayTable } from '../platform/TenantUsageDayTable'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -70,10 +71,10 @@ const actionTexts = {
 } as const
 
 /**
- * The Tenant view of the cell console: one tenant's status, application and hosts, the state of each host the operator
- * asked for, its quotas with the ones it overrides,
- * its usage of the last 13 months by day in the table of the users page's "Usage" section, and its jobs in the shared job
- * table. An unknown id shows the not-found page. An `active` or `readOnly` tenant offers
+ * The Tenant view of the cell console, in parts a rule apart, see docs/reference/shell.md#layout: Details with one tenant's
+ * status, application, hosts and actions, then Host verification with the state of each host the operator asked for,
+ * Quotas with the ones it overrides, Usage of the last 13 months by day in the table of the users page's "Usage" section,
+ * and Jobs in the shared job table. An unknown id shows the not-found page. An `active` or `readOnly` tenant offers
  * Suspend and a `suspended` or `readOnly` one offers Resume. Any tenant but a `provisioning` one offers Export. An `active`,
  * `readOnly` or `suspended` tenant offers Delete, which stays off until the operator types the tenant id exactly, and a
  * `deleting` one offers Cancel deletion in place of Suspend, Resume and Delete. Each action is behind a confirmation. An
@@ -278,9 +279,9 @@ export function CellTenantPage() {
       {tenantFailed && (
         <AxisAlert data-testid="cell-tenant-error" kind="error" message={t('shell.cell.tenant.loadFailed')} />
       )}
-      {tenant && (
-        <>
-          <Card>
+      <SectionParts>
+        {tenant && (
+          <SectionPart testName="cell-tenant-details" heading={{ title: t('shell.cell.tenant.details') }}>
             <Descriptions
               data-testid="cell-tenant"
               column={1}
@@ -373,8 +374,10 @@ export function CellTenantPage() {
                 {t('shell.cell.tenant.addHost')}
               </AxisButton>
             </Flex>
-          </Card>
-          <Card title={t('shell.cell.tenant.hostRequests')}>
+          </SectionPart>
+        )}
+        {tenant && (
+          <SectionPart testName="cell-tenant-host-requests" heading={{ title: t('shell.cell.tenant.hostRequests') }}>
             <AxisTable<CellHostRequestState>
               testId="cell-tenant-host-requests"
               rowKey={(row) => row.host}
@@ -382,8 +385,10 @@ export function CellTenantPage() {
               columns={hostRequestColumns}
               emptyText={t('shell.cell.tenant.noHostRequests')}
             />
-          </Card>
-          <Card title={t('shell.cell.tenant.quotas')}>
+          </SectionPart>
+        )}
+        {tenant && (
+          <SectionPart testName="cell-tenant-quotas" heading={{ title: t('shell.cell.tenant.quotas') }}>
             <AxisTable<QuotaRow>
               testId="cell-tenant-quotas"
               rowKey={(row) => row.key}
@@ -391,12 +396,24 @@ export function CellTenantPage() {
               columns={quotaColumns}
               emptyText={t('shell.cell.tenant.noQuotas')}
             />
-          </Card>
-          <Card title={t('shell.cell.tenant.usage')}>
+          </SectionPart>
+        )}
+        {tenant && (
+          <SectionPart testName="cell-tenant-usage" heading={{ title: t('shell.cell.tenant.usage') }}>
             <TenantUsageDayTable days={tenant.days} locale={locale} testId="cell-tenant-usage" />
-          </Card>
-        </>
-      )}
+          </SectionPart>
+        )}
+        <SectionPart testName="cell-tenant-jobs" heading={{ title: t('shell.cell.tenant.jobs') }}>
+          {jobsFailed && (
+            <AxisAlert
+              data-testid="cell-tenant-jobs-error"
+              kind="error"
+              message={t('shell.cell.tenant.jobsLoadFailed')}
+            />
+          )}
+          {jobs && <CellJobTable jobs={jobs} locale={locale} />}
+        </SectionPart>
+      </SectionParts>
       {tenant && openDialog === 'quotas' && (
         <CellTenantQuotasDialog
           tenant={id}
@@ -471,16 +488,6 @@ export function CellTenantPage() {
           </Flex>
         </Modal>
       )}
-      <Card title={t('shell.cell.tenant.jobs')}>
-        {jobsFailed && (
-          <AxisAlert
-            data-testid="cell-tenant-jobs-error"
-            kind="error"
-            message={t('shell.cell.tenant.jobsLoadFailed')}
-          />
-        )}
-        {jobs && <CellJobTable jobs={jobs} locale={locale} />}
-      </Card>
     </PageLayout>
   )
 }

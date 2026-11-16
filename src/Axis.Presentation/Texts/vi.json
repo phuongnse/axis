@@ -363,6 +363,7 @@
   "shell.cell.tenants.status.deleting": "Đang xóa",
   "shell.cell.tenant.loadFailed": "Không tải được tenant.",
   "shell.cell.tenant.status": "Trạng thái",
+  "shell.cell.tenant.details": "Thông tin",
   "shell.cell.tenant.application": "Ứng dụng",
   "shell.cell.tenant.hosts": "Tên miền",
   "shell.cell.tenant.quotas": "Hạn mức",

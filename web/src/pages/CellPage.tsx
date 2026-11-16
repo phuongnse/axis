@@ -1,4 +1,4 @@
-import { Card, Descriptions } from 'antd'
+import { Descriptions } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { fetchCell, type Cell } from '../platform/cell'
@@ -40,44 +40,43 @@ export function CellPage() {
     <PageLayout title={t('shell.cell.overview.title')}>
       {failed && <AxisAlert data-testid="cell-error" kind="error" message={t('shell.cell.loadFailed')} />}
       {cell && (
-        <Card data-testid="cell-overview">
-          <Descriptions
-            column={1}
-            items={[
-              { key: 'id', label: t('shell.cell.overview.id'), children: cell.id },
-              { key: 'region', label: t('shell.cell.overview.region'), children: cell.region },
-              {
-                key: 'tenants',
-                label: t('shell.cell.overview.tenants'),
-                children:
-                  cell.cap === null
-                    ? cell.tenants
-                    : t('shell.cell.overview.tenantsOfCap')
-                        .replace('{tenants}', String(cell.tenants))
-                        .replace('{cap}', String(cell.cap)),
-              },
-              {
-                key: 'restoreCheck',
-                label: t('shell.cell.overview.restoreCheck'),
-                children: (
-                  <span data-testid="cell-restore-check">
-                    {cell.restoreCheck === null ? (
-                      <EmptyDash />
-                    ) : (
-                      t(
-                        cell.restoreCheck.passed
-                          ? 'shell.cell.overview.restoreCheck.passed'
-                          : 'shell.cell.overview.restoreCheck.failed',
-                      )
-                        .replace('{tenant}', cell.restoreCheck.tenantId)
-                        .replace('{time}', new Date(cell.restoreCheck.ranAt).toLocaleString(locale))
-                    )}
-                  </span>
-                ),
-              },
-            ]}
-          />
-        </Card>
+        <Descriptions
+          data-testid="cell-overview"
+          column={1}
+          items={[
+            { key: 'id', label: t('shell.cell.overview.id'), children: cell.id },
+            { key: 'region', label: t('shell.cell.overview.region'), children: cell.region },
+            {
+              key: 'tenants',
+              label: t('shell.cell.overview.tenants'),
+              children:
+                cell.cap === null
+                  ? cell.tenants
+                  : t('shell.cell.overview.tenantsOfCap')
+                      .replace('{tenants}', String(cell.tenants))
+                      .replace('{cap}', String(cell.cap)),
+            },
+            {
+              key: 'restoreCheck',
+              label: t('shell.cell.overview.restoreCheck'),
+              children: (
+                <span data-testid="cell-restore-check">
+                  {cell.restoreCheck === null ? (
+                    <EmptyDash />
+                  ) : (
+                    t(
+                      cell.restoreCheck.passed
+                        ? 'shell.cell.overview.restoreCheck.passed'
+                        : 'shell.cell.overview.restoreCheck.failed',
+                    )
+                      .replace('{tenant}', cell.restoreCheck.tenantId)
+                      .replace('{time}', new Date(cell.restoreCheck.ranAt).toLocaleString(locale))
+                  )}
+                </span>
+              ),
+            },
+          ]}
+        />
       )}
     </PageLayout>
   )

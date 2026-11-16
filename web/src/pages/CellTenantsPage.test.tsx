@@ -282,6 +282,16 @@ describe('CellTenantsPage', () => {
     expect(screen.getByText('Status is Suspended')).toBeInTheDocument()
   })
 
+  it('shows the table right under the page heading, with no card', async () => {
+    stubTenants(200, [acme])
+    renderPage()
+
+    const heading = screen.getByRole('heading', { level: 1, name: 'Tenants' })
+    const table = await screen.findByTestId('cell-tenants')
+    expect(heading.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(document.querySelector('.ant-card')).toBeNull()
+  })
+
   it('reports a refusal to the console', async () => {
     stubTenants(401)
     const onRefused = renderPage()
