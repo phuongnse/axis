@@ -29,6 +29,7 @@ with no heading. A property that no section names goes to a last section with no
   are such parts. Each is headed with its field's title and help, and the auto-accept switch is a part with no heading.
 - **Used by the generic form, most editors and the Overview.** The generic form, the seed, page, process, connector,
   identity provider and scenario editors and the Studio Overview draw their sections through it.
+  A module data source, rule, trigger, sequence, event or seed draws the same parts, under its Customized tag and Reset all.
 - **Add… in the heading of every list part** _(planned for M33)_. The records, values, sign-in providers and steps
   parts put their Add… on the right of their heading.
 - **Every Studio form is built from it.** _(planned for M33)_ The entity designer draws its sections through it too.

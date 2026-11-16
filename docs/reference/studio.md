@@ -105,14 +105,13 @@ resource opens it alone, under its [name](studio-workspace.md#names), with its e
   the name, the description, the module and the status, and filters on its columns in the browser, so the
   module, a tag and not a column, is not a filter.
 
-A module resource opens in its
-kind's editor with the application's layer applied, as
-[customization layers in Studio](customization-layers.md#in-studio) describes. A module contract opens
-in its contract editor, with Relax and Undo relax, as
-[module contracts in Studio](module-contracts.md#in-studio) describes, and draws its lifecycle as a
-state diagram that marks the initial and deletable states and labels each arrow with its transition's
-name and whether it has a guard. A module scenario opens read-only, as formatted JSON under a notice in
-the alert role.
+A module resource opens in its kind's editor with the application's layer applied, as
+[customization layers in Studio](customization-layers.md#in-studio) describes. A module data source, rule, trigger,
+sequence, event or seed draws the same [parts](studio-resource-form.md#sections) as a local resource's Form tab, with
+its Customized tag and Reset all above them. A module contract opens in its contract editor, with Relax and Undo relax,
+as [module contracts in Studio](module-contracts.md#in-studio) describes, and draws its lifecycle as a state diagram
+that marks the initial and deletable states and labels each arrow with its transition's name and whether it has a
+guard. A module scenario opens read-only, as formatted JSON under a notice in the alert role.
 
 ## Editor
 
