@@ -338,8 +338,6 @@
   "shell.cell.jobs.runAgainBody": "A new job starts at the first step that did not succeed. Steps that succeeded are not run again.",
   "shell.cell.jobs.runAgainOk": "Run again",
   "shell.cell.tenants.title": "Tenants",
-  "shell.cell.tenants.search": "Search by ID or host",
-  "shell.cell.tenants.statusFilter": "Status",
   "shell.cell.tenants.empty": "The cell has no tenants yet.",
   "shell.cell.tenants.loadFailed": "The tenants could not be loaded.",
   "shell.cell.tenants.id": "ID",
