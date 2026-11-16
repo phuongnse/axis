@@ -2264,7 +2264,6 @@
   "shell.studio.scenario.addOutput": "Add output",
   "shell.studio.scenario.notJson": "This is not JSON, so the value is not saved.",
   "shell.studio.texts.key": "Key",
-  "shell.studio.texts.search": "Search keys and texts",
   "shell.studio.texts.missing": "Missing",
   "shell.studio.texts.newKey": "New key",
   "shell.studio.texts.addKey": "Add key",

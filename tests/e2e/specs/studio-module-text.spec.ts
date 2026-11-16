@@ -71,6 +71,12 @@ test.describe("Studio edits a module text as a layer", () => {
     await openKind(page, "text");
     await openModuleResource(page, "text", "Checklists", "TextsEn");
 
+    // The table pages, so the key is searched for before its row is looked for.
+    const search = page
+      .getByTestId("studio-text-table")
+      .getByRole("searchbox", { name: "Search", exact: true });
+    await search.fill(reviewerKey);
+    await search.press("Enter");
     const row = page.locator(
       `[data-testid="studio-text-row"][data-key="${reviewerKey}"]`,
     );
