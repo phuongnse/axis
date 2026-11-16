@@ -5,19 +5,21 @@ import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { ExpandAltOutlined } from '@ant-design/icons'
 import { Flex, Modal, Typography } from 'antd'
-import { useContext, useEffect, useRef, useState } from 'react'
+import { Fragment, useContext, useEffect, useRef, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import {
   checkStudioExpression,
   fetchStudioExpressionScope,
   type ExpressionCheck,
   type ExpressionScope,
+  type ExpressionScopeFunction,
   type StudioNames,
 } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { PlatformContext } from './context'
+import { callAt } from './expressionCall'
 import { completeAt, insertAt } from './expressionCompletion'
 import { expressionLanguage } from './expressionLanguage'
 import { ExpressionPanel } from './ExpressionPanel'
@@ -81,6 +83,8 @@ export default function ExpressionEditor({
   const [themeCompartment] = useState(() => new Compartment())
   const [result, setResult] = useState<Result>({ type: null, error: null })
   const [checking, setChecking] = useState(true)
+  // The text before the cursor, which says whether the cursor is inside a call.
+  const [before, setBefore] = useState('')
   const placeKey = JSON.stringify([application, resourceId, path])
   const [loaded, setLoaded] = useState<{ placeKey: string; scope: ExpressionScope | null } | null>(null)
   // An answer for another place is not this place's scope.
@@ -177,6 +181,9 @@ export default function ExpressionEditor({
           initial.themeCompartment.of(initial.theme),
           EditorView.contentAttributes.of({ 'aria-label': name }),
           EditorView.updateListener.of((update) => {
+            if (update.docChanged || update.selectionSet) {
+              setBefore(update.state.sliceDoc(0, update.state.selection.main.head))
+            }
             if (!update.docChanged) {
               return
             }
@@ -200,6 +207,7 @@ export default function ExpressionEditor({
       clearTimeout(timer)
       controller.abort()
       setChecking(true)
+      setBefore('')
       view.destroy()
       viewRef.current = null
       latest.current.onView?.(null)
@@ -229,6 +237,8 @@ export default function ExpressionEditor({
         ? t('shell.studio.expression.needs').replace('{type}', words(scope.type))
         : null
 
+  const call = scope ? callAt(before, scope.functions) : null
+
   return (
     <div aria-busy={checking}>
       <Flex gap={tokens.spacing.xs} align="flex-start">
@@ -242,6 +252,21 @@ export default function ExpressionEditor({
           />
         )}
       </Flex>
+      {call !== null && (
+        <div data-testid="studio-expression-signature">
+          <Typography.Text>
+            {call.fn.name}(
+            {call.fn.parameters.map((parameter, index) => (
+              <Fragment key={index}>
+                {index > 0 && ', '}
+                {index === boldParameter(call.fn, call.argument) ? <strong>{parameter}</strong> : parameter}
+              </Fragment>
+            ))}
+            )
+          </Typography.Text>{' '}
+          <Typography.Text type="secondary">{call.fn.description}</Typography.Text>
+        </div>
+      )}
       {result.error !== null ? (
         <div data-testid="studio-expression-error">
           <Typography.Text type="danger">{result.error.message}</Typography.Text>{' '}
@@ -322,6 +347,12 @@ export default function ExpressionEditor({
     const first = answer.diagnostics[0]
     setResult({ type: null, error: { code: first.code, message: first.message } })
   }
+}
+
+/** The parameter to show in bold for an argument: a repeating last parameter, `…`, takes every argument past the list. */
+function boldParameter(fn: ExpressionScopeFunction, argument: number): number {
+  const last = fn.parameters.length - 1
+  return argument <= last ? argument : fn.parameters[last] === '…' ? last : -1
 }
 
 const expressionTheme = sharedTheme((tokens, mode) => [
