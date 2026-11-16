@@ -132,8 +132,8 @@ The selection is kept across the Design, Form and JSON tabs while the resource s
   that the form lists, because a condition reads only those.
 - **Entity flags.** A field that the entity marks `required` has no `visibleWhen` box, even when it
   already has a `visibleWhen`, which the author removes in the Form or JSON tab. A computed, sequence or creator field
-  shows `readOnly` on and locked. The panel reads these flags from the canvas's latest answer, so it
-  shows nothing about a field until the form is drawn.
+  shows `readOnly` on and locked, with the reason as the box's help. The panel reads these flags from the
+  canvas's latest answer, so it shows nothing about a field until the form is drawn.
 - **Section name.** The Name box applies on Enter or when it loses focus. It renames the step entries
   that list the section in the same edit, so one Undo reverses it. It refuses an empty name and another
   section's name, ignoring letter case, and a message under the box says why.
