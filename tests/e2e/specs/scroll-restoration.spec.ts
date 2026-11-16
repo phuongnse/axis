@@ -47,7 +47,8 @@ test.describe('Studio on a copy of its own', () => {
     const late = roleIds[roleIds.length - 2]
     const lateButton = page.getByTestId(`studio-resource-${late}`)
 
-    await page.goto(`${server.url}/studio?app=PurchaseRequests&kind=role`)
+    // A kind's list shows 20 resources a page, so the page size of 100 keeps all 45 roles in one long page.
+    await page.goto(`${server.url}/studio?app=PurchaseRequests&kind=role&pageSize=100`)
     await lateButton.scrollIntoViewIfNeeded()
     const before = await scrollY(page)
     expect(before).toBeGreaterThan(0)
@@ -57,7 +58,7 @@ test.describe('Studio on a copy of its own', () => {
     await expect.poll(() => scrollY(page)).toBe(0)
 
     await page.goBack()
-    await expect(page).toHaveURL(/[?&]kind=role$/)
+    await expect(page).toHaveURL(/[?&]kind=role&pageSize=100$/)
     await expect(lateButton).toBeVisible()
     await expect.poll(() => scrollY(page)).toBe(before)
   })

@@ -393,10 +393,13 @@ test.describe('Studio on a copy of its own', () => {
       await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-saved')).toBeVisible()
 
+      // The kind list is loaded from the server, so it is opened before the server stops.
+      await openKind(page, 'entity')
+      const lineItemLink = page.getByTestId(`studio-resource-${lineItem.id}`)
+      await expect(lineItemLink).toBeVisible()
       const { port } = restarted
       await restarted.stop()
-      await openKind(page, 'entity')
-      await page.getByTestId(`studio-resource-${lineItem.id}`).click()
+      await lineItemLink.click()
       await expect(page.getByTestId('studio-reconnecting')).toBeVisible()
 
       restarted = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Folders__0: copy }, port)

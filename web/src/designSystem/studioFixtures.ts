@@ -5,6 +5,7 @@ import type {
   StudioCatalog,
   StudioDiagnostic,
   StudioFormMetadataAnswer,
+  StudioKindListItem,
   StudioNameEntity,
   StudioNames,
   StudioPageMetadataAnswer,
@@ -12,7 +13,6 @@ import type {
   StudioRelease,
   StudioReleases,
   StudioResource,
-  StudioResourceActivity,
   StudioResourceItem,
   StudioResourceReferences,
   StudioRevision,
@@ -100,19 +100,33 @@ function items(folder: Folder): StudioResourceItem[] {
   ]
 }
 
-/** Each resource's activity: a mix of statuses, and a writer and a time on the first resource. */
-function activity(folder: Folder): { items: StudioResourceActivity[] } {
+/**
+ * The first page of the entity list: 20 rows at most, with a mix of statuses and a writer and a time on the first row.
+ * The answer ignores the query, so a sort or a page change in the preview shows the same rows.
+ */
+function entityList(folder: Folder): {
+  items: StudioKindListItem[]
+  page: number
+  pageSize: number
+  totalCount: number
+} {
   const statuses = ['new', 'changed', 'published', null] as const
+  const pageSize = 20
   return {
-    items: items(folder).map((item, index) => ({
-      id: item.id,
+    items: folder.entities.slice(0, pageSize).map((entity, index) => ({
+      id: id(firstEntityId + index),
+      title: entity.title,
+      locale: null,
+      description: null,
       module: null,
+      moduleLabel: null,
       status: statuses[index % statuses.length],
-      titles: null,
-      descriptions: null,
       modifiedBy: index === 0 ? 'Linh Nguyen' : null,
       modifiedAt: index === 0 ? '2026-11-02T09:30:00Z' : null,
     })),
+    page: 1,
+    pageSize,
+    totalCount: folder.entities.length,
   }
 }
 
@@ -643,7 +657,7 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     [`${folderPath}/policy-matrix`]: () => policyMatrix(folder),
     [appsPath]: () => ({ items: folder.apps }) satisfies { items: StudioApplication[] },
     [`${folderPath}/resources`]: () => ({ items: items(folder) }) satisfies { items: StudioResourceItem[] },
-    [`${folderPath}/resource-activity`]: () => activity(folder),
+    [`${folderPath}/kinds/entity/resources`]: () => entityList(folder),
     [`${folderPath}/diagnostics`]: () =>
       ({ diagnostics: answers.diagnostics }) satisfies { diagnostics: StudioDiagnostic[] },
     // A field's default has no field in scope, and no state types an expression, so the scope is empty.

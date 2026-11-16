@@ -100,6 +100,7 @@ namespace Axis.Server.Studio;
 /// <c>application.json</c> stored with that release, with the words that <see cref="StudioRelaxedWords"/> reads from its module
 /// copies. It reads the tenant database and changes nothing.
 /// <c>GET /api/studio/apps/{application}/releases/{number}</c> is in <see cref="StudioReleaseEndpoints"/>.
+/// <c>GET /api/studio/apps/{application}/kinds/{kind}/resources</c>, the page of a kind's list, is in <see cref="StudioKindListEndpoints"/>.
 /// </summary>
 internal static class StudioEndpoints
 {
@@ -133,6 +134,7 @@ internal static class StudioEndpoints
         endpoints.MapStudioApplicationEndpoints();
         endpoints.MapStudioSettingsEndpoints();
         endpoints.MapStudioActivityEndpoints();
+        endpoints.MapStudioKindListEndpoints();
         endpoints.MapStudioPackageFileEndpoints();
     }
 

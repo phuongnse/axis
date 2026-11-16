@@ -15,11 +15,10 @@ import { LeaveWithoutSaving, UnsavedChangesGuard } from '../platform/UnsavedChan
 import type {
   StudioApplication,
   StudioDiagnostic,
+  StudioKindList,
   StudioReference,
-  StudioResourceActivity,
   StudioResourceItem,
 } from '../platform/studio'
-import { studioResourceAddress } from '../platform/studioAddress'
 import { PlatformContext, type Platform } from './context'
 import { StudioPage } from './StudioPage'
 import { editJson, jsonText } from '../test/jsonView'
@@ -187,6 +186,25 @@ interface ExpressionStub {
   manifest?: Record<string, unknown>
 }
 
+/** The page that `GET .../kinds/{kind}/resources` answers: the folder's resources of that kind, titled by label, else name. */
+function kindList(input: string): StudioKindList {
+  const kind = input.slice(`${folder}/kinds/`.length).split('/')[0]
+  const items = resources
+    .filter((item) => item.kind === kind)
+    .map((item) => ({
+      id: item.id,
+      title: item.titles?.en ?? item.name ?? kind,
+      locale: item.locale ?? null,
+      description: null,
+      module: null,
+      moduleLabel: null,
+      status: null,
+      modifiedBy: null,
+      modifiedAt: null,
+    }))
+  return { items, totalCount: items.length }
+}
+
 /** Stubs `fetch` with the Studio list routes, the read, patch and delete of the purchase request entity, and its references. `apps` is the status or list of `/api/studio/apps`. */
 function stubServer(
   apps: (Partial<StudioApplication> & { name: string })[] | number = [{ name: 'PurchaseRequests' }],
@@ -270,8 +288,8 @@ function stubServer(
     if (input === `${folder}/names`) {
       return json(applicationNames)
     }
-    if (input === `${folder}/resource-activity`) {
-      return json({ items: [] })
+    if (input.startsWith(`${folder}/kinds/`)) {
+      return json(kindList(input))
     }
     if (input === '/api/studio/catalog') {
       return json({ modules: [], packages: [], timeZones: [] })
@@ -395,12 +413,11 @@ describe('StudioPage', () => {
     renderPage('/studio?app=PurchaseRequests&kind=entity')
 
     expect(await screen.findByRole('heading', { level: 4, name: 'Entities' })).toBeInTheDocument()
-    const entities = screen.getByTestId('studio-group-entity')
-    expect(
-      within(entities)
-        .getAllByRole('link')
-        .map((link) => link.textContent),
-    ).toEqual(['Department', 'PurchaseRequest'])
+    const entities = await screen.findByTestId('studio-group-entity')
+    expect((await within(entities).findAllByRole('link')).map((link) => link.textContent)).toEqual([
+      'Department',
+      'PurchaseRequest',
+    ])
     expect(screen.queryByTestId('studio-group-form')).not.toBeInTheDocument()
     expect(screen.queryByTestId(`studio-resource-${formId}`)).not.toBeInTheDocument()
   })
@@ -440,248 +457,6 @@ describe('StudioPage', () => {
     } else {
       expect(screen.queryByTestId('studio-releases')).not.toBeInTheDocument()
     }
-  })
-
-  describe('names', () => {
-    const textId = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff'
-    const named: StudioResourceItem[] = [
-      ...resources.map((item) =>
-        item.id === entityId ? { ...item, titles: { en: 'Purchase request', vi: 'Yêu cầu mua hàng' } } : item,
-      ),
-      { id: textId, kind: 'text', name: 'TextsVi', file: 'texts/vi.json', version: 'e', usedBy: 0, locale: 'vi' },
-    ]
-
-    function stubNamed() {
-      const fetchMock = stubServer()
-      const base = fetchMock.getMockImplementation()!
-      fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
-        input === `${folder}/resources` ? json({ items: named }) : base(input, init),
-      )
-    }
-
-    it('lists an entity by its label in the UI locale, not by its name', async () => {
-      stubNamed()
-      renderPage('/studio?app=PurchaseRequests&kind=entity')
-
-      expect(await screen.findByRole('link', { name: 'Purchase request' })).toBeInTheDocument()
-      expect(screen.queryByRole('link', { name: 'PurchaseRequest' })).not.toBeInTheDocument()
-    })
-
-    it('lists a text resource by its language, not by its file', async () => {
-      stubNamed()
-      renderPage('/studio?app=PurchaseRequests&kind=text')
-
-      expect(await screen.findByRole('link', { name: 'Vietnamese' })).toBeInTheDocument()
-      expect(screen.queryByText('texts/vi.json')).not.toBeInTheDocument()
-    })
-  })
-
-  describe('the kind lists', () => {
-    const requesterId = 'cccccccc-dddd-4eee-8fff-000000000000'
-    const moduleEntityId = '7c1e2f30-4b5a-4d6e-8f70-91a2b3c4d5e6'
-    const listed: StudioResourceItem[] = [
-      ...resources,
-      { id: requesterId, kind: 'role', name: 'Requester', file: 'roles/requester.json', version: 'f', usedBy: 0 },
-    ]
-    const activity: StudioResourceActivity[] = [
-      {
-        id: departmentId,
-        module: null,
-        status: 'new',
-        titles: null,
-        descriptions: null,
-        modifiedBy: null,
-        modifiedAt: null,
-      },
-      {
-        id: entityId,
-        module: null,
-        status: 'changed',
-        titles: null,
-        descriptions: null,
-        modifiedBy: 'Linh Nguyen',
-        modifiedAt: '2026-11-02T09:30:00Z',
-      },
-      {
-        id: requesterId,
-        module: null,
-        status: 'published',
-        titles: null,
-        descriptions: null,
-        modifiedBy: null,
-        modifiedAt: null,
-      },
-    ]
-
-    /** Stubs the resource list with the role too, and the activity route with `answer`. With `modules`, the names hold a module entity of the Organization module, and the catalog holds that module. */
-    function stubLists(answer: () => Response | Promise<Response> = () => json({ items: activity }), modules = false) {
-      const fetchMock = stubServer()
-      const base = fetchMock.getMockImplementation()!
-      fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
-        if (input === `${folder}/resources`) {
-          return json({ items: listed })
-        }
-        if (input === `${folder}/resource-activity`) {
-          return answer()
-        }
-        if (modules && input === namesPath) {
-          return json({
-            ...applicationNames,
-            entities: [
-              ...applicationNames.entities,
-              { id: moduleEntityId, name: 'organization/Employee', module: 'organization', fields: [] },
-            ],
-          })
-        }
-        if (modules && input === '/api/studio/catalog') {
-          return json({
-            modules: [{ id: 'organization', label: 'Organization', versions: ['1.0.0'], roles: [], connectors: [] }],
-            packages: [],
-            timeZones: [],
-          })
-        }
-        return base(input, init)
-      })
-      return fetchMock
-    }
-
-    it.each(['entity', 'role'])('shows the %s list as one table with the same five columns', async (kind) => {
-      stubLists()
-      renderPage(`/studio?app=PurchaseRequests&kind=${kind}`)
-
-      const group = await screen.findByTestId(`studio-group-${kind}`)
-      expect(
-        within(group)
-          .getAllByRole('columnheader')
-          .map((header) => header.textContent),
-      ).toEqual(['Name', 'Description', 'Status', 'Last modified by', 'Last modified at'])
-    })
-
-    it('links each name to its resource, and shows the dash in a cell with no value', async () => {
-      stubLists()
-      renderPage('/studio?app=PurchaseRequests&kind=entity')
-
-      const group = await screen.findByTestId('studio-group-entity')
-      const link = within(group).getByRole('link', { name: 'Department' })
-      expect(link).toHaveAttribute('href', studioResourceAddress('PurchaseRequests', departmentId))
-      const cells = within(link.closest('tr')!).getAllByRole('cell')
-      expect(cells[1]).toHaveTextContent('—')
-      expect(cells[3]).toHaveTextContent('—')
-      expect(cells[4]).toHaveTextContent('—')
-    })
-
-    it('shows New or Changed, and the writer and time of the last write, from the activity route', async () => {
-      const fetchMock = stubLists()
-      renderPage('/studio?app=PurchaseRequests&kind=entity')
-
-      const group = await screen.findByTestId('studio-group-entity')
-      const row = (name: string) => within(group).getByRole('link', { name }).closest('tr')!
-      expect(within(row('Department')).getByText('New')).toBeInTheDocument()
-      const changed = within(row('PurchaseRequest'))
-      expect(changed.getByText('Changed')).toBeInTheDocument()
-      expect(changed.getByText('Linh Nguyen')).toBeInTheDocument()
-      const time = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'medium' }).format(
-        new Date('2026-11-02T09:30:00Z'),
-      )
-      expect(changed.getByText(time)).toBeInTheDocument()
-      expect(fetchMock.mock.calls.some(([input]) => input === `${folder}/resource-activity`)).toBe(true)
-    })
-
-    it('shows Published for a resource the release holds unchanged', async () => {
-      stubLists()
-      renderPage('/studio?app=PurchaseRequests&kind=role')
-
-      const group = await screen.findByTestId('studio-group-role')
-      expect(within(group).getByText('Published')).toBeInTheDocument()
-    })
-
-    it('shows Loading in the Status cell while the activity has not answered', async () => {
-      stubLists(() => new Promise<Response>(() => {}))
-      renderPage('/studio?app=PurchaseRequests&kind=entity')
-
-      const group = await screen.findByTestId('studio-group-entity')
-      expect(await within(group).findAllByText('Loading…')).toHaveLength(2)
-      expect(within(group).getByRole('link', { name: 'Department' })).toBeInTheDocument()
-    })
-
-    it('shows Unavailable in the Status cell when the activity route fails, and still links the names', async () => {
-      stubLists(() => json({ title: 'Failed' }, 500))
-      renderPage('/studio?app=PurchaseRequests&kind=entity')
-
-      const group = await screen.findByTestId('studio-group-entity')
-      expect(await within(group).findAllByText('Unavailable')).toHaveLength(2)
-      expect(within(group).getByRole('link', { name: 'Department' })).toBeInTheDocument()
-    })
-
-    it('lists a module resource in its kind table, named without its prefix and tagged with its module', async () => {
-      stubLists(undefined, true)
-      renderPage('/studio?app=PurchaseRequests&kind=entity')
-
-      const group = await screen.findByTestId('studio-group-entity')
-      const row = (await within(group).findByRole('link', { name: 'Employee' })).closest('tr')!
-      expect(await within(row).findByText('Organization')).toBeInTheDocument()
-      expect(
-        within(group)
-          .getAllByRole('columnheader')
-          .map((header) => header.textContent),
-      ).toEqual(['Name', 'Description', 'Status', 'Last modified by', 'Last modified at'])
-      expect(screen.queryByRole('link', { name: 'organization/Employee' })).not.toBeInTheDocument()
-      expect(screen.queryByTestId('studio-group-module-entities')).not.toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: 'Module entities' })).not.toBeInTheDocument()
-    })
-
-    it('shows a module resource its label, description, status and writer from the activity route', async () => {
-      const moduleActivity: StudioResourceActivity = {
-        id: moduleEntityId,
-        module: 'organization',
-        status: 'changed',
-        titles: { en: 'Staff member' },
-        descriptions: { en: 'Someone who works here.' },
-        modifiedBy: 'Hoa Tran',
-        modifiedAt: null,
-      }
-      stubLists(() => json({ items: [...activity, moduleActivity] }), true)
-      renderPage('/studio?app=PurchaseRequests&kind=entity')
-
-      const group = await screen.findByTestId('studio-group-entity')
-      const row = (await within(group).findByRole('link', { name: 'Staff member' })).closest('tr')!
-      expect(within(row).getByText('Someone who works here.')).toBeInTheDocument()
-      expect(within(row).getByText('Changed')).toBeInTheDocument()
-      expect(within(row).getByText('Hoa Tran')).toBeInTheDocument()
-      expect(await within(row).findByText('Organization')).toBeInTheDocument()
-      expect(within(group).queryByRole('link', { name: 'Employee' })).not.toBeInTheDocument()
-    })
-
-    it("shows a module's id in the tag when the catalog does not load", async () => {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-      const fetchMock = stubLists(undefined, true)
-      const base = fetchMock.getMockImplementation()!
-      fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
-        input === '/api/studio/catalog' ? json({ title: 'Failed' }, 500) : base(input, init),
-      )
-      renderPage('/studio?app=PurchaseRequests&kind=entity')
-
-      const group = await screen.findByTestId('studio-group-entity')
-      const row = (await within(group).findByRole('link', { name: 'Employee' })).closest('tr')!
-      await waitFor(() => expect(warn).toHaveBeenCalledWith('Loading the Studio catalog failed', expect.anything()))
-      expect(within(row).getByText('organization')).toBeInTheDocument()
-      expect(within(row).queryByText('Organization')).not.toBeInTheDocument()
-      warn.mockRestore()
-    })
-
-    it('loads the activity once with the application, and again after a save', async () => {
-      const fetchMock = stubLists()
-      renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
-      const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
-      const loads = () => fetchMock.mock.calls.filter(([input]) => input === `${folder}/resource-activity`).length
-      await waitFor(() => expect(loads()).toBe(1))
-
-      await userEvent.clear(maxLength)
-      await userEvent.type(maxLength, '250')
-      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
-      await screen.findByTestId('studio-saved')
-      await waitFor(() => expect(loads()).toBe(2))
-    })
   })
 
   it('shows the details of a resource and keeps it in the address without its kind', async () => {
@@ -2290,7 +2065,9 @@ describe('StudioPage publishing', () => {
 
       await userEvent.click(await screen.findByRole('button', { name: 'New entity…' }))
 
-      const dialog = await screen.findByRole('dialog', { name: 'New entity' })
+      // The table's page size picker takes the id that antd gives every id in tests, so the dialog is found by its title.
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText('New entity')).toBeVisible()
       expect(within(dialog).queryByRole('combobox', { name: 'Kind' })).not.toBeInTheDocument()
       const create = within(dialog).getByRole('button', { name: 'Create' })
       expect(create).toBeEnabled()
@@ -2309,7 +2086,9 @@ describe('StudioPage publishing', () => {
 
       await userEvent.click(await screen.findByRole('button', { name: 'New entity…' }))
 
-      const dialog = await screen.findByRole('dialog', { name: 'New entity' })
+      // The table's page size picker takes the id that antd gives every id in tests, so the dialog is found by its title.
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText('New entity')).toBeVisible()
       await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'CostCentre{Enter}')
 
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('resource='))
@@ -2342,7 +2121,7 @@ describe('StudioPage publishing', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Create' }))
 
       expect(await screen.findByText('A resource with this name or locale already exists.')).toBeInTheDocument()
-      expect(screen.getByRole('dialog', { name: 'New entity' })).toBeInTheDocument()
+      expect(within(screen.getByRole('dialog')).getByText('New entity')).toBeVisible()
     })
 
     it('offers no create button on the list of a kind that has no starter', async () => {

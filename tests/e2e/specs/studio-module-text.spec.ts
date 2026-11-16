@@ -69,7 +69,8 @@ test.describe("Studio edits a module text as a layer", () => {
     await page.goto(`${server.url}/studio?app=ModuleApp`);
 
     await openKind(page, "text");
-    await openModuleResource(page, "text", "Checklists", "TextsEn");
+    // A text resource shows its language, as the application's own do.
+    await openModuleResource(page, "text", "Checklists", "English");
 
     // The table pages, so the key is searched for before its row is looked for.
     const search = page

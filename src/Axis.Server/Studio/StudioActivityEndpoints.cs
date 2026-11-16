@@ -17,6 +17,7 @@ namespace Axis.Server.Studio;
 /// folder and of the modules the folder pins, see <c>docs/reference/studio-resource-form.md#resource-activity</c>. It
 /// checks the session (401), the author role (403) and the application (404). It compiles the folder to find the pinned
 /// modules, reads the live release and the write records of <see cref="StudioWriteRecords"/>, and changes nothing.
+/// <see cref="ReadAsync"/> is that read, which the kind list route of <see cref="StudioKindListEndpoints"/> builds on.
 /// </summary>
 internal static class StudioActivityEndpoints
 {
@@ -30,12 +31,18 @@ internal static class StudioActivityEndpoints
     // An item before its writer is known, with the file and the version whose record would name the writer.
     private sealed record Pending(
         string Id,
+        string? Kind,
+        string? Name,
+        string? Locale,
         string? Module,
+        string? ModuleLabel,
         string? Status,
-        IReadOnlyDictionary<string, string>? Titles,
-        IReadOnlyDictionary<string, string>? Descriptions,
+        IReadOnlyDictionary<string, string> Titles,
+        IReadOnlyDictionary<string, string> Descriptions,
         string? WriterFile,
         string? WriterVersion);
+
+    private static readonly IReadOnlyDictionary<string, string> _noTexts = new Dictionary<string, string>();
 
     private static async Task<IResult> GetAsync(
         string application,
@@ -51,7 +58,32 @@ internal static class StudioActivityEndpoints
             return refusal!;
         }
 
-        var cancellationToken = httpContext.RequestAborted;
+        var entries = await ReadAsync(folder, packages, modules, database, httpContext.RequestAborted);
+        return Results.Ok(new StudioResourceActivityResponse(
+            [
+                .. entries.Select(entry => new StudioResourceActivityItem(
+                    entry.Id,
+                    entry.Module,
+                    entry.Status,
+                    entry.Module is null ? null : entry.Titles,
+                    entry.Module is null ? null : entry.Descriptions,
+                    entry.ModifiedBy,
+                    entry.ModifiedAt)),
+            ]));
+    }
+
+    /// <summary>
+    /// Reads every resource of <paramref name="folder"/> and of the module versions it pins, each with its status, its last
+    /// write, its titles and descriptions by locale, and for a module resource its module's label. The folder's own
+    /// resources come first by file, then each module's in module order.
+    /// </summary>
+    internal static async Task<IReadOnlyList<StudioActivityEntry>> ReadAsync(
+        string folder,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        TenantDatabase database,
+        CancellationToken cancellationToken)
+    {
         var connection = await database.GetConnectionAsync(cancellationToken);
         var released = new Dictionary<string, string>(StringComparer.Ordinal);
         IReadOnlyDictionary<string, StudioWriteRecords.Write> writes = new Dictionary<string, StudioWriteRecords.Write>();
@@ -87,21 +119,25 @@ internal static class StudioActivityEndpoints
 
         var names = await UserProfiles.FindDisplayNamesAsync(
             connection, [.. pending.Select(WriterOf).OfType<StudioWriteRecords.Write>().Select(write => write.UserId)], cancellationToken);
-        return Results.Ok(new StudioResourceActivityResponse(
-            [
-                .. pending.Select(item =>
-                {
-                    var write = WriterOf(item);
-                    return new StudioResourceActivityItem(
-                        item.Id,
-                        item.Module,
-                        item.Status,
-                        item.Titles,
-                        item.Descriptions,
-                        write is null ? null : names.GetValueOrDefault(write.UserId) ?? write.UserName,
-                        write?.WrittenAt);
-                }),
-            ]));
+        return
+        [
+            .. pending.Select(item =>
+            {
+                var write = WriterOf(item);
+                return new StudioActivityEntry(
+                    item.Id,
+                    item.Kind,
+                    item.Name,
+                    item.Locale,
+                    item.Module,
+                    item.ModuleLabel,
+                    item.Status,
+                    item.Titles,
+                    item.Descriptions,
+                    write is null ? null : names.GetValueOrDefault(write.UserId) ?? write.UserName,
+                    write?.WrittenAt);
+            }),
+        ];
     }
 
     // The resources of the folder by file, then a released file that no longer loads, which is changed and keeps its id.
@@ -112,13 +148,18 @@ internal static class StudioActivityEndpoints
         Dictionary<string, string> releasedOwn)
     {
         var contents = files.ToDictionary(file => file.Path, file => file.Content, StringComparer.Ordinal);
+        var titles = StudioResourceTitles.Read(resources);
         var items = new List<(string File, Pending Item)>();
         foreach (var resource in resources)
         {
             var status = resource.Kind == ResourceKinds.Scenario
                 ? null
                 : StatusOf(hasRelease, contents[resource.File], releasedOwn.GetValueOrDefault(resource.File));
-            items.Add((resource.File, new Pending(resource.Id.ToString("D"), null, status, null, null, resource.File, resource.Version)));
+            var (resourceTitles, descriptions, locale) = titles[resource.Id];
+            items.Add((
+                resource.File,
+                new Pending(
+                    resource.Id.ToString("D"), resource.Kind, resource.Name, locale, null, null, status, resourceTitles, descriptions, resource.File, resource.Version)));
         }
 
         var listed = resources.Select(resource => resource.File).ToHashSet(StringComparer.Ordinal);
@@ -130,7 +171,7 @@ internal static class StudioActivityEndpoints
                 continue;
             }
 
-            items.Add((path, new Pending(id.ToString("D"), null, Changed, null, null, null, null)));
+            items.Add((path, new Pending(id.ToString("D"), null, null, null, null, null, Changed, _noTexts, _noTexts, null, null)));
         }
 
         items.Sort((left, right) => string.CompareOrdinal(left.File, right.File));
@@ -195,14 +236,28 @@ internal static class StudioActivityEndpoints
                     }
                 }
 
-                var (resourceTitles, descriptions, _) = titles[resource.Id];
+                var (resourceTitles, descriptions, locale) = titles[resource.Id];
                 items.Add(new Pending(
-                    resource.Id.ToString("D"), pin.Id, status, resourceTitles, descriptions, layer?.File.File, layer?.File.Version));
+                    resource.Id.ToString("D"),
+                    resource.Kind,
+                    Unprefixed(resource.Name, pin.Id),
+                    locale,
+                    pin.Id,
+                    string.IsNullOrWhiteSpace(installed.Manifest.Label) ? pin.Id : installed.Manifest.Label,
+                    status,
+                    resourceTitles,
+                    descriptions,
+                    layer?.File.File,
+                    layer?.File.Version));
             }
         }
 
         return items;
     }
+
+    // A module resource's name without its "<module>/" prefix, which the list shows when it has no label.
+    private static string? Unprefixed(string? name, string module) =>
+        name is not null && name.StartsWith($"{module}/", StringComparison.Ordinal) ? name[(module.Length + 1)..] : name;
 
     // A layer that only one side has, or whose canonical JSON differs, is a difference.
     private static bool LayerDiffers(StudioFile? current, StudioFile? release) =>
@@ -239,5 +294,23 @@ internal sealed record StudioResourceActivityItem(
     string? Status,
     IReadOnlyDictionary<string, string>? Titles,
     IReadOnlyDictionary<string, string>? Descriptions,
+    string? ModifiedBy,
+    DateTimeOffset? ModifiedAt);
+
+/// <summary>
+/// One resource of the folder or of a module, as <see cref="StudioActivityEndpoints.ReadAsync"/> reads it. <c>Kind</c> is null
+/// for a released file that no longer loads. <c>Locale</c> is that of a text resource. <c>ModuleLabel</c> is the label of the
+/// pinned module version, else the module's id. <c>Titles</c> and <c>Descriptions</c> are keyed by locale.
+/// </summary>
+internal sealed record StudioActivityEntry(
+    string Id,
+    string? Kind,
+    string? Name,
+    string? Locale,
+    string? Module,
+    string? ModuleLabel,
+    string? Status,
+    IReadOnlyDictionary<string, string> Titles,
+    IReadOnlyDictionary<string, string> Descriptions,
     string? ModifiedBy,
     DateTimeOffset? ModifiedAt);
