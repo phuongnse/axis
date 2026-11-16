@@ -587,7 +587,14 @@ export function AxisTable<T extends object>({
               tableLayout="auto"
               dataSource={pageRows as T[] | undefined}
               loading={loading}
-              locale={{ emptyText: <EmptyState text={emptyText} /> }}
+              // The table gives the space that EmptyState no longer keeps, so an empty table keeps its height.
+              locale={{
+                emptyText: (
+                  <div style={{ padding: `${tokens.spacing.xl}px ${tokens.spacing.xs}px` }}>
+                    <EmptyState text={emptyText} />
+                  </div>
+                ),
+              }}
               pagination={
                 paging
                   ? {
@@ -597,6 +604,8 @@ export function AxisTable<T extends object>({
                       showSizeChanger: picker,
                       hideOnSinglePage: !picker,
                       itemRender: markCurrentPage(paging.current),
+                      // A shared widget keeps no space around itself, see docs/reference/shared-widgets.md#the-rule.
+                      style: { marginBottom: 0 },
                       showTotal: (all, [from, to]) =>
                         t('shell.table.range')
                           .replace('{from}', number.format(from))
