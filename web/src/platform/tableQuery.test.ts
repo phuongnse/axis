@@ -252,3 +252,55 @@ describe('columns', () => {
     expect(recordQuery({ page: 1, pageSize: 20, sort: null, columns: ['title', 'note'] })).toBe('')
   })
 })
+
+describe('a prefixed table', () => {
+  const prefixed = 'deadLetters.'
+  const filter: FilterGroup = { all: [{ field: 'title', op: 'eq', value: 'x' }] }
+  const own = new URLSearchParams({
+    [`${prefixed}search`]: 'boom',
+    [`${prefixed}filter`]: JSON.stringify(filter),
+    [`${prefixed}sort`]: '-title',
+    [`${prefixed}page`]: '3',
+    [`${prefixed}pageSize`]: '50',
+    [`${prefixed}columns`]: 'title',
+    [`${prefixed}tenant`]: 'acme',
+  })
+
+  it('reads only its own prefixed names', () => {
+    const plain = new URLSearchParams('search=other&page=9&pageSize=10&sort=title')
+
+    expect(parseTableQuery(plain, fields, 20, ['tenant'], true, true, true, prefixed)).toEqual({
+      page: 1,
+      pageSize: 20,
+      sort: null,
+      parameters: {},
+    })
+    expect(parseTableQuery(own, fields, 20, ['tenant'], true, true, true, prefixed)).toEqual({
+      page: 3,
+      pageSize: 50,
+      sort: { field: 'title', descending: true },
+      parameters: { tenant: 'acme' },
+      search: 'boom',
+      filter,
+      columns: ['title'],
+    })
+  })
+
+  it('writes and clears only its own prefixed names and leaves the plain ones as they are', () => {
+    const query = { page: 2, pageSize: 20, sort: null, search: 'new', parameters: { tenant: 'beta' } }
+
+    expect(
+      writeTableQuery(new URLSearchParams(`search=other&page=9&${own}`), query, 20, ['tenant'], prefixed).toString(),
+    ).toBe('search=other&page=9&deadLetters.tenant=beta&deadLetters.search=new&deadLetters.page=2')
+    expect(
+      writeTableQuery(
+        new URLSearchParams(`search=other&${own}`),
+        { page: 1, pageSize: 20, sort: null },
+        20,
+        ['tenant'],
+        prefixed,
+      ).toString(),
+    ).toBe('search=other')
+    expect(recordQuery(query)).toBe('tenant=beta&search=new&page=2')
+  })
+})

@@ -1,3 +1,4 @@
+using Axis.Data.Records;
 using Npgsql;
 
 namespace Axis.Processes.Instances;
@@ -67,36 +68,42 @@ public static class DeadLetters
     }
 
     /// <summary>
-    /// Reads one page of the dead letters of every application of the tenant database, newest first, and the
-    /// number of them on every page, including those that belong to no process. <paramref name="applicationId"/>
-    /// keeps one application and <paramref name="state"/> keeps one state, or every one when they are
-    /// <see langword="null"/>.
+    /// Reads one page of the dead letters of every application of the tenant database, and the number of them on every
+    /// page, including those that belong to no process. <paramref name="applicationId"/> keeps one application and
+    /// <paramref name="state"/> keeps one state, or every one when they are <see langword="null"/>. <paramref name="list"/> adds
+    /// a filter, a search and a sort over the columns of <c>axis.dead_letters</c>. The order is newest first when it has no sort,
+    /// and a sort breaks its ties newest first.
     /// </summary>
     public static async Task<DeadLetterPage> ListTenantAsync(
         NpgsqlConnection connection,
         Guid? applicationId,
         string? state,
+        ListSql list,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(list);
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
-        const string where = "WHERE (@application::uuid IS NULL OR application_id = @application) AND (@state::text IS NULL OR state = @state)";
+        var where = $"WHERE (@application::uuid IS NULL OR application_id = @application) AND (@state::text IS NULL OR state = @state) AND {list.Condition}";
+        var order = list.Order is null ? "created_at DESC, id DESC" : $"{list.Order}, created_at DESC, id DESC";
 
         long totalCount;
         await using (var count = new NpgsqlCommand($"SELECT count(*) FROM axis.dead_letters {where}", connection))
         {
             AddTenantFilter(count, applicationId, state);
+            list.AddTo(count);
             totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
         }
 
         await using var command = new NpgsqlCommand(
-            $"SELECT {Columns} FROM axis.dead_letters {where} ORDER BY created_at DESC, id DESC LIMIT @limit OFFSET @offset",
+            $"SELECT {Columns} FROM axis.dead_letters {where} ORDER BY {order} LIMIT @limit OFFSET @offset",
             connection);
         AddTenantFilter(command, applicationId, state);
+        list.AddTo(command);
         command.Parameters.AddWithValue("limit", pageSize);
         command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 

@@ -29,8 +29,9 @@ const pageSize = 20
  * calls with an unknown outcome, newest first, with paging and an application filter. Under it, the Webhook deliveries
  * view lists the recent webhook deliveries, then the Publishing view lists the release history and the publish requests of
  * one application, read only, and the Dead letters view lists the dead letters of every application and redelivers or
- * discards each. Under that, the Schedules view lists the schedule triggers of the active releases with their last and
- * next occurrence, paged on the server with the table toolbar, whose state the address keeps. A user without the operator role sees the forbidden page.
+ * discards each, paged on the server with the table toolbar, whose state the address keeps under the `deadLetters.` names.
+ * Under that, the Schedules view lists the schedule triggers of the active releases with their last and
+ * next occurrence, paged on the server with the table toolbar, whose state the address keeps under the plain names. A user without the operator role sees the forbidden page.
  */
 export function ConsolePage() {
   const t = useText()

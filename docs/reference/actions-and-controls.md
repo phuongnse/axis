@@ -203,7 +203,8 @@ be kept right.
   actions its author configures.
 - **Every control in one table.** `AxisTable` has every control below, and each view
   turns on what it needs. Search, filter, sort, page and columns live in the address. A view is only a
-  filter kept there, so a link opens the same rows for anyone who follows it.
+  filter kept there, so a link opens the same rows for anyone who follows it. A second table on a page puts a
+  prefix of its own before each address name, as the console's Dead letters view does with `deadLetters.filter`.
 - **Sort.** A column sorts from its header when its values have an order a person uses: names, people,
   statuses, dates and numbers. Long text, files, lists and actions do not. A header only sorts, as there is
   one place to filter. A table that holds all its rows sorts them by the value its column gives through

@@ -37,7 +37,7 @@ header, as the other session routes do. They are checked on the server whatever 
 | `POST /api/console/instances/{id}/cancel`                 | Runs the cancel command of an instance on its active release              |
 | `POST /api/console/instances/{id}/calls/{callId}/resolve` | Runs the resolve command of a call of an instance                         |
 | `GET /api/console/applications/{id}/publishing`           | Answers one application's release history and publish requests, read-only |
-| `GET /api/console/dead-letters`                           | Lists one page of the tenant's dead letters, newest first                 |
+| `GET /api/console/dead-letters`                           | Lists one page of the tenant's dead letters, searched, filtered and sorted in PostgreSQL |
 | `GET /api/console/schedules`                              | Lists one page of the schedule triggers of the active release of each application |
 | `POST /api/console/dead-letters/{id}/redeliver`           | Redelivers an open dead letter                                            |
 | `POST /api/console/dead-letters/{id}/discard`             | Discards an open dead letter                                              |
@@ -115,12 +115,19 @@ header, as the other session routes do. They are checked on the server whatever 
   request has its `id`, `kind`, `target`, `status`, `label`, `note`, `requestedBy`,
   `requestedByName`, `requestedAt`, `startedAt`, `finishedAt` and `releaseId`. It never holds the
   file snapshot, the diagnostics or the test results.
-- **`GET /api/console/dead-letters`.** Answers one page of the dead letters of every
-  application of the tenant, newest first, as the instance list pages, including the letters
-  that belong to no process. An optional `application` (an application id) keeps one
-  application and an optional `state` (`open`, `redelivered` or `discarded`) keeps one state.
-  An invalid `application`, `state`, `page` or `pageSize` is a `400` that names each. An item is
-  a [process's dead letter](process-events.md#dead-letters) with its `applicationId` and
+- **`GET /api/console/dead-letters`.** Answers one page, `{ "items": [...], "page", "pageSize",
+  "totalCount" }`, of the dead letters of every application of the tenant, including the letters
+  that belong to no process. PostgreSQL filters, searches, sorts and pages them. The route takes
+  `page`, `pageSize`, `sort`, `search` and `filter` in the
+  [record API's format](record-api.md#paging-and-sorting) over the fields `application` (the
+  application id), `kind`, `event`, `target` (the trigger or webhook id), `attempts`,
+  `lastError`, `state` and `createdAt`. `createdAt` filters by its UTC day and sorts by its
+  instant. A search looks in `kind` and `lastError`. A sort or filter on another field, and an
+  invalid `page` or `pageSize`, is a `400` that names the parameter. Without `sort` the letters
+  are newest first, and a sorted list breaks ties newest first. An optional `application` (an
+  application id) keeps one application and an optional `state` (`open`, `redelivered` or
+  `discarded`) keeps one state. An invalid `application` or `state` is a `400` that names it. An
+  item is a [process's dead letter](process-events.md#dead-letters) with its `applicationId` and
   `processId` (null for a letter with no process). Its `commands` are `redeliver` and `discard`
   while the letter is `open` and empty otherwise.
 - **`GET /api/console/schedules`.** Answers one page, `{ "items": [...], "page", "pageSize",
@@ -164,9 +171,16 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   lists.
 - **Dead letters.** Event deliveries that reached the event delivery limit,
   including [webhook deliveries](outbound-webhooks.md#outbound-webhooks) and those that belong to
-  no process. The view lists them in every state, with an application filter. Each shows the
-  application, the kind, the event, the trigger or webhook, the attempts, the last error and the
-  state. An `open` letter offers redeliver and discard.
+  no process. The view lists them in every state, newest first until it is sorted, and is paged on
+  the server. Each shows the application, the kind, the event, the trigger or webhook, the
+  attempts, the last error, the state and the time it was created. Its table has the toolbar of
+  [tables](actions-and-controls.md#tables), with Search, Filter, Columns and Refresh, a sort on
+  Kind, Attempts, State and Created, and a pager with a page size. The Application column filters
+  on the applications of the tenant by name, and the view has no Application picker. Search looks
+  in the kind and the last error. The address keeps the view as `deadLetters.search`,
+  `deadLetters.filter`, `deadLetters.sort`, `deadLetters.page`, `deadLetters.pageSize` and
+  `deadLetters.columns`, because Schedules on the same page keeps the plain names. An `open`
+  letter offers redeliver and discard.
 - **Webhook deliveries.** Recent deliveries of each webhook, with their status code and attempts.
   A table under the Tenant view with the application, webhook, event, state, attempts, status
   code and delivery time, and two filters, one for the application and one for the webhook.

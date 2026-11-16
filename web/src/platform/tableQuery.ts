@@ -55,7 +55,8 @@ export function columnsChoice(keys: readonly string[], shown: readonly string[])
  * when the table is `searchable`, and it is not trimmed. `filter` is read only when the table is `filterable`, and
  * a `filter` that is not valid for `fields` is dropped, see docs/reference/record-api.md#paging-and-sorting.
  * `columns` is read only when the table has the `columnsControl`, with the first field first and unknown or repeated
- * names dropped, see docs/reference/actions-and-controls.md#tables.
+ * names dropped, see docs/reference/actions-and-controls.md#tables. A `prefix` goes before every name in the URL, so a
+ * second table on a page keeps its view under names of its own, and the other names are never read.
  */
 export function parseTableQuery(
   params: URLSearchParams,
@@ -65,29 +66,30 @@ export function parseTableQuery(
   searchable = false,
   filterable = false,
   columnsControl = false,
+  prefix = '',
 ): TableQuery {
   const parameters: Record<string, string> = {}
   for (const name of parameterNames) {
     // `get` returns the first value of a repeated parameter.
-    const value = params.get(name)
+    const value = params.get(prefix + name)
     if (value) {
       setOwn(parameters, name, value)
     }
   }
-  const search = searchable ? params.get('search') : null
-  const filterText = filterable ? params.get('filter') : null
+  const search = searchable ? params.get(`${prefix}search`) : null
+  const filterText = filterable ? params.get(`${prefix}filter`) : null
   const filter = filterText
     ? parseFilter(
         filterText,
         fields.map((field) => field.name),
       )
     : undefined
-  const columnsText = columnsControl ? params.get('columns') : null
+  const columnsText = columnsControl ? params.get(`${prefix}columns`) : null
   const names = fields.map((field) => field.name)
   const columns = columnsText ? columnsChoice(names, shownColumns(names, columnsText.split(','))) : undefined
-  const page = params.get('page')
-  const pageSize = tablePageSizes(defaultPageSize).find((size) => String(size) === params.get('pageSize'))
-  const sort = params.get('sort')
+  const page = params.get(`${prefix}page`)
+  const pageSize = tablePageSizes(defaultPageSize).find((size) => String(size) === params.get(`${prefix}pageSize`))
+  const sort = params.get(`${prefix}sort`)
   const sortField = sort?.startsWith('-') ? sort.slice(1) : sort
   const sortable = fields.some(
     (field) => field.name === sortField && field.type !== 'reference' && field.type !== 'file',
@@ -107,29 +109,28 @@ export function parseTableQuery(
  * Writes the table's parameters into a copy of the URL parameters. Other parameters stay first, as
  * they are. The data source parameter values follow, then `search`, `filter`, `page`, `pageSize`, `sort` and `columns`
  * in that order, and defaults are left out. `parameterNames`, `search`, `filter` and `columns` are removed first, so a
- * cleared value goes. `columns` is for the address only, so the record query never has it.
+ * cleared value goes. `columns` is for the address only, so the record query never has it. A `prefix` goes before every
+ * name written or removed, and the other names stay as they are.
  */
 export function writeTableQuery(
   current: URLSearchParams,
   query: TableQuery,
   defaultPageSize: number = recordPageSize,
   parameterNames: readonly string[] = [],
+  prefix = '',
 ): URLSearchParams {
   const next = new URLSearchParams(current)
   for (const name of parameterNames) {
-    next.delete(name)
+    next.delete(prefix + name)
   }
-  next.delete('search')
-  next.delete('filter')
-  next.delete('columns')
-  next.delete('page')
-  next.delete('pageSize')
-  next.delete('sort')
+  for (const name of ['search', 'filter', 'columns', 'page', 'pageSize', 'sort']) {
+    next.delete(prefix + name)
+  }
   for (const [name, value] of new URLSearchParams(recordQuery(query, defaultPageSize))) {
-    next.append(name, value)
+    next.append(prefix + name, value)
   }
   if (query.columns) {
-    next.set('columns', query.columns.join(','))
+    next.set(`${prefix}columns`, query.columns.join(','))
   }
   return next
 }

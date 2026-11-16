@@ -269,7 +269,6 @@
   "shell.console.publishing.empty": "Chưa có gì để hiển thị.",
   "shell.console.publishing.loadFailed": "Không tải được thông tin phát hành.",
   "shell.console.deadLetters.title": "Thư lỗi",
-  "shell.console.deadLetters.allApplications": "Tất cả ứng dụng",
   "shell.console.deadLetters.application": "Ứng dụng",
   "shell.console.deadLetters.event": "Sự kiện",
   "shell.console.deadLetters.target": "Bộ kích hoạt hoặc webhook",

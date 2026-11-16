@@ -16,6 +16,8 @@ internal enum ListColumnKind
 /// One declared column of a list. <paramref name="Value"/> gives a row's value: a string for text and enum, a number
 /// for number and a <see cref="DateOnly"/> for date, or null for none. <paramref name="Order"/> gives the value that a sort
 /// uses when it differs from the one a filter compares, as a time sorts by its instant and filters by its day.
+/// <paramref name="Sql"/> is the column's SQL expression in a fixed table, for a list that <see cref="ListQuery{T}.Sql"/> renders, and
+/// <paramref name="OrderSql"/> is the one a sort uses when it differs. Both are written in code and never come from a request.
 /// </summary>
 internal sealed record ListColumn<T>(
     string Name,
@@ -23,14 +25,17 @@ internal sealed record ListColumn<T>(
     Func<T, object?> Value,
     bool Searchable = false,
     IReadOnlyList<string>? Values = null,
-    Func<T, IComparable?>? Order = null);
+    Func<T, IComparable?>? Order = null,
+    string? Sql = null,
+    string? OrderSql = null);
 
 /// <summary>One page of a list, with the number of rows that matched before it was cut.</summary>
 internal sealed record ListPage<T>(IReadOnlyList<T> Items, int Page, int PageSize, long TotalCount);
 
 /// <summary>
 /// The <c>page</c>, <c>pageSize</c>, <c>sort</c>, <c>search</c> and <c>filter</c> of a list, checked against the
-/// columns that the list declares and applied to rows held in memory. The format is the record API's, see
+/// columns that the list declares and applied to rows held in memory, or rendered as SQL over the columns of a fixed table
+/// by <see cref="Sql"/>. The format is the record API's, see
 /// <c>docs/reference/record-api.md#paging-and-sorting</c>. The filter is parsed by <see cref="RecordListFilter"/>, over the
 /// columns turned into an entity, so the operators have one definition. A sort or a filter on a column the list does
 /// not declare is an error, and so is a search on a list with no searchable column.
@@ -39,9 +44,7 @@ internal sealed class ListQuery<T>
 {
     private readonly IReadOnlyList<ListColumn<T>> _columns;
 
-    private readonly int _page;
-
-    private readonly int _pageSize;
+    private readonly EntityModel _entity;
 
     private readonly ListColumn<T>? _sortColumn;
 
@@ -53,6 +56,7 @@ internal sealed class ListQuery<T>
 
     private ListQuery(
         IReadOnlyList<ListColumn<T>> columns,
+        EntityModel entity,
         int page,
         int pageSize,
         ListColumn<T>? sortColumn,
@@ -61,13 +65,20 @@ internal sealed class ListQuery<T>
         RecordListFilter? filter)
     {
         _columns = columns;
-        _page = page;
-        _pageSize = pageSize;
+        _entity = entity;
+        Page = page;
+        PageSize = pageSize;
         _sortColumn = sortColumn;
         _descending = descending;
         _search = search;
         _filter = filter;
     }
+
+    /// <summary>The page to read, from 1.</summary>
+    public int Page { get; }
+
+    /// <summary>The number of rows on a page.</summary>
+    public int PageSize { get; }
 
     /// <summary>
     /// Reads the five parameters of <paramref name="request"/>. Each invalid one adds its message to <paramref name="errors"/>
@@ -130,7 +141,7 @@ internal sealed class ListQuery<T>
             errors["filter"] = [message];
         }
 
-        return new ListQuery<T>(columns, page, pageSize, sortColumn, descending, search, filter);
+        return new ListQuery<T>(columns, entity, page, pageSize, sortColumn, descending, search, filter);
     }
 
     /// <summary>Filters, searches, sorts and pages <paramref name="rows"/>. A page past the end holds no items.</summary>
@@ -162,8 +173,44 @@ internal sealed class ListQuery<T>
                 : [.. matched.OrderBy(Key, KeyComparer.Instance)];
         }
 
-        var items = matched.Skip((int)Math.Min((long)(_page - 1) * _pageSize, int.MaxValue)).Take(_pageSize).ToList();
-        return new ListPage<T>(items, _page, _pageSize, matched.Count);
+        var items = matched.Skip((int)Math.Min((long)(Page - 1) * PageSize, int.MaxValue)).Take(PageSize).ToList();
+        return new ListPage<T>(items, Page, PageSize, matched.Count);
+    }
+
+    /// <summary>
+    /// Renders the filter and the search as one condition and the sort as one ORDER BY term, over the SQL expressions that the
+    /// columns declare. Every column that the request names must declare <see cref="ListColumn{T}.Sql"/>. A search looks in the searchable
+    /// columns. The paging is <see cref="Page"/> and <see cref="PageSize"/>.
+    /// </summary>
+    public ListSql Sql()
+    {
+        string Expression(FieldModel field) =>
+            _columns.First(column => column.Name == field.Name).Sql
+            ?? throw new InvalidOperationException($"The column '{field.Name}' declares no SQL expression.");
+
+        var terms = new List<string>();
+        if (_filter is { } filter)
+        {
+            terms.Add(filter.Sql(Expression));
+        }
+
+        RecordSearch? search = null;
+        if (_search is { } text)
+        {
+            var searched = _entity.Fields.Where(field => _columns.First(column => column.Name == field.Name).Searchable).ToList();
+            search = new RecordSearch(text, searched);
+            terms.Add(search.Sql(Expression));
+        }
+
+        string? order = null;
+        if (_sortColumn is { } sortColumn)
+        {
+            var expression = sortColumn.OrderSql ?? sortColumn.Sql
+                ?? throw new InvalidOperationException($"The column '{sortColumn.Name}' declares no SQL expression.");
+            order = $"{expression} {(_descending ? "DESC" : "ASC")}";
+        }
+
+        return new ListSql(terms.Count == 0 ? "TRUE" : string.Join(" AND ", terms), order, _filter, search);
     }
 
     // The columns as an entity, so the record API's parsers read them. A number is a decimal, which holds every number.

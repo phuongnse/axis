@@ -182,7 +182,7 @@ const emptySchedules: ConsoleSchedulePage = { items: [], page: 1, pageSize: 20, 
  */
 function stubServer(
   answer: (url: string) => Response,
-  letters: () => Response = () => json(emptyDeadLetters),
+  letters: (url: string) => Response = () => json(emptyDeadLetters),
   schedules: (url: string) => Response = () => json(emptySchedules),
   deliveries = [leaveDelivery, orderDelivery],
 ) {
@@ -201,7 +201,7 @@ function stubServer(
     if (input.startsWith('/api/console/applications/')) {
       return json({ active: null, releases: [], requests: [], page: 1, pageSize: 20, totalCount: 0 })
     }
-    return input.startsWith(deadLettersPath) ? letters() : answer(input)
+    return input.startsWith(deadLettersPath) ? letters(input) : answer(input)
   })
   vi.stubGlobal('fetch', fetchMock)
   return Object.assign(fetchMock, { requests, bodies })
@@ -414,17 +414,38 @@ describe('ConsolePage', () => {
     expect(within(discarded).queryByRole('button')).toBeNull()
   })
 
-  it('asks for the dead letters of the chosen application', async () => {
-    const server = stubServer(tenantAndFailedWork, () => json(allLetters))
+  it('keeps the search, filter, sort and page size of the dead letters in the address and the request', async () => {
+    const filter = JSON.stringify({ all: [{ field: 'state', op: 'eq', value: 'open' }] })
+    const address = `/console?${new URLSearchParams({
+      'deadLetters.search': 'timeout',
+      'deadLetters.filter': filter,
+      'deadLetters.sort': '-attempts',
+    })}`
+    const server = stubServer(tenantAndFailedWork, () => json({ ...allLetters, totalCount: 33 }))
     const user = userEvent.setup()
-    renderPage()
+    renderPage(address)
 
     const view = await screen.findByTestId('console-dead-letters')
-    await within(view).findByText('webhook.deliver')
-    await user.click(within(view).getByRole('combobox', { name: 'Application' }))
-    await user.click(await screen.findByTitle('Purchasing'))
+    const requested = (path: string) => server.requests.filter((request) => request.startsWith(`GET ${path}`))
+    await waitFor(() => expect(requested(deadLettersPath)).toHaveLength(1))
+    const first = new URL(requested(deadLettersPath)[0].replace('GET ', ''), 'http://localhost').searchParams
+    expect(first.get('search')).toBe('timeout')
+    expect(first.get('filter')).toBe(filter)
+    expect(first.get('sort')).toBe('-attempts')
+    await waitFor(() => expect(requested(schedulesPath)).toHaveLength(1))
+    const schedules = new URL(requested(schedulesPath)[0].replace('GET ', ''), 'http://localhost').searchParams
+    expect([...schedules.keys()]).toEqual([])
+    expect(await within(view).findByText('1–20 of 33')).toBeVisible()
 
-    await waitFor(() => expect(server.requests).toContain(`GET ${deadLettersPath}?application=a2`))
+    await user.click(within(view).getByRole('combobox'))
+    await user.click(await screen.findByTitle('50 / page'))
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('deadLetters.pageSize=50'))
+    await waitFor(() =>
+      expect(requested(deadLettersPath).some((request) => request.includes('pageSize=50'))).toBe(true),
+    )
+    expect(screen.getByTestId('location')).toHaveTextContent('deadLetters.sort=-attempts')
+    expect(requested(schedulesPath)).toHaveLength(1)
   })
 
   it.each([

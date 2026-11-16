@@ -156,8 +156,8 @@ export interface ConsoleDeadLetterPage extends Omit<DeadLetterPage, 'items'> {
 }
 
 /**
- * Loads one page of the dead letters of the tenant, newest first. `query` holds the console API's `application`, `state`,
- * `page` and `pageSize`. A 403 returns {@link forbidden}. A 401 shows the sign-in prompt and throws, as any other failure does.
+ * Loads one page of the dead letters of the tenant, newest first until `query` sorts them. `query` holds the console API's
+ * `page`, `pageSize`, `sort`, `search` and `filter`, see docs/reference/operator-console.md#api. A 403 returns {@link forbidden}. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function fetchConsoleDeadLetters(
   query: string,

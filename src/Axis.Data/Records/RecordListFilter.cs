@@ -118,7 +118,19 @@ public sealed class RecordListFilter
     }
 
     /// <summary>The condition, wrapped in parentheses, that the row aliased <paramref name="rowAlias"/> matches. Its values are <c>@lf0</c>, <c>@lf1</c>, ….</summary>
-    internal string Sql(string rowAlias) => _root.Sql(rowAlias);
+    internal string Sql(string rowAlias) =>
+        Sql(field => $"{EntityNaming.Quote(rowAlias)}.{EntityNaming.Quote(EntityNaming.Column(field.Name))}");
+
+    /// <summary>
+    /// The condition, wrapped in parentheses, over the column expression that <paramref name="column"/> gives for each field, for
+    /// a list over a fixed table. The expressions are written in code and never come from a request. Its values are <c>@lf0</c>, <c>@lf1</c>, ….
+    /// </summary>
+    public string Sql(Func<FieldModel, string> column)
+    {
+        ArgumentNullException.ThrowIfNull(column);
+
+        return _root.Sql(column);
+    }
 
     /// <summary>
     /// Whether a row matches the filter, as the SQL of the filter would decide it for the same row. <paramref name="valueOf"/>
@@ -159,15 +171,15 @@ public sealed class RecordListFilter
 
     private abstract record Node
     {
-        public abstract string Sql(string rowAlias);
+        public abstract string Sql(Func<FieldModel, string> column);
 
         public abstract bool Matches(Func<FieldModel, object?> valueOf);
     }
 
     private sealed record Group(bool IsAll, List<Node> Children) : Node
     {
-        public override string Sql(string rowAlias) =>
-            $"({string.Join(IsAll ? " AND " : " OR ", Children.Select(child => child.Sql(rowAlias)))})";
+        public override string Sql(Func<FieldModel, string> column) =>
+            $"({string.Join(IsAll ? " AND " : " OR ", Children.Select(child => child.Sql(column)))})";
 
         public override bool Matches(Func<FieldModel, object?> valueOf) =>
             IsAll ? Children.All(child => child.Matches(valueOf)) : Children.Any(child => child.Matches(valueOf));
@@ -178,9 +190,9 @@ public sealed class RecordListFilter
     {
         public string ParameterName => $"lf{Index.ToString(CultureInfo.InvariantCulture)}";
 
-        public override string Sql(string rowAlias)
+        public override string Sql(Func<FieldModel, string> columnOf)
         {
-            var column = $"{EntityNaming.Quote(rowAlias)}.{EntityNaming.Quote(EntityNaming.Column(Field.Name))}";
+            var column = columnOf(Field);
             var placeholder = FieldTypes.HoldsDecimal(Field.Type) ? $"@{ParameterName}::numeric" : $"@{ParameterName}";
             var text = Field.Type == FieldType.Text;
             return Operator switch
