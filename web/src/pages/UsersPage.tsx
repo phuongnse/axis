@@ -1,13 +1,15 @@
-import { Button, Flex, Input, Modal, Result, Tabs, Tag, Typography } from 'antd'
+import { Button, Flex, Modal, Result, Tabs, Tag, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable } from '../platform/AxisTable'
 import { PageLayout } from '../platform/PageLayout'
 import { SectionParts } from '../platform/SectionParts'
+import type { FieldMetadata } from '../platform/site'
 import { useText } from '../platform/texts'
 import { fetchTenantOutsideClients, type TenantOutsideClients } from '../platform/tenantOutsideClients'
 import { useDesignTokens } from '../platform/themeMode'
+import { useTableView } from '../platform/useTableView'
 import {
   fetchUsers,
   resendInvitation,
@@ -28,6 +30,10 @@ import { TenantModelKeySection } from './TenantModelKeySection'
 import { TenantUsageSection } from './TenantUsageSection'
 
 const pageSize = 20
+
+// The people table has no fields or parameters of its own. Stable empty arrays keep useTableView from recomputing on each render.
+const noFields: readonly Pick<FieldMetadata, 'name' | 'type'>[] = []
+const noParameters: readonly string[] = []
 
 const statusColors: Record<UserListItem['status'], string> = {
   invited: 'blue',
@@ -57,9 +63,10 @@ const userCommands: Record<Exclude<Command, 'resend'>, UserCommand> = {
 }
 
 /**
- * The tenant's users for an administrator: a table that is searched by name or email and paged by the
- * server. A search starts on Enter or on the search button and goes back to page 1. The display name is a link to the
- * person's page, which shows their roles. The Invite button opens the form that invites a person. An invited account has a Resend
+ * The tenant's users for an administrator: a table that is searched by name or email with AxisTable's own Search box
+ * and paged by the server. The search and the page live in the address, so reload and Back keep them. A search starts
+ * on Enter or on the search button and goes back to page 1, see docs/reference/platform-pages.md#the-list. The display
+ * name is a link to the person's page, which shows their roles. The Invite button opens the form that invites a person. An invited account has a Resend
  * invitation button. A row that is not disabled has a Disable button, a disabled row has an Enable button, and an
  * account has a Reset authenticator button. Each of these asks for a confirmation, then reloads the list, because a
  * resend gives the person a new id. The page has two tabs. People holds the list and, below it, the Export data and
@@ -72,8 +79,9 @@ export function UsersPage() {
   const { size } = useDesignTokens()
   const platform = usePlatform()
   const { locale } = platform.current
-  const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const { view: query, setView } = useTableView(noFields, pageSize, noParameters, true)
+  const search = query.search?.trim() ?? ''
+  const page = query.page
   const [list, setList] = useState<UserList>()
   const [refusal, setRefusal] = useState<Exclude<UserListResult['kind'], 'ok'>>()
   const [loadFailed, setLoadFailed] = useState(false)
@@ -181,22 +189,8 @@ export function UsersPage() {
                     rowKey={(row) => row.id}
                     dataSource={list.items}
                     emptyText={t('shell.users.empty')}
-                    pagination={{ current: page, pageSize, total: list.totalCount }}
-                    onChange={(pagination) => setPage(pagination.current ?? 1)}
+                    view={{ query, onChange: setView, total: list.totalCount, search: true }}
                     toolbar={{
-                      view: (
-                        <Input.Search
-                          allowClear
-                          maxLength={200}
-                          aria-label={t('shell.users.search')}
-                          placeholder={t('shell.users.search')}
-                          style={{ maxWidth: 400 }}
-                          onSearch={(value) => {
-                            setSearch(value.trim())
-                            setPage(1)
-                          }}
-                        />
-                      ),
                       main: (
                         // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                         <Button

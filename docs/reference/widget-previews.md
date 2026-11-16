@@ -83,7 +83,9 @@ that a form submits inside the sandbox, and that no fixture reaches the server's
 through Studio's sidebar in the `studio` preview, opens a state with `&state=` and picks one in the
 Fixtures control. It also checks that the Fixtures control wraps its captions onto more lines in a 360 px frame.
 It proves that each framed state's frame is its height with the page scrolling inside it, and that a dialog
-opened in the scrolled Entity state of `studio` shows inside the frame.
+opened in the scrolled Entity state of `studio` shows inside the frame. It also proves that the `studio` preview's
+Settings page and its Entity state draw no panel, and that each part of them has no background, border, padding or
+radius.
 A unit test compares the groups of the cards table with the groups in `cardOrder.ts`.
 
 `tests/e2e/specs/design-system-contrast.spec.ts` opens every preview in light and in dark mode, and sweeps each of its

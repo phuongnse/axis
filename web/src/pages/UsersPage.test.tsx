@@ -1,6 +1,6 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
@@ -131,12 +131,17 @@ function requested(fetchMock: ReturnType<typeof stubServer>) {
   return fetchMock.mock.calls.map(([input]) => input)
 }
 
-function renderPage() {
+function LocationProbe() {
+  return <output data-testid="location">{useLocation().search}</output>
+}
+
+function renderPage(initialEntry = '/users') {
   render(
     <PlatformContext.Provider value={platform}>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[initialEntry]}>
           <UsersPage />
+          <LocationProbe />
         </MemoryRouter>
       </TextProvider>
     </PlatformContext.Provider>,
@@ -277,11 +282,36 @@ describe('UsersPage', () => {
       '/api/users?page=1&pageSize=20',
     ])
 
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Search by name or email' }), 'ann{Enter}')
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'ann{Enter}')
     await vi.waitFor(() => expect(requested(fetchMock)).toContain('/api/users?search=ann&page=1&pageSize=20'))
 
     await userEvent.click(await screen.findByTitle('2'))
     await vi.waitFor(() => expect(requested(fetchMock)).toContain('/api/users?search=ann&page=2&pageSize=20'))
+  })
+
+  it('keeps a search typed in the Search box in the address and asks the server for it', async () => {
+    const ann: UserList = { totalCount: 1, items: [users.items[0]] }
+    const fetchMock = stubServer((input) => (input.includes('search=ann') ? json(ann) : json(users)))
+    renderPage()
+    await screen.findByText('Bob Active')
+
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'ann{Enter}')
+
+    await vi.waitFor(() => expect(requested(fetchMock)).toContain('/api/users?search=ann&page=1&pageSize=20'))
+    expect(screen.getByTestId('location')).toHaveTextContent('search=ann')
+    expect(await screen.findByText('Ann Invited')).toBeVisible()
+    expect(screen.queryByText('Bob Active')).toBeNull()
+  })
+
+  it('opens at the search and the page of the address and shows the search in the box', async () => {
+    const fetchMock = stubServer(() => json(users))
+    renderPage('/users?search=ann&page=2')
+
+    expect(await screen.findByText('Ann Invited')).toBeVisible()
+    expect(requested(fetchMock).find((input) => input.startsWith('/api/users'))).toBe(
+      '/api/users?search=ann&page=2&pageSize=20',
+    )
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('ann')
   })
 
   it('says the page is for administrators on a 403', async () => {

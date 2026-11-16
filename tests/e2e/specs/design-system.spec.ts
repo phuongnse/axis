@@ -15,6 +15,7 @@ import {
   repositoryRoot,
 } from "../design-system";
 import { contrast } from "../../../web/src/test/contrast";
+import { designTokensFor } from "../../../web/src/platform/designTokens";
 
 const productionBuild = path.join(
   repositoryRoot,
@@ -923,6 +924,125 @@ test("a dialog opened in the scrolled entity state of studio shows inside the fr
     await screen.evaluate((element) => element.scrollTop),
   ).toBeGreaterThan(0);
   expect(recording.errors).toEqual([]);
+});
+
+/**
+ * What a Studio editor draws, read in the page: each element that has the panel's style, a surface background with a
+ * 1px border of borderSubtle on all four sides, and each part whose box is not bare, which is a background, a border,
+ * a padding or a radius. The panel's colours come from a probe element, so the browser's own form of each colour is
+ * compared. `testIds` lists the parts in order.
+ */
+function panelReport(
+  root: HTMLElement,
+  colour: { surface: string; borderSubtle: string },
+) {
+  const document = root.ownerDocument;
+  const probe = document.createElement("div");
+  probe.style.background = colour.surface;
+  probe.style.border = `1px solid ${colour.borderSubtle}`;
+  document.body.append(probe);
+  const expected = getComputedStyle(probe);
+  const background = expected.backgroundColor;
+  const sides = ["top", "right", "bottom", "left"];
+  const borders = sides.map((side) =>
+    expected.getPropertyValue(`border-${side}-color`),
+  );
+  probe.remove();
+
+  const panels = [root, ...root.querySelectorAll<HTMLElement>("*")]
+    .filter((element) => {
+      const style = getComputedStyle(element);
+      return (
+        style.backgroundColor === background &&
+        sides.every(
+          (side, index) =>
+            style.getPropertyValue(`border-${side}-width`) === "1px" &&
+            style.getPropertyValue(`border-${side}-style`) === "solid" &&
+            style.getPropertyValue(`border-${side}-color`) === borders[index],
+        )
+      );
+    })
+    .map((element) => element.dataset.testid ?? element.tagName);
+
+  const parts = [
+    ...root.querySelectorAll<HTMLElement>('[data-testid^="studio-section-"]'),
+  ];
+  const styled = parts
+    .filter((part) => {
+      const style = getComputedStyle(part);
+      return (
+        style.backgroundColor !== "rgba(0, 0, 0, 0)" ||
+        style.borderRadius !== "0px" ||
+        sides.some(
+          (side) =>
+            style.getPropertyValue(`border-${side}-width`) !== "0px" ||
+            style.getPropertyValue(`padding-${side}`) !== "0px",
+        )
+      );
+    })
+    .map((part) => part.dataset.testid!);
+
+  return {
+    panels,
+    styled,
+    testIds: parts.map((part) => part.dataset.testid!),
+  };
+}
+
+test("the studio preview draws no panel on its Settings page or its Entity state in light mode", async ({
+  page,
+}) => {
+  const { surface, borderSubtle } = designTokensFor("light").colour;
+  const colour = { surface, borderSubtle };
+
+  const settingsQuery = "?preview=studio&mode=light";
+  const settings = await openHarness(page, settingsQuery, {
+    sandboxed: true,
+    frameWidth: 992,
+  });
+  const state = figure(page.frameLocator("iframe"), "Typical");
+  await state
+    .getByRole("menu")
+    .getByRole("menuitem", { name: "Settings", exact: true })
+    .click();
+  await expect(
+    state.getByRole("heading", {
+      name: fixtureMarker,
+      exact: true,
+      level: 4,
+    }),
+  ).toBeVisible();
+  const settingsEditor = state.getByTestId("studio-editor");
+  await expect(settingsEditor).toBeVisible();
+  const settingsReport = await settingsEditor.evaluate(panelReport, colour);
+  expect(settingsReport.panels).toEqual([]);
+  expect(settingsReport.styled).toEqual([]);
+  expect(settingsReport.testIds.at(-1)).toBe("studio-section-autoAccept");
+  expect(settings.errors).toEqual([]);
+  expect(
+    settings.requests.filter((url) => !url.startsWith("data:")),
+  ).toEqual([
+    `${origin}/sandboxed.html`,
+    `${harnessUrl}${settingsQuery}`,
+    bundleUrl,
+  ]);
+
+  const entityQuery = "?preview=studio&mode=light&state=entity";
+  const entity = await openHarness(page, entityQuery, {
+    sandboxed: true,
+    frameWidth: 992,
+  });
+  const entityFrame = page.frameLocator("iframe");
+  await expect(entityFrame.getByTestId("studio-entity-designer")).toBeVisible();
+  const entityEditor = entityFrame.getByTestId("studio-editor");
+  await expect(entityEditor).toBeVisible();
+  const entityReport = await entityEditor.evaluate(panelReport, colour);
+  expect(entityReport.panels).toEqual([]);
+  expect(entityReport.styled).toEqual([]);
+  expect(entity.errors).toEqual([]);
+  expect(
+    entity.requests.filter((url) => !url.startsWith("data:")),
+  ).toEqual([`${origin}/sandboxed.html`, `${harnessUrl}${entityQuery}`, bundleUrl]);
 });
 
 for (const mode of modes) {

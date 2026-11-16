@@ -31,7 +31,7 @@ test("an administrator opens Users from the app switcher and finds a user by ema
   ).toBeVisible();
 
   await main
-    .getByRole("searchbox", { name: "Search by name or email", exact: true })
+    .getByRole("searchbox", { name: "Search", exact: true })
     .fill("auditor@axis.local");
   await page.keyboard.press("Enter");
 
@@ -147,7 +147,7 @@ test.describe("roles of a user", () => {
     await page.goto("/users");
     const main = page.getByRole("main");
     await main
-      .getByRole("searchbox", { name: "Search by name or email", exact: true })
+      .getByRole("searchbox", { name: "Search", exact: true })
       .fill("auditor@axis.local");
     await page.keyboard.press("Enter");
     // The list is replaced by the search result, so wait for the header and the one row.
@@ -212,7 +212,7 @@ test.describe("invitations", () => {
   async function findRow(page: Page, email: string) {
     const main = page.getByRole("main");
     await main
-      .getByRole("searchbox", { name: "Search by name or email", exact: true })
+      .getByRole("searchbox", { name: "Search", exact: true })
       .fill(email);
     await page.keyboard.press("Enter");
     const row = main.getByRole("row").filter({ hasText: email });
