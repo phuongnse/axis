@@ -170,6 +170,28 @@ public sealed class CellConsoleSignInTests(PostgreSqlFixture database, KeycloakF
     }
 
     [Fact]
+    public async Task A_quotas_change_through_the_console_session_names_the_operator_as_actor_and_one_without_the_role_writes_no_record()
+    {
+        var (factory, platform) = await StartAsync();
+        await using var _ = factory;
+        using var client = CreateClient(factory, _console);
+        using var other = CreateClient(factory, _console);
+        await SignInAsync(client, "operator");
+        var operatorId = (string)(await PostgreSqlServer.AdminScalarAsync(platform, "SELECT operator_id FROM platform.operator_sessions", CancellationToken))!;
+        await SignInAsync(other, "stranger");
+
+        using var allowed = await SetQuotasAsync(client);
+        using var denied = await SetQuotasAsync(other);
+
+        Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+        Assert.Equal(1L, await PostgreSqlServer.AdminScalarAsync(platform, "SELECT count(*) FROM platform.audit_records", CancellationToken));
+        Assert.Equal(
+            ("tenant quotas set", "b", operatorId),
+            await ReadAuditRecordAsync(platform));
+    }
+
+    [Fact]
     public async Task A_signed_in_operator_without_the_role_gets_403()
     {
         var (factory, _) = await StartAsync();
@@ -393,6 +415,24 @@ public sealed class CellConsoleSignInTests(PostgreSqlFixture database, KeycloakF
             AllowAutoRedirect = false,
             HandleCookies = handleCookies,
         });
+
+    private static async Task<(string Command, string Tenant, string Actor)> ReadAuditRecordAsync(string platform)
+    {
+        var command = (string)(await PostgreSqlServer.AdminScalarAsync(platform, "SELECT command FROM platform.audit_records", CancellationToken))!;
+        var tenant = (string)(await PostgreSqlServer.AdminScalarAsync(platform, "SELECT tenant_id FROM platform.audit_records", CancellationToken))!;
+        var actor = (string)(await PostgreSqlServer.AdminScalarAsync(platform, "SELECT actor FROM platform.audit_records", CancellationToken))!;
+        return (command, tenant, actor);
+    }
+
+    private static async Task<HttpResponseMessage> SetQuotasAsync(HttpClient client)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, new Uri("/api/cell/tenants/b/quotas", UriKind.Relative))
+        {
+            Content = JsonContent.Create(new { set = new Dictionary<string, long?> { ["users"] = 5 } }),
+        };
+        request.Headers.Add("X-Axis-Csrf", "1");
+        return await client.SendAsync(request, CancellationToken);
+    }
 
     private static async Task<long> CountSessionsAsync(string platform) =>
         (long)(await PostgreSqlServer.AdminScalarAsync(platform, Sessions, CancellationToken))!;

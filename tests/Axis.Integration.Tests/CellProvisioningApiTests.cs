@@ -670,7 +670,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
-    public async Task An_operator_sets_and_clears_quotas_and_the_tenant_read_and_an_audit_record_show_them()
+    public async Task An_operator_sets_and_clears_quotas_and_the_tenant_read_and_an_audit_record_naming_the_caller_show_them()
     {
         await using var factory = await StartAsync();
         using var client = CreateClient(factory, _console);
@@ -702,6 +702,15 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         Assert.Equal(
             [("tenant quotas set", "b", "storage,users"), ("tenant quotas set", "b", "users")],
             records);
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var actors = new NpgsqlCommand("SELECT actor FROM platform.audit_records ORDER BY occurred_at, id", connection);
+        await using var reader = await actors.ExecuteReaderAsync(CancellationToken);
+        var subject = new JsonWebToken(token).Subject;
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        Assert.Equal(subject, reader.GetString(0));
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        Assert.Equal(subject, reader.GetString(0));
     }
 
     [Fact]
