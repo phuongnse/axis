@@ -1,10 +1,26 @@
 import type { StudioNames } from '../platform/studio'
 
-/** A name an expression can use. `cursorInside` puts the cursor between the brackets of a call. */
+/**
+ * A name an expression can use. `cursorInside` puts the cursor between the brackets of a call. The rest tells
+ * completion what the name is: `valueType` is its expression type, `labelKey` the key of its label, `values` the
+ * values of an enum, and `parameters` the parameters of a rule.
+ */
 export interface ScopeOption {
   label: string
   type: 'field' | 'parameter' | 'rule' | 'function'
   cursorInside: boolean
+  valueType?: string | null
+  labelKey?: string | null
+  values?: string[] | null
+  parameters?: { name: string; type: string }[]
+}
+
+/** The expression type of a field type, see [types](docs/reference/expressions.md#types). Any other type is its own. */
+export function expressionType(fieldType: string): string {
+  if (fieldType === 'money') {
+    return 'decimal'
+  }
+  return fieldType === 'references' || fieldType === 'child-collection' ? 'list' : fieldType
 }
 
 const fieldDefault = /^\/fields\/\d+\/default$/
@@ -29,19 +45,19 @@ export function expressionScope(
   const payload = waitEventPayload(kind, draft, pointer, names)
   if (payload !== undefined) {
     return [
-      ...payload.map((name) => option(name, 'field', false)),
-      ...names.rules.map((rule) => option(`${rule.name}()`, 'rule', true)),
+      ...payload.map((field) => option(field.name, 'field', false, { valueType: expressionType(field.type) })),
+      ...names.rules.map(ruleOption),
     ]
   }
   return [
     ...parameterOptions(kind, draft, pointer),
     ...fieldOptions(kind, draft, pointer, names),
-    ...names.rules.map((rule) => option(`${rule.name}()`, 'rule', true)),
+    ...names.rules.map(ruleOption),
   ]
 }
 
 /**
- * The payload fields of the event a wait for event step waits for, when the pointer is that step's `when`. The
+ * The payload fields, with their types, of the event a wait for event step waits for, when the pointer is that step's `when`. The
  * `when` reads the payload, as an event trigger's does, so the subject's fields, `id` and parameters are not in
  * scope. An unknown event has no fields. Undefined when the pointer is not a wait for event step's `when`.
  */
@@ -50,7 +66,7 @@ function waitEventPayload(
   draft: Record<string, unknown>,
   pointer: string,
   names: StudioNames,
-): string[] | undefined {
+): { name: string; type: string }[] | undefined {
   const match = kind === 'process' ? waitEventWhen.exec(pointer) : null
   if (match === null || !Array.isArray(draft.steps)) {
     return undefined
@@ -60,7 +76,7 @@ function waitEventPayload(
     return undefined
   }
   const event = stringProperty(step, 'event')?.toLowerCase()
-  return names.events.find((item) => item.name.toLowerCase() === event)?.fields.map((field) => field.name) ?? []
+  return names.events.find((item) => item.name.toLowerCase() === event)?.fields ?? []
 }
 
 function parameterOptions(kind: string, draft: Record<string, unknown>, pointer: string): ScopeOption[] {
@@ -69,7 +85,7 @@ function parameterOptions(kind: string, draft: Record<string, unknown>, pointer:
     (kind === 'dataSource' && pointer === '/filter') ||
     // A process without a subject has parameters in place of an entity.
     (kind === 'process' && !hasEntity(draft))
-  return offered ? namesOf(draft.parameters).map((name) => option(name, 'parameter', false)) : []
+  return offered ? entriesOf(draft.parameters).map((item) => draftOption(item, 'parameter')) : []
 }
 
 function hasEntity(draft: Record<string, unknown>): boolean {
@@ -87,7 +103,7 @@ function fieldOptions(
     if (fieldDefault.test(pointer)) {
       return []
     }
-    return namesOf(draft.fields).map((name) => option(name, 'field', false))
+    return entriesOf(draft.fields).map((item) => draftOption(item, 'field'))
   }
   const entity = (kind === 'process' ? itemEntity(draft, pointer, names) : undefined) ?? entityOf(kind, draft, pointer)
   const found = names.entities.find((item) => item.name.toLowerCase() === entity?.toLowerCase())
@@ -97,12 +113,19 @@ function fieldOptions(
   // A form condition reads only the fields the form lists.
   const listed = kind === 'form' ? listedFields(draft) : undefined
   // The record's `id` is in scope of a process and of a trigger, and it is a reference, so a path cannot start from it.
-  const id = kind === 'process' || kind === 'trigger' ? [option('id', 'parameter', false)] : []
+  const id =
+    kind === 'process' || kind === 'trigger' ? [option('id', 'parameter', false, { valueType: 'reference' })] : []
   return [
     ...id,
     ...found.fields
       .filter((field) => listed === undefined || listed.has(field.name.toLowerCase()))
-      .map((field) => option(field.name, 'field', false)),
+      .map((field) =>
+        option(field.name, 'field', false, {
+          valueType: expressionType(field.type),
+          labelKey: field.labelKey,
+          values: field.values,
+        }),
+      ),
   ]
 }
 
@@ -164,17 +187,40 @@ function entityOf(kind: string, draft: Record<string, unknown>, pointer: string)
   return undefined
 }
 
-function option(label: string, type: ScopeOption['type'], cursorInside: boolean): ScopeOption {
-  return { label, type, cursorInside }
+function option(
+  label: string,
+  type: ScopeOption['type'],
+  cursorInside: boolean,
+  about: Pick<ScopeOption, 'valueType' | 'labelKey' | 'values' | 'parameters'> = {},
+): ScopeOption {
+  return { label, type, cursorInside, ...about }
 }
 
-function namesOf(list: unknown): string[] {
+function ruleOption(rule: StudioNames['rules'][number]): ScopeOption {
+  return option(`${rule.name}()`, 'rule', true, {
+    valueType: expressionType(rule.resultType),
+    parameters: rule.parameters,
+  })
+}
+
+/** The option of a field or parameter of the draft, which the names route does not know until it is saved. */
+function draftOption(item: Record<string, unknown>, type: 'field' | 'parameter'): ScopeOption {
+  const fieldType = stringProperty(item, 'type')
+  const values = Array.isArray(item.values) ? item.values.filter((value) => typeof value === 'string') : null
+  return option(stringProperty(item, 'name')!, type, false, {
+    valueType: fieldType === undefined ? null : expressionType(fieldType),
+    labelKey: stringProperty(item.label, 'textKey'),
+    values,
+  })
+}
+
+/** The objects of a draft's list that have a name. */
+function entriesOf(list: unknown): Record<string, unknown>[] {
   if (!Array.isArray(list)) {
     return []
   }
-  return list.map((item) => stringProperty(item, 'name')).filter((name): name is string => name !== undefined)
+  return list.filter(isRecord).filter((item) => stringProperty(item, 'name') !== undefined)
 }
-
 function stringProperty(value: unknown, key: string): string | undefined {
   if (value === null || typeof value !== 'object') {
     return undefined

@@ -153,8 +153,6 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
   shows "Not set", see the [empty values](frontend.md#shown-values). It never shows nothing, which
   cannot tell "not given" from "not loaded", and never N/A, which says "does not apply" and does not
   translate. A No is a value, so it reads No, never a dash.
-- **Muted is for facts only** _(planned for M35)_. Muted text, `textMuted`, marks a fact, such as the dash
-  of a value that is not there. A heading, a hint or a message takes the ordinary text colour.
 - **A reference is a link, and only the reference** _(planned for M35)_. A reference to another resource
   shows as a link, named as people read it, and no other text in it is a link.
 - **A status is a `StatusTag` with five tones, and any other enum value is text** _(planned for M35)_. A

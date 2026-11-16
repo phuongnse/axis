@@ -245,4 +245,73 @@ describe('expressionScope', () => {
       expect(labels).not.toContain('sku')
     })
   })
+
+  describe('what completion needs to know of a name', () => {
+    it('gives a draft field its expression type, label key and values', () => {
+      const draft = {
+        fields: [
+          { name: 'price', type: 'money', label: { textKey: 'price.label' } },
+          { name: 'state', type: 'enum', values: ['Open', 'Closed', 3] },
+          { name: 'lines', type: 'child-collection' },
+          { name: 'plain' },
+        ],
+      }
+      const options = expressionScope('entity', draft, '/validations/0/expression', names)
+      const found = (label: string) => options.find((option) => option.label === label)
+
+      expect(found('price')).toMatchObject({ valueType: 'decimal', labelKey: 'price.label' })
+      expect(found('state')).toMatchObject({ valueType: 'enum', values: ['Open', 'Closed'] })
+      expect(found('lines')?.valueType).toBe('list')
+      expect(found('plain')?.valueType).toBeNull()
+    })
+
+    it('gives a field of the names route its type, label key and values, and id the reference type', () => {
+      const withValues = {
+        ...names,
+        entities: [
+          {
+            name: 'Ticket',
+            module: null,
+            fields: [
+              { name: 'severity', labelKey: 'ticket.severity', type: 'enum', target: null, values: ['Low', 'High'] },
+              { name: 'owner', type: 'references', target: 'User', values: null },
+            ],
+          },
+        ],
+      } as unknown as StudioNames
+      const options = expressionScope('process', { entity: 'Ticket' }, '/steps/0/branches/0/when', withValues)
+      const found = (label: string) => options.find((option) => option.label === label)
+
+      expect(found('id')?.valueType).toBe('reference')
+      expect(found('severity')).toMatchObject({
+        valueType: 'enum',
+        labelKey: 'ticket.severity',
+        values: ['Low', 'High'],
+      })
+      expect(found('owner')?.valueType).toBe('list')
+    })
+
+    it('gives a rule its parameters and the type it gives, and an event field its type', () => {
+      const withRule = {
+        ...names,
+        rules: [
+          {
+            name: 'Discount',
+            module: null,
+            parameters: [{ name: 'amount', type: 'money' }],
+            resultType: 'money',
+          },
+        ],
+      } as unknown as StudioNames
+      const found = expressionScope('entity', { fields: [] }, '/validations/0/expression', withRule).find(
+        (option) => option.label === 'Discount()',
+      )
+
+      expect(found).toMatchObject({ valueType: 'decimal', parameters: [{ name: 'amount', type: 'money' }] })
+
+      const draft = { steps: [{ type: 'waitEvent', event: 'PaymentReceived' }] }
+      const payload = expressionScope('process', draft, '/steps/0/when', names)
+      expect(payload.find((option) => option.label === 'amount')?.valueType).toBe('decimal')
+    })
+  })
 })

@@ -332,19 +332,54 @@ describe('ExpressionEditor completion', () => {
     )
   })
 
+  /** The labels of the options in the list, in the order shown. Their text content holds the detail too. */
+  function labels(): string[] {
+    return [...document.querySelectorAll('.cm-completionLabel')].map((label) => label.textContent ?? '')
+  }
+
+  /** Picks the option with the label, by a click. */
+  async function pick(user: ReturnType<typeof userEvent.setup>, label: string) {
+    await waitFor(() => expect(labels()).toContain(label))
+    const option = [...document.querySelectorAll('[role="option"]')].find(
+      (item) => item.querySelector('.cm-completionLabel')?.textContent === label,
+    )!
+    await user.click(option)
+  }
+
+  /** Waits for the scope of the place to load, so that the functions are in the list. */
+  async function scopeLoaded() {
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledWith(scopePath, expect.anything()))
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+  }
+
+  function stubScope(scope: unknown) {
+    vi.stubGlobal(
+      'fetch',
+      routes(() => json({ type: 'text', diagnostics: [] }), scope),
+    )
+  }
+
+  const length = {
+    name: 'length',
+    parameters: ['text'],
+    result: 'integer',
+    group: 'Text',
+    example: "length('abc')",
+    description: 'Counts the characters of a text.',
+  }
+
   it('opens with Ctrl+Space and inserts the picked option from the keyboard', async () => {
     const user = userEvent.setup()
-    // The list sorts by label, so 'amount' comes first and ArrowDown reaches 'length()'.
-    renderEditor('', vi.fn(), null, false, [
-      { label: 'amount', type: 'field', cursorInside: false },
-      { label: 'length()', type: 'function', cursorInside: true },
-    ])
+    stubScope({ type: null, fields: [], functions: [length] })
+    // Completion keeps the order of its sources, so ArrowUp from the first option wraps to the last, 'length()'.
+    renderEditor('', vi.fn(), null, false, [{ label: 'amount', type: 'field', cursorInside: false }])
 
     await user.click(screen.getByRole('textbox', { name: 'expression' }))
+    await scopeLoaded()
     await user.keyboard('{Control>}[Space]{/Control}')
     await screen.findByRole('option', { name: /amount/ })
     await act(() => new Promise((resolve) => setTimeout(resolve, 100)))
-    await user.keyboard('{ArrowDown}')
+    await user.keyboard('{ArrowUp}')
     await waitFor(() => expect(screen.getByRole('option', { name: /length/ })).toHaveAttribute('aria-selected', 'true'))
     await user.keyboard('{Enter}')
 
@@ -353,29 +388,18 @@ describe('ExpressionEditor completion', () => {
     expect(view.state.selection.main.head).toBe(7)
   })
 
-  it('offers exactly the functions of the scope, with the cursor inside the brackets of one that takes parameters', async () => {
+  it('offers the functions of the scope after the fields and the language’s words, with the cursor inside the brackets of one that takes parameters', async () => {
     const user = userEvent.setup()
-    const functions = ['length', 'now'].map((name) => ({
-      name,
-      parameters: name === 'length' ? ['text'] : [],
-      result: name === 'length' ? 'integer' : 'date-time',
-      group: 'Text',
-      example: `${name}()`,
-      description: '',
-    }))
-    vi.stubGlobal(
-      'fetch',
-      routes(() => json({ type: 'text', diagnostics: [] }), { type: null, fields: [], functions }),
-    )
+    const now = { ...length, name: 'now', parameters: [], result: 'date-time', example: 'now()', description: '' }
+    stubScope({ type: null, fields: [], functions: [length, now] })
     renderEditor('', vi.fn(), null, false, [{ label: 'amount', type: 'field', cursorInside: false }])
 
     await user.click(screen.getByRole('textbox', { name: 'expression' }))
-    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledWith(scopePath, expect.anything()))
-    await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+    await scopeLoaded()
     await user.keyboard('{Control>}[Space]{/Control}')
     await screen.findByRole('option', { name: /amount/ })
 
-    expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['amount', 'length()', 'now()'])
+    expect(labels()).toEqual(['amount', 'true', 'false', 'null', "'text'", "date('…')", 'not', 'length()', 'now()'])
     await user.click(screen.getByRole('option', { name: /length/ }))
     expect(viewOf().state.doc.toString()).toBe('length()')
     expect(viewOf().state.selection.main.head).toBe(7)
@@ -395,7 +419,98 @@ describe('ExpressionEditor completion', () => {
     await user.keyboard('{Control>}[Space]{/Control}')
     await screen.findByRole('option', { name: /amount/ })
 
-    expect(screen.getAllByRole('option')).toHaveLength(1)
+    expect(labels()).toEqual(['amount', 'true', 'false', 'null', "'text'", "date('…')", 'not'])
+  })
+
+  it('builds an expression from picks, spaces and one Ctrl+Space, offering what fits after each value', async () => {
+    const user = userEvent.setup()
+    stubScope({ type: 'boolean', fields: [], functions: [] })
+    renderEditor('', vi.fn(), null, false, [
+      { label: 'totalAmount', type: 'field', cursorInside: false, valueType: 'decimal' },
+    ])
+
+    await user.click(screen.getByRole('textbox', { name: 'expression' }))
+    await scopeLoaded()
+    await user.keyboard('{Control>}[Space]{/Control}')
+    await pick(user, 'totalAmount')
+    expect(document.querySelector('.cm-completionDetail')).toBeNull()
+
+    await user.keyboard(' ')
+    await waitFor(() => expect(labels()[0]).toBe('=='))
+    await pick(user, 'is null')
+    expect(viewOf().state.doc.toString()).toBe('totalAmount is null')
+
+    await user.keyboard(' ')
+    await waitFor(() => expect(labels()).toEqual(['and', 'or']))
+    await pick(user, 'or')
+    expect(viewOf().state.doc.toString()).toBe('totalAmount is null or')
+
+    // After `or` the cursor follows no value, so the list does not open by itself.
+    await user.keyboard(' ')
+    await user.keyboard('{Control>}[Space]{/Control}')
+    await pick(user, 'totalAmount')
+    await user.keyboard(' ')
+    await pick(user, '>')
+    await user.keyboard(' 0')
+
+    expect(viewOf().state.doc.toString()).toBe('totalAmount is null or totalAmount > 0')
+  })
+
+  it('opens the values of an enum field after its comparison and a quote, in order, and a pick closes the quote', async () => {
+    const user = userEvent.setup()
+    stubScope({ type: 'boolean', fields: [], functions: [] })
+    renderEditor('', vi.fn(), null, false, [
+      {
+        label: 'status',
+        type: 'field',
+        cursorInside: false,
+        valueType: 'enum',
+        values: ['Draft', 'Submitted', 'Approved'],
+      },
+    ])
+
+    await user.click(screen.getByRole('textbox', { name: 'expression' }))
+    await scopeLoaded()
+    await user.keyboard('{Control>}[Space]{/Control}')
+    await pick(user, 'status')
+    await user.keyboard(' ')
+    await pick(user, '==')
+    await user.keyboard(" '")
+
+    await waitFor(() => expect(labels()).toEqual(['Draft', 'Submitted', 'Approved']))
+    await pick(user, 'Submitted')
+
+    expect(viewOf().state.doc.toString()).toBe("status == 'Submitted'")
+    expect(viewOf().state.selection.main.head).toBe(21)
+  })
+
+  it('explains a function with its signature, description and example, and a field with its type', async () => {
+    const user = userEvent.setup()
+    stubScope({ type: null, fields: [], functions: [length] })
+    renderEditor('', vi.fn(), null, false, [
+      { label: 'amount', type: 'field', cursorInside: false, valueType: 'decimal' },
+    ])
+
+    await user.click(screen.getByRole('textbox', { name: 'expression' }))
+    await scopeLoaded()
+    await user.keyboard('{Control>}[Space]{/Control}')
+    await screen.findByRole('option', { name: /amount/ })
+    expect(document.querySelector('.cm-completionDetail')?.textContent).toBe('a decimal number')
+
+    await act(() => new Promise((resolve) => setTimeout(resolve, 100)))
+    await user.keyboard('{ArrowUp}')
+
+    await waitFor(() => {
+      const info = document.querySelector('.cm-completionInfo')
+      expect(info?.textContent).toContain('length(text)')
+      expect(info?.textContent).toContain('Counts the characters of a text.')
+      expect([...(info?.querySelectorAll('code') ?? [])].map((code) => code.textContent)).toEqual([
+        'length(text)',
+        "length('abc')",
+      ])
+    })
+    const detail = [...document.querySelectorAll('.cm-completionDetail')].at(-1)
+    expect(detail?.textContent).toBe('length(text)')
   })
 })
 

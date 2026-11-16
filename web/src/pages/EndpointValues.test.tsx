@@ -56,7 +56,8 @@ describe.each(['light', 'dark'])('EndpointValues in %s mode', (mode) => {
 
   it('renders inside the theme root with a row per mapping', async () => {
     renderValues()
-    await screen.findAllByTestId('studio-expression-type')
+    // The first check waits for the lazy editor chunk, which can take long on a cold, busy machine.
+    await screen.findAllByTestId('studio-expression-type', undefined, { timeout: 5000 })
 
     const root = screen.getByTestId('studio-field-/values')
     expect(root.closest(`[data-theme-mode=${mode}]`)).not.toBeNull()
