@@ -351,5 +351,6 @@ to the frame shows in every state. How previews work is in
   Overview of a new application, Entity and Policy matrix. Clicks in the sidebar move between
   Overview, Settings, the kind lists and Releases, all answered from fixtures. Entity opens an entity
   in the entity designer and Policy matrix the policy matrix, both over the fixtures of Typical.
-- **More Studio previews** _(planned for M33)_. The previews `studioPageDesign`, `studioFormDesign`
-  and `studioProcessDesign` follow `studio`.
+- **Studio's designers** are three previews that follow `studio`: `studioPageDesign`, `studioFormDesign`
+  and `studioProcessDesign`. Each draws Studio through the shell with a page, a form or a process open in
+  its designer. Each has one state, Typical, over the fixtures of the `studio` preview's Typical state.

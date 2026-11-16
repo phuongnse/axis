@@ -17,7 +17,7 @@ import { IdentitySignIn } from './IdentitySignIn'
 import { SignUpPreview } from './SignUpPreview'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import { ClickOnMount, ShellPreview } from './ShellPreview'
-import { studioFixtures, typicalEntityId } from './studioFixtures'
+import { studioFixtures, typicalEntityId, typicalFormId, typicalPageId, typicalProcessId } from './studioFixtures'
 import {
   application,
   blankDetailWidget,
@@ -158,6 +158,22 @@ const childCollectionStates: readonly PreviewState[] = [
   { caption: 'Empty', draw: () => <FieldPreview type="child-collection" record={emptyLinesRecord} /> },
 ]
 
+/**
+ * A Studio card that opens one resource of the Typical folder in its designer, in the one Typical state. The cards are
+ * listed in docs/reference/widget-previews.md#the-cards.
+ */
+function studioDesignerStates(resourceId: string): readonly PreviewState[] {
+  return [
+    {
+      caption: 'Typical',
+      fixtures: studioFixtures.typical,
+      entry: `/studio?app=${application}&resource=${resourceId}`,
+      draw: () => <ShellPreview />,
+      frameHeight: 640,
+    },
+  ]
+}
+
 /** What a preview draws: its states, each the shared widget component over fixture metadata. */
 export const previews: Record<string, readonly PreviewState[]> = {
   table: [
@@ -293,6 +309,9 @@ export const previews: Record<string, readonly PreviewState[]> = {
     },
     { caption: 'Policy matrix', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=policies` },
   ].map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 })),
+  studioPageDesign: studioDesignerStates(typicalPageId),
+  studioFormDesign: studioDesignerStates(typicalFormId),
+  studioProcessDesign: studioDesignerStates(typicalProcessId),
   signIn: [
     {
       caption: 'Sign-in refused',
