@@ -235,16 +235,15 @@ function TaskBody({
   // Proposed: a page that shows one thing is headed by its name, with the state the platform keeps of it as tags
   // beside the name and its kind as the line, and the rest of what the platform keeps of it is the page's first part,
   // see the review on #3650.
-  // The record the task is about opens on its own page, and each fact takes a row of its own, as
-  // docs/reference/actions-and-controls.md#fields says.
-  const subjectLabel = task.form.entity.labelKey ? t(task.form.entity.labelKey) : t('shell.tasks.subject')
+  // The record the task is about opens on its own page, named Record as in the Tasks inbox, and each fact takes a row
+  // of its own, as docs/reference/actions-and-controls.md#fields says.
   const facts: Term[] = [
     ...(task.subject.label === null
       ? []
       : [
           {
             key: 'subject',
-            term: subjectLabel,
+            term: t('shell.tasks.subject'),
             value: (
               <RecordLink entity={task.subject.entity} id={task.subject.id}>
                 {task.subject.label}
