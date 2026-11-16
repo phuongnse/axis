@@ -2084,6 +2084,7 @@
   "shell.studio.release.notFound": "Lịch sử không có phiên bản này.",
   "shell.studio.release.failed": "Không tải được phiên bản này.",
   "shell.studio.release.all": "Tất cả phiên bản",
+  "shell.studio.release.details": "Thông tin",
   "shell.studio.release.status": "Trạng thái",
   "shell.studio.release.liveSince": "Đang chạy từ {time}",
   "shell.studio.release.replacedOn": "Ngừng chạy lúc {time}",

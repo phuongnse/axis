@@ -2084,6 +2084,7 @@
   "shell.studio.release.notFound": "This release is not in the history.",
   "shell.studio.release.failed": "This release could not be loaded.",
   "shell.studio.release.all": "All releases",
+  "shell.studio.release.details": "Details",
   "shell.studio.release.status": "Status",
   "shell.studio.release.liveSince": "Live since {time}",
   "shell.studio.release.replacedOn": "Replaced on {time}",

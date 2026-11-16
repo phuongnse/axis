@@ -821,6 +821,7 @@ const framedPreviews: Record<
       "Releases",
       "History",
       "Revision",
+      "Release page",
     ],
     pickedInFixtures: true,
   },
@@ -1035,6 +1036,12 @@ for (const [slug, expectKeyElement] of [
     async (state: FrameLocator) => {
       await expect(state.getByTestId("studio-revision")).toBeVisible();
       await expect(state.getByTestId("studio-changes-file")).toHaveCount(3);
+    },
+  ],
+  [
+    "release-page",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-release")).toBeVisible();
     },
   ],
 ] as const) {

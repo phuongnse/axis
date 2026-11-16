@@ -226,7 +226,7 @@ the history lacks says so in one line, with a link to every release.
 The page shows, in order:
 
 1. **The heading** "Release N" with its tags, and Activate… as the page's action on the heading's right.
-2. **Facts:** Label; Status, live since or replaced on; Published; Published by; and Note, on a line of
+2. **Details:** Label; Status, live since or replaced on; Published; Published by; and Note, on a line of
    its own.
 3. **Relaxed points**, for a release that pins a module: the module's label, the point's label with a
    muted line that says what kind of point it is and on which entity, and the reason. With none, one
@@ -239,6 +239,10 @@ The page shows, in order:
    the release it compares with.
 5. **Modules and packages** that the release pins: name, type and version.
 6. **Activations:** when, by whom, the release it replaced and until when it was live.
+
+The parts from Details to Activations each have a `heading5` heading, with a `divider` rule between
+them and none before the first, through `SectionParts`. A part that the page leaves out, such as Relaxed
+points without a module, adds no rule.
 
 - **Cannot replace the live one.** An older release that lacks a module that the live
   release pins, or pins it at a version without some of its entities or fields, cannot replace the live

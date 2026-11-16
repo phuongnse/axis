@@ -322,6 +322,11 @@ export const previews: Record<string, readonly PreviewState[]> = {
       fixtures: studioFixtures.typical,
       entry: `/studio?app=${application}&view=history&revision=${typicalRevisionId}`,
     },
+    {
+      caption: 'Release page',
+      fixtures: studioFixtures.releasePage,
+      entry: `/studio?app=${application}&view=release&release=2`,
+    },
   ].map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 })),
   studioPageDesign: studioDesignerStates(typicalPageId),
   studioFormDesign: studioDesignerStates(typicalFormId),
