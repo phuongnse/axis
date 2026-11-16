@@ -127,7 +127,7 @@ describe('design-system previews', () => {
     ])
   })
 
-  test('the studio preview has its seven states, each with a slug of its own and a frame', () => {
+  test('the studio preview has its eleven states, each with a slug of its own and a frame', () => {
     const states = previews.studio
 
     expect(states.map(({ caption }) => caption)).toEqual([
@@ -138,6 +138,10 @@ describe('design-system previews', () => {
       'Many rows',
       'Long names',
       'Access denied',
+      'Overview with errors and changes not live',
+      'Overview of a new application',
+      'Entity',
+      'Policy matrix',
     ])
     expect(states.map(({ caption }) => stateSlug(caption))).toEqual([
       'typical',
@@ -147,6 +151,10 @@ describe('design-system previews', () => {
       'many-rows',
       'long-names',
       'access-denied',
+      'overview-with-errors-and-changes-not-live',
+      'overview-of-a-new-application',
+      'entity',
+      'policy-matrix',
     ])
     for (const { frameHeight, fixtures } of states) {
       expect(frameHeight).toBeGreaterThan(0)
