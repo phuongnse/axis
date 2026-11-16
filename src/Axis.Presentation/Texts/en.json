@@ -2082,6 +2082,7 @@
   "shell.studio.releases.label": "Label",
   "shell.studio.releases.note": "Note",
   "shell.studio.releases.empty": "No release yet.",
+  "shell.studio.releases.loadFailed": "The releases could not be loaded.",
   "shell.studio.activate.button": "Activate…",
   "shell.studio.release.title": "Release {release}",
   "shell.studio.release.notFound": "This release is not in the history.",

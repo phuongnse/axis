@@ -16,7 +16,6 @@ import {
   moduleResources,
   previewSiteUrl,
   putStudioTexts,
-  releaseList,
   releasePublisher,
   resourceTitle,
   revisionAuthor,
@@ -28,7 +27,6 @@ import {
   undoStudioRevision,
   type StudioReleaseChange,
   type StudioRevision,
-  type StudioReleaseItem,
   type StudioReleases,
   type StudioNames,
   type StudioResourceItem,
@@ -443,76 +441,9 @@ describe('moduleResources', () => {
   })
 })
 
-function release(releaseId: string, number: number, activatedAt: string): StudioReleaseItem {
-  return {
-    releaseId,
-    number,
-    contentHash: `hash-${number}`,
-    activatedAt,
-    actor: 'author',
-    actorName: null,
-    label: null,
-    note: null,
-    requestId: null,
-    offStandard: false,
-    relaxed: [],
-  }
-}
-
-describe('releaseList', () => {
-  const items = [
-    release('r2', 2, '2026-05-02T10:00:00Z'),
-    { ...release('r1', 1, '2026-05-01T10:00:00Z'), label: 'First', note: 'Initial', actorName: 'Author User' },
-    { ...release('r1', 1, '2026-05-03T10:00:00Z'), label: null, note: null, actor: 'operator' },
-    release('r3', 3, '2026-05-03T10:00:00Z'),
-  ]
-
-  it('has one row for each release, the highest number first', () => {
-    const rows = releaseList({ active: null, folderContentHash: null, changes: null, partChanges: null, items })
-
-    expect(rows.map((row) => row.number)).toEqual([3, 2, 1])
-    expect(rows.map((row) => row.live)).toEqual([false, false, false])
-  })
-
-  it('takes the details of a release from its first activation', () => {
-    const rows = releaseList({ active: null, folderContentHash: null, changes: null, partChanges: null, items })
-
-    expect(rows[2]).toMatchObject({
-      releaseId: 'r1',
-      label: 'First',
-      note: 'Initial',
-      publishedAt: '2026-05-01T10:00:00Z',
-      actor: 'author',
-      actorName: 'Author User',
-    })
-  })
-
-  it('marks the live release', () => {
-    const rows = releaseList({
-      active: { releaseId: 'r1', number: 1, contentHash: 'hash-1' },
-      folderContentHash: null,
-      changes: null,
-      partChanges: null,
-      items,
-    })
-
-    expect(rows.map((row) => row.live)).toEqual([false, false, true])
-  })
-})
-
 describe('releasePublisher', () => {
   const t = (key: string) => key
-  const row = (actor: string, actorName: string | null) => ({
-    ...releaseList({
-      active: null,
-      folderContentHash: null,
-      changes: null,
-      partChanges: null,
-      items: [release('r1', 1, '2026-05-01T10:00:00Z')],
-    })[0],
-    actor,
-    actorName,
-  })
+  const row = (actor: string, actorName: string | null) => ({ actor, actorName })
 
   it('names the person when there is a name', () => {
     expect(releasePublisher(row('user-1', 'Author User'), t)).toBe('Author User')

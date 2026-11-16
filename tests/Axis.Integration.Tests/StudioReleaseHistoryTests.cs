@@ -23,6 +23,8 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
 
     private const string ReleasesUrl = "/api/studio/apps/PurchaseRequests/releases";
 
+    private const string ReleaseListUrl = "/api/studio/apps/PurchaseRequests/release-list";
+
     private readonly PostgreSqlFixture _database = new();
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
@@ -85,6 +87,105 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         using var anonymous = factory.CreateClient();
         Assert.Equal(HttpStatusCode.Forbidden, (await requester.SendAsync(RecordApiFixture.Request(ReleasesUrl, Host), CancellationToken)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.SendAsync(RecordApiFixture.Request(ReleasesUrl, Host), CancellationToken)).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_release_list_answers_one_row_for_each_release_and_pages_sorts_searches_and_filters_them()
+    {
+        using var folder = new TemporaryFolder();
+        CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), folder.Path);
+        var connectionString = await _database.CreateDatabaseAsync("studio_release_list", CancellationToken);
+        await using var factory = CreateFactory(connectionString, folder.Path);
+        using var author = factory.CreateClient().SignedInAs("author");
+        await ActivateThreeReleasesAsync(connectionString, folder.Path);
+
+        // Release 1 was activated again, so it has two activations but one row, which takes its first activation.
+        var all = await GetAsync(author, ReleaseListUrl);
+        Assert.Equal([3, 2, 1], Numbers(all));
+        Assert.Equal(3, all.GetProperty("totalCount").GetInt64());
+        Assert.Equal((1, 20), (all.GetProperty("page").GetInt32(), all.GetProperty("pageSize").GetInt32()));
+        var rows = all.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(["startup", "author", "author"], rows.Reverse<JsonElement>().Select(row => row.GetProperty("actor").GetString()));
+        Assert.Equal([true, false, false], rows.Select(row => row.GetProperty("live").GetBoolean()));
+        Assert.Equal([false, false, false], rows.Select(row => row.GetProperty("offStandard").GetBoolean()));
+        Assert.Equal(("Autumn", "Spring"), (rows[0].GetProperty("label").GetString(), rows[1].GetProperty("label").GetString()));
+        Assert.Equal("Teams rename", rows[1].GetProperty("note").GetString());
+        Assert.Equal(JsonValueKind.Null, rows[2].GetProperty("label").ValueKind);
+
+        var second = await GetAsync(author, $"{ReleaseListUrl}?pageSize=2&page=2");
+        Assert.Equal([1], Numbers(second));
+        Assert.Equal(3, second.GetProperty("totalCount").GetInt64());
+        Assert.Equal([1, 2, 3], Numbers(await GetAsync(author, $"{ReleaseListUrl}?sort=number")));
+        Assert.Equal([3, 2, 1], Numbers(await GetAsync(author, $"{ReleaseListUrl}?sort=label")));
+        Assert.Equal([1, 2, 3], Numbers(await GetAsync(author, $"{ReleaseListUrl}?sort=-label")));
+
+        var searched = await GetAsync(author, $"{ReleaseListUrl}?search=spring");
+        Assert.Equal([2], Numbers(searched));
+        Assert.Equal(1, searched.GetProperty("totalCount").GetInt64());
+        Assert.Equal([2], Numbers(await GetAsync(author, $"{ReleaseListUrl}?search=rename")));
+
+        var filtered = await GetAsync(author, $"{ReleaseListUrl}?filter={Uri.EscapeDataString("""{"all":[{"field":"number","op":"gte","value":2}]}""")}");
+        Assert.Equal([3, 2], Numbers(filtered));
+        Assert.Equal(2, filtered.GetProperty("totalCount").GetInt64());
+
+        using var undeclared = await author.SendAsync(
+            RecordApiFixture.Request($"{ReleaseListUrl}?filter={Uri.EscapeDataString("""{"all":[{"field":"contentHash","op":"eq","value":"x"}]}""")}", Host), CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, undeclared.StatusCode);
+        Assert.Contains("filter", await ErrorNamesAsync(undeclared));
+        using var unsorted = await author.SendAsync(RecordApiFixture.Request($"{ReleaseListUrl}?sort=live", Host), CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, unsorted.StatusCode);
+        Assert.Contains("sort", await ErrorNamesAsync(unsorted));
+
+        using var requester = factory.CreateClient().SignedInAs("requester");
+        using var anonymous = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.Forbidden, (await requester.SendAsync(RecordApiFixture.Request(ReleaseListUrl, Host), CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.SendAsync(RecordApiFixture.Request(ReleaseListUrl, Host), CancellationToken)).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_release_history_ignores_the_list_parameters_and_answers_every_activation_newest_first()
+    {
+        using var folder = new TemporaryFolder();
+        CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), folder.Path);
+        var connectionString = await _database.CreateDatabaseAsync("studio_release_history_params", CancellationToken);
+        await using var factory = CreateFactory(connectionString, folder.Path);
+        using var author = factory.CreateClient().SignedInAs("author");
+        await ActivateThreeReleasesAsync(connectionString, folder.Path);
+
+        var plain = await GetAsync(author, ReleasesUrl);
+        var withParameters = await GetAsync(author, $"{ReleasesUrl}?page=2&pageSize=1&sort=label&search=x");
+
+        // Release 1 is in the history twice, and its second activation is the newest.
+        Assert.Equal([1, 3, 2, 1], Numbers(withParameters));
+        Assert.Equal(plain.GetProperty("items").GetRawText(), withParameters.GetProperty("items").GetRawText());
+        Assert.Equal(plain.GetProperty("active").GetRawText(), withParameters.GetProperty("active").GetRawText());
+        Assert.False(withParameters.TryGetProperty("totalCount", out _));
+    }
+
+    // Release 1 comes from startup. Releases 2 and 3 are labelled, and release 1 is activated again a day later.
+    private static async Task ActivateThreeReleasesAsync(string connectionString, string folder)
+    {
+        await EditTextAsync(folder, "\"Departments\"", "\"Teams\"");
+        await ActivateAsync(connectionString, folder, ActivationActor.User("author", "Spring", "Teams rename", Guid.NewGuid()));
+        await EditTextAsync(folder, "\"Teams\"", "\"Groups\"");
+        await ActivateAsync(connectionString, folder, ActivationActor.User("author", "Autumn", null, null));
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString,
+            """
+            INSERT INTO axis.release_activations (id, release_id, application_id, number, content_hash, activated_at, actor)
+            SELECT uuidv7(), release_id, application_id, number, content_hash, activated_at + interval '1 day', 'author'
+            FROM axis.release_activations WHERE actor = 'startup'
+            """,
+            CancellationToken);
+    }
+
+    private static List<int> Numbers(JsonElement answer) =>
+        [.. answer.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("number").GetInt32())];
+
+    private static async Task<List<string>> ErrorNamesAsync(HttpResponseMessage response)
+    {
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return [.. body.RootElement.GetProperty("errors").EnumerateObject().Select(error => error.Name)];
     }
 
     [Fact]

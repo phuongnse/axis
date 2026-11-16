@@ -10,7 +10,7 @@ in its own process. This page gives the API's settings, routes, versions, order 
 [module resource saves](module-resource-saves.md).
 
 A write takes a lock in the platform database, see [Versions](#versions). Reads and diagnostics touch no database,
-except the [release history](#release-history), [release](studio-workspace.md#release-route), [resource activity](studio-resource-form.md#resource-activity), [kind list](studio-resource-form.md#kind-list),
+except the [release history](#release-history), [release list](#release-list), [release](studio-workspace.md#release-route), [resource activity](studio-resource-form.md#resource-activity), [kind list](studio-resource-form.md#kind-list),
 [request status](#the-request) and [application settings](#application-settings) routes, which read the tenant database.
 Some routes exist to help Studio's editors: [names](#names) feeds the reference pickers and the expression completion,
 [text writes](authoring-text-writes.md) the label texts, and the [expression check](#expression-check) the expression editor.
@@ -98,6 +98,7 @@ Studio lists on every request, in list order, and the first match wins. A resour
 | `GET /api/studio/bindings`                                                          | `200` with the names of the tenant's bindings by kind, see [Studio API](studio-resource-form.md#studio-api)                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `GET /api/studio/apps/{application}/relaxed`                                        | `200` with `{ items }`, the folder's relax entries, see [Studio API](studio-resource-form.md#studio-api)                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `GET /api/studio/apps/{application}/releases/{number}`                              | `200` with one release for its page, see [release route](studio-workspace.md#release-route)                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `GET /api/studio/apps/{application}/release-list`                                   | `200` with `{ items, page, pageSize, totalCount }`, one page of the releases, see [Release list](#release-list)                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 The publishing routes are in [Publishing](#publishing).
 
@@ -775,7 +776,10 @@ stateDiagram-v2
 
 `GET .../releases` answers the application's activations in this tenant, newest first, as
 `{ active: { releaseId, number, contentHash }, folderContentHash, changes, partChanges, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId, offStandard, relaxed: [{ module, point, reason, moduleTitle, part, entityTitles, titles }] }] }`.
-The publisher writes the rows of a `publish` and an `activate` request.
+The publisher writes the rows of a `publish` and an `activate` request. The route takes no list parameters
+and ignores `page`, `pageSize`, `sort`, `search` and `filter`, because the band, Publishing and the
+[release page](studio-workspace.md#release-page) read the whole history from it. The Releases table pages the
+[release list](#release-list) instead.
 
 - **`active`** is the application's active release in this tenant, or null when there is none.
 - **`folderContentHash`** is the content hash that the folder would compile to now, so Studio can show
@@ -814,6 +818,36 @@ The publisher writes the rows of a `publish` and an `activate` request.
   two tenants.
 - **No copies.** Activating the release that is already active adds no row and keeps the number, so
   that every restart under `scripts/dev.sh` does not fill the history with copies.
+
+### Release list
+
+`GET .../release-list` answers `200` with
+`{ items: [{ releaseId, number, label, note, publishedAt, actor, actorName, live, offStandard, relaxed }], page, pageSize, totalCount }`:
+one page of the application's releases, the highest `number` first unless `sort` says otherwise. Each release
+appears once, with the `label`, `note`, `publishedAt`, `actor` and `actorName` of its first activation, the earliest
+`activatedAt`, and the server's order of the [history](#release-history) when two tie. `live` is true on the active
+release, and `offStandard` and `relaxed` are those of the release, as in the history. A folder that has never been
+activated lists no releases.
+
+The route takes the record API's `page`, `pageSize`, `sort`, `search` and `filter`, as
+[paging and sorting](record-api.md#paging-and-sorting) defines them. The columns are `number`, which is a number,
+`label`, `publishedBy` and `note`, which are text, and `publishedAt`, which is a date.
+
+- **`sort`.** One column, `-` first for descending order. A `sort` on `publishedAt` orders by the full time.
+  Rows that tie keep the highest-number-first order. A missing value comes last ascending and first descending.
+- **`search`.** Keeps the releases whose `label`, `publishedBy` or `note` contains the text, ignoring letter case.
+- **`filter`.** The same groups and operators as the record API. A condition on `publishedAt` takes a day,
+  `YYYY-MM-DD`, and compares the day of the first activation in UTC. `publishedBy` is the name that `actorName`
+  holds, so a release that a startup or an operator activated has none, and `empty` matches it.
+- **`totalCount`.** How many releases match, before the page is cut. A page past the end is `200` with empty
+  `items` and the real `totalCount`.
+
+`live` and `offStandard` are fields of each row only, so a sort or a filter on them is refused. A `page`,
+`pageSize`, `sort`, `search` or `filter` that is invalid, including a `sort` or a `filter` on a column the list does
+not hold, is `400` with a problem whose `errors` name the parameter, as the record API does. The route checks the
+session (`401`), the author role (`403`) and the application (`404`) first, and never compiles the folder. It reads
+every activation of the application for each request and pages them in memory, as the
+[shared list query](shared-widgets.md#which-widget) does for [revisions](authoring-revisions.md#list).
 
 ### Activating a release
 

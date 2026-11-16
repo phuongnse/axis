@@ -98,8 +98,9 @@ namespace Axis.Server.Studio;
 /// <see cref="StudioReleaseEndpoints"/>, and is null when nothing is active. Each item has
 /// <c>offStandard</c> and <c>relaxed: [{ module, point, reason, moduleTitle, part, entityTitles, titles }]</c>, read from the
 /// <c>application.json</c> stored with that release, with the words that <see cref="StudioRelaxedWords"/> reads from its module
-/// copies. It reads the tenant database and changes nothing.
-/// <c>GET /api/studio/apps/{application}/releases/{number}</c> is in <see cref="StudioReleaseEndpoints"/>.
+/// copies. It reads the tenant database and changes nothing. It takes no list parameters: the band, Publishing and the release
+/// page read the whole history from it, and the Releases table pages <c>GET /api/studio/apps/{application}/release-list</c> instead.
+/// <c>GET /api/studio/apps/{application}/releases/{number}</c> and the release list are in <see cref="StudioReleaseEndpoints"/>.
 /// <c>GET /api/studio/apps/{application}/kinds/{kind}/resources</c>, the page of a kind's list, is in <see cref="StudioKindListEndpoints"/>.
 /// </summary>
 internal static class StudioEndpoints
@@ -714,19 +715,27 @@ internal static class StudioEndpoints
             : activations.FirstOrDefault(row => row.ReleaseId == active.ReleaseId) is { } current
                 ? new StudioActiveRelease(current.ReleaseId, current.Number, current.ContentHash)
                 : null;
+        var items = await ReleaseItemsAsync(store, database, activations, cancellationToken);
+        return Results.Ok(new StudioReleaseHistoryResponse(activeRelease, compiled.ContentHash, changes, partChanges, items));
+    }
+
+    // One item for each activation, with the name of who activated it and the points its release relaxed.
+    internal static async Task<IReadOnlyList<StudioReleaseItem>> ReleaseItemsAsync(
+        ActiveReleaseStore store, TenantDatabase database, IReadOnlyList<ReleaseActivation> activations, CancellationToken cancellationToken)
+    {
         var names = await UserProfiles.FindDisplayNamesAsync(
             await database.GetConnectionAsync(cancellationToken), [.. activations.Select(row => row.Actor)], cancellationToken);
         var relaxedPoints = await StudioRelaxedWords.ReadAsync(store, [.. activations.Select(row => row.ReleaseId).Distinct()], cancellationToken);
-        var items = activations
-            .Select(row =>
+        return
+        [
+            .. activations.Select(row =>
             {
                 var relaxed = relaxedPoints.GetValueOrDefault(row.ReleaseId) ?? [];
                 return new StudioReleaseItem(
                     row.ReleaseId, row.Number, row.ContentHash, row.ActivatedAt, row.Actor, names.GetValueOrDefault(row.Actor) ?? row.ActorName, row.Label, row.Note, row.RequestId,
                     relaxed.Count > 0, relaxed);
-            })
-            .ToList();
-        return Results.Ok(new StudioReleaseHistoryResponse(activeRelease, compiled.ContentHash, changes, partChanges, items));
+            }),
+        ];
     }
 
     private static async Task<IResult> PatchAsync(

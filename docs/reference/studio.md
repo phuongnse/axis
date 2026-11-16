@@ -243,11 +243,11 @@ its end.
 
 ## Releases
 
-The Releases entry lists the release history from `GET .../releases`, as
+The Releases entry lists the releases from `GET .../release-list`, as
 [releases](studio-workspace.md#releases) describes, and Activate… makes another release live.
 
 - **A row's facts.** A release's label, note, time and publisher are those of its first activation,
-  which is the publish. The list has one page.
+  which is the publish. The list is paged on the server, and its view is kept in the address.
 - **Activate….** Confirming its dialog sends `POST .../releases/{id}/activate`, see
   [publishing](authoring.md#publishing), and the status line follows the request as it follows a
   publish. A failed activation puts its diagnostics in the Problems panel, and the list still marks

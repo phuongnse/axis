@@ -2082,6 +2082,7 @@
   "shell.studio.releases.label": "Tên hiển thị",
   "shell.studio.releases.note": "Ghi chú",
   "shell.studio.releases.empty": "Chưa có phiên bản nào.",
+  "shell.studio.releases.loadFailed": "Không tải được danh sách phiên bản.",
   "shell.studio.activate.button": "Kích hoạt…",
   "shell.studio.release.title": "Phiên bản {release}",
   "shell.studio.release.notFound": "Lịch sử không có phiên bản này.",
