@@ -35,6 +35,8 @@ import type {
   SignInContext,
   SignInTexts,
   SignOutContext,
+  TermsContext,
+  TermsTexts,
   TwoStepContext,
   TwoStepTexts,
   UpdatePasswordContext,
@@ -1038,6 +1040,33 @@ export const identityUpdateProfileContext: UpdateProfileContext = {
   frameTexts: identityFrameTexts,
   legal: identityLegal,
   texts: identityUpdateProfileTexts,
+}
+
+/** The texts of the terms page, in English, as the theme's messages give them. */
+export const identityTermsTexts: TermsTexts = {
+  title: 'Accept the terms',
+  accept: 'I accept the {terms} and the {privacy}.',
+  acceptTermsOnly: 'I accept the {terms}.',
+  termsOfService: 'Terms of service',
+  privacyPolicy: 'Privacy policy',
+  required: 'Accept the terms to continue.',
+  continue: 'Continue',
+  decline: 'Decline and sign out',
+}
+
+/** What the identity provider's terms page draws in the design system. Its links use their own addresses, apart from the footer's. */
+export const identityTermsContext: TermsContext = {
+  page: 'terms',
+  title: identityTermsTexts.title,
+  realmName: identitySignInContext.realmName,
+  loginAction: '#accept-terms',
+  termsUrl: '#terms-of-service',
+  privacyUrl: '#privacy-policy',
+  locale: identitySignInContext.locale,
+  locales: identitySignInContext.locales,
+  frameTexts: identityFrameTexts,
+  legal: identityLegal,
+  texts: identityTermsTexts,
 }
 
 /** What the identity provider's sign-out question draws in the design system. */

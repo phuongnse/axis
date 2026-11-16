@@ -333,17 +333,15 @@ to the frame shows in every state. How previews work is in
 
 - **The Shell group** is the seventh group of cards, after Shared states, with three previews:
 
-  | Preview          | States                                                                                                                                                                                                                                                                                                                              |
-  | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `shell`          | Application site, Navigation collapsed, Form page, Platform site, App switcher, and Language and theme                                                                                                                                                                                                                              |
-  | `signIn`         | Sign-in refused, Signed out and Session ended, with the organization's heading over the cards                                                                                                                                                                                                                                       |
-  | `identitySignIn` | The sign-in page of [Axis's identity provider](identity-provider.md#theme) in Sign in, Wrong password, Organization sign-in only, Two-step verification, Forgot password, Set password, Add an authenticator, Choose how to sign in, Update your profile, Sign out, Notice, Error, and Language and theme with the gear's menu open |
+  | Preview          | States                                                                                                                                                                                                                                                                                                                                                                                        |
+  | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `shell`          | Application site, Navigation collapsed, Form page, Platform site, App switcher, and Language and theme                                                                                                                                                                                                                                                                                        |
+  | `signIn`         | Sign-in refused, Signed out and Session ended, with the organization's heading over the cards                                                                                                                                                                                                                                                                                                 |
+  | `identitySignIn` | The sign-in page of [Axis's identity provider](identity-provider.md#theme) in Sign in, Wrong password, Fields left empty, Organization sign-in only, Two-step verification, Forgot password, Set password, Add an authenticator, Choose how to sign in, Update your profile, Terms and privacy, Terms not accepted, Sign out, Notice, Error, and Language and theme with the gear's menu open |
 
 - **The identity provider's pages are the theme's own.** `identitySignIn` is built from fixtures
   through the shared sign-in components in `web/src/identitySignIn/`. Its states from Two-step
   verification to Error are the same components that the theme draws.
-- **More sign-in states** _(planned for M33)_. `identitySignIn` also shows Fields left empty, Terms and
-  privacy, and Terms not accepted.
 - **A frame holds the whole shell.** A shell preview draws the shell, from the header to the footer, in
   a frame at least as tall as its height, which grows to hold the whole shell, so several states fit
   one card.
