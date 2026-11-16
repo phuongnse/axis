@@ -153,7 +153,8 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackL
   // Proposed: a task that does not exist says so under the inbox page's heading, with a link to the inbox, see the
   // review on #3650.
   if (task === null) {
-    return <RecordNotFound />
+    // Proposed: a missing task is called a task, see the review on #3650.
+    return <RecordNotFound textKey="shell.task.notFound" />
   }
   if (task === assignedElsewhere) {
     return (

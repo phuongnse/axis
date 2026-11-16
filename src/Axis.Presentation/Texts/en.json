@@ -591,6 +591,7 @@
   "shell.tasks.claimedByYou": "Claimed by you",
   "shell.task.assignedElsewhere": "This task is assigned to someone else.",
   "shell.task.kind": "Task",
+  "shell.task.notFound": "This task does not exist, or you cannot open it.",
   "shell.task.outcomes": "Decision",
   "shell.task.saveFailed": "The changes could not be saved.",
   "shell.task.completed": "This task is already done.",

@@ -591,6 +591,7 @@
   "shell.tasks.claimedByYou": "Bạn đã nhận",
   "shell.task.assignedElsewhere": "Công việc này đã giao cho người khác.",
   "shell.task.kind": "Công việc",
+  "shell.task.notFound": "Công việc này không tồn tại hoặc bạn không có quyền mở.",
   "shell.task.outcomes": "Quyết định",
   "shell.task.saveFailed": "Không lưu được các thay đổi.",
   "shell.task.completed": "Công việc này đã xong.",
