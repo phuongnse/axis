@@ -91,7 +91,7 @@ export interface PreviewState {
   fixtures?: Record<string, () => unknown>
   /** The address the state starts at. */
   entry?: InitialEntry
-  /** The height of the frame the state draws in, with its menus and dialogs inside it. */
+  /** The height of the screen the state draws in. A taller page scrolls inside it. */
   frameHeight?: number
 }
 
