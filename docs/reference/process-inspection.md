@@ -61,8 +61,10 @@ lists the instances of the process, whatever release they are pinned to.
 - `page` and `pageSize` follow the record API's
   [paging rules](record-api.md#paging-and-sorting). There is no `sort` or
   `search`.
-- `state` is optional. It is one of `running`, `waiting`, `completed`, `failed`
-  and `cancelled`. Any other value is a `400` keyed `state`.
+- `state` is optional and may repeat. Each value is one of `running`, `waiting`,
+  `completed`, `failed` and `cancelled`, and the list keeps the instances in any
+  of the given states. Without `state`, every state is listed. Any other or
+  empty value is a `400` keyed `state`.
 - `subject` is optional. It is a record id in the hyphenated UUID form.
   Anything else is a `400` keyed `subject`.
 - Instances are ordered by `created_at` descending, then by `id` descending.

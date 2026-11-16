@@ -80,6 +80,24 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
     }
 
     [Fact]
+    public async Task A_repeated_state_keeps_the_instances_in_any_of_the_states()
+    {
+        var completed = await StartAsync();
+        var failed = await StartAsync();
+        var running = await StartAsync();
+        await fixture.SetInstanceStateAsync(completed.Id, "completed");
+        await fixture.SetInstanceStateAsync(failed.Id, "failed");
+
+        var items = await ListAsync("state=running&state=completed");
+        var ids = items.Select(item => item.GetProperty("id").GetGuid()).ToList();
+
+        Assert.Contains(running.Id, ids);
+        Assert.Contains(completed.Id, ids);
+        Assert.DoesNotContain(failed.Id, ids);
+        Assert.All(items, item => Assert.True(item.GetProperty("state").GetString() is "running" or "completed"));
+    }
+
+    [Fact]
     public async Task The_subject_filter_keeps_only_the_instances_of_that_record()
     {
         var wanted = await StartAsync();
@@ -114,6 +132,7 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
     [Theory]
     [InlineData("state=nope", "state")]
     [InlineData("state=Running", "state")]
+    [InlineData("state=running&state=nope", "state")]
     [InlineData("state=", "state")]
     [InlineData("subject=abc", "subject")]
     [InlineData("subject=", "subject")]
