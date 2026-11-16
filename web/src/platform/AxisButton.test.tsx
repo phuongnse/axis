@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PlusOutlined } from '@ant-design/icons'
 import { ConfigProvider } from 'antd'
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AxisActionRow, AxisButton } from './AxisButton'
 import { buttonRoles } from './buttonRoles'
 import { designTokensFor } from './designTokens'
@@ -13,7 +13,13 @@ import { ThemeModeProvider } from './theme'
 import type { ThemeMode } from './themeMode'
 import { withAntdStyles } from '../test/antdStyles'
 
-const texts = { 'test.add': 'Add a row' }
+const texts = {
+  'test.add': 'Add a row',
+  'test.validate': 'Validate',
+  'test.preview': 'Preview',
+  'test.runTests': 'Run tests',
+  'shell.actionRow.more': 'More actions',
+}
 const catalogs = [{ texts, fallbackTexts: texts }]
 
 /** Waits past Ant Design's hover delay, so a tooltip that should open has opened. */
@@ -282,5 +288,153 @@ describe('a disabled button', () => {
     )
 
     expect(screen.getByRole('button', { name: 'Main' }).style.color).toBe('')
+  })
+})
+
+// jsdom has no layout, so the widths are faked: the row is `box` wide, and its content `content` wide.
+describe('an action row that folds', () => {
+  let box = 0
+  let content = 0
+  let resize: () => void = () => {}
+
+  function fakeWidths(boxWidth: number, contentWidth: number) {
+    box = boxWidth
+    content = contentWidth
+    const onRow = (element: HTMLElement, width: number) => (element.hasAttribute('data-fold-row') ? width : 0)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return onRow(this, box)
+    })
+    vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return onRow(this, Math.max(box, content))
+    })
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          resize = () => act(callback)
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    )
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  const actions = (disabled = false, onClick: () => void = () => {}) => [
+    { key: 'validate', labelKey: 'test.validate', disabled, onClick },
+    { key: 'preview', labelKey: 'test.preview', disabled, onClick },
+    { key: 'run', labelKey: 'test.runTests', disabled, onClick },
+  ]
+  const renderFolding = (fold = actions()) =>
+    renderIn(
+      'light',
+      <AxisActionRow fold={fold} end={<AxisButton role="finish">Publish…</AxisButton>}>
+        <AxisButton role="main">New resource…</AxisButton>
+      </AxisActionRow>,
+    )
+
+  it('keeps one line, and a row without fold still wraps', () => {
+    fakeWidths(500, 400)
+    const { container } = renderFolding()
+
+    expect(container.querySelector('[data-fold-row]')).not.toHaveClass('ant-flex-wrap-wrap')
+    renderIn('light', <AxisActionRow>Row</AxisActionRow>)
+    expect(screen.getByText('Row')).toHaveClass('ant-flex-wrap-wrap')
+    expect(screen.getByText('Row')).not.toHaveAttribute('data-fold-row')
+  })
+
+  it('shows every action as a button, in order, while they fit', () => {
+    fakeWidths(500, 400)
+    renderFolding()
+
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'New resource…',
+      'Validate',
+      'Preview',
+      'Run tests',
+      'Publish…',
+    ])
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+  })
+
+  it('folds the named actions, in order, into one More actions menu when they do not fit, and unfolds them when they do', async () => {
+    fakeWidths(300, 400)
+    renderFolding()
+
+    expect(screen.getAllByRole('button').map((button) => button.textContent ?? button.ariaLabel)).toEqual([
+      'New resource…',
+      '',
+      'Publish…',
+    ])
+    await userEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    expect((await screen.findAllByRole('menuitem')).map((item) => item.textContent)).toEqual([
+      'Validate',
+      'Preview',
+      'Run tests',
+    ])
+    expect(screen.queryByRole('button', { name: 'Validate' })).not.toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+
+    // The row is only as wide as the content was before it folded, so it unfolds once it is that wide.
+    box = 399
+    resize()
+    expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument()
+    box = 400
+    resize()
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'New resource…',
+      'Validate',
+      'Preview',
+      'Run tests',
+      'Publish…',
+    ])
+  })
+
+  it('folds when the row shrinks after it drew', () => {
+    fakeWidths(500, 400)
+    renderFolding()
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+
+    box = 200
+    resize()
+
+    expect(screen.getByRole('button', { name: 'More actions' })).toBeInTheDocument()
+  })
+
+  it('keeps the disabled state of a folded entry', async () => {
+    fakeWidths(300, 400)
+    const onClick = vi.fn()
+    renderFolding(actions(true, onClick))
+
+    await userEvent.click(screen.getByRole('button', { name: 'More actions' }))
+    const entry = await screen.findByRole('menuitem', { name: 'Validate' })
+    expect(entry).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(entry)
+
+    expect(onClick).not.toHaveBeenCalled()
+  })
+
+  it('opens from the More actions button and runs an entry by keyboard alone', async () => {
+    fakeWidths(300, 400)
+    const onClick = vi.fn()
+    renderFolding(actions(false, onClick))
+
+    await userEvent.tab()
+    await userEvent.tab()
+    expect(screen.getByRole('button', { name: 'More actions' })).toHaveFocus()
+    await userEvent.keyboard('{Enter}')
+    expect(await screen.findByRole('menu', { name: 'More actions' })).toBeInTheDocument()
+    // The menu takes focus once it has opened, on its first entry.
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: 'Validate' })).toHaveFocus())
+    // jsdom gives user-event's keys no key code, which the menu reads, so Enter is fired with it.
+    fireEvent.keyDown(document.activeElement!, { key: 'Enter', keyCode: 13 })
+
+    expect(onClick).toHaveBeenCalledTimes(1)
   })
 })

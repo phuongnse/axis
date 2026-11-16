@@ -486,6 +486,7 @@
   "shell.notFound.title": "Page not found",
   "shell.notFound.message": "There is nothing at this address.",
   "shell.notFound.home": "Go to the home page",
+  "shell.actionRow.more": "More actions",
   "shell.table.yes": "Yes",
   "shell.table.no": "No",
   "shell.table.empty": "No records yet.",

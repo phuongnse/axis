@@ -79,9 +79,9 @@ comes first, so it is never next to Publish….
 
 - **One row for every author.** The actions are one `AxisActionRow`, the same gap apart, and
   the row is the same with or without Publish…, for an author who may not publish.
-- **Too little room** _(planned for M33)_. The band's actions never push the page wider than the window. The row
-  does not wrap, and the band measures whether it fits. When it does not, Validate, Preview and Run tests
-  fold into one "…" icon menu, in that order, and New resource… and Publish… stay. They unfold when the
+- **Too little room.** The band's actions never push the page wider than the window. The row keeps one line and
+  folds through `AxisActionRow`'s `fold`. When the actions do not fit, Validate, Preview and Run tests
+  fold into one "…" icon menu, More actions, in that order, and New resource… and Publish… stay. They unfold when the
   room comes back.
 
 - **Ask AI** _(planned for M35)_. Ask AI is a text button just before Publish…, and it opens the

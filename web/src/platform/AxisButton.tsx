@@ -1,6 +1,16 @@
-import { DownOutlined } from '@ant-design/icons'
-import { Button, Flex, Tooltip, type ButtonProps, type FlexProps } from 'antd'
-import { createContext, useContext, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
+import { DownOutlined, EllipsisOutlined } from '@ant-design/icons'
+import { Button, Dropdown, Flex, Tooltip, type ButtonProps, type FlexProps } from 'antd'
+import {
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type Ref,
+} from 'react'
 import type { ButtonRole } from './buttonRoles'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -96,23 +106,129 @@ function IconButton(props: IconButtonProps) {
 }
 
 /**
+ * An action of an `AxisActionRow` that folds, see docs/reference/actions-and-controls.md#buttons. It is a secondary
+ * button, or a menu entry once the row folds. `labelKey` is the text key of its text, `attributes` go to its button.
+ */
+export interface AxisFoldAction {
+  key: string
+  labelKey: string
+  disabled?: boolean
+  onClick: () => void
+  attributes?: object
+}
+
+/** Justifies the row like `justify`, but starts the row at its start edge when the content is wider, so it can be measured. */
+function safeJustify(justify: FlexProps['justify']): CSSProperties['justifyContent'] {
+  return justify === 'flex-end' || justify === 'end' || justify === 'center' ? `safe ${justify}` : undefined
+}
+
+/**
  * A row of actions that has a solid `finish` button, see docs/reference/actions-and-controls.md#buttons. Beside it,
  * `main`, `secondary` and `destructive` buttons are text buttons in their own colour, so the finish button is the only
- * filled shape.
+ * filled shape. The row wraps. A row with `fold` keeps one line instead: it draws `children`, then the `fold` actions
+ * as secondary buttons, then `end`. When its content is wider than the row, the `fold` actions become the entries of
+ * one "…" icon menu named More actions, in their order. They are buttons again when the row is as wide as the content
+ * was before it folded.
  */
 export function AxisActionRow({
   children,
+  fold,
+  end,
   justify,
   align,
 }: {
-  children: ReactNode
+  children?: ReactNode
+  fold?: AxisFoldAction[]
+  end?: ReactNode
   justify?: FlexProps['justify']
   align?: FlexProps['align']
 }) {
+  const t = useText()
+  const rowRef = useRef<HTMLDivElement>(null)
+  const measureRef = useRef<() => void>(() => {})
+  const needed = useRef(0)
+  const foldedKeys = useRef('')
+  const [folded, setFolded] = useState(false)
+  const keys = fold?.map((action) => action.key).join('\n') ?? ''
+
+  // The row measures itself after every draw and when it resizes, the way a table measures its width.
+  useLayoutEffect(() => {
+    measureRef.current = () => {
+      const row = rowRef.current
+      if (!row || !fold) {
+        return
+      }
+      if (foldedKeys.current !== keys) {
+        // The actions changed, so unfold to measure them.
+        foldedKeys.current = keys
+        if (folded) {
+          setFolded(false)
+          return
+        }
+      }
+      if (!folded && row.scrollWidth > row.clientWidth) {
+        needed.current = row.scrollWidth
+        setFolded(true)
+      } else if (folded && row.clientWidth >= needed.current) {
+        setFolded(false)
+      }
+    }
+    measureRef.current()
+  })
+  const folds = fold !== undefined
+  useEffect(() => {
+    const row = rowRef.current
+    if (!folds || !row || typeof ResizeObserver === 'undefined') {
+      return
+    }
+    const observer = new ResizeObserver(() => measureRef.current())
+    observer.observe(row)
+    return () => observer.disconnect()
+  }, [folds])
+
+  const rowProps = fold
+    ? {
+        ref: rowRef,
+        'data-fold-row': true,
+        wrap: false,
+        style: { flex: '1 1 auto', minWidth: 0, justifyContent: safeJustify(justify) },
+      }
+    : { wrap: true }
   return (
     <ActionRowContext.Provider value={true}>
-      <Flex gap="small" wrap justify={justify} align={align}>
+      <Flex gap="small" justify={justify} align={align} {...rowProps}>
         {children}
+        {fold &&
+          (folded ? (
+            <Dropdown
+              trigger={['click']}
+              autoFocus
+              menu={{
+                items: fold.map((action) => ({
+                  key: action.key,
+                  label: t(action.labelKey),
+                  disabled: action.disabled,
+                  onClick: action.onClick,
+                })),
+                'aria-label': t('shell.actionRow.more'),
+              }}
+            >
+              <AxisButton role="icon" nameKey="shell.actionRow.more" icon={<EllipsisOutlined />} />
+            </Dropdown>
+          ) : (
+            fold.map((action) => (
+              <AxisButton
+                key={action.key}
+                role="secondary"
+                disabled={action.disabled}
+                onClick={action.onClick}
+                {...action.attributes}
+              >
+                {t(action.labelKey)}
+              </AxisButton>
+            ))
+          ))}
+        {end}
       </Flex>
     </ActionRowContext.Provider>
   )

@@ -31,6 +31,9 @@ widget names a role, never an Ant Design button type.
   Design dialog's Cancel this way, and `AxisActionRow`, the action row of `AxisButton`, draws the
   other rows. A main action with no solid button beside it, such as a table's first toolbar action,
   stays outlined.
+- **An action row folds into a menu.** An `AxisActionRow` with `fold` keeps one line. When its content does not
+  fit, the actions named in `fold` become the entries of one "…" icon menu, More actions, in their order, each
+  keeping its disabled state. They are buttons again when the room comes back. A row without `fold` wraps.
 - **An action bar folds into More** _(planned for M35)_. An `ActionBar`, the bar of actions above a
   footer, folds its actions into one More menu through `AxisActionRow`'s `fold`, as a table's row
   actions fold at narrow width.

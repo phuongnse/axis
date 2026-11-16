@@ -85,6 +85,32 @@ test.describe('Studio on a copy of its own', () => {
     await expect(page.getByTestId('studio-band')).toBeVisible()
   })
 
+  test("an author on a narrow window keeps the page no wider than the window and runs Validate from the band's More actions menu", async ({
+    page,
+  }) => {
+    await useSession(page, 'author')
+    const band = page.getByTestId('studio-band')
+    const more = band.getByRole('button', { name: 'More actions', exact: true })
+
+    // The row folds when the band's actions do not fit, so the window narrows until they fold.
+    let width = 768
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto(`${server.url}/studio?app=PurchaseRequests`)
+    await expect(band.getByRole('button', { name: 'New resource…', exact: true })).toBeVisible()
+    while (!(await more.isVisible()) && width > 360) {
+      width -= 40
+      await page.setViewportSize({ width, height: 900 })
+    }
+
+    await expect(more).toBeVisible()
+    await expect(band.getByRole('button', { name: 'Validate', exact: true })).toHaveCount(0)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width)
+    await more.click()
+    await page.getByRole('menuitem', { name: 'Validate', exact: true }).click()
+
+    await expect(page.getByTestId('studio-request-status')).toBeVisible()
+  })
+
   test('an author changes the maxLength of an entity field and the file holds only that change', async ({ page }) => {
     await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
