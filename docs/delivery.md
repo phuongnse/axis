@@ -377,8 +377,13 @@ change, a design review and a sync are in the
   a time, the session prototypes each change in the real widget code on a
   `design/<yyyy-mm-dd>-<topic>` branch, which holds only what the design needs, and the owner sees it
   in the [widget previews](reference/widget-previews.md), on fixtures. A review covers one screen
-  or one group of screens, and what it finds outside them becomes an issue. The branch is pushed, so
-  the review can go on from any machine, and is never merged. No push to a branch starts CI, as
+  or one group of screens, and what it finds outside them becomes an issue. The owner judges each
+  step only on what it designs, so a case the fixtures do not show is not a finding and opens no
+  issue. When the owner needs a case the fixtures lack to see a step, such as a `section` marked
+  `collapsed` on a page in the `shell` preview, the session adds that fixture on the prototype branch
+  in the same step. It names the fixture in the design issue's build notes, so the build adds it to
+  the preview as it adds a widget's new state. The branch is pushed, so the review can go on from any
+  machine, and is never merged. No push to a branch starts CI, as
   [D146](decisions/d146-ci-runs-on-main-every-few-merges-and-nexkit-checks-every-branch.md)
   agrees. A prototype is never merged, and it never gets `/nexkit review`, because it changes the widgets
   without their tests. When the review ends, the branch's last commit gets a
