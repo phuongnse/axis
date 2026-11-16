@@ -158,5 +158,9 @@ describe('AxisCheckboxField', () => {
       // @ts-expect-error Every platform field has help.
       <AxisCheckboxField label="Active" name="active" />,
     ).toBeDefined()
+    expect(
+      // @ts-expect-error Every platform field has help, also when the caller holds the value.
+      <AxisCheckboxField label="Active" checked onChange={vi.fn()} />,
+    ).toBeDefined()
   })
 })

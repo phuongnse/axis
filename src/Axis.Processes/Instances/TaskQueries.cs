@@ -158,11 +158,8 @@ public static class TaskQueries
 
         var branches = labelled.Select(pair =>
         {
-            var displayField = pair.Entity.DisplayField
-                ?? throw new InvalidOperationException($"The entity '{pair.Entity.Name}' has no display field.");
             return $"WHEN process_tasks.release_id = '{pair.ReleaseId:D}'::uuid AND process_tasks.subject_entity_id = '{pair.Entity.Id:D}'::uuid "
-                + $"THEN (SELECT ls.{EntityNaming.Quote(EntityNaming.Column(displayField))} FROM {RecordQueries.Table(pair.Entity)} AS ls "
-                + $"WHERE ls.{EntityNaming.Quote(EntityNaming.IdColumn)} = process_tasks.subject_id)";
+                + $"THEN {InstanceQueries.SubjectLabelSql(pair.Entity, "process_tasks.subject_id")}";
         });
         return $"CASE {string.Join(" ", branches)} END";
     }

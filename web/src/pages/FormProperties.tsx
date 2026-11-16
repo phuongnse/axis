@@ -1,5 +1,6 @@
-import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
+import { Button, Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { useState } from 'react'
+import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { renameSection } from '../platform/formLayout'
@@ -131,26 +132,20 @@ function FieldProperties({
   const name = typeof field.field === 'string' ? field.field : ''
   const entityField = entityFields.find((candidate) => candidate.name.toLowerCase() === name.toLowerCase())
   const locked = entityField !== undefined && (entityField.computed || entityField.sequence || entityField.creator)
+  const readOnly = fieldTexts(t, 'sections.fields.readOnly')
   const conditions: Condition[] = entityField?.required
     ? ['requiredWhen', 'readOnlyWhen']
     : ['visibleWhen', 'requiredWhen', 'readOnlyWhen']
   return (
     <Flex vertical gap="small" data-testid="studio-design-field">
       <Typography.Text strong>{name}</Typography.Text>
-      <div>
-        <AxisField {...fieldTexts(t, 'sections.fields.readOnly')}>
-          <Checkbox
-            checked={locked || field.readOnly === true}
-            disabled={locked}
-            onChange={(event) => onChange(`${pointer}/readOnly`, event.target.checked)}
-          />
-        </AxisField>
-        {locked && (
-          <div>
-            <Typography.Text type="secondary">{t('shell.studio.design.readOnlyLocked')}</Typography.Text>
-          </div>
-        )}
-      </div>
+      <AxisCheckboxField
+        label={readOnly.label}
+        help={locked ? t('shell.studio.design.readOnlyLocked') : readOnly.help}
+        checked={locked || field.readOnly === true}
+        disabled={locked}
+        onChange={(checked) => onChange(`${pointer}/readOnly`, checked)}
+      />
       <AxisField {...fieldTexts(t, 'sections.fields.width')}>
         <InputNumber
           min={1}

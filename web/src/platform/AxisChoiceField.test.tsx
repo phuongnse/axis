@@ -143,5 +143,9 @@ describe('AxisChoiceField', () => {
       // @ts-expect-error Every platform field has help.
       <AxisChoiceField label="Size" name="size" options={options} />,
     ).toBeDefined()
+    expect(
+      // @ts-expect-error Every platform field has help, also when the caller holds the value.
+      <AxisChoiceField label="Size" options={options} value="small" onChange={vi.fn()} />,
+    ).toBeDefined()
   })
 })

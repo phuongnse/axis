@@ -1774,8 +1774,13 @@ describe('PageEditor container panels', () => {
   it('switches Collapsed on by writing true', async () => {
     const onChange = await open(section)
 
-    const collapsed = within(screen.getByTestId('studio-field-/widgets/0/collapsed')).getByRole('switch')
+    const collapsed = within(screen.getByTestId('studio-field-/widgets/0/collapsed')).getByRole('switch', {
+      name: 'Collapsed',
+    })
     expect(collapsed).not.toBeChecked()
+    expect(collapsed).toHaveAccessibleDescription(
+      'Whether the section starts collapsed, with its widgets hidden until a person opens it.',
+    )
     await userEvent.click(collapsed)
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/collapsed', true)
   })
@@ -1783,7 +1788,9 @@ describe('PageEditor container panels', () => {
   it('switches Collapsed off by removing the key', async () => {
     const onChange = await open({ ...section, collapsed: true })
 
-    const collapsed = within(screen.getByTestId('studio-field-/widgets/0/collapsed')).getByRole('switch')
+    const collapsed = within(screen.getByTestId('studio-field-/widgets/0/collapsed')).getByRole('switch', {
+      name: 'Collapsed',
+    })
     expect(collapsed).toBeChecked()
     await userEvent.click(collapsed)
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/collapsed', undefined)
@@ -1818,7 +1825,9 @@ describe('PageEditor container panels', () => {
     const sectionChange = await open(section)
     const key = within(screen.getByTestId('studio-field-/widgets/0/title')).getByRole('textbox', { name: 'English' })
     await userEvent.type(key, '!')
-    await userEvent.click(within(screen.getByTestId('studio-field-/widgets/0/collapsed')).getByRole('switch'))
+    await userEvent.click(
+      within(screen.getByTestId('studio-field-/widgets/0/collapsed')).getByRole('switch', { name: 'Collapsed' }),
+    )
     const pointers = sectionChange.mock.calls.map(([pointer]) => pointer)
     expect(pointers.every((pointer) => pointer.startsWith('/widgets/0/') && pointer !== '/widgets/0')).toBe(true)
     expect(pointers).toContain('/widgets/0/collapsed')
@@ -1840,7 +1849,9 @@ describe('PageEditor container panels', () => {
   it('writes only the collapsed key on a section with a key it does not show', async () => {
     const onChange = await open(section)
 
-    await userEvent.click(within(screen.getByTestId('studio-field-/widgets/0/collapsed')).getByRole('switch'))
+    await userEvent.click(
+      within(screen.getByTestId('studio-field-/widgets/0/collapsed')).getByRole('switch', { name: 'Collapsed' }),
+    )
 
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(onChange).toHaveBeenCalledWith('/widgets/0/collapsed', true)
