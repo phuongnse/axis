@@ -186,7 +186,7 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * as the names do. While it reloads, the table keeps its last answer, and the Status cell says it is loading only until the first answer arrives.
  * The module resources of that kind that the application uses join the table, from the names, sorted with the application's own by the shown name.
  * A module resource is named by its label in the activity, else by its name without the `<module>/` prefix, and has a neutral tag beside the
- * name with its module's label from `GET /api/studio/catalog`, else the module's id. The catalog loads once, and again after a reconnect.
+ * name with its module's label from `GET /api/studio/catalog`, else the module's id. The catalog loads once an application is open, and again after a reconnect.
  * A module resource of every kind but a contract and a scenario opens in its editor with the application's layer applied
  * and every input on, with no JSON tab, Delete, migration questions, Uses or Used by lists: an entity in the entity
  * designer, a process in the process designer, and a data source, rule, trigger, sequence and event in the schema
@@ -368,8 +368,13 @@ function StudioWorkspace() {
     return () => controller.abort()
   }, [application, generation, folderRevision, lost])
 
-  // The catalog is the same for every application, so it loads once, and again after a reconnect. Null when it did not load.
+  // The catalog is the same for every application, so it loads once an application is open, and again after a reconnect.
+  // Null when it did not load. Only a kind's list reads it, and that list exists only in an open application.
+  const applicationOpen = application !== null
   useEffect(() => {
+    if (!applicationOpen) {
+      return
+    }
     const controller = new AbortController()
     fetchStudioCatalog(controller.signal).then(
       (answer) => setCatalog(answer),
@@ -386,7 +391,7 @@ function StudioWorkspace() {
       },
     )
     return () => controller.abort()
-  }, [generation, lost])
+  }, [applicationOpen, generation, lost])
 
   const manifestId = useMemo(
     () =>

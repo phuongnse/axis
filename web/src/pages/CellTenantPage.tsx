@@ -11,6 +11,7 @@ import {
   fetchCellJobs,
   fetchCellTenant,
   queueCellTenantJob,
+  type CellHostRequestState,
   type CellJob,
   type CellQuota,
   type CellTenantAction,
@@ -69,7 +70,8 @@ const actionTexts = {
 } as const
 
 /**
- * The Tenant view of the cell console: one tenant's status, application and hosts, its quotas with the ones it overrides,
+ * The Tenant view of the cell console: one tenant's status, application and hosts, the state of each host the operator
+ * asked for, its quotas with the ones it overrides,
  * its usage of the last 13 months by day in the table of the users page's "Usage" section, and its jobs in the shared job
  * table. An unknown id shows the not-found page. An `active` or `readOnly` tenant offers
  * Suspend and a `suspended` or `readOnly` one offers Resume. Any tenant but a `provisioning` one offers Export. An `active`,
@@ -79,7 +81,8 @@ const actionTexts = {
  * final answer. The page then follows the job every 2 seconds until it ends and reloads the tenant and its jobs. With a
  * succeeded `export` job among the jobs, Download opens a warning that the ZIP is restricted data, and only accepting it
  * fetches the ZIP. Set quotas and Add a host open their own dialogs, show for every status and queue no job: the quota
- * table shows the quotas that the cell answered.
+ * table shows the quotas that the cell answered. Once Add a host is answered, the page loads the tenant again, so the
+ * new host shows as pending.
  */
 export function CellTenantPage() {
   const t = useText()
@@ -249,6 +252,27 @@ export function CellTenantPage() {
     },
   ]
 
+  const hostRequestColumns: AxisColumn<CellHostRequestState>[] = [
+    {
+      key: 'host',
+      kind: 'freeText',
+      title: t('shell.cell.tenant.hostRequest.host'),
+      render: (_value, row) => row.host,
+    },
+    {
+      key: 'state',
+      kind: 'fixed',
+      title: t('shell.cell.tenant.hostRequest.state'),
+      render: (_value, row) => t(`shell.cell.tenant.hostRequest.state.${row.state}`),
+    },
+    {
+      key: 'expiresAt',
+      kind: 'fixed',
+      title: t('shell.cell.tenant.hostRequest.expiresAt'),
+      render: (_value, row) => (row.state === 'pending' ? new Date(row.expiresAt).toLocaleString(locale) : null),
+    },
+  ]
+
   return (
     <PageLayout title={id}>
       {tenantFailed && (
@@ -350,6 +374,15 @@ export function CellTenantPage() {
               </AxisButton>
             </Flex>
           </Card>
+          <Card title={t('shell.cell.tenant.hostRequests')}>
+            <AxisTable<CellHostRequestState>
+              testId="cell-tenant-host-requests"
+              rowKey={(row) => row.host}
+              dataSource={tenant.hostRequests}
+              columns={hostRequestColumns}
+              emptyText={t('shell.cell.tenant.noHostRequests')}
+            />
+          </Card>
           <Card title={t('shell.cell.tenant.quotas')}>
             <AxisTable<QuotaRow>
               testId="cell-tenant-quotas"
@@ -374,7 +407,12 @@ export function CellTenantPage() {
         />
       )}
       {openDialog === 'host' && (
-        <CellTenantHostDialog tenant={id} onRefused={onRefused} onClose={() => setOpenDialog(null)} />
+        <CellTenantHostDialog
+          tenant={id}
+          onRefused={onRefused}
+          onAdded={() => setReload((count) => count + 1)}
+          onClose={() => setOpenDialog(null)}
+        />
       )}
       {confirming && (
         <Modal

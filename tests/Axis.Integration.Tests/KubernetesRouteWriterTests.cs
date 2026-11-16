@@ -7,7 +7,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// The Kubernetes route writer posts one <c>networking.k8s.io/v1</c> Ingress for a host to the API server, with the bearer token of the
 /// service account. The Ingress holds the class, the annotations, TLS with the host's secret and the <c>https</c> port of the server
-/// Service. An existing Ingress (<c>409</c>) is success and any other status throws without the token.
+/// Service. An existing Ingress (<c>409</c>) is success and any other status throws without the token. A delete sends <c>DELETE</c> to the
+/// Ingress named after the host, where a <c>404</c> is done and any other failure throws without the token.
 /// </summary>
 public sealed class KubernetesRouteWriterTests
 {
@@ -90,6 +91,42 @@ public sealed class KubernetesRouteWriterTests
         using var handler = new RecordingHandler(HttpStatusCode.Forbidden);
 
         var exception = await Assert.ThrowsAsync<HttpRequestException>(() => Writer(handler).WriteAsync("acme", "approvals.acme.vn", CancellationToken));
+
+        Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
+        Assert.Contains("403", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("token-1", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_delete_sends_delete_with_the_token_to_the_ingress_named_after_the_host()
+    {
+        using var handler = new RecordingHandler(HttpStatusCode.OK);
+
+        await Writer(handler).DeleteAsync("approvals.acme.vn", CancellationToken);
+
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Delete, request.Method);
+        Assert.Equal("https://10.0.0.1/apis/networking.k8s.io/v1/namespaces/axis/ingresses/approvals.acme.vn", request.Uri.ToString());
+        Assert.Equal("Bearer token-1", request.Authorization);
+        Assert.Equal("", request.Body);
+    }
+
+    [Fact]
+    public async Task A_route_that_is_gone_counts_as_deleted()
+    {
+        using var handler = new RecordingHandler(HttpStatusCode.NotFound);
+
+        await Writer(handler).DeleteAsync("approvals.acme.vn", CancellationToken);
+
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task Any_other_status_of_a_delete_throws_and_the_message_never_holds_the_token()
+    {
+        using var handler = new RecordingHandler(HttpStatusCode.Forbidden);
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => Writer(handler).DeleteAsync("approvals.acme.vn", CancellationToken));
 
         Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
         Assert.Contains("403", exception.Message, StringComparison.Ordinal);
