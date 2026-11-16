@@ -900,6 +900,20 @@ for (const [slug, expectKeyElement] of [
   });
 }
 
+test("the studio preview's entity state loads each field's default editor with no missing fixture", async ({
+  page,
+}) => {
+  const recording = await openHarness(
+    page,
+    "?preview=studio&mode=light&state=entity",
+  );
+
+  await expect(
+    page.getByTestId("studio-field-/fields/0/default").locator(".cm-editor"),
+  ).toBeVisible();
+  expect(recording.errors).toEqual([]);
+});
+
 test("the studio preview replaces the entity designer with the policy matrix picked in the Fixtures control", async ({
   page,
 }) => {
