@@ -145,12 +145,14 @@ that holds it.
   agrees. The item is marked `person` in the checklist, so no fix round undoes the change: the owner's
   approval of the reviewed commit accepts it, and NexKit then merges it.
 - **Every plan and review answers Axis's checklist.** NexKit's [`review.checklist`][nexkit-checklist]
-  setting holds it. Each item names one doc section that holds rules a review can check in the diff,
-  summarizes it in a sentence and asks the review to check the diff against each of its rules. The
-  rules stay in their section, so a new rule adds no item. A rule that a script or a test can check is
-  checked there, not by the review. An item not met requests changes like a blocking finding, so a pull
-  request that leaves a doc false does not merge. An item the owner decides, marked `person`, starts no
-  fix round, and its pull request waits for the owner's approval.
+  setting holds it. Each item names one doc that holds rules a review checks in the diff: the page, or
+  the one section that holds all its rules. It summarizes that doc in a sentence and asks the review to
+  check the diff against each of its rules. Every plan and review answers each item, so a new item is due
+  only for such a doc that no item names and no script or test checks. A new rule or a new section in a
+  doc that an item names adds no item. A rule that a script or a test can check is checked there, not by
+  the review. An item not met requests changes like a blocking finding, so a pull request that leaves a
+  doc false does not merge. An item the owner decides, marked `person`, starts no fix round, and its pull
+  request waits for the owner's approval.
 - **NexKit acts as the owner's [GitHub App][nexkit-app],** which its `github_app` setting names. The owner keeps one
   App for every repository that uses NexKit and installs it on this one, and its id and private key
   are repository secrets. Its pushes and merges count like a person's: they start workflows, and
@@ -402,7 +404,9 @@ change, a design review and a sync are in the
   change adds, so the owner decides only on what is new. The session edits that comment in place and
   never adds a second. The rules the owner agrees about one screen, or in one step of the review, share
   one English comment. Each rule has its own bold heading, the doc page where it lives, any API contract
-  the screen needs and the prototype commit, so NexKit finds each rule. A later rule about the same
+  the screen needs and the prototype commit, so NexKit finds each rule. A review checklist item that a
+  rule asks for follows the bullet **Every plan and review answers Axis's checklist** in
+  [how pull requests merge](#how-pull-requests-merge). A later rule about the same
   screen is added to that comment by an edit. A rule that changes while the issue has `on-hold` is
   edited in its comment. NexKit reads the issue only once the label comes off, and GitHub keeps each
   comment's edit history. There is no docs branch, and no other file holds these rules.

@@ -822,6 +822,7 @@
   "shell.studio.expression.type.reference": "a reference",
   "shell.studio.expression.type.file": "a file",
   "shell.studio.expression.type.null": "no value",
+  "shell.studio.expression.type.list": "a list of records",
   "shell.studio.expression.expand": "Expand",
   "shell.studio.expression.fields": "Fields",
   "shell.studio.expression.operators": "Operators",

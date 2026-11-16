@@ -75,7 +75,7 @@ function collectSamples(root: Element): Sample[] {
       element.closest(
         '[aria-hidden="true"], fieldset:disabled, [aria-disabled="true"]',
       ) ||
-      element.matches(":disabled")
+      element.closest(":disabled")
     ) {
       return true;
     }

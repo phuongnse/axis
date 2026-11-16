@@ -23,12 +23,17 @@ because its change needs those paths:
 
 1. Add the `hand-made` label to the issue, as
    [hand-made pull requests](../../../docs/delivery.md#hand-made-pull-requests)
-   says: `gh issue edit <n> --add-label hand-made`. Then make the change on an
-   `ops/<topic>` branch, exactly as the plan says.
-2. Run at least the plan's check commands, `node scripts/check-links.mjs` and
+   says: `gh issue edit <n> --add-label hand-made`. Then create an `ops/<topic>`
+   branch.
+2. When the change adds an item to NexKit's `review.checklist`, check the plan's
+   item against the bullet **Every plan and review answers Axis's checklist** in
+   [how pull requests merge](../../../docs/delivery.md#how-pull-requests-merge).
+   Bring the owner an item that the bullet does not allow, and do not make it.
+3. Make the change on that branch, exactly as the plan says.
+4. Run at least the plan's check commands, `node scripts/check-links.mjs` and
    `node scripts/check-docs.mjs`.
-3. Ask the owner before you push.
-4. Push, and open a pull request that closes the issue, with the plan's points
+5. Ask the owner before you push.
+6. Push, and open a pull request that closes the issue, with the plan's points
    for the owner in their own short section. It carries the issue's labels and
    milestone, as [hand-made pull requests](../../../docs/delivery.md#hand-made-pull-requests)
    requires. Read them with `gh issue view`, and pass them to `gh pr create`:
@@ -40,7 +45,7 @@ because its change needs those paths:
      ${labels:+--label "$labels"} ${milestone:+--milestone "$milestone"}
    ```
 
-5. Comment `/nexkit review` on it after each push. When CI, `nexkit/checks` or
+7. Comment `/nexkit review` on it after each push. When CI, `nexkit/checks` or
    `nexkit/review` fails, fix the cause, ask the owner, push and comment again.
-6. When all are green, tell the owner that it is ready to merge. Never approve
+8. When all are green, tell the owner that it is ready to merge. Never approve
    or merge it.
