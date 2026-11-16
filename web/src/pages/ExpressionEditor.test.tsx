@@ -399,6 +399,70 @@ describe('ExpressionEditor completion', () => {
   })
 })
 
+describe('ExpressionEditor signature', () => {
+  const contains = {
+    name: 'contains',
+    parameters: ['text', 'text'],
+    result: 'boolean',
+    group: 'text',
+    example: "contains(title, 'PR-')",
+    description: 'Whether the first text holds the second.',
+  }
+
+  async function renderWithScope(scope: unknown, value: string) {
+    vi.stubGlobal(
+      'fetch',
+      routes(() => json({ type: 'boolean', diagnostics: [] }), scope),
+    )
+    renderEditor(value)
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledWith(scopePath, expect.anything()))
+  }
+
+  function moveTo(anchor: number) {
+    act(() => viewOf().dispatch({ selection: { anchor } }))
+  }
+
+  it('shows the signature with the parameter at the cursor in bold, and hides it outside the call', async () => {
+    const value = "contains(title, 'x')"
+    await renderWithScope({ type: 'boolean', fields: [], functions: [contains] }, value)
+
+    moveTo(16)
+    const line = await screen.findByTestId('studio-expression-signature')
+    expect(line.textContent).toContain('contains(text, text)')
+    expect(line.querySelectorAll('strong')).toHaveLength(1)
+    expect(line.querySelector('strong')!.previousSibling!.textContent).toBe(', ')
+    expect(line.textContent).toContain('Whether the first text holds the second.')
+
+    moveTo(value.length)
+    expect(screen.queryByTestId('studio-expression-signature')).toBeNull()
+  })
+
+  it('bolds the repeating last parameter for an argument past the list, and nothing for other functions', async () => {
+    const concat = { ...contains, name: 'concat', parameters: ['text', '…'], description: '' }
+    const value = 'concat(a, b, c) contains(a, b, c)'
+    await renderWithScope({ type: 'text', fields: [], functions: [concat, contains] }, value)
+
+    moveTo(13)
+    const repeating = await screen.findByTestId('studio-expression-signature')
+    expect(repeating.textContent).toContain('concat(text, …)')
+    expect(Array.from(repeating.querySelectorAll('strong'), (item) => item.textContent)).toEqual(['…'])
+
+    moveTo(value.length - 1)
+    const line = screen.getByTestId('studio-expression-signature')
+    expect(line.textContent).toContain('contains(text, text)')
+    expect(line.querySelectorAll('strong')).toHaveLength(0)
+  })
+
+  it('shows no line when the scope is not answered', async () => {
+    await renderWithScope(undefined, "contains(title, 'x')")
+
+    moveTo(16)
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+
+    expect(screen.queryByTestId('studio-expression-signature')).toBeNull()
+  })
+})
+
 describe.each(['light', 'dark'] as const)('ExpressionEditor in %s mode', (mode) => {
   beforeEach(() => {
     localStorage.setItem('axis.themeMode', mode)
