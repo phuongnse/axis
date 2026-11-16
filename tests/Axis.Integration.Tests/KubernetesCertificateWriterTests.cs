@@ -6,8 +6,8 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The Kubernetes writer posts one cert-manager <c>Certificate</c> for a host to the API server, with the bearer token of the service
-/// account. An existing Certificate (<c>409</c>) is success and any other status throws without the token. Outside a cluster the
-/// in-cluster factory gives nothing.
+/// account, and deletes it by its name. An existing Certificate (<c>409</c>) is success of a write and a Certificate that is gone (<c>404</c>) is
+/// success of a delete. Any other status throws without the token. Outside a cluster the in-cluster factory gives nothing.
 /// </summary>
 public sealed class KubernetesCertificateWriterTests
 {
@@ -60,6 +60,42 @@ public sealed class KubernetesCertificateWriterTests
         Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
         Assert.Contains("403", exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("token-1", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_delete_sends_the_bearer_token_to_the_url_of_the_certificate()
+    {
+        using var handler = new RecordingHandler(HttpStatusCode.OK);
+
+        await Writer(handler).DeleteAsync("approvals.acme.vn", CancellationToken);
+
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Delete, request.Method);
+        Assert.Equal("https://10.0.0.1/apis/cert-manager.io/v1/namespaces/axis/certificates/approvals.acme.vn", request.Uri.ToString());
+        Assert.Equal("Bearer token-1", request.Authorization);
+    }
+
+    [Fact]
+    public async Task A_certificate_that_is_gone_counts_as_deleted()
+    {
+        using var handler = new RecordingHandler(HttpStatusCode.NotFound);
+
+        await Writer(handler).DeleteAsync("approvals.acme.vn", CancellationToken);
+
+        Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task A_refused_delete_throws_and_the_message_never_holds_the_token()
+    {
+        using var handler = new RecordingHandler(HttpStatusCode.Forbidden);
+        var writer = new KubernetesCertificateWriter(new KubernetesApi(new HttpClient(handler), new Uri("https://10.0.0.1:443/"), "axis", () => "token-4815162342"), "axis-tenant-hosts");
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() => writer.DeleteAsync("approvals.acme.vn", CancellationToken));
+
+        Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
+        Assert.Contains("403", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("4815162342", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

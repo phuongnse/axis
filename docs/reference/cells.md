@@ -104,7 +104,9 @@ that it controls the host.
      redirect addresses in step as `tenant host add` does. It creates the `Certificate` through the
      Kubernetes API with its own service account, names it after the host, and uses the Issuer
      `<release>-tenant-hosts` that the chart renders for the HTTP-01 challenge. A `Certificate` that
-     exists counts as done, and a cell without `cell.certificate.enabled` writes none.
+     exists counts as done, and a cell without `cell.certificate.enabled` writes none. The purge of
+     a tenant deletes the `Certificate` of each of its hosts, see
+     [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant).
   4. **Route.** After the `Certificate` and before it marks the request `verified`, the publisher
      creates a Kubernetes Ingress for the host, so the tenant is served on it. It creates the Ingress
      through the Kubernetes API with its own service account and names it after the host. The Ingress

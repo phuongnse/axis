@@ -540,7 +540,7 @@ public sealed class TenantHostVerificationTests(KeycloakFixture keycloak, Postgr
             return Fail ? throw new HttpRequestException("The write failed.") : Task.CompletedTask;
         }
 
-        public Task DeleteAsync(string host, CancellationToken cancellationToken) => throw new NotSupportedException("The verification never deletes a route.");
+        public Task DeleteAsync(string host, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     // Records each write, and throws when Fail is set. The record comes first, so a failed write is counted too.

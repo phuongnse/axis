@@ -762,9 +762,11 @@ because the provisioning API answers `404` there, so no `delete` job and no `del
   tenant whose deletion was cancelled has no `delete_after`, so it is never purged and keeps all its
   data.
 - **Steps.** The job has the eight steps of `TenantPurge`, in order: `hosts`, `database`, `realm`,
-  `files`, `studio`, `keys`, `rows` and `directory`. In a cell with `Cell:HostRouteService` set, `hosts`
-  also deletes the Ingress of each host of the tombstone, and a `404` counts as done. When the job ends it writes one platform audit
-  record, `tenant purge`, with the actor of the job.
+  `files`, `studio`, `keys`, `rows` and `directory`. The `hosts` step also deletes the cert-manager
+  `Certificate` of each host in the tombstone, and reads `Cell:HostCertificateIssuer` to know whether the
+  cell has any. Blank, it deletes none. In a cell with `Cell:HostRouteService` set, `hosts` also deletes
+  the Ingress of each host of the tombstone, and a `404` counts as done. When the job ends it writes one
+  platform audit record, `tenant purge`, with the actor of the job.
 - **Settings.** It reads the admin database role and the identity provider admin client of the
   [create job](#create-job), and `Studio:ApplicationsPath`. When one of them is missing, the job fails
   at its first step with a message that names the setting, removes nothing, and the publisher keeps

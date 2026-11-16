@@ -12,7 +12,9 @@ namespace Axis.Admin;
 /// <c>realm</c>, <c>files</c>, <c>studio</c>, <c>keys</c>, <c>rows</c> and <c>directory</c>. <c>hosts</c> first writes the tombstone, one row of
 /// <c>platform.deleted_tenants</c> with the id, the time, the actor from the job input <c>{ "actor" }</c> and the hosts, and refuses the job when the
 /// input names no actor. It then deletes the tenant's hosts and, when the publisher writes routes, the Ingress route of each host that the tombstone holds, by the host's
-/// name, where a <c>404</c> counts as done (see <see href="docs/reference/tenant-lifecycle.md#deleting-a-tenant">deleting a tenant</see>). Last it clears its realm's redirect addresses. <c>database</c> drops the database and the schema and
+/// name, where a <c>404</c> counts as done (see <see href="docs/reference/tenant-lifecycle.md#deleting-a-tenant">deleting a tenant</see>). It then deletes, when the cell has a
+/// host certificate issuer, the cert-manager <c>Certificate</c> of each host in the tombstone, where a <c>404</c> is done too (see
+/// <see href="docs/reference/cells.md#hosts-and-certificates">hosts and certificates</see>). Last it clears its realm's redirect addresses. <c>database</c> drops the database and the schema and
 /// runtime roles, <c>realm</c> deletes the realm, <c>files</c> does nothing until files outside the database exist, <c>studio</c> deletes the Studio
 /// folder, <c>keys</c> destroys the data, lookup and backup keys, which is the crypto-shredding, <c>rows</c> deletes the quota, lease, usage and counter
 /// rows, and <c>directory</c> deletes the tenant row, which cascades to the rest. When the tenant has a preview tenant, each step runs for the preview
@@ -27,7 +29,8 @@ internal sealed class TenantPurge(
     HttpClient http,
     IdentityProviderAdmin identityProvider,
     string? studioApplicationsPath,
-    IRouteWriter? routes)
+    IRouteWriter? routes,
+    ICertificateWriter? certificates = null)
 {
     private const string NoActor = "The job input names no actor.";
 
@@ -84,6 +87,7 @@ internal sealed class TenantPurge(
         {
             await RemoveHostsAsync(part, actor, cancellationToken);
             await DeleteRoutesAsync(part, cancellationToken);
+            await DeleteCertificatesAsync(part, cancellationToken);
             await ClearRedirectAddressesAsync(part, cancellationToken);
         }
 
@@ -137,16 +141,30 @@ internal sealed class TenantPurge(
             return;
         }
 
-        string[]? hosts;
-        await using (var platform = NewPlatform())
-        {
-            hosts = await platform.DeletedTenants.AsNoTracking().Where(row => row.Id == id).Select(row => row.Hosts).SingleOrDefaultAsync(cancellationToken);
-        }
-
-        foreach (var host in hosts ?? [])
+        foreach (var host in await TombstoneHostsAsync(id, cancellationToken))
         {
             await routes.DeleteAsync(host, cancellationToken);
         }
+    }
+
+    // A host without a certificate answers 404, which counts as done. A cell without a host certificate issuer has no writer and sends no delete.
+    private async Task DeleteCertificatesAsync(string id, CancellationToken cancellationToken)
+    {
+        if (certificates is null)
+        {
+            return;
+        }
+
+        foreach (var host in await TombstoneHostsAsync(id, cancellationToken))
+        {
+            await certificates.DeleteAsync(host, cancellationToken);
+        }
+    }
+
+    private async Task<string[]> TombstoneHostsAsync(string id, CancellationToken cancellationToken)
+    {
+        await using var platform = NewPlatform();
+        return await platform.DeletedTenants.AsNoTracking().Where(row => row.Id == id).Select(row => row.Hosts).SingleOrDefaultAsync(cancellationToken) ?? [];
     }
 
     // Writes no redirect address to the tenant's realm, as the host commands do with the hosts. A tenant without a realm of its own, such as a preview

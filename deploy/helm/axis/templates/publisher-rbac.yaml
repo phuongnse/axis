@@ -1,4 +1,4 @@
-{{- /* The publisher creates the Certificate and the Ingress of a verified tenant host, deletes the Ingress when the purge removes the tenant, and does nothing else, in the release namespace. */}}
+{{- /* The publisher creates the Certificate and the Ingress of a verified tenant host, deletes the Certificates and the Ingresses when the purge removes the tenant, and does nothing else, in the release namespace. */}}
 {{- if and .Values.cell.id .Values.cell.certificate.enabled }}
 apiVersion: v1
 kind: ServiceAccount
@@ -25,6 +25,7 @@ rules:
       - certificates
     verbs:
       - create
+      - delete
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

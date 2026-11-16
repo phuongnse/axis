@@ -16,7 +16,8 @@ namespace Axis.Integration.Tests;
 /// realm, Studio folders, keys and every row of the <c>platform</c> tables that holds a <c>tenant_id</c>, except the jobs, the restore checks and the audit records.
 /// Each purged tenant gets a tombstone with its id, time, actor and hosts. A purge that stopped after the <c>database</c> step finishes when it runs
 /// again and a second tenant stays whole. A job without an actor in its input is refused before it removes a host. The <c>hosts</c> step deletes the
-/// route of each tombstone host through the route writer, and a rerun succeeds when every delete answers <c>404</c>.
+/// route of each tombstone host through the route writer, and a rerun succeeds when every delete answers <c>404</c>. With a certificate writer, it deletes the
+/// Certificate of each tombstone host of the tenant and its preview, and a Certificate that is gone counts as done.
 /// </summary>
 public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
@@ -199,6 +200,33 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
     }
 
     [Fact]
+    public async Task The_hosts_step_deletes_the_certificate_of_each_tombstone_host_and_a_certificate_that_is_gone_counts_as_done()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        using var studio = new TemporaryFolder();
+        var (id, preview) = await CreateWithPreviewAsync(scenario, studio);
+        var hosts = (await scenario.HostsAsync(id)).Concat(await scenario.HostsAsync(preview)).ToArray();
+        Assert.NotEmpty(hosts);
+        using var cluster = new CertificateCluster();
+        var writer = new KubernetesCertificateWriter(new KubernetesApi(new HttpClient(cluster), new Uri("https://10.0.0.1:443/"), "axis", () => "token-1"), "axis-tenant-hosts");
+        var hostsStep = PurgeFor(scenario, studio, certificates: writer).Steps().Single(step => step.Name == "hosts");
+        var urls = hosts.Select(host => $"https://10.0.0.1/apis/cert-manager.io/v1/namespaces/axis/certificates/{host}").Order(StringComparer.Ordinal).ToArray();
+
+        Assert.Null(await hostsStep.RunAsync(Guid.NewGuid(), id, Input, CancellationToken));
+
+        Assert.Equal(urls, cluster.Deletes.Select(call => call.Uri).Order(StringComparer.Ordinal));
+        Assert.All(cluster.Deletes, call => Assert.Equal(HttpStatusCode.OK, call.Status));
+        Assert.Empty(await scenario.HostsAsync(id));
+        cluster.Clear();
+
+        // The rerun finds every host in the tombstones, and every Certificate is gone by now.
+        Assert.Null(await hostsStep.RunAsync(Guid.NewGuid(), id, Input, CancellationToken));
+
+        Assert.Equal(urls, cluster.Deletes.Select(call => call.Uri).Order(StringComparer.Ordinal));
+        Assert.All(cluster.Deletes, call => Assert.Equal(HttpStatusCode.NotFound, call.Status));
+    }
+
+    [Fact]
     public async Task The_hosts_step_deletes_the_route_of_each_tombstone_host_and_a_rerun_succeeds_when_the_routes_are_gone()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
@@ -366,7 +394,7 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
         return await context.TenantBackupKeys.AnyAsync(row => row.TenantId == id, CancellationToken);
     }
 
-    private TenantPurge PurgeFor(AdminScenario scenario, TemporaryFolder studio, IRouteWriter? routes = null) =>
+    private TenantPurge PurgeFor(AdminScenario scenario, TemporaryFolder studio, IRouteWriter? routes = null, ICertificateWriter? certificates = null) =>
         new(
             new NpgsqlConnectionStringBuilder(scenario.AdminConnection),
             scenario.Platform,
@@ -374,7 +402,8 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
             new HttpClient(_handler, disposeHandler: false),
             new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret),
             studio.Path,
-            routes);
+            routes,
+            certificates);
 
     private Dictionary<string, string?> Settings(TemporaryFolder studio) => new()
     {
@@ -423,6 +452,47 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
         return body.GetProperty("access_token").GetString()!;
+    }
+
+    private sealed record Deleted(string Uri, HttpStatusCode Status);
+
+    // Stands in for the Kubernetes API. It answers 200 the first time it sees a URL and 404 after that, as for a Certificate that is gone.
+    private sealed class CertificateCluster : HttpMessageHandler
+    {
+        private readonly List<Deleted> _deletes = [];
+        private readonly HashSet<string> _seen = [];
+
+        public IReadOnlyList<Deleted> Deletes
+        {
+            get
+            {
+                lock (_deletes)
+                {
+                    return [.. _deletes];
+                }
+            }
+        }
+
+        public void Clear()
+        {
+            lock (_deletes)
+            {
+                _deletes.Clear();
+            }
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Assert.Equal(HttpMethod.Delete, request.Method);
+            Assert.Equal("Bearer token-1", request.Headers.Authorization?.ToString());
+            var uri = request.RequestUri!.ToString();
+            lock (_deletes)
+            {
+                var status = _seen.Add(uri) ? HttpStatusCode.OK : HttpStatusCode.NotFound;
+                _deletes.Add(new Deleted(uri, status));
+                return Task.FromResult(new HttpResponseMessage(status));
+            }
+        }
     }
 
     private async Task<HttpResponseMessage> SendAsync(HttpClient http, string token, HttpMethod method, string path)

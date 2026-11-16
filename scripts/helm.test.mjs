@@ -752,13 +752,14 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(find(renderOk('--set', 'cell.certificate.issuer.email='), 'Issuer', 'axis-tenant-hosts'), /email:/)
   })
 
-  test('the publisher may only create certificates.cert-manager.io in the release namespace', () => {
+  test('the publisher may only create and delete certificates.cert-manager.io in the release namespace', () => {
     const output = renderOk('--namespace', 'axis')
     const role = find(output, 'Role', 'axis-publisher-certificates')
     assert.match(role, /namespace: axis\n/)
-    assert.match(role, /rules:\n\s+- apiGroups:\n\s+- cert-manager\.io\n\s+resources:\n\s+- certificates\n\s+verbs:\n\s+- create\n/)
+    assert.match(role, /rules:\n\s+- apiGroups:\n\s+- cert-manager\.io\n\s+resources:\n\s+- certificates\n\s+verbs:\n\s+- create\n\s+- delete\n/)
     assert.equal(role.match(/- apiGroups:/g).length, 1)
     assert.equal(role.match(/verbs:/g).length, 1)
+    assert.deepEqual(role.split('verbs:')[1].match(/^\s+- \w+$/gm).map((line) => line.trim()), ['- create', '- delete'])
     const binding = find(output, 'RoleBinding', 'axis-publisher-certificates')
     assert.match(binding, /namespace: axis\n/)
     assert.match(binding, /roleRef:\n\s+apiGroup: rbac\.authorization\.k8s\.io\n\s+kind: Role\n\s+name: axis-publisher-certificates\n/)
