@@ -380,8 +380,8 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
   type. A place that takes any type shows no "Needs" line.
 - **An error in words.** An error reads first in words, with its code after it, small. An
   empty expression is not sent to be checked. The box wraps long lines and grows with them.
-- **A function's signature** _(planned for M33)_. Inside a call, a line shows the function's signature, with the
-  parameter at the cursor in bold, and what it does.
+- **A function's signature**. In a call to an allowed function, a line shows `contains(text, text)` and what it does,
+  with the parameter at the cursor in bold, counted by the commas at the call's own level. Outside a call, none.
 - **Expand** _(planned for M33)_. An icon beside the box opens the expression in a large dialog, with a panel of
   three tabs, Fields, Operators and Functions, and every rule allowed there. A click inserts the name at
   the cursor. A search looks in all three and lists what it finds best first: a name that is the words,
