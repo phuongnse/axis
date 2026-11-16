@@ -1,5 +1,6 @@
 using Axis.Configuration.Releases;
 using Axis.Data.Profiles;
+using Axis.Data.Records;
 using Axis.Server.Http;
 using Axis.Server.Studio;
 using Axis.Server.Tenancy;
@@ -13,20 +14,48 @@ namespace Axis.Server.Console;
 /// <c>GET /api/console/applications/{id}/publishing</c> answers one application, named by its id (a hyphenated UUID, else a
 /// 404), with its active release, its release history and its publish requests. The release history has the rows, order and
 /// fields of Studio's releases route, and <c>active</c> is its active release, or null when there is none. The publish
-/// requests are newest first, paged by the optional <c>page</c> and <c>pageSize</c> as the record API pages. An application
+/// requests are one page, which PostgreSQL filters, searches, sorts and pages in the record API's format, over the fields
+/// <c>kind</c>, <c>target</c>, <c>status</c>, <c>label</c>, <c>requestedBy</c>, <c>requestedAt</c> and <c>finishedAt</c>.
+/// Newest first is the order when there is no sort, and a sorted list breaks its ties newest first. A sort or filter on
+/// another field is a 400 that names it. The release history is never paged or filtered. An application
 /// that no release or request names answers empty lists. A request shows its kind, target, status, label, note, who asked and
 /// when, when it started and finished, and its release. It never holds the file snapshot, the diagnostics or the test results.
-/// The route only reads: publishing and activating stay in Studio.
+/// The route only reads: publishing and activating stay in Studio. The fields and the rules are in
+/// docs/reference/operator-console.md#api.
 /// </summary>
 internal static class ConsolePublishingEndpoints
 {
     public static void MapConsolePublishingEndpoints(this RouteGroupBuilder console) =>
         console.MapGet("/applications/{id}/publishing", GetAsync);
 
+    // The columns the list's search, filter and sort can name, over axis.publish_requests, see docs/reference/operator-console.md#api.
+    // The requestedAt and finishedAt columns filter by their UTC day and sort by their instant. A search looks in label and requestedBy.
+    private static readonly IReadOnlyList<ListColumn<ConsolePublishRequest>> _columns =
+    [
+        new("kind", ListColumnKind.Enum, row => row.Kind, Values: ["validate", "publish", "activate", "test", "accept"], Sql: "kind"),
+        new("target", ListColumnKind.Enum, row => row.Target, Values: ["tenant", "preview"], Sql: "target"),
+        new("status", ListColumnKind.Enum, row => row.Status, Values: ["queued", "running", "succeeded", "failed"], Sql: "status"),
+        new("label", ListColumnKind.Text, row => row.Label, Searchable: true, Sql: "label"),
+        new("requestedBy", ListColumnKind.Text, row => row.RequestedByName ?? row.RequestedBy, Searchable: true, Sql: "coalesce(requested_by_name, requested_by)"),
+        new(
+            "requestedAt",
+            ListColumnKind.Date,
+            row => DateOnly.FromDateTime(row.RequestedAt.UtcDateTime),
+            Order: row => row.RequestedAt,
+            Sql: "(requested_at AT TIME ZONE 'UTC')::date",
+            OrderSql: "requested_at"),
+        new(
+            "finishedAt",
+            ListColumnKind.Date,
+            row => row.FinishedAt is { } finished ? DateOnly.FromDateTime(finished.UtcDateTime) : null,
+            Order: row => row.FinishedAt,
+            Sql: "(finished_at AT TIME ZONE 'UTC')::date",
+            OrderSql: "finished_at"),
+    ];
+
     private static async Task<IResult> GetAsync(
         string id,
-        string? page,
-        string? pageSize,
+        HttpContext httpContext,
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
@@ -36,7 +65,7 @@ internal static class ConsolePublishingEndpoints
         }
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
+        var query = ListQuery<ConsolePublishRequest>.Read(httpContext.Request, _columns, errors);
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
@@ -54,7 +83,7 @@ internal static class ConsolePublishingEndpoints
                 : null;
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var (requests, totalCount) = await ReadRequestsAsync(connection, applicationId, pageNumber, size, cancellationToken);
+        var (requests, totalCount) = await ReadRequestsAsync(connection, applicationId, query.Sql(), query.Page, query.PageSize, cancellationToken);
         var names = await UserProfiles.FindDisplayNamesAsync(
             connection,
             [.. activations.Select(row => row.Actor), .. requests.Select(row => row.RequestedBy)],
@@ -72,34 +101,39 @@ internal static class ConsolePublishingEndpoints
         var items = requests
             .Select(row => row with { RequestedByName = names.GetValueOrDefault(row.RequestedBy) ?? row.RequestedByName })
             .ToList();
-        return Results.Ok(new ConsolePublishingResponse(activeRelease, releases, items, pageNumber, size, totalCount));
+        return Results.Ok(new ConsolePublishingResponse(activeRelease, releases, items, query.Page, query.PageSize, totalCount));
     }
 
     // Each reader is disposed before the next command, because Npgsql allows one open reader per connection.
     private static async Task<(List<ConsolePublishRequest> Items, long TotalCount)> ReadRequestsAsync(
-        NpgsqlConnection connection, Guid applicationId, int page, int size, CancellationToken cancellationToken)
+        NpgsqlConnection connection, Guid applicationId, ListSql list, int page, int size, CancellationToken cancellationToken)
     {
+        var where = $"WHERE application_id = @application AND {list.Condition}";
+        var order = list.Order is null ? "requested_at DESC, id DESC" : $"{list.Order}, requested_at DESC, id DESC";
+
         long totalCount;
-        await using (var count = new NpgsqlCommand("SELECT count(*) FROM axis.publish_requests WHERE application_id = @application", connection))
+        await using (var count = new NpgsqlCommand($"SELECT count(*) FROM axis.publish_requests {where}", connection))
         {
             count.Parameters.AddWithValue("application", applicationId);
+            list.AddTo(count);
             totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
         }
 
         var items = new List<ConsolePublishRequest>();
-        await using var list = new NpgsqlCommand(
-            """
+        await using var command = new NpgsqlCommand(
+            $"""
             SELECT id, kind, target, status, label, note, requested_by, requested_by_name, requested_at, started_at, finished_at, release_id
             FROM axis.publish_requests
-            WHERE application_id = @application
-            ORDER BY requested_at DESC, id DESC
+            {where}
+            ORDER BY {order}
             LIMIT @limit OFFSET @offset
             """,
             connection);
-        list.Parameters.AddWithValue("application", applicationId);
-        list.Parameters.AddWithValue("limit", size);
-        list.Parameters.AddWithValue("offset", (long)(page - 1) * size);
-        await using var reader = await list.ExecuteReaderAsync(cancellationToken);
+        command.Parameters.AddWithValue("application", applicationId);
+        list.AddTo(command);
+        command.Parameters.AddWithValue("limit", size);
+        command.Parameters.AddWithValue("offset", (long)(page - 1) * size);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
             items.Add(new ConsolePublishRequest(
@@ -123,7 +157,7 @@ internal static class ConsolePublishingEndpoints
 
 /// <summary>
 /// The publishing of one application: its active release, its release history newest first, and one page of its publish
-/// requests newest first with the number of them on every page.
+/// requests, newest first until a sort is given, with the number of them on every page.
 /// </summary>
 internal sealed record ConsolePublishingResponse(
     StudioActiveRelease? Active,
