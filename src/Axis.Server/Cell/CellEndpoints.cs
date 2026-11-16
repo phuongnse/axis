@@ -82,8 +82,8 @@ namespace Axis.Server.CellApi;
 /// does not name stays as it is. It applies at once with no job and answers <c>200</c> with the tenant's quotas. An unknown key,
 /// a negative value, a key both set and removed, or a request that names no key answers <c>400</c> and writes nothing. It writes
 /// over the schema role, see <see cref="CellPlatformWriter"/>, and saves the rows with one platform audit record, command
-/// <c>tenant quotas set</c>, naming the keys of the request, or saves neither. The route passes no actor yet, so the record's
-/// <c>actor</c> column stays empty.
+/// <c>tenant quotas set</c>, naming the keys of the request, or saves neither. The record's <c>actor</c> is the operator's id, the
+/// subject of the bearer token or of the console session.
 /// </para>
 /// <para>
 /// <c>POST /api/cell/tenants/{id}/suspend</c>, <c>/resume</c> and <c>/read-only</c>, <c>DELETE /api/cell/tenants/{id}</c> and
@@ -487,7 +487,12 @@ internal static partial class CellEndpoints
         }
 
         await PlatformAuditRecords.WriteAsync(
-            platform, "tenant quotas set", id, [.. QuotaKeys.All.Where(named.Contains)], cancellationToken);
+            platform,
+            "tenant quotas set",
+            id,
+            [.. QuotaKeys.All.Where(named.Contains)],
+            httpContext.User.FindFirst(CellOperator.IdClaim)!.Value,
+            cancellationToken);
         var quotas = await ReadQuotasAsync(platform, [id], defaults, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.Ok(new CellQuotasResponse(quotas[id]));
