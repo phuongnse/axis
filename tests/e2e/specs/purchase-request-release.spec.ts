@@ -14,7 +14,7 @@ import { guardStep } from '../hang-guard'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
 import { previewURL, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { addMapping, openKind, openProblems, openTab } from '../studio-resources'
+import { addMapping, openKind, openModuleResource, openProblems, openTab } from '../studio-resources'
 import { chooseTheme } from '../shell'
 import { logInAtKeycloak } from '../keycloak'
 
@@ -259,13 +259,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await useSession(page, 'author')
       await openStudio(page, server.url)
       await openKind(page, 'contract')
-      await page
-        .getByTestId('studio-group-module-contracts')
-        .getByRole('button', {
-          name: 'department-budgets/BudgetContract',
-          exact: true,
-        })
-        .click()
+      await openModuleResource(page, 'contract', 'Department budgets', 'BudgetContract')
       await page.getByTestId(`studio-contract-relax-${point}`).click()
       const dialog = await waitForDialog(page)
       await dialog.getByRole('textbox', { name: 'Reason', exact: true }).fill(reason)
@@ -418,13 +412,7 @@ test.describe('the active release of the purchase request sample changes', () =>
         )
         await openStudio(page, server.url)
         await openKind(page, 'process')
-        await page
-          .getByTestId('studio-group-module-processes')
-          .getByRole('button', {
-            name: 'department-budgets/BudgetApproval',
-            exact: true,
-          })
-          .click()
+        await openModuleResource(page, 'process', 'Department budgets', 'BudgetApproval')
         await dragTo(
           page,
           'studio-process-design',

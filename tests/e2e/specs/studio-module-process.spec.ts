@@ -13,7 +13,7 @@ import {
 } from "../server-settings";
 import { pickOption } from "../select";
 import { useSession } from "../sessions";
-import { openKind } from "../studio-resources";
+import { openKind, openModuleResource } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -70,10 +70,7 @@ test.describe("Studio edits a module process as a layer", () => {
     await page.goto(`${server.url}/studio?app=ModuleApp`);
 
     await openKind(page, "process");
-    await page
-      .getByTestId("studio-group-module-processes")
-      .getByRole("button", { name: "checklists/ChecklistReview", exact: true })
-      .click();
+    await openModuleResource(page, "process", "Checklists", "ChecklistReview");
 
     await expect(page.getByTestId("studio-process-design")).toBeVisible();
     await expect(page.getByTestId("studio-module-layer")).toHaveCount(0);

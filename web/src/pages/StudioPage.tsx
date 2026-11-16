@@ -1,4 +1,4 @@
-import { Button, Descriptions, Flex, Result, Typography } from 'antd'
+import { Button, Descriptions, Flex, Result, Tag, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
@@ -6,11 +6,12 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { AxisActionRow } from '../platform/AxisButton'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
-import type { ModuleKind } from '../platform/moduleKinds'
+import { sortByName } from '../platform/listOrder'
 import { ShellSidebar } from '../platform/shellSidebar'
 import { SiteMark } from '../platform/SiteMark'
 import {
   fetchStudioApps,
+  fetchStudioCatalog,
   fetchStudioDiagnostics,
   fetchStudioNames,
   fetchStudioResource,
@@ -18,9 +19,11 @@ import {
   fetchStudioResources,
   groupByKind,
   moduleResources,
+  type ModuleResourceItem,
   resourceTitle,
   ServerUnreachableError,
   type StudioApplication,
+  type StudioCatalog,
   studioAppDescription,
   studioAppTitle,
   type StudioDiagnostic,
@@ -57,38 +60,21 @@ import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishin
 import { studioActiveEntry, studioNavigation } from './studioNavigation'
 import { StudioSidebar } from './StudioSidebar'
 
-/** The titles and test ids of the module resource groups in the list. */
-const moduleGroupTitles: Record<ModuleKind, string> = {
-  entity: 'shell.studio.moduleEntities',
-  dataSource: 'shell.studio.moduleDataSources',
-  rule: 'shell.studio.moduleRules',
-  sequence: 'shell.studio.moduleSequences',
-  form: 'shell.studio.moduleForms',
-  page: 'shell.studio.modulePages',
-  process: 'shell.studio.moduleProcesses',
-  event: 'shell.studio.moduleEvents',
-  text: 'shell.studio.moduleTexts',
-  seed: 'shell.studio.moduleSeeds',
-  policy: 'shell.studio.modulePolicies',
-  trigger: 'shell.studio.moduleTriggers',
-  scenario: 'shell.studio.moduleScenarios',
-  contract: 'shell.studio.moduleContracts',
+/**
+ * A row of a kind's list: one of the application's own resources, or a module resource of the application's modules.
+ * `module` is the module's id for a module resource, else `null`. `title` is the text the row shows and sorts by.
+ */
+interface KindListRow {
+  id: string
+  title: string
+  descriptions: Readonly<Record<string, string>> | null | undefined
+  module: string | null
 }
-const moduleGroupTestIds: Record<ModuleKind, string> = {
-  entity: 'studio-group-module-entities',
-  dataSource: 'studio-group-module-data-sources',
-  rule: 'studio-group-module-rules',
-  sequence: 'studio-group-module-sequences',
-  form: 'studio-group-module-forms',
-  page: 'studio-group-module-pages',
-  process: 'studio-group-module-processes',
-  event: 'studio-group-module-events',
-  text: 'studio-group-module-texts',
-  seed: 'studio-group-module-seeds',
-  policy: 'studio-group-module-policies',
-  trigger: 'studio-group-module-triggers',
-  scenario: 'studio-group-module-scenarios',
-  contract: 'studio-group-module-contracts',
+
+/** A module resource's name without its `<module>/` prefix, which shows when its activity has no label. */
+function unprefixed(item: ModuleResourceItem): string {
+  const prefix = `${item.module}/`
+  return item.name.startsWith(prefix) ? item.name.slice(prefix.length) : item.name
 }
 
 /** The tiles of the applications Studio may edit, in the UI locale with `en` as the fallback. Each opens its application. */
@@ -166,7 +152,7 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * solid New application… button on its right. A tile opens its application, and a single application is not opened by itself.
  * Every page of an open application heads its content with one level-4 `StudioPageHeading`, and no page has a
  * breadcrumb. The Overview's heading is the application's title, with its description under it, then the blocks of
- * `StudioOverview`. A kind's sidebar entry, as `&kind=<kind>`, shows that kind's list as one table under a heading with its name, then the module group of that kind when modules hold one.
+ * `StudioOverview`. A kind's sidebar entry, as `&kind=<kind>`, shows that kind's list as one table under a heading with its name.
  * A resource opens alone in the content, under a heading with its name and, for a scenario, Run scenario on its right:
  * its details, its editor, and its Uses and Used by lists. The band under the header holds the application's state and
  * its actions. Its errors and warnings are one button that opens the Problems panel beside the page, which lists
@@ -198,7 +184,10 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * A kind's list is one table with the columns Name, Description, Status, Last modified by and Last modified at, whose Name is a link. Its status and
  * last write come from the resource activity, which loads with the application and again after a save, a text write, a delete and a reconnect,
  * as the names do. While it reloads, the table keeps its last answer, and the Status cell says it is loading only until the first answer arrives.
- * A kind's list shows the module resources of that kind that the application uses, from the names, by their `<module>/<name>`. A module resource of every kind but a contract and a scenario opens in its editor with the application's layer applied
+ * The module resources of that kind that the application uses join the table, from the names, sorted with the application's own by the shown name.
+ * A module resource is named by its label in the activity, else by its name without the `<module>/` prefix, and has a neutral tag beside the
+ * name with its module's label from `GET /api/studio/catalog`, else the module's id. The catalog loads once, and again after a reconnect.
+ * A module resource of every kind but a contract and a scenario opens in its editor with the application's layer applied
  * and every input on, with no JSON tab, Delete, migration questions, Uses or Used by lists: an entity in the entity
  * designer, a process in the process designer, and a data source, rule, trigger, sequence and event in the schema
  * form, and a seed in the seed grid. Save writes the layer, and a Customized tag with Reset all, which deletes
@@ -267,6 +256,7 @@ function StudioWorkspace() {
   const [activityState, setActivityState] = useState<ActivityState>()
   const [manifestState, setManifestState] = useState<ManifestState>()
   const [manifestReload, setManifestReload] = useState(0)
+  const [catalog, setCatalog] = useState<StudioCatalog | null>(null)
   const publishing = useRef<StudioPublishingHandle>(null)
   const editor = useRef<StudioEditorHandle>(null)
   const [problemsOpen, setProblemsOpen] = useState(false)
@@ -378,6 +368,26 @@ function StudioWorkspace() {
     return () => controller.abort()
   }, [application, generation, folderRevision, lost])
 
+  // The catalog is the same for every application, so it loads once, and again after a reconnect. Null when it did not load.
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchStudioCatalog(controller.signal).then(
+      (answer) => setCatalog(answer),
+      (error: unknown) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        if (error instanceof ServerUnreachableError) {
+          lost()
+          return
+        }
+        console.warn('Loading the Studio catalog failed', error)
+        setCatalog(null)
+      },
+    )
+    return () => controller.abort()
+  }, [generation, lost])
+
   const manifestId = useMemo(
     () =>
       (folder?.application === application && 'resources' in folder ? folder.resources : []).find(
@@ -444,20 +454,62 @@ function StudioWorkspace() {
       : new Map(activityState.items.map((item) => [item.id.toLowerCase(), item]))
   }, [activityState, application])
   /** A resource's activity once it has loaded, or undefined while it loads and after it fails. */
-  const activityOf = (id: string) => (activity instanceof Map ? activity.get(id.toLowerCase()) : undefined)
+  const activityOf = useCallback(
+    (id: string) => (activity instanceof Map ? activity.get(id.toLowerCase()) : undefined),
+    [activity],
+  )
   const timeFormat = useMemo(
     () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' }),
     [locale],
   )
-  const listColumns: AxisColumn<StudioResourceItem>[] = [
+  const { colour } = useDesignTokens()
+  const moduleLabels = useMemo(
+    () => new Map((catalog?.modules ?? []).map((module) => [module.id, module.label])),
+    [catalog],
+  )
+  // The application's own resources and the module resources of this kind, sorted together by the shown name.
+  const kindRows = useMemo<KindListRow[]>(() => {
+    const own = (groups[0]?.items ?? []).map((item): KindListRow => ({
+      id: item.id,
+      title: resourceTitle(item, locale, t),
+      descriptions: item.descriptions,
+      module: null,
+    }))
+    const shared = (moduleGroups[0]?.items ?? []).map((item): KindListRow => {
+      const resource = activityOf(item.id)
+      return {
+        id: item.id,
+        title: textIn(resource?.titles, locale) ?? unprefixed(item),
+        descriptions: resource?.descriptions,
+        module: item.module,
+      }
+    })
+    return sortByName([...own, ...shared], (row) => row.title, locale)
+  }, [groups, moduleGroups, activityOf, locale, t])
+  const listColumns: AxisColumn<KindListRow>[] = [
     {
       key: 'name',
       kind: 'freeText',
       title: t('shell.studio.list.name'),
       render: (_value, row) => (
-        <Link data-testid={`studio-resource-${row.id}`} to={studioResourceAddress(application!, row.id)}>
-          {resourceTitle(row, locale, t)}
-        </Link>
+        <Flex gap="small" align="center" wrap>
+          <Link data-testid={`studio-resource-${row.id}`} to={studioResourceAddress(application!, row.id)}>
+            {row.title}
+          </Link>
+          {row.module !== null && (
+            <Tag
+              variant="outlined"
+              style={{
+                color: colour.textMuted,
+                borderColor: colour.border,
+                background: 'transparent',
+                marginInlineEnd: 0,
+              }}
+            >
+              {moduleLabels.get(row.module) ?? row.module}
+            </Tag>
+          )}
+        </Flex>
       ),
     },
     {
@@ -507,10 +559,6 @@ function StudioWorkspace() {
 
   function pickApplication(name: string) {
     setParams({ app: name })
-  }
-
-  function selectResource(id: string) {
-    navigate(studioResourceAddress(application!, id))
   }
 
   function onCreated(item: StudioResourceItem, diagnostics: StudioDiagnostic[]) {
@@ -841,33 +889,13 @@ function StudioWorkspace() {
                       ) : undefined
                     }
                   />
-                  {(groups.length > 0 || moduleGroups.length === 0) && (
-                    <AxisTable<StudioResourceItem>
-                      testId={`studio-group-${kind}`}
-                      columns={listColumns}
-                      rowKey={(row) => row.id}
-                      dataSource={groups[0]?.items ?? []}
-                      pagination={false}
-                    />
-                  )}
-                  {moduleGroups.map((group) => (
-                    <section key={group.kind} data-testid={moduleGroupTestIds[group.kind]}>
-                      <Typography.Title level={5}>{t(moduleGroupTitles[group.kind])}</Typography.Title>
-                      <Flex vertical align="flex-start">
-                        {group.items.map((item) => (
-                          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                          <Button
-                            key={item.id}
-                            type="text"
-                            data-testid={`studio-module-resource-${item.id}`}
-                            onClick={() => selectResource(item.id)}
-                          >
-                            {item.name}
-                          </Button>
-                        ))}
-                      </Flex>
-                    </section>
-                  ))}
+                  <AxisTable<KindListRow>
+                    testId={`studio-group-${kind}`}
+                    columns={listColumns}
+                    rowKey={(row) => row.id}
+                    dataSource={kindRows}
+                    pagination={false}
+                  />
                 </Flex>
               ) : (
                 <StudioOverview

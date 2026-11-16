@@ -6,7 +6,7 @@ import { expect, test } from "../test";
 import { startServer } from "../activate";
 import { e2eApp, purchaseRequests } from "../server-settings";
 import { useSession } from "../sessions";
-import { openKind } from "../studio-resources";
+import { openKind, openModuleResource } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -49,13 +49,7 @@ test.describe("Studio edits a module form as a layer", () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests`);
 
     await openKind(page, "form");
-    await page
-      .getByTestId("studio-group-module-forms")
-      .getByRole("button", {
-        name: "department-budgets/BudgetReview",
-        exact: true,
-      })
-      .click();
+    await openModuleResource(page, "form", "Department budgets", "BudgetReview");
 
     await expect(page.getByTestId("studio-form-design")).toBeVisible();
     await expect(page.getByTestId("studio-module-layer")).toHaveCount(0);
