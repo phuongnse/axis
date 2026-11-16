@@ -167,10 +167,11 @@ open one lookup dialog, which lists the records a person may pick.
   texts.
 - **Picking.** Clicking a row or pressing Enter on it picks the record and closes the dialog.
 - **Search.** A search box in the table's toolbar filters the records to those whose display field contains
-  the typed text, ignoring letter case. The search applies 300 ms after typing stops, so typing does
-  not request records for every key. The SPA trims the text and sends it as the record API's `search`
-  parameter, and leaves `search` out when the text is empty. A new search starts again at page 1. Like
-  paging, the search stays out of the URL and is empty each time the dialog opens.
+  the typed text, ignoring letter case. It is the table's own Search box, so the search applies on Enter,
+  on the search button and when the box is cleared, never on each key. The SPA trims the text and sends
+  it as the record API's `search` parameter, and leaves `search` out when the text is empty. A new search
+  starts again at page 1. Like paging, the search stays in the dialog, out of the URL, and is empty each
+  time the dialog opens.
 - **Reference label.** On edit, the label starts from the record's `labels`, and a picked record's
   display field value replaces it at once. A changed reference is sent as the record id, and a cleared
   one as `null`. Picking the record that was already set leaves the field unchanged.

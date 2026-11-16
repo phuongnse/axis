@@ -212,7 +212,8 @@ be kept right.
   in the record API, and search looks in all of them. `AxisTable` draws the box, which says Search, and a
   table that holds all its rows searches them by itself, while a table paged on the server sends the text to
   the server. The text applies on Enter, on the search button and when the box is cleared, never on each
-  key, and a new search starts at page 1. Search, sort, page and page size live in the address.
+  key, and a new search starts at page 1. Search, sort, page and page size live in the address. A table in a
+  dialog, such as the [lookup](form-widget.md#lookup), keeps them in the dialog instead.
 - **Filter.** Filter is an icon button that carries the count of conditions in force, and
   opens a builder of conditions in groups of All or Any, with no limit on depth. A column can be filtered
   on when it gives its kind of value through `filter`, and conditions follow that kind, text, enum, number

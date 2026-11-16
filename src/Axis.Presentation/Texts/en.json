@@ -712,7 +712,6 @@
   "shell.form.processStarted": "The process has started.",
   "shell.form.processRunning": "This record is already in a running process.",
   "shell.form.startFailed": "The process could not be started.",
-  "shell.lookup.search": "Search",
   "shell.history.title": "History",
   "shell.history.empty": "No history yet.",
   "shell.history.loadFailed": "The history could not be loaded.",
