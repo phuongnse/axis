@@ -10,8 +10,9 @@ is in [Studio workspace](studio-workspace.md), and what each editor and designer
 ## Sections
 
 The form puts a resource's root properties in sections, so that an author reads them in groups that
-each say what they hold. Each section is a panel on `surface`, as the Overview's blocks are, with a
-heading and a line that says what it holds. An Overview block's heading has no line. The application's
+each say what they hold. Each section is a part with no panel, with its
+heading in `heading5` and a line that says what it holds. The sections sit one above another, with a `divider` rule
+before every one but the first, as [layout](shell.md#layout) says. An Overview block's heading has no line. The application's
 Settings, for example, has General (name, title, description and time zone), Modules, Packages and File
 storage, then the [auto-accept switch](ai-authoring-in-studio.md#auto-accept). A property that no section
 names goes to a last section with no heading.
@@ -20,11 +21,11 @@ names goes to a last section with no heading.
   no label of its own. A section that holds one object shows the object's fields itself.
 - **One list in a section.** A section that holds one list puts the list's Add… on the right of its
   heading, and the table has no toolbar row.
-- **One rhythm.** The sections are `spacing-md` apart.
-- **One shared part.** The section is one shared part that the generic form draws and the typed editors can
-  draw too.
-- **Used by the generic form and most editors.** The generic form and the page, process, connector, identity
-  provider and scenario editors draw their sections through it.
+- **One rhythm.** There is `spacing-md` on each side of the rule.
+- **One shared part.** The section is `SectionPart`, in `SectionParts`, one shared part that the generic form
+  draws and the typed editors draw too.
+- **Used by the generic form, most editors and the Overview.** The generic form, the page, process, connector,
+  identity provider and scenario editors and the Studio Overview draw their sections through it.
 - **Every Studio form is built from it.** _(planned for M33)_ The entity designer and the seed editor draw their
   sections through it too.
 

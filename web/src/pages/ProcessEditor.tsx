@@ -17,7 +17,7 @@ import { Expression, NamePicker } from './ProcessFields'
 import { moved, requiredStepKeys, uniqueStepName } from './processPalette'
 import { stepTypes, withType } from './processStepSchema'
 import { ReferencePicker } from './ReferencePicker'
-import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { SchemaForm, type ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -97,13 +97,13 @@ export function ProcessEditor({
 
   return (
     <div data-testid="studio-process-editor">
-      <ResourceFormSections>
+      <SectionParts>
         {/* The form draws the General section: the name, the description and the start condition. */}
         <SchemaForm schema={withoutSubject(schema)} value={value} onChange={onChange} />
-        <ResourceFormSection testName="subject" heading={heading('subject')}>
+        <SectionPart testName="subject" heading={heading('subject')}>
           <Subject value={value} onChange={onChange} />
-        </ResourceFormSection>
-        <ResourceFormSection testName="steps" heading={heading('steps')}>
+        </SectionPart>
+        <SectionPart testName="steps" heading={heading('steps')}>
           <Flex vertical gap="small">
             <div data-testid="studio-field-/start">
               <AxisField {...field('start')}>
@@ -153,8 +153,8 @@ export function ProcessEditor({
               </Flex>
             </div>
           </Flex>
-        </ResourceFormSection>
-      </ResourceFormSections>
+        </SectionPart>
+      </SectionParts>
     </div>
   )
 }

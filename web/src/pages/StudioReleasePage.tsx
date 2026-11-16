@@ -25,7 +25,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import { relaxedPointLabel } from './relaxEntries'
-import { SectionPart, SectionParts } from './SectionParts'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { StudioActivateDialog, StudioLiveTag, StudioReleaseBlockers } from './StudioReleases'
 import { StudioChangeList } from './StudioChangeList'
 import { StudioPageHeading } from './StudioPageHeading'
@@ -268,7 +268,7 @@ function ReleaseContent({
         />
       )}
       <SectionParts>
-        <SectionPart title={t('shell.studio.release.details')}>
+        <SectionPart testName="details" heading={{ title: t('shell.studio.release.details') }}>
           <Descriptions
             column={1}
             items={[
@@ -285,11 +285,11 @@ function ReleaseContent({
           />
         </SectionPart>
         {release.modules.length > 0 && (
-          <SectionPart title={t('shell.studio.release.relaxed')}>
+          <SectionPart testName="relaxed" heading={{ title: t('shell.studio.release.relaxed') }}>
             <RelaxedPoints relaxed={first.relaxed} locale={locale} />
           </SectionPart>
         )}
-        <SectionPart title={compareTitle(release, t)}>
+        <SectionPart testName="changes" heading={{ title: compareTitle(release, t) }}>
           {release.previous === null || release.changes === null ? (
             <Typography.Text>{t('shell.studio.release.changes.first')}</Typography.Text>
           ) : (
@@ -308,7 +308,7 @@ function ReleaseContent({
             </>
           )}
         </SectionPart>
-        <SectionPart title={t('shell.studio.release.parts')}>
+        <SectionPart testName="parts" heading={{ title: t('shell.studio.release.parts') }}>
           <AxisTable<PartRow>
             columns={partColumns}
             rowKey={(row) => row.key}
@@ -319,7 +319,7 @@ function ReleaseContent({
             toolbar={{}}
           />
         </SectionPart>
-        <SectionPart title={t('shell.studio.release.activations')}>
+        <SectionPart testName="activations" heading={{ title: t('shell.studio.release.activations') }}>
           <AxisTable<ActivationRow>
             columns={activationColumns}
             rowKey={(row) => row.key}
