@@ -353,7 +353,7 @@ const texts = {
   'shell.form.add': 'Add',
   'shell.form.added': 'Added',
   'shell.form.removed': 'Removed',
-  'shell.lookup.search': 'Search',
+  'shell.table.search': 'Search',
   'shell.table.empty': 'No records yet.',
   'shell.value.notSet': 'Not set',
   'shell.table.yes': 'Yes',
@@ -949,7 +949,21 @@ describe('FormWidget', () => {
     expect(requests()[2].body).toBe('{"version":1,"values":{"title":"Buy paper!"}}')
   })
 
-  it('reloads the lookup from page 1 when the search changes', async () => {
+  it('searches the lookup with the trimmed text on Enter and keeps the address', async () => {
+    const requests = stubFetch({ status: 200, body: categoryPageJson }, { status: 200, body: categoryPageJson })
+    renderForm()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByText('Office')
+    await userEvent.type(within(dialog).getByRole('searchbox', { name: 'Search' }), '  off  {Enter}')
+
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1].url).toBe('/api/apps/E2eApp/entities/Category/records?search=off&sort=name')
+    expect(screen.getByTestId('location')).toHaveTextContent('/e2e/noteform/new')
+  })
+
+  it('keeps the lookup search and sort when it goes to page 2', async () => {
     const longCategoryPageJson = categoryPageJson.replace('"totalCount":1', '"totalCount":45')
     const requests = stubFetch(
       { status: 200, body: longCategoryPageJson },
@@ -961,16 +975,26 @@ describe('FormWidget', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
     const dialog = await screen.findByRole('dialog')
     await within(dialog).findByText('Office')
-    await userEvent.click(within(dialog).getByTitle('2'))
+    await userEvent.type(within(dialog).getByRole('searchbox', { name: 'Search' }), 'off{Enter}')
     await waitFor(() => expect(requests()).toHaveLength(2))
-    await userEvent.type(within(dialog).getByLabelText('Search'), 'off')
+    await userEvent.click(within(dialog).getByTitle('2'))
 
-    // The search applies once typing pauses, so the three key presses send one request.
     await waitFor(() => expect(requests()).toHaveLength(3))
-    expect(requests()[1].url).toMatch(/\?page=2&sort=name$/)
-    expect(requests()[2].url).toBe('/api/apps/E2eApp/entities/Category/records?search=off&sort=name')
+    expect(requests()[2].url).toBe('/api/apps/E2eApp/entities/Category/records?search=off&page=2&sort=name')
+  })
+
+  it('does not search the lookup until Enter is pressed', async () => {
+    const requests = stubFetch({ status: 200, body: categoryPageJson })
+    renderForm()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
+    const dialog = await screen.findByRole('dialog')
+    await within(dialog).findByText('Office')
+    await userEvent.type(within(dialog).getByRole('searchbox', { name: 'Search' }), 'off')
+
     await new Promise((resolve) => setTimeout(resolve, 400))
-    expect(requests()).toHaveLength(3)
+    expect(requests()).toHaveLength(1)
+    expect(requests().some(({ url }) => url.includes('search='))).toBe(false)
   })
 
   it('shows the lookup error when the target records cannot be loaded', async () => {
@@ -1190,14 +1214,13 @@ describe('FormWidget', () => {
     })
   })
 
-  it('has the choose, clear, add, added, removed and lookup search texts in every platform locale', () => {
+  it('has the choose, clear, add, added and removed texts in every platform locale', () => {
     for (const catalog of [platformEnglish, platformVietnamese]) {
       expect(catalog).toHaveProperty(['shell.form.choose'])
       expect(catalog).toHaveProperty(['shell.form.clear'])
       expect(catalog).toHaveProperty(['shell.form.add'])
       expect(catalog).toHaveProperty(['shell.form.added'])
       expect(catalog).toHaveProperty(['shell.form.removed'])
-      expect(catalog).toHaveProperty(['shell.lookup.search'])
     }
   })
 

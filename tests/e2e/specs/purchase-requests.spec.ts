@@ -384,7 +384,9 @@ test('searching in the supplier lookup filters the suppliers by name, and pickin
   await page.getByTestId('reference-supplier').getByRole('button', { name: 'Choose…', exact: true }).click()
   const dialog = await waitForDialog(page)
   await expect(dialog.getByRole('row', { name: /Acme Supplies/ })).toBeVisible()
-  await dialog.getByLabel(fieldLabel('Search')).fill('glob')
+  const search = dialog.getByRole('searchbox', { name: 'Search', exact: true })
+  await search.fill('glob')
+  await search.press('Enter')
 
   // The search ignores case, so `glob` finds Globex.
   await expect(dialog.getByRole('row', { name: /Globex/ })).toBeVisible()
