@@ -10,6 +10,7 @@ import { fetchTasks, type TaskListItem, type TaskPage } from './tasks'
 import { resolveText, useText, useTextCatalogs } from './texts'
 import { useReleaseTexts } from './useReleaseTexts'
 import { siteAddress } from './siteLinks'
+import { RecordLink } from './RecordLink'
 
 interface TaskInboxWidgetProps {
   sitePath: string
@@ -131,7 +132,13 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
         key: 'subject',
         kind: 'freeText',
         title: t('shell.tasks.subject'),
-        render: (_value: unknown, task: TaskListItem) => task.subject.label ?? null,
+        // Proposed: the record a task is about opens from the inbox too, see the review on #3650.
+        render: (_value: unknown, task: TaskListItem) =>
+          task.subject.label === null ? null : (
+            <RecordLink entity={task.subject.entity} id={task.subject.id}>
+              {task.subject.label}
+            </RecordLink>
+          ),
       },
       {
         key: 'dueAt',

@@ -22,6 +22,7 @@ import {
   type RecordValue,
   type RowLabels,
 } from './records'
+import { OpenRecordButton, RecordLink } from './RecordLink'
 import { ReadOnlyValue } from './ReadOnlyValue'
 import { requiredMark } from './requiredMark'
 import { ReferenceLookup } from './ReferenceLookup'
@@ -478,9 +479,16 @@ export function useRecordForm(
         )
       }
       // The server sets the value on save, so it is shown as a table cell shows it.
+      const shown = formatValue(field, value as RecordValue, labels, { locale, text: t }, values)
       return (
         <ReadOnlyValue field={id}>
-          {formatValue(field, value as RecordValue, labels, { locale, text: t }, values)}
+          {field.type === 'reference' && field.target ? (
+            <RecordLink entity={field.target.entity} id={String(value)}>
+              {shown}
+            </RecordLink>
+          ) : (
+            shown
+          )}
         </ReadOnlyValue>
       )
     }
@@ -490,6 +498,7 @@ export function useRecordForm(
         // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
         return (
           <Space.Compact block data-testid={`reference-${field.name}`}>
+            {/* Proposed: the chosen record opens from the field, see the review on #3650. */}
             <Input
               id={id}
               readOnly
@@ -504,6 +513,9 @@ export function useRecordForm(
               icon={<SearchOutlined />}
               onClick={() => setLookup(field.name)}
             />
+            {field.target && typeof value === 'string' && (
+              <OpenRecordButton entity={field.target.entity} id={value} name={typeof label === 'string' ? label : ''} />
+            )}
             {!field.required && value !== null && (
               <AxisButton
                 role="icon"

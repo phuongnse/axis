@@ -21,6 +21,7 @@ import {
 } from './records'
 import type { EntityWidgetMetadata, FieldMetadata, NavigateAction, StartProcessAction } from './site'
 import { PageHeading } from './PageLayout'
+import { RecordLink } from './RecordLink'
 import { RecordNotFound } from './RecordNotFound'
 import { PartRule, SectionPart } from './SectionParts'
 import { TermList } from './TermList'
@@ -222,6 +223,11 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
       <FileLink field={field} value={value} />
     ) : value === null ? (
       <NotSet />
+    ) : field.type === 'reference' && field.target ? (
+      // Proposed: a reference opens the record it points to, see the review on #3650.
+      <RecordLink entity={field.target.entity} id={String(value)}>
+        {formatValue(field, value as RecordValue, record.labels, { locale, text: t }, record.values)}
+      </RecordLink>
     ) : (
       formatValue(field, value as RecordValue, record.labels, { locale, text: t }, record.values)
     )

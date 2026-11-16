@@ -83,6 +83,11 @@ export interface ApplicationSite {
   notificationsPath?: string | null
   /** The site's own links, or else its tenant's, or `null` or missing when neither sets any. */
   legal?: SiteLegal | null
+  /**
+   * Proposed, see the review on #3650: the address of each entity's record page in the site, `/{site}/{page}`, for the
+   * entities the person may read, or missing when there is none.
+   */
+  recordPages?: Record<string, string>
 }
 
 /** A field type as written in entity files. */

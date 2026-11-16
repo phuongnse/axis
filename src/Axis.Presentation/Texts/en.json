@@ -706,6 +706,7 @@
   "shell.form.clear": "Clear",
   "shell.form.addRow": "Add row",
   "shell.form.newRecord": "New {entity}",
+  "shell.form.openRecord": "Open",
   "shell.form.removeRow": "Delete row",
   "shell.form.add": "Add",
   "shell.form.added": "Added",

@@ -794,6 +794,9 @@ export const applicationSite: ApplicationSite = {
     { page: 'Tasks', labelKey: 'nav.tasks', icon: 'tasks' },
   ],
   notificationsPath,
+  // Proposed: a request opens on the Request page the site names, and a category, which has no page of its own, on the
+  // default record page, see the review on #3650.
+  recordPages: { Request: `/${sitePath}/request`, Category: `/${sitePath}/records/Category` },
 }
 
 const requestsPage: PageMetadata = {

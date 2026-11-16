@@ -706,6 +706,7 @@
   "shell.form.clear": "Xóa",
   "shell.form.addRow": "Thêm dòng",
   "shell.form.newRecord": "{entity} mới",
+  "shell.form.openRecord": "Mở",
   "shell.form.removeRow": "Xóa dòng",
   "shell.form.add": "Thêm",
   "shell.form.added": "Đã thêm",

@@ -15,6 +15,7 @@ import {
   type RecordValue,
   type RowLabels,
 } from './records'
+import { OpenRecordButton, RecordLink } from './RecordLink'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
@@ -148,8 +149,8 @@ export function ChildCollectionTable({
           const shown = formatValue(child, row[child.name] ?? null, aligned[index] ?? {}, { locale, text: t }, row)
           return (
             <Form.Item
-              // The inputs keep a usable width when the table scrolls sideways. A reference cell has two buttons.
-              style={{ minWidth: child.type === 'reference' ? 240 : 160 }}
+              // The inputs keep a usable width when the table scrolls sideways. A reference cell has three buttons.
+              style={{ minWidth: child.type === 'reference' ? 272 : 160 }}
               validateStatus={cellErrors ? 'error' : undefined}
               help={
                 cellErrors && (
@@ -170,6 +171,11 @@ export function ChildCollectionTable({
                     ) : (
                       <EmptyDash />
                     )
+                  ) : shown && child.type === 'reference' && child.target ? (
+                    // Proposed: a reference opens the record it points to, see the review on #3650.
+                    <RecordLink entity={child.target.entity} id={String(row[child.name])}>
+                      {shown}
+                    </RecordLink>
                   ) : shown ? (
                     shown
                   ) : (
@@ -188,6 +194,13 @@ export function ChildCollectionTable({
                     icon={<SearchOutlined />}
                     onClick={() => setLookup({ index, field: child })}
                   />
+                  {child.target && typeof row[child.name] === 'string' && (
+                    <OpenRecordButton
+                      entity={child.target.entity}
+                      id={row[child.name] as string}
+                      name={`${label} ${index + 1}`}
+                    />
+                  )}
                   {!child.required && row[child.name] != null && (
                     <AxisButton
                       role="icon"

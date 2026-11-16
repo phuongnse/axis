@@ -2,7 +2,8 @@ import { Flex, Form, Tag } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisActionRow, AxisButton, AxisButtonGroup } from './AxisButton'
 import { PageActions, PageHeading } from './PageLayout'
-import { PartRule, ThingHeading } from './SectionParts'
+import { PartRule } from './SectionParts'
+import { RecordLink } from './RecordLink'
 import { TermList, type Term } from './TermList'
 import { RecordNotFound } from './RecordNotFound'
 import { SaveBar } from './SaveBar'
@@ -234,9 +235,25 @@ function TaskBody({
   // Proposed: a page that shows one thing is headed by its name, with the state the platform keeps of it as tags
   // beside the name and its kind as the line, and the rest of what the platform keeps of it is the page's first part,
   // see the review on #3650.
-  // The record is the form below, so only what belongs to the task is a fact, each on a row of its own, as
+  // The record the task is about opens on its own page, and each fact takes a row of its own, as
   // docs/reference/actions-and-controls.md#fields says.
-  const facts: Term[] = dueAt === null ? [] : [{ key: 'dueAt', term: t('shell.tasks.dueAt'), value: dueAt }]
+  const subjectLabel = task.form.entity.labelKey ? t(task.form.entity.labelKey) : t('shell.tasks.subject')
+  const facts: Term[] = [
+    ...(task.subject.label === null
+      ? []
+      : [
+          {
+            key: 'subject',
+            term: subjectLabel,
+            value: (
+              <RecordLink entity={task.subject.entity} id={task.subject.id}>
+                {task.subject.label}
+              </RecordLink>
+            ),
+          },
+        ]),
+    ...(dueAt === null ? [] : [{ key: 'dueAt', term: t('shell.tasks.dueAt'), value: dueAt }]),
+  ]
   return (
     <Flex vertical gap="middle">
       <PageHeading
@@ -266,11 +283,6 @@ function TaskBody({
             onCommand={onCommand}
             onReassign={onReassign}
           />
-          {/* Proposed: the record the task is about is named above its form, by its name and its kind, so the person
-              sees that what follows is that record, see the review on #3650. */}
-          {task.subject.label !== null && task.form.entity.labelKey && (
-            <ThingHeading name={task.subject.label} kind={t(task.form.entity.labelKey)} />
-          )}
           <OpenTaskForm
             task={task}
             tasksPath={tasksPath}

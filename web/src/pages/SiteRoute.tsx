@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, Outlet, useParams } from 'react-router'
 import { readStoredLocale, storeLocale } from '../platform/locale'
 import { Shell } from '../platform/Shell'
+import { RecordPagesContext } from '../platform/recordPages'
 import { fetchApplicationSite, type ApplicationSite } from '../platform/site'
 import { useSignInNeeded } from '../platform/signInNeeded'
 import { TextProvider } from '../platform/TextProvider'
@@ -11,6 +12,8 @@ import { NotFoundPage } from './NotFoundPage'
 import { platformTextsFor, useApplicationSite, usePlatform, type SiteOutlet } from './context'
 import { PlatformShellRoute } from './PlatformShellRoute'
 import { siteAddress } from '../platform/siteLinks'
+
+const noRecordPages: Readonly<Record<string, string>> = {}
 
 interface LoadedSite {
   site: ApplicationSite
@@ -149,7 +152,10 @@ function SiteShell({ path }: { path: string }) {
         legal={site.legal}
       >
         {localeFailed && <LocaleLoadFailed onClose={() => setLocaleFailed(false)} />}
-        <Outlet context={{ site, locale } satisfies SiteOutlet} />
+        {/* Proposed: every reference to a record in the site opens it on its record page, see the review on #3650. */}
+        <RecordPagesContext.Provider value={site.recordPages ?? noRecordPages}>
+          <Outlet context={{ site, locale } satisfies SiteOutlet} />
+        </RecordPagesContext.Provider>
       </Shell>
     </TextProvider>
   )
