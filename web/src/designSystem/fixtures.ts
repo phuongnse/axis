@@ -771,9 +771,11 @@ const requestsPage: PageMetadata = {
   widgets: [tableWidget],
 }
 
+// Proposed: the form page is titled as a site's form page is, for a new and a saved record alike, see the review on
+// #3650.
 const requestPage: PageMetadata = {
   name: 'Request',
-  titleKey: 'request.new',
+  titleKey: 'request.label',
   parameters: [],
   widgets: [formWidget],
 }

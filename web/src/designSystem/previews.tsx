@@ -259,6 +259,14 @@ export const previews: Record<string, readonly PreviewState[]> = {
       entry: { pathname: '/sample/request/new', state: { from: '/sample/requests' } },
       frameHeight: 600,
     },
+    // Proposed: a saved record's form page, with its action on the heading, its history and the action bar, see the
+    // review on #3650.
+    {
+      caption: 'Saved record',
+      draw: () => <ShellPreview />,
+      entry: { pathname: `/sample/request/${requestId}`, state: { from: '/sample/requests' } },
+      frameHeight: 600,
+    },
     { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: 600 },
     {
       caption: 'App switcher',

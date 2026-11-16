@@ -41,6 +41,8 @@ export function ShellPreview() {
         <Route path=":site" element={<SiteRoute />}>
           <Route path=":page" element={<PageRoute />} />
           <Route path=":page/new" element={<PageRoute form="new" />} />
+          {/* Proposed: a saved record's form page, as App.tsx routes it, see the review on #3650. */}
+          <Route path=":page/:id" element={<PageRoute form="edit" />} />
           <Route path=":module/:page/new" element={<PageRoute form="new" />} />
           <Route path=":module/:page/:id" element={<PageRoute form="edit" />} />
         </Route>

@@ -1,5 +1,6 @@
 import { Breadcrumb, Flex, Typography } from 'antd'
-import type { ReactNode } from 'react'
+import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -25,18 +26,25 @@ export function PageLayout({
   breadcrumb?: readonly BreadcrumbStep[]
   children: ReactNode
 }) {
+  const [slot, setSlot] = useState<HTMLDivElement | null>(null)
   const heading = (
-    // Level one for the outline, at the 20px and 28px that a level-four heading has.
-    <Typography.Title level={1} style={{ margin: 0, fontSize: 20, lineHeight: '28px' }}>
-      {title}
-    </Typography.Title>
+    // Proposed: the page's own actions sit on the heading's right, as a Studio page's do, see the review on #3650.
+    <Flex justify="space-between" align="center" gap="middle">
+      {/* Level one for the outline, at the 20px and 28px that a level-four heading has. */}
+      <Typography.Title level={1} style={{ margin: 0, fontSize: 20, lineHeight: '28px' }}>
+        {title}
+      </Typography.Title>
+      <div ref={setSlot} />
+    </Flex>
   )
 
   return (
-    <Flex vertical gap="middle">
-      {breadcrumb ? <HeaderBand steps={breadcrumb}>{heading}</HeaderBand> : heading}
-      {children}
-    </Flex>
+    <PageActionsSlot.Provider value={slot}>
+      <Flex vertical gap="middle">
+        {breadcrumb ? <HeaderBand steps={breadcrumb}>{heading}</HeaderBand> : heading}
+        {children}
+      </Flex>
+    </PageActionsSlot.Provider>
   )
 }
 
@@ -65,4 +73,19 @@ function HeaderBand({ steps, children }: { steps: readonly BreadcrumbStep[]; chi
       </Flex>
     </div>
   )
+}
+
+// Where the page's own actions go: the right of its heading. Outside a page layout, such as in a widget's preview, there is none.
+const PageActionsSlot = createContext<HTMLDivElement | null | undefined>(undefined)
+
+/**
+ * Proposed, see the review on #3650: draws a widget's actions on the right of its page's heading, as the page's own
+ * actions, such as a form's Submit for approval. Outside a page layout it draws them where it stands.
+ */
+export function PageActions({ children }: { children: ReactNode }) {
+  const slot = useContext(PageActionsSlot)
+  if (slot === undefined) {
+    return <Flex justify="end">{children}</Flex>
+  }
+  return slot ? createPortal(children, slot) : null
 }
