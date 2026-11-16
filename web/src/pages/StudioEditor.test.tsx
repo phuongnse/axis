@@ -1334,27 +1334,39 @@ describe('StudioEditor for a text resource', () => {
 
   function renderTexts() {
     render(
-      <ThemeModeProvider>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioEditor
-            application="Shop"
-            item={enItem}
-            resources={[enItem, viItem]}
-            path={null}
-            diagnosticPaths={[]}
-            onOpen={vi.fn()}
-            onSaved={vi.fn()}
-            onTextsWritten={vi.fn()}
-            onDeleted={vi.fn()}
-          />
-        </TextProvider>
-      </ThemeModeProvider>,
+      <MemoryRouter>
+        <ThemeModeProvider>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioEditor
+              application="Shop"
+              item={enItem}
+              resources={[enItem, viItem]}
+              path={null}
+              diagnosticPaths={[]}
+              onOpen={vi.fn()}
+              onSaved={vi.fn()}
+              onTextsWritten={vi.fn()}
+              onDeleted={vi.fn()}
+            />
+          </TextProvider>
+        </ThemeModeProvider>
+      </MemoryRouter>,
     )
   }
 
   function calls(fetchMock: ReturnType<typeof vi.fn>, method: string) {
     return fetchMock.mock.calls.filter(([, init]) => init?.method === method) as [string, RequestInit][]
   }
+
+  it('does not mount the text table while the Used by tab is open', async () => {
+    stubTexts()
+    renderTexts()
+    await screen.findAllByTestId('studio-text-row', undefined, slow)
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Used by' }))
+
+    expect(screen.queryByTestId('studio-text-table')).toBeNull()
+  })
 
   it('saves one patch to the open locale only, holding only the edited key', async () => {
     const fetchMock = stubTexts()

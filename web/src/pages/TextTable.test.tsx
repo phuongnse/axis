@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
@@ -20,15 +21,23 @@ function ThemeRoot({ children }: { children: ReactNode }) {
 
 type Add = (key: string, texts: Record<string, string>) => Promise<'added' | 'invalid' | 'failed'>
 
+/** The address of the page, which holds the table's search and page. */
+function LocationProbe() {
+  return <output data-testid="location">{useLocation().search}</output>
+}
+
 function renderTable(data: TextColumn[] = columns, onChange = vi.fn(), onAdd = vi.fn<Add>(async () => 'added')) {
   render(
-    <ThemeModeProvider>
-      <ThemeRoot>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <TextTable columns={data} onChange={onChange} onAdd={onAdd} />
-        </TextProvider>
-      </ThemeRoot>
-    </ThemeModeProvider>,
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <ThemeRoot>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <TextTable columns={data} onChange={onChange} onAdd={onAdd} />
+          </TextProvider>
+        </ThemeRoot>
+      </ThemeModeProvider>
+      <LocationProbe />
+    </MemoryRouter>,
   )
   return { onChange, onAdd }
 }
@@ -59,20 +68,35 @@ describe.each(['light', 'dark'])('TextTable in %s mode', (mode) => {
 })
 
 describe('TextTable', () => {
-  it('filters the rows by key or by the text of any locale, ignoring letter case', async () => {
+  it('searches the text of any locale on Enter and keeps the search in the address', async () => {
     renderTable()
-    const search = screen.getByRole('searchbox', { name: 'Search keys and texts' })
+    const search = screen.getByRole('searchbox', { name: 'Search' })
 
-    await userEvent.type(search, 'XIN')
+    await userEvent.type(search, 'XIN{Enter}')
+    expect(screen.getByTestId('location')).toHaveTextContent('search=XIN')
     expect(shownKeys()).toEqual(['greeting'])
 
     await userEvent.clear(search)
-    await userEvent.type(search, 'FARE')
+    await userEvent.type(search, 'goodBYE{Enter}')
     expect(shownKeys()).toEqual(['farewell'])
+  })
 
-    await userEvent.clear(search)
-    await userEvent.type(search, 'goodBYE')
+  it('searches part of a key in another letter case and shows only that key row', async () => {
+    renderTable()
+
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'FARE{Enter}')
+
     expect(shownKeys()).toEqual(['farewell'])
+  })
+
+  it('shows 20 rows on the first page of a table with 21 keys', () => {
+    const texts = Object.fromEntries(
+      Array.from({ length: 21 }, (_, index) => [`key${String(index).padStart(2, '0')}`, 'Text']),
+    )
+    renderTable([{ id: 'en-id', locale: 'en', texts, editable: true }])
+
+    expect(shownKeys()).toHaveLength(20)
+    expect(shownKeys()).not.toContain('key20')
   })
 
   it('edits the open column and sets an empty string when a cell is cleared', async () => {

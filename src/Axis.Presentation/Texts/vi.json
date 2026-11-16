@@ -2265,7 +2265,6 @@
   "shell.studio.scenario.addOutput": "Thêm đầu ra",
   "shell.studio.scenario.notJson": "Đây không phải JSON, nên giá trị chưa được lưu.",
   "shell.studio.texts.key": "Khóa",
-  "shell.studio.texts.search": "Tìm khóa và văn bản",
   "shell.studio.texts.missing": "Chưa dịch",
   "shell.studio.texts.newKey": "Khóa mới",
   "shell.studio.texts.addKey": "Thêm khóa",

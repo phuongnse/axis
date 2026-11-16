@@ -1070,23 +1070,26 @@ export function StudioEditor({
   ) : item.kind === 'scenario' ? (
     <ScenarioEditor value={draft} onChange={onUpdate} />
   ) : item.kind === 'text' && schema && isContent(draft.texts) && otherTexts ? (
-    <TextTable
-      columns={resources
-        .filter((resource) => resource.kind === 'text')
-        .map((resource) =>
-          resource.id === item.id
-            ? {
-                id: item.id,
-                locale: String(loaded.content.locale),
-                texts: draft.texts as Record<string, unknown>,
-                editable: true,
-              }
-            : otherTexts.find((column) => column.id === resource.id),
-        )
-        .filter((column): column is TextColumn => column !== undefined)}
-      onChange={onUpdate}
-      onAdd={addTextKey}
-    />
+    // The table reads the address for its search and page, so it is mounted only while its tab is open, as Used by is.
+    tab === 'form' ? (
+      <TextTable
+        columns={resources
+          .filter((resource) => resource.kind === 'text')
+          .map((resource) =>
+            resource.id === item.id
+              ? {
+                  id: item.id,
+                  locale: String(loaded.content.locale),
+                  texts: draft.texts as Record<string, unknown>,
+                  editable: true,
+                }
+              : otherTexts.find((column) => column.id === resource.id),
+          )
+          .filter((column): column is TextColumn => column !== undefined)}
+        onChange={onUpdate}
+        onAdd={addTextKey}
+      />
+    ) : null
   ) : item.kind === 'entity' && schema ? (
     <EntityDesigner
       value={draft}

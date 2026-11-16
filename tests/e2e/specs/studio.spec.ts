@@ -500,6 +500,10 @@ test.describe('Studio on a copy of its own', () => {
       await add.getByRole('textbox', { name: 'en', exact: true }).fill('E2E text')
       await add.getByRole('textbox', { name: 'vi', exact: true }).fill('Văn bản E2E')
       await add.getByRole('button', { name: 'Add key', exact: true }).click()
+      // A new key sorts past the first page, so the table is searched for it before its row is looked for.
+      const search = page.getByTestId('studio-text-table').getByRole('searchbox', { name: 'Search', exact: true })
+      await search.fill(key)
+      await search.press('Enter')
       await expect(page.locator(`[data-testid="studio-text-row"][data-key="${key}"]`)).toBeVisible()
 
       const [en, vi] = await Promise.all(
