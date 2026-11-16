@@ -9,7 +9,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import { HomeTileStyle } from './HomeTileStyle'
-import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { SiteTiles } from './SiteTiles'
 import { StudioChangeList } from './StudioChangeList'
 import { StudioPageHeading } from './StudioPageHeading'
@@ -57,9 +57,9 @@ export function StudioOverview({
     <Flex vertical gap={spacing.lg}>
       <HomeTileStyle />
       <StudioPageHeading title={title} line={description} />
-      <ResourceFormSections>
+      <SectionParts>
         {getStarted && (
-          <ResourceFormSection testName="get-started" heading={{ title: t('shell.studio.overview.getStarted') }}>
+          <SectionPart testName="get-started" heading={{ title: t('shell.studio.overview.getStarted') }}>
             <ol style={{ margin: 0, paddingInlineStart: spacing.lg }}>
               <li>
                 <Link to={address({ kind: 'entity' })}>{t('shell.studio.overview.start.entity')}</Link>
@@ -74,18 +74,18 @@ export function StudioOverview({
                 <Link to={address({ view: 'releases' })}>{t('shell.studio.overview.start.publish')}</Link>
               </li>
             </ol>
-          </ResourceFormSection>
+          </SectionPart>
         )}
         {(loaded === undefined || releaseId !== null) && (
-          <ResourceFormSection testName="live" heading={{ title: t('shell.studio.overview.live') }}>
+          <SectionPart testName="live" heading={{ title: t('shell.studio.overview.live') }}>
             {releaseId === null ? (
               <ReleasesState failed={history === 'failed'} />
             ) : (
               <LiveSites application={application} locale={locale} releaseId={releaseId} />
             )}
-          </ResourceFormSection>
+          </SectionPart>
         )}
-        <ResourceFormSection testName="changes" heading={{ title: t('shell.studio.overview.changes') }}>
+        <SectionPart testName="changes" heading={{ title: t('shell.studio.overview.changes') }}>
           {loaded === undefined ? (
             <ReleasesState failed={history === 'failed'} />
           ) : (
@@ -104,9 +104,9 @@ export function StudioOverview({
               <Link to={address({ view: 'releases' })}>{t('shell.studio.overview.changes.releases')}</Link>
             </Flex>
           )}
-        </ResourceFormSection>
+        </SectionPart>
         {missing.length > 0 && (
-          <ResourceFormSection testName="more" heading={{ title: t('shell.studio.overview.more') }}>
+          <SectionPart testName="more" heading={{ title: t('shell.studio.overview.more') }}>
             <Flex vertical gap={spacing.sm}>
               {missing.map((entry) => (
                 <Flex key={entry.kind} vertical>
@@ -118,9 +118,9 @@ export function StudioOverview({
                 </Flex>
               ))}
             </Flex>
-          </ResourceFormSection>
+          </SectionPart>
         )}
-      </ResourceFormSections>
+      </SectionParts>
     </Flex>
   )
 }

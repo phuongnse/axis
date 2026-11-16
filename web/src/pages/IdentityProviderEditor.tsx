@@ -8,7 +8,7 @@ import { useText } from '../platform/texts'
 import { useFieldTexts } from './fieldTexts'
 import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
-import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import type { ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -172,11 +172,11 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
   function section(name: string, children: ReactNode, action?: ReactNode) {
     const prefix = `shell.studio.section.identityProvider.${name}`
     return (
-      <ResourceFormSection testName={name} heading={{ title: t(prefix), line: t(`${prefix}.line`) }} action={action}>
+      <SectionPart testName={name} heading={{ title: t(prefix), line: t(`${prefix}.line`) }} action={action}>
         <Flex vertical gap="small">
           {children}
         </Flex>
-      </ResourceFormSection>
+      </SectionPart>
     )
   }
 
@@ -184,7 +184,7 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
 
   return (
     <div data-testid="studio-identity-provider-editor">
-      <ResourceFormSections>
+      <SectionParts>
         {section(
           'general',
           <>
@@ -342,7 +342,7 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
             {t('shell.studio.identityProvider.addAcr')}
           </AxisButton>,
         )}
-      </ResourceFormSections>
+      </SectionParts>
     </div>
   )
 }

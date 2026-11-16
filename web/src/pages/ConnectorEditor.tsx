@@ -8,7 +8,7 @@ import { useText } from '../platform/texts'
 import { BindingSelect } from './CatalogControls'
 import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
-import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import type { ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -142,17 +142,17 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
   function section(name: string, children: ReactNode, action?: ReactNode) {
     const prefix = `shell.studio.section.connector.${name}`
     return (
-      <ResourceFormSection testName={name} heading={{ title: t(prefix), line: t(`${prefix}.line`) }} action={action}>
+      <SectionPart testName={name} heading={{ title: t(prefix), line: t(`${prefix}.line`) }} action={action}>
         <Flex vertical gap="small">
           {children}
         </Flex>
-      </ResourceFormSection>
+      </SectionPart>
     )
   }
 
   return (
     <div data-testid="studio-connector-editor">
-      <ResourceFormSections>
+      <SectionParts>
         {section(
           'general',
           <>
@@ -233,7 +233,7 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
             {t('shell.studio.connector.addOperation')}
           </AxisButton>,
         )}
-      </ResourceFormSections>
+      </SectionParts>
     </div>
   )
 }
