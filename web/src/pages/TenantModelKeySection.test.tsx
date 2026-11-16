@@ -54,7 +54,7 @@ function renderSection() {
 async function expectHidden(fetchMock: ReturnType<typeof stubServer>) {
   await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/tenant/model-key', expect.anything()))
   await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
-  expect(screen.queryByTestId('tenant-model-key')).toBeNull()
+  expect(screen.queryByRole('region', { name: 'Model key' })).toBeNull()
   expect(screen.queryByText('Model key')).toBeNull()
 }
 
@@ -88,8 +88,8 @@ describe('TenantModelKeySection', () => {
     stubServer([new Response(null, { status: 503 })])
     renderSection()
 
-    const section = await screen.findByTestId('tenant-model-key')
-    expect(within(section).getByRole('heading', { name: 'Model key' })).toBeVisible()
+    const section = await screen.findByRole('region', { name: 'Model key' })
+    expect(within(section).getByRole('heading', { name: 'Model key', level: 2 })).toBeVisible()
     expect(await within(section).findByTestId('tenant-model-key-load-failed')).toHaveTextContent(
       'The model key could not be loaded.',
     )
@@ -121,7 +121,7 @@ describe('TenantModelKeySection', () => {
     )
     renderSection()
 
-    const section = await screen.findByTestId('tenant-model-key')
+    const section = await screen.findByRole('region', { name: 'Model key' })
     expect(within(section).getByRole('heading', { name: 'Model key' })).toBeVisible()
     expect(within(section).getByText('Loading the model key…')).toBeVisible()
     expect(within(section).queryByText('No key is set.')).toBeNull()
@@ -132,7 +132,7 @@ describe('TenantModelKeySection', () => {
     stubServer([json(keySet)])
     renderSection()
 
-    const section = await screen.findByTestId('tenant-model-key')
+    const section = await screen.findByRole('region', { name: 'Model key' })
     expect(within(section).getByRole('heading', { name: 'Model key' })).toBeVisible()
     expect(within(section).getByTestId('tenant-model-key-masked')).toHaveTextContent(/^••••7890$/)
     expect(within(section).getByRole('button', { name: 'Change key…' })).toBeVisible()
@@ -151,7 +151,7 @@ describe('TenantModelKeySection', () => {
     stubServer([json(keyNotSet)])
     renderSection()
 
-    const section = await screen.findByTestId('tenant-model-key')
+    const section = await screen.findByRole('region', { name: 'Model key' })
     expect(within(section).getByText('No key is set.')).toBeVisible()
     expect(within(section).getByRole('button', { name: 'Set key…' })).toBeVisible()
     expect(within(section).queryByRole('button', { name: 'Remove key…' })).toBeNull()

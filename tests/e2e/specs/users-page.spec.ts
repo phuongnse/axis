@@ -101,7 +101,7 @@ test("an administrator reads the warning, confirms the start of an export and do
   await useSession(page, "administrator");
   await page.goto("/users");
 
-  const section = page.getByTestId("tenant-export");
+  const section = page.getByRole("region", { name: "Export data", exact: true });
   await expect(
     section.getByRole("heading", { name: "Export data", exact: true }),
   ).toBeVisible();

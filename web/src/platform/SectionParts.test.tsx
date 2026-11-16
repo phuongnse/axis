@@ -32,7 +32,8 @@ describe('SectionPart', () => {
 
     const section = screen.getByRole('region', { name: 'Basics' })
     expect(section).toBe(screen.getByTestId('studio-section-basics'))
-    expect(within(section).getByRole('heading', { name: 'Basics', level: 5 })).toBeVisible()
+    expect(within(section).getByRole('heading', { name: 'Basics', level: 2 })).toBeVisible()
+    expect(within(section).getByRole('heading', { name: 'Basics' })).toHaveStyle({ fontSize: '16px' })
     expect(within(section).getByText('What it is called.')).toBeVisible()
     expect(within(section).getByText('Fields')).toBeVisible()
   })
@@ -110,6 +111,55 @@ describe('SectionPart', () => {
     expect(screen.getByTestId('studio-section-three').previousElementSibling).toBe(rules[1])
     expect(rules[0]).toHaveStyle(rule)
     expect(rules[1]).toHaveStyle(rule)
+  })
+
+  it('draws no extra rule for a component child that renders nothing, in the middle or at the end', () => {
+    const Hidden = () => null
+    const part = (name: string) => (
+      <SectionPart key={name} testName={name} heading={{ title: name }}>
+        <span>Fields</span>
+      </SectionPart>
+    )
+    const { unmount } = renderSections([part('one'), <Hidden key="hidden" />, part('two')])
+
+    expect(screen.getAllByRole('separator')).toHaveLength(1)
+    expect(screen.getByTestId('studio-section-two').previousElementSibling).toBe(screen.getByRole('separator'))
+    unmount()
+
+    renderSections([part('one'), part('two'), <Hidden key="hidden" />])
+
+    expect(screen.getAllByRole('separator')).toHaveLength(1)
+    expect(screen.getByTestId('studio-section-two').previousElementSibling).toBe(screen.getByRole('separator'))
+  })
+
+  it('draws exactly one rule above the first part of a column that follows another part', () => {
+    renderSections([
+      <SectionPart key="one" testName="one" heading={{ title: 'one' }}>
+        <span>Fields</span>
+      </SectionPart>,
+      <SectionParts key="nested">
+        <SectionPart testName="two" heading={{ title: 'two' }}>
+          <span>Fields</span>
+        </SectionPart>
+      </SectionParts>,
+    ])
+
+    expect(screen.getAllByRole('separator')).toHaveLength(1)
+    expect(screen.getByTestId('studio-section-two').previousElementSibling).toBe(screen.getByRole('separator'))
+  })
+
+  it('draws no rule for a part nested in the body of another part', () => {
+    renderSections([
+      <SectionPart key="one" testName="one" heading={{ title: 'one' }}>
+        <SectionParts>
+          <SectionPart testName="inner" heading={{ title: 'inner' }}>
+            <span>Fields</span>
+          </SectionPart>
+        </SectionParts>
+      </SectionPart>,
+    ])
+
+    expect(screen.queryByRole('separator')).toBeNull()
   })
 
   it('draws no rule for a single part', () => {

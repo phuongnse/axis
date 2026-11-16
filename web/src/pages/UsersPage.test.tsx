@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -212,6 +212,66 @@ describe('UsersPage', () => {
     expect(await screen.findByText('Ann Invited')).toBeVisible()
     expect(screen.getByRole('tab', { name: 'People' })).toBeVisible()
     expect(screen.queryByRole('tab', { name: 'Connected apps' })).toBeNull()
+  })
+
+  it('shows Export data, Usage, Model key and Application packages as parts under the table, each with a rule above', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        switch (input) {
+          case '/api/me':
+            return json({ ...administrator, tenantExports: true })
+          case '/api/tenant/usage':
+            return json({ quotas: { users: { limit: 5, used: 2 } }, days: [] })
+          case '/api/tenant/model-key':
+            return json({ set: false })
+          case applicationPackagesPath:
+            return json({ on: false })
+          case outsideClientsPath:
+            return new Response(null, { status: 404 })
+          default:
+            return json(users)
+        }
+      }),
+    )
+    renderPage()
+
+    expect(await screen.findByText('Ann Invited')).toBeVisible()
+    for (const name of ['Export data', 'Usage', 'Model key', 'Application packages']) {
+      const region = await screen.findByRole('region', { name })
+      expect(within(region).getByRole('heading', { level: 2, name })).toBeVisible()
+    }
+    expect(screen.getAllByRole('separator')).toHaveLength(4)
+  })
+
+  it('shows none of the four parts and no rule when their routes refuse', async () => {
+    const fetchMock = vi.fn(async (input: string) => {
+      switch (input) {
+        case '/api/me':
+          return json({ ...administrator, tenantExports: false })
+        case '/api/tenant/usage':
+        case '/api/tenant/model-key':
+        case applicationPackagesPath:
+          return new Response(null, { status: 403 })
+        case outsideClientsPath:
+          return new Response(null, { status: 404 })
+        default:
+          return json(users)
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    renderPage()
+
+    expect(await screen.findByText('Ann Invited')).toBeVisible()
+    await vi.waitFor(() => {
+      for (const path of ['/api/me', '/api/tenant/usage', '/api/tenant/model-key', applicationPackagesPath]) {
+        expect(fetchMock).toHaveBeenCalledWith(path, expect.anything())
+      }
+    })
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+
+    expect(screen.queryByRole('region')).toBeNull()
+    expect(screen.queryByRole('separator')).toBeNull()
   })
 
   it('searches from page 1 and pages from the server', async () => {

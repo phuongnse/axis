@@ -101,6 +101,20 @@ describe('UserPage', () => {
     expect(within(roleRow(page, 'administrator')).getByRole('button', { name: 'Give' })).toBeVisible()
   })
 
+  it('shows each place where roles are given as a part named by its heading, with a rule between', async () => {
+    stubRoles()
+    const page = await openAnn()
+    await within(page).findByText('Purchasing')
+
+    for (const name of ['Purchasing', 'Platform']) {
+      const region = within(page).getByRole('region', { name })
+      expect(within(region).getByRole('heading', { level: 2, name })).toBeVisible()
+    }
+    expect(within(within(page).getByRole('region', { name: 'Purchasing' })).getByText('buyer')).toBeVisible()
+    expect(within(page).getAllByRole('separator')).toHaveLength(1)
+    expect(within(page).getByTestId('user-email')).toBeVisible()
+  })
+
   it('offers the developer role and shows it on a person who holds it', async () => {
     stubRoles()
     const page = await openAnn()

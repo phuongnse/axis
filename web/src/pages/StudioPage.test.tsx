@@ -1147,7 +1147,7 @@ describe('StudioPage', () => {
       renderPage()
 
       expect(await screen.findByTestId('studio-band')).toBeInTheDocument()
-      expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { level: 2, name: /PurchaseRequests/ })).not.toBeInTheDocument()
     })
 
     it.each([

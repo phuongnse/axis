@@ -71,8 +71,8 @@ their own controls where they expect them.
   page declares its colour scheme, so every scrollbar, the page's and the sidebar's, follows the mode.
 - **Flush page area.** Pages draw on `surface`, flush with the frame, with `spacing-lg` padding. A wide table
   scrolls inside its widget, so the page never scrolls sideways.
-- **Parts a rule apart** _(planned for M35)_. A page's parts sit a `divider` rule apart, and each part's heading
-  is `heading5`.
+- **Parts a rule apart.** A page's parts sit a `divider` rule apart, and each part's heading is an `h2` drawn at
+  `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule.
 - **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area, just above the footer. It
   has no link back, because the navigation and the breadcrumb lead back.
 - **Footer.** A slim footer on `surface` with a `borderSubtle` rule above it, with `spacing-xs`
