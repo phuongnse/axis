@@ -46,10 +46,21 @@ the task.
 
 ## List my tasks
 
-`GET /api/apps/{app}/tasks?page=&pageSize=` lists the `open` tasks the user may act on, whatever
-release their instance is pinned to. `page` and `pageSize` follow the record API's
-[paging rules](record-api.md#paging-and-sorting), and there is no `sort` or `search`. Tasks are
-ordered by `dueAt` ascending with no due date last, then by `createdAt`, then by `id`.
+`GET /api/apps/{app}/tasks?page=&pageSize=&sort=&search=&filter=` lists the `open` tasks the user may
+act on, whatever release their instance is pinned to. The five parameters follow the record API's
+[paging and sorting](record-api.md#paging-and-sorting), and PostgreSQL applies them. The list has two
+fields:
+
+- `subject` is text, and `search` looks in it. It is the subject label that `subject.label` shows.
+- `dueAt` is a date. A filter compares its UTC day and a sort uses its exact time. A `sort=-dueAt`
+  puts the tasks with no due date first.
+
+A subject label the user may not read is empty for all three parameters: a search never finds it, a
+filter never compares its value, and a sort puts it with the empty labels. A `sort` or a `filter` on
+any other field is a `400` keyed `sort` or `filter`, like every other list. With no `sort`, the tasks
+are ordered by `dueAt` ascending with no due date last, then by `createdAt`, then by `id`. With a
+`sort`, tasks that sort as equal keep that order. `totalCount` counts only the tasks that match
+`filter` and `search`.
 
 ```json
 {

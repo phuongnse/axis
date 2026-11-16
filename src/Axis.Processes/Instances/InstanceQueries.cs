@@ -36,15 +36,16 @@ public static class InstanceQueries
     /// <summary>
     /// The SQL expression of an instance's subject label, the display field value of its subject record in
     /// <paramref name="subjectEntity"/>, for a list's filter, search and sort. The caller declares it only when the reader
-    /// may see the label. Throws when the entity has no display field.
+    /// may see the label. <paramref name="subjectIdSql"/> is the outer column that holds the subject record id, the instance's
+    /// by default. Throws when the entity has no display field.
     /// </summary>
-    public static string SubjectLabelSql(EntityModel subjectEntity)
+    public static string SubjectLabelSql(EntityModel subjectEntity, string? subjectIdSql = null)
     {
         ArgumentNullException.ThrowIfNull(subjectEntity);
 
         var displayField = subjectEntity.DisplayField
             ?? throw new InvalidOperationException($"The entity '{subjectEntity.Name}' has no display field.");
-        return $"(SELECT ls.{EntityNaming.Quote(EntityNaming.Column(displayField))} FROM {RecordQueries.Table(subjectEntity)} AS ls WHERE ls.{EntityNaming.Quote(EntityNaming.IdColumn)} = {InstanceAlias}.subject_id)";
+        return $"(SELECT ls.{EntityNaming.Quote(EntityNaming.Column(displayField))} FROM {RecordQueries.Table(subjectEntity)} AS ls WHERE ls.{EntityNaming.Quote(EntityNaming.IdColumn)} = {subjectIdSql ?? $"{InstanceAlias}.subject_id"})";
     }
 
     /// <summary>
