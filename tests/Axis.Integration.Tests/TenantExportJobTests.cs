@@ -258,22 +258,9 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         using var output = new StringWriter();
         var runner = new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease);
 
-        await RunRoundsAsync(runner, job, output);
+        await ProvisioningJobRounds.RunAsync(runner, fixture.Scenario.Platform, job, output, CancellationToken);
 
         return (job, output.ToString());
-    }
-
-    // MinIO at times fails a request. A step that throws releases the job, and the publisher claims it again in the next round, up to three claims.
-    private async Task RunRoundsAsync(ProvisioningJobs runner, Guid job, TextWriter output, int rounds = 3)
-    {
-        for (var round = 1; round <= rounds; round++)
-        {
-            Assert.True(await runner.RunNextAsync(output, CancellationToken));
-            if (await StateAsync(job) != "running")
-            {
-                break;
-            }
-        }
     }
 
     [Fact]
@@ -353,13 +340,13 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         Assert.True(await runnerA);
         if (await StateAsync(jobA) == "running")
         {
-            await RunRoundsAsync(runnerJobsA, jobA, outputA, rounds: 2);
+            await ProvisioningJobRounds.RunAsync(runnerJobsA, fixture.Scenario.Platform, jobA, outputA, CancellationToken, rounds: 2);
         }
 
         Assert.True(await StateAsync(jobA) == "succeeded", outputA.ToString());
         Assert.Equal(0, await LeaseCountAsync(fixture.TenantId));
 
-        await RunRoundsAsync(new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease), jobB, outputB);
+        await ProvisioningJobRounds.RunAsync(new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease), fixture.Scenario.Platform, jobB, outputB, CancellationToken);
 
         var output = outputB.ToString();
         var failed = output.IndexOf($"{fixture.TenantId} export failed: AmazonS3Exception", StringComparison.Ordinal);
@@ -537,13 +524,7 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         return (reader.GetInt32(0), reader.GetInt32(1));
     }
 
-    private async Task<string?> StateAsync(Guid job)
-    {
-        await using var connection = new Npgsql.NpgsqlConnection(fixture.Scenario.Platform);
-        await connection.OpenAsync(CancellationToken);
-        await using var command = new Npgsql.NpgsqlCommand($"SELECT state FROM platform.jobs WHERE id = '{job}'", connection);
-        return (string?)await command.ExecuteScalarAsync(CancellationToken);
-    }
+    private Task<string?> StateAsync(Guid job) => ProvisioningJobRounds.StateAsync(fixture.Scenario.Platform, job, CancellationToken);
 
     private static async Task<Guid> CreateLeaveRequestAsync(HttpClient client, string reason)
     {

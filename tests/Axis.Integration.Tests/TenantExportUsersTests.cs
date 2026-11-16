@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -106,7 +107,39 @@ public sealed class TenantExportUsersTests(KeycloakFixture keycloak, PostgreSqlF
         Assert.DoesNotContain("users.csv", files.Keys);
     }
 
-    private async Task<(Guid Job, string Output)> RunExportAsync(AdminScenario scenario, string tenantId, string bucket)
+    [Fact]
+    public async Task An_export_of_a_tenant_with_a_realm_whose_first_try_drops_the_connection_is_claimed_again_and_its_zip_holds_users_csv()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = await CreateTenantWithUserAsync(scenario);
+        using var s3 = minio.NewClient();
+        var bucket = await NewBucketAsync(s3);
+        var first = 1;
+
+        var (job, output) = await RunExportAsync(
+            scenario,
+            id,
+            bucket,
+            wrap: step => step.Name != "export"
+                ? step
+                : step with
+                {
+                    RunAsync = (jobId, tenant, input, cancellationToken) => Interlocked.Exchange(ref first, 0) == 1
+                        ? throw new IOException("Connection reset by peer", new SocketException((int)SocketError.ConnectionReset))
+                        : step.RunAsync(jobId, tenant, input, cancellationToken),
+                });
+
+        var failed = output.IndexOf($"{id} export failed: IOException", StringComparison.Ordinal);
+        var released = output.IndexOf("job released", StringComparison.Ordinal);
+        var done = output.IndexOf($"{id} export ok", StringComparison.Ordinal);
+        Assert.True(failed >= 0 && released > failed && done > released, output);
+        Assert.Equal("succeeded", await ProvisioningJobRounds.StateAsync(scenario.Platform, job, CancellationToken));
+        var files = await ReadZipAsync(s3, bucket, $"exports/{id}/{job:D}.zip");
+        var lines = files["users.csv"].TrimStart('\ufeff').Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+        Assert.Single(lines.Skip(1), line => line.StartsWith($"{Username},", StringComparison.Ordinal));
+    }
+
+    private async Task<(Guid Job, string Output)> RunExportAsync(AdminScenario scenario, string tenantId, string bucket, Func<JobStep, JobStep>? wrap = null)
     {
         var platform = scenario.Platform;
         var storage = new CellBackupStorage(minio.ServiceUrl, "us-east-1", bucket, minio.AccessKey, minio.SecretKey);
@@ -121,11 +154,11 @@ public sealed class TenantExportUsersTests(KeycloakFixture keycloak, PostgreSqlF
             http,
             new TenantLeases(source, NullLogger<TenantLeases>.Instance),
             null));
-        var kinds = new Dictionary<string, IReadOnlyList<JobStep>> { ["export"] = steps };
+        var kinds = new Dictionary<string, IReadOnlyList<JobStep>> { ["export"] = wrap is null ? steps : [.. steps.Select(wrap)] };
         var job = await ProvisioningJobs.QueueAsync(platform, kinds, "export", tenantId, "operator-1", null, null, CancellationToken);
         using var output = new StringWriter();
 
-        Assert.True(await new ProvisioningJobs(platform, kinds, _lease).RunNextAsync(output, CancellationToken));
+        await ProvisioningJobRounds.RunAsync(new ProvisioningJobs(platform, kinds, _lease), platform, job, output, CancellationToken);
         return (job, output.ToString());
     }
 
