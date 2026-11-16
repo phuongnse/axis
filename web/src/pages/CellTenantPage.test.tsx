@@ -1,9 +1,9 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Outlet, Route, Routes } from 'react-router'
+import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import type { CellJob, CellTenantDetail } from '../platform/cell'
+import type { CellJob, CellTenantDetail, CellTenantUsageDayPage } from '../platform/cell'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { CellTenantPage } from './CellTenantPage'
@@ -63,8 +63,25 @@ interface Answer {
 const ok = (body: unknown): Answer => ({ status: 200, body })
 const fail = (status: number): Answer => ({ status, body: { status } })
 
-function stubRoutes(tenant: Answer, jobs: Answer = ok({ items: [job] }), deleted: Answer = fail(404)) {
+const noDays: CellTenantUsageDayPage = { items: [], page: 1, pageSize: 20, totalCount: 0 }
+
+/** The answer to a read of the usage days route, which the stubs give before the tenant. */
+const usageDays = (input: string, page: CellTenantUsageDayPage = noDays) =>
+  input.startsWith('/api/cell/tenants/acme/usage-days')
+    ? new Response(JSON.stringify(page), { status: 200 })
+    : undefined
+
+function stubRoutes(
+  tenant: Answer,
+  jobs: Answer = ok({ items: [job] }),
+  deleted: Answer = fail(404),
+  days: CellTenantUsageDayPage = noDays,
+) {
   const fetchMock = vi.fn(async (input: string) => {
+    const daysAnswer = usageDays(input, days)
+    if (daysAnswer) {
+      return daysAnswer
+    }
     const answer = input.startsWith('/api/cell/jobs')
       ? jobs
       : input.startsWith('/api/cell/deleted-tenants/')
@@ -100,6 +117,9 @@ function stubActions(
       }
       return new Response(JSON.stringify(answer.body), { status: answer.status })
     }
+    if (usageDays(input)) {
+      return usageDays(input)!
+    }
     if (input.startsWith('/api/cell/jobs/')) {
       return new Response(JSON.stringify({ ...job, id: input.split('/').pop() }), { status: 200 })
     }
@@ -123,6 +143,9 @@ function stubWrites(answers: Record<string, Answer>) {
       writes.push({ method: init.method, path: input, body: JSON.parse(init.body as string) })
       const answer = answers[input]!
       return new Response(JSON.stringify(answer.body), { status: answer.status })
+    }
+    if (usageDays(input)) {
+      return usageDays(input)!
     }
     if (input.startsWith('/api/cell/jobs')) {
       return new Response(JSON.stringify({ items: [] }), { status: 200 })
@@ -163,6 +186,9 @@ function stubDownload(jobs: CellJob[], downloads: Response[] = []) {
       accepts.push(new Headers(init?.headers).get('Accept'))
       return downloads.shift()!
     }
+    if (usageDays(input)) {
+      return usageDays(input)!
+    }
     if (input.startsWith('/api/cell/jobs')) {
       return new Response(JSON.stringify({ items: jobs }), { status: 200 })
     }
@@ -170,6 +196,10 @@ function stubDownload(jobs: CellJob[], downloads: Response[] = []) {
   })
   vi.stubGlobal('fetch', fetchMock)
   return { accepts, fetchMock }
+}
+
+function Address() {
+  return <output data-testid="address">{useLocation().search}</output>
 }
 
 function renderPage(path: string, onRefused = vi.fn()) {
@@ -186,6 +216,7 @@ function renderPage(path: string, onRefused = vi.fn()) {
           </TextProvider>
         </PlatformContext.Provider>
       </ThemeModeProvider>
+      <Address />
     </MemoryRouter>,
   )
   return onRefused
@@ -256,7 +287,7 @@ describe('CellTenantPage', () => {
     )
   })
 
-  it('lists the days of the tenant read in the usage table', async () => {
+  it('lists the days of the usage days route in the usage table', async () => {
     const day = {
       day: '2026-11-04',
       databaseBytes: 2048,
@@ -267,7 +298,7 @@ describe('CellTenantPage', () => {
       connectorCalls: 9,
       workItemsRun: 4321,
     }
-    stubRoutes(ok({ ...acme, days: [day] }))
+    stubRoutes(ok(acme), undefined, undefined, { ...noDays, items: [day], totalCount: 1 })
     renderPage('/tenants/acme')
 
     const rows = within(await screen.findByTestId('cell-tenant-usage')).getAllByRole('row')
@@ -275,11 +306,57 @@ describe('CellTenantPage', () => {
     expect(rows[1]).toHaveTextContent('4,321')
   })
 
-  it('shows the empty text when the tenant read has no days', async () => {
+  it('shows the empty text when the usage days route has no days', async () => {
     stubRoutes(ok(acme))
     renderPage('/tenants/acme')
 
     expect(await screen.findByTestId('cell-tenant-usage')).toHaveTextContent('No usage recorded yet.')
+  })
+
+  it('keeps the filter, sort and page size of the usage table in the address and the request', async () => {
+    const filter = JSON.stringify({ all: [{ field: 'workItemsRun', op: 'gte', value: 300 }] })
+    const fetchMock = stubRoutes(ok(acme), undefined, undefined, { ...noDays, totalCount: 45 })
+    const user = userEvent.setup()
+    renderPage(`/tenants/acme?${new URLSearchParams({ filter, sort: '-day' })}`)
+
+    const table = await screen.findByTestId('cell-tenant-usage')
+    expect(await within(table).findByText('1–20 of 45')).toBeVisible()
+    const requests = () =>
+      fetchMock.mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.startsWith('/api/cell/tenants/acme/usage-days'))
+    const first = new URL(requests()[0]!, 'http://localhost').searchParams
+    expect(first.get('filter')).toBe(filter)
+    expect(first.get('sort')).toBe('-day')
+
+    await user.click(within(table).getByRole('combobox'))
+    await user.click(await screen.findByTitle('50 / page'))
+
+    await waitFor(() => expect(screen.getByTestId('address').textContent).toContain('pageSize=50'))
+    await waitFor(() =>
+      expect(requests().some((url) => new URL(url, 'http://localhost').searchParams.get('pageSize') === '50')).toBe(
+        true,
+      ),
+    )
+  })
+
+  it('shows an error in the usage part only when the days fail to load', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) =>
+        input.startsWith('/api/cell/tenants/acme/usage-days')
+          ? new Response('{}', { status: 500 })
+          : input.startsWith('/api/cell/jobs')
+            ? new Response(JSON.stringify({ items: [] }), { status: 200 })
+            : new Response(JSON.stringify(acme), { status: 200 }),
+      ),
+    )
+    renderPage('/tenants/acme')
+
+    expect(await screen.findByTestId('cell-tenant-usage-error')).toHaveTextContent('The usage could not be loaded.')
+    expect(screen.getByTestId('cell-tenant')).toHaveTextContent('crm')
+    warn.mockRestore()
   })
 
   it('shows the not-found page and no quotas for an unknown id', async () => {

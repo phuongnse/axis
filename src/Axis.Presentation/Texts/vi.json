@@ -371,6 +371,7 @@
   "shell.cell.tenant.noQuotas": "Tenant này chưa có hạn mức nào.",
   "shell.cell.tenant.jobs": "Tác vụ",
   "shell.cell.tenant.jobsLoadFailed": "Không tải được các tác vụ.",
+  "shell.cell.tenant.usageLoadFailed": "Không tải được mức sử dụng.",
   "shell.cell.tenant.suspend": "Tạm dừng…",
   "shell.cell.tenant.resume": "Tiếp tục hoạt động…",
   "shell.cell.tenant.suspendConfirm": "Tạm dừng {tenant}?",

@@ -66,6 +66,13 @@ namespace Axis.Server.CellApi;
 /// by host. A pending request past its expiry answers <c>expired</c>, and the token is never answered.
 /// </para>
 /// <para>
+/// <c>GET /api/cell/tenants/{id}/usage-days</c> answers the tenant's day rows of the kept 13 months as one page, <c>{ items, page, pageSize, totalCount }</c>,
+/// 20 days by default, from the same <c>page</c>, <c>pageSize</c>, <c>sort</c> and <c>filter</c> of the shared <see cref="ListQuery{T}"/>. The fields are
+/// <c>day</c>, <c>databaseBytes</c>, <c>fileBytes</c>, <c>users</c>, <c>applications</c>, <c>emailsSent</c>, <c>connectorCalls</c> and <c>workItemsRun</c>.
+/// A day holds no text, so the list has no search and a <c>search</c> answers <c>400</c>. Without <c>sort</c> the days come newest first.
+/// An unknown tenant or a preview tenant answers <c>404</c> before any <c>400</c> of the query, see <c>docs/reference/tenant-lifecycle.md#routes</c>.
+/// </para>
+/// <para>
 /// Both reads answer each tenant's <c>usage</c>: <c>storage</c>, <c>users</c>, <c>applications</c> and <c>emailsPerDay</c>, each as
 /// <c>{ limit, used }</c> as <c>GET /api/tenant/usage</c> does, with the limit of the tenant's <c>quotas</c>. The <c>used</c> of
 /// <c>storage</c> is the latest hourly sample, that of <c>users</c> and <c>applications</c> is the newest day row of
@@ -203,6 +210,7 @@ internal static partial class CellEndpoints
         cell.MapGet("/session", GetSession);
         cell.MapGet("/tenants", ListTenantsAsync);
         cell.MapGet("/tenants/{id}", GetTenantAsync);
+        cell.MapGet("/tenants/{id}/usage-days", ListUsageDaysAsync);
         cell.MapGet("/tenants/{id}/administrators", ListAdministratorsAsync);
         cell.MapGet("/deleted-tenants/{id}", GetDeletedTenantAsync);
         cell.MapPut("/tenants/{id}/quotas", SetQuotasAsync);
@@ -304,6 +312,19 @@ internal static partial class CellEndpoints
             Order: tenant => tenant.NewestArchiveAt),
     ];
 
+    // The fields of the usage days of a tenant, see docs/reference/tenant-lifecycle.md#routes. A day holds no text, so none is searchable.
+    private static readonly IReadOnlyList<ListColumn<TenantUsageDayResponse>> _usageDayColumns =
+    [
+        new("day", ListColumnKind.Date, day => day.Day),
+        new("databaseBytes", ListColumnKind.Number, day => day.DatabaseBytes),
+        new("fileBytes", ListColumnKind.Number, day => day.FileBytes),
+        new("users", ListColumnKind.Number, day => day.Users),
+        new("applications", ListColumnKind.Number, day => day.Applications),
+        new("emailsSent", ListColumnKind.Number, day => day.EmailsSent),
+        new("connectorCalls", ListColumnKind.Number, day => day.ConnectorCalls),
+        new("workItemsRun", ListColumnKind.Number, day => day.WorkItemsRun),
+    ];
+
     private static async Task<IResult> ListTenantsAsync(
         HttpContext httpContext,
         NpgsqlDataSource dataSource,
@@ -382,10 +403,40 @@ internal static partial class CellEndpoints
             usage[tenant.Id],
             archives.TryGetValue(tenant.Id, out var archive) ? archive : null,
             tenant.DeleteAfter,
-            [.. days.Select(row => new TenantUsageDayResponse(
-                row.Day, row.DatabaseBytes, row.FileBytes, row.Users, row.Applications, row.EmailsSent, row.ConnectorCalls, row.WorkItemsRun))],
+            UsageDaysOf(days),
             hostRequests));
     }
+
+    // The tenant row is checked before the query, as the other tenant routes check the id before the rest of the request.
+    private static async Task<IResult> ListUsageDaysAsync(
+        string id,
+        HttpContext httpContext,
+        NpgsqlDataSource dataSource,
+        TenantUsageStore usageStore,
+        TimeProvider time,
+        CancellationToken cancellationToken)
+    {
+        await using var platform = Open(dataSource);
+        if (!await platform.Tenants.AsNoTracking().AnyAsync(row => row.Id == id && row.PreviewOf == null, cancellationToken))
+        {
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status404NotFound, "No tenant has this id.");
+        }
+
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var query = ListQuery<TenantUsageDayResponse>.Read(httpContext.Request, _usageDayColumns, errors);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var days = await usageStore.ListDaysAsync(id, Today(time).AddMonths(-TenantUsageStore.RetentionMonths), cancellationToken);
+        var page = query.Apply(UsageDaysOf(days));
+        return Results.Ok(new CellTenantUsageDayListResponse(page.Items, page.Page, page.PageSize, page.TotalCount));
+    }
+
+    private static IReadOnlyList<TenantUsageDayResponse> UsageDaysOf(IReadOnlyList<TenantUsageRow> days) =>
+        [.. days.Select(row => new TenantUsageDayResponse(
+            row.Day, row.DatabaseBytes, row.FileBytes, row.Users, row.Applications, row.EmailsSent, row.ConnectorCalls, row.WorkItemsRun))];
 
     // The tombstone of a preview tenant stays hidden: only a main tenant has a purge job that names it. The hosts step writes the tombstone,
     // so a purge that is still running has one already. The actor and the hosts stay out of the select.
@@ -1229,6 +1280,9 @@ internal sealed record CellDeletedTenantResponse(string Id, DateTimeOffset Delet
 
 /// <summary>One page of the tenants of the cell, with the number of tenants that matched before the page was cut.</summary>
 internal sealed record CellTenantListResponse(IReadOnlyList<CellTenantResponse> Items, int Page, int PageSize, long TotalCount);
+
+/// <summary>One page of the day rows of a tenant's usage, with the number of days that matched before the page was cut.</summary>
+internal sealed record CellTenantUsageDayListResponse(IReadOnlyList<TenantUsageDayResponse> Items, int Page, int PageSize, long TotalCount);
 
 /// <summary>
 /// One tenant of the cell with its effective quotas, keyed by quota key, its day rows of the last 13 months, newest first, and the newest

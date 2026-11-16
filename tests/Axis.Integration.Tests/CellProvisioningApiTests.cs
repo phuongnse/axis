@@ -274,6 +274,50 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task The_usage_days_route_answers_a_filtered_sorted_page_with_its_total_400_for_an_unknown_field_and_404_for_an_unknown_tenant()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync(
+            """
+            INSERT INTO platform.tenant_usage (tenant_id, day, database_bytes, file_bytes, users, applications, emails_sent, connector_calls, work_items_run)
+            VALUES
+                ('a', ((now() AT TIME ZONE 'UTC')::date - interval '14 months')::date, 1, 1, 1, 1, 1, 1, 111),
+                ('a', ((now() AT TIME ZONE 'UTC')::date - interval '12 months')::date, 20, 21, NULL, NULL, 22, 23, 222),
+                ('a', (now() AT TIME ZONE 'UTC')::date - 1, 30, 31, 3, 2, 32, 33, 333),
+                ('a', (now() AT TIME ZONE 'UTC')::date - 2, 40, 41, 4, 3, 42, 43, 444)
+            """);
+        var large = Uri.EscapeDataString("""{"all":[{"field":"workItemsRun","op":"gte","value":300}]}""");
+        var undeclared = Uri.EscapeDataString("""{"all":[{"field":"nothing","op":"eq","value":"x"}]}""");
+
+        using var bare = await GetAsync(client, "/api/cell/tenants/a/usage-days", token);
+        using var filtered = await GetAsync(client, $"/api/cell/tenants/a/usage-days?filter={large}&sort=day&pageSize=1", token);
+        using var badFilter = await GetAsync(client, $"/api/cell/tenants/a/usage-days?filter={undeclared}", token);
+        using var badSort = await GetAsync(client, "/api/cell/tenants/a/usage-days?sort=nothing", token);
+        using var search = await GetAsync(client, "/api/cell/tenants/a/usage-days?search=1", token);
+        using var unknown = await GetAsync(client, "/api/cell/tenants/nobody/usage-days", token);
+        using var unknownBadSort = await GetAsync(client, "/api/cell/tenants/nobody/usage-days?sort=nothing", token);
+        using var preview = await GetAsync(client, "/api/cell/tenants/a-preview/usage-days", token);
+
+        var all = await bare.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(3, all.GetProperty("totalCount").GetInt64());
+        Assert.Equal(20, all.GetProperty("pageSize").GetInt32());
+        Assert.Equal([333L, 444L, 222L], all.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("workItemsRun").GetInt64()).ToArray());
+        var narrowed = await filtered.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal([444L], narrowed.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("workItemsRun").GetInt64()).ToArray());
+        Assert.Equal(1, narrowed.GetProperty("page").GetInt32());
+        Assert.Equal(1, narrowed.GetProperty("pageSize").GetInt32());
+        Assert.Equal(2, narrowed.GetProperty("totalCount").GetInt64());
+        await AssertBadRequestAsync(badFilter, "filter");
+        await AssertBadRequestAsync(badSort, "sort");
+        await AssertBadRequestAsync(search, "search");
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknownBadSort.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+    }
+
+    [Fact]
     public async Task A_row_written_before_the_counts_existed_answers_null_failed_work()
     {
         await using var factory = await StartAsync();
@@ -512,12 +556,14 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         using var none = await GetAsync(client, "/api/cell/tenants", token: null);
         using var tenantRealm = await GetAsync(client, "/api/cell/tenants", tenantRealmToken);
         using var tenantRealmOne = await GetAsync(client, "/api/cell/tenants/a", tenantRealmToken);
+        using var noTokenDays = await GetAsync(client, "/api/cell/tenants/a/usage-days", token: null);
         using var garbage = await GetAsync(client, "/api/cell/tenants", "not-a-token");
         using var noTokenBadSort = await GetAsync(client, "/api/cell/tenants?sort=nothing", token: null);
 
         Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, tenantRealm.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, tenantRealmOne.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, noTokenDays.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, garbage.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, noTokenBadSort.StatusCode);
     }
@@ -531,10 +577,12 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
 
         using var list = await GetAsync(client, "/api/cell/tenants", token);
         using var one = await GetAsync(client, "/api/cell/tenants/a", token);
+        using var days = await GetAsync(client, "/api/cell/tenants/a/usage-days", token);
         using var badSort = await GetAsync(client, "/api/cell/tenants?sort=nothing", token);
 
         Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, one.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, days.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, badSort.StatusCode);
     }
 

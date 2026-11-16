@@ -160,6 +160,27 @@ export function fetchCellTenants(query: string, signal?: AbortSignal): Promise<C
   return fetchCellRoute<CellTenantPage>(`/api/cell/tenants${query ? `?${query}` : ''}`, 'tenants', signal)
 }
 
+/** One page of a tenant's usage days, as served by `GET /api/cell/tenants/{id}/usage-days`. `totalCount` is the number of days that matched before the page was cut. */
+export interface CellTenantUsageDayPage {
+  items: TenantUsageDay[]
+  page: number
+  pageSize: number
+  totalCount: number
+}
+
+/** Loads one page of a tenant's usage days. `query` is the record API's paging, sort and filter query string. */
+export function fetchCellTenantUsageDays(
+  id: string,
+  query: string,
+  signal?: AbortSignal,
+): Promise<CellResult<CellTenantUsageDayPage>> {
+  return fetchCellRoute<CellTenantUsageDayPage>(
+    `/api/cell/tenants/${encodeURIComponent(id)}/usage-days${query ? `?${query}` : ''}`,
+    'tenant usage days',
+    signal,
+  )
+}
+
 /** Loads one tenant with its quotas. The value is `null` when the cell has no tenant with that id. */
 export function fetchCellTenant(id: string, signal?: AbortSignal): Promise<CellResult<CellTenantDetail | null>> {
   return fetchCellRoute<CellTenantDetail | null>(`/api/cell/tenants/${encodeURIComponent(id)}`, 'tenant', signal, true)
