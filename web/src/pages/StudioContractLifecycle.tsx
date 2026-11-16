@@ -2,6 +2,7 @@ import dagre from '@dagrejs/dagre'
 import { type Edge, Handle, MarkerType, type Node, type NodeProps, Position, ReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useMemo } from 'react'
+import { fillText } from '../platform/fillText'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import type { ContractEdge, ContractState } from './contractView'
@@ -81,7 +82,8 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
   const t = useText()
   const { mode } = useThemeMode()
   const { colour } = useDesignTokens()
-  const to = t('shell.studio.processGraph.to')
+  const edgeLabel = t('shell.studio.contract.edgeLabel')
+  const edgeName = t('shell.studio.contract.edgeName')
   const guard = t('shell.studio.contract.guard')
   const noGuard = t('shell.studio.contract.noGuard')
 
@@ -105,13 +107,13 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
           (edge) => states.some((state) => state.name === edge.from) && states.some((state) => state.name === edge.to),
         )
         .map((edge): Edge => {
-          const label = `${edge.name}, ${edge.guard ? guard : noGuard}`
+          const label = fillText(edgeLabel, { name: edge.name, guard: edge.guard ? guard : noGuard })
           return {
             id: edge.id,
             source: edge.from,
             target: edge.to,
             label,
-            ariaLabel: `${edge.from} ${to} ${edge.to}, ${label}`,
+            ariaLabel: fillText(edgeName, { source: edge.from, target: edge.to, label }),
             style: { stroke: colour.textMuted },
             markerEnd: { type: MarkerType.ArrowClosed, color: colour.textMuted },
             labelStyle: { fill: colour.text },
@@ -119,7 +121,7 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
           }
         }),
     }
-  }, [states, edges, colour, to, guard, noGuard])
+  }, [states, edges, colour, edgeLabel, edgeName, guard, noGuard])
 
   return (
     <section

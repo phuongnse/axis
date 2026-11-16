@@ -29,6 +29,7 @@ import {
 } from '../platform/scenarioSteps'
 import type { SeedField } from '../platform/seedValues'
 import { StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
+import { fillText } from '../platform/fillText'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useFieldTexts } from './fieldTexts'
@@ -529,7 +530,7 @@ export function ScenarioStep({
       <Card
         size="small"
         data-testid="studio-scenario-step"
-        title={`${t('shell.studio.scenario.step')} ${index + 1}`}
+        title={fillText(t('shell.studio.scenario.step'), { number: index + 1 })}
         extra={
           <Flex gap="small">
             {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}

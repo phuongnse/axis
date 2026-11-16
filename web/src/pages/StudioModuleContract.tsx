@@ -20,6 +20,7 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { fillText } from '../platform/fillText'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useUnsavedChanges } from '../platform/unsavedChanges'
@@ -147,7 +148,7 @@ function Point({ value }: { value: string }) {
       ) : (
         <>
           <Typography.Text type="secondary" data-testid={`studio-contract-relaxed-${value}`}>
-            {t('shell.studio.contract.relaxed')} {entry.reason}
+            {fillText(t('shell.studio.contract.relaxed'), { reason: entry.reason })}
           </Typography.Text>
           {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button size="small" data-testid={`studio-contract-undo-relax-${value}`} disabled={busy} onClick={undo}>
@@ -447,11 +448,11 @@ function RowName({ name, added, onRemove }: { name: string; added: boolean; onRe
   return (
     <Flex gap="small" align="center" wrap>
       {name}
-      <Tag role="note" aria-label={`${t('shell.studio.module.added')} ${name}`}>
+      <Tag role="note" aria-label={fillText(t('shell.studio.contract.addedName'), { name })}>
         {t('shell.studio.module.added')}
       </Tag>
       {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button size="small" aria-label={`${t('shell.studio.contract.remove')} ${name}`} onClick={onRemove}>
+      <Button size="small" aria-label={fillText(t('shell.studio.contract.removeName'), { name })} onClick={onRemove}>
         {t('shell.studio.contract.remove')}
       </Button>
     </Flex>
