@@ -247,7 +247,8 @@ export function Shell({
             )}
             <Layout>
               {!hasAccount && <ReadOnlyBanner />}
-              <Layout.Content style={{ padding: claimed ? spacing.md : spacing.lg }}>
+              {/* Proposed: a page draws on surface, flush with the header and the sidebar, see the review on #3650. */}
+              <Layout.Content style={{ padding: claimed ? spacing.md : spacing.lg, background: colour.surface }}>
                 <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
               </Layout.Content>
               {sidebar && <ShellFooter legal={legal} />}
