@@ -239,6 +239,30 @@ function stubServer(
     if (input === `${folder}/diagnostics`) {
       return json({ diagnostics })
     }
+    if (input === `${folder}/revisions`) {
+      return json({
+        items: [
+          {
+            id: 'r2',
+            summary: 'Added a field',
+            author: 'Linh Nguyen',
+            userId: 'u1',
+            client: 'studio',
+            request: null,
+            time: '2026-11-02T09:30:00Z',
+          },
+          {
+            id: 'r1',
+            summary: 'Created the application',
+            author: 'Linh Nguyen',
+            userId: 'u1',
+            client: 'studio',
+            request: null,
+            time: '2026-11-01T08:00:00Z',
+          },
+        ],
+      })
+    }
     if (input === `${folder}/names`) {
       return json(applicationNames)
     }
@@ -919,6 +943,35 @@ describe('StudioPage', () => {
     expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('entities/purchase-request.json')
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()
+  })
+
+  describe('the page area', () => {
+    /** Checks the table comes straight after its heading, and no element between them draws a border or a background. */
+    async function expectTableStraightAfterHeading(name: string, testId: string) {
+      const heading = await screen.findByRole('heading', { level: 4, name })
+      const table = within(await screen.findByTestId(testId)).getByRole('table')
+      let shared = table.parentElement!
+      while (!shared.contains(heading)) shared = shared.parentElement!
+      const children = [...shared.children]
+      const at = children.findIndex((child) => child.contains(heading))
+      expect(children[at + 1].contains(table)).toBe(true)
+      for (let element = table.parentElement; element !== shared; element = element!.parentElement) {
+        expect(element!.style.border).toBe('')
+        expect(element!.style.background).toBe('')
+      }
+    }
+
+    it.each([
+      ['the kind list', '&kind=entity', 'Entities', 'studio-group-entity'],
+      ['Releases', '&view=releases', 'Releases', 'studio-releases'],
+      ['History', '&view=history', 'History', 'studio-history'],
+      ['the policy matrix', '&view=policies', 'Policy matrix', 'studio-matrix'],
+    ])('shows %s as a table straight after its heading, with no panel', async (_name, view, heading, testId) => {
+      stubServer()
+      renderPage(`/studio?app=PurchaseRequests${view}`)
+
+      await expectTableStraightAfterHeading(heading, testId)
+    })
   })
 
   describe('application tiles', () => {

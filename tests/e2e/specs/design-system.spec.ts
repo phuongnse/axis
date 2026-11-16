@@ -818,6 +818,8 @@ const framedPreviews: Record<
       "Overview of a new application",
       "Entity",
       "Policy matrix",
+      "Releases",
+      "History",
     ],
     pickedInFixtures: true,
   },
@@ -1011,6 +1013,20 @@ for (const [slug, expectKeyElement] of [
       await expect(
         state.getByTestId("studio-matrix-cell-Requester-entity-Request"),
       ).toBeVisible();
+    },
+  ],
+  [
+    "releases",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-releases")).toBeVisible();
+      await expect(state.getByTestId("studio-release-row")).toHaveCount(2);
+    },
+  ],
+  [
+    "history",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-history")).toBeVisible();
+      await expect(state.getByTestId("studio-revision-row")).toHaveCount(3);
     },
   ],
 ] as const) {
