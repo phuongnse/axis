@@ -33,7 +33,7 @@ describe('the New resource dialog', () => {
 
     expect(kind.parentElement).toBe(name.parentElement)
     expect(kind.parentElement).toHaveStyle({ gap: `${spacing.lg}px` })
-    expect(kind).toHaveStyle({ marginBottom: '0px' })
-    expect(name).toHaveStyle({ marginBottom: '0px' })
+    expect(getComputedStyle(kind).getPropertyValue('--ant-form-item-margin-bottom')).toBe('0px')
+    expect(getComputedStyle(name).getPropertyValue('--ant-form-item-margin-bottom')).toBe('0px')
   })
 })

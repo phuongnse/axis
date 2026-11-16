@@ -15,6 +15,7 @@ import { requiredMark } from './requiredMark'
 import { fetchRecord, saveRecord, type RecordItem, type RecordProblem } from './records'
 import type { EntityWidgetMetadata, NavigateAction, StartProcessAction } from './site'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 import { useFormSteps } from './useFormSteps'
 import { sectionsOf, useRecordForm } from './useRecordForm'
 
@@ -72,6 +73,7 @@ function FooterRow({ children }: { children: ReactNode }) {
  */
 export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale }: FormWidgetProps) {
   const t = useText()
+  const { spacing } = useDesignTokens()
   const navigate = useNavigate()
   const location = useLocation()
   const canvas = useCanvasActions()
@@ -310,71 +312,74 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
         {steps.progress}
         {/* Enter acts as Next on a step before the last, and saves on the last. */}
         <Form layout="vertical" requiredMark={requiredMark} onFinish={steps.last ? save : steps.next}>
-          {steps.fields}
-          <Row>
-            {!steps.first && (
-              <AxisButton role="secondary" onClick={steps.back} disabled={steps.checking}>
-                {t('shell.form.back')}
+          {/* The form's layout gives the gap below the fields, see docs/reference/form-widget.md#fields-in-columns. */}
+          <Flex vertical gap={spacing.lg}>
+            {steps.fields}
+            <Row>
+              {!steps.first && (
+                <AxisButton role="secondary" onClick={steps.back} disabled={steps.checking}>
+                  {t('shell.form.back')}
+                </AxisButton>
+              )}
+              {/* A quick check shows no spinner, because antd can leave one half removed after a flash. */}
+              {!steps.last && (
+                <AxisButton role="finish" htmlType="submit" loading={steps.checking && { delay: 200 }}>
+                  {t('shell.form.next')}
+                </AxisButton>
+              )}
+              {steps.last && canSave && (
+                <AxisButton role="finish" htmlType="submit" loading={saving} disabled={starting}>
+                  {t('shell.form.save')}
+                </AxisButton>
+              )}
+              <AxisButton role="secondary" onClick={() => navigate(returnTo)}>
+                {t('shell.form.cancel')}
               </AxisButton>
-            )}
-            {/* A quick check shows no spinner, because antd can leave one half removed after a flash. */}
-            {!steps.last && (
-              <AxisButton role="finish" htmlType="submit" loading={steps.checking && { delay: 200 }}>
-                {t('shell.form.next')}
-              </AxisButton>
-            )}
-            {steps.last && canSave && (
-              <AxisButton role="finish" htmlType="submit" loading={saving} disabled={starting}>
-                {t('shell.form.save')}
-              </AxisButton>
-            )}
-            <AxisButton role="secondary" onClick={() => navigate(returnTo)}>
-              {t('shell.form.cancel')}
-            </AxisButton>
-            {(canvas.active || (steps.last && recordId !== null)) &&
-              widget.actions
-                .filter((action): action is StartProcessAction => action.type === 'startProcess')
-                .map((action) => (
-                  <AxisButton
-                    role="main"
-                    key={action.instancesPath}
-                    htmlType="button"
-                    disabled={saving || starting}
-                    onClick={() => void runAction(action)}
-                    {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
-                  >
-                    {t(action.labelKey)}
-                  </AxisButton>
-                ))}
-            {(canvas.active || (recordId !== null && record?.id === recordId)) &&
-              widget.actions
-                .filter((action): action is NavigateAction => action.type === 'navigate')
-                .map((action, index) => {
-                  // The canvas has no record, so its button has no target.
-                  const open =
-                    recordId !== null && record
-                      ? navigateTarget(sitePath, action, { id: recordId, values: record.values })
-                      : null
-                  return (
-                    (canvas.active || open) && (
-                      <AxisButton
-                        role="secondary"
-                        key={index}
-                        htmlType="button"
-                        disabled={saving || starting}
-                        onClick={() => {
-                          if (open) {
-                            void runNavigate(open)
-                          }
-                        }}
-                        {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
-                      >
-                        {t(action.labelKey)}
-                      </AxisButton>
+              {(canvas.active || (steps.last && recordId !== null)) &&
+                widget.actions
+                  .filter((action): action is StartProcessAction => action.type === 'startProcess')
+                  .map((action) => (
+                    <AxisButton
+                      role="main"
+                      key={action.instancesPath}
+                      htmlType="button"
+                      disabled={saving || starting}
+                      onClick={() => void runAction(action)}
+                      {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
+                    >
+                      {t(action.labelKey)}
+                    </AxisButton>
+                  ))}
+              {(canvas.active || (recordId !== null && record?.id === recordId)) &&
+                widget.actions
+                  .filter((action): action is NavigateAction => action.type === 'navigate')
+                  .map((action, index) => {
+                    // The canvas has no record, so its button has no target.
+                    const open =
+                      recordId !== null && record
+                        ? navigateTarget(sitePath, action, { id: recordId, values: record.values })
+                        : null
+                    return (
+                      (canvas.active || open) && (
+                        <AxisButton
+                          role="secondary"
+                          key={index}
+                          htmlType="button"
+                          disabled={saving || starting}
+                          onClick={() => {
+                            if (open) {
+                              void runNavigate(open)
+                            }
+                          }}
+                          {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
+                        >
+                          {t(action.labelKey)}
+                        </AxisButton>
+                      )
                     )
-                  )
-                })}
-          </Row>
+                  })}
+            </Row>
+          </Flex>
         </Form>
         {recordId !== null && (
           <RecordHistory

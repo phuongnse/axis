@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { identityUpdatePasswordContext } from '../designSystem/fixtures'
+import { designTokensFor } from '../platform/designTokens'
 import { ThemeModeProvider } from '../platform/theme'
 import type { TermsContext } from './signInContext'
 import { TermsPage } from './TermsPage'
@@ -46,6 +47,15 @@ describe('TermsPage', () => {
     expect(privacy).toHaveAttribute('href', 'https://contoso.test/privacy')
     expect(privacy).toHaveAttribute('target', '_blank')
     expect(screen.getByText('Contoso')).toBeInTheDocument()
+  })
+
+  it('spaces the box and the Continue button 24px apart', () => {
+    render(<TermsPage context={context} />, { wrapper: ThemeModeProvider })
+
+    const box = screen.getByRole('checkbox').closest<HTMLElement>('.ant-form-item')
+    const next = screen.getByRole('button', { name: 'Continue' }).parentElement
+    expect(box?.parentElement).toBe(next)
+    expect(next).toHaveStyle({ gap: `${designTokensFor('light').spacing.lg}px` })
   })
 
   it('names only the Terms of service when the tenant has no privacy policy', () => {

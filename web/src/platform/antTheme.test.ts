@@ -195,6 +195,10 @@ describe.each(['light', 'dark'] as const)('the shared field rules in %s mode', (
     }
   })
 
+  it('keeps no space below a form item, as the form layout gives the gap', () => {
+    expect(themeConfig?.components?.Form).toMatchObject({ itemMarginBottom: 0 })
+  })
+
   it('sits a checkbox and a radio box at the top, level with the first line of a label that wraps', () => {
     const box = { styles: { icon: { alignSelf: 'flex-start', marginTop: expect.closeTo(3) } } }
     expect(checkbox).toMatchObject(box)

@@ -1,4 +1,4 @@
-import { Button, Form, Input, Typography } from 'antd'
+import { Button, Flex, Form, Input, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useId, useRef } from 'react'
 import { useDesignTokens } from '../platform/themeMode'
@@ -11,7 +11,7 @@ import type { ResetPasswordContext } from './signInContext'
  */
 export function ResetPasswordPage({ context }: { context: ResetPasswordContext }) {
   const { texts, error, username, loginAction, loginUrl } = context
-  const { colour } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const formId = useId()
   const submitRef = useRef<HTMLInputElement>(null)
   return (
@@ -28,20 +28,22 @@ export function ResetPasswordPage({ context }: { context: ResetPasswordContext }
         // Ant Design validates and stops the submit event, so the native post happens here.
         onFinish={() => submitRef.current?.form?.submit()}
       >
-        <Form.Item
-          name="username"
-          label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{texts.username}</span>}
-          rules={[{ required: true, message: texts.usernameRequired }]}
-          validateStatus={error ? 'error' : undefined}
-        >
-          <Input name="username" autoComplete="username" />
-        </Form.Item>
-        {/* No name, so the field posts nothing. It only gives onFinish the form. */}
-        <input ref={submitRef} type="hidden" />
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button type="primary" htmlType="submit" block>
-          {texts.sendLink}
-        </Button>
+        <Flex vertical gap={spacing.lg}>
+          <Form.Item
+            name="username"
+            label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{texts.username}</span>}
+            rules={[{ required: true, message: texts.usernameRequired }]}
+            validateStatus={error ? 'error' : undefined}
+          >
+            <Input name="username" autoComplete="username" />
+          </Form.Item>
+          {/* No name, so the field posts nothing. It only gives onFinish the form. */}
+          <input ref={submitRef} type="hidden" />
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+          <Button type="primary" htmlType="submit" block>
+            {texts.sendLink}
+          </Button>
+        </Flex>
       </Form>
       <Typography.Link href={loginUrl}>{texts.backToSignIn}</Typography.Link>
     </IdentityFrame>

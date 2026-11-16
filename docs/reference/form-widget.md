@@ -63,6 +63,7 @@ when left out. So `{ "field": "quantity", "width": 4 }` takes a third of the row
 - Fields fill a row from left to right, and the next field that does not fit starts a new row.
 - A row is as tall as its tallest field and its fields line up at the top, so a message under one
   field never shifts the rows below.
+- Fields of a row are `spacing-md` apart across. Rows and sections are `spacing-lg` apart.
 - At narrow width every field takes the whole row, in file order.
 - A detail lays out the same sections with the same widths, and Studio's
   [form designer](form-designer.md) edits them.
@@ -143,9 +144,9 @@ These rules hold for every field on a form.
   tied to the input with `aria-describedby`. A file input and a read-only value show it but are not
   tied to it. A message under the input never replaces it. It is one or two short lines, because longer
   guidance belongs on the page or the section. Only a form shows it, not a table or a detail.
-- **Validation messages.** A message shows under its input, and the field keeps its whole gap below the
-  message, so the layout grows when a message appears, as every form does, see
-  [fields](actions-and-controls.md#fields).
+- **Validation messages.** A message shows under its input, and the form's layout keeps `spacing-lg`
+  between the message and the next field, so the layout grows when a message appears, as every form does,
+  see [fields](actions-and-controls.md#fields).
 - **Read-only values.** A field the form makes read-only, by `readOnly` or `readOnlyWhen`, and a
   `computed`, `sequence` or `creator` field show plain text, not an input, so nothing looks editable
   that is not. A boolean shows Yes or No. The field keeps the height of an editable field. An empty

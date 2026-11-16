@@ -1,7 +1,8 @@
-import { Button, Form } from 'antd'
+import { Button, Flex, Form } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useId, useRef } from 'react'
 import { AcceptTermsField } from '../platform/AcceptTermsField'
+import { useDesignTokens } from '../platform/themeMode'
 import { IdentityFrame } from './IdentityFrame'
 import type { TermsContext } from './signInContext'
 
@@ -15,6 +16,7 @@ import type { TermsContext } from './signInContext'
  */
 export function TermsPage({ context }: { context: TermsContext }) {
   const { texts, error, loginAction, termsUrl, privacyUrl } = context
+  const { spacing } = useDesignTokens()
   const formId = useId()
   const submitRef = useRef<HTMLInputElement>(null)
   return (
@@ -29,20 +31,22 @@ export function TermsPage({ context }: { context: TermsContext }) {
         // Ant Design validates and stops the submit event, so the native post happens here.
         onFinish={() => submitRef.current?.form?.submit()}
       >
-        <AcceptTermsField
-          name="accept"
-          text={privacyUrl ? texts.accept : texts.acceptTermsOnly}
-          documents={{
-            terms: { label: texts.termsOfService, href: termsUrl },
-            privacy: { label: texts.privacyPolicy, href: privacyUrl },
-          }}
-          requiredMessage={texts.required}
-        />
-        <input ref={submitRef} type="hidden" name="accept" value="true" />
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button type="primary" htmlType="submit" block>
-          {texts.continue}
-        </Button>
+        <Flex vertical gap={spacing.lg}>
+          <AcceptTermsField
+            name="accept"
+            text={privacyUrl ? texts.accept : texts.acceptTermsOnly}
+            documents={{
+              terms: { label: texts.termsOfService, href: termsUrl },
+              privacy: { label: texts.privacyPolicy, href: privacyUrl },
+            }}
+            requiredMessage={texts.required}
+          />
+          <input ref={submitRef} type="hidden" name="accept" value="true" />
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+          <Button type="primary" htmlType="submit" block>
+            {texts.continue}
+          </Button>
+        </Flex>
       </Form>
       <form method="post" action={loginAction}>
         <input type="hidden" name="cancel" value="true" />

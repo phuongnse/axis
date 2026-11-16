@@ -1,5 +1,5 @@
 import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
-import { Col, Form, Input, Row, Space, Typography } from 'antd'
+import { Col, Flex, Form, Input, Row, Space, Typography } from 'antd'
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
@@ -8,7 +8,6 @@ import { NotSet } from './EmptyValue'
 import { FieldInput } from './FieldInput'
 import { FileInput, FileLink } from './FileInput'
 import { FormCanvasContext } from './formCanvas'
-import { fieldRows } from './formLayout'
 import { fetchFormState, type FormStateAnswer } from './formState'
 import { formatValue, moneyCurrency, referencesLabels } from './formatValue'
 import { placeProblemErrors } from './problemErrors'
@@ -552,96 +551,99 @@ export function useRecordForm(
 
   // The inputs of the sections a wizard step lists, or of every section with `null`. In the Studio canvas each
   // section and each field is wrapped, so the canvas can mark it.
-  const fieldsFor = (names: readonly string[] | null): ReactNode => (
-    <>
-      {sections.map((section, index) => {
-        if (names !== null && !(section.name !== null && names.includes(section.name))) {
-          return null
-        }
-        const visible = section.fields.filter(({ field }) => !hiddenOf(field))
-        const content = (
-          <>
-            {section.titleKey !== null &&
-              !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) && (
-                <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>
-              )}
-            {fieldRows(
-              visible.map((entry) => entry.width),
-              narrow,
-            ).map((row) => (
-              <Row key={row[0]} gutter={[spacing.md, 0]} align="top">
-                {row.map((position) => {
-                  const entry = visible[position]
-                  const { field } = entry
-                  const errors = errorsOf(field.name)
-                  const required = stateOf(field.name)?.required ?? field.required
-                  const helpId = field.helpKey ? `${field.name}-help` : undefined
-                  const control = input(field, lockedOf(entry), required, helpId)
-                  const item = (
-                    <Form.Item
-                      key={field.name}
-                      label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{labelOf(field)}</span>}
-                      // A child collection and a read-only value have no input for the label to point to.
-                      htmlFor={
-                        field.type === 'child-collection' || asText(field, lockedOf(entry)) ? undefined : field.name
-                      }
-                      required={required}
-                      validateStatus={errors ? 'error' : undefined}
-                      help={
-                        errors && (
-                          <div role="alert" data-testid={`field-error-${field.name}`}>
-                            {errors.join(' ')}
-                          </div>
-                        )
-                      }
+  const fieldsFor = (names: readonly string[] | null): ReactNode => {
+    const nodes = sections.map((section, index) => {
+      if (names !== null && !(section.name !== null && names.includes(section.name))) {
+        return null
+      }
+      const visible = section.fields.filter(({ field }) => !hiddenOf(field))
+      // Outside the canvas a section with no field to show draws nothing, so it adds no gap of its own.
+      if (!canvas && visible.length === 0) {
+        return null
+      }
+      const content = (
+        <div>
+          {section.titleKey !== null &&
+            !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) && (
+              <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>
+            )}
+          <Row gutter={[spacing.md, spacing.lg]} align="top">
+            {visible.map((entry) => {
+              const { field } = entry
+              const errors = errorsOf(field.name)
+              const required = stateOf(field.name)?.required ?? field.required
+              const helpId = field.helpKey ? `${field.name}-help` : undefined
+              const control = input(field, lockedOf(entry), required, helpId)
+              const item = (
+                <Form.Item
+                  key={field.name}
+                  label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{labelOf(field)}</span>}
+                  // A child collection and a read-only value have no input for the label to point to.
+                  htmlFor={field.type === 'child-collection' || asText(field, lockedOf(entry)) ? undefined : field.name}
+                  required={required}
+                  validateStatus={errors ? 'error' : undefined}
+                  help={
+                    errors && (
+                      <div role="alert" data-testid={`field-error-${field.name}`}>
+                        {errors.join(' ')}
+                      </div>
+                    )
+                  }
+                >
+                  {field.helpKey && (
+                    // The label has Ant Design's 8px padding below it, so this pulls the help 4px under it.
+                    <div
+                      id={helpId}
+                      style={{
+                        fontSize: 12,
+                        lineHeight: '20px',
+                        color: colour.textMuted,
+                        marginTop: -4,
+                        marginBottom: spacing.xs,
+                      }}
                     >
-                      {field.helpKey && (
-                        // The label has Ant Design's 8px padding below it, so this pulls the help 4px under it.
-                        <div
-                          id={helpId}
-                          style={{
-                            fontSize: 12,
-                            lineHeight: '20px',
-                            color: colour.textMuted,
-                            marginTop: -4,
-                            marginBottom: spacing.xs,
-                          }}
-                        >
-                          {t(field.helpKey)}
-                        </div>
-                      )}
-                      {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
-                    </Form.Item>
-                  )
-                  return (
-                    <Col key={field.name} xs={24} lg={narrow ? 24 : entry.width * 2}>
-                      {canvas ? canvas.field(field.name, item) : item}
-                    </Col>
-                  )
-                })}
-              </Row>
-            ))}
-          </>
-        )
-        return <Fragment key={index}>{canvas ? canvas.section(index, content) : content}</Fragment>
-      })}
-      {shown
-        .filter(
-          (entry) =>
-            !lockedOf(entry) && !hiddenOf(entry.field) && entry.field.type === 'reference' && entry.field.target,
-        )
-        .map(({ field }) => (
-          <ReferenceLookup
-            key={field.name}
-            field={field}
-            title={labelOf(field)}
-            open={lookup === field.name}
-            onPick={(record) => pick(field, record)}
-            onClose={() => setLookup(null)}
-          />
-        ))}
-    </>
-  )
+                      {t(field.helpKey)}
+                    </div>
+                  )}
+                  {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
+                </Form.Item>
+              )
+              return (
+                <Col key={field.name} xs={24} lg={narrow ? 24 : entry.width * 2}>
+                  {canvas ? canvas.field(field.name, item) : item}
+                </Col>
+              )
+            })}
+          </Row>
+        </div>
+      )
+      return <Fragment key={index}>{canvas ? canvas.section(index, content) : content}</Fragment>
+    })
+    return (
+      <>
+        {nodes.some((node) => node !== null) && (
+          <Flex vertical gap={spacing.lg}>
+            {nodes}
+          </Flex>
+        )}
+        {shown
+          .filter(
+            (entry) =>
+              !lockedOf(entry) && !hiddenOf(entry.field) && entry.field.type === 'reference' && entry.field.target,
+          )
+          .map(({ field }) => (
+            <ReferenceLookup
+              key={field.name}
+              field={field}
+              title={labelOf(field)}
+              open={lookup === field.name}
+              onPick={(record) => pick(field, record)}
+              onClose={() => setLookup(null)}
+            />
+          ))}
+      </>
+    )
+  }
 
   const fields = fieldsFor(null)
 

@@ -1,4 +1,4 @@
-import { Button, Form, Input, Typography } from 'antd'
+import { Button, Flex, Form, Input, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useId, useRef } from 'react'
 import { useDesignTokens } from '../platform/themeMode'
@@ -14,7 +14,7 @@ import type { UpdatePasswordContext } from './signInContext'
  */
 export function UpdatePasswordPage({ context }: { context: UpdatePasswordContext }) {
   const { texts, error, loginAction, appInitiated } = context
-  const { colour } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const formId = useId()
   const labelStyle = { fontWeight: 500, color: colour.textMuted }
   const submitRef = useRef<HTMLInputElement>(null)
@@ -31,35 +31,37 @@ export function UpdatePasswordPage({ context }: { context: UpdatePasswordContext
         // Ant Design validates and stops the submit event, so the native post happens here.
         onFinish={() => submitRef.current?.form?.submit()}
       >
-        <Form.Item
-          name="password-new"
-          label={<span style={labelStyle}>{texts.newPassword}</span>}
-          rules={[{ required: true, message: texts.newPasswordRequired }]}
-          validateStatus={error ? 'error' : undefined}
-        >
-          <Input.Password name="password-new" autoComplete="new-password" />
-        </Form.Item>
-        <Form.Item
-          name="password-confirm"
-          label={<span style={labelStyle}>{texts.confirmPassword}</span>}
-          dependencies={['password-new']}
-          rules={[
-            { required: true, message: texts.passwordsDiffer },
-            ({ getFieldValue }) => ({
-              validator: (_, value) =>
-                !value || getFieldValue('password-new') === value
-                  ? Promise.resolve()
-                  : Promise.reject(new Error(texts.passwordsDiffer)),
-            }),
-          ]}
-        >
-          <Input.Password name="password-confirm" autoComplete="new-password" />
-        </Form.Item>
-        <input ref={submitRef} type="hidden" name="logout-sessions" value="on" />
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button type="primary" htmlType="submit" block>
-          {texts.setPassword}
-        </Button>
+        <Flex vertical gap={spacing.lg}>
+          <Form.Item
+            name="password-new"
+            label={<span style={labelStyle}>{texts.newPassword}</span>}
+            rules={[{ required: true, message: texts.newPasswordRequired }]}
+            validateStatus={error ? 'error' : undefined}
+          >
+            <Input.Password name="password-new" autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item
+            name="password-confirm"
+            label={<span style={labelStyle}>{texts.confirmPassword}</span>}
+            dependencies={['password-new']}
+            rules={[
+              { required: true, message: texts.passwordsDiffer },
+              ({ getFieldValue }) => ({
+                validator: (_, value) =>
+                  !value || getFieldValue('password-new') === value
+                    ? Promise.resolve()
+                    : Promise.reject(new Error(texts.passwordsDiffer)),
+              }),
+            ]}
+          >
+            <Input.Password name="password-confirm" autoComplete="new-password" />
+          </Form.Item>
+          <input ref={submitRef} type="hidden" name="logout-sessions" value="on" />
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+          <Button type="primary" htmlType="submit" block>
+            {texts.setPassword}
+          </Button>
+        </Flex>
       </Form>
       {appInitiated && (
         <form method="post" action={loginAction}>

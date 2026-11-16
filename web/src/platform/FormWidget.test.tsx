@@ -728,19 +728,43 @@ describe('FormWidget', () => {
   describe('with antd styles', () => {
     withAntdStyles()
 
-    it('sets a field error 4px under its input in 14/20 text, with the field gap below it', async () => {
+    it('sets a field error 4px under its input in 14/20 text', async () => {
       stubFetch({ status: 400, body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Required."]}}' })
       renderForm(null, noteWidget, 'light')
 
       await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       const message = await screen.findByTestId('field-error-title')
-      const explain = message.closest('.ant-form-item-explain')
-      const item = message.closest('.ant-form-item')
-      expect(explain).toHaveStyle({ marginTop: '4px', fontSize: '14px', lineHeight: '20px' })
-      expect(item && getComputedStyle(item).getPropertyValue('--ant-form-item-margin-bottom')).toBe(
-        `${designTokensFor('light').spacing.lg}px`,
-      )
+      expect(message.closest('.ant-form-item-explain')).toHaveStyle({
+        marginTop: '4px',
+        fontSize: '14px',
+        lineHeight: '20px',
+      })
+    })
+
+    it('keeps no margin below any form item, and the layout gives the 24px gap between rows', async () => {
+      stubFetch({ status: 400, body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Required."]}}' })
+      const { container } = renderForm(null, noteWidget, 'light')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+      await screen.findByTestId('field-error-title')
+
+      const items = Array.from(container.querySelectorAll<HTMLElement>('form .ant-form-item'))
+      expect(items.length).toBeGreaterThan(1)
+      for (const item of items) {
+        expect(getComputedStyle(item).getPropertyValue('--ant-form-item-margin-bottom')).toBe('0px')
+        expect(item.closest<HTMLElement>('.ant-row')?.style.rowGap).toBe(`${designTokensFor('light').spacing.lg}px`)
+      }
+    })
+
+    it('gives the sections of a form a 24px gap from the layout, each section in its own block', async () => {
+      stubFetch({ status: 200, body: sectionsJson(1) })
+      renderForm(noteId, sectionsWidget, 'light')
+
+      const main = (await screen.findByRole('heading', { name: 'Main' })).parentElement
+      const details = screen.getByRole('heading', { name: 'Details' }).parentElement
+      expect(main?.parentElement).toBe(details?.parentElement)
+      expect(main?.parentElement?.style.gap).toBe(`${designTokensFor('light').spacing.lg}px`)
     })
   })
 
@@ -1448,6 +1472,18 @@ describe('FormWidget', () => {
     expect(screen.getByLabelText('Priority')).toHaveValue('7')
     expect(screen.queryByLabelText('Done')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Amount')).not.toBeInTheDocument()
+  })
+
+  it('draws no heading for a section with no field to show, so it adds no gap', async () => {
+    stubFetch({ status: 200, body: sectionsJson(1) })
+    const form = sectionsWidget.form!
+    renderForm(noteId, {
+      ...sectionsWidget,
+      form: { ...form, sections: [...form.sections, { name: 'empty', titleKey: 'noteSections.main', fields: [] }] },
+    })
+
+    expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('Buy paper')
+    expect(screen.getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Main', 'Details'])
   })
 
   it('puts each field in a column of its width, and a field without a width on the whole row', async () => {

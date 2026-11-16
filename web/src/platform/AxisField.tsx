@@ -139,10 +139,9 @@ function FormField({
 }: FormFieldProps) {
   const { colour } = useDesignTokens()
   return (
-    // The form gives the gap below the field, see docs/reference/shared-widgets.md#the-rule.
+    // The theme keeps no margin below the field. The form gives the gap, see docs/reference/shared-widgets.md#the-rule.
     <Form.Item
       name={name}
-      style={{ marginBottom: 0 }}
       label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{label}</span>}
       required={requiredMessage !== undefined}
       valuePropName={valuePropName}
