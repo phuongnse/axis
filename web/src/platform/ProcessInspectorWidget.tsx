@@ -1,8 +1,8 @@
-import { Flex, Select } from 'antd'
+import { Flex } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
-import { AxisTable, type AxisColumn, type AxisTableProps } from './AxisTable'
+import { Link } from 'react-router'
+import { AxisTable, type AxisColumn } from './AxisTable'
 import { DeadLetterList } from './DeadLetterList'
 import { formatValue } from './formatValue'
 import {
@@ -14,7 +14,9 @@ import {
   type InstancePage,
 } from './inspection'
 import type { WidgetMetadata } from './site'
-import { parseTableQuery, recordQuery, tablePageSizes, writeTableQuery } from './tableQuery'
+import { matchesFilter } from './tableFilter'
+import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
+import { useTableView } from './useTableView'
 import { useText } from './texts'
 import { siteAddress } from './siteLinks'
 
@@ -38,14 +40,17 @@ interface LoadState {
 }
 
 const pageSizes = tablePageSizes()
-const parameterNames = ['state']
+// useTableView needs stable arrays. The list has no sort and no parameter of its own.
+const stateFields = [{ name: 'state', type: 'enum' }] as const
+const noParameters: readonly string[] = []
 const createdAtField = { name: 'createdAt', type: 'date-time' } as const
 const endedAtField = { name: 'endedAt', type: 'date-time' } as const
 
 /**
- * Lists the instances of the widget's process, newest first, as the inspection API orders them. A
- * clearable select in the table's toolbar filters them by state. `state`, `page` and `pageSize` live in the URL, and a
- * state change goes back to page 1. The first column links each row to the instance's address
+ * Lists the instances of the widget's process, newest first, as the inspection API orders them. The table's Filter
+ * filters them by State. `filter`, `page` and `pageSize` live in the URL, and a new filter goes back to page 1. The
+ * browser works out which of the five states the filter keeps and sends each one as `state`, none when it keeps all of
+ * them, and no request at all when it keeps none. The first column links each row to the instance's address
  * under the inspector page. A `403` shows that the user may not inspect the process. With nobody
  * signed in, the inspection API's 401 shows the sign-in prompt.
  *
@@ -54,34 +59,41 @@ const endedAtField = { name: 'endedAt', type: 'date-time' } as const
  */
 export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: ProcessInspectorWidgetProps) {
   const t = useText()
-  const [searchParams, setSearchParams] = useSearchParams()
   // The server sets the path on every process inspector.
   const instancesPath = widget.instancesPath!
   const instancePath = siteAddress(sitePath, pageName.toLowerCase())
-  // The list has no sort, so no field is offered as one. A state the API does not know is dropped,
-  // so the server never answers it with a 400.
-  const query = useMemo(() => {
-    const parsed = parseTableQuery(searchParams, [], undefined, parameterNames)
-    const state = parsed.parameters?.state
-    return state === undefined || (instanceStates as readonly string[]).includes(state)
-      ? parsed
-      : { ...parsed, parameters: {} }
-  }, [searchParams])
-  const state = query.parameters?.state
-  const requestQuery = recordQuery(query)
+  const { view: query, setView } = useTableView(stateFields, recordPageSize, noParameters, false, true)
+  const { filter } = query
+  const keptStates = useMemo(
+    () =>
+      filter
+        ? instanceStates.filter((state) =>
+            matchesFilter(
+              { state },
+              filter,
+              () => ({ kind: 'enum', value: (row: { state: string }) => row.state }),
+              locale,
+            ),
+          )
+        : [...instanceStates],
+    [filter, locale],
+  )
+  const noneKept = keptStates.length === 0
+  // The filter itself stays in the address. The server gets the states it keeps, none when it keeps all of them.
+  const requestQuery = useMemo(() => {
+    const params = new URLSearchParams(recordQuery({ ...query, filter: undefined }))
+    if (keptStates.length < instanceStates.length) {
+      for (const state of keptStates) {
+        params.append('state', state)
+      }
+    }
+    return params.toString()
+  }, [query, keptStates])
   const requestUrl = `${instancesPath}${requestQuery ? `?${requestQuery}` : ''}`
   const [load, setLoad] = useState<LoadState>({ failed: false, forbidden: false })
-  const loading = load.url !== requestUrl
-  const failed = load.failed && !loading
-  const totalCount = loading ? undefined : load.page?.totalCount
-
-  // An invalid, repeated or out-of-order parameter is rewritten without a history entry.
-  useEffect(() => {
-    const canonical = writeTableQuery(searchParams, query, undefined, parameterNames)
-    if (canonical.toString() !== searchParams.toString()) {
-      setSearchParams(canonical, { replace: true, preventScrollReset: true })
-    }
-  }, [searchParams, query, setSearchParams])
+  const loading = !noneKept && load.url !== requestUrl
+  const failed = load.failed && !loading && !noneKept
+  const totalCount = noneKept ? 0 : loading ? undefined : load.page?.totalCount
 
   // A page past the end becomes the last page once the total is known, so the URL and the
   // pagination agree.
@@ -91,14 +103,14 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
     }
     const lastPage = Math.max(1, Math.ceil(totalCount / query.pageSize))
     if (query.page > lastPage) {
-      setSearchParams(writeTableQuery(searchParams, { ...query, page: lastPage }, undefined, parameterNames), {
-        replace: true,
-        preventScrollReset: true,
-      })
+      setView({ ...query, page: lastPage }, { replace: true })
     }
-  }, [totalCount, searchParams, query, setSearchParams])
+  }, [totalCount, query, setView])
 
   useEffect(() => {
+    if (noneKept) {
+      return
+    }
     const controller = new AbortController()
     fetchInstances(instancesPath, requestQuery, controller.signal)
       .then((result) =>
@@ -116,7 +128,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
         setLoad({ url: requestUrl, failed: true, forbidden: false })
       })
     return () => controller.abort()
-  }, [instancesPath, requestQuery, requestUrl])
+  }, [instancesPath, requestQuery, requestUrl, noneKept])
 
   const columns = useMemo<AxisColumn<InstanceListItem>[]>(
     () => [
@@ -136,6 +148,10 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
         kind: 'fixed',
         title: t('shell.inspector.state'),
         render: (_value, instance) => stateText(t, instance.state),
+        filter: {
+          kind: 'enum',
+          options: instanceStates.map((value) => ({ value, label: stateText(t, value) })),
+        },
       },
       { key: 'step', kind: 'freeText', title: t('shell.inspector.step'), render: (_value, instance) => instance.step },
       {
@@ -161,28 +177,6 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
     [locale, t, instancePath],
   )
 
-  const stateOptions = useMemo(() => instanceStates.map((value) => ({ value, label: stateText(t, value) })), [t])
-
-  // A new state or page size starts again at page 1. Paging adds history entries.
-  const onChange: AxisTableProps<InstanceListItem>['onChange'] = (pagination) => {
-    const pageSize = pagination.pageSize ?? query.pageSize
-    const page = pageSize !== query.pageSize ? 1 : (pagination.current ?? 1)
-    setSearchParams(writeTableQuery(searchParams, { ...query, page, pageSize }, undefined, parameterNames), {
-      preventScrollReset: true,
-    })
-  }
-
-  const onStateChange = (value: string | undefined) =>
-    setSearchParams(
-      writeTableQuery(
-        searchParams,
-        { ...query, page: 1, parameters: value ? { state: value } : {} },
-        undefined,
-        parameterNames,
-      ),
-      { preventScrollReset: true },
-    )
-
   if (load.forbidden && !loading) {
     return <AxisAlert data-testid="inspector-forbidden" kind="warning" message={t('shell.inspector.forbidden')} />
   }
@@ -192,32 +186,12 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
   return (
     <Flex vertical gap="middle">
       <AxisTable<InstanceListItem>
-        toolbar={{
-          view: (
-            <Select
-              allowClear
-              aria-label={t('shell.inspector.state')}
-              style={{ width: 240 }}
-              placeholder={t('shell.inspector.allStates')}
-              value={state}
-              options={stateOptions}
-              virtual={false}
-              onChange={onStateChange}
-            />
-          ),
-        }}
         rowKey={(instance) => instance.id}
         columns={columns}
-        dataSource={load.page?.items}
+        dataSource={noneKept ? [] : load.page?.items}
         loading={loading}
         emptyText={t('shell.inspector.empty')}
-        pagination={{
-          current: query.page,
-          pageSize: query.pageSize,
-          total: load.page?.totalCount ?? 0,
-          pageSizeOptions: pageSizes,
-        }}
-        onChange={onChange}
+        view={{ query, onChange: setView, total: noneKept ? 0 : (load.page?.totalCount ?? 0), pageSizes }}
       />
       <DeadLetterList deadLettersPath={widget.deadLettersPath!} locale={locale} />
     </Flex>

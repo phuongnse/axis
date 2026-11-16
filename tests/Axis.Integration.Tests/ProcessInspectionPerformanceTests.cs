@@ -87,10 +87,10 @@ public sealed class ProcessInspectionPerformanceTests(ProcessInspectionData data
     private async Task<(InstanceListPage Page, TimeSpan Elapsed)> ListAsync(string? state, Guid? subjectId)
     {
         await using var connection = await data.Steps.DataSource.OpenConnectionAsync(CancellationToken);
-        await InstanceQueries.ListAsync(connection, data.ApplicationId, data.ProcessId, data.Subject, state, subjectId, null, 1, PageSize, CancellationToken);
+        await InstanceQueries.ListAsync(connection, data.ApplicationId, data.ProcessId, data.Subject, state is null ? null : [state], subjectId, null, 1, PageSize, CancellationToken);
 
         var stopwatch = Stopwatch.StartNew();
-        var page = await InstanceQueries.ListAsync(connection, data.ApplicationId, data.ProcessId, data.Subject, state, subjectId, null, 1, PageSize, CancellationToken);
+        var page = await InstanceQueries.ListAsync(connection, data.ApplicationId, data.ProcessId, data.Subject, state is null ? null : [state], subjectId, null, 1, PageSize, CancellationToken);
         stopwatch.Stop();
         return (page!, stopwatch.Elapsed);
     }
@@ -101,7 +101,7 @@ public sealed class ProcessInspectionPerformanceTests(ProcessInspectionData data
             InstanceQueries.ListPageSql(data.Subject, null),
             command =>
             {
-                InstanceQueries.AddListParameters(command, data.ApplicationId, data.ProcessId, data.Subject.Id, state, subjectId, null);
+                InstanceQueries.AddListParameters(command, data.ApplicationId, data.ProcessId, data.Subject.Id, state is null ? null : [state], subjectId, null);
                 command.Parameters.AddWithValue("limit", PageSize);
                 command.Parameters.AddWithValue("offset", 0L);
             },

@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { tabTo } from '../test/antd'
+import { clickInDialog, pick } from '../test/tableFilter'
 import { designTokensFor } from './designTokens'
 import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
@@ -237,51 +238,66 @@ describe('ProcessInspectorWidget', () => {
     expect(row).not.toHaveTextContent('0192f49a-1b2c-7d3e-8f40-5b6c7d8e9f01')
   })
 
-  it('sends the state in the URL to the instance list', async () => {
+  it('filters State is Failed through Filter, keeps the filter in the address and goes back to page 1', async () => {
+    const requests = stubInstances()
+    const user = userEvent.setup()
+
+    renderWidget('?page=2&pageSize=10')
+
+    await screen.findByRole('row', { name: /managerApproval/ })
+    await user.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Value', 0, 'Failed')
+    await clickInDialog('Apply')
+
+    await waitFor(() => expect(requests()).toContain(`${instancesPath}?pageSize=10&state=failed`))
+    const address = new URLSearchParams(screen.getByTestId('search').textContent ?? '')
+    expect(JSON.parse(address.get('filter')!)).toEqual({ all: [{ field: 'state', op: 'eq', value: 'failed' }] })
+    expect(address.has('page')).toBe(false)
+    expect(address.get('pageSize')).toBe('10')
+  })
+
+  it('sends every state that State is not Running keeps', async () => {
+    const requests = stubInstances()
+    const user = userEvent.setup()
+
+    renderWidget()
+
+    await screen.findByRole('row', { name: /managerApproval/ })
+    await user.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Operator', 0, 'is not')
+    await pick('Value', 0, 'Running')
+    await clickInDialog('Apply')
+
+    await waitFor(() =>
+      expect(requests()).toContain(`${instancesPath}?state=waiting&state=completed&state=failed&state=cancelled`),
+    )
+  })
+
+  it('shows the empty text and makes no request when the filter keeps no state', async () => {
+    const requests = stubInstances()
+
+    renderWidget(`?filter=${encodeURIComponent(JSON.stringify({ all: [{ field: 'state', op: 'empty' }] }))}`)
+
+    expect(await screen.findByText('No instances.')).toBeInTheDocument()
+    expect(requests()).toEqual([])
+  })
+
+  it('sends no state when the filter keeps every state', async () => {
+    const requests = stubInstances()
+    const filter = JSON.stringify({ all: [{ field: 'state', op: 'notEmpty' }] })
+
+    renderWidget(`?filter=${encodeURIComponent(filter)}`)
+
+    await screen.findByRole('row', { name: /managerApproval/ })
+    expect(requests()).toEqual([instancesPath])
+  })
+
+  it('does not read an old state parameter and lists every instance', async () => {
     const requests = stubInstances()
 
     renderWidget('?state=waiting')
 
     await screen.findByRole('row', { name: /managerApproval/ })
-    expect(requests()).toEqual([`${instancesPath}?state=waiting`])
-  })
-
-  it('writes the chosen state to the URL and goes back to page 1', async () => {
-    const requests = stubInstances()
-    const user = userEvent.setup()
-
-    renderWidget('?state=waiting&page=2&pageSize=10')
-
-    await screen.findByRole('row', { name: /managerApproval/ })
-    await user.click(screen.getByRole('combobox', { name: 'State' }))
-    await user.click(await screen.findByTitle('Failed'))
-
-    await waitFor(() => expect(screen.getByTestId('search').textContent).toBe('?state=failed&pageSize=10'))
-    await waitFor(() => expect(requests()).toContain(`${instancesPath}?state=failed&pageSize=10`))
-  })
-
-  it('clears the state filter', async () => {
-    const requests = stubInstances()
-    const user = userEvent.setup()
-
-    renderWidget('?state=waiting')
-
-    await screen.findByRole('row', { name: /managerApproval/ })
-    const select = screen.getByRole('combobox', { name: 'State' })
-    await user.hover(select)
-    await user.click(await screen.findByLabelText('close-circle'))
-
-    await waitFor(() => expect(screen.getByTestId('search').textContent).toBe(''))
-    await waitFor(() => expect(requests()).toContain(instancesPath))
-  })
-
-  it('drops a state the API does not know from the URL and requests the unfiltered list', async () => {
-    const requests = stubInstances()
-
-    renderWidget('?state=sleeping&page=0')
-
-    await screen.findByRole('row', { name: /managerApproval/ })
-    await waitFor(() => expect(screen.getByTestId('search').textContent).toBe(''))
     expect(requests()).toEqual([instancesPath])
   })
 
@@ -307,10 +323,10 @@ describe('ProcessInspectorWidget', () => {
   it('asks to sign in when nobody is signed in', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.mocked(assignLocation).mockReset()
-    history.pushState(null, '', '/e2e/inspector?state=waiting')
+    history.pushState(null, '', '/e2e/inspector')
     stubInstances('', 401)
 
-    renderWidget('?state=waiting')
+    renderWidget()
 
     await waitFor(() => expect(isSignInNeeded()).toBe(true))
     expect(assignLocation).not.toHaveBeenCalled()

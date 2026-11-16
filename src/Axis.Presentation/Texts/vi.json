@@ -616,7 +616,6 @@
   "shell.inspector.release": "Phiên bản",
   "shell.inspector.createdAt": "Bắt đầu",
   "shell.inspector.endedAt": "Kết thúc",
-  "shell.inspector.allStates": "Tất cả trạng thái",
   "shell.inspector.empty": "Chưa có lượt chạy nào.",
   "shell.inspector.forbidden": "Bạn không có quyền xem chi tiết quy trình này.",
   "shell.inspector.notFound": "Quy trình này không có lượt chạy nào mang ID này.",

@@ -616,7 +616,6 @@
   "shell.inspector.release": "Release",
   "shell.inspector.createdAt": "Started",
   "shell.inspector.endedAt": "Ended",
-  "shell.inspector.allStates": "All states",
   "shell.inspector.empty": "No instances.",
   "shell.inspector.forbidden": "You may not inspect this process.",
   "shell.inspector.notFound": "No instance of this process exists with this id.",

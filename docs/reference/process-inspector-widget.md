@@ -37,10 +37,12 @@ A page whose widget is a `processInspector` names one process.
 The page lists the process's instances, newest first in the API's order, with their record, state,
 step, release and times.
 
-- **State filter.** A clearable select above the list filters by state, and offers the five states
-  with platform texts. Changing the state goes back to page 1. A `state` in the URL that is not one of
-  the five is dropped.
-- **Paging.** `state`, `page` and `pageSize` live in the URL, as for a table.
+- **State filter.** The State column has an enum filter with the five states, platform texts, through
+  the table's Filter, see [tables](actions-and-controls.md#tables). A new filter goes back to page 1. The
+  browser works out which of the five states the filter keeps and sends each one as `state`. With all five
+  kept it sends none, and with none kept it shows the empty list and makes no request. A `state` in the
+  address is not read.
+- **Paging.** `filter`, `page` and `pageSize` live in the URL, as for a table.
 - **Record.** The first column, headed Record, is the instance's record, named by `subjectLabel`, and
   is the link that opens the instance. When `subjectLabel` is `null` the link reads
   `shell.inspector.noSubject` for an instance without a subject, and `shell.inspector.open` when the

@@ -15,6 +15,7 @@ using Axis.Server.Http;
 using Axis.Server.Records;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 
 namespace Axis.Server.Processes;
@@ -23,7 +24,7 @@ namespace Axis.Server.Processes;
 /// The endpoints for a user who may inspect a process. The list at
 /// <c>GET /api/apps/{app}/processes/{process}/instances</c> shows the instances of the process,
 /// newest first and paged as the record API pages, whatever release each is pinned to. The
-/// <c>state</c> parameter keeps one state, and <c>subject</c> keeps the instances of one record. A
+/// <c>state</c> parameter may repeat and keeps the instances in any of the given states, and <c>subject</c> keeps the instances of one record. A
 /// request is checked in order: session or service account bearer token (401), application and process (404), the user's
 /// <c>inspect</c> grant on the process (403), then the parameters (400), each keyed by its name.
 /// An instance is listed only when its subject record exists and matches one of the user's read
@@ -75,11 +76,12 @@ internal static class ProcessInspectionEndpoints
         endpoints.MapGet("/api/apps/{app}/processes/{process}/instances/{id}", GetAsync).WithMetadata(ServiceAccountRoute.Instance);
     }
 
-    // The query parameters are bound as strings so every invalid one is reported in one problem.
+    // The query parameters are bound as strings so every invalid one is reported in one problem. The repeated `state` needs
+    // [FromQuery], because the request delegate generator does not map the route without it.
     private static async Task<IResult> ListAsync(
         string app,
         string process,
-        string? state,
+        [FromQuery] string[]? state,
         string? subject,
         string? page,
         string? pageSize,
@@ -114,11 +116,13 @@ internal static class ProcessInspectionEndpoints
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
-        if (state is not null && !_states.Contains(state, StringComparer.Ordinal))
+        if (state is not null && state.Any(value => !_states.Contains(value, StringComparer.Ordinal)))
         {
             errors["state"] = [$"Must be one of {string.Join(", ", _states)}."];
         }
 
+        // A missing state is an empty array, which is no filter.
+        IReadOnlyList<string>? states = state is { Length: > 0 } ? state : null;
         Guid? subjectId = null;
         if (subject is not null)
         {
@@ -144,7 +148,7 @@ internal static class ProcessInspectionEndpoints
                 await database.GetConnectionAsync(cancellationToken),
                 application.Manifest.Id,
                 model.Id,
-                state,
+                states,
                 subjectId,
                 pageNumber,
                 size,
@@ -176,7 +180,7 @@ internal static class ProcessInspectionEndpoints
             ? await RecordFilters.ConditionAsync(application, entity, RecordCommand.Expressions(filters), user.Id, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken)
             : null;
         if (await InstanceQueries.ListAsync(
-                connection, application.Manifest.Id, model.Id, entity, state, subjectId, condition, pageNumber, size, cancellationToken) is not { } result)
+                connection, application.Manifest.Id, model.Id, entity, states, subjectId, condition, pageNumber, size, cancellationToken) is not { } result)
         {
             // PostgreSQL cannot fail one branch of an OR, so every filter of the list is named.
             var logger = loggerFactory.CreateLogger(typeof(ProcessInspectionEndpoints).FullName!);
