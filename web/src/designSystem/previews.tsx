@@ -43,6 +43,7 @@ import {
   manyStepsFormRoutes,
   manyStepsRequestForm,
   missingRequestId,
+  instanceId,
   missingTaskId,
   openTaskId,
   loadingRoutes,
@@ -281,6 +282,13 @@ export const previews: Record<string, readonly PreviewState[]> = {
       caption: 'Task not found',
       draw: () => <ShellPreview />,
       entry: { pathname: `/sample/tasks/${missingTaskId}`, state: { from: '/sample/tasks' } },
+      frameHeight: 600,
+    },
+    // Proposed: a request's approval waiting at its review, opened from the Approvals inspector, see the review on #3650.
+    {
+      caption: 'Process instance',
+      draw: () => <ShellPreview />,
+      entry: { pathname: `/sample/instances/${instanceId}`, state: { from: '/sample/instances' } },
       frameHeight: 600,
     },
     // Proposed: a request that does not exist, opened from Requests, see the review on #3650.

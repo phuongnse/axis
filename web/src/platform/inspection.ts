@@ -26,6 +26,11 @@ export interface InstanceListItem {
   id: string
   /** The subject the instance runs for, or `null` when its process has no subject. */
   subjectId: string | null
+  /**
+   * Proposed, see the review on #3650: the subject record with its entity and its display field's value, as a task's
+   * subject is, so the page links it, or `null` when the process has no subject.
+   */
+  subject?: { entity: string; id: string; label: string | null } | null
   /** The subject's display field value, or `null` without a subject or when the user may not read it. */
   subjectLabel: string | null
   state: string
@@ -157,7 +162,14 @@ export interface InstanceDetail {
   process: string
   /** The subject the instance runs for, or `null` when its process has no subject. */
   subjectId: string | null
+  /**
+   * Proposed, see the review on #3650: the subject record with its entity and its display field's value, as a task's
+   * subject is, so the page links it, or `null` when the process has no subject.
+   */
+  subject?: { entity: string; id: string; label: string | null } | null
   releaseId: string
+  /** Proposed, see the review on #3650: the number of the release the instance is pinned to, as the list has it. */
+  releaseNumber?: number | null
   state: string
   step: string
   createdAt: string

@@ -627,7 +627,7 @@
   "shell.inspector.allStates": "All states",
   "shell.inspector.empty": "No instances.",
   "shell.inspector.forbidden": "You may not inspect this process.",
-  "shell.inspector.notFound": "No instance of this process exists with this id.",
+  "shell.inspector.notFound": "This process instance does not exist, or you cannot open it.",
   "shell.inspector.loadFailed": "The instances could not be loaded.",
   "shell.inspector.steps": "Steps",
   "shell.inspector.taken": "Taken",

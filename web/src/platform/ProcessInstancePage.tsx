@@ -1,6 +1,7 @@
 import { Button, Descriptions, Flex, Tag, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AxisButton } from './AxisButton'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { EmptyState } from './EmptyState'
@@ -22,6 +23,11 @@ import {
   type SubProcess,
 } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
+import { PageActions, PageHeading } from './PageLayout'
+import { RecordLink } from './RecordLink'
+import { RecordNotFound } from './RecordNotFound'
+import { PartRule, SectionPart } from './SectionParts'
+import { TermList, type Term } from './TermList'
 import { ReasonDialog } from './ReasonDialog'
 import { ResolveDialog } from './ResolveDialog'
 import type { WidgetMetadata } from './site'
@@ -111,7 +117,9 @@ export function ProcessInstancePage({
     return null
   }
   if (instance === null) {
-    return <AxisAlert data-testid="inspector-not-found" kind="warning" message={t('shell.inspector.notFound')} />
+    // Proposed: a missing instance says so in one line with a link to its list, as a missing record does, see the review
+    // on #3650.
+    return <RecordNotFound textKey="shell.inspector.notFound" />
   }
   if (instance === forbidden) {
     return <AxisAlert data-testid="inspector-forbidden" kind="warning" message={t('shell.inspector.forbidden')} />
@@ -288,7 +296,22 @@ export function InstanceDetailView({
   ]
 
   const subProcessColumns: AxisColumn<SubProcess>[] = [
-    { key: 'process', kind: 'freeText', title: t('shell.inspector.process'), render: (_v, row) => row.process },
+    {
+      key: 'process',
+      kind: 'freeText',
+      title: t('shell.inspector.process'),
+      // Proposed: the identifying cell opens the child, as a table's rows open, see the review on #3650.
+      render: (_v, row) => {
+        const page = inspectors?.get(row.process)
+        return page === undefined ? (
+          row.process
+        ) : (
+          <Link to={inspectorPath(sitePath, page, row.id)} data-testid={`inspector-subprocess-${row.id}`}>
+            {row.process}
+          </Link>
+        )
+      },
+    },
     { key: 'step', kind: 'freeText', title: t('shell.inspector.step'), render: (_v, row) => stepLabel(row.step) },
     { key: 'state', kind: 'fixed', title: t('shell.inspector.state'), render: (_v, row) => stateText(t, row.state) },
     {
@@ -303,64 +326,83 @@ export function InstanceDetailView({
       title: t('shell.inspector.endedAt'),
       render: (_v, row) => time('endedAt', row.endedAt),
     },
-    {
-      key: 'open',
-      kind: 'fixed',
-      render: (_v, row) => {
-        const page = inspectors?.get(row.process)
-        return page === undefined ? null : (
-          <Link to={inspectorPath(sitePath, page, row.id)} data-testid={`inspector-subprocess-${row.id}`}>
-            {t('shell.inspector.open')}
-          </Link>
-        )
-      },
-    },
   ]
 
-  const taken = new Set(instance.path.map((entry) => entry.step))
-  return (
-    <Flex vertical gap="large" data-testid="inspector-instance">
-      <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
-      <Descriptions
-        column={1}
-        items={[
-          { key: 'state', label: t('shell.inspector.state'), children: stateText(t, instance.state) },
-          { key: 'step', label: t('shell.inspector.step'), children: stepLabel(instance.step) },
+  // Proposed, see the review on #3650: the instance is headed by its process, its state a tag beside it and its kind the
+  // line; what the platform keeps of it is the first part, each fact on a row of its own, and each part after it is a
+  // part with a rule above it.
+  const subject = instance.subject ?? null
+  const facts: Term[] = [
+    ...(subject === null
+      ? []
+      : [
           {
             key: 'subject',
-            label: t('shell.inspector.subject'),
-            children: instance.subjectId ?? t('shell.inspector.noSubject'),
+            term: t('shell.inspector.subject'),
+            value: (
+              <RecordLink entity={subject.entity} id={subject.id}>
+                {subject.label ?? subject.id}
+              </RecordLink>
+            ),
           },
-          ...(instance.parent === null
-            ? []
-            : [
-                {
-                  key: 'parent',
-                  label: t('shell.inspector.parent'),
-                  children:
-                    parentPage === undefined ? (
-                      instance.parent.process
-                    ) : (
-                      <Link
-                        to={inspectorPath(sitePath, parentPage, instance.parent.id)}
-                        data-testid="inspector-parent-link"
-                      >
-                        {instance.parent.process}
-                      </Link>
-                    ),
-                },
-              ]),
-          { key: 'release', label: t('shell.inspector.release'), children: instance.releaseId },
-          { key: 'createdAt', label: t('shell.inspector.createdAt'), children: time('createdAt', instance.createdAt) },
-          { key: 'endedAt', label: t('shell.inspector.endedAt'), children: time('endedAt', instance.endedAt) },
-          ...(due === null ? [] : [{ key: 'dueAt', label: t('shell.inspector.dueAt'), children: time('dueAt', due) }]),
-        ]}
+        ]),
+    { key: 'step', term: t('shell.inspector.step'), value: stepLabel(instance.step) },
+    ...(instance.parent === null
+      ? []
+      : [
+          {
+            key: 'parent',
+            term: t('shell.inspector.parent'),
+            value:
+              parentPage === undefined ? (
+                instance.parent.process
+              ) : (
+                <Link to={inspectorPath(sitePath, parentPage, instance.parent.id)} data-testid="inspector-parent-link">
+                  {instance.parent.process}
+                </Link>
+              ),
+          },
+        ]),
+    { key: 'createdAt', term: t('shell.inspector.createdAt'), value: time('createdAt', instance.createdAt) },
+    ...(instance.endedAt === null
+      ? []
+      : [{ key: 'endedAt', term: t('shell.inspector.endedAt'), value: time('endedAt', instance.endedAt) }]),
+    ...(due === null ? [] : [{ key: 'dueAt', term: t('shell.inspector.dueAt'), value: time('dueAt', due) }]),
+    { key: 'release', term: t('shell.inspector.release'), value: instance.releaseNumber ?? instance.releaseId },
+  ]
+  const part = (title: string, content: ReactNode) => (
+    <>
+      <PartRule />
+      <SectionPart title={title}>{content}</SectionPart>
+    </>
+  )
+  const taken = new Set(instance.path.map((entry) => entry.step))
+  return (
+    <Flex vertical gap="middle" data-testid="inspector-instance">
+      <PageHeading
+        title={instance.process}
+        line={t('shell.inspector.process')}
+        tags={
+          // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
+          <Tag color={instance.state === 'failed' ? 'error' : undefined}>{stateText(t, instance.state)}</Tag>
+        }
       />
-      <section>
-        <Typography.Title level={5}>{t('shell.inspector.steps')}</Typography.Title>
+      <PageActions>
+        <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
+      </PageActions>
+      <TermList terms={facts} />
+      {part(
+        t('shell.inspector.steps'),
         <Flex vertical>
-          {instance.graph.steps.map((step) => (
-            <Flex key={step.name} vertical gap="small" data-testid={`inspector-step-${step.name}`} style={rowStyle}>
+          {instance.graph.steps.map((step, index) => (
+            <Flex
+              key={step.name}
+              vertical
+              gap="small"
+              data-testid={`inspector-step-${step.name}`}
+              // The last step has no line of its own, as the next part's rule follows it.
+              style={index === instance.graph.steps.length - 1 ? { paddingBlock: spacing.sm } : rowStyle}
+            >
               <Flex gap="small" align="center">
                 <Typography.Text strong>{stepLabel(step.name)}</Typography.Text>
                 <Typography.Text type="secondary">{step.type}</Typography.Text>
@@ -376,29 +418,29 @@ export function InstanceDetailView({
               ))}
             </Flex>
           ))}
-        </Flex>
-      </section>
-      <section>
-        <Typography.Title level={5}>{t('shell.inspector.history')}</Typography.Title>
+        </Flex>,
+      )}
+      {part(
+        t('shell.inspector.history'),
         <AxisTable<PathEntry>
           rowKey={(row) => `${row.step}|${row.startedAt}|${row.finishedAt}`}
           columns={historyColumns}
           dataSource={instance.path}
           emptyText={t('shell.inspector.noHistory')}
-        />
-      </section>
-      <section>
-        <Typography.Title level={5}>{t('shell.inspector.tasks')}</Typography.Title>
+        />,
+      )}
+      {part(
+        t('shell.inspector.tasks'),
         <AxisTable<InstanceTask>
           rowKey={(row) => row.id}
           columns={taskColumns}
           dataSource={instance.tasks}
           emptyText={t('shell.inspector.noTasks')}
-        />
-      </section>
-      <section>
-        <Typography.Title level={5}>{t('shell.inspector.calls')}</Typography.Title>
-        {instance.calls.length === 0 ? (
+        />,
+      )}
+      {part(
+        t('shell.inspector.calls'),
+        instance.calls.length === 0 ? (
           <EmptyState text={t('shell.inspector.noCalls')} />
         ) : (
           <Flex vertical>
@@ -414,17 +456,17 @@ export function InstanceDetailView({
               />
             ))}
           </Flex>
-        )}
-      </section>
-      <section>
-        <Typography.Title level={5}>{t('shell.inspector.subProcesses')}</Typography.Title>
+        ),
+      )}
+      {part(
+        t('shell.inspector.subProcesses'),
         <AxisTable<SubProcess>
           rowKey={(row) => row.id}
           columns={subProcessColumns}
           dataSource={instance.subProcesses}
           emptyText={t('shell.inspector.noSubProcesses')}
-        />
-      </section>
+        />,
+      )}
     </Flex>
   )
 }
@@ -446,10 +488,14 @@ function InstanceCommands({ instance, instancesPath, onChanged }: InstanceComman
   return (
     <Flex gap="small">
       {allowed.map((command) => (
-        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-        <Button key={command} data-testid={`inspector-command-${command}`} onClick={() => setOpen(command)}>
+        <AxisButton
+          role="secondary"
+          key={command}
+          data-testid={`inspector-command-${command}`}
+          onClick={() => setOpen(command)}
+        >
           {t(`shell.inspector.commands.${command}`)}
-        </Button>
+        </AxisButton>
       ))}
       {open && (
         <ReasonDialog

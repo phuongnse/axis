@@ -627,7 +627,7 @@
   "shell.inspector.allStates": "Tất cả trạng thái",
   "shell.inspector.empty": "Chưa có lượt chạy nào.",
   "shell.inspector.forbidden": "Bạn không có quyền xem chi tiết quy trình này.",
-  "shell.inspector.notFound": "Quy trình này không có lượt chạy nào mang ID này.",
+  "shell.inspector.notFound": "Lượt chạy quy trình này không tồn tại hoặc bạn không có quyền mở.",
   "shell.inspector.loadFailed": "Không tải được các lượt chạy.",
   "shell.inspector.steps": "Các bước",
   "shell.inspector.taken": "Đã qua",

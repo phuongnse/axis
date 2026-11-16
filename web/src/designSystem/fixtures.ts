@@ -3,7 +3,7 @@ import type { CurrentUser } from '../platform/currentUser'
 import type { LegalLinks } from '../platform/LegalLine'
 import type { NotificationPage } from '../platform/notifications'
 import type { HistoryPage, RecordItem, RecordPage } from '../platform/records'
-import type { DeadLetterPage, InstancePage } from '../platform/inspection'
+import type { DeadLetterPage, InstanceDetail, InstancePage } from '../platform/inspection'
 import type {
   ApplicationSite,
   DataSourceMetadata,
@@ -670,6 +670,14 @@ const tasksPage: PageMetadata = {
   widgets: [taskInboxWidget],
 }
 
+/** The process inspector page of the fixture site, which no navigation entry opens, so an instance opens under it. */
+const instancesPage: PageMetadata = {
+  name: 'Instances',
+  titleKey: 'preview.instances',
+  parameters: [],
+  widgets: [processInspectorWidget],
+}
+
 const instancePage: InstancePage = {
   items: [
     {
@@ -709,6 +717,67 @@ const instancePage: InstancePage = {
   page: 1,
   pageSize: 20,
   totalCount: 3,
+}
+
+/** A request's approval waiting at its review task, which the `shell` preview opens from the Instances page. */
+export const instanceId = 'be6b7f80-92a3-4eb5-bfc6-e708192a3b4c'
+
+const instanceDetail: InstanceDetail = {
+  id: instanceId,
+  process: 'Approve',
+  subjectId: requestId,
+  subject: { entity: 'Request', id: requestId, label: 'Standing desks for the new office' },
+  releaseId,
+  releaseNumber: 3,
+  state: 'waiting',
+  step: 'Review',
+  createdAt: '2026-03-04T09:31:00.000000Z',
+  endedAt: null,
+  graph: {
+    start: 'Check',
+    steps: [
+      { name: 'Check', type: 'decision', labelKey: null, transitions: [{ next: 'Review', on: null }] },
+      {
+        name: 'Review',
+        type: 'task',
+        labelKey: 'request.task.review',
+        transitions: [
+          { next: 'Notify', on: 'approve' },
+          { next: 'Done', on: 'reject' },
+        ],
+      },
+      { name: 'Notify', type: 'call', labelKey: null, transitions: [{ next: 'Done', on: null }] },
+      { name: 'Done', type: 'end', labelKey: null, transitions: [] },
+    ],
+  },
+  path: [
+    {
+      step: 'Check',
+      startedAt: '2026-03-04T09:31:00.000000Z',
+      finishedAt: '2026-03-04T09:31:01.000000Z',
+      decision: 'Review',
+      output: null,
+      error: null,
+      traceId: '4bf92f3577b34da6a3ce929d0e0e4736',
+    },
+  ],
+  tasks: [
+    {
+      id: openTaskId,
+      step: 'Review',
+      assigneeKind: 'role',
+      assignee: 'Approver',
+      state: 'open',
+      outcome: null,
+      completedBy: null,
+      createdAt: '2026-03-04T09:31:01.000000Z',
+      completedAt: null,
+    },
+  ],
+  calls: [],
+  parent: null,
+  subProcesses: [],
+  commands: ['cancel'],
 }
 
 const deadLetterPage: DeadLetterPage = {
@@ -1244,6 +1313,7 @@ export const siteTexts: Record<string, string> = {
   'kpi.requests': 'Requests',
   'preview.requests': 'Requests',
   'preview.tasks': 'Tasks',
+  'preview.instances': 'Approvals',
   'preview.help': 'A short note that explains the field.',
   'preview.error.field': 'This value is not valid.',
   'preview.error.title': 'Enter a title.',
@@ -1314,6 +1384,9 @@ export const routes: Record<string, () => unknown> = {
   [`${tasksPath}/${openTaskId}/save`]: () => ({ version: 2 }),
   [`${tasksPath}/${missingTaskId}`]: () => new Response(null, { status: 404 }),
   [instancesPath]: () => instancePage,
+  [`${instancesPath}/${instanceId}`]: () => instanceDetail,
+  [`/api/sites/${sitePath}/texts/${locale}?release=${releaseId}`]: () => ({ texts: siteTexts }),
+  [`/api/sites/${sitePath}/pages/instances`]: () => instancesPage,
   [deadLettersPath]: () => deadLetterPage,
   [requestsByStatusPath]: () => requestsByStatusPage,
   [requestTotalsPath]: () => requestTotalsPage,
