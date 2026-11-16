@@ -624,6 +624,28 @@ describe('StudioModuleEditor', () => {
       expect(screen.getByTestId('studio-module-layer')).toBeInTheDocument()
     })
 
+    it('draws a module data source as parts with no panel', async () => {
+      renderEditor(
+        () =>
+          readOf('dataSource', { entity: 'Department', fields: [{ name: 'title', path: 'title' }] }, [
+            { path: '/fields/0', mark: 'changed' },
+          ]),
+        dataSourceItem,
+      )
+
+      const part = await screen.findByTestId('studio-section-rest')
+      expect(part.previousElementSibling).toBeNull()
+      expect(screen.queryByRole('separator')).toBeNull()
+      for (const property of ['background', 'border', 'border-radius', 'padding']) {
+        expect(part.style.getPropertyValue(property)).toBe('')
+      }
+      for (let node = part.parentElement; node && node !== document.body; node = node.parentElement) {
+        expect(node.style.getPropertyValue('border')).toBe('')
+        expect(node.style.getPropertyValue('background')).toBe('')
+      }
+      expect(within(part).getByRole('note', { name: 'Changed title' })).toBeInTheDocument()
+    })
+
     it('marks an added record Added in the seed grid', async () => {
       renderEditor(
         (url) =>
@@ -647,6 +669,34 @@ describe('StudioModuleEditor', () => {
       const rows = await screen.findAllByTestId('studio-seed-row')
       expect(within(rows[1]).getByRole('note', { name: 'Added r2' })).toBeInTheDocument()
       expect(within(rows[0]).queryByRole('note')).toBeNull()
+    })
+
+    it("draws a module seed's records grid as a part", async () => {
+      renderEditor(
+        (url) =>
+          url.endsWith('/department-id')
+            ? read(null, entity)
+            : readOf(
+                'seed',
+                {
+                  entity: 'Department',
+                  records: [
+                    { id: 'r1', values: { title: 'Sales' } },
+                    { id: 'r2', values: { title: 'Support' } },
+                  ],
+                },
+                [{ path: '/records/1', mark: 'added' }],
+              ),
+        seedItem,
+        moduleNames,
+      )
+
+      const part = await screen.findByRole('region', { name: 'Records' })
+      expect(part).toHaveAttribute('data-testid', 'studio-section-records')
+      expect(within(part).getByTestId('studio-field-/records')).toBeInTheDocument()
+      expect(part.previousElementSibling).toHaveAttribute('role', 'separator')
+      expect(within(part).getByRole('note', { name: 'Added r2' })).toBeInTheDocument()
+      expect(screen.getByTestId('studio-section-rest')).toBeInTheDocument()
     })
 
     it('keeps Save on with a wrong seed cell, and a click focuses that cell and sends nothing until it is fixed', async () => {
