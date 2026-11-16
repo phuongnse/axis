@@ -5,8 +5,8 @@ import type { ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { ExpressionField } from '../pages/ExpressionField'
 import { ReferencePicker } from '../pages/ReferencePicker'
-import { ResourceFormSection, ResourceFormSections } from '../pages/ResourceFormSection'
 import { StudioChanges } from '../pages/StudioChanges'
+import { SectionPart, SectionParts } from './SectionParts'
 import { withAntdStyles } from '../test/antdStyles'
 import { Announcement } from './Announcement'
 import { antConfigFor } from './antTheme'
@@ -98,15 +98,15 @@ const widgets: Record<string, ReactElement> = {
       <AxisButton role="secondary">Cancel</AxisButton>
     </AxisActionRow>
   ),
-  'ResourceFormSections with a section with a heading and one without': (
-    <ResourceFormSections>
-      <ResourceFormSection testName="named" heading={{ title: 'Named' }}>
+  'SectionParts with a part with a heading and one without': (
+    <SectionParts>
+      <SectionPart testName="named" heading={{ title: 'Named' }}>
         <Input />
-      </ResourceFormSection>
-      <ResourceFormSection testName="unnamed">
+      </SectionPart>
+      <SectionPart testName="unnamed">
         <Input />
-      </ResourceFormSection>
-    </ResourceFormSections>
+      </SectionPart>
+    </SectionParts>
   ),
   'ExpressionField as a plain box': (
     <ExpressionField
