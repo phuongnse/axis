@@ -1,7 +1,7 @@
 import { defaultHighlightStyle } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,6 +11,7 @@ import { colourTokens } from '../platform/designTokens'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
 import ExpressionEditor from './ExpressionEditor'
+import { rankEntries, type PanelEntry } from './expressionPanelEntries'
 import type { ScopeOption } from './expressionScope'
 import { withAntdStyles } from '../test/antdStyles'
 
@@ -407,7 +408,7 @@ describe.each(['light', 'dark'] as const)('ExpressionEditor in %s mode', (mode) 
     )
   })
 
-  it('renders inside the theme root with an accessible name, and Tab leaves it', async () => {
+  it('renders inside the theme root with an accessible name, and Tab reaches Expand before it leaves', async () => {
     const user = userEvent.setup()
     renderEditor('title > 5', vi.fn(), <button type="button">Next</button>)
 
@@ -415,6 +416,8 @@ describe.each(['light', 'dark'] as const)('ExpressionEditor in %s mode', (mode) 
     expect(editor.closest(`[data-theme-mode="${mode}"]`)).not.toBeNull()
 
     await user.click(editor)
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Expand' })).toHaveFocus()
     await user.tab()
     expect(screen.getByRole('button', { name: 'Next' })).toHaveFocus()
   })
@@ -437,5 +440,110 @@ describe.each(['light', 'dark'] as const)('ExpressionEditor in %s mode', (mode) 
         }
       }
     })
+  })
+})
+
+describe('ExpressionEditor expand', () => {
+  const scope = {
+    type: 'boolean',
+    fields: [
+      { name: 'date', labelKey: null, type: 'date' },
+      { name: 'amount', labelKey: null, type: 'decimal' },
+    ],
+    functions: [
+      {
+        name: 'toDate',
+        parameters: ['text'],
+        result: 'date',
+        group: 'Date',
+        example: "toDate('2026-01-31')",
+        description: 'Turns a text into a date.',
+      },
+    ],
+  }
+
+  async function openDialog(onChange = vi.fn()) {
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      routes(() => json({ type: 'boolean', diagnostics: [] }), scope),
+    )
+    renderEditor('amount > 0', onChange, null, true, [{ label: 'refund()', type: 'rule', cursorInside: true }])
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledWith(scopePath, expect.anything()))
+    await user.click(screen.getByRole('button', { name: 'Expand' }))
+    return { user, dialog: await screen.findByRole('dialog') }
+  }
+
+  it('lists one search across fields, operators and functions best first, and inserts a click at the cursor', async () => {
+    const onChange = vi.fn()
+    const { user, dialog } = await openDialog(onChange)
+    expect(within(dialog).getByRole('textbox', { name: 'expression' })).toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument()
+
+    await user.type(within(dialog).getByRole('textbox', { name: 'Search fields, operators and functions' }), 'date')
+    const list = within(dialog).getByRole('list', { name: 'Search fields, operators and functions' })
+    await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(3))
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((item) => item.querySelector('code')!.textContent),
+    ).toEqual(['date', "date('…')", 'toDate()'])
+
+    const dialogView = EditorView.findFromDOM(within(dialog).getByRole('textbox', { name: 'expression' }))!
+    dialogView.dispatch({ selection: { anchor: dialogView.state.doc.length } })
+    await user.click(within(list).getByRole('button', { name: 'toDate()' }))
+
+    expect(dialogView.state.doc.toString()).toBe('amount > 0toDate()')
+    expect(dialogView.state.selection.main.head).toBe(17)
+    expect(onChange).toHaveBeenLastCalledWith(path, 'amount > 0toDate()')
+  })
+
+  it('lists the fields, operators and functions in tabs, with the rules after the functions', async () => {
+    const { user, dialog } = await openDialog()
+    const names = (list: HTMLElement) =>
+      within(list)
+        .getAllByRole('listitem')
+        .map((item) => item.querySelector('code')!.textContent)
+
+    await waitFor(() => expect(names(within(dialog).getByRole('list', { name: 'Fields' }))).toEqual(['date', 'amount']))
+    await user.click(within(dialog).getByRole('tab', { name: 'Operators' }))
+    expect(names(within(dialog).getByRole('list', { name: 'Operators' })).slice(0, 2)).toEqual(['==', '!='])
+    await user.click(within(dialog).getByRole('tab', { name: 'Functions' }))
+    expect(names(within(dialog).getByRole('list', { name: 'Functions' }))).toEqual(['toDate()', 'refund()'])
+  })
+
+  it('shows that nothing matches', async () => {
+    const { user, dialog } = await openDialog()
+
+    await user.type(within(dialog).getByRole('textbox', { name: 'Search fields, operators and functions' }), 'zzzz')
+    expect(within(dialog).getByText('Nothing matches')).toBeInTheDocument()
+  })
+
+  it('puts the cursor inside the quotes of a text', async () => {
+    const onChange = vi.fn()
+    const { user, dialog } = await openDialog(onChange)
+
+    await user.click(within(dialog).getByRole('tab', { name: 'Operators' }))
+    const dialogView = EditorView.findFromDOM(within(dialog).getByRole('textbox', { name: 'expression' }))!
+    dialogView.dispatch({ selection: { anchor: dialogView.state.doc.length } })
+    await user.click(within(dialog).getByRole('button', { name: "'text'" }))
+
+    expect(dialogView.state.doc.toString()).toBe("amount > 0''")
+    expect(dialogView.state.selection.main.head).toBe(11)
+  })
+})
+
+describe('rankEntries', () => {
+  const entry = (name: string, description: string): PanelEntry => ({
+    kind: 'operator',
+    name,
+    insert: name,
+    cursorInside: false,
+    description,
+  })
+
+  it('finds an entry by the words of its description, after those whose name matches', () => {
+    const entries = [entry("'text'", 'A text, between single quotes'), entry('quotes', ''), entry('x', 'no match')]
+    expect(rankEntries(entries, ' Quotes ').map((item) => item.name)).toEqual(['quotes', "'text'"])
   })
 })

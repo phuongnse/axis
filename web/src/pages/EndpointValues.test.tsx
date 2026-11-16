@@ -96,7 +96,9 @@ describe('EndpointValues', () => {
   it('removes a mapping by its key', async () => {
     const onChange = renderValues()
 
-    await userEvent.click(within(screen.getByTestId('studio-field-/values/department')).getByRole('button'))
+    await userEvent.click(
+      within(screen.getByTestId('studio-field-/values/department')).getByRole('button', { name: 'Remove' }),
+    )
     expect(onChange).toHaveBeenLastCalledWith('/values/department', undefined)
   })
 

@@ -56,6 +56,7 @@ export function ExpressionField({
         required={required}
         draft={check.draft}
         options={expressionScope(check.kind, check.draft, pointer, check.names)}
+        names={check.names}
         onChange={onChange}
       />
     </Suspense>
