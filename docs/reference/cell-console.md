@@ -108,7 +108,11 @@ tenant button of the Tenants view and the actions of the Tenant view.
   The view shows its parts in this order: Details, with the status, the application, the hosts and the actions,
   then Host verification, Quotas, Usage and Jobs.
   - **Usage.** The tenant's usage of the last 13 months by day, in the same table as the users page's "Usage"
-    section, see [the tenant read](tenant-lifecycle.md#routes).
+    section, read from [the usage days route](tenant-lifecycle.md#routes) and newest first until the table is sorted.
+    The table has Filter on every column, Columns, a sort on every header and a pager with a page size, 20 days by
+    default. The `filter`, `columns`, `sort`, `page` and `pageSize` live in the address under their plain names, see
+    [tables](actions-and-controls.md#tables). It has no Search, because a day holds no text. If the days fail to load,
+    this part shows its own error and the rest of the view still works.
   - **Host verification.** Each host that the operator asked for, from the [tenant read](tenant-lifecycle.md#routes)'s
     `hostRequests`: pending with the date its request expires, verified or expired.
   - **Dates of a deletion.** A `deleting` tenant shows its purge date, `deleteAfter` of the

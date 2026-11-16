@@ -24,7 +24,6 @@ import { saveFile } from '../platform/exports'
 import { PageLayout } from '../platform/PageLayout'
 import { newIdempotencyKey } from '../platform/processes'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
-import { TenantUsageDayTable } from '../platform/TenantUsageDayTable'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useFollowCellJob } from '../platform/useFollowCellJob'
@@ -32,6 +31,7 @@ import { usePlatform } from './context'
 import { useCellConsole } from './cellConsoleContext'
 import { CellTenantHostDialog } from './CellTenantHostDialog'
 import { CellTenantQuotasDialog } from './CellTenantQuotasDialog'
+import { CellTenantUsage } from './CellTenantUsage'
 import { NotFoundPage } from './NotFoundPage'
 
 interface QuotaRow extends CellQuota {
@@ -75,7 +75,7 @@ const actionTexts = {
 /**
  * The Tenant view of the cell console, in parts a rule apart, see docs/reference/shell.md#layout: Details with one tenant's
  * status, application, hosts and actions, then Host verification with the state of each host the operator asked for,
- * Quotas with the ones it overrides, Usage of the last 13 months by day in the table of the users page's "Usage" section,
+ * Quotas with the ones it overrides, Usage of the last 13 months by day in the table of the users page's "Usage" section, paged on the server from the tenant's own usage days route,
  * and Jobs in the shared job table. A `deleting` tenant shows its purge date after its status. An id that is no tenant
  * but a purged one shows only Deleted, the date of the purge, the date its deletion is complete and its jobs, with no
  * action, see docs/reference/cell-console.md#views. An id that is neither shows the not-found page. An `active` or `readOnly` tenant offers
@@ -439,7 +439,7 @@ export function CellTenantPage() {
         )}
         {tenant && (
           <SectionPart testName="cell-tenant-usage" heading={{ title: t('shell.cell.tenant.usage') }}>
-            <TenantUsageDayTable days={tenant.days} locale={locale} testId="cell-tenant-usage" />
+            <CellTenantUsage tenant={id} locale={locale} />
           </SectionPart>
         )}
         <SectionPart testName="cell-tenant-jobs" heading={{ title: t('shell.cell.tenant.jobs') }}>

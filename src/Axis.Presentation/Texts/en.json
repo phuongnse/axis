@@ -371,6 +371,7 @@
   "shell.cell.tenant.noQuotas": "The tenant has no quotas.",
   "shell.cell.tenant.jobs": "Jobs",
   "shell.cell.tenant.jobsLoadFailed": "The jobs could not be loaded.",
+  "shell.cell.tenant.usageLoadFailed": "The usage could not be loaded.",
   "shell.cell.tenant.suspend": "Suspend…",
   "shell.cell.tenant.resume": "Resume…",
   "shell.cell.tenant.suspendConfirm": "Suspend {tenant}?",
