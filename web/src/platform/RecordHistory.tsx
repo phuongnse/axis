@@ -1,4 +1,4 @@
-import { Card, Flex, Pagination, Space, Spin, Typography } from 'antd'
+import { Flex, Pagination, Space, Spin, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
@@ -7,6 +7,7 @@ import { historySummary } from './historySummary'
 import { inspectTarget } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { markCurrentPage } from './pagination'
+import { PartRule, SectionPart } from './SectionParts'
 import { fetchHistory, historyPageSize, type HistoryItem, type HistoryPage } from './records'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
@@ -87,68 +88,73 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
   const totalCount = state.result?.totalCount ?? 0
 
   return (
-    <Card data-testid="record-history" aria-busy={loading} title={t('shell.history.title')} size="small">
-      {failed ? (
-        <AxisAlert data-testid="record-history-error" kind="error" message={t('shell.history.loadFailed')} />
-      ) : (
-        <Spin spinning={loading}>
-          {!loading && items.length === 0 ? (
-            <EmptyState text={t('shell.history.empty')} />
-          ) : (
-            <Flex vertical>
-              {items.map((item) => {
-                const summary = historySummary(item, fields, t)
-                const target = typeof item.inspectPath === 'string' ? inspectTarget(item.inspectPath) : null
-                const inspectorPage = target === null ? undefined : inspectors?.get(target.process)
-                return (
-                  <Flex
-                    key={item.id}
-                    vertical
-                    gap={2}
-                    data-testid="history-entry"
-                    style={{ paddingBlock: spacing.sm, borderBlockEnd: `1px solid ${colour.divider}` }}
-                  >
-                    <Space wrap size="small">
-                      <Typography.Text strong>
-                        {textOr(t, `shell.history.action.${item.action}`, item.action)}
-                      </Typography.Text>
-                      <Typography.Text>{actorOf(item, t)}</Typography.Text>
-                      <Typography.Text type="secondary">
-                        <time dateTime={item.occurredAt}>{time.format(new Date(item.occurredAt))}</time>
-                      </Typography.Text>
-                      {target !== null && inspectorPage !== undefined && (
-                        <Link
-                          to={inspectorPath(sitePath, inspectorPage, target.instanceId)}
-                          data-testid="history-inspect-link"
-                        >
-                          {t('shell.history.openInstance')}
-                        </Link>
-                      )}
-                    </Space>
-                    {summary.map((line) => (
-                      <Typography.Text key={line} type="secondary">
-                        {line}
-                      </Typography.Text>
-                    ))}
-                  </Flex>
-                )
-              })}
-            </Flex>
-          )}
-          {totalCount > historyPageSize && (
-            <Flex justify="end" style={{ marginTop: spacing.lg }}>
-              <Pagination
-                current={page}
-                pageSize={historyPageSize}
-                total={totalCount}
-                showSizeChanger={false}
-                itemRender={markCurrentPage(page)}
-                onChange={setPage}
-              />
-            </Flex>
-          )}
-        </Spin>
-      )}
-    </Card>
+    // Proposed: the history is the last part of the form's page, a rule below the form, with no card, see the review
+    // on #3650.
+    <Flex vertical gap={spacing.md} data-testid="record-history" aria-busy={loading}>
+      <PartRule />
+      <SectionPart title={t('shell.history.title')}>
+        {failed ? (
+          <AxisAlert data-testid="record-history-error" kind="error" message={t('shell.history.loadFailed')} />
+        ) : (
+          <Spin spinning={loading}>
+            {!loading && items.length === 0 ? (
+              <EmptyState text={t('shell.history.empty')} />
+            ) : (
+              <Flex vertical>
+                {items.map((item) => {
+                  const summary = historySummary(item, fields, t)
+                  const target = typeof item.inspectPath === 'string' ? inspectTarget(item.inspectPath) : null
+                  const inspectorPage = target === null ? undefined : inspectors?.get(target.process)
+                  return (
+                    <Flex
+                      key={item.id}
+                      vertical
+                      gap={2}
+                      data-testid="history-entry"
+                      style={{ paddingBlock: spacing.sm, borderBlockEnd: `1px solid ${colour.divider}` }}
+                    >
+                      <Space wrap size="small">
+                        <Typography.Text strong>
+                          {textOr(t, `shell.history.action.${item.action}`, item.action)}
+                        </Typography.Text>
+                        <Typography.Text>{actorOf(item, t)}</Typography.Text>
+                        <Typography.Text type="secondary">
+                          <time dateTime={item.occurredAt}>{time.format(new Date(item.occurredAt))}</time>
+                        </Typography.Text>
+                        {target !== null && inspectorPage !== undefined && (
+                          <Link
+                            to={inspectorPath(sitePath, inspectorPage, target.instanceId)}
+                            data-testid="history-inspect-link"
+                          >
+                            {t('shell.history.openInstance')}
+                          </Link>
+                        )}
+                      </Space>
+                      {summary.map((line) => (
+                        <Typography.Text key={line} type="secondary">
+                          {line}
+                        </Typography.Text>
+                      ))}
+                    </Flex>
+                  )
+                })}
+              </Flex>
+            )}
+            {totalCount > historyPageSize && (
+              <Flex justify="end" style={{ marginTop: spacing.lg }}>
+                <Pagination
+                  current={page}
+                  pageSize={historyPageSize}
+                  total={totalCount}
+                  showSizeChanger={false}
+                  itemRender={markCurrentPage(page)}
+                  onChange={setPage}
+                />
+              </Flex>
+            )}
+          </Spin>
+        )}
+      </SectionPart>
+    </Flex>
   )
 }

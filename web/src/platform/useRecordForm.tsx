@@ -26,6 +26,7 @@ import { ReadOnlyValue } from './ReadOnlyValue'
 import { ReferenceLookup } from './ReferenceLookup'
 import { ReferencesInput } from './ReferencesInput'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
+import { PartRule } from './SectionParts'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
@@ -552,6 +553,8 @@ export function useRecordForm(
   // The inputs of the sections a wizard step lists, or of every section with `null`. In the Studio canvas each
   // section and each field is wrapped, so the canvas can mark it.
   const fieldsFor = (names: readonly string[] | null): ReactNode => {
+    // Proposed: a titled group of fields is a part, a rule below the group before it, see the review on #3650.
+    let drawn = 0
     const nodes = sections.map((section, index) => {
       if (names !== null && !(section.name !== null && names.includes(section.name))) {
         return null
@@ -561,8 +564,15 @@ export function useRecordForm(
       if (!canvas && visible.length === 0) {
         return null
       }
+      const ruleAbove = drawn > 0 && section.titleKey !== null
+      drawn += 1
       const content = (
         <div>
+          {ruleAbove && (
+            <div style={{ marginBottom: spacing.md }}>
+              <PartRule />
+            </div>
+          )}
           {section.titleKey !== null &&
             !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) && (
               <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>

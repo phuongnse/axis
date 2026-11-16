@@ -21,6 +21,7 @@ import {
   type RowLabels,
 } from './records'
 import type { EntityWidgetMetadata, FieldMetadata, NavigateAction, StartProcessAction } from './site'
+import { PartRule } from './SectionParts'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { sectionsOf } from './useRecordForm'
@@ -234,6 +235,8 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
       {errors.length > 0 && <AxisAlert data-testid="detail-error" kind="error" message={errors.join(' ')} />}
       {sections.map((section, index) => (
         <Fragment key={index}>
+          {/* Proposed: a titled section after another is a part, a rule below it, see the review on #3650. */}
+          {index > 0 && section.titleKey !== null && <PartRule />}
           {section.titleKey !== null && <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>}
           <dl
             style={{
