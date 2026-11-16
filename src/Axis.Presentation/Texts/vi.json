@@ -281,7 +281,6 @@
   "shell.console.deadLetters.state.discarded": "Đã bỏ",
   "shell.console.schedules.title": "Lịch chạy",
   "shell.console.schedules.application": "Ứng dụng",
-  "shell.console.schedules.allApplications": "Tất cả ứng dụng",
   "shell.console.schedules.trigger": "Bộ kích hoạt",
   "shell.console.schedules.process": "Quy trình",
   "shell.console.schedules.schedule": "Lịch",

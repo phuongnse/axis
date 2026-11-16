@@ -1,16 +1,22 @@
 using Axis.Configuration.Model;
 using Axis.Processes.Instances;
 using Axis.Server.Applications;
+using Axis.Server.Http;
 using Axis.Server.Tenancy;
 
 namespace Axis.Server.Console;
 
 /// <summary>
 /// The schedule route of the operator console, in the group of <see cref="ConsoleEndpoints"/>, so the group's checks
-/// (signed-in user 401, operator role 403) come first. The list at <c>GET /api/console/schedules</c> answers
-/// <c>{ "items": [...] }</c>, not paged, with each schedule trigger of the active release of every application, ordered by
-/// application name and then by trigger name. An optional <c>application</c> (an application id, a hyphenated UUID) keeps
-/// one application, and an invalid one is a 400 that names it. A module's schedule trigger is listed once for each
+/// (signed-in user 401, operator role 403) come first. The list at <c>GET /api/console/schedules</c> answers one page,
+/// <c>{ "items": [...], "page", "pageSize", "totalCount" }</c>, of the schedule triggers of the active release of every
+/// application. It reads the record API's <c>page</c>, <c>pageSize</c>, <c>sort</c>, <c>search</c> and <c>filter</c> through
+/// <see cref="ListQuery{T}"/>, over the declared fields <c>application</c>, <c>trigger</c>, <c>process</c>, <c>schedule</c>,
+/// <c>timeZone</c>, <c>lastOccurrenceAt</c> and <c>nextOccurrenceAt</c>, and a search looks in <c>application</c>,
+/// <c>trigger</c> and <c>process</c>. An invalid parameter, and a sort or filter on another field, is a 400 that names the
+/// parameter. Without <c>sort</c> the items are ordered by application name and then by trigger name, see
+/// <c>docs/reference/operator-console.md#api</c>. An optional <c>application</c> (an application id, a hyphenated UUID)
+/// keeps one application, and an invalid one is a 400 that names it. A module's schedule trigger is listed once for each
 /// application that uses the module, because each application holds its own copy of it. A trigger is listed only when the
 /// active release has it and <c>axis.trigger_schedules</c> holds its state, so a trigger that a newer release removed, and
 /// every trigger of an application with no active release, is left out. An item names the application, the trigger, its
@@ -22,12 +28,29 @@ internal static class ConsoleScheduleEndpoints
     public static void MapConsoleScheduleEndpoints(this RouteGroupBuilder console) =>
         console.MapGet("/schedules", ListAsync);
 
+    private static readonly IReadOnlyList<ListColumn<ConsoleScheduleItem>> _listColumns =
+    [
+        new("application", ListColumnKind.Text, item => item.Application, Searchable: true),
+        new("trigger", ListColumnKind.Text, item => item.Trigger, Searchable: true),
+        new("process", ListColumnKind.Text, item => item.Process, Searchable: true),
+        new("schedule", ListColumnKind.Text, item => item.Schedule),
+        new("timeZone", ListColumnKind.Text, item => item.TimeZone),
+        new(
+            "lastOccurrenceAt",
+            ListColumnKind.Date,
+            item => item.LastOccurrenceAt is { } at ? DateOnly.FromDateTime(at) : (DateOnly?)null,
+            Order: item => item.LastOccurrenceAt),
+        new("nextOccurrenceAt", ListColumnKind.Date, item => DateOnly.FromDateTime(item.NextOccurrenceAt), Order: item => item.NextOccurrenceAt),
+    ];
+
     private static async Task<IResult> ListAsync(
         string? application,
+        HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         Guid? applicationId = null;
         if (application is not null)
         {
@@ -37,11 +60,14 @@ internal static class ConsoleScheduleEndpoints
             }
             else
             {
-                return Results.ValidationProblem(new SortedDictionary<string, string[]>(StringComparer.Ordinal)
-                {
-                    ["application"] = ["Must be the id of an application."],
-                });
+                errors["application"] = ["Must be the id of an application."];
             }
+        }
+
+        var query = ListQuery<ConsoleScheduleItem>.Read(httpContext.Request, _listColumns, errors);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
         }
 
         var models = await resolver.ListAsync(cancellationToken);
@@ -72,12 +98,15 @@ internal static class ConsoleScheduleEndpoints
             }
         }
 
-        return Results.Ok(new ConsoleScheduleListResponse(items));
+        return Results.Ok(ToResponse(query.Apply(items)));
     }
+
+    private static ConsoleScheduleListResponse ToResponse(ListPage<ConsoleScheduleItem> page) =>
+        new(page.Items, page.Page, page.PageSize, page.TotalCount);
 }
 
-/// <summary>The schedule triggers of the active releases of the tenant.</summary>
-internal sealed record ConsoleScheduleListResponse(IReadOnlyList<ConsoleScheduleItem> Items);
+/// <summary>One page of the schedule triggers of the active releases of the tenant, with the number that matched before it was cut.</summary>
+internal sealed record ConsoleScheduleListResponse(IReadOnlyList<ConsoleScheduleItem> Items, int Page, int PageSize, long TotalCount);
 
 /// <summary>A schedule trigger of an active release with its latest occurrence that ran, which is null while none has, and its next occurrence.</summary>
 internal sealed record ConsoleScheduleItem(

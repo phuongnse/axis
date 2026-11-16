@@ -986,7 +986,7 @@ describe('StudioPage', () => {
     expect(await screen.findByTestId('studio-group-entity')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-group-form')).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByTestId(`studio-resource-${entityId}`))
+    await userEvent.click(await screen.findByTestId(`studio-resource-${entityId}`))
 
     expect(await screen.findByTestId('studio-editor')).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent(`app=PurchaseRequests&resource=${entityId}`)

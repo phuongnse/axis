@@ -1,5 +1,6 @@
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Studio;
@@ -70,12 +71,12 @@ internal static class StudioRevisionEndpoints
     }
 
     // A time filters by its day in UTC, as a date column does, and sorts by its instant.
-    private static readonly IReadOnlyList<StudioListColumn<StudioRevision>> _listColumns =
+    private static readonly IReadOnlyList<ListColumn<StudioRevision>> _listColumns =
     [
-        new("summary", StudioListKind.Text, revision => revision.Summary, Searchable: true),
-        new("author", StudioListKind.Text, revision => revision.Author, Searchable: true),
-        new("time", StudioListKind.Date, revision => DateOnly.FromDateTime(revision.Time.UtcDateTime), Order: revision => revision.Time),
-        new("client", StudioListKind.Text, revision => revision.Client),
+        new("summary", ListColumnKind.Text, revision => revision.Summary, Searchable: true),
+        new("author", ListColumnKind.Text, revision => revision.Author, Searchable: true),
+        new("time", ListColumnKind.Date, revision => DateOnly.FromDateTime(revision.Time.UtcDateTime), Order: revision => revision.Time),
+        new("client", ListColumnKind.Text, revision => revision.Client),
     ];
 
     private static async Task<IResult> ListAsync(string application, HttpContext httpContext, StudioOptions options)
@@ -87,7 +88,7 @@ internal static class StudioRevisionEndpoints
         }
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        var query = StudioListQuery<StudioRevision>.Read(httpContext.Request, _listColumns, errors);
+        var query = ListQuery<StudioRevision>.Read(httpContext.Request, _listColumns, errors);
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);

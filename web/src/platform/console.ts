@@ -256,26 +256,28 @@ export interface ConsoleScheduleItem {
   nextOccurrenceAt: string
 }
 
-/** The schedule triggers of the tenant, ordered by application and trigger name. They are not paged. */
-export interface ConsoleScheduleList {
+/**
+ * One page of the schedule triggers of the tenant, ordered by application and trigger name unless the query sorts them,
+ * with the number that matched before the page was cut.
+ */
+export interface ConsoleSchedulePage {
   items: ConsoleScheduleItem[]
+  page: number
+  pageSize: number
+  totalCount: number
 }
 
-/** The answer of the schedules route: the list, or the refusal that the view shows. */
-export type ConsoleSchedulesResult = { kind: 'ok'; schedules: ConsoleScheduleList } | { kind: 'forbidden' }
+/** The answer of the schedules route: the page, or the refusal that the view shows. */
+export type ConsoleSchedulesResult = { kind: 'ok'; schedules: ConsoleSchedulePage } | { kind: 'forbidden' }
 
-/** Loads the schedule triggers of the tenant, of one application when `application` is set. */
-export async function fetchConsoleSchedules(
-  application: string | undefined,
-  signal?: AbortSignal,
-): Promise<ConsoleSchedulesResult> {
-  const query = application ? `?${new URLSearchParams({ application })}` : ''
-  const response = await apiFetch(`/api/console/schedules${query}`, { signal })
+/** Loads one page of the schedule triggers of the tenant. `query` is the record API's paging, sort, search and filter query string. */
+export async function fetchConsoleSchedules(query: string, signal?: AbortSignal): Promise<ConsoleSchedulesResult> {
+  const response = await apiFetch(`/api/console/schedules${query ? `?${query}` : ''}`, { signal })
   if (response.status === 403) {
     return { kind: 'forbidden' }
   }
   if (!response.ok) {
     throw new Error(`Loading the console schedules failed with status ${response.status}.`)
   }
-  return { kind: 'ok', schedules: (await response.json()) as ConsoleScheduleList }
+  return { kind: 'ok', schedules: (await response.json()) as ConsoleSchedulePage }
 }

@@ -6,6 +6,7 @@ using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Data;
+using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Studio;
 
@@ -24,7 +25,7 @@ namespace Axis.Server.Studio;
 /// <c>GET /api/studio/apps/{application}/release-list</c> answers one page of the application's releases as
 /// <c>{ items, page, pageSize, totalCount }</c>, see <c>docs/reference/authoring.md#release-list</c>. Each release is one item, with
 /// the data of its first activation and its Live and Off-standard flags. It takes the record API's <c>page</c>, <c>pageSize</c>,
-/// <c>sort</c>, <c>search</c> and <c>filter</c> through <see cref="StudioListQuery{T}"/>, checks the session (401), the author
+/// <c>sort</c>, <c>search</c> and <c>filter</c> through <see cref="ListQuery{T}"/>, checks the session (401), the author
 /// role (403) and the application (404), and answers 400 for a sort or a filter on a column it does not hold. It does not
 /// compile the folder.
 /// </summary>
@@ -39,13 +40,13 @@ internal static class StudioReleaseEndpoints
     }
 
     // A time filters by its day in UTC, as a date column does, and sorts by its instant.
-    private static readonly IReadOnlyList<StudioListColumn<StudioReleaseListRow>> _listColumns =
+    private static readonly IReadOnlyList<ListColumn<StudioReleaseListRow>> _listColumns =
     [
-        new("number", StudioListKind.Number, row => row.Number),
-        new("label", StudioListKind.Text, row => row.Label, Searchable: true),
-        new("publishedAt", StudioListKind.Date, row => DateOnly.FromDateTime(row.PublishedAt.UtcDateTime), Order: row => row.PublishedAt),
-        new("publishedBy", StudioListKind.Text, row => row.ActorName, Searchable: true),
-        new("note", StudioListKind.Text, row => row.Note, Searchable: true),
+        new("number", ListColumnKind.Number, row => row.Number),
+        new("label", ListColumnKind.Text, row => row.Label, Searchable: true),
+        new("publishedAt", ListColumnKind.Date, row => DateOnly.FromDateTime(row.PublishedAt.UtcDateTime), Order: row => row.PublishedAt),
+        new("publishedBy", ListColumnKind.Text, row => row.ActorName, Searchable: true),
+        new("note", ListColumnKind.Text, row => row.Note, Searchable: true),
     ];
 
     private static async Task<IResult> ListAsync(
@@ -58,7 +59,7 @@ internal static class StudioReleaseEndpoints
         }
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        var query = StudioListQuery<StudioReleaseListRow>.Read(httpContext.Request, _listColumns, errors);
+        var query = ListQuery<StudioReleaseListRow>.Read(httpContext.Request, _listColumns, errors);
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
@@ -89,7 +90,7 @@ internal static class StudioReleaseEndpoints
         return Results.Ok(ToResponse(query.Apply(rows)));
     }
 
-    private static StudioReleaseListResponse ToResponse(StudioListPage<StudioReleaseListRow> page) =>
+    private static StudioReleaseListResponse ToResponse(ListPage<StudioReleaseListRow> page) =>
         new(page.Items, page.Page, page.PageSize, page.TotalCount);
 
     private static async Task<IResult> GetAsync(

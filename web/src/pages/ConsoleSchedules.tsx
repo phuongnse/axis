@@ -1,60 +1,57 @@
-import { Flex, Select } from 'antd'
-import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
+import { AxisAlert } from '../platform/AxisAlert'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
-import { fetchConsoleSchedules, type ConsoleApplication, type ConsoleScheduleItem } from '../platform/console'
+import { fetchConsoleSchedules, type ConsoleSchedulePage, type ConsoleScheduleItem } from '../platform/console'
 import { SectionPart } from '../platform/SectionParts'
+import { recordPageSize, recordQuery, tablePageSizes } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
+import { useTableView } from '../platform/useTableView'
 
 interface ConsoleSchedulesProps {
-  /** The applications of the tenant, which fill the filter. */
-  applications: ConsoleApplication[]
   /** The UI locale, for formatting the times. */
   locale: string
 }
 
-/** The outcome of the last finished request. */
-interface LoadState {
-  /** The application filter of the request, so a result for an older filter shows as loading. */
-  application?: string
-  /** Whether the result belongs to a request at all, because the first state has none. */
-  done: boolean
-  /** The last list loaded. It stays while the next one loads. */
-  items?: ConsoleScheduleItem[]
-  failed: boolean
-}
+/** The columns the view's search, filter and sort can name, see docs/reference/operator-console.md#api. */
+const scheduleFields = [
+  { name: 'application', type: 'text' },
+  { name: 'trigger', type: 'text' },
+  { name: 'process', type: 'text' },
+  { name: 'schedule', type: 'text' },
+  { name: 'lastOccurrenceAt', type: 'date' },
+  { name: 'nextOccurrenceAt', type: 'date' },
+] as const
+// The view has no parameters of its own. A stable empty array keeps useTableView from recomputing on each render.
+const noParameters: readonly string[] = []
 
 /**
  * The Schedules view of the operator console: the schedule triggers of the active release of every application, ordered
- * by application and trigger name and not paged, each with its process, its cron schedule and time zone, the last
- * occurrence that ran and the next occurrence. The application filter asks the server for one application. A failure, a
- * 403 included, shows an error in this part only.
+ * by application and trigger name until the view sorts them, paged on the server, each with its process, its cron
+ * schedule and time zone, the last occurrence that ran and the next occurrence. The table has Search, Filter, Columns,
+ * Refresh, a sort on every column but Schedule, and a pager with a page size, all kept in the address, see
+ * docs/reference/operator-console.md#views and docs/reference/actions-and-controls.md#tables. A failure, a 403
+ * included, shows an error in this part only.
  */
-export function ConsoleSchedules({ applications, locale }: ConsoleSchedulesProps) {
+export function ConsoleSchedules({ locale }: ConsoleSchedulesProps) {
   const t = useText()
-  const [application, setApplication] = useState<string>()
-  const [load, setLoad] = useState<LoadState>({ done: false, failed: false })
-  const loading = !load.done || load.application !== application
+  const { view, setView } = useTableView(scheduleFields, recordPageSize, noParameters, true, true, true)
+  const query = recordQuery(view)
+  const [schedules, setSchedules] = useState<ConsoleSchedulePage | 'failed'>()
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
-    fetchConsoleSchedules(application, controller.signal)
-      .then((result) => {
-        setLoad(
-          result.kind === 'ok'
-            ? { application, done: true, items: result.schedules.items, failed: false }
-            : { application, done: true, failed: true },
-        )
-      })
+    fetchConsoleSchedules(query, controller.signal)
+      .then((result) => setSchedules(result.kind === 'ok' ? result.schedules : 'failed'))
       .catch((error: unknown) => {
         if (controller.signal.aborted) {
           return
         }
         console.warn('Loading the console schedules failed', error)
-        setLoad({ application, done: true, failed: true })
+        setSchedules('failed')
       })
     return () => controller.abort()
-  }, [application])
+  }, [query, reload])
 
   const columns = useMemo<AxisColumn<ConsoleScheduleItem>[]>(
     () => [
@@ -62,73 +59,82 @@ export function ConsoleSchedules({ applications, locale }: ConsoleSchedulesProps
         key: 'application',
         kind: 'freeText',
         title: t('shell.console.schedules.application'),
+        filter: { kind: 'text' },
+        sorter: true,
         render: (_value, item) => item.application,
       },
       {
         key: 'trigger',
         kind: 'freeText',
         title: t('shell.console.schedules.trigger'),
+        filter: { kind: 'text' },
+        sorter: true,
         render: (_value, item) => item.trigger,
       },
       {
         key: 'process',
         kind: 'freeText',
         title: t('shell.console.schedules.process'),
+        filter: { kind: 'text' },
+        sorter: true,
         render: (_value, item) => item.process,
       },
       {
         key: 'schedule',
         kind: 'fixed',
         title: t('shell.console.schedules.schedule'),
+        filter: { kind: 'text' },
         render: (_value, item) => `${item.schedule} ${item.timeZone}`,
       },
       {
-        key: 'lastOccurrence',
+        key: 'lastOccurrenceAt',
         kind: 'fixed',
         title: t('shell.console.schedules.lastOccurrence'),
+        filter: { kind: 'date' },
+        sorter: true,
         render: (_value, item) =>
           item.lastOccurrenceAt === null ? null : new Date(item.lastOccurrenceAt).toLocaleString(locale),
       },
       {
-        key: 'nextOccurrence',
+        key: 'nextOccurrenceAt',
         kind: 'fixed',
         title: t('shell.console.schedules.nextOccurrence'),
+        filter: { kind: 'date' },
+        sorter: true,
         render: (_value, item) => new Date(item.nextOccurrenceAt).toLocaleString(locale),
       },
     ],
     [locale, t],
   )
+  const page = typeof schedules === 'object' ? schedules : undefined
 
   return (
     <SectionPart testId="console-schedules" heading={{ title: t('shell.console.schedules.title') }}>
-      <Flex vertical gap="middle">
-        <Select
-          data-testid="console-schedules-application"
-          aria-label={t('shell.console.schedules.application')}
-          style={{ maxWidth: 320 }}
-          value={application ?? ''}
-          options={[
-            { value: '', label: t('shell.console.schedules.allApplications') },
-            ...applications.map((row) => ({ value: row.id, label: row.name })),
-          ]}
-          onChange={(value) => setApplication(value || undefined)}
-        />
-        {load.failed && !loading ? (
-          <AxisAlert
-            data-testid="console-schedules-error"
-            kind="error"
-            message={t('shell.console.schedules.loadFailed')}
-          />
-        ) : (
-          <AxisTable<ConsoleScheduleItem>
-            rowKey={(item) => `${item.applicationId}:${item.triggerId}`}
-            columns={columns}
-            dataSource={load.items}
-            loading={loading}
-            emptyText={t('shell.console.schedules.empty')}
-          />
-        )}
-      </Flex>
+      <AxisTable<ConsoleScheduleItem>
+        rowKey={(item) => `${item.applicationId}:${item.triggerId}`}
+        columns={columns}
+        dataSource={page?.items ?? []}
+        loading={schedules === undefined}
+        emptyText={t('shell.console.schedules.empty')}
+        view={{
+          query: view,
+          onChange: setView,
+          pageSizes: tablePageSizes(),
+          total: page?.totalCount ?? 0,
+          search: true,
+          columns: true,
+        }}
+        toolbar={{ onRefresh: () => setReload((value) => value + 1) }}
+        failure={
+          schedules === 'failed' ? (
+            <AxisAlert
+              data-testid="console-schedules-error"
+              kind="error"
+              message={t('shell.console.schedules.loadFailed')}
+            />
+          ) : undefined
+        }
+      />
     </SectionPart>
   )
 }
