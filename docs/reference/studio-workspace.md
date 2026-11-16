@@ -168,8 +168,7 @@ While the release history loads, Live and Changes both say so, and when it fails
 load. Once it has loaded, Live is left out when there is no live release. Live also says so while its sites load.
 
 Each block is a panel on `surface`, as a [resource form's sections](studio-resource-form.md#sections) are,
-with its title as its heading and no line under it. The blocks are `spacing-md` apart. The page's
-`canvas` holds only the heading, the description and the gaps between the blocks.
+with its title as its heading and no line under it. The blocks are `spacing-md` apart. Outside the blocks, the page holds only the heading, the description and the gaps between the blocks.
 
 ## Change list
 

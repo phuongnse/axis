@@ -69,10 +69,10 @@ their own controls where they expect them.
   band stays under it. The sidebar's background runs the page's height, while its navigation stays
   under the header with a scroll of its own. A regular band and the footer scroll with the page. The
   page declares its colour scheme, so every scrollbar, the page's and the sidebar's, follows the mode.
-- **Page area.** Pages draw on `canvas` with `spacing-lg` padding. A wide table scrolls inside its
-  widget, so the page never scrolls sideways.
-- **Flush page area** _(planned for M35)_. Pages draw on `surface`, flush with the frame. Their parts sit a `divider`
-  rule apart, and each part's heading is `heading5`.
+- **Flush page area.** Pages draw on `surface`, flush with the frame, with `spacing-lg` padding. A wide table
+  scrolls inside its widget, so the page never scrolls sideways.
+- **Parts a rule apart** _(planned for M35)_. A page's parts sit a `divider` rule apart, and each part's heading
+  is `heading5`.
 - **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area, just above the footer. It
   has no link back, because the navigation and the breadcrumb lead back.
 - **Footer.** A slim footer on `surface` with a `borderSubtle` rule above it, with `spacing-xs`
@@ -109,7 +109,7 @@ application never depends on the UI library.
 ## Page header
 
 Every page of a site starts with a header band on `surface` across the page area, with a
-`borderSubtle` rule below it, over the page's widgets on `canvas`. It says where the person is and what
+`borderSubtle` rule below it, over the page's widgets. It says where the person is and what
 the page is.
 
 - **Regular band.** The band holds the breadcrumb, then the page title in `heading4`. It has
@@ -345,11 +345,12 @@ to the frame shows in every state. How previews work is in
 - **A frame is a screen.** A shell preview draws the shell in a frame exactly as tall as its height, and
   the page scrolls inside it as in a window, so a dialog opens in the middle of what shows.
 - **The Studio group** is the eighth group of cards, after Shell. Its `studio` preview draws Studio
-  through the shell over fixtures of the purchase request sample, in twelve states: Typical, Empty,
+  through the shell over fixtures of the purchase request sample, in fourteen states: Typical, Empty,
   Loading, Failed, Many rows, Long names, Access denied, Overview with errors and changes not live,
-  Overview of a new application, Entity, Policy matrix and Release page. Clicks in the sidebar move between
+  Overview of a new application, Entity, Policy matrix, Releases, History and Release page. Clicks in the sidebar move between
   Overview, Settings, the kind lists and Releases, all answered from fixtures. Entity opens an entity
-  in the entity designer and Policy matrix the policy matrix, both over the fixtures of Typical. Release page opens release 2 over the fixtures of
+  in the entity designer and Policy matrix the policy matrix, both over the fixtures of Typical. Releases
+  opens the release list and History the revision list, over the same fixtures. Release page opens release 2 over the fixtures of
   Typical.
 - **Studio's designers** are three previews that follow `studio`: `studioPageDesign`, `studioFormDesign`
   and `studioProcessDesign`. Each draws Studio through the shell with a page, a form or a process open in
