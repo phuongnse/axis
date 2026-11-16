@@ -10,6 +10,11 @@ export interface PanelEntry {
   example?: string
 }
 
+/** A call's signature as the panel and completion show it: the name and its parameter names in brackets. */
+export function signatureOf(name: string, parameters: readonly string[]): string {
+  return `${name}(${parameters.join(', ')})`
+}
+
 /** A name without its brackets and quotes, in lower case: `date('…')` is `date` and `toDate()` is `todate`. */
 function bareName(name: string): string {
   return name

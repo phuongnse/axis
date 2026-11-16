@@ -1,16 +1,11 @@
-import {
-  autocompletion,
-  type Completion,
-  type CompletionContext,
-  type CompletionResult,
-} from '@codemirror/autocomplete'
+import { autocompletion, type CompletionContext } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
 import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { ExpandAltOutlined } from '@ant-design/icons'
 import { Flex, Modal, Typography } from 'antd'
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useContext, useEffect, useRef, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import {
   checkStudioExpression,
@@ -23,7 +18,9 @@ import {
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
+import { PlatformContext } from './context'
 import { callAt } from './expressionCall'
+import { completeAt, insertAt } from './expressionCompletion'
 import { expressionLanguage } from './expressionLanguage'
 import { ExpressionPanel } from './ExpressionPanel'
 import type { ScopeOption } from './expressionScope'
@@ -76,6 +73,7 @@ export default function ExpressionEditor({
   onChange,
 }: ExpressionEditorProps) {
   const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { mode } = useThemeMode()
   const tokens = useDesignTokens()
   const hostRef = useRef<HTMLDivElement>(null)
@@ -96,7 +94,10 @@ export default function ExpressionEditor({
     onView,
     required,
     options,
-    functions: functionOptions(scope),
+    scope,
+    names,
+    locale,
+    t,
     draft,
     value,
     theme: expressionTheme(tokens, mode),
@@ -109,7 +110,10 @@ export default function ExpressionEditor({
       onView,
       required,
       options,
-      functions: functionOptions(scope),
+      scope,
+      names,
+      locale,
+      t,
       draft,
       value,
       theme: expressionTheme(tokens, mode),
@@ -163,8 +167,7 @@ export default function ExpressionEditor({
     }
 
     const initial = latest.current
-    const complete = (context: CompletionContext) =>
-      completeAt(context, [...latest.current.options, ...latest.current.functions])
+    const complete = (context: CompletionContext) => completeAt(context, latest.current)
     const view = new EditorView({
       parent: hostRef.current!,
       state: EditorState.create({
@@ -173,7 +176,7 @@ export default function ExpressionEditor({
           expressionLanguage,
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
-          autocompletion({ override: [complete] }),
+          autocompletion({ override: [complete], compareCompletions: () => 0 }),
           EditorView.lineWrapping,
           initial.themeCompartment.of(initial.theme),
           EditorView.contentAttributes.of({ 'aria-label': name }),
@@ -352,39 +355,10 @@ function boldParameter(fn: ExpressionScopeFunction, argument: number): number {
   return argument <= last ? argument : fn.parameters[last] === '…' ? last : -1
 }
 
-/** The functions and aggregates that the scope of the place allows. A call with parameters puts the cursor inside its brackets. */
-function functionOptions(scope: ExpressionScope | null): ScopeOption[] {
-  return (scope?.functions ?? []).map((item) => ({
-    label: `${item.name}()`,
-    type: 'function',
-    cursorInside: item.parameters.length > 0,
-  }))
-}
-
-/** Completes the word before the cursor, or opens the list at the cursor when Ctrl+Space asks for it. */
-function completeAt(context: CompletionContext, options: ScopeOption[]): CompletionResult | null {
-  const word = context.matchBefore(/[A-Za-z][A-Za-z0-9-]*(:[A-Za-z0-9]*)?/)
-  if (!word && !context.explicit) {
-    return null
-  }
-  return { from: word?.from ?? context.pos, options: options.map(toCompletion) }
-}
-
-function toCompletion(option: ScopeOption): Completion {
-  return {
-    label: option.label,
-    type: option.type === 'field' || option.type === 'parameter' ? 'variable' : 'function',
-    apply: (view, completion, from, to) => insertAt(view, from, to, completion.label, option.cursorInside),
-  }
-}
-
-/** Replaces the range with the text and puts the cursor after it, or one character before the end where a value goes inside brackets or quotes. */
-function insertAt(view: EditorView, from: number, to: number, text: string, cursorInside: boolean) {
-  const cursor = from + text.length - (cursorInside ? 1 : 0)
-  view.dispatch({ changes: { from, to, insert: text }, selection: { anchor: cursor } })
-}
-
 const expressionTheme = sharedTheme((tokens, mode) => [
   codeEditorTheme(tokens, mode),
-  EditorView.theme({ '.cm-content': { padding: '4px 0' } }),
+  EditorView.theme({
+    '.cm-content': { padding: '4px 0' },
+    '.cm-completionInfo code': { fontFamily: tokens.type.codeFontFamily },
+  }),
 ])
