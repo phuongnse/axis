@@ -419,15 +419,17 @@ export function chooseFixtures(state: PreviewState): void {
  * The fixture paths that states answer for themselves, each answered by the chosen state. A path the chosen state lacks
  * is logged as a missing fixture and answered with a 404, as a path with no route is.
  */
-export function chosenRoutes(all: Record<string, readonly PreviewState[]>): Record<string, () => unknown> {
+export function chosenRoutes(
+  all: Record<string, readonly PreviewState[]>,
+): Record<string, (init?: RequestInit) => unknown> {
   const paths = Object.values(all).flatMap((states) => states.flatMap((state) => Object.keys(state.fixtures ?? {})))
   return Object.fromEntries(
     paths.map((path) => [
       path,
-      () => {
-        const answer = chosen[path]
+      (init?: RequestInit) => {
+        const answer: ((init?: RequestInit) => unknown) | undefined = chosen[path]
         if (answer) {
-          return answer()
+          return answer(init)
         }
         console.error('No design-system fixture for', path)
         return new Response(null, { status: 404 })

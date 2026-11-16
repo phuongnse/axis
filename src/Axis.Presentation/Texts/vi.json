@@ -854,6 +854,8 @@
   "shell.studio.expression.reads.label": "Diễn giải:",
   "shell.studio.expression.reads.all": "Thỏa tất cả điều sau:",
   "shell.studio.expression.reads.any": "Thỏa ít nhất một điều sau:",
+  "shell.studio.expression.reads.notAll": "Không thỏa đủ tất cả điều sau:",
+  "shell.studio.expression.reads.none": "Không thỏa điều nào sau đây:",
   "shell.studio.expression.reads.equal": "{a} là {b}",
   "shell.studio.expression.reads.not-equal": "{a} không phải là {b}",
   "shell.studio.expression.reads.less": "{a} nhỏ hơn {b}",

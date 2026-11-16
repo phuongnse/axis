@@ -14,10 +14,12 @@ export interface ReadingPart {
 }
 
 /**
- * What an expression reads as: one phrase, or a group of conditions that must all hold (`all`) or of which one must
- * hold (`any`). A group whose conditions are all phrases reads on one line; a group inside a group reads as a list.
+ * What an expression reads as: one phrase, or a group of conditions that must all hold (`all`), of which one must
+ * hold (`any`), that must not all hold (`notAll`, `not (a and b)`) or of which none may hold (`none`, `not (a or b)`).
+ * A group of `all` or `any` whose conditions are all phrases reads on one line; any other group reads as a list.
  */
-export type Reading = { kind: 'phrase'; parts: ReadingPart[] } | { kind: 'all' | 'any'; items: Reading[] }
+export type Reading =
+  { kind: 'phrase'; parts: ReadingPart[] } | { kind: 'all' | 'any' | 'notAll' | 'none'; items: Reading[] }
 
 type Node =
   | { t: 'or' | 'and'; items: Node[] }
@@ -248,6 +250,11 @@ class Reader {
 
   reading(node: Node): Reading {
     const bare = node.t === 'group' ? node.item : node
+    // `not` before a group reads as a heading of its own over the group's conditions.
+    const negated = bare.t === 'not' ? (bare.item.t === 'group' ? bare.item.item : bare.item) : null
+    if (negated !== null && (negated.t === 'and' || negated.t === 'or')) {
+      return { kind: negated.t === 'and' ? 'notAll' : 'none', items: negated.items.map((item) => this.reading(item)) }
+    }
     if (bare.t === 'and' || bare.t === 'or') {
       return { kind: bare.t === 'and' ? 'all' : 'any', items: bare.items.map((item) => this.reading(item)) }
     }

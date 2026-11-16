@@ -668,6 +668,12 @@ function expressionEntity(folder: Folder): StudioResource {
           field: 'dueDate',
         },
         {
+          name: 'notTooLarge',
+          expression: "not (status == 'approved' or amount > 50000)",
+          message: { textKey: 'request.notTooLarge' },
+          field: 'amount',
+        },
+        {
           name: 'supplierNamed',
           expression: 'length(supplier.name) > 2',
           message: { textKey: 'request.supplierNamed' },
@@ -693,6 +699,7 @@ const expressionTexts: StudioNames['texts'] = Object.entries({
   'request.urgentNeedsDate': ['An urgent request needs a due date.', 'Yêu cầu gấp cần có hạn chót.'],
   'request.dueAfterToday': ['The due date has passed.', 'Hạn chót đã qua.'],
   'request.supplierNamed': ['The supplier needs a name.', 'Nhà cung cấp cần có tên.'],
+  'request.notTooLarge': ['An approved request cannot change.', 'Yêu cầu đã duyệt không thể sửa.'],
 }).map(([key, [en, vi]]) => ({ key, texts: { en, vi }, usedBy: 1 }))
 
 function expressionRoutes(folder: Folder): Record<string, () => unknown> {
@@ -714,7 +721,12 @@ function expressionRoutes(folder: Folder): Record<string, () => unknown> {
       ),
       texts: [...typicalNames.texts, ...expressionTexts],
     }),
-    [`${folderPath}/expressions/scope`]: () => ({ type: null, fields: [], functions: [] }),
+    // A validation needs yes or no; the field boxes, which take the field's type, are left empty here.
+    [`${folderPath}/expressions/scope`]: (init?: RequestInit) => ({
+      type: String(init?.body ?? '').includes('"/validations/') ? 'boolean' : null,
+      fields: [],
+      functions: [],
+    }),
     [`${folderPath}/expressions/check`]: () => ({ type: 'boolean', diagnostics: [] }),
   }
 }

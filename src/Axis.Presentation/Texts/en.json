@@ -854,6 +854,8 @@
   "shell.studio.expression.reads.label": "In words:",
   "shell.studio.expression.reads.all": "All of these:",
   "shell.studio.expression.reads.any": "At least one of these:",
+  "shell.studio.expression.reads.notAll": "Not all of these:",
+  "shell.studio.expression.reads.none": "None of these:",
   "shell.studio.expression.reads.equal": "{a} is {b}",
   "shell.studio.expression.reads.not-equal": "{a} is not {b}",
   "shell.studio.expression.reads.less": "{a} is less than {b}",

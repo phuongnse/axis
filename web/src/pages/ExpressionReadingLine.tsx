@@ -26,6 +26,9 @@ export function ExpressionReadingLine({ reading, locale }: { reading: Reading; l
     )
 
   const flat = (item: Reading): item is Extract<Reading, { kind: 'phrase' }> => item.kind === 'phrase'
+  // A group reads as a list under its heading when it holds a group, or when it is negated, as only a heading says so.
+  const asList = (item: Reading): item is Exclude<Reading, { kind: 'phrase' }> =>
+    item.kind !== 'phrase' && (item.kind === 'notAll' || item.kind === 'none' || !item.items.every(flat))
 
   const inline = (item: Reading, key = 'r'): ReactNode[] => {
     if (item.kind === 'phrase') {
@@ -59,12 +62,10 @@ export function ExpressionReadingLine({ reading, locale }: { reading: Reading; l
     </>
   )
 
-  const nested = reading.kind !== 'phrase' && !reading.items.every(flat)
-
   return (
     <div data-testid="studio-expression-reading">
       <Typography.Text type="secondary">{t('shell.studio.expression.reads.label')}</Typography.Text>{' '}
-      {nested ? list(reading) : <Typography.Text>{inline(reading)}</Typography.Text>}
+      {asList(reading) ? list(reading) : <Typography.Text>{inline(reading)}</Typography.Text>}
     </div>
   )
 }

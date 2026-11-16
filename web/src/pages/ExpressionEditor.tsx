@@ -281,7 +281,9 @@ export default function ExpressionEditor({
       ) : (
         <>
           {reading !== null && <ExpressionReadingLine reading={reading} locale={locale} />}
-          {line !== null && (
+          {/* Proposed (#3265): the reading takes the place of "Gives …" where the place needs a type, as a type
+              that does not match is an error; a place that takes any type keeps it. */}
+          {line !== null && (reading === null || !scope?.type) && (
             <div>
               <Typography.Text data-testid="studio-expression-type">{line}</Typography.Text>
             </div>
