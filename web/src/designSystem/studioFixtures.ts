@@ -10,6 +10,7 @@ import type {
   StudioPageMetadataAnswer,
   StudioPolicyMatrix,
   StudioRelease,
+  StudioReleaseListRow,
   StudioReleases,
   StudioResource,
   StudioResourceActivity,
@@ -496,6 +497,35 @@ const typicalRelease: StudioRelease = {
   blockers: [],
 }
 
+/**
+ * The release list of a state's releases: one row for each release, the highest number first, from its first activation,
+ * as the server builds it, with the whole list as one page.
+ */
+export function releasePage(releases: StudioReleases) {
+  const first = new Map<string, StudioReleases['items'][number]>()
+  for (const item of releases.items) {
+    const known = first.get(item.releaseId)
+    if (!known || Date.parse(item.activatedAt) < Date.parse(known.activatedAt)) {
+      first.set(item.releaseId, item)
+    }
+  }
+  const items: StudioReleaseListRow[] = [...first.values()]
+    .map((item) => ({
+      releaseId: item.releaseId,
+      number: item.number,
+      label: item.label,
+      note: item.note,
+      publishedAt: item.activatedAt,
+      actor: item.actor,
+      actorName: item.actorName,
+      live: item.releaseId === releases.active?.releaseId,
+      offStandard: item.offStandard,
+      relaxed: item.relaxed,
+    }))
+    .sort((left, right) => right.number - left.number)
+  return { items, page: 1, pageSize: 20, totalCount: items.length }
+}
+
 /** What a state's folder answers for its diagnostics and its releases. */
 interface StateAnswers {
   diagnostics: StudioDiagnostic[]
@@ -660,6 +690,7 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     [`${folderPath}/resources/${formId}/references`]: () => formReferences,
     [`${folderPath}/resources/${processId}`]: () => processResource,
     [`${folderPath}/releases`]: () => answers.releases,
+    [`${folderPath}/release-list`]: () => releasePage(answers.releases),
     [`${folderPath}/revisions`]: () => typicalRevisions,
     [`${folderPath}/revisions/${typicalRevisionId}`]: () => typicalRevisionDiff,
     [`${folderPath}/settings`]: () => settings,

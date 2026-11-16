@@ -21,13 +21,76 @@ namespace Axis.Server.Studio;
 /// <see cref="ModuleUpgradeCheck"/> on the two stored releases, and is empty for the live release and when nothing is live.
 /// A module's label is the one in the <c>module.json</c> that the release stores and a package's label is the one of the
 /// installed package of that version, else the id stands in. It reads the tenant database and changes nothing.
+/// <c>GET /api/studio/apps/{application}/release-list</c> answers one page of the application's releases as
+/// <c>{ items, page, pageSize, totalCount }</c>, see <c>docs/reference/authoring.md#release-list</c>. Each release is one item, with
+/// the data of its first activation and its Live and Off-standard flags. It takes the record API's <c>page</c>, <c>pageSize</c>,
+/// <c>sort</c>, <c>search</c> and <c>filter</c> through <see cref="StudioListQuery{T}"/>, checks the session (401), the author
+/// role (403) and the application (404), and answers 400 for a sort or a filter on a column it does not hold. It does not
+/// compile the folder.
 /// </summary>
 internal static class StudioReleaseEndpoints
 {
     private const string NoRelease = "No release has this number.";
 
-    public static void MapStudioReleaseEndpoints(this IEndpointRouteBuilder endpoints) =>
+    public static void MapStudioReleaseEndpoints(this IEndpointRouteBuilder endpoints)
+    {
         endpoints.MapGet("/api/studio/apps/{application}/releases/{number}", GetAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/release-list", ListAsync);
+    }
+
+    // A time filters by its day in UTC, as a date column does, and sorts by its instant.
+    private static readonly IReadOnlyList<StudioListColumn<StudioReleaseListRow>> _listColumns =
+    [
+        new("number", StudioListKind.Number, row => row.Number),
+        new("label", StudioListKind.Text, row => row.Label, Searchable: true),
+        new("publishedAt", StudioListKind.Date, row => DateOnly.FromDateTime(row.PublishedAt.UtcDateTime), Order: row => row.PublishedAt),
+        new("publishedBy", StudioListKind.Text, row => row.ActorName, Searchable: true),
+        new("note", StudioListKind.Text, row => row.Note, Searchable: true),
+    ];
+
+    private static async Task<IResult> ListAsync(
+        string application, HttpContext httpContext, StudioOptions options, TenantDatabase database)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var query = StudioListQuery<StudioReleaseListRow>.Read(httpContext.Request, _listColumns, errors);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        // A folder without a readable manifest id has never been activated, so its history is empty.
+        if (StudioFolder.List(folder).FirstOrDefault(file => file.File == "application.json")?.Id is not { } applicationId)
+        {
+            return Results.Ok(ToResponse(query.Apply([])));
+        }
+
+        var cancellationToken = httpContext.RequestAborted;
+        var store = new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken));
+        var active = await store.FindByApplicationIdAsync(applicationId, cancellationToken);
+        var activations = await store.ListActivationsAsync(applicationId, cancellationToken);
+        var items = await StudioEndpoints.ReleaseItemsAsync(store, database, activations, cancellationToken);
+
+        // A release can be in the history more than once, so its first activation gives the row. On equal times the first
+        // in the history's own order stays.
+        var rows = items
+            .GroupBy(item => item.ReleaseId)
+            .Select(group => group.MinBy(item => item.ActivatedAt)!)
+            .OrderByDescending(item => item.Number)
+            .Select(item => new StudioReleaseListRow(
+                item.ReleaseId, item.Number, item.Label, item.Note, item.ActivatedAt, item.Actor, item.ActorName,
+                item.ReleaseId == active?.ReleaseId, item.OffStandard, item.Relaxed))
+            .ToList();
+        return Results.Ok(ToResponse(query.Apply(rows)));
+    }
+
+    private static StudioReleaseListResponse ToResponse(StudioListPage<StudioReleaseListRow> page) =>
+        new(page.Items, page.Page, page.PageSize, page.TotalCount);
 
     private static async Task<IResult> GetAsync(
         string application,
@@ -212,3 +275,22 @@ internal sealed record StudioReleasePartChange(
 
 /// <summary>A module of the live release that the release cannot replace. <c>Version</c> is null when the release lacks the module.</summary>
 internal sealed record StudioReleaseBlocker(string Module, string Label, string LiveVersion, string? Version);
+
+/// <summary>
+/// One release of the release list: the data of its first activation, with <c>Live</c> set on the release that runs and the
+/// release's own <c>OffStandard</c> and <c>Relaxed</c>, see <see cref="StudioReleaseEndpoints"/>.
+/// </summary>
+internal sealed record StudioReleaseListRow(
+    Guid ReleaseId,
+    int Number,
+    string? Label,
+    string? Note,
+    DateTimeOffset PublishedAt,
+    string Actor,
+    string? ActorName,
+    bool Live,
+    bool OffStandard,
+    IReadOnlyList<StudioRelaxedPoint> Relaxed);
+
+/// <summary>One page of the release list with the number of releases that matched, see <see cref="StudioReleaseEndpoints"/>.</summary>
+internal sealed record StudioReleaseListResponse(IReadOnlyList<StudioReleaseListRow> Items, int Page, int PageSize, long TotalCount);
