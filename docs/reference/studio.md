@@ -382,10 +382,10 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
   empty expression is not sent to be checked. The box wraps long lines and grows with them.
 - **A function's signature** _(planned for M33)_. Inside a call, a line shows the function's signature, with the
   parameter at the cursor in bold, and what it does.
-- **Expand** _(planned for M33)_. An icon beside the box opens the expression in a large dialog, with a panel of
-  three tabs, Fields, Operators and Functions, and every rule allowed there. A click inserts the name at
-  the cursor. A search looks in all three and lists what it finds best first: a name that is the words,
-  then one that starts with them, then one that holds them, then one whose description does.
+- **Expand.** An icon beside the box, next in Tab order, opens the expression in a large dialog, with an editor
+  that checks and saves like the box, and a panel of tabs Fields, Operators and Functions, with every rule
+  allowed there. A click inserts the name at the cursor. A search looks in all three, best first: a name that
+  is the words, then one that starts with them, then one that holds them, then one whose description does.
 - **Completion that explains** _(planned for M33)_. Completion names each choice: a field by its label and type,
   and a rule or a function by its signature, with what it does and an example beside the list.
 - **Completion knows where the cursor stands** _(planned for M33)_. After a value it offers the operators that
