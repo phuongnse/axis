@@ -22,6 +22,7 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { ExpressionField } from './ExpressionField'
 import { newGrant, newPolicy, ownGrantIndexes, targetActions } from './policyMatrixDraft'
@@ -92,10 +93,10 @@ export function StudioPolicyMatrixTable({
           <Typography.Text type="secondary">
             {item.module
               ? fillText(t('shell.studio.matrix.targetFrom'), {
-                  kind: t(`shell.studio.nav.kindOne.${item.kind}`),
+                  kind: kindSingular(item.kind, t),
                   module: item.module,
                 })
-              : t(`shell.studio.nav.kindOne.${item.kind}`)}
+              : kindSingular(item.kind, t)}
           </Typography.Text>
         </Flex>
       ),

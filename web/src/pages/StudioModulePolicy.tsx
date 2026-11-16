@@ -1,5 +1,6 @@
 import { Button, Checkbox, Descriptions, Flex, Tag, Typography } from 'antd'
 import { fillText } from '../platform/fillText'
+import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { targetActions } from './policyMatrixDraft'
@@ -61,7 +62,7 @@ export function StudioModulePolicy({
                 <span>
                   {kind
                     ? fillText(t('shell.studio.matrix.grantTarget'), {
-                        kind: t(`shell.studio.nav.kindOne.${kind}`),
+                        kind: kindSingular(kind, t),
                         name: grant[kind] as string,
                       })
                     : ''}
