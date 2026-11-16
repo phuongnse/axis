@@ -49,7 +49,8 @@ namespace Axis.Server.CellApi;
 /// </para>
 /// <para>
 /// <c>GET /api/cell/tenants</c> answers <c>{ "items": [...] }</c>, ordered by id, with each tenant's <c>id</c>,
-/// <c>status</c>, <c>application</c>, <c>hosts</c>, <c>failedWork</c>, <c>usage</c> and <c>newestArchiveAt</c>. <c>GET /api/cell/tenants/{id}</c> answers one
+/// <c>status</c>, <c>application</c>, <c>hosts</c>, <c>failedWork</c>, <c>usage</c>, <c>newestArchiveAt</c> and <c>deleteAfter</c>, the scheduled purge time of a
+/// <c>deleting</c> tenant and <see langword="null"/> for every other. <c>GET /api/cell/tenants/{id}</c> answers one
 /// such tenant. Both read the platform tables over the reader role. The <c>failedWork</c> is <c>{ instances, unknownCalls, deadLetters }</c>, the counts of the worker's
 /// latest hourly sample in <c>platform.tenant_usage_latest</c>, and <see langword="null"/> until the worker has counted the tenant. The <c>status</c> is <c>deleting</c> while the tenant has a scheduled deletion, whatever
 /// its stored status, which stays <c>suspended</c>. A preview tenant belongs to its main tenant's Studio and is not a tenant of the
@@ -116,6 +117,11 @@ namespace Axis.Server.CellApi;
 /// download on a server without the <c>Cell:ExportStorage</c> settings <c>503</c>. A refused call and a read of the JSON write no record.
 /// </para>
 /// <para>
+/// <c>GET /api/cell/deleted-tenants/{id}</c> answers <c>{ id, deletedAt, completeAt }</c> of a purged main tenant from its tombstone in
+/// <c>platform.deleted_tenants</c>, where <c>completeAt</c> is 7 days after <c>deletedAt</c>, see <c>docs/reference/tenant-lifecycle.md#deleting-a-tenant</c>.
+/// It never answers the tombstone's actor or hosts. An unknown id and a preview tenant's tombstone, which no <c>purge</c> job names, answer <c>404</c>.
+/// </para>
+/// <para>
 /// A call that an operator makes and a route refuses with a <c>4xx</c> writes the refused call warning of <see cref="RefusedRequests"/>
 /// and no record, see <c>docs/reference/tenant-lifecycle.md#provisioning-api</c>.
 /// </para>
@@ -176,6 +182,10 @@ internal static partial class CellEndpoints
 
     private static readonly TimeSpan _hostRequestWindow = TimeSpan.FromDays(7);
 
+    // The managed PostgreSQL's point-in-time recovery retention, after which a deletion is complete,
+    // see docs/reference/tenant-lifecycle.md#deleting-a-tenant.
+    private static readonly TimeSpan _pointInTimeRecovery = TimeSpan.FromDays(7);
+
     private static readonly JsonSerializerOptions _createJobInputOptions =
         new(JsonSerializerOptions.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
 
@@ -189,6 +199,7 @@ internal static partial class CellEndpoints
         cell.MapGet("/tenants", ListTenantsAsync);
         cell.MapGet("/tenants/{id}", GetTenantAsync);
         cell.MapGet("/tenants/{id}/administrators", ListAdministratorsAsync);
+        cell.MapGet("/deleted-tenants/{id}", GetDeletedTenantAsync);
         cell.MapPut("/tenants/{id}/quotas", SetQuotasAsync);
         cell.MapPost("/tenants", CreateTenantAsync);
         cell.MapPost("/tenants/{id}/suspend", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
@@ -272,7 +283,7 @@ internal static partial class CellEndpoints
         await using var platform = Open(dataSource);
         var tenants = await platform.Tenants.AsNoTracking()
             .Where(tenant => tenant.PreviewOf == null)
-            .Select(tenant => new { tenant.Id, Status = tenant.DeleteAfter != null ? "deleting" : tenant.Status, tenant.Application })
+            .Select(tenant => new { tenant.Id, Status = tenant.DeleteAfter != null ? "deleting" : tenant.Status, tenant.Application, tenant.DeleteAfter })
             .ToListAsync(cancellationToken);
         var ids = tenants.Select(tenant => tenant.Id).ToList();
         var hosts = await ReadHostsAsync(platform, ids, cancellationToken);
@@ -291,7 +302,8 @@ internal static partial class CellEndpoints
                     HostsOf(hosts, tenant.Id),
                     latest.GetValueOrDefault(tenant.Id)?.FailedWork,
                     usage[tenant.Id],
-                    archives.TryGetValue(tenant.Id, out var archive) ? archive : null))]));
+                    archives.TryGetValue(tenant.Id, out var archive) ? archive : null,
+                    tenant.DeleteAfter))]));
     }
 
     private static async Task<IResult> GetTenantAsync(
@@ -306,7 +318,7 @@ internal static partial class CellEndpoints
         await using var platform = Open(dataSource);
         var tenant = await platform.Tenants.AsNoTracking()
             .Where(row => row.Id == id && row.PreviewOf == null)
-            .Select(row => new { row.Id, Status = row.DeleteAfter != null ? "deleting" : row.Status, row.Application })
+            .Select(row => new { row.Id, Status = row.DeleteAfter != null ? "deleting" : row.Status, row.Application, row.DeleteAfter })
             .SingleOrDefaultAsync(cancellationToken);
         if (tenant is null)
         {
@@ -329,9 +341,31 @@ internal static partial class CellEndpoints
             quotas[tenant.Id],
             usage[tenant.Id],
             archives.TryGetValue(tenant.Id, out var archive) ? archive : null,
+            tenant.DeleteAfter,
             [.. days.Select(row => new TenantUsageDayResponse(
                 row.Day, row.DatabaseBytes, row.FileBytes, row.Users, row.Applications, row.EmailsSent, row.ConnectorCalls, row.WorkItemsRun))],
             hostRequests));
+    }
+
+    // The tombstone of a preview tenant stays hidden: only a main tenant has a purge job that names it. The hosts step writes the tombstone,
+    // so a purge that is still running has one already. The actor and the hosts stay out of the select.
+    private static async Task<IResult> GetDeletedTenantAsync(
+        string id,
+        HttpContext httpContext,
+        NpgsqlDataSource dataSource,
+        CancellationToken cancellationToken)
+    {
+        await using var platform = Open(dataSource);
+        var deletedAt = await platform.DeletedTenants.AsNoTracking()
+            .Where(row => row.Id == id && platform.Jobs.Any(job => job.Kind == PurgeJobKind && job.TenantId == id))
+            .Select(row => (DateTimeOffset?)row.DeletedAt)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (deletedAt is null)
+        {
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status404NotFound, "No deleted tenant has this id.");
+        }
+
+        return Results.Ok(new CellDeletedTenantResponse(id, deletedAt.Value, deletedAt.Value + _pointInTimeRecovery));
     }
 
     // The token stays out of the select. A request whose expiry has passed is not pending, as in RequestHostAsync, see docs/reference/tenant-lifecycle.md#hosts.
@@ -1132,7 +1166,8 @@ internal sealed record CellTenantUsageResponse(
 
 /// <summary>
 /// One tenant of the cell. <c>Application</c> is the one the create job recorded, and null for a tenant that no create job made. <c>FailedWork</c> is null until the
-/// worker has counted the tenant. <c>NewestArchiveAt</c> is null for a tenant that was never backed up.
+/// worker has counted the tenant. <c>NewestArchiveAt</c> is null for a tenant that was never backed up. <c>DeleteAfter</c> is the scheduled purge time of a
+/// <c>deleting</c> tenant and null for every other.
 /// </summary>
 internal sealed record CellTenantResponse(
     string Id,
@@ -1141,7 +1176,11 @@ internal sealed record CellTenantResponse(
     IReadOnlyList<string> Hosts,
     CellFailedWorkResponse? FailedWork,
     CellTenantUsageResponse Usage,
-    DateTimeOffset? NewestArchiveAt);
+    DateTimeOffset? NewestArchiveAt,
+    DateTimeOffset? DeleteAfter);
+
+/// <summary>A purged main tenant: when the purge removed its hosts and when its deletion is complete, 7 days later.</summary>
+internal sealed record CellDeletedTenantResponse(string Id, DateTimeOffset DeletedAt, DateTimeOffset CompleteAt);
 
 /// <summary>The tenants of the cell, ordered by id.</summary>
 internal sealed record CellTenantListResponse(IReadOnlyList<CellTenantResponse> Items);
@@ -1159,6 +1198,7 @@ internal sealed record CellTenantDetailResponse(
     IReadOnlyDictionary<string, CellQuotaResponse> Quotas,
     CellTenantUsageResponse Usage,
     DateTimeOffset? NewestArchiveAt,
+    DateTimeOffset? DeleteAfter,
     IReadOnlyList<TenantUsageDayResponse> Days,
     IReadOnlyList<CellHostRequestStateResponse> HostRequests);
 

@@ -102,14 +102,18 @@ tenant button of the Tenants view and the actions of the Tenant view.
   - the time of the newest daily archive, marked when it is more than 26 hours old, with a dash for a tenant
     that has no archive.
 - **Tenant.** One tenant's status and hosts, its quotas with the rows that override the cell's
-  defaults, its usage and its jobs in the same table as the Jobs view. An unknown id shows the not-found page.
+  defaults, its usage and its jobs in the same table as the Jobs view. An id that is neither a tenant nor a purged tenant shows the not-found page.
   The view shows its parts in this order: Details, with the status, the application, the hosts and the actions,
   then Host verification, Quotas, Usage and Jobs.
   - **Usage.** The tenant's usage of the last 13 months by day, in the same table as the users page's "Usage"
     section, see [the tenant read](tenant-lifecycle.md#routes).
   - **Host verification.** Each host that the operator asked for, from the [tenant read](tenant-lifecycle.md#routes)'s
     `hostRequests`: pending with the date its request expires, verified or expired.
-  - **Deletion dates** _(planned for M33)_: the dates of a tenant's deletion.
+  - **Dates of a deletion.** A `deleting` tenant shows its purge date, `deleteAfter` of the
+    [tenant read](tenant-lifecycle.md#routes), after its status. An id that was a tenant and is purged shows the status
+    Deleted, the date it was purged, the date its deletion is complete and its jobs, read from
+    [the deleted-tenant read](tenant-lifecycle.md#routes). The purge removed the rest, so that view shows no hosts,
+    host verification, quotas, usage or action. Both dates show with the time, in the operator's locale.
   - **Actions.** A Suspend, a Resume, an Export, a Delete and a Cancel deletion button, each with a confirmation
     that names the tenant, a Download button once an export has succeeded, and a Set quotas and an Add a host
     button, each with a dialog that names the tenant, see [actions](#actions).
@@ -151,12 +155,12 @@ Set quotas and Add a host apply at once.
   2 seconds, and shows its state and steps until it succeeds or fails. Close is there at any time and stops
   following the job, which keeps running. When the job ends, or when the dialog closes after the job was
   queued, the Tenants view loads the list again.
-- **Set quotas.** The Tenant view shows Set quotas for every status. A dialog that names the tenant lists every
+- **Set quotas.** The Tenant view shows Set quotas for every status of a live tenant, and a purged tenant's view shows none. A dialog that names the tenant lists every
   quota key, and each key takes a value, no limit or the cell's default. Saving sends only the keys that
   changed to `PUT /api/cell/tenants/{id}/quotas`, see [the routes](tenant-lifecycle.md#routes), and Save is off
   until a choice has changed. Its fields are [checked on click](actions-and-controls.md#fields). The quota table
   then shows the quotas that the route answered.
-- **Add a host.** The Tenant view shows Add a host for every status. A dialog that names the tenant asks for a
+- **Add a host.** The Tenant view shows Add a host for every status of a live tenant, and a purged tenant's view shows none. A dialog that names the tenant asks for a
   host and calls `POST /api/cell/tenants/{id}/hosts`, see [hosts](tenant-lifecycle.md#hosts). It then shows the
   TXT and CNAME records that the customer must add and when the request expires. Once the request is answered, the
   view loads the tenant again, so the host shows as pending under Host verification.

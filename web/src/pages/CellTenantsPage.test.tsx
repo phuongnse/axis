@@ -40,6 +40,7 @@ const acme: CellTenant = {
     emailsPerDay: { limit: 1000, used: 1200 },
   },
   newestArchiveAt: hoursAgo(30),
+  deleteAfter: null,
 }
 const beta: CellTenant = {
   id: 'beta',
@@ -49,6 +50,7 @@ const beta: CellTenant = {
   failedWork: null,
   usage: noUsage,
   newestArchiveAt: null,
+  deleteAfter: null,
 }
 const gamma: CellTenant = {
   id: 'gamma',
@@ -58,6 +60,7 @@ const gamma: CellTenant = {
   failedWork: { instances: 0, unknownCalls: 0, deadLetters: 0 },
   usage: noUsage,
   newestArchiveAt: hoursAgo(2),
+  deleteAfter: null,
 }
 
 function stubTenants(status: number, items: CellTenant[] = []) {

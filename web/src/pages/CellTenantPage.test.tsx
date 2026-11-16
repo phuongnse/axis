@@ -36,6 +36,7 @@ const acme: CellTenantDetail = {
     emailsPerDay: { limit: null, used: null },
   },
   newestArchiveAt: null,
+  deleteAfter: null,
   quotas: {
     users: { value: 100, overridden: true },
     applications: { value: 10, overridden: false },
@@ -62,9 +63,13 @@ interface Answer {
 const ok = (body: unknown): Answer => ({ status: 200, body })
 const fail = (status: number): Answer => ({ status, body: { status } })
 
-function stubRoutes(tenant: Answer, jobs: Answer = ok({ items: [job] })) {
+function stubRoutes(tenant: Answer, jobs: Answer = ok({ items: [job] }), deleted: Answer = fail(404)) {
   const fetchMock = vi.fn(async (input: string) => {
-    const answer = input.startsWith('/api/cell/jobs') ? jobs : tenant
+    const answer = input.startsWith('/api/cell/jobs')
+      ? jobs
+      : input.startsWith('/api/cell/deleted-tenants/')
+        ? deleted
+        : tenant
     return new Response(JSON.stringify(answer.body), { status: answer.status })
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -283,6 +288,60 @@ describe('CellTenantPage', () => {
 
     expect(await screen.findByTestId('not-found')).toBeInTheDocument()
     expect(screen.queryByTestId('cell-tenant-quotas')).not.toBeInTheDocument()
+  })
+
+  it('shows the purge date of a deleting tenant next to its status', async () => {
+    stubRoutes(ok({ ...acme, status: 'deleting', deleteAfter: '2026-11-12T10:00:00Z' }))
+    renderPage('/tenants/acme')
+
+    const details = await screen.findByTestId('cell-tenant')
+    expect(details).toHaveTextContent('Deleting')
+    expect(details).toHaveTextContent(`Purge after${new Date('2026-11-12T10:00:00Z').toLocaleString('en')}`)
+  })
+
+  it('shows no purge date for a tenant that is not deleting', async () => {
+    stubRoutes(ok(acme))
+    renderPage('/tenants/acme')
+
+    expect(await screen.findByTestId('cell-tenant')).not.toHaveTextContent('Purge after')
+  })
+
+  it('shows a purged id as Deleted with both dates, its jobs and no action', async () => {
+    const fetchMock = stubRoutes(
+      fail(404),
+      ok({ items: [{ ...job, kind: 'purge', tenantId: 'gone' }] }),
+      ok({ id: 'gone', deletedAt: '2026-11-01T00:00:00Z', completeAt: '2026-11-08T00:00:00Z' }),
+    )
+    renderPage('/tenants/gone')
+
+    const details = await screen.findByTestId('cell-tenant-deleted')
+    expect(details).toHaveTextContent('Deleted')
+    expect(details).toHaveTextContent(`Purged${new Date('2026-11-01T00:00:00Z').toLocaleString('en')}`)
+    expect(details).toHaveTextContent(`Deletion complete${new Date('2026-11-08T00:00:00Z').toLocaleString('en')}`)
+    expect(await screen.findByText('purge')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/cell/deleted-tenants/gone', expect.anything())
+    for (const action of [
+      'suspend',
+      'resume',
+      'export',
+      'delete',
+      'cancel-deletion',
+      'download',
+      'set-quotas',
+      'add-host',
+    ]) {
+      expect(screen.queryByTestId(`cell-tenant-${action}`)).not.toBeInTheDocument()
+    }
+    expect(screen.queryByTestId('cell-tenant-quotas')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('not-found')).not.toBeInTheDocument()
+  })
+
+  it('shows the not-found page for an id that is neither a tenant nor a purged tenant', async () => {
+    stubRoutes(fail(404), ok({ items: [] }), fail(404))
+    renderPage('/tenants/never')
+
+    expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+    expect(screen.queryByTestId('cell-tenant-deleted')).not.toBeInTheDocument()
   })
 
   it('reports a refusal of the tenant call to the console', async () => {
