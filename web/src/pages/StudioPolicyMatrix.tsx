@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyState } from '../platform/EmptyState'
+import { fillText } from '../platform/fillText'
 import { diffPatch, setAt } from '../platform/jsonPatch'
 import {
   createStudioResource,
@@ -88,7 +89,14 @@ export function StudioPolicyMatrixTable({
       title: (
         <Flex vertical>
           <span>{item.name}</span>
-          <Typography.Text type="secondary">{item.module ? `${item.kind}, ${item.module}` : item.kind}</Typography.Text>
+          <Typography.Text type="secondary">
+            {item.module
+              ? fillText(t('shell.studio.matrix.targetFrom'), {
+                  kind: t(`shell.studio.nav.kindOne.${item.kind}`),
+                  module: item.module,
+                })
+              : t(`shell.studio.nav.kindOne.${item.kind}`)}
+          </Typography.Text>
         </Flex>
       ),
       render: (_: unknown, row: StudioMatrixRole) => (
@@ -136,7 +144,8 @@ export function StudioPolicyMatrixTable({
 function RoleHeader({ role }: { role: StudioMatrixRole }) {
   const t = useText()
   const reasonKey = `shell.studio.matrix.reason.${role.readOnlyReason}`
-  const reasonText = t(reasonKey) === reasonKey ? role.readOnlyReason : t(reasonKey)
+  const reasonText =
+    t(reasonKey) === reasonKey ? role.readOnlyReason : fillText(t(reasonKey), { policy: role.accessPolicy.name })
   return (
     <Flex vertical align="flex-start">
       <span>
@@ -150,7 +159,6 @@ function RoleHeader({ role }: { role: StudioMatrixRole }) {
       {!role.editable && role.readOnlyReason !== null && (
         <Typography.Text type="secondary" data-testid={`studio-matrix-readonly-${role.name}`}>
           {reasonText}
-          {role.readOnlyReason === 'accessPolicyShared' && ` ${role.accessPolicy.name}`}
         </Typography.Text>
       )}
     </Flex>
@@ -188,7 +196,7 @@ function MatrixCell({
         {cell.missingEntityRead !== null && (
           // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
           <Tag color="warning" style={{ marginInlineEnd: 0 }} data-testid="studio-matrix-missing-read">
-            {t('shell.studio.matrix.missingEntityRead')} {cell.missingEntityRead}
+            {fillText(t('shell.studio.matrix.missingEntityRead'), { entity: cell.missingEntityRead })}
           </Tag>
         )}
       </Flex>
@@ -220,7 +228,7 @@ function GrantPanel({
   return (
     <section data-testid="studio-matrix-grants">
       <Typography.Title level={5}>
-        {t('shell.studio.matrix.grants')} {role.name}, {target.name}
+        {fillText(t('shell.studio.matrix.grants'), { role: role.name, target: target.name })}
       </Typography.Title>
       {!role.editable && cell.grants.length === 0 && <EmptyState text={t('shell.studio.matrix.noGrants')} />}
       <Flex vertical gap="small">
@@ -375,7 +383,12 @@ function OwnGrants({
   )
 
   if (state === 'failed') {
-    return <AxisAlert kind="error" message={t('shell.studio.matrix.loadFailed')} />
+    return (
+      <AxisAlert
+        kind="error"
+        message={fillText(t('shell.studio.matrix.policyLoadFailed'), { policy: role.accessPolicy.name })}
+      />
+    )
   }
   if (state === undefined) {
     return (
@@ -497,7 +510,7 @@ function OwnGrants({
               {unaccepted.map((action) => (
                 // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
                 <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
-                  {t('shell.studio.matrix.unacceptedAction')} {action}
+                  {fillText(t('shell.studio.matrix.unacceptedAction'), { action })}
                 </Tag>
               ))}
               {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}

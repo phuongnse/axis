@@ -1,4 +1,5 @@
 import { Button, Checkbox, Descriptions, Flex, Tag, Typography } from 'antd'
+import { fillText } from '../platform/fillText'
 import { useText } from '../platform/texts'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { targetActions } from './policyMatrixDraft'
@@ -57,7 +58,14 @@ export function StudioModulePolicy({
             <Flex key={index} vertical gap={4} data-testid={`studio-module-policy-grant-${index}`}>
               <Flex gap="small" align="center" wrap>
                 {typeof grant.name === 'string' && <Typography.Text code>{grant.name}</Typography.Text>}
-                <span>{kind ? `${kind} ${grant[kind] as string}` : ''}</span>
+                <span>
+                  {kind
+                    ? fillText(t('shell.studio.matrix.grantTarget'), {
+                        kind: t(`shell.studio.nav.kindOne.${kind}`),
+                        name: grant[kind] as string,
+                      })
+                    : ''}
+                </span>
                 {layer !== undefined && typeof grant.name === 'string' && (
                   <LayerMarkTag layer={layer} list="/grants" index={index} name={grant.name} />
                 )}
@@ -76,7 +84,7 @@ export function StudioModulePolicy({
                 {unaccepted.map((action) => (
                   // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
                   <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
-                    {t('shell.studio.matrix.unacceptedAction')} {action}
+                    {fillText(t('shell.studio.matrix.unacceptedAction'), { action })}
                   </Tag>
                 ))}
                 {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
