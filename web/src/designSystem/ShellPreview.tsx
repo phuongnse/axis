@@ -82,3 +82,41 @@ export function ClickOnMount({ selector, children }: { selector: string; childre
   }, [selector])
   return <div ref={wrapper}>{children}</div>
 }
+
+/**
+ * Proposed, see the review on #3650: types `text` at the end of the first input matching `selector` once the shell
+ * draws it, as a person would, so a state shows a form with a change to save.
+ */
+export function TypedOnMount({ selector, text, children }: { selector: string; text: string; children: ReactNode }) {
+  const wrapper = useRef<HTMLDivElement>(null)
+  const typed = useRef(false)
+  useEffect(() => {
+    const element = wrapper.current
+    if (!element) {
+      return
+    }
+    const type = () => {
+      const input = element.querySelector<HTMLInputElement>(selector)
+      // The record's value arrives after the input, so the change waits for it.
+      if (typed.current || !input || input.value === '') {
+        return false
+      }
+      typed.current = true
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setValue?.call(input, `${input.value}${text}`)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      return true
+    }
+    if (type()) {
+      return
+    }
+    const observer = new MutationObserver(() => {
+      if (type()) {
+        observer.disconnect()
+      }
+    })
+    observer.observe(element, { childList: true, subtree: true, attributes: true })
+    return () => observer.disconnect()
+  }, [selector, text])
+  return <div ref={wrapper}>{children}</div>
+}

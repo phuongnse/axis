@@ -244,6 +244,18 @@ export function useRecordForm(
     [clearErrors, asking, ask],
   )
 
+  // Proposed: Discard on the save bar puts the values back as the form started, see the review on #3650.
+  const discard = () => {
+    setValues(snapshot.initial)
+    clearErrors()
+    if (asking) {
+      sequence.current++
+      setTouched(new Set())
+      setAnswer(null)
+      ask(0)
+    }
+  }
+
   const stateOf = (name: string) => answer?.fields[name]
   // A field the form or the answer locks is shown but never sent.
   const lockedOf = ({ field, readOnly }: ShownField) => readOnly || stateOf(field.name)?.readOnly === true
@@ -727,6 +739,7 @@ export function useRecordForm(
     check,
     start,
     changed,
+    discard,
     version: snapshot.version,
     showProblem,
     clearErrors,

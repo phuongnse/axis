@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { antLocaleFor } from './antLocale'
-import { ActionBar } from './ActionBar'
 import { AxisActionRow, AxisButton } from './AxisButton'
 import { useCanvasActions } from './canvasActions'
 import { formStatePath } from './formState'
@@ -18,7 +17,9 @@ import type { EntityWidgetMetadata, NavigateAction, StartProcessAction } from '.
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useFormSteps } from './useFormSteps'
+import { useUnsavedChanges } from './unsavedChanges'
 import { PageActions } from './PageLayout'
+import { SaveBar } from './SaveBar'
 import { sectionsOf, useRecordForm } from './useRecordForm'
 
 interface FormWidgetProps {
@@ -104,6 +105,9 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
   )
   const form = useRecordForm(entity, sections, locale, conditions)
   const steps = useFormSteps(widget.form, sections, form)
+  const unsaved = canSave && Object.keys(form.changed()).length > 0
+  // Before a wizard's last step the save bar is not drawn, so the form counts its changes in for the guard itself.
+  useUnsavedChanges(unsaved && !steps.last)
   const { start: startForm, setFormErrors } = form
   const [load, setLoad] = useState<LoadState>(recordId === null ? 'ready' : 'loading')
   const [conflict, setConflict] = useState(false)
@@ -377,13 +381,9 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
                 locale={locale}
               />
             )}
-            {/* Proposed: what finishes the form sits in the page's action bar, the finishing action last, see the
-                review on #3650. */}
-            <ActionBar>
+            {/* A wizard's Back and Next move between its steps, so they stay under the step's fields. */}
+            {steps.active && (!steps.first || !steps.last) && (
               <Row>
-                <AxisButton role="secondary" onClick={() => navigate(returnTo)}>
-                  {t('shell.form.cancel')}
-                </AxisButton>
                 {!steps.first && (
                   <AxisButton role="secondary" onClick={steps.back} disabled={steps.checking}>
                     {t('shell.form.back')}
@@ -395,16 +395,22 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
                     {t('shell.form.next')}
                   </AxisButton>
                 )}
-                {steps.last && canSave && (
-                  <AxisButton role="finish" htmlType="submit" loading={saving} disabled={starting}>
-                    {t('shell.form.save')}
-                  </AxisButton>
-                )}
               </Row>
-            </ActionBar>
+            )}
           </Flex>
         </Form>
       </Flex>
+      {/* Proposed: a form's save is Studio's save bar, shown while there is something to save, with Discard, see the
+          review on #3650. A wizard shows it on its last step. */}
+      {canSave && steps.last && (
+        <SaveBar
+          unsaved={unsaved}
+          saveable={unsaved && !saving && !starting}
+          busy={saving || starting}
+          onDiscard={form.discard}
+          onSave={() => void save()}
+        />
+      )}
     </ConfigProvider>
   )
 }

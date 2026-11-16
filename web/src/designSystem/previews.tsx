@@ -16,7 +16,7 @@ import { FieldPreview } from './FieldPreview'
 import { IdentitySignIn } from './IdentitySignIn'
 import { SignUpPreview } from './SignUpPreview'
 import { SubmittedOnMount } from './SubmittedOnMount'
-import { ClickOnMount, ShellPreview } from './ShellPreview'
+import { ClickOnMount, ShellPreview, TypedOnMount } from './ShellPreview'
 import { studioFixtures, typicalEntityId, typicalFormId, typicalPageId, typicalProcessId } from './studioFixtures'
 import {
   application,
@@ -259,11 +259,21 @@ export const previews: Record<string, readonly PreviewState[]> = {
       entry: { pathname: '/sample/request/new', state: { from: '/sample/requests' } },
       frameHeight: 600,
     },
-    // Proposed: a saved record's form page, with its action on the heading, its history and the action bar, see the
-    // review on #3650.
+    // Proposed: a saved record's form page, with its action on the heading and its history, then the same page with a
+    // change, which shows the save bar, see the review on #3650.
     {
       caption: 'Saved record',
       draw: () => <ShellPreview />,
+      entry: { pathname: `/sample/request/${requestId}`, state: { from: '/sample/requests' } },
+      frameHeight: 600,
+    },
+    {
+      caption: 'Saved record with a change',
+      draw: () => (
+        <TypedOnMount selector="input#title" text=" (revised)">
+          <ShellPreview />
+        </TypedOnMount>
+      ),
       entry: { pathname: `/sample/request/${requestId}`, state: { from: '/sample/requests' } },
       frameHeight: 600,
     },

@@ -1,12 +1,13 @@
 import { RedoOutlined, UndoOutlined } from '@ant-design/icons'
 import { Flex, Modal } from 'antd'
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { AxisActionRow, AxisButton } from '../platform/AxisButton'
-import { useText } from '../platform/texts'
-import { useDesignTokens } from '../platform/themeMode'
-import { useUnsavedChanges } from '../platform/unsavedChanges'
+import { AxisActionRow, AxisButton } from './AxisButton'
+import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
+import { useUnsavedChanges } from './unsavedChanges'
 
 /**
+ * Proposed, see the review on #3650: a site's record form draws its save in this bar too, with no Undo and Redo.
  * The save bar of a Studio resource, see docs/reference/studio-resource-form.md#save-bar. It stays at the foot of the
  * window across the content, over the footer, while there is something to save or a step can be redone, and it is not
  * drawn otherwise. Discard asks first, because no Undo brings the changes back, see
@@ -14,8 +15,8 @@ import { useUnsavedChanges } from '../platform/unsavedChanges'
  */
 export function SaveBar({
   unsaved,
-  undoable,
-  redoable,
+  undoable = false,
+  redoable = false,
   saveable,
   busy,
   onUndo,
@@ -25,33 +26,41 @@ export function SaveBar({
 }: {
   /** There is a change to save, valid or not. */
   unsaved: boolean
-  undoable: boolean
-  redoable: boolean
+  /** Undo and Redo show only where the editor gives `onUndo` and `onRedo`. */
+  undoable?: boolean
+  redoable?: boolean
   /** Whether Save is on, which the editor decides. */
   saveable: boolean
   /** A save runs. */
   busy: boolean
-  onUndo: () => void
-  onRedo: () => void
+  onUndo?: () => void
+  onRedo?: () => void
   onDiscard: () => void
   onSave: () => void
 }): ReactNode {
   const t = useText()
   const { size, colour, spacing } = useDesignTokens()
   const anchorRef = useRef<HTMLDivElement>(null)
+  const barRef = useRef<HTMLDivElement>(null)
   const [frame, setFrame] = useState<{ left: number; width: number }>()
   const [discardOpen, setDiscardOpen] = useState(false)
   const shown = unsaved || redoable
   useUnsavedChanges(unsaved)
 
-  // The bar spans the content, which is the nearest main, so it leaves the sidebar uncovered.
+  // The bar spans the content, which is the nearest main, so it leaves the sidebar uncovered. Proposed, as the review on
+  // #3263 found: a fixed bar is placed from the window's edge, or from a transformed ancestor's, such as a
+  // design-system frame, so its own origin is taken off, see the review on #3650.
   useLayoutEffect(() => {
     const main = anchorRef.current?.closest('main')
     if (!shown || !main) {
       return
     }
     const measure = () => {
-      const { left, width } = main.getBoundingClientRect()
+      const bar = barRef.current
+      const origin = bar === null ? 0 : bar.getBoundingClientRect().left - (parseFloat(bar.style.left) || 0)
+      const box = main.getBoundingClientRect()
+      const left = box.left - origin
+      const width = box.width
       setFrame((current) => (current?.left === left && current.width === width ? current : { left, width }))
     }
     measure()
@@ -72,6 +81,7 @@ export function SaveBar({
     <>
       <div ref={anchorRef} style={{ height: size.bar }} />
       <Flex
+        ref={barRef}
         data-testid="studio-save-bar"
         align="center"
         justify="space-between"
@@ -92,22 +102,26 @@ export function SaveBar({
       >
         <AxisActionRow align="center">
           <span>{unsaved ? t('shell.studio.saveBar.unsaved') : t('shell.studio.saveBar.noUnsaved')}</span>
-          <AxisButton
-            role="icon"
-            nameKey="shell.studio.undo"
-            icon={<UndoOutlined />}
-            aria-keyshortcuts="Control+Z Meta+Z"
-            disabled={!undoable || busy}
-            onClick={onUndo}
-          />
-          <AxisButton
-            role="icon"
-            nameKey="shell.studio.redo"
-            icon={<RedoOutlined />}
-            aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
-            disabled={!redoable || busy}
-            onClick={onRedo}
-          />
+          {onUndo && (
+            <>
+              <AxisButton
+                role="icon"
+                nameKey="shell.studio.undo"
+                icon={<UndoOutlined />}
+                aria-keyshortcuts="Control+Z Meta+Z"
+                disabled={!undoable || busy}
+                onClick={onUndo}
+              />
+              <AxisButton
+                role="icon"
+                nameKey="shell.studio.redo"
+                icon={<RedoOutlined />}
+                aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z"
+                disabled={!redoable || busy}
+                onClick={onRedo}
+              />
+            </>
+          )}
         </AxisActionRow>
         <AxisActionRow align="center">
           {unsaved && (
