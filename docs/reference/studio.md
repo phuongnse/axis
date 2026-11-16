@@ -428,16 +428,16 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
   sources, the processes and the endpoints. A cell shows the OR of the role's actions from all its
   policies, as in [combining grants](security.md#combining-grants). A data source cell that lacks the
   `read` of its root entity warns and names that entity.
-- **A cell's grants.** Selecting a cell opens its grants under the table, each with its actions, its
-  filter in the [expression editor](#expression-editor) and its fields in a field picker.
+- **A cell's grants.** Selecting a cell opens its grants under the table, each with its actions, its filter in the
+  [expression editor](#expression-editor) and its fields in a field picker. The panel says the cell has no grant only
+  when it shows none. An editable row whose cell has only shared grants lists them and offers Add grant.
 - **Where an edit goes.** An edit writes to `<Role>Access`, the PascalCase role name plus `Access`, so
   `department-manager` writes `DepartmentManagerAccess`. When the role has none, Save creates
   `policies/<role>-access.json` with `roles` set to that role only.
-- **Read-only grants.** A grant from a policy that names several roles, or from another policy of the
-  role, is tagged Shared, and its Open policy link opens that policy. A `<Role>Access` that names other
-  roles counts as shared too, so its row is read-only and shows its reason. A module policy's grant, in
-  the row of its slot's role, is tagged with the module and has no link. Splitting a shared policy is
-  not done here.
+- **Read-only grants.** A grant from a policy that names several roles, or from another policy of the role, is tagged
+  Shared, and its Open policy link opens that policy. A `<Role>Access` that names other roles counts as shared too, so
+  its row is read-only and shows its reason. A module policy's grant, in the row of its slot's role, is tagged with the
+  module and has no link. Splitting a shared policy is not done here.
 - **Editable grants.** In an editable row, the cell's own grants, those of `<Role>Access` that name
   exactly this target, are editable. The panel reads that policy with the resource route, so every
   edit fits the file that a save patches. While the policy loads, the panel says so.

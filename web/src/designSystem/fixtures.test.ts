@@ -1,8 +1,17 @@
 import { describe, expect, test } from 'vitest'
 import type { RecordPage } from '../platform/records'
+import type { StudioPolicyMatrix } from '../platform/studio'
 import { chartWidget, routes, siteTexts } from './fixtures'
+import { studioFixtures } from './studioFixtures'
 
 const rowsOf = (rowsPath: string) => (routes[rowsPath]() as RecordPage).items
+
+/** The policy matrix of each state that answers the policy matrix route, with the state's name. */
+const policyMatrices = Object.entries(studioFixtures).flatMap(([state, answers]) =>
+  Object.entries(answers)
+    .filter(([path]) => path.endsWith('/policy-matrix'))
+    .map(([, answer]) => [state, answer() as StudioPolicyMatrix] as const),
+)
 
 describe('design-system chart fixtures', () => {
   test.each(['bar', 'line'] as const)('the %s chart measures are on a similar scale', (kind) => {
@@ -37,5 +46,26 @@ describe('design-system chart fixtures', () => {
 
   test('the pie chart binds one measure', () => {
     expect(chartWidget('pie').chart!.measures).toHaveLength(1)
+  })
+})
+
+describe('design-system Policy matrix fixtures', () => {
+  test('the Typical state answers the policy matrix route', () => {
+    expect(policyMatrices.map(([state]) => state)).toContain('typical')
+  })
+
+  test('a grant that is not shared comes from the policy of its own row', () => {
+    for (const [state, matrix] of policyMatrices) {
+      for (const role of matrix.roles) {
+        for (const cell of role.cells) {
+          for (const grant of cell.grants.filter((grant) => !grant.shared)) {
+            expect(
+              grant.policy.toLowerCase(),
+              `${state}: the ${grant.policy} grant of ${role.name} on ${cell.target} is not shared, so it must come from ${role.accessPolicy.name}`,
+            ).toBe(role.accessPolicy.name.toLowerCase())
+          }
+        }
+      }
+    }
   })
 })

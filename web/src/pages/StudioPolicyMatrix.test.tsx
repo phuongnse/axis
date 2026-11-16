@@ -287,6 +287,43 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(emptyDescription('No grant.', screen.getByTestId('studio-matrix-own-grants'))).toBeInTheDocument()
   })
 
+  it('shows no own-grant empty text under a shared grant of an editable row', async () => {
+    stubFetch()
+    renderMatrix({
+      roles: [
+        {
+          ...matrix.roles[0],
+          cells: matrix.roles[0].cells.map((item) =>
+            item.target === 'Intake'
+              ? cell('endpoint', 'Intake', {
+                  actions: ['invoke'],
+                  grants: [
+                    {
+                      policyId: sharedPolicyId,
+                      policy: 'StaffAccess',
+                      index: 0,
+                      actions: ['invoke'],
+                      filter: null,
+                      fields: null,
+                      shared: true,
+                      module: null,
+                    },
+                  ],
+                })
+              : item,
+          ),
+        },
+      ],
+    })
+
+    await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-endpoint-Intake'))
+
+    const own = await screen.findByTestId('studio-matrix-own-grants')
+    expect(within(screen.getByTestId('studio-matrix-grant')).getByText('StaffAccess')).toBeInTheDocument()
+    expect(within(screen.getByTestId('studio-matrix-grant')).getByText('Shared')).toBeInTheDocument()
+    expect(within(own).queryByText('No grant.')).not.toBeInTheDocument()
+  })
+
   it('offers only the actions a process takes', async () => {
     stubFetch()
     renderMatrix()
