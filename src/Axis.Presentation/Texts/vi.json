@@ -830,8 +830,6 @@
   "shell.studio.expression.functions": "Hàm",
   "shell.studio.expression.search": "Tìm trường, toán tử và hàm",
   "shell.studio.expression.noMatch": "Không có kết quả phù hợp",
-  "shell.studio.expression.startFrom": "Bắt đầu từ:",
-  "shell.studio.expression.startTab": "Bắt đầu từ",
   "shell.studio.expression.op.equal": "Bằng",
   "shell.studio.expression.op.not-equal": "Khác",
   "shell.studio.expression.op.less": "Nhỏ hơn",

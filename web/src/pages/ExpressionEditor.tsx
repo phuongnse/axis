@@ -24,8 +24,6 @@ import { completeAt, insertAt } from './expressionCompletion'
 import { expressionLanguage } from './expressionLanguage'
 import { readExpression } from './expressionReading'
 import { ExpressionReadingLine } from './ExpressionReadingLine'
-import { readingInline } from './readingInline'
-import { expressionStarts, type ExpressionStart } from './expressionStarts'
 import { ExpressionPanel } from './ExpressionPanel'
 import type { ScopeOption } from './expressionScope'
 
@@ -87,8 +85,6 @@ export default function ExpressionEditor({
   const [themeCompartment] = useState(() => new Compartment())
   const [result, setResult] = useState<Result>({ type: null, error: null })
   const [checking, setChecking] = useState(true)
-  // Proposed (#3265): whether the focus is in the box or its starting points, as an empty box offers them only then.
-  const [focused, setFocused] = useState(false)
   // The text before the cursor, which says whether the cursor is inside a call.
   const [before, setBefore] = useState('')
   const placeKey = JSON.stringify([application, resourceId, path])
@@ -247,7 +243,7 @@ export default function ExpressionEditor({
 
   const call = scope ? callAt(before, scope.functions) : null
   // Proposed (#3265): the expression read back in words, under the box, while it has no error.
-  // The reading and the starts are worked out again only when what they read changes, not on every draw of the page.
+  // The reading is worked out again only when what it reads changes, not on every draw of the page.
   const optionsKey = options.map((option) => `${option.type}:${option.label}:${option.valueType}`).join(',')
   const sources = useMemo(
     () => ({ options, names, locale, t }),
@@ -258,50 +254,9 @@ export default function ExpressionEditor({
     () => (result.error === null ? readExpression(value, sources) : null),
     [result.error, value, sources],
   )
-  // Proposed (#3265): an empty box offers starting points by the type the place needs.
-  // A computed field reads no computed field, itself included, see docs/reference/expressions.md#names-and-references.
-  const computed = /^\/fields\/\d+\/expression$/.test(path)
-    ? new Set(
-        (Array.isArray(draft.fields) ? (draft.fields as Record<string, unknown>[]) : [])
-          .filter((field) => typeof field.expression === 'string')
-          .map((field) => field.name),
-      )
-    : new Set<unknown>()
-  const starts = useMemo(
-    () =>
-      expressionStarts(
-        scope?.type,
-        sources.options.filter((option) => !computed.has(option.label)),
-      ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `computed` follows the draft; the place and its scope decide.
-    [scope?.type, sources, path],
-  )
-
-  /** Puts a starting point at the cursor of `view`, selects its first value to change, and gives the box the focus. */
-  const begin = (view: EditorView | null, start: ExpressionStart) => {
-    if (!view) {
-      return
-    }
-    const { from, to } = view.state.selection.main
-    view.dispatch({
-      changes: { from, to, insert: start.text },
-      selection: start.select
-        ? { anchor: from + start.select.from, head: from + start.select.to }
-        : { anchor: from + start.text.length },
-    })
-    view.focus()
-  }
 
   return (
-    <div
-      aria-busy={checking}
-      onFocus={() => setFocused(true)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) {
-          setFocused(false)
-        }
-      }}
-    >
+    <div aria-busy={checking}>
       {/* Proposed (#3265): Expand sits inside the box, at its end, and the box keeps room for it. */}
       <div style={{ position: 'relative' }}>
         <div ref={hostRef} />
@@ -349,25 +304,6 @@ export default function ExpressionEditor({
               <Typography.Text data-testid="studio-expression-type">{line}</Typography.Text>
             </div>
           )}
-          {!inDialog && focused && value === '' && starts.length > 0 && (
-            <Flex vertical align="flex-start" data-testid="studio-expression-starts">
-              <Typography.Text type="secondary">{t('shell.studio.expression.startFrom')}</Typography.Text>
-              {starts.map((start) => {
-                const words = readExpression(start.text, sources)
-                return (
-                  <AxisButton
-                    key={start.text}
-                    role="link"
-                    title={start.text}
-                    style={{ height: 'auto', whiteSpace: 'normal', textAlign: 'start' }}
-                    onClick={() => begin(viewRef.current, start)}
-                  >
-                    <span>{words ? readingInline(words, locale) : start.text}</span>
-                  </AxisButton>
-                )
-              })}
-            </Flex>
-          )}
         </>
       )}
       {expanded && (
@@ -395,9 +331,6 @@ export default function ExpressionEditor({
               onChange={onChange}
             />
             <ExpressionPanel
-              starts={starts}
-              sources={sources}
-              onStart={(start) => begin(dialogView.current, start)}
               scope={scope}
               rules={options.filter((option) => option.type === 'rule')}
               names={names}

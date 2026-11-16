@@ -830,8 +830,6 @@
   "shell.studio.expression.functions": "Functions",
   "shell.studio.expression.search": "Search fields, operators and functions",
   "shell.studio.expression.noMatch": "Nothing matches",
-  "shell.studio.expression.startFrom": "Start from:",
-  "shell.studio.expression.startTab": "Start from",
   "shell.studio.expression.op.equal": "Is equal to",
   "shell.studio.expression.op.not-equal": "Is not equal to",
   "shell.studio.expression.op.less": "Is less than",
