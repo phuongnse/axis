@@ -1,6 +1,7 @@
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Presentation.Texts;
+using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Studio;
 
@@ -28,21 +29,21 @@ internal static class StudioKindListEndpoints
     private static readonly string[] _statuses = ["new", "changed", "published"];
 
     // A time filters by its day in UTC, as a date column does, and sorts by its instant. A name sorts ignoring letter case.
-    private static readonly IReadOnlyList<StudioListColumn<StudioKindListItem>> _columns =
+    private static readonly IReadOnlyList<ListColumn<StudioKindListItem>> _columns =
     [
-        new("name", StudioListKind.Text, row => row.Title, Searchable: true, Order: row => row.Title.ToUpperInvariant()),
-        new("description", StudioListKind.Text, row => row.Description, Searchable: true),
-        new("module", StudioListKind.Text, row => row.ModuleLabel, Searchable: true),
+        new("name", ListColumnKind.Text, row => row.Title, Searchable: true, Order: row => row.Title.ToUpperInvariant()),
+        new("description", ListColumnKind.Text, row => row.Description, Searchable: true),
+        new("module", ListColumnKind.Text, row => row.ModuleLabel, Searchable: true),
         new(
             "status",
-            StudioListKind.Enum,
+            ListColumnKind.Enum,
             row => row.Status,
             Values: _statuses,
             Order: row => row.Status is null ? null : Array.IndexOf(_statuses, row.Status)),
-        new("modifiedBy", StudioListKind.Text, row => row.ModifiedBy),
+        new("modifiedBy", ListColumnKind.Text, row => row.ModifiedBy),
         new(
             "modifiedAt",
-            StudioListKind.Date,
+            ListColumnKind.Date,
             row => row.ModifiedAt is { } time ? DateOnly.FromDateTime(time.UtcDateTime) : null,
             Order: row => row.ModifiedAt),
     ];
@@ -64,7 +65,7 @@ internal static class StudioKindListEndpoints
         }
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        var query = StudioListQuery<StudioKindListItem>.Read(httpContext.Request, _columns, errors);
+        var query = ListQuery<StudioKindListItem>.Read(httpContext.Request, _columns, errors);
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
