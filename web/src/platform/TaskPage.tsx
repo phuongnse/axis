@@ -2,7 +2,7 @@ import { Flex, Form, Tag } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisActionRow, AxisButton, AxisButtonGroup } from './AxisButton'
 import { PageActions, PageHeading } from './PageLayout'
-import { PartRule } from './SectionParts'
+import { PartRule, ThingHeading } from './SectionParts'
 import { TermList, type Term } from './TermList'
 import { RecordNotFound } from './RecordNotFound'
 import { SaveBar } from './SaveBar'
@@ -266,6 +266,11 @@ function TaskBody({
             onCommand={onCommand}
             onReassign={onReassign}
           />
+          {/* Proposed: the record the task is about is named above its form, by its name and its kind, so the person
+              sees that what follows is that record, see the review on #3650. */}
+          {task.subject.label !== null && task.form.entity.labelKey && (
+            <ThingHeading name={task.subject.label} kind={t(task.form.entity.labelKey)} />
+          )}
           <OpenTaskForm
             task={task}
             tasksPath={tasksPath}

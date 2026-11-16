@@ -59,3 +59,20 @@ export function SectionPart({
     </section>
   )
 }
+
+/**
+ * Proposed, see the review on #3650: names a thing that a page shows inside it, such as the record a task is about, in
+ * the shape a page that shows one thing has: its name as a level-2 heading, and its kind alone as the line under it, in
+ * `textMuted`. The parts that follow belong to it.
+ */
+export function ThingHeading({ name, kind }: { name: string; kind: string }) {
+  const { colour } = useDesignTokens()
+  return (
+    <Flex vertical>
+      <Typography.Title level={2} style={{ margin: 0, fontSize: 16, lineHeight: '24px' }}>
+        {name}
+      </Typography.Title>
+      <span style={{ color: colour.textMuted }}>{kind}</span>
+    </Flex>
+  )
+}
