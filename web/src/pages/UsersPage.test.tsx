@@ -23,6 +23,8 @@ const platform: Platform = {
 }
 
 const users: UserList = {
+  page: 1,
+  pageSize: 20,
   totalCount: 45,
   items: [
     {
@@ -104,8 +106,19 @@ function stubInvitations(status = 201) {
     if (input === '/api/me') {
       return json(administrator)
     }
-    return input.startsWith('/api/users?') ? json(users) : json(roles)
+    return isList(input) ? json(users) : json(roles)
   })
+}
+
+/** Whether the address is the list route, with or without a query. Another route under /api/users has a path after it. */
+function isList(input: string) {
+  return /^\/api\/users(\?|$)/.test(input)
+}
+
+/** Opens the "…" menu of a row and chooses the command. A row's commands are entries of that menu, not buttons. */
+async function chooseCommand(row: HTMLElement, name: string) {
+  await userEvent.click(within(row).getByRole('button', { name: 'Actions' }))
+  await userEvent.click(await screen.findByRole('menuitem', { name }))
 }
 
 function posts(fetchMock: ReturnType<typeof stubServer>) {
@@ -278,26 +291,24 @@ describe('UsersPage', () => {
     const fetchMock = stubServer(() => json(users))
     renderPage()
     await screen.findByText('Ann Invited')
-    expect(requested(fetchMock).filter((input) => input.startsWith('/api/users'))).toEqual([
-      '/api/users?page=1&pageSize=20',
-    ])
+    expect(requested(fetchMock).filter(isList)).toEqual(['/api/users'])
 
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'ann{Enter}')
-    await vi.waitFor(() => expect(requested(fetchMock)).toContain('/api/users?search=ann&page=1&pageSize=20'))
+    await vi.waitFor(() => expect(requested(fetchMock)).toContain('/api/users?search=ann'))
 
     await userEvent.click(await screen.findByTitle('2'))
-    await vi.waitFor(() => expect(requested(fetchMock)).toContain('/api/users?search=ann&page=2&pageSize=20'))
+    await vi.waitFor(() => expect(requested(fetchMock)).toContain('/api/users?search=ann&page=2'))
   })
 
   it('keeps a search typed in the Search box in the address and asks the server for it', async () => {
-    const ann: UserList = { totalCount: 1, items: [users.items[0]] }
+    const ann: UserList = { page: 1, pageSize: 20, totalCount: 1, items: [users.items[0]] }
     const fetchMock = stubServer((input) => (input.includes('search=ann') ? json(ann) : json(users)))
     renderPage()
     await screen.findByText('Bob Active')
 
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'ann{Enter}')
 
-    await vi.waitFor(() => expect(requested(fetchMock)).toContain('/api/users?search=ann&page=1&pageSize=20'))
+    await vi.waitFor(() => expect(requested(fetchMock)).toContain('/api/users?search=ann'))
     expect(screen.getByTestId('location')).toHaveTextContent('search=ann')
     expect(await screen.findByText('Ann Invited')).toBeVisible()
     expect(screen.queryByText('Bob Active')).toBeNull()
@@ -308,10 +319,34 @@ describe('UsersPage', () => {
     renderPage('/users?search=ann&page=2')
 
     expect(await screen.findByText('Ann Invited')).toBeVisible()
-    expect(requested(fetchMock).find((input) => input.startsWith('/api/users'))).toBe(
-      '/api/users?search=ann&page=2&pageSize=20',
-    )
+    expect(requested(fetchMock).find(isList)).toBe('/api/users?search=ann&page=2')
     expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('ann')
+  })
+
+  it('keeps the search, filter, sort and page size in the address and the request', async () => {
+    const filter = JSON.stringify({ all: [{ field: 'status', op: 'eq', value: 'invited' }] })
+    const fetchMock = stubServer(() => json(users))
+    renderPage(`/users?${new URLSearchParams({ search: 'ann', filter, sort: '-lastSignedInAt' })}`)
+
+    expect(await screen.findByText('Ann Invited')).toBeVisible()
+    const first = new URLSearchParams(requested(fetchMock).find(isList)!.split('?')[1])
+    expect(first.get('search')).toBe('ann')
+    expect(first.get('filter')).toBe(filter)
+    expect(first.get('sort')).toBe('-lastSignedInAt')
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('ann')
+    expect(await screen.findByText('1–20 of 45')).toBeVisible()
+
+    await userEvent.click(screen.getByRole('combobox'))
+    await userEvent.click(await screen.findByTitle('50 / page'))
+
+    await vi.waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('pageSize=50'))
+    await vi.waitFor(() =>
+      expect(
+        requested(fetchMock)
+          .filter(isList)
+          .some((input) => input.includes('pageSize=50')),
+      ).toBe(true),
+    )
   })
 
   it('says the page is for administrators on a 403', async () => {
@@ -338,7 +373,7 @@ describe('UsersPage', () => {
   })
 
   it('links the name to the page of the person and offers no Edit button', async () => {
-    stubServer((input) => (input.startsWith('/api/users?') ? json(users) : json(roles)))
+    stubServer((input) => (isList(input) ? json(users) : json(roles)))
     renderPage()
 
     const link = await screen.findByRole('link', { name: 'Ann Invited' })
@@ -376,9 +411,7 @@ describe('UsersPage', () => {
       displayName: 'New Person',
       roles: [{ applicationId, role: 'approver' }, { role: 'operator' }],
     })
-    await vi.waitFor(() =>
-      expect(requested(fetchMock).filter((input) => input.startsWith('/api/users?'))).toHaveLength(2),
-    )
+    await vi.waitFor(() => expect(requested(fetchMock).filter(isList)).toHaveLength(2))
   })
 
   it('invites without roles when the roles cannot be loaded', async () => {
@@ -387,7 +420,7 @@ describe('UsersPage', () => {
       if (init?.method === 'POST') {
         return json({ id: 'u9' }, 201)
       }
-      return input.startsWith('/api/users?') ? json(users) : new Response(null, { status: 500 })
+      return isList(input) ? json(users) : new Response(null, { status: 500 })
     })
     const form = await fillInvitation()
     expect(await within(form).findByTestId('users-invite-roles-failed')).toHaveTextContent(
@@ -461,21 +494,16 @@ describe('UsersPage', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Invite' }))
 
     expect(await screen.findByTestId('users-invite-problem')).toHaveTextContent('The invitation could not be sent.')
-    await vi.waitFor(() =>
-      expect(requested(fetchMock).filter((input) => input.startsWith('/api/users?'))).toHaveLength(2),
-    )
+    await vi.waitFor(() => expect(requested(fetchMock).filter(isList)).toHaveLength(2))
   })
 
   it('offers Resend invitation on an invited account only and sends it after a confirmation', async () => {
     const fetchMock = stubInvitations()
     renderPage()
     const row = (await screen.findByText('Ann Invited')).closest('tr')!
-    expect(screen.getAllByRole('button', { name: 'Resend invitation' })).toHaveLength(1)
-    const other = within(screen.getByText('Bob Active').closest('tr')!)
-    expect(other.queryByRole('button', { name: 'Resend invitation' })).toBeNull()
-    expect(other.queryByRole('button', { name: 'Reset authenticator' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Resend invitation' })).toBeNull()
 
-    await userEvent.click(within(row).getByRole('button', { name: 'Resend invitation' }))
+    await chooseCommand(row, 'Resend invitation')
     const dialog = await confirmation('Resend the invitation?')
     expect(dialog).toHaveTextContent('Person: Ann Invited')
     expect(dialog).toHaveTextContent('Email: ann@axis.local')
@@ -486,9 +514,7 @@ describe('UsersPage', () => {
     const [post] = posts(fetchMock)
     expect(post[0]).toBe('/api/users/u1/resend-invitation')
     expect(post[1]!.body).toBeUndefined()
-    await vi.waitFor(() =>
-      expect(requested(fetchMock).filter((input) => input.startsWith('/api/users?'))).toHaveLength(2),
-    )
+    await vi.waitFor(() => expect(requested(fetchMock).filter(isList)).toHaveLength(2))
     expect(requested(fetchMock)).not.toContain('/api/users/u1/roles')
     expect(screen.queryByTestId('user-roles')).toBeNull()
   })
@@ -501,7 +527,7 @@ describe('UsersPage', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     stubInvitations(status)
     renderPage()
-    await userEvent.click(await screen.findByRole('button', { name: 'Resend invitation' }))
+    await chooseCommand((await screen.findByText('Ann Invited')).closest('tr')!, 'Resend invitation')
     const dialog = await confirmation('Resend the invitation?')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Resend' }))
 
@@ -513,14 +539,20 @@ describe('UsersPage', () => {
     stubInvitations()
     renderPage()
     await screen.findByText('Ann Invited')
-    const names = (person: string) =>
-      within(screen.getByText(person).closest('tr')!)
-        .getAllByRole('button')
-        .map((button) => button.textContent)
+    const names = async (person: string) => {
+      await userEvent.click(within(screen.getByText(person).closest('tr')!).getByRole('button', { name: 'Actions' }))
+      // A menu that was closed stays in the page, so the newest one is the open one.
+      const menu = (await screen.findAllByRole('menu', { name: 'Actions' })).at(-1)!
+      const entries = within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent)
+      await userEvent.keyboard('{Escape}')
+      return entries
+    }
 
-    expect(names('Ann Invited')).toEqual(['Resend invitation', 'Disable', 'Reset authenticator'])
-    expect(names('Bob Active')).toEqual(['Disable'])
-    expect(names('Cid Disabled')).toEqual(['Enable', 'Reset authenticator'])
+    expect(await names('Ann Invited')).toEqual(['Resend invitation', 'Disable', 'Reset authenticator'])
+    expect(await names('Cid Disabled')).toEqual(['Enable', 'Reset authenticator'])
+    expect(await names('Bob Active')).toEqual(['Disable'])
   })
 
   it.each([
@@ -541,7 +573,7 @@ describe('UsersPage', () => {
       renderPage()
       const row = (await screen.findByText(person)).closest('tr')!
 
-      await userEvent.click(within(row).getByRole('button', { name: button }))
+      await chooseCommand(row, button)
       const dialog = await confirmation(title)
       expect(within(dialog).getByTestId('users-command-confirm')).toHaveTextContent(`Person: ${person}`)
       expect(dialog).toHaveTextContent(`Email: ${users.items.find((user) => user.id === id)!.email}`)
@@ -554,9 +586,7 @@ describe('UsersPage', () => {
       const [post] = posts(fetchMock)
       expect(post[0]).toBe(`/api/users/${id}/${route}`)
       expect(post[1]!.body).toBeUndefined()
-      await vi.waitFor(() =>
-        expect(requested(fetchMock).filter((input) => input.startsWith('/api/users?'))).toHaveLength(2),
-      )
+      await vi.waitFor(() => expect(requested(fetchMock).filter(isList)).toHaveLength(2))
     },
   )
 
@@ -569,23 +599,21 @@ describe('UsersPage', () => {
     const fetchMock = stubInvitations(status)
     renderPage()
     const row = (await screen.findByText('Bob Active')).closest('tr')!
-    await userEvent.click(within(row).getByRole('button', { name: 'Disable' }))
+    await chooseCommand(row, 'Disable')
     const dialog = await confirmation('Disable this person?')
     expect(dialog).toHaveTextContent('Their sessions end and they cannot sign in until they are enabled.')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Disable' }))
 
     expect(await screen.findByTestId('users-command-problem')).toHaveTextContent(text)
     expect(screen.queryByTestId('users-done')).toBeNull()
-    await vi.waitFor(() =>
-      expect(requested(fetchMock).filter((input) => input.startsWith('/api/users?'))).toHaveLength(2),
-    )
+    await vi.waitFor(() => expect(requested(fetchMock).filter(isList)).toHaveLength(2))
   })
 
   it('shows the generic text when an enable or a reset is refused', async () => {
     stubInvitations(403)
     renderPage()
     const row = (await screen.findByText('Cid Disabled')).closest('tr')!
-    await userEvent.click(within(row).getByRole('button', { name: 'Reset authenticator' }))
+    await chooseCommand(row, 'Reset authenticator')
     const dialog = await confirmation('Reset the authenticator?')
     expect(dialog).toHaveTextContent(
       'Their sessions end, and their next sign-in asks them to add an authenticator again.',
@@ -609,6 +637,7 @@ describe('UsersPage', () => {
     )
 
     const row = (await screen.findByText('Bob Active')).closest('tr')!
-    expect(within(row).getByRole('button', { name: 'Khóa' })).toBeVisible()
+    await userEvent.click(within(row).getByRole('button', { name: 'Thao tác' }))
+    expect(await screen.findByRole('menuitem', { name: 'Khóa' })).toBeVisible()
   })
 })

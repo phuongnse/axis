@@ -15,25 +15,18 @@ export interface UserListItem {
 /** One page of the tenant's users. */
 export interface UserList {
   items: UserListItem[]
-  /** How many users match the search, over all pages. */
+  page: number
+  pageSize: number
+  /** How many users match the search and the filter, over all pages. */
   totalCount: number
 }
 
 /** The answer of the list route: the page, or the refusal that the page shows. */
 export type UserListResult = { kind: 'ok'; list: UserList } | { kind: 'forbidden' } | { kind: 'notFound' }
 
-/** Loads one page of the tenant's users. A 401 shows the sign-in prompt. */
-export async function fetchUsers(
-  query: { search: string; page: number; pageSize: number },
-  signal?: AbortSignal,
-): Promise<UserListResult> {
-  const parameters = new URLSearchParams()
-  if (query.search) {
-    parameters.set('search', query.search)
-  }
-  parameters.set('page', String(query.page))
-  parameters.set('pageSize', String(query.pageSize))
-  const response = await apiFetch(`/api/users?${parameters}`, { signal })
+/** Loads one page of the tenant's users. `query` is the record API's paging, sort, search and filter query string. A 401 shows the sign-in prompt. */
+export async function fetchUsers(query: string, signal?: AbortSignal): Promise<UserListResult> {
+  const response = await apiFetch(`/api/users${query ? `?${query}` : ''}`, { signal })
   if (response.status === 403) {
     return { kind: 'forbidden' }
   }

@@ -69,11 +69,18 @@ Four routes read users, their roles and the tenant's usage. When the identity pr
 | `GET /api/me/authenticators` | Reads the signed-in user's authenticators, see [the authenticators route](#read-routes) |
 | `GET /api/tenant/usage`      | Reads the tenant's quotas and usage, see [the usage route](#read-routes)                |
 
-- **The list route.** `GET /api/users?search=&page=&pageSize=` answers `{ items, totalCount }` for the tenant's realm
-  to an administrator. `page` starts at 1 and defaults to 1. `pageSize` is 1 to 50 and defaults to 50, and a value
-  outside these answers `400`. A service account is not listed. The route answers `401` with nobody signed in, `403`
-  without `Users:AdministratorRole`, and `404` on a preview tenant and on a tenant that has no users client, such as one
-  that signs in through an outside identity provider. Each item has these fields:
+- **The list route.** `GET /api/users` answers `{ items, page, pageSize, totalCount }` for the tenant's realm to an
+  administrator. It takes `page`, `pageSize`, `sort`, `search` and `filter` in the
+  [record API's format](record-api.md#paging-and-sorting), so `pageSize` is 1 to 100 and defaults to 20. The
+  fields that `sort` and `filter` name are `displayName`, `email` and `provider` as text, `status` as an enum of
+  `invited`, `active` and `disabled`, and `lastSignedInAt` as a date. A time filters by its UTC day and sorts by
+  its instant. A search looks in `displayName` and `email`. A sort or filter on another field, and an invalid
+  `page`, `pageSize` or `search`, is a `400` that names the parameter. Without `sort` the items are ordered by
+  display name. The route reads every realm user on each request and pages them in the server, because the status
+  and the last sign-in come from `axis.user_profiles`. A service account is not listed. The route checks in order
+  and answers `401` with nobody signed in, `403` without `Users:AdministratorRole`, `404` on a preview tenant and
+  on a tenant that has no users client, such as one that signs in through an outside identity provider, and then
+  `400` for the parameters. Each item has these fields:
 
   | Field            | Value                                                                                                                       |
   | ---------------- | --------------------------------------------------------------------------------------------------------------------------- |

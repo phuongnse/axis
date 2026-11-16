@@ -123,7 +123,8 @@ test('the administrator disables an account on the users page, its next sign-in 
       await expect(row).toHaveCount(1)
       return row
     }
-    await (await findMember()).getByRole('button', { name: 'Disable', exact: true }).click()
+    await (await findMember()).getByRole('button', { name: 'Actions', exact: true }).click()
+    await adminPage.getByRole('menuitem', { name: 'Disable', exact: true }).click()
     const disableDialog = await waitForDialog(adminPage, 'Disable this person?')
     await disableDialog.getByRole('button', { name: 'Disable', exact: true }).click()
     await expect(adminPage.getByTestId('users-done')).toHaveText('The person was disabled.')
@@ -136,7 +137,8 @@ test('the administrator disables an account on the users page, its next sign-in 
     await expect(memberPage.getByRole('alert')).toBeVisible()
     expect(new URL(memberPage.url()).origin).toBe(new URL(process.env.AXIS_E2E_KEYCLOAK_URL ?? '').origin)
 
-    await (await findMember()).getByRole('button', { name: 'Enable', exact: true }).click()
+    await (await findMember()).getByRole('button', { name: 'Actions', exact: true }).click()
+    await adminPage.getByRole('menuitem', { name: 'Enable', exact: true }).click()
     const enableDialog = await waitForDialog(adminPage, 'Enable this person?')
     await enableDialog.getByRole('button', { name: 'Enable', exact: true }).click()
     await expect(adminPage.getByTestId('users-done')).toHaveText('The person was enabled.')
