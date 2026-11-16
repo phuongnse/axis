@@ -310,6 +310,32 @@ describe('CellTenantPage', () => {
     expect(await screen.findByTestId('cell-tenant')).toBeInTheDocument()
   })
 
+  it('shows Details, Host verification, Quotas, Usage and Jobs as parts with no card', async () => {
+    stubRoutes(ok(acme))
+    renderPage('/tenants/acme')
+
+    for (const name of ['Details', 'Host verification', 'Quotas', 'Usage', 'Jobs']) {
+      const region = await screen.findByRole('region', { name })
+      expect(within(region).getByRole('heading', { level: 2, name })).toBeInTheDocument()
+    }
+    expect(screen.getAllByRole('separator')).toHaveLength(4)
+    expect(document.querySelector('.ant-card')).toBeNull()
+  })
+
+  it('shows only the Jobs part, with no rule, when the tenant fails to load', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubRoutes(fail(500))
+    renderPage('/tenants/acme')
+
+    expect(await screen.findByTestId('cell-tenant-error')).toBeInTheDocument()
+    const jobs = await screen.findByTestId('cell-jobs')
+    const regions = screen.getAllByRole('region')
+    expect(regions).toHaveLength(1)
+    expect(regions[0]).toContainElement(jobs)
+    expect(within(regions[0]).getByRole('heading', { level: 2, name: 'Jobs' })).toBeInTheDocument()
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument()
+  })
+
   it('offers Suspend and no Resume for an active tenant, and neither for a provisioning one', async () => {
     stubRoutes(ok(acme))
     renderPage('/tenants/acme')

@@ -363,6 +363,7 @@
   "shell.cell.tenants.status.deleting": "Deleting",
   "shell.cell.tenant.loadFailed": "The tenant could not be loaded.",
   "shell.cell.tenant.status": "Status",
+  "shell.cell.tenant.details": "Details",
   "shell.cell.tenant.application": "Application",
   "shell.cell.tenant.hosts": "Hosts",
   "shell.cell.tenant.quotas": "Quotas",

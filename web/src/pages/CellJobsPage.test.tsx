@@ -120,6 +120,16 @@ describe('CellJobsPage', () => {
     expect(within(rows[2]).queryByTestId('cell-job-step-error')).not.toBeInTheDocument()
   })
 
+  it('shows the table right under the page heading, with no card', async () => {
+    stubJobs(200, [failed])
+    renderPage()
+
+    const heading = screen.getByRole('heading', { level: 1, name: 'Jobs' })
+    const table = await screen.findByTestId('cell-jobs')
+    expect(heading.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(document.querySelector('.ant-card')).toBeNull()
+  })
+
   it('says that no step has run yet for a job with no steps', async () => {
     stubJobs(200, [{ ...succeeded, state: 'queued', steps: [] }, failed])
     renderPage()
