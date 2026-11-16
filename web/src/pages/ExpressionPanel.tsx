@@ -12,7 +12,7 @@ import type { EntryKind, PanelEntry } from './expressionPanelEntries'
 import { rankEntries, signatureOf } from './expressionPanelEntries'
 import type { ScopeOption } from './expressionScope'
 import { readExpression, type ReadingSources } from './expressionReading'
-import { readingInline } from './ExpressionReadingLine'
+import { readingInline } from './readingInline'
 import type { ExpressionStart } from './expressionStarts'
 
 const kinds: readonly EntryKind[] = ['field', 'operator', 'function']

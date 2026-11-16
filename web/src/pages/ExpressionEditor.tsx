@@ -5,7 +5,7 @@ import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { ExpandAltOutlined } from '@ant-design/icons'
 import { Flex, Modal, Typography } from 'antd'
-import { Fragment, useContext, useEffect, useRef, useState } from 'react'
+import { Fragment, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import {
   checkStudioExpression,
@@ -23,7 +23,8 @@ import { callAt } from './expressionCall'
 import { completeAt, insertAt } from './expressionCompletion'
 import { expressionLanguage } from './expressionLanguage'
 import { readExpression } from './expressionReading'
-import { ExpressionReadingLine, readingInline } from './ExpressionReadingLine'
+import { ExpressionReadingLine } from './ExpressionReadingLine'
+import { readingInline } from './readingInline'
 import { expressionStarts, type ExpressionStart } from './expressionStarts'
 import { ExpressionPanel } from './ExpressionPanel'
 import type { ScopeOption } from './expressionScope'
@@ -246,9 +247,18 @@ export default function ExpressionEditor({
 
   const call = scope ? callAt(before, scope.functions) : null
   // Proposed (#3265): the expression read back in words, under the box, while it has no error.
-  const reading = result.error === null ? readExpression(value, { options, names, locale, t }) : null
+  // The reading and the starts are worked out again only when what they read changes, not on every draw of the page.
+  const optionsKey = options.map((option) => `${option.type}:${option.label}:${option.valueType}`).join(',')
+  const sources = useMemo(
+    () => ({ options, names, locale, t }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `options` is new on every draw; its key says when it changed.
+    [optionsKey, names, locale, t],
+  )
+  const reading = useMemo(
+    () => (result.error === null ? readExpression(value, sources) : null),
+    [result.error, value, sources],
+  )
   // Proposed (#3265): an empty box offers starting points by the type the place needs.
-  const sources = { options, names, locale, t }
   // A computed field reads no computed field, itself included, see docs/reference/expressions.md#names-and-references.
   const computed = /^\/fields\/\d+\/expression$/.test(path)
     ? new Set(
@@ -257,9 +267,14 @@ export default function ExpressionEditor({
           .map((field) => field.name),
       )
     : new Set<unknown>()
-  const starts = expressionStarts(
-    scope?.type,
-    options.filter((option) => !computed.has(option.label)),
+  const starts = useMemo(
+    () =>
+      expressionStarts(
+        scope?.type,
+        sources.options.filter((option) => !computed.has(option.label)),
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `computed` follows the draft; the place and its scope decide.
+    [scope?.type, sources, path],
   )
 
   /** Puts a starting point at the cursor of `view`, selects its first value to change, and gives the box the focus. */

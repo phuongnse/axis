@@ -36,7 +36,10 @@ type Node =
 
 class Parser {
   private index = 0
-  constructor(private readonly tokens: ExpressionToken[]) {}
+  private readonly tokens: ExpressionToken[]
+  constructor(tokens: ExpressionToken[]) {
+    this.tokens = tokens
+  }
 
   parse(): Node {
     const node = this.or()
@@ -250,7 +253,10 @@ export function readExpression(text: string, sources: ReadingSources): Reading |
 }
 
 class Reader {
-  constructor(private readonly sources: ReadingSources) {}
+  private readonly sources: ReadingSources
+  constructor(sources: ReadingSources) {
+    this.sources = sources
+  }
 
   reading(node: Node): Reading {
     const bare = node.t === 'group' ? node.item : node
@@ -405,7 +411,9 @@ class Reader {
     const { locale, t } = this.sources
     switch (node.kind) {
       case 'number':
-        return new Intl.NumberFormat(locale, { maximumFractionDigits: 20 }).format(Number(node.text))
+        return formatter(`number:${locale}`, () => new Intl.NumberFormat(locale, { maximumFractionDigits: 20 })).format(
+          Number(node.text),
+        )
       case 'true':
         return t('shell.studio.expression.reads.yes')
       case 'false':
@@ -455,7 +463,8 @@ class Reader {
 
   private list(items: ReadingPart[][], type: 'conjunction' | 'disjunction' = 'disjunction'): ReadingPart[] {
     const marks = items.map((_, index) => `\u0000${index}\u0000`)
-    const joined = new Intl.ListFormat(this.sources.locale, { type }).format(marks)
+    const locale = this.sources.locale
+    const joined = formatter(`list:${type}:${locale}`, () => new Intl.ListFormat(locale, { type })).format(marks)
     return splitMarks(joined, (index) => items[Number(index)])
   }
 
@@ -477,4 +486,16 @@ function splitMarks(text: string, part: (mark: string) => ReadingPart[]): Readin
 
 function labelOf(sources: ReadingSources, option: ScopeOption): string | undefined {
   return sources.names ? labelText(sources.names, option.labelKey, sources.locale) : undefined
+}
+
+const formatters = new Map<string, unknown>()
+
+/** One formatter for each kind and language, made once, as making one costs far more than using it. */
+export function formatter<T>(key: string, make: () => T): T {
+  let made = formatters.get(key) as T | undefined
+  if (made === undefined) {
+    made = make()
+    formatters.set(key, made)
+  }
+  return made
 }
