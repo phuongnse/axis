@@ -1,6 +1,7 @@
 import { Flex, Progress, Tag, Typography } from 'antd'
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { TenantUsageDayTable } from '../platform/TenantUsageDayTable'
+import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { fetchTenantUsage, formatBytes, type TenantQuotaUse, type TenantUsage } from '../platform/tenantUsage'
@@ -14,7 +15,6 @@ export function TenantUsageSection() {
   const t = useText()
   const { locale } = usePlatform().current
   const { colour } = useDesignTokens()
-  const headingId = useId()
   const [usage, setUsage] = useState<TenantUsage | null>(null)
 
   useEffect(() => {
@@ -80,16 +80,13 @@ export function TenantUsageSection() {
   }
 
   return (
-    <section aria-labelledby={headingId} data-testid="tenant-usage">
+    <SectionPart testName="tenant-usage" heading={{ title: t('shell.users.usage.title') }}>
       <Flex vertical gap="middle">
-        <Typography.Title level={3} id={headingId}>
-          {t('shell.users.usage.title')}
-        </Typography.Title>
         <Flex vertical gap="middle">
           {Object.entries(usage.quotas).map(([key, quota]) => quotaRow(key, quota))}
         </Flex>
         <TenantUsageDayTable days={usage.days} locale={locale} testId="tenant-usage-days" />
       </Flex>
-    </section>
+    </SectionPart>
   )
 }

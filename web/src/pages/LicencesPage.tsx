@@ -1,4 +1,4 @@
-import { Col, Flex, Input, Row, Typography } from 'antd'
+import { Flex, Input, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { fetchAboutVersion } from '../platform/about'
@@ -12,13 +12,14 @@ import {
   type Licences,
 } from '../platform/licences'
 import { PageLayout } from '../platform/PageLayout'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { usePlatform } from './context'
 
 /**
  * The open source licences page, open without signing in. It names Axis's licence and links its text and Axis's source, which
- * points at the commit when the server's version names one. Below, the npm and NuGet packages Axis ships sit in two lists, side
- * by side and stacked at narrow width, that one search box filters by name or licence. Only a signed-in person sees versions.
+ * points at the commit when the server's version names one. Below, the npm and NuGet packages Axis ships sit in two lists, one
+ * above the other, that one search box filters by name or licence. Only a signed-in person sees versions.
  */
 export function LicencesPage() {
   const t = useText()
@@ -77,29 +78,25 @@ export function LicencesPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          <Row gutter={[16, 16]}>
-            <Col xs={24} md={12}>
-              <PackageList
-                title={t('shell.licences.npm')}
-                entries={licences.npm.filter(matches)}
-                testId="licences-npm"
-              />
-            </Col>
-            <Col xs={24} md={12}>
-              <PackageList
-                title={t('shell.licences.nuget')}
-                entries={licences.nuget.filter(matches)}
-                testId="licences-nuget"
-              />
-            </Col>
-          </Row>
+          <SectionParts>
+            <PackageList
+              title={t('shell.licences.npm')}
+              entries={licences.npm.filter(matches)}
+              testName="licences-npm"
+            />
+            <PackageList
+              title={t('shell.licences.nuget')}
+              entries={licences.nuget.filter(matches)}
+              testName="licences-nuget"
+            />
+          </SectionParts>
         </>
       )}
     </PageLayout>
   )
 }
 
-function PackageList({ title, entries, testId }: { title: string; entries: LicencePackage[]; testId: string }) {
+function PackageList({ title, entries, testName }: { title: string; entries: LicencePackage[]; testName: string }) {
   const t = useText()
   const withVersions = entries.some((entry) => entry.version !== undefined)
   const columns: AxisColumn<LicencePackage>[] = [
@@ -124,8 +121,7 @@ function PackageList({ title, entries, testId }: { title: string; entries: Licen
     },
   ]
   return (
-    <div data-testid={testId}>
-      <Typography.Title level={5}>{title}</Typography.Title>
+    <SectionPart testName={testName} heading={{ title }}>
       <AxisTable<LicencePackage>
         rowKey={(entry) => `${entry.name}/${entry.version ?? ''}/${entry.licence}`}
         pagination={false}
@@ -133,6 +129,6 @@ function PackageList({ title, entries, testId }: { title: string; entries: Licen
         emptyText={t('shell.licences.empty')}
         columns={columns}
       />
-    </div>
+    </SectionPart>
   )
 }

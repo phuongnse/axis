@@ -27,6 +27,7 @@
   "shell.account.signOut": "Sign out",
   "shell.account.sessions": "Sessions",
   "shell.account.sessions.title": "Your sessions",
+  "shell.account.sessions.heading": "Active sessions",
   "shell.account.sessions.signedInAt": "Signed in",
   "shell.account.sessions.lastRequestAt": "Last active",
   "shell.account.sessions.current": "This session",

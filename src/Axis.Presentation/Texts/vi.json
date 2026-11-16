@@ -27,6 +27,7 @@
   "shell.account.signOut": "Đăng xuất",
   "shell.account.sessions": "Phiên đăng nhập",
   "shell.account.sessions.title": "Phiên đăng nhập của bạn",
+  "shell.account.sessions.heading": "Phiên đang hoạt động",
   "shell.account.sessions.signedInAt": "Đăng nhập lúc",
   "shell.account.sessions.lastRequestAt": "Hoạt động gần nhất",
   "shell.account.sessions.current": "Phiên này",

@@ -283,4 +283,29 @@ describe('AccountPage', () => {
     expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
     warn.mockRestore()
   })
+
+  it('shows Password, Authenticators and Active sessions as parts with a rule between them', async () => {
+    stubServer(() => json(sessions(true)))
+    renderPage()
+
+    for (const name of ['Password', 'Authenticators', 'Active sessions']) {
+      const region = await screen.findByRole('region', { name })
+      expect(within(region).getByRole('heading', { level: 2, name })).toBeVisible()
+    }
+    expect(screen.getAllByRole('separator')).toHaveLength(2)
+  })
+
+  it('shows only Active sessions, with no rule, to a user who is not an account', async () => {
+    stubServer(
+      () => json(sessions(true)),
+      undefined,
+      () => json({ account: false, authenticators: [] }),
+    )
+    renderPage()
+
+    const region = await screen.findByRole('region', { name: 'Active sessions' })
+    expect(within(region).getByRole('heading', { level: 2 })).toBeVisible()
+    await waitFor(() => expect(screen.getAllByRole('region')).toHaveLength(1))
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument()
+  })
 })

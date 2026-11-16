@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable } from '../platform/AxisTable'
 import { PageLayout } from '../platform/PageLayout'
+import { SectionParts } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { fetchTenantOutsideClients, type TenantOutsideClients } from '../platform/tenantOutsideClients'
 import { useDesignTokens } from '../platform/themeMode'
@@ -175,7 +176,7 @@ export function UsersPage() {
               key: 'people',
               label: t('shell.users.people'),
               children: (
-                <>
+                <SectionParts>
                   <AxisTable<UserListItem>
                     rowKey={(row) => row.id}
                     dataSource={list.items}
@@ -293,7 +294,7 @@ export function UsersPage() {
                   <TenantUsageSection />
                   <TenantModelKeySection />
                   <TenantApplicationPackagesSection />
-                </>
+                </SectionParts>
               ),
             },
             ...(outsideClients

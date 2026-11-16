@@ -48,7 +48,7 @@ test('an administrator of a cell tenant sees the storage quota and its use in th
     await memberPage.waitForURL(`https://${host}/`)
     await memberPage.goto(`https://${host}/users`)
     await expect(memberPage.getByTestId('users-forbidden')).toBeVisible()
-    await expect(memberPage.getByTestId('tenant-usage')).toHaveCount(0)
+    await expect(memberPage.getByRole('region', { name: 'Usage', exact: true })).toHaveCount(0)
     const answer = await memberPage.goto(`https://${host}/api/tenant/usage`)
     expect(answer?.status()).toBe(403)
 
@@ -60,7 +60,7 @@ test('an administrator of a cell tenant sees the storage quota and its use in th
     await adminPage.waitForURL(`https://${host}/`)
     await adminPage.goto(`https://${host}/users`)
 
-    const usage = adminPage.getByTestId('tenant-usage')
+    const usage = adminPage.getByRole('region', { name: 'Usage', exact: true })
     await expect(usage.getByRole('heading', { name: 'Usage', exact: true })).toBeVisible()
     const storage = usage.getByTestId('tenant-usage-quota-storage')
     await expect(storage).toContainText('Storage')

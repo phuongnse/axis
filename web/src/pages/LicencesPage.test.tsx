@@ -133,8 +133,19 @@ describe('LicencesPage', () => {
     await userEvent.clear(screen.getByRole('textbox', { name: 'Search by package name or licence' }))
     await userEvent.type(screen.getByRole('textbox', { name: 'Search by package name or licence' }), 'mit')
 
-    expect(within(screen.getByTestId('licences-npm')).getByText('react')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'npm packages' })).getByText('react')).toBeInTheDocument()
     expect(screen.queryByText('Npgsql')).not.toBeInTheDocument()
+  })
+
+  it('shows the npm and NuGet lists as two parts, one above the other, with a rule between', async () => {
+    stubServer({ licences: unauthorized, about: unauthorized })
+    renderPage()
+    await screen.findByText('react')
+
+    for (const name of ['npm packages', 'NuGet packages']) {
+      expect(within(screen.getByRole('region', { name })).getByRole('heading', { level: 2, name })).toBeVisible()
+    }
+    expect(screen.getAllByRole('separator')).toHaveLength(1)
   })
 
   it('puts the licence link and the source link side by side', async () => {
