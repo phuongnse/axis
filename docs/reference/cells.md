@@ -115,7 +115,7 @@ that it controls the host.
      `https` port of the Service `<release>-server`. An Ingress that exists counts as done, and a
      cell without `cell.certificate.enabled` writes none. A failed write leaves the request
      `pending` and the next round tries again. The chart's Role for the publisher may only `create`
-     Ingresses, so the purge of a tenant leaves its Ingress behind, see
+     and `delete` Ingresses, and the purge of a tenant deletes the Ingress of each of its hosts, see
      [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant).
   5. A host that is not verified is never served: the ingress has no route for it, and the server
      answers `404` for it, as for any unknown host.

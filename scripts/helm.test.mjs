@@ -766,13 +766,15 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(output, /^kind: (ClusterRole|ClusterRoleBinding)$/m)
   })
 
-  test('the publisher may only create ingresses.networking.k8s.io in the release namespace', () => {
+  test('the publisher may only create and delete ingresses.networking.k8s.io in the release namespace', () => {
     const output = renderOk('--namespace', 'axis')
     const role = find(output, 'Role', 'axis-publisher-routes')
     assert.match(role, /namespace: axis\n/)
-    assert.match(role, /rules:\n\s+- apiGroups:\n\s+- networking\.k8s\.io\n\s+resources:\n\s+- ingresses\n\s+verbs:\n\s+- create\n/)
+    assert.match(role, /rules:\n\s+- apiGroups:\n\s+- networking\.k8s\.io\n\s+resources:\n\s+- ingresses\n\s+verbs:\n\s+- create\n\s+- delete\n/)
     assert.equal(role.match(/- apiGroups:/g).length, 1)
     assert.equal(role.match(/verbs:/g).length, 1)
+    // The two verbs are all the Role lists, so get, list, update and * fail.
+    assert.deepEqual(role.match(/verbs:\n((?:\s+- .*\n?)+)/)[1].match(/- (.*)/g), ['- create', '- delete'])
     const binding = find(output, 'RoleBinding', 'axis-publisher-routes')
     assert.match(binding, /namespace: axis\n/)
     assert.match(binding, /roleRef:\n\s+apiGroup: rbac\.authorization\.k8s\.io\n\s+kind: Role\n\s+name: axis-publisher-routes\n/)

@@ -161,7 +161,7 @@ public sealed class ProvisioningPurgeJobTests(KeycloakFixture keycloak, PostgreS
         const string problem = "The setting Studio:ApplicationsPath is required.";
         var kinds = new Dictionary<string, IReadOnlyList<JobStep>>(ProvisioningJobs.Builtin(scenario.Platform))
         {
-            [PurgeJob.Kind] = PurgeJob.Steps(CreateSettings(scenario), JobSetting<string>.Missing(problem), scenario.Platform, AdminScenario.Cipher, http),
+            [PurgeJob.Kind] = PurgeJob.Steps(CreateSettings(scenario), JobSetting<string>.Missing(problem), scenario.Platform, AdminScenario.Cipher, http, null),
         };
         var jobs = new ProvisioningJobs(scenario.Platform, kinds, TimeSpan.FromMinutes(5));
         while (await jobs.RunNextAsync(TextWriter.Null, CancellationToken))
@@ -205,8 +205,8 @@ public sealed class ProvisioningPurgeJobTests(KeycloakFixture keycloak, PostgreS
         using var studio = new TemporaryFolder();
         using var http = new HttpClient(_handler, disposeHandler: false);
 
-        var real = PurgeJob.Steps(CreateSettings(scenario), JobSetting<string>.Of(studio.Path), scenario.Platform, AdminScenario.Cipher, http);
-        var refusing = PurgeJob.Steps(JobSetting<CreateSettings>.Missing("The setting IdentityProvider:Url is required."), JobSetting<string>.Of(studio.Path), scenario.Platform, AdminScenario.Cipher, http);
+        var real = PurgeJob.Steps(CreateSettings(scenario), JobSetting<string>.Of(studio.Path), scenario.Platform, AdminScenario.Cipher, http, null);
+        var refusing = PurgeJob.Steps(JobSetting<CreateSettings>.Missing("The setting IdentityProvider:Url is required."), JobSetting<string>.Of(studio.Path), scenario.Platform, AdminScenario.Cipher, http, null);
 
         Assert.Equal(_stepNames, real.Select(step => step.Name));
         Assert.Equal(_stepNames, refusing.Select(step => step.Name));
@@ -216,7 +216,7 @@ public sealed class ProvisioningPurgeJobTests(KeycloakFixture keycloak, PostgreS
     private Dictionary<string, IReadOnlyList<JobStep>> Kinds(AdminScenario scenario, TemporaryFolder studio, HttpClient http) =>
         new Dictionary<string, IReadOnlyList<JobStep>>(ProvisioningJobs.Builtin(scenario.Platform))
         {
-            [PurgeJob.Kind] = PurgeJob.Steps(CreateSettings(scenario), JobSetting<string>.Of(studio.Path), scenario.Platform, AdminScenario.Cipher, http),
+            [PurgeJob.Kind] = PurgeJob.Steps(CreateSettings(scenario), JobSetting<string>.Of(studio.Path), scenario.Platform, AdminScenario.Cipher, http, null),
         };
 
     private JobSetting<CreateSettings> CreateSettings(AdminScenario scenario) =>
