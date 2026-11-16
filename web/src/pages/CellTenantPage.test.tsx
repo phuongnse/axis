@@ -301,7 +301,9 @@ describe('CellTenantPage', () => {
     stubRoutes(ok(acme), undefined, undefined, { ...noDays, items: [day], totalCount: 1 })
     renderPage('/tenants/acme')
 
-    const rows = within(await screen.findByTestId('cell-tenant-usage')).getAllByRole('row')
+    const table = await screen.findByTestId('cell-tenant-usage')
+    expect(await within(table).findByText('4,321')).toBeVisible()
+    const rows = within(table).getAllByRole('row')
     expect(rows).toHaveLength(2)
     expect(rows[1]).toHaveTextContent('4,321')
   })

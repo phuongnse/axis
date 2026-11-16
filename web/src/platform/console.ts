@@ -198,7 +198,7 @@ export interface ConsoleReleaseItem {
 /** One publish request of an application. It never holds the file snapshot, the diagnostics or the test results. */
 export interface ConsolePublishRequest {
   id: string
-  kind: 'publish' | 'activate' | 'test'
+  kind: 'validate' | 'publish' | 'activate' | 'test' | 'accept'
   target: string
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   label: string | null
@@ -211,7 +211,7 @@ export interface ConsolePublishRequest {
   releaseId: string | null
 }
 
-/** The publishing of one application: its release history and one page of its publish requests, newest first. */
+/** The publishing of one application: its release history and one page of its publish requests. */
 export interface ConsolePublishing {
   active: ConsoleActiveRelease | null
   releases: ConsoleReleaseItem[]
@@ -224,16 +224,18 @@ export interface ConsolePublishing {
 /** The answer of the publishing route: the publishing, or the refusal that the page shows. */
 export type ConsolePublishingResult = { kind: 'ok'; publishing: ConsolePublishing } | { kind: 'forbidden' }
 
-/** Loads the release history and one page of the publish requests of the application with the id `application`. */
+/**
+ * Loads the release history and one page of the publish requests of the application with the id `application`. `query` is the
+ * record API's paging, sort, search and filter query string, which the view keeps under `publishRequests.` in the address.
+ */
 export async function fetchConsolePublishing(
   application: string,
-  page: number,
+  query: string,
   signal?: AbortSignal,
 ): Promise<ConsolePublishingResult> {
-  const response = await apiFetch(
-    `/api/console/applications/${encodeURIComponent(application)}/publishing?page=${page}&pageSize=20`,
-    { signal },
-  )
+  const response = await apiFetch(`/api/console/applications/${encodeURIComponent(application)}/publishing?${query}`, {
+    signal,
+  })
   if (response.status === 403) {
     return { kind: 'forbidden' }
   }
