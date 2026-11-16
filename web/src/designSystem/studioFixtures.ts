@@ -375,6 +375,7 @@ const typicalReleases = {
     },
   ],
   changes: [{ path: 'pages/request-list.json', change: 'changed', kind: null, name: null, titles: null, locale: null }],
+  partChanges: [],
 } satisfies StudioReleases
 
 /** What a state's folder answers for its diagnostics and its releases. */
@@ -433,7 +434,7 @@ const errorAnswers: StateAnswers = {
 
 const unpublishedAnswers: StateAnswers = {
   diagnostics: [],
-  releases: { active: null, folderContentHash: 'n1', items: [], changes: null },
+  releases: { active: null, folderContentHash: 'n1', items: [], changes: null, partChanges: null },
 }
 
 const catalog = {

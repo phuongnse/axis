@@ -4,7 +4,12 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { fetchSites, type SiteListItem } from '../platform/site'
-import type { StudioReleaseChange, StudioReleases, StudioResourceItem } from '../platform/studio'
+import type {
+  StudioReleaseChange,
+  StudioReleasePartChange,
+  StudioReleases,
+  StudioResourceItem,
+} from '../platform/studio'
 import { studioKinds } from '../platform/studioKinds'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
@@ -36,6 +41,7 @@ const live: StudioReleases = {
   active: { releaseId: 'r1', number: 1, contentHash: 'hash-1' },
   folderContentHash: 'hash-1',
   changes: [],
+  partChanges: [],
   items: [],
 }
 
@@ -263,6 +269,68 @@ describe('Changes since the live release', () => {
     const row = within(section('Changes since the live release').getByTestId('studio-change-row'))
     expect(row.getByRole('link', { name: 'Start' })).toHaveAttribute('href', '/studio?app=PurchaseRequests&resource=s1')
     expect(row.getByText(english['shell.studio.overview.change.added'])).toBeInTheDocument()
+  })
+
+  it('lists the modules and packages that differ after the files, modules first, with no line for none differing', () => {
+    const changes: StudioReleaseChange[] = [
+      { path: 'entities/purchase-request.json', change: 'changed', kind: null, name: null, titles: null, locale: null },
+    ]
+    const partChanges: StudioReleasePartChange[] = [
+      {
+        type: 'package',
+        id: 'payment-terms',
+        label: 'Payment terms',
+        change: 'upgraded',
+        version: '1.2.0',
+        previousVersion: '1.1.0',
+      },
+      {
+        type: 'module',
+        id: 'department-budgets',
+        label: 'Department budgets',
+        change: 'added',
+        version: '1.0.0',
+        previousVersion: null,
+      },
+    ]
+    renderOverview({ history: { ...live, changes, partChanges } })
+
+    const rows = [
+      ...screen
+        .getByRole('region', { name: 'Changes since the live release' })
+        .querySelectorAll('[data-testid^="studio-change-"]'),
+    ]
+    expect(rows.map((row) => row.getAttribute('data-testid'))).toEqual([
+      'studio-change-row',
+      'studio-change-part',
+      'studio-change-part',
+    ])
+    expect(rows[1]).toHaveTextContent('Department budgets')
+    expect(rows[1]).toHaveTextContent('Module')
+    expect(rows[1]).toHaveTextContent('Added at 1.0.0')
+    expect(rows[2]).toHaveTextContent('Payment terms')
+    expect(rows[2]).toHaveTextContent('Package')
+    expect(rows[2]).toHaveTextContent('Upgraded from 1.1.0 to 1.2.0')
+    expect(screen.queryByText(english['shell.studio.overview.change.parts.none'])).not.toBeInTheDocument()
+  })
+
+  it('shows a module that differs without saying everything is live, when no file differs', () => {
+    const partChanges: StudioReleasePartChange[] = [
+      {
+        type: 'module',
+        id: 'department-budgets',
+        label: 'Department budgets',
+        change: 'removed',
+        version: null,
+        previousVersion: '1.2.0',
+      },
+    ]
+    renderOverview({ history: { ...live, partChanges } })
+
+    const changesSection = section('Changes since the live release')
+    expect(changesSection.getAllByTestId('studio-change-part')).toHaveLength(1)
+    expect(changesSection.queryByTestId('studio-change-row')).not.toBeInTheDocument()
+    expect(screen.queryByText('Everything is live.')).not.toBeInTheDocument()
   })
 
   it('links to the releases list', () => {

@@ -76,11 +76,7 @@ internal static class StudioReleaseEndpoints
         if (previous is not null)
         {
             changes = StudioReleaseChanges.Compare(Contents(release), Contents(previous));
-            partChanges =
-            [
-                .. PartChanges("module", moduleRows, ModuleParts(previousModules!, null)),
-                .. PartChanges("package", packageRows, PackageParts(packages, previous, null)),
-            ];
+            partChanges = PartChanges(moduleRows, packageRows, previous, packages);
 
             // Only the live release has modules to keep, and a release replaces nothing while it is live itself.
             if (previousIsLive)
@@ -99,6 +95,14 @@ internal static class StudioReleaseEndpoints
         return Results.Ok(new StudioReleaseResponse(
             requested, previousActivation?.Number, previousIsLive, live, changes, partChanges, moduleRows, packageRows, blockers));
     }
+
+    // What the given parts pin that differs from what the stored release pins, modules first and each by id.
+    internal static List<StudioReleasePartChange> PartChanges(
+        IReadOnlyList<StudioReleasePart> modules, IReadOnlyList<StudioReleasePart> packageParts, Release other, PackageCatalog packages) =>
+        [
+            .. PartChanges("module", modules, ModuleParts(ModulesOf(other), null)),
+            .. PartChanges("package", packageParts, PackageParts(packages, other, null)),
+        ];
 
     // What the release pins that differs from what the other release pins, modules and packages each by id.
     private static IEnumerable<StudioReleasePartChange> PartChanges(
@@ -149,6 +153,26 @@ internal static class StudioReleaseEndpoints
                     package.Version,
                     other?.Packages.Find(candidate => candidate.PackageId == package.PackageId)?.Version)),
         ];
+
+    // The modules and packages that the folder's compile picks, each with its label, read even when the compile has errors.
+    // A module's label is the one of the installed module of that version, and a package's is the one of its installed version.
+    internal static (List<StudioReleasePart> Modules, List<StudioReleasePart> Packages) FolderParts(
+        CompilationResult compiled, ModuleCatalog modules, PackageCatalog packages) =>
+        (
+            [
+                .. compiled.ModulePins.Select(pin => new StudioReleasePart(
+                    pin.Id,
+                    modules.Modules.FirstOrDefault(module => module.Manifest.Id == pin.Id && module.Manifest.Version == pin.Version) is { } installed
+                        ? LabelOf(installed)
+                        : pin.Id,
+                    pin.Version,
+                    null)),
+            ],
+            [
+                .. compiled.PackagePins
+                    .OrderBy(pin => pin.Id, StringComparer.Ordinal)
+                    .Select(pin => new StudioReleasePart(pin.Id, PackageLabel(packages, pin.Id, pin.Version), pin.Version, null)),
+            ]);
 
     private static List<InstalledModule> ModulesOf(Release release) =>
         ApplicationCompiler.ReadModuleCopies(

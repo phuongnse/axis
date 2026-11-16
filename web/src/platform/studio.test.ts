@@ -468,14 +468,14 @@ describe('releaseList', () => {
   ]
 
   it('has one row for each release, the highest number first', () => {
-    const rows = releaseList({ active: null, folderContentHash: null, changes: null, items })
+    const rows = releaseList({ active: null, folderContentHash: null, changes: null, partChanges: null, items })
 
     expect(rows.map((row) => row.number)).toEqual([3, 2, 1])
     expect(rows.map((row) => row.live)).toEqual([false, false, false])
   })
 
   it('takes the details of a release from its first activation', () => {
-    const rows = releaseList({ active: null, folderContentHash: null, changes: null, items })
+    const rows = releaseList({ active: null, folderContentHash: null, changes: null, partChanges: null, items })
 
     expect(rows[2]).toMatchObject({
       releaseId: 'r1',
@@ -492,6 +492,7 @@ describe('releaseList', () => {
       active: { releaseId: 'r1', number: 1, contentHash: 'hash-1' },
       folderContentHash: null,
       changes: null,
+      partChanges: null,
       items,
     })
 
@@ -506,6 +507,7 @@ describe('releasePublisher', () => {
       active: null,
       folderContentHash: null,
       changes: null,
+      partChanges: null,
       items: [release('r1', 1, '2026-05-01T10:00:00Z')],
     })[0],
     actor,
@@ -630,6 +632,7 @@ describe('folderDiffers', () => {
     active,
     folderContentHash: 'hash-1',
     changes: null,
+    partChanges: null,
     items: [],
     ...overrides,
   })

@@ -14,8 +14,9 @@ import { PlatformContext } from './context'
  * The change list of Studio: one row for each file that differs, with its name, its kind and what changed. A name opens
  * its resource, except a removed file's, which the folder lacks and shows as plain text. With
  * `plainChanged`, which a release page sets, a changed resource is plain text too, because the folder's version is not
- * the one the release changed. With `parts`, which a release page sets, each module and package that differs follows
- * the files, modules first and each group by label, and an empty `parts` says that none differs.
+ * the one the release changed. With `parts`, which a release page and the Overview set, each module and package that
+ * differs follows the files, modules first and each group by label. Only a release page passes an empty `parts`, which
+ * says that none differs. The Overview passes `parts` only when one differs, as its all-live line covers the other case.
  */
 export function StudioChangeList({
   rows,

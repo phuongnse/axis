@@ -16,6 +16,7 @@ const live: StudioReleases = {
   active: { releaseId: 'r7', number: 7, contentHash: 'hash-7' },
   folderContentHash: 'hash-7',
   changes: null,
+  partChanges: null,
   items: [],
 }
 
@@ -40,6 +41,7 @@ function release3(offStandard: boolean): StudioReleases {
     active: { releaseId: 'r3', number: 3, contentHash: 'hash-3' },
     folderContentHash: 'hash-3',
     changes: null,
+    partChanges: null,
     items: [activation('r3', 3, offStandard)],
   }
 }
@@ -110,7 +112,7 @@ describe('StudioBand', () => {
   })
 
   it('says Not published yet when there is no live release', () => {
-    renderBand({ active: null, folderContentHash: null, changes: null, items: [] })
+    renderBand({ active: null, folderContentHash: null, changes: null, partChanges: null, items: [] })
 
     expect(screen.getByText('Not published yet')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-folder-differs')).not.toBeInTheDocument()
@@ -153,7 +155,7 @@ describe('StudioBand', () => {
   it.each([
     ['Release is live', live, []],
     ['Changes not live', { ...live, folderContentHash: 'other' }, []],
-    ['Not published yet', { active: null, folderContentHash: null, changes: null, items: [] }, []],
+    ['Not published yet', { active: null, folderContentHash: null, changes: null, partChanges: null, items: [] }, []],
     ['Releases did not load', 'failed' as const, []],
     ['off-standard live', release3(true), []],
     ['problems', live, [diagnostic('error', 'AXC1'), diagnostic('warning', 'AXC2')]],

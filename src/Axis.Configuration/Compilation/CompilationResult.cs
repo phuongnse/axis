@@ -24,6 +24,9 @@ public sealed record CompilationResult(ApplicationModel? Model, IReadOnlyList<Di
     /// <summary>The modules the application pins, each with the installed version the compile picked, even when it has errors.</summary>
     public IReadOnlyList<PinnedModuleModel> ModulePins { get; init; } = [];
 
+    /// <summary>The package versions the application and its modules pin, each with the installed version the compile picked, even when it has errors.</summary>
+    public IReadOnlyList<PinnedPackageModel> PackagePins { get; init; } = [];
+
     /// <summary>
     /// The scenarios of the pinned modules, present when no diagnostic is an error. Each is named
     /// <c>&lt;module id&gt;/&lt;name&gt;</c> and its users, assignees and recipients hold the application roles the pins map
