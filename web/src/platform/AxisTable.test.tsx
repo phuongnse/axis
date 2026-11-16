@@ -5,6 +5,7 @@ import { Button } from 'antd'
 import { useState, type HTMLAttributes } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { chooseOption, tabTo } from '../test/antd'
+import { withAntdStyles } from '../test/antdStyles'
 import { dialog, filterTexts } from '../test/tableFilter'
 import { AxisTable, type AxisColumn, type AxisRowAction, type AxisTableProps } from './AxisTable'
 import { designTokensFor } from './designTokens'
@@ -738,6 +739,41 @@ describe('AxisTable', () => {
 
       expect(headerNames()).toEqual(['Name', 'Amount', 'Note'])
       expect(movedLines(container)).toEqual([])
+    })
+  })
+
+  describe('spacing', () => {
+    withAntdStyles()
+
+    it('draws a paged table with no bottom margin on its pager, so the table ends where the pager ends', () => {
+      const manyRows: Row[] = Array.from({ length: 25 }, (_, index) => ({
+        id: String(index),
+        name: `Item ${index}`,
+        amount: index,
+      }))
+      const { container } = renderTable({
+        dataSource: manyRows,
+        pagination: { current: 1, pageSize: 20, total: manyRows.length, pageSizeOptions: [10, 20] },
+      })
+
+      const pager = container.querySelector('.ant-pagination') as HTMLElement
+      expect(pager).not.toBeNull()
+      // Ant Design's pager margin is `var(--ant-margin) 0`, which jsdom does not resolve. Only a bottom margin that the
+      // pager's own style sets reads as 0px, so this is strict.
+      expect(getComputedStyle(pager).marginBottom).toBe('0px')
+    })
+
+    it('gives the padding around the empty text of an empty table, so the table keeps its height', () => {
+      const { spacing } = designTokensFor('light')
+      const { container } = renderTable({ dataSource: [], pagination: false })
+
+      const padder = container.querySelector('.ant-empty')?.parentElement as HTMLElement
+      expect(padder).toBeTruthy()
+      const style = getComputedStyle(padder)
+      expect(style.paddingTop).toBe(`${spacing.xl}px`)
+      expect(style.paddingBottom).toBe(`${spacing.xl}px`)
+      expect(style.paddingLeft).toBe(`${spacing.xs}px`)
+      expect(style.paddingRight).toBe(`${spacing.xs}px`)
     })
   })
 })

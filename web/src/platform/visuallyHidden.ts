@@ -5,7 +5,7 @@ export const visuallyHidden: CSSProperties = {
   position: 'absolute',
   width: 1,
   height: 1,
-  margin: -1,
+  margin: 0,
   padding: 0,
   border: 0,
   overflow: 'hidden',

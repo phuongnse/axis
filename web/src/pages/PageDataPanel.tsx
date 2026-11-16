@@ -61,10 +61,14 @@ function DataList({
   items: { id: string; name: string }[]
   onPick: (binding: DataBinding) => void
 }) {
+  const { spacing } = useDesignTokens()
   return (
     <AxisFieldGroup title={title} help={help}>
       {items.length === 0 ? (
-        <EmptyState text={empty} />
+        // EmptyState keeps no space below, so the line gives it, see docs/reference/shared-widgets.md#the-rule.
+        <div style={{ paddingBottom: spacing.xl }}>
+          <EmptyState text={empty} />
+        </div>
       ) : (
         <Flex gap="small" wrap>
           {items.map((item) => (
