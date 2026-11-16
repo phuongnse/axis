@@ -169,7 +169,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         string? input = null,
         HttpMessageHandler? identityProvider = null,
         IDnsTxtResolver? dnsResolver = null,
-        ICertificateWriter? certificateWriter = null)
+        ICertificateWriter? certificateWriter = null,
+        IRouteWriter? routeWriter = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -206,7 +207,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             identityProvider ?? IdentityProvider,
             stop?.Token ?? CancellationToken,
             dnsResolver,
-            certificateWriter);
+            certificateWriter,
+            routeWriter);
         var text = output.ToString()!;
         _texts.Add(text);
         _texts.Add(error.ToString());

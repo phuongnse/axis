@@ -157,6 +157,16 @@
                 "ingressClassName": { "type": "string" }
               },
               "additionalProperties": false
+            },
+            "route": {
+              "type": "object",
+              "properties": {
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false

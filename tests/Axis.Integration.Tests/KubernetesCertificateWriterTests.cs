@@ -67,7 +67,7 @@ public sealed class KubernetesCertificateWriterTests
     {
         using var handler = new RecordingHandler(HttpStatusCode.Created);
         var tokens = new Queue<string>(["token-1", "token-2"]);
-        var writer = new KubernetesCertificateWriter(new HttpClient(handler), new Uri("https://10.0.0.1:443/"), "axis", tokens.Dequeue, "axis-tenant-hosts");
+        var writer = new KubernetesCertificateWriter(new KubernetesApi(new HttpClient(handler), new Uri("https://10.0.0.1:443/"), "axis", tokens.Dequeue), "axis-tenant-hosts");
 
         await writer.WriteAsync("acme", "a.acme.vn", CancellationToken);
         await writer.WriteAsync("acme", "b.acme.vn", CancellationToken);
@@ -76,12 +76,12 @@ public sealed class KubernetesCertificateWriterTests
     }
 
     [Fact]
-    public void A_folder_without_the_service_account_files_gives_no_writer()
+    public void A_folder_without_the_service_account_files_gives_no_client()
     {
         var folder = Directory.CreateTempSubdirectory("axis-service-account-");
         try
         {
-            Assert.Null(KubernetesCertificateWriter.InCluster("axis-tenant-hosts", folder.FullName));
+            Assert.Null(KubernetesApi.InCluster(folder.FullName));
         }
         finally
         {
@@ -90,7 +90,7 @@ public sealed class KubernetesCertificateWriterTests
     }
 
     private static KubernetesCertificateWriter Writer(HttpMessageHandler handler) =>
-        new(new HttpClient(handler), new Uri("https://10.0.0.1:443/"), "axis", () => "token-1", "axis-tenant-hosts");
+        new(new KubernetesApi(new HttpClient(handler), new Uri("https://10.0.0.1:443/"), "axis", () => "token-1"), "axis-tenant-hosts");
 
     private sealed record Recorded(HttpMethod Method, Uri Uri, string? Authorization, string Body);
 

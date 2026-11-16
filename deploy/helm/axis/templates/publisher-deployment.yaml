@@ -21,7 +21,7 @@ spec:
         app.kubernetes.io/component: publisher
     spec:
       {{- if and .Values.cell.id .Values.cell.certificate.enabled }}
-      {{- /* The token lets the publisher create the Certificate of a verified tenant host, see publisher-rbac.yaml. */}}
+      {{- /* The token lets the publisher create the Certificate and the Ingress of a verified tenant host, see publisher-rbac.yaml. */}}
       serviceAccountName: {{ .Release.Name }}-publisher
       automountServiceAccountToken: true
       {{- else }}
@@ -57,6 +57,14 @@ spec:
             {{- if .Values.cell.certificate.enabled }}
             - name: Cell__HostCertificateIssuer
               value: {{ printf "%s-tenant-hosts" .Release.Name | quote }}
+            - name: Cell__HostRouteService
+              value: {{ printf "%s-server" .Release.Name | quote }}
+            {{- with .Values.cell.certificate.http01.ingressClassName }}
+            - name: Cell__HostRouteIngressClass
+              value: {{ . | quote }}
+            {{- end }}
+            - name: Cell__HostRouteAnnotations
+              value: {{ toJson .Values.cell.certificate.route.annotations | quote }}
             {{- end }}
             {{- else }}
             {{- include "axis.hostEnv" . | nindent 12 }}

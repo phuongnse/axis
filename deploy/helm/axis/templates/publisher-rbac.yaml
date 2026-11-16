@@ -1,4 +1,4 @@
-{{- /* The publisher creates the Certificate of a verified tenant host, and nothing else, in the release namespace. */}}
+{{- /* The publisher creates the Certificate and the Ingress of a verified tenant host, and nothing else, in the release namespace. */}}
 {{- if and .Values.cell.id .Values.cell.certificate.enabled }}
 apiVersion: v1
 kind: ServiceAccount
@@ -38,6 +38,39 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: {{ .Release.Name }}-publisher-certificates
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-publisher
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-publisher-routes
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: publisher
+rules:
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses
+    verbs:
+      - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-publisher-routes
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: publisher
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Release.Name }}-publisher-routes
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Name }}-publisher

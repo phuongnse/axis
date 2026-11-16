@@ -105,8 +105,18 @@ that it controls the host.
      Kubernetes API with its own service account, names it after the host, and uses the Issuer
      `<release>-tenant-hosts` that the chart renders for the HTTP-01 challenge. A `Certificate` that
      exists counts as done, and a cell without `cell.certificate.enabled` writes none.
-  4. **Route** _(planned for M33)_. The cell's ingress gets a route for the verified host, so the
-     tenant is served on it.
+  4. **Route.** After the `Certificate` and before it marks the request `verified`, the publisher
+     creates a Kubernetes Ingress for the host, so the tenant is served on it. It creates the Ingress
+     through the Kubernetes API with its own service account and names it after the host. The Ingress
+     has the annotation `axis/tenant`, which holds the tenant id and which a configured annotation
+     never replaces. Its class is `cell.certificate.http01.ingressClassName`, and a blank class
+     leaves the cluster's default. Its other annotations are `cell.certificate.route.annotations`.
+     It serves TLS from the Secret that is named after the host, and it sends every path to the
+     `https` port of the Service `<release>-server`. An Ingress that exists counts as done, and a
+     cell without `cell.certificate.enabled` writes none. A failed write leaves the request
+     `pending` and the next round tries again. The chart's Role for the publisher may only `create`
+     Ingresses, so the purge of a tenant leaves its Ingress behind, see
+     [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant).
   5. A host that is not verified is never served: the ingress has no route for it, and the server
      answers `404` for it, as for any unknown host.
 
@@ -116,7 +126,7 @@ that it controls the host.
   of the tenant's own in the same steps.
 - **Routing.** Inside the cell, a request is resolved as on any installation, see
   [request resolution](../architecture.md#request-resolution).
-- **The region directory** _(planned for M33)_. The [region directory](region-directory.md) sends a
+- **The region directory.** The [region directory](region-directory.md) sends a
   sign-up and a host to its cell.
 
 ## Connections

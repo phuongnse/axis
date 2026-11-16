@@ -34,4 +34,5 @@ internal sealed record AdminRun(
     HttpMessageHandler? IdentityProviderHandler,
     CancellationToken CancellationToken,
     IDnsTxtResolver? DnsResolver = null,
-    ICertificateWriter? CertificateWriter = null);
+    ICertificateWriter? CertificateWriter = null,
+    IRouteWriter? RouteWriter = null);
