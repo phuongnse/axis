@@ -21,6 +21,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace Axis.Server.CellApi;
 
@@ -42,10 +43,14 @@ namespace Axis.Server.CellApi;
 /// <c>GET /api/cell</c> answers <c>{ id, region, tenants, cap, restoreCheck }</c>: <c>tenants</c> is the count the tenant cap checks, previews
 /// and unfinished creates included, see docs/reference/cells.md#cell-size, <c>cap</c> is <see cref="CellOptions.TenantCap"/> or
 /// <see langword="null"/>, and <c>restoreCheck</c> is <c>{ ranAt, tenantId, passed }</c> of the newest row of <c>platform.restore_checks</c> or
-/// <see langword="null"/> when no check has run. <c>GET /api/cell/jobs?tenant&amp;limit</c> answers <c>{ "items": [...] }</c>, the jobs newest first, each as
-/// the job read answers it, and never with the job's <c>actor</c> or <c>input</c>. <c>tenant</c> keeps one tenant's jobs and an
-/// unknown tenant answers an empty list. <c>limit</c> is a whole number from 1 to 200, 50 when missing, and any other value
-/// answers <c>400</c>.
+/// <see langword="null"/> when no check has run. <c>GET /api/cell/jobs?tenant</c> answers one page as <c>{ items, page, pageSize, totalCount }</c>, 20 jobs by default, each as
+/// the job read answers it, and never with the job's <c>actor</c> or <c>input</c>. The <c>page</c>, <c>pageSize</c>, <c>sort</c>,
+/// <c>search</c> and <c>filter</c> are those of the shared <see cref="ListQuery{T}"/>, in the record API's format, and the database applies
+/// them, through its SQL form. The fields are <c>createdAt</c>, <c>kind</c>, <c>tenant</c>, <c>state</c>, <c>steps</c> and <c>error</c>,
+/// <c>createdAt</c> filters by its UTC day and sorts by its instant, and the search looks in the tenant and the error. An undeclared field,
+/// an invalid page or an invalid page size answers <c>400</c> keyed by the parameter, after the checks of the operator policy. The jobs stay
+/// newest first without <c>sort</c>, and a sorted list breaks ties newest first, see <c>docs/reference/tenant-lifecycle.md#routes</c>.
+/// <c>tenant</c> keeps one tenant's jobs and an unknown tenant answers an empty list.
 /// </para>
 /// <para>
 /// <c>GET /api/cell/tenants</c> answers one page as <c>{ items, page, pageSize, totalCount }</c>, 20 tenants by default, from the
@@ -167,10 +172,6 @@ internal static partial class CellEndpoints
     private const int MaxIdempotencyKeyLength = 255;
 
     private const string PurgeJobKind = "purge";
-
-    private const int DefaultJobListLimit = 50;
-
-    private const int MaxJobListLimit = 200;
 
     private static readonly TimeSpan _idempotencyWindow = TimeSpan.FromHours(24);
 
@@ -310,6 +311,29 @@ internal static partial class CellEndpoints
             ListColumnKind.Date,
             tenant => tenant.NewestArchiveAt is { } at ? DateOnly.FromDateTime(at.UtcDateTime) : (DateOnly?)null,
             Order: tenant => tenant.NewestArchiveAt),
+    ];
+
+    // The fields of the job list, over platform.jobs, see docs/reference/tenant-lifecycle.md#routes. createdAt filters by its UTC day and
+    // sorts by its instant. The Value lambdas only satisfy ListColumn, as this list never reads rows in memory.
+    private static readonly IReadOnlyList<ListColumn<JobRow>> _jobColumns =
+    [
+        new(
+            "createdAt",
+            ListColumnKind.Date,
+            job => DateOnly.FromDateTime(job.CreatedAt.UtcDateTime),
+            Order: job => job.CreatedAt,
+            Sql: "(created_at AT TIME ZONE 'UTC')::date",
+            OrderSql: "created_at"),
+        new(
+            "kind",
+            ListColumnKind.Enum,
+            job => job.Kind,
+            Values: ["suspend", "resume", "read-only", "create", "export", "delete", "cancel-deletion", "purge"],
+            Sql: "kind"),
+        new("tenant", ListColumnKind.Text, job => job.TenantId, Searchable: true, Sql: "tenant_id"),
+        new("state", ListColumnKind.Enum, job => job.State, Values: ["queued", "running", "succeeded", "failed"], Sql: "state"),
+        new("steps", ListColumnKind.Text, job => job.Steps, Sql: "steps::text"),
+        new("error", ListColumnKind.Text, job => job.Error, Searchable: true, Sql: "error"),
     ];
 
     // The fields of the usage days of a tenant, see docs/reference/tenant-lifecycle.md#routes. A day holds no text, so none is searchable.
@@ -1063,31 +1087,60 @@ internal static partial class CellEndpoints
     }
 
     // Job ids are time-ordered, so the id settles jobs created in the same instant.
-    private static async Task<IResult> ListJobsAsync(string? tenant, string? limit, HttpContext httpContext, NpgsqlDataSource dataSource, CancellationToken cancellationToken)
+    private static async Task<IResult> ListJobsAsync(string? tenant, HttpContext httpContext, NpgsqlDataSource dataSource, CancellationToken cancellationToken)
     {
-        var take = DefaultJobListLimit;
-        if (limit is not null
-            && (!int.TryParse(limit, NumberStyles.None, CultureInfo.InvariantCulture, out take) || take is < 1 or > MaxJobListLimit))
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var query = ListQuery<JobRow>.Read(httpContext.Request, _jobColumns, errors);
+        if (errors.Count > 0)
         {
-            return RefusedRequests.Problem(
-                httpContext,
-                StatusCodes.Status400BadRequest,
-                $"The limit must be a whole number from 1 to {MaxJobListLimit}.");
+            return Results.ValidationProblem(errors);
         }
 
-        await using var platform = Open(dataSource);
-        var jobs = platform.Jobs.AsNoTracking();
-        if (!string.IsNullOrEmpty(tenant))
+        var list = query.Sql();
+        var where = $"WHERE (@tenant::text IS NULL OR tenant_id = @tenant) AND {list.Condition}";
+        var order = list.Order is null ? "created_at DESC, id DESC" : $"{list.Order}, created_at DESC, id DESC";
+
+        void AddFilter(NpgsqlCommand command)
         {
-            jobs = jobs.Where(job => job.TenantId == tenant);
+            command.Parameters.Add(new NpgsqlParameter("tenant", NpgsqlDbType.Text)
+            {
+                Value = string.IsNullOrEmpty(tenant) ? DBNull.Value : tenant,
+            });
+            list.AddTo(command);
         }
 
-        var rows = await jobs
-            .OrderByDescending(job => job.CreatedAt)
-            .ThenByDescending(job => job.Id)
-            .Take(take)
-            .ToListAsync(cancellationToken);
-        return Results.Ok(new CellJobListResponse([.. rows.Select(JobDetail)]));
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        long totalCount;
+        await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {PlatformDbContext.Schema}.jobs {where}", connection))
+        {
+            AddFilter(count);
+            totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
+        }
+
+        await using var command = new NpgsqlCommand(
+            $"SELECT id, kind, tenant_id, state, created_at, steps::text, error FROM {PlatformDbContext.Schema}.jobs {where} ORDER BY {order} LIMIT @limit OFFSET @offset",
+            connection);
+        AddFilter(command);
+        command.Parameters.AddWithValue("limit", query.PageSize);
+        command.Parameters.AddWithValue("offset", (long)(query.Page - 1) * query.PageSize);
+
+        var items = new List<CellJobDetailResponse>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(JobDetail(new JobRow
+            {
+                Id = reader.GetGuid(0),
+                Kind = reader.GetString(1),
+                TenantId = reader.GetString(2),
+                State = reader.GetString(3),
+                CreatedAt = reader.GetFieldValue<DateTimeOffset>(4),
+                Steps = reader.GetString(5),
+                Error = reader.IsDBNull(6) ? null : reader.GetString(6),
+            }));
+        }
+
+        return Results.Ok(new CellJobListResponse(items, query.Page, query.PageSize, totalCount));
     }
 
     private static CellJobDetailResponse JobDetail(JobRow job)
@@ -1362,8 +1415,8 @@ internal sealed record CellJobDetailResponse(
     IReadOnlyList<CellJobStepResponse> Steps,
     string? Error);
 
-/// <summary>The jobs of the cell, newest first.</summary>
-internal sealed record CellJobListResponse(IReadOnlyList<CellJobDetailResponse> Items);
+/// <summary>One page of the jobs of the cell, with the number of jobs that matched before it was cut.</summary>
+internal sealed record CellJobListResponse(IReadOnlyList<CellJobDetailResponse> Items, int Page, int PageSize, long TotalCount);
 
 /// <summary>One step of a job. <c>Error</c> is the refusal of a failed step.</summary>
 internal sealed record CellJobStepResponse(string Name, string State, string? Error);
