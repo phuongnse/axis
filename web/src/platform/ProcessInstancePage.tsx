@@ -25,6 +25,7 @@ import {
 } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { PageActions, PageHeading } from './PageLayout'
+import { ProcessGraphCanvas, type ProcessGraphStep, type ProcessGraphTransitionView } from './ProcessGraph'
 import { RecordLink } from './RecordLink'
 import { RecordNotFound } from './RecordNotFound'
 import { PartRule, SectionPart } from './SectionParts'
@@ -186,8 +187,6 @@ export function InstanceDetailView({
   stepNames = false,
 }: InstanceDetailViewProps) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  const rowStyle = { paddingBlock: spacing.sm, borderBlockEnd: `1px solid ${colour.divider}` }
   const stepsByName = useMemo(
     () => new Map(instance.graph.steps.map((step) => [step.name, step])),
     [instance.graph.steps],
@@ -383,6 +382,42 @@ export function InstanceDetailView({
     </>
   )
   const taken = new Set(instance.path.map((entry) => entry.step))
+  // The transitions the instance took: from each step of its path to the next, and from the last to the step it is at.
+  const walked = [...instance.path.map((entry) => entry.step), instance.step]
+  const tookTransition = new Set(walked.slice(1).map((step, index) => `${walked[index]}>${step}`))
+  const to = t('shell.studio.processGraph.to')
+  const graphSteps = instance.graph.steps.map((step): ProcessGraphStep => {
+    const tone = step.name === instance.step ? 'current' : taken.has(step.name) ? 'taken' : 'idle'
+    const state =
+      tone === 'current'
+        ? `, ${t('shell.inspector.current')}`
+        : tone === 'taken'
+          ? `, ${t('shell.inspector.taken')}`
+          : ''
+    return {
+      id: step.name,
+      name: stepLabel(step.name),
+      type: step.type,
+      start: step.name === instance.graph.start,
+      tone,
+      ariaLabel: `${stepLabel(step.name)}, ${step.type}${state}`,
+      ariaCurrent: tone === 'current',
+      testId: `inspector-step-${step.name}`,
+    }
+  })
+  const graphTransitions = instance.graph.steps.flatMap((step) =>
+    step.transitions.map((transition): ProcessGraphTransitionView => {
+      const took = tookTransition.has(`${step.name}>${transition.next}`)
+      return {
+        id: `${step.name}>${transition.next}|${transition.on ?? ''}`,
+        source: step.name,
+        target: transition.next,
+        label: transition.on ?? '',
+        ariaLabel: `${stepLabel(step.name)} ${to} ${stepLabel(transition.next)}${transition.on === null ? '' : `, ${transition.on}`}`,
+        tone: took ? 'taken' : 'idle',
+      }
+    }),
+  )
   return (
     <Flex vertical gap="middle" data-testid="inspector-instance">
       <PageHeading
@@ -400,32 +435,16 @@ export function InstanceDetailView({
       <TermList terms={facts} />
       {part(
         t('shell.inspector.steps'),
-        <Flex vertical>
-          {instance.graph.steps.map((step, index) => (
-            <Flex
-              key={step.name}
-              vertical
-              gap="small"
-              data-testid={`inspector-step-${step.name}`}
-              // The last step has no line of its own, as the next part's rule follows it.
-              style={index === instance.graph.steps.length - 1 ? { paddingBlock: spacing.sm } : rowStyle}
-            >
-              <Flex gap="small" align="center">
-                <Typography.Text strong>{stepLabel(step.name)}</Typography.Text>
-                <Typography.Text type="secondary">{step.type}</Typography.Text>
-                {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-                {taken.has(step.name) && <Tag color="green">{t('shell.inspector.taken')}</Tag>}
-                {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-                {step.name === instance.step && <Tag color="blue">{t('shell.inspector.current')}</Tag>}
-              </Flex>
-              {step.transitions.map((transition) => (
-                <Typography.Text key={`${transition.next}|${transition.on ?? ''}`} type="secondary">
-                  {`→ ${stepLabel(transition.next)}${transition.on === null ? '' : ` (${transition.on})`}`}
-                </Typography.Text>
-              ))}
-            </Flex>
-          ))}
-        </Flex>,
+        // Proposed: the steps are the process's graph, drawn as the process designer draws it, with the steps the
+        // instance has run and the transitions it took in the success colour and the step it is at in the primary
+        // colour, see the review on #3650.
+        <ProcessGraphCanvas
+          steps={graphSteps}
+          transitions={graphTransitions}
+          ariaLabel={t('shell.inspector.steps')}
+          testId="inspector-graph"
+          height={400}
+        />,
       )}
       {part(
         t('shell.inspector.history'),

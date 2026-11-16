@@ -1,117 +1,10 @@
-import dagre from '@dagrejs/dagre'
 import { useDroppable } from '@dnd-kit/core'
-import {
-  BaseEdge,
-  type Edge,
-  EdgeLabelRenderer,
-  type EdgeProps,
-  getBezierPath,
-  Handle,
-  MarkerType,
-  type Node,
-  type NodeProps,
-  type OnConnectEnd,
-  Position,
-  ReactFlow,
-} from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
+import { BaseEdge, EdgeLabelRenderer, type EdgeProps, getBezierPath, type OnConnectEnd } from '@xyflow/react'
 import { type KeyboardEvent, useMemo, useRef } from 'react'
+import { ProcessGraphCanvas, type ProcessGraphStep, type ProcessGraphTransitionView } from '../platform/ProcessGraph'
 import { useText } from '../platform/texts'
-import { useDesignTokens, useThemeMode } from '../platform/themeMode'
+import { useDesignTokens } from '../platform/themeMode'
 import { type ProcessGraph, type ProcessGraphTransition, transitionName } from './processGraph'
-
-const nodeWidth = 200
-const nodeHeight = 48
-const handleSize = 10
-
-type StepNodeData = {
-  index: number
-  name: string
-  type: string
-  start: boolean
-  current: boolean
-  marked: boolean
-  connectable: boolean
-  layerMark?: 'added' | 'changed'
-}
-
-type StepNode = Node<StepNodeData, 'step'>
-
-function placeSteps(graph: ProcessGraph): (index: number) => { x: number; y: number } {
-  const layout = new dagre.graphlib.Graph()
-  layout.setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 56 })
-  layout.setDefaultEdgeLabel(() => ({}))
-  for (const step of graph.steps) {
-    layout.setNode(String(step.index), { width: nodeWidth, height: nodeHeight })
-  }
-  for (const transition of graph.transitions) {
-    layout.setEdge(String(transition.source), String(transition.target))
-  }
-  dagre.layout(layout)
-  return (index) => {
-    const placed = layout.node(String(index))
-    return { x: placed.x - nodeWidth / 2, y: placed.y - nodeHeight / 2 }
-  }
-}
-
-function StepNodeView({ data }: NodeProps<StepNode>) {
-  const t = useText()
-  const { colour, radius } = useDesignTokens()
-  const mark = data.layerMark === undefined ? undefined : t(`shell.studio.module.${data.layerMark}`)
-  const label = `${data.name}, ${data.type}${mark === undefined ? '' : `, ${mark}`}`
-  return (
-    <>
-      <Handle type="target" position={Position.Top} isConnectable={false} />
-      <button
-        type="button"
-        data-testid={`studio-graph-node-${data.index}`}
-        aria-label={data.marked ? `${label}, ${t('shell.studio.processGraph.hasDiagnostics')}` : label}
-        aria-current={data.current ? 'true' : undefined}
-        data-marked={data.marked ? 'true' : undefined}
-        style={{
-          width: '100%',
-          height: '100%',
-          padding: '0 8px',
-          overflow: 'hidden',
-          textAlign: 'left',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          font: 'inherit',
-          color: colour.text,
-          background: colour.surface,
-          border: `${data.start ? 3 : 1}px solid ${data.marked ? colour.danger : data.current ? colour.primary : colour.border}`,
-          borderRadius: radius.base,
-          cursor: 'pointer',
-        }}
-      >
-        <strong>{data.name}</strong> <span>{data.type}</span>
-        {mark !== undefined && (
-          <>
-            {' '}
-            <span data-layer-mark={data.layerMark}>{mark}</span>
-          </>
-        )}
-      </button>
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        isConnectable={data.connectable}
-        data-testid={`studio-graph-handle-${data.index}`}
-        aria-hidden
-        style={{
-          width: handleSize,
-          height: handleSize,
-          background: colour.primary,
-          border: `1px solid ${colour.surface}`,
-          cursor: data.connectable ? 'crosshair' : 'default',
-          display: data.connectable ? undefined : 'none',
-        }}
-      />
-    </>
-  )
-}
-
-const nodeTypes = { step: StepNodeView }
 
 /**
  * An edge drawn as the default edge is, with a drop target at its midpoint: a transition that a palette entry can be
@@ -175,7 +68,6 @@ function TransitionEdge({
   )
 }
 
-const edgeTypes = { transition: TransitionEdge }
 const dropWidth = 56
 const dropHeight = 28
 
@@ -217,63 +109,48 @@ export default function StudioProcessGraph({
   layerMarks?: ReadonlyMap<number, 'added' | 'changed'>
 }) {
   const t = useText()
-  const { mode } = useThemeMode()
-  const { colour } = useDesignTokens()
   const to = t('shell.studio.processGraph.to')
   const section = useRef<HTMLElement>(null)
   const { setNodeRef } = useDroppable({ id: 'process-canvas', data: { pointer: '/steps' } })
 
-  const { nodes, edges } = useMemo(() => {
-    const place = placeSteps(graph)
-    return {
-      nodes: graph.steps.map((step): StepNode => ({
-        id: String(step.index),
-        type: 'step',
-        position: place(step.index),
-        width: nodeWidth,
-        height: nodeHeight,
-        handles: [
-          { type: 'target', position: Position.Top, x: nodeWidth / 2, y: 0, width: 1, height: 1 },
-          {
-            type: 'source',
-            position: Position.Bottom,
-            x: nodeWidth / 2 - handleSize / 2,
-            y: nodeHeight - handleSize / 2,
-            width: handleSize,
-            height: handleSize,
-          },
-        ],
-        data: {
-          index: step.index,
+  // Proposed: the designer edits the one drawing of a process, which a process instance's page shows too, see the
+  // review on #3650.
+  const steps = useMemo(
+    () =>
+      graph.steps.map((step): ProcessGraphStep => {
+        const layerMark = layerMarks?.get(step.index)
+        const note =
+          layerMark === undefined ? undefined : { text: t(`shell.studio.module.${layerMark}`), kind: layerMark }
+        const label = `${step.name ?? ''}, ${step.type ?? ''}${note === undefined ? '' : `, ${note.text}`}`
+        return {
+          id: String(step.index),
           name: step.name ?? '',
           type: step.type ?? '',
           start: graph.start === step.index,
-          current: selected === step.index,
-          marked: step.marked,
+          tone: step.marked ? 'error' : selected === step.index ? 'selected' : 'plain',
+          ariaLabel: step.marked ? `${label}, ${t('shell.studio.processGraph.hasDiagnostics')}` : label,
+          ariaCurrent: selected === step.index,
+          note,
           connectable: !readOnly && step.type !== 'end',
-          layerMark: layerMarks?.get(step.index),
-        },
-      })),
-      edges: graph.transitions.map((transition): Edge => {
-        const current = transition.path === selectedEdge
-        const stroke = current ? colour.primary : colour.textMuted
-        return {
-          id: transition.path,
-          type: 'transition',
-          source: String(transition.source),
-          target: String(transition.target),
-          label: transition.label ?? transition.kind,
-          ariaLabel: transitionName(graph, transition, to),
-          ariaRole: 'button',
-          domAttributes: current ? { 'aria-current': 'true' } : undefined,
-          style: { stroke, strokeWidth: current ? 2 : undefined },
-          markerEnd: { type: MarkerType.ArrowClosed, color: stroke },
-          labelStyle: { fill: colour.text },
-          labelBgStyle: { fill: colour.surface },
+          testId: `studio-graph-node-${step.index}`,
+          handleTestId: `studio-graph-handle-${step.index}`,
         }
       }),
-    }
-  }, [graph, selected, selectedEdge, colour, to, readOnly, layerMarks])
+    [graph, selected, readOnly, layerMarks, t],
+  )
+  const transitions = useMemo(
+    () =>
+      graph.transitions.map((transition): ProcessGraphTransitionView => ({
+        id: transition.path,
+        source: String(transition.source),
+        target: String(transition.target),
+        label: transition.label ?? transition.kind,
+        ariaLabel: transitionName(graph, transition, to),
+        tone: transition.path === selectedEdge ? 'selected' : 'plain',
+        ariaCurrent: transition.path === selectedEdge,
+      })),
+    [graph, selectedEdge, to],
+  )
 
   // A drag ends on a node when React Flow snaps to its handle, and anywhere else on the node otherwise, so the node
   // under the pointer is the target. `onConnect` is not set, or React Flow would report a snapped drag twice.
@@ -318,40 +195,25 @@ export default function StudioProcessGraph({
   }
 
   return (
-    <section
-      ref={(element) => {
+    <ProcessGraphCanvas
+      steps={steps}
+      transitions={transitions}
+      ariaLabel={t('shell.studio.processGraph')}
+      testId="studio-process-graph"
+      edgeType={TransitionEdge}
+      sectionRef={(element: HTMLElement | null) => {
         section.current = element
         setNodeRef(element)
       }}
-      data-testid="studio-process-graph"
-      aria-label={t('shell.studio.processGraph')}
-      style={{ height: 480, position: 'relative' }}
       onKeyDown={onKeyDown}
-    >
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        colorMode={mode}
-        fitView
-        minZoom={0.1}
-        nodesDraggable={false}
-        nodesConnectable={!readOnly}
-        nodesFocusable={false}
-        elementsSelectable={false}
-        edgesFocusable
-        deleteKeyCode={null}
-        zoomOnScroll={false}
-        onConnectEnd={readOnly ? undefined : onConnectEnd}
-        onNodeClick={(_, node) => onSelect(Number(node.id))}
-        onEdgeClick={(_, edge) => {
-          const transition = graph.transitions.find((candidate) => candidate.path === edge.id)
-          if (transition) {
-            onSelectEdge(transition)
-          }
-        }}
-      />
-    </section>
+      onStepClick={(id) => onSelect(Number(id))}
+      onTransitionClick={(id) => {
+        const transition = graph.transitions.find((candidate) => candidate.path === id)
+        if (transition) {
+          onSelectEdge(transition)
+        }
+      }}
+      onConnectEnd={readOnly ? undefined : onConnectEnd}
+    />
   )
 }
