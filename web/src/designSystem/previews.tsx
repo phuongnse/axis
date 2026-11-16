@@ -17,7 +17,14 @@ import { IdentitySignIn } from './IdentitySignIn'
 import { SignUpPreview } from './SignUpPreview'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import { ClickOnMount, ShellPreview } from './ShellPreview'
-import { studioFixtures, typicalEntityId, typicalFormId, typicalPageId, typicalProcessId } from './studioFixtures'
+import {
+  studioFixtures,
+  typicalEntityId,
+  typicalFormId,
+  typicalPageId,
+  typicalProcessId,
+  typicalRevisionId,
+} from './studioFixtures'
 import {
   application,
   blankDetailWidget,
@@ -310,6 +317,11 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Policy matrix', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=policies` },
     { caption: 'Releases', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=releases` },
     { caption: 'History', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=history` },
+    {
+      caption: 'Revision',
+      fixtures: studioFixtures.typical,
+      entry: `/studio?app=${application}&view=history&revision=${typicalRevisionId}`,
+    },
   ].map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 })),
   studioPageDesign: studioDesignerStates(typicalPageId),
   studioFormDesign: studioDesignerStates(typicalFormId),

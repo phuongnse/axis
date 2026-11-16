@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ExpressionField } from '../pages/ExpressionField'
 import { ReferencePicker } from '../pages/ReferencePicker'
 import { ResourceFormSection, ResourceFormSections } from '../pages/ResourceFormSection'
+import { StudioChanges } from '../pages/StudioChanges'
 import { withAntdStyles } from '../test/antdStyles'
 import { Announcement } from './Announcement'
 import { antConfigFor } from './antTheme'
@@ -42,6 +43,10 @@ const texts = {
   'shell.form.cancel': 'Cancel',
   'shell.table.selectRow': 'Select row',
   'row.open': 'Open',
+  'shell.studio.history.before': 'Before',
+  'shell.studio.history.after': 'After',
+  'shell.studio.overview.change.changed': 'Changed',
+  'shell.studio.nav.kindOne.role': 'Role',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -111,6 +116,22 @@ const widgets: Record<string, ReactElement> = {
       value=""
       required={false}
       onChange={onChange}
+    />
+  ),
+  'StudioChanges with one changed file': (
+    <StudioChanges
+      files={[
+        {
+          file: 'roles/buyer.json',
+          change: 'changed',
+          id: null,
+          kind: 'role',
+          name: 'Buyer',
+          before: '{"label":"first"}',
+          after: '{"label":"second"}',
+        },
+      ]}
+      resources={[]}
     />
   ),
   CardPage: <CardPage title="Sign in">Body</CardPage>,

@@ -89,13 +89,16 @@ test.describe("Studio shows the history of an application and undoes a revision"
 
     await rows.first().getByTestId("studio-revision-link").click();
     await expect(page).toHaveURL(/[?&]revision=[0-9a-f]{40}(&|$)/);
-    const change = page.getByTestId("studio-revision-change");
+    await expect(
+      page.getByRole("link", { name: "Back to History", exact: true }),
+    ).toHaveCount(0);
+    const change = page.getByTestId("studio-changes-file");
     await expect(change).toHaveCount(1);
     await expect(change).toHaveAttribute("data-file", roleFile);
-    await expect(change.getByTestId("studio-revision-before")).toContainText(
+    await expect(change.getByTestId("json-diff-before")).toContainText(
       "role.employee.first",
     );
-    await expect(change.getByTestId("studio-revision-after")).toContainText(
+    await expect(change.getByTestId("json-diff-after")).toContainText(
       "role.employee.second",
     );
 
@@ -141,5 +144,18 @@ test.describe("Studio shows the history of an application and undoes a revision"
     );
     await expect(rows).toHaveCount(6);
     expect(await readFile(path.join(copy, roleFile), "utf8")).toBe(before);
+  });
+
+  test("an author opens a revision that does not exist and finds the link to History", async ({
+    page,
+  }) => {
+    await useSession(page, "author");
+    await page.goto(
+      `${server.url}/studio?app=PurchaseRequests&view=history&revision=${"0".repeat(40)}`,
+    );
+    await expect(page.getByTestId("studio-revision-not-found")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Back to History", exact: true }),
+    ).toBeVisible();
   });
 });
