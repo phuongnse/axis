@@ -36,7 +36,7 @@ header, as the other session routes do. They are checked on the server whatever 
 | `POST /api/console/instances/{id}/retry`                  | Runs the retry command of an instance on its active release               |
 | `POST /api/console/instances/{id}/cancel`                 | Runs the cancel command of an instance on its active release              |
 | `POST /api/console/instances/{id}/calls/{callId}/resolve` | Runs the resolve command of a call of an instance                         |
-| `GET /api/console/applications/{id}/publishing`           | Answers one application's release history and publish requests, read-only |
+| `GET /api/console/applications/{id}/publishing`           | Answers one application's release history and one page of its publish requests, read-only, the requests searched, filtered and sorted in PostgreSQL |
 | `GET /api/console/dead-letters`                           | Lists one page of the tenant's dead letters, searched, filtered and sorted in PostgreSQL |
 | `GET /api/console/schedules`                              | Lists one page of the schedule triggers of the active release of each application |
 | `POST /api/console/dead-letters/{id}/redeliver`           | Redelivers an open dead letter                                            |
@@ -108,19 +108,25 @@ header, as the other session routes do. They are checked on the server whatever 
   that is refused writes nothing. A success answers `200` with the instance, as the process
   routes do.
 - **`GET /api/console/applications/{id}/publishing`.** Answers one application, named by its id,
-  with its release history and its publish requests, read-only. The group's checks apply (`401`,
+  with its release history and one page of its publish requests, read-only. The group's checks apply (`401`,
   `403`) and the Studio author and publisher roles play no part. An `id` that is not a hyphenated
   UUID is a `404`. A valid `id` that no release or request names answers empty lists. `active` is
   the active release (`releaseId`, `number` and `contentHash`), or `null`. `releases` is the
   whole history, newest first, with the rows and fields of Studio's
   [releases route](studio.md): `releaseId`, `number`, `contentHash`, `activatedAt`, `actor`,
   `actorName`, `label`, `note` and `requestId`. It leaves out the folder's content hash, because
-  the console has no Studio folders. `requests` is one page of the publish requests, newest
-  first, and the answer has `page`, `pageSize` and `totalCount`. The optional `page` and
-  `pageSize` are read as the other list routes read them, and an invalid one is a `400`. A
-  request has its `id`, `kind`, `target`, `status`, `label`, `note`, `requestedBy`,
-  `requestedByName`, `requestedAt`, `startedAt`, `finishedAt` and `releaseId`. It never holds the
-  file snapshot, the diagnostics or the test results.
+  the console has no Studio folders. `requests` is one page of the publish requests, which
+  PostgreSQL filters, searches, sorts and pages. The route takes `page`, `pageSize`, `sort`,
+  `search` and `filter` in the [record API's format](record-api.md#paging-and-sorting) over the
+  fields `kind`, `target`, `status`, `label`, `requestedBy`, `requestedAt` and `finishedAt`.
+  `requestedAt` and `finishedAt` filter by their UTC day and sort by their instant. A search looks
+  in `label` and `requestedBy`, where `requestedBy` is the name stored with the request, or the user
+  id when none was stored. A sort or filter on another field, and an invalid `page` or `pageSize`,
+  is a `400` that names the parameter. Without `sort` the requests are newest first, and a sorted
+  list breaks ties newest first. The answer has `page`, `pageSize` and `totalCount`. A request has
+  its `id`, `kind`, `target`, `status`, `label`, `note`, `requestedBy`, `requestedByName`,
+  `requestedAt`, `startedAt`, `finishedAt` and `releaseId`. It never holds the file snapshot, the
+  diagnostics or the test results.
 - **`GET /api/console/dead-letters`.** Answers one page, `{ "items": [...], "page", "pageSize",
   "totalCount" }`, of the dead letters of every application of the tenant, including the letters
   that belong to no process. PostgreSQL filters, searches, sorts and pages them. The route takes
@@ -198,7 +204,7 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   filter, and search finds the event occurrence id. The address keeps the view as
   `webhookDeliveries.search`, `webhookDeliveries.filter`, `webhookDeliveries.sort`,
   `webhookDeliveries.page`, `webhookDeliveries.pageSize` and `webhookDeliveries.columns`, because
-  Schedules keeps the plain names and Dead letters its own prefix.
+  Schedules keeps the plain names and Dead letters and Publishing their own prefixes.
 - **Schedules.** Each schedule trigger of each active release, with its process, its schedule and
   time zone, and its last and next occurrence, see [schedules](process-events.md#schedules). The
   view is ordered by application and trigger name until it is sorted and is paged on the server.
@@ -206,14 +212,24 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   Columns and Refresh, a sort on every column but Schedule, and a pager with a page size. The
   address keeps the view as `search`, `filter`, `sort`, `page`, `pageSize` and `columns`.
 - **Publishing.** Publish requests and the [release history](studio.md) of each application,
-  read-only. Publishing and activating a release stay in Studio. A part under the Webhook
-  deliveries view with a picker of the applications of the Tenant view, which starts on the first one. A releases table
-  shows the number, label, note, who activated it and when, and marks the active release. Who activated it is named
-  in words, as [names](studio-workspace.md#names) says for Studio. It marks an
-  [off-standard release](module-contracts.md#off-standard-releases) with the Off-standard tag and the
-  module, point and reason of each relaxed entry, as Studio does. A paged
-  table shows each publish request with its kind, target, status, label, who asked, when it was
-  asked and when it finished. It offers no publish or activate button.
+  read-only. Publishing and activating a release stay in Studio. A picker of the applications of
+  the tenant sits above both tables and starts on the first one. The picker is not kept in the
+  address, so a link with a `publishRequests.` view opens the first application. A releases table
+  shows the number, label, note, who activated it and when, and marks the active release. Who
+  activated it is named in words, as [names](studio-workspace.md#names) says for Studio. It marks
+  an [off-standard release](module-contracts.md#off-standard-releases) with the Off-standard tag and
+  the module, point and reason of each relaxed entry, as Studio does. The releases are never paged.
+  The publish requests table is paged on the server and shows each request with its kind, target,
+  status, label, who asked, when it was asked and when it finished. Its table has the toolbar of
+  [tables](actions-and-controls.md#tables), with Search, Filter, Columns and Refresh, a sort on
+  Status, Label, Requested by, Requested and Finished, and a pager with a page size. Kind and Target
+  filter by their values and do not sort. Requested by filters, searches and sorts on the name
+  stored with the request, so it can differ from the name the cell shows after a person is renamed.
+  The address keeps the requests view as `publishRequests.search`, `publishRequests.filter`,
+  `publishRequests.sort`, `publishRequests.page`, `publishRequests.pageSize` and
+  `publishRequests.columns`. Picking another application starts again at page 1 and keeps the rest
+  of the view. A failed load shows the error in each table in place of its rows, and the requests
+  table keeps its toolbar. It offers no publish or activate button.
 - **Tenant.** The tenant's status and each application's active release, as a table with the
   application, the release number and label, and the activation time.
 

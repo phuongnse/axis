@@ -11,8 +11,10 @@ import {
 } from './console'
 import { ReleaseOffStandard } from './ReleaseOffStandard'
 import { SectionPart } from './SectionParts'
+import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { releasePublisher } from './studio'
 import { useText } from './texts'
+import { useTableView } from './useTableView'
 
 interface ConsolePublishingProps {
   /** The applications of the tenant, for the application picker. */
@@ -23,9 +25,9 @@ interface ConsolePublishingProps {
 
 /** The outcome of the last finished request. */
 interface LoadState {
-  /** The application and page of the request, so a result for an older request shows as loading. */
+  /** The application and query of the request, so a result for an older request shows as loading. */
   key?: string
-  /** The last answer loaded. It stays while the next page loads. */
+  /** The last answer loaded. It stays while the next view loads. */
   publishing?: ConsolePublishing
   failed: boolean
 }
@@ -37,40 +39,67 @@ const statusColors: Record<ConsolePublishRequest['status'], string> = {
   failed: 'error',
 }
 
+/** The columns the requests table's search, filter and sort can name, see docs/reference/operator-console.md#api. */
+const requestFields = [
+  { name: 'kind', type: 'enum' },
+  { name: 'target', type: 'enum' },
+  { name: 'status', type: 'enum' },
+  { name: 'label', type: 'text' },
+  { name: 'requestedBy', type: 'text' },
+  { name: 'requestedAt', type: 'date' },
+  { name: 'finishedAt', type: 'date' },
+] as const
+// The view has no parameters of its own. A stable empty array keeps useTableView from recomputing on each render.
+const noParameters: readonly string[] = []
+const requestKinds: ConsolePublishRequest['kind'][] = ['validate', 'publish', 'activate', 'test', 'accept']
+const requestTargets: ConsolePublishRequest['target'][] = ['tenant', 'preview']
+const requestStatuses: ConsolePublishRequest['status'][] = ['queued', 'running', 'succeeded', 'failed']
+
 function formatTime(value: string | null, locale: string) {
   return value === null ? null : new Date(value).toLocaleString(locale)
 }
 
 /**
  * The Publishing view of the operator console: the release history and the publish requests of one application, read
- * only. The picker starts on the first application of the tenant. The releases table marks the active release and every off-standard release with its relaxed points, and the
- * requests table lists the publish requests newest first, one page at a time. The view has no publish or activate
- * command, because those stay in Studio. A failure shows an error in this part only.
+ * only. The picker starts on the first application of the tenant and sits above both tables, outside the address. The
+ * releases table marks the active release and every off-standard release with its relaxed points, and is never paged.
+ * The requests table is paged on the server and has the full toolbar, with its view kept in the address under the
+ * `publishRequests.` prefix, see docs/reference/operator-console.md#views and docs/reference/actions-and-controls.md#tables.
+ * The view has no publish or activate command, because those stay in Studio. A failed load shows an error in each table in
+ * place of its rows, and the requests table keeps its toolbar.
  */
 export function ConsolePublishing({ applications, locale }: ConsolePublishingProps) {
   const t = useText()
   const [application, setApplication] = useState<string | undefined>(applications[0]?.id)
-  const [page, setPage] = useState(1)
+  const { view, setView } = useTableView(
+    requestFields,
+    recordPageSize,
+    noParameters,
+    true,
+    true,
+    true,
+    'publishRequests.',
+  )
+  const query = recordQuery(view)
+  const [reload, setReload] = useState(0)
   const [load, setLoad] = useState<LoadState>({ failed: false })
-  const key = application === undefined ? undefined : `${application}/${page}`
+  const key = application === undefined ? undefined : `${application}?${query}`
   const loading = key !== undefined && load.key !== key
+  // A failed answer is for the view that asked, so it shows only once that view has loaded.
+  const failed = load.failed && !loading
 
   useEffect(() => {
     if (application === undefined) {
       return
     }
     const controller = new AbortController()
-    const requested = `${application}/${page}`
-    fetchConsolePublishing(application, page, controller.signal)
+    const requested = `${application}?${query}`
+    fetchConsolePublishing(application, query, controller.signal)
       .then((result) => {
         if (result.kind === 'forbidden') {
           setLoad({ key: requested, failed: true })
           return
         }
-        // A page past the end becomes the last page once the total is known.
-        setPage((current) =>
-          Math.min(current, Math.max(1, Math.ceil(result.publishing.totalCount / result.publishing.pageSize))),
-        )
         setLoad({ key: requested, publishing: result.publishing, failed: false })
       })
       .catch((error: unknown) => {
@@ -81,7 +110,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
         setLoad({ key: requested, failed: true })
       })
     return () => controller.abort()
-  }, [application, page])
+  }, [application, query, reload])
 
   // Only the newest row of the active release is marked, as Studio marks it, because a release can be in the history twice.
   const activeReleaseId = load.publishing?.active?.releaseId
@@ -139,14 +168,32 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
     [activeRow, locale, t],
   )
 
+  // Kind and target have no order a person uses, so their headers do not sort. The other columns sort on the server.
   const requestColumns = useMemo<AxisColumn<ConsolePublishRequest>[]>(
     () => [
-      { key: 'kind', kind: 'fixed', title: t('shell.console.publishing.kind'), dataIndex: 'kind' },
-      { key: 'target', kind: 'fixed', title: t('shell.console.publishing.target'), dataIndex: 'target' },
+      {
+        key: 'kind',
+        kind: 'fixed',
+        title: t('shell.console.publishing.kind'),
+        filter: { kind: 'enum', options: requestKinds.map((value) => ({ value, label: value })) },
+        dataIndex: 'kind',
+      },
+      {
+        key: 'target',
+        kind: 'fixed',
+        title: t('shell.console.publishing.target'),
+        filter: { kind: 'enum', options: requestTargets.map((value) => ({ value, label: value })) },
+        dataIndex: 'target',
+      },
       {
         key: 'status',
         kind: 'fixed',
         title: t('shell.console.publishing.status'),
+        filter: {
+          kind: 'enum',
+          options: requestStatuses.map((value) => ({ value, label: t(`shell.console.publishing.status.${value}`) })),
+        },
+        sorter: true,
         render: (_value, row) => (
           <Tag color={statusColors[row.status]}>{t(`shell.console.publishing.status.${row.status}`)}</Tag>
         ),
@@ -155,24 +202,32 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
         key: 'label',
         kind: 'freeText',
         title: t('shell.console.publishing.label'),
+        filter: { kind: 'text' },
+        sorter: true,
         render: (_value, row) => row.label,
       },
       {
         key: 'requestedBy',
         kind: 'freeText',
         title: t('shell.console.publishing.requestedBy'),
+        filter: { kind: 'text' },
+        sorter: true,
         render: (_value, row) => row.requestedByName ?? row.requestedBy,
       },
       {
         key: 'requestedAt',
         kind: 'fixed',
         title: t('shell.console.publishing.requestedAt'),
+        filter: { kind: 'date' },
+        sorter: true,
         render: (_value, row) => formatTime(row.requestedAt, locale),
       },
       {
         key: 'finishedAt',
         kind: 'fixed',
         title: t('shell.console.publishing.finishedAt'),
+        filter: { kind: 'date' },
+        sorter: true,
         render: (_value, row) => formatTime(row.finishedAt, locale),
       },
     ],
@@ -189,47 +244,58 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
           options={applications.map((candidate) => ({ value: candidate.id, label: candidate.name }))}
           onChange={(value: string) => {
             setApplication(value)
-            setPage(1)
+            setView({ ...view, page: 1 })
           }}
         />
-        {load.failed && !loading ? (
-          <AxisAlert
-            data-testid="console-publishing-error"
-            kind="error"
-            message={t('shell.console.publishing.loadFailed')}
+        <Flex vertical gap="small">
+          <Typography.Text strong>{t('shell.console.publishing.releases')}</Typography.Text>
+          <AxisTable<ConsoleReleaseItem>
+            testId="console-publishing-releases"
+            rowKey={(row) => `${row.releaseId}/${row.activatedAt}`}
+            columns={releaseColumns}
+            dataSource={load.publishing?.releases}
+            loading={loading}
+            emptyText={t('shell.console.publishing.empty')}
+            failure={
+              failed ? (
+                <AxisAlert
+                  data-testid="console-publishing-releases-error"
+                  kind="error"
+                  message={t('shell.console.publishing.loadFailed')}
+                />
+              ) : undefined
+            }
           />
-        ) : (
-          <>
-            <Flex vertical gap="small">
-              <Typography.Text strong>{t('shell.console.publishing.releases')}</Typography.Text>
-              <AxisTable<ConsoleReleaseItem>
-                testId="console-publishing-releases"
-                rowKey={(row) => `${row.releaseId}/${row.activatedAt}`}
-                columns={releaseColumns}
-                dataSource={load.publishing?.releases}
-                loading={loading}
-                emptyText={t('shell.console.publishing.empty')}
-              />
-            </Flex>
-            <Flex vertical gap="small">
-              <Typography.Text strong>{t('shell.console.publishing.requests')}</Typography.Text>
-              <AxisTable<ConsolePublishRequest>
-                testId="console-publishing-requests"
-                rowKey={(row) => row.id}
-                columns={requestColumns}
-                dataSource={load.publishing?.requests}
-                loading={loading}
-                emptyText={t('shell.console.publishing.empty')}
-                pagination={{
-                  current: page,
-                  pageSize: load.publishing?.pageSize ?? 20,
-                  total: load.publishing?.totalCount ?? 0,
-                }}
-                onChange={(pagination) => setPage(pagination.current ?? 1)}
-              />
-            </Flex>
-          </>
-        )}
+        </Flex>
+        <Flex vertical gap="small">
+          <Typography.Text strong>{t('shell.console.publishing.requests')}</Typography.Text>
+          <AxisTable<ConsolePublishRequest>
+            testId="console-publishing-requests"
+            rowKey={(row) => row.id}
+            columns={requestColumns}
+            dataSource={load.publishing?.requests ?? []}
+            loading={loading}
+            emptyText={t('shell.console.publishing.empty')}
+            view={{
+              query: view,
+              onChange: setView,
+              pageSizes: tablePageSizes(),
+              total: load.publishing?.totalCount ?? 0,
+              search: true,
+              columns: true,
+            }}
+            toolbar={{ onRefresh: () => setReload((count) => count + 1) }}
+            failure={
+              failed ? (
+                <AxisAlert
+                  data-testid="console-publishing-requests-error"
+                  kind="error"
+                  message={t('shell.console.publishing.loadFailed')}
+                />
+              ) : undefined
+            }
+          />
+        </Flex>
       </Flex>
     </SectionPart>
   )
