@@ -525,6 +525,16 @@ export const sectionWidget: PageWidgetMetadata = {
   widgets: [taskInboxWidget],
 }
 
+// Proposed: a section marked collapsed, which folds and starts closed, after one that does not, so the preview shows
+// the rule between the parts and both headings. See the review on #3650.
+/** A section marked `collapsed` around the request table. */
+export const collapsedSectionWidget: PageWidgetMetadata = {
+  type: 'section',
+  titleKey: 'preview.requests',
+  collapsed: true,
+  widgets: [tableWidget],
+}
+
 const savedRequest = (id: string, title: string, status: string): RecordItem => ({
   id,
   version: 1,

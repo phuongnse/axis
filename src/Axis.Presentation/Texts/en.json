@@ -465,6 +465,8 @@
   "shell.navigation.menu": "Menu",
   "shell.navigation.collapse": "Collapse navigation",
   "shell.navigation.expand": "Expand navigation",
+  "shell.section.show": "Show section",
+  "shell.section.hide": "Hide section",
   "shell.legal.label": "Legal",
   "shell.legal.privacy": "Privacy",
   "shell.legal.terms": "Terms",

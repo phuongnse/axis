@@ -1,5 +1,5 @@
-import { Col, Collapse, Flex, Row, Tabs } from 'antd'
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { Col, Flex, Row, Tabs } from 'antd'
+import { createContext, Fragment, useContext, useMemo, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import {
   isPlaceholder,
@@ -10,6 +10,7 @@ import {
   type TabsWidgetMetadata,
   type WidgetMetadata,
 } from './site'
+import { PartRule, SectionPart } from './SectionParts'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
@@ -80,7 +81,11 @@ function WidgetList({
   const drawn = (
     <Flex vertical gap="middle">
       {widgets.map((widget, index) => (
-        <Node key={index} widget={widget} renderLeaf={renderLeaf} />
+        <Fragment key={index}>
+          {/* Proposed: a rule sits above a section that follows another widget, see the review on #3650. */}
+          {index > 0 && !isPlaceholder(widget) && widget.type === 'section' && <PartRule />}
+          <Node widget={widget} renderLeaf={renderLeaf} />
+        </Fragment>
       ))}
     </Flex>
   )
@@ -180,23 +185,13 @@ function TabsNode({ widget, renderLeaf }: { widget: TabsWidgetMetadata; renderLe
   )
 }
 
+// Proposed: a section is a part of the page with its level-5 heading and no panel. Only a section marked `collapsed`
+// folds, and it starts closed. See the review on #3650.
 function Section({ widget, renderLeaf }: { widget: SectionWidgetMetadata; renderLeaf: RenderLeaf }) {
   const t = useText()
-  const title = t(widget.titleKey)
   return (
-    <div role="region" aria-label={title}>
-      <Collapse
-        defaultActiveKey={widget.collapsed ? [] : ['section']}
-        items={[
-          {
-            key: 'section',
-            label: title,
-            children: (
-              <WidgetList widgets={widget.widgets} renderLeaf={renderLeaf} pointer={listPointer(widget, 'widgets')} />
-            ),
-          },
-        ]}
-      />
-    </div>
+    <SectionPart title={t(widget.titleKey)} folds={widget.collapsed} startsClosed={widget.collapsed}>
+      <WidgetList widgets={widget.widgets} renderLeaf={renderLeaf} pointer={listPointer(widget, 'widgets')} />
+    </SectionPart>
   )
 }

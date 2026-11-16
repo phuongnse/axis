@@ -465,6 +465,8 @@
   "shell.navigation.menu": "Trình đơn",
   "shell.navigation.collapse": "Thu gọn thanh điều hướng",
   "shell.navigation.expand": "Mở rộng thanh điều hướng",
+  "shell.section.show": "Hiện phần",
+  "shell.section.hide": "Ẩn phần",
   "shell.legal.label": "Pháp lý",
   "shell.legal.privacy": "Quyền riêng tư",
   "shell.legal.terms": "Điều khoản",
