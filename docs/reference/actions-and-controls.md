@@ -265,7 +265,7 @@ be kept right.
 - **Named exceptions** _(planned for M35)_. A table that is part of one thing is the exception to the growth
   test. Its rows belong to that one thing, such as the lines of a child collection on a form, so a search or
   a filter of its own would split them from it.
-- **No control of its own** _(planned for M35)_. A table gets no control for one view. A view is a filter
+- **No control of its own**. A table gets no control for one view. A view is a filter
   kept in the address, so the page offers it beside the table and a link opens the same rows.
 - **View controls on one line** _(planned for M35)_. The view controls sit on one line beside the search box,
   which keeps its own width.
