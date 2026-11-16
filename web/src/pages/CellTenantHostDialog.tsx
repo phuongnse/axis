@@ -20,6 +20,7 @@ interface RecordRow {
 interface CellTenantHostDialogProps {
   tenant: string
   onRefused: (kind: 'unauthorized' | 'forbidden') => void
+  onAdded: () => void
   onClose: () => void
 }
 
@@ -27,9 +28,10 @@ interface CellTenantHostDialogProps {
  * The dialog that requests a host of the tenant's own. It asks for the host name and then shows the TXT and CNAME
  * records that the customer must add, with the date the request expires. Add is on until a request runs. A click with
  * the host empty shows what is missing under the field, focuses it and sends nothing, see
- * docs/reference/actions-and-controls.md#fields. A refused request keeps the dialog open with the cell's reason.
+ * docs/reference/actions-and-controls.md#fields. A refused request keeps the dialog open with the cell's reason. An
+ * answered request calls `onAdded`, so the page can show the new request.
  */
-export function CellTenantHostDialog({ tenant, onRefused, onClose }: CellTenantHostDialogProps) {
+export function CellTenantHostDialog({ tenant, onRefused, onAdded, onClose }: CellTenantHostDialogProps) {
   const t = useText()
   const { size } = useDesignTokens()
   const { locale } = usePlatform().current
@@ -45,6 +47,7 @@ export function CellTenantHostDialog({ tenant, onRefused, onClose }: CellTenantH
       const result = await requestCellTenantHost(tenant, host.trim())
       if (result.kind === 'ok') {
         setAdded(result.value)
+        onAdded()
       } else if (result.kind === 'problem') {
         setError(t('shell.cell.tenant.actionRefused').replace('{title}', result.title))
       } else {

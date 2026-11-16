@@ -79,10 +79,21 @@ export interface CellQuota {
   overridden: boolean
 }
 
-/** One tenant with its quotas and its usage of the last 13 months by day, newest first, as served by `GET /api/cell/tenants/{id}`. */
+/** The newest request for one host of a tenant's own. `expiresAt` is an ISO 8601 time. */
+export interface CellHostRequestState {
+  host: string
+  state: 'pending' | 'verified' | 'expired'
+  expiresAt: string
+}
+
+/**
+ * One tenant with its quotas, its usage of the last 13 months by day, newest first, and the newest request of each
+ * host that the operator asked for, ordered by host, as served by `GET /api/cell/tenants/{id}`.
+ */
 export interface CellTenantDetail extends CellTenant {
   quotas: Record<string, CellQuota>
   days: TenantUsageDay[]
+  hostRequests: CellHostRequestState[]
 }
 
 /**
