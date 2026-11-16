@@ -69,7 +69,6 @@
   "shell.users.status.active": "Active",
   "shell.users.status.disabled": "Disabled",
   "shell.users.lastSignedInAt": "Last sign-in",
-  "shell.users.search": "Search by name or email",
   "shell.users.forbidden": "This page is for administrators.",
   "shell.users.loadFailed": "The users could not be loaded.",
   "shell.users.empty": "No users found.",

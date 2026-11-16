@@ -115,7 +115,7 @@ test('the administrator disables an account on the users page, its next sign-in 
 
     const main = adminPage.getByRole('main')
     async function findMember() {
-      await main.getByRole('searchbox', { name: 'Search by name or email', exact: true }).fill(memberEmail)
+      await main.getByRole('searchbox', { name: 'Search', exact: true }).fill(memberEmail)
       await adminPage.keyboard.press('Enter')
       const row = main.getByRole('row').filter({ hasText: memberEmail })
       // The list before the search holds the member too, so wait until the search left only the header and the member.

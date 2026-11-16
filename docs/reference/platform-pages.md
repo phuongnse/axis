@@ -65,8 +65,10 @@ server.
 - **Columns.** Each row has the display name, which links to [the user's page](#a-users-roles), the email, how the person signs in (the provider's alias
   as the [list route](user-administration.md#read-routes) sends it, or "Account"), the status as a tag
   (`invited`, `active` or `disabled`) and the last sign-in.
-- **Search.** A search box filters by name or email. A search starts on Enter or on the search button
-  and goes back to page 1.
+- **Search.** The search is the table's own: its Search box, in the toolbar, filters by name or email.
+  A search starts on Enter or on the search button and goes back to page 1. The search and the page
+  live in the address as `search` and `page`, so a reload or the Back button keeps them. See
+  [tables](actions-and-controls.md#tables).
 - **Refusals.** A `403` shows that the page is for administrators. A `404`, which a preview tenant and
   a tenant without a users client answer, shows the not-found page. Any other failure shows an error
   message.
