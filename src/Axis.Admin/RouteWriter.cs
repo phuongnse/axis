@@ -2,7 +2,7 @@ using System.Text.Json.Nodes;
 
 namespace Axis.Admin;
 
-/// <summary>Creates the route of a verified tenant host, so that tests can answer in place of the cluster.</summary>
+/// <summary>Creates and deletes the route of a tenant host, so that tests can answer in place of the cluster.</summary>
 internal interface IRouteWriter
 {
     /// <summary>
@@ -10,6 +10,9 @@ internal interface IRouteWriter
     /// Any other failure throws.
     /// </summary>
     Task WriteAsync(string tenantId, string host, CancellationToken cancellationToken);
+
+    /// <summary>Deletes the route of <paramref name="host"/>. A route that is already gone counts as done. Any other failure throws.</summary>
+    Task DeleteAsync(string host, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -18,6 +21,8 @@ internal interface IRouteWriter
 /// <c>axis/tenant</c>. The Ingress serves TLS from the secret named after the host and sends every path to the <c>https</c> port of the
 /// server Service. A blank class leaves <c>ingressClassName</c> out, so the default class of the cluster applies. The tenant annotation
 /// wins over a configured one, because it ties the route to its tenant. The name makes a second create a <c>409</c>, which counts as done.
+/// The purge of a deleted tenant deletes the Ingress of each host by that name, and a <c>404</c> counts as done, see
+/// <see href="docs/reference/tenant-lifecycle.md#deleting-a-tenant">deleting a tenant</see>.
 /// </summary>
 internal sealed class KubernetesRouteWriter(KubernetesApi api, string service, string? ingressClass, IReadOnlyDictionary<string, string> annotations) : IRouteWriter
 {
@@ -62,4 +67,7 @@ internal sealed class KubernetesRouteWriter(KubernetesApi api, string service, s
         };
         return api.CreateAsync("apis/networking.k8s.io/v1", "ingresses", body, "route", cancellationToken);
     }
+
+    public Task DeleteAsync(string host, CancellationToken cancellationToken) =>
+        api.DeleteAsync("apis/networking.k8s.io/v1", "ingresses", host, "route", cancellationToken);
 }

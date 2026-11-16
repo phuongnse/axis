@@ -15,7 +15,8 @@ namespace Axis.Integration.Tests;
 /// <see cref="TenantPurge"/> on real PostgreSQL and Keycloak. The eight steps remove a tenant and its preview tenant with their databases, roles,
 /// realm, Studio folders, keys and every row of the <c>platform</c> tables that holds a <c>tenant_id</c>, except the jobs, the restore checks and the audit records.
 /// Each purged tenant gets a tombstone with its id, time, actor and hosts. A purge that stopped after the <c>database</c> step finishes when it runs
-/// again and a second tenant stays whole. A job without an actor in its input is refused before it removes a host.
+/// again and a second tenant stays whole. A job without an actor in its input is refused before it removes a host. The <c>hosts</c> step deletes the
+/// route of each tombstone host through the route writer, and a rerun succeeds when every delete answers <c>404</c>.
 /// </summary>
 public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
@@ -198,6 +199,37 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
     }
 
     [Fact]
+    public async Task The_hosts_step_deletes_the_route_of_each_tombstone_host_and_a_rerun_succeeds_when_the_routes_are_gone()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        using var studio = new TemporaryFolder();
+        var id = await CreateTenantAsync(scenario, studio);
+        using var cluster = new ClusterHandler(HttpStatusCode.OK);
+        var routes = new KubernetesRouteWriter(
+            new KubernetesApi(new HttpClient(cluster), new Uri("https://10.0.0.1:443/"), "axis", () => "token-1"), "axis-server", null, new Dictionary<string, string>());
+        var hostsStep = PurgeFor(scenario, studio, routes).Steps().Single(step => step.Name == "hosts");
+
+        Assert.Null(await hostsStep.RunAsync(Guid.NewGuid(), id, Input, CancellationToken));
+
+        await using var context = NewContext(scenario);
+        var tombstone = await context.DeletedTenants.AsNoTracking().SingleAsync(CancellationToken);
+        Assert.NotEmpty(tombstone.Hosts);
+        var deletes = cluster.Requests;
+        Assert.All(deletes, request => Assert.Equal(HttpMethod.Delete, request.Method));
+        var deleted = deletes.Select(request => request.Uri.ToString()).Order(StringComparer.Ordinal).ToList();
+        Assert.Equal(
+            tombstone.Hosts.Select(host => $"https://10.0.0.1/apis/networking.k8s.io/v1/namespaces/axis/ingresses/{host}").Order(StringComparer.Ordinal),
+            deleted);
+
+        // The routes are gone, so the rerun finds every delete answered 404, and it reads the hosts from the tombstone that the first run kept.
+        cluster.Status = HttpStatusCode.NotFound;
+        Assert.Null(await hostsStep.RunAsync(Guid.NewGuid(), id, Input, CancellationToken));
+        Assert.Equal(deletes.Count * 2, cluster.Requests.Count);
+        Assert.All(cluster.Requests.Skip(deletes.Count), request => Assert.Equal(HttpMethod.Delete, request.Method));
+        Assert.Equal(deleted, cluster.Requests.Skip(deletes.Count).Select(request => request.Uri.ToString()).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
     public void The_steps_are_named_in_the_order_of_the_purge()
     {
         var purge = new TenantPurge(
@@ -206,6 +238,7 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
             AdminScenario.Cipher,
             new HttpClient(_handler, disposeHandler: false),
             new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret),
+            null,
             null);
 
         Assert.Equal(_stepNames, purge.Steps().Select(step => step.Name));
@@ -333,14 +366,15 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
         return await context.TenantBackupKeys.AnyAsync(row => row.TenantId == id, CancellationToken);
     }
 
-    private TenantPurge PurgeFor(AdminScenario scenario, TemporaryFolder studio) =>
+    private TenantPurge PurgeFor(AdminScenario scenario, TemporaryFolder studio, IRouteWriter? routes = null) =>
         new(
             new NpgsqlConnectionStringBuilder(scenario.AdminConnection),
             scenario.Platform,
             AdminScenario.Cipher,
             new HttpClient(_handler, disposeHandler: false),
             new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret),
-            studio.Path);
+            studio.Path,
+            routes);
 
     private Dictionary<string, string?> Settings(TemporaryFolder studio) => new()
     {
@@ -396,5 +430,33 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
         using var request = new HttpRequestMessage(method, new Uri(_baseAddress, path));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return await http.SendAsync(request, CancellationToken);
+    }
+
+    private sealed class ClusterHandler(HttpStatusCode status) : HttpMessageHandler
+    {
+        private readonly List<(HttpMethod Method, Uri Uri)> _requests = [];
+
+        public HttpStatusCode Status { get; set; } = status;
+
+        public IReadOnlyList<(HttpMethod Method, Uri Uri)> Requests
+        {
+            get
+            {
+                lock (_requests)
+                {
+                    return [.. _requests];
+                }
+            }
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            lock (_requests)
+            {
+                _requests.Add((request.Method, request.RequestUri!));
+            }
+
+            return Task.FromResult(new HttpResponseMessage(Status));
+        }
     }
 }
