@@ -507,8 +507,9 @@ reaches the roles and connectors of the application through the module that depe
 
 #### In Studio
 
-Studio lists the resources of every module the application uses, by `<module id>/<name>`, and opens
-each in the editor of its kind with the application's layer applied, so an author's edit is saved as a
+Studio lists the resources of every module the application uses in their kind's list, each named by its
+label or by its name without the `<module>/` prefix, under a tag of its module's label. It opens each in
+the editor of its kind with the application's layer applied, so an author's edit is saved as a
 customization layer and Studio never edits the module's own files, see
 [customization layers in Studio](customization-layers.md#in-studio). The
 [policy matrix](studio.md#policy-matrix) lists a module policy's grants in the row of the role that its

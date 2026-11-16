@@ -49,8 +49,10 @@ leaves out a kind the application has no resource of, since the Overview introdu
 entry shows a count. An open entry shows its label alone and a collapsed one its icon alone, with the
 label as its tooltip; collapsed, a group's title becomes a thin rule.
 
-A kind's entry opens its list, at `&kind=<kind>`, under a heading with the kind's name; for a kind that
-modules hold, the module's resources follow. A resource open in an editor marks its kind's entry, and
+A kind's entry opens its list, at `&kind=<kind>`, under a heading with the kind's name. For a kind that
+modules hold, the list also has the module's resources, sorted with the application's own, each under a
+tag of its module, see [kind lists](studio.md#kind-lists-and-module-resources). A resource open in an
+editor marks its kind's entry, and
 the address keeps the view, as in `/studio?app=PurchaseRequests&resource=<id>`.
 
 ## Band
