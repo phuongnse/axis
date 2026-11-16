@@ -608,6 +608,7 @@
   "shell.task.reassignSend": "Reassign",
   "shell.task.reassignCancel": "Cancel",
   "shell.inspector.open": "Open",
+  "shell.inspector.details": "Details",
   "shell.inspector.state": "State",
   "shell.inspector.step": "Step",
   "shell.inspector.subject": "Record",

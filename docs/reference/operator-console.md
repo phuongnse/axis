@@ -138,17 +138,17 @@ header, as the other session routes do. They are checked on the server whatever 
   as the process routes, with the operator as actor. It answers `409` for a letter that is not
   `open`, for a trigger that is not in the active release and for a kind that cannot be
   redelivered, and writes nothing then. A success answers `200` with the settled letter.
-`ConsoleRouteGuardTests` reads every route under `/api/console/` from the endpoint data source, so a
-new route is checked without a list. It expects `401` signed out, `403` without the role and, for a
-write, `403` without the CSRF header. Every read must answer the operator `200` without a seeded
-sensitive value, secret, binding value or webhook body. `ConsoleRouteGuardSelfTests` shows that the
-guard reports a route that breaks each rule.
+  `ConsoleRouteGuardTests` reads every route under `/api/console/` from the endpoint data source, so a
+  new route is checked without a list. It expects `401` signed out, `403` without the role and, for a
+  write, `403` without the CSRF header. Every read must answer the operator `200` without a seeded
+  sensitive value, secret, binding value or webhook body. `ConsoleRouteGuardSelfTests` shows that the
+  guard reports a route that breaks each rule.
 
 ## Views
 
 The views show the tenant's failed work and its history of deliveries, schedules and releases. Each
 view filters by application. Unless a view says otherwise, it lists the newest items first and pages
-through them.
+through them. Each view is a part of the page, see [layout](shell.md#layout).
 
 - **Failed work.** Process instances that are `failed`, and connector and package calls whose
   outcome is `unknown`, across every process of every application. An entry opens the
@@ -168,7 +168,7 @@ through them.
   time zone, and its last and next occurrence, see [schedules](process-events.md#schedules). The
   view is ordered by application and trigger name, is not paged and has an application filter.
 - **Publishing.** Publish requests and the [release history](studio.md) of each application,
-  read-only. Publishing and activating a release stay in Studio. A card under the Webhook
+  read-only. Publishing and activating a release stay in Studio. A part under the Webhook
   deliveries view with a picker of the applications of the Tenant view, which starts on the first one. A releases table
   shows the number, label, note, who activated it and when, and marks the active release. Who activated it is named
   in words, as [names](studio-workspace.md#names) says for Studio. It marks an

@@ -24,6 +24,7 @@ import {
 import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { ReasonDialog } from './ReasonDialog'
 import { ResolveDialog } from './ResolveDialog'
+import { SectionPart, SectionParts } from './SectionParts'
 import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
@@ -319,113 +320,120 @@ export function InstanceDetailView({
 
   const taken = new Set(instance.path.map((entry) => entry.step))
   return (
-    <Flex vertical gap="large" data-testid="inspector-instance">
-      <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
-      <Descriptions
-        column={1}
-        items={[
-          { key: 'state', label: t('shell.inspector.state'), children: stateText(t, instance.state) },
-          { key: 'step', label: t('shell.inspector.step'), children: stepLabel(instance.step) },
-          {
-            key: 'subject',
-            label: t('shell.inspector.subject'),
-            children: instance.subjectId ?? t('shell.inspector.noSubject'),
-          },
-          ...(instance.parent === null
-            ? []
-            : [
+    <div data-testid="inspector-instance">
+      <SectionParts>
+        <SectionPart testName="inspector-details" heading={{ title: t('shell.inspector.details') }}>
+          <Flex vertical gap="middle">
+            <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
+            <Descriptions
+              column={1}
+              items={[
+                { key: 'state', label: t('shell.inspector.state'), children: stateText(t, instance.state) },
+                { key: 'step', label: t('shell.inspector.step'), children: stepLabel(instance.step) },
                 {
-                  key: 'parent',
-                  label: t('shell.inspector.parent'),
-                  children:
-                    parentPage === undefined ? (
-                      instance.parent.process
-                    ) : (
-                      <Link
-                        to={inspectorPath(sitePath, parentPage, instance.parent.id)}
-                        data-testid="inspector-parent-link"
-                      >
-                        {instance.parent.process}
-                      </Link>
-                    ),
+                  key: 'subject',
+                  label: t('shell.inspector.subject'),
+                  children: instance.subjectId ?? t('shell.inspector.noSubject'),
                 },
-              ]),
-          { key: 'release', label: t('shell.inspector.release'), children: instance.releaseId },
-          { key: 'createdAt', label: t('shell.inspector.createdAt'), children: time('createdAt', instance.createdAt) },
-          { key: 'endedAt', label: t('shell.inspector.endedAt'), children: time('endedAt', instance.endedAt) },
-          ...(due === null ? [] : [{ key: 'dueAt', label: t('shell.inspector.dueAt'), children: time('dueAt', due) }]),
-        ]}
-      />
-      <section>
-        <Typography.Title level={5}>{t('shell.inspector.steps')}</Typography.Title>
-        <Flex vertical>
-          {instance.graph.steps.map((step) => (
-            <Flex key={step.name} vertical gap="small" data-testid={`inspector-step-${step.name}`} style={rowStyle}>
-              <Flex gap="small" align="center">
-                <Typography.Text strong>{stepLabel(step.name)}</Typography.Text>
-                <Typography.Text type="secondary">{step.type}</Typography.Text>
-                {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-                {taken.has(step.name) && <Tag color="green">{t('shell.inspector.taken')}</Tag>}
-                {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-                {step.name === instance.step && <Tag color="blue">{t('shell.inspector.current')}</Tag>}
-              </Flex>
-              {step.transitions.map((transition) => (
-                <Typography.Text key={`${transition.next}|${transition.on ?? ''}`} type="secondary">
-                  {`→ ${stepLabel(transition.next)}${transition.on === null ? '' : ` (${transition.on})`}`}
-                </Typography.Text>
-              ))}
-            </Flex>
-          ))}
-        </Flex>
-      </section>
-      <section>
-        <Typography.Title level={5}>{t('shell.inspector.history')}</Typography.Title>
-        <AxisTable<PathEntry>
-          rowKey={(row) => `${row.step}|${row.startedAt}|${row.finishedAt}`}
-          columns={historyColumns}
-          dataSource={instance.path}
-          emptyText={t('shell.inspector.noHistory')}
-        />
-      </section>
-      <section>
-        <Typography.Title level={5}>{t('shell.inspector.tasks')}</Typography.Title>
-        <AxisTable<InstanceTask>
-          rowKey={(row) => row.id}
-          columns={taskColumns}
-          dataSource={instance.tasks}
-          emptyText={t('shell.inspector.noTasks')}
-        />
-      </section>
-      <section>
-        <Typography.Title level={5}>{t('shell.inspector.calls')}</Typography.Title>
-        {instance.calls.length === 0 ? (
-          <EmptyState text={t('shell.inspector.noCalls')} />
-        ) : (
+                ...(instance.parent === null
+                  ? []
+                  : [
+                      {
+                        key: 'parent',
+                        label: t('shell.inspector.parent'),
+                        children:
+                          parentPage === undefined ? (
+                            instance.parent.process
+                          ) : (
+                            <Link
+                              to={inspectorPath(sitePath, parentPage, instance.parent.id)}
+                              data-testid="inspector-parent-link"
+                            >
+                              {instance.parent.process}
+                            </Link>
+                          ),
+                      },
+                    ]),
+                { key: 'release', label: t('shell.inspector.release'), children: instance.releaseId },
+                {
+                  key: 'createdAt',
+                  label: t('shell.inspector.createdAt'),
+                  children: time('createdAt', instance.createdAt),
+                },
+                { key: 'endedAt', label: t('shell.inspector.endedAt'), children: time('endedAt', instance.endedAt) },
+                ...(due === null
+                  ? []
+                  : [{ key: 'dueAt', label: t('shell.inspector.dueAt'), children: time('dueAt', due) }]),
+              ]}
+            />
+          </Flex>
+        </SectionPart>
+        <SectionPart testName="inspector-steps" heading={{ title: t('shell.inspector.steps') }}>
           <Flex vertical>
-            {instance.calls.map((call) => (
-              <CallItem
-                key={call.id}
-                call={call}
-                instanceId={instance.id}
-                instancesPath={instancesPath}
-                onChanged={onChanged}
-                stepLabel={stepLabel}
-                attemptColumns={attemptColumns}
-              />
+            {instance.graph.steps.map((step) => (
+              <Flex key={step.name} vertical gap="small" data-testid={`inspector-step-${step.name}`} style={rowStyle}>
+                <Flex gap="small" align="center">
+                  <Typography.Text strong>{stepLabel(step.name)}</Typography.Text>
+                  <Typography.Text type="secondary">{step.type}</Typography.Text>
+                  {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
+                  {taken.has(step.name) && <Tag color="green">{t('shell.inspector.taken')}</Tag>}
+                  {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
+                  {step.name === instance.step && <Tag color="blue">{t('shell.inspector.current')}</Tag>}
+                </Flex>
+                {step.transitions.map((transition) => (
+                  <Typography.Text key={`${transition.next}|${transition.on ?? ''}`} type="secondary">
+                    {`→ ${stepLabel(transition.next)}${transition.on === null ? '' : ` (${transition.on})`}`}
+                  </Typography.Text>
+                ))}
+              </Flex>
             ))}
           </Flex>
-        )}
-      </section>
-      <section>
-        <Typography.Title level={5}>{t('shell.inspector.subProcesses')}</Typography.Title>
-        <AxisTable<SubProcess>
-          rowKey={(row) => row.id}
-          columns={subProcessColumns}
-          dataSource={instance.subProcesses}
-          emptyText={t('shell.inspector.noSubProcesses')}
-        />
-      </section>
-    </Flex>
+        </SectionPart>
+        <SectionPart testName="inspector-history" heading={{ title: t('shell.inspector.history') }}>
+          <AxisTable<PathEntry>
+            rowKey={(row) => `${row.step}|${row.startedAt}|${row.finishedAt}`}
+            columns={historyColumns}
+            dataSource={instance.path}
+            emptyText={t('shell.inspector.noHistory')}
+          />
+        </SectionPart>
+        <SectionPart testName="inspector-tasks" heading={{ title: t('shell.inspector.tasks') }}>
+          <AxisTable<InstanceTask>
+            rowKey={(row) => row.id}
+            columns={taskColumns}
+            dataSource={instance.tasks}
+            emptyText={t('shell.inspector.noTasks')}
+          />
+        </SectionPart>
+        <SectionPart testName="inspector-calls" heading={{ title: t('shell.inspector.calls') }}>
+          {instance.calls.length === 0 ? (
+            <EmptyState text={t('shell.inspector.noCalls')} />
+          ) : (
+            <Flex vertical>
+              {instance.calls.map((call) => (
+                <CallItem
+                  key={call.id}
+                  call={call}
+                  instanceId={instance.id}
+                  instancesPath={instancesPath}
+                  onChanged={onChanged}
+                  stepLabel={stepLabel}
+                  attemptColumns={attemptColumns}
+                />
+              ))}
+            </Flex>
+          )}
+        </SectionPart>
+        <SectionPart testName="inspector-sub-processes" heading={{ title: t('shell.inspector.subProcesses') }}>
+          <AxisTable<SubProcess>
+            rowKey={(row) => row.id}
+            columns={subProcessColumns}
+            dataSource={instance.subProcesses}
+            emptyText={t('shell.inspector.noSubProcesses')}
+          />
+        </SectionPart>
+      </SectionParts>
+    </div>
   )
 }
 

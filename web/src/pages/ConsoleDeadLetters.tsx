@@ -1,5 +1,5 @@
 import { DeleteOutlined, SendOutlined } from '@ant-design/icons'
-import { Card, Flex, Select, Tag } from 'antd'
+import { Flex, Select, Tag } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
@@ -13,6 +13,7 @@ import {
 import { formatValue } from '../platform/formatValue'
 import { deadLetterCommands, forbidden, sendDeadLetterCommand, type DeadLetterCommand } from '../platform/inspection'
 import { ReasonDialog } from '../platform/ReasonDialog'
+import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 
 interface ConsoleDeadLettersProps {
@@ -44,7 +45,7 @@ const createdAtField = { name: 'createdAt', type: 'date-time' } as const
  * newest first, including those that belong to no process. The application filter asks the server for one application.
  * A row has a button for each command the server lists in the item's `commands`, and the view never decides which
  * letter may take one. A button opens the reason dialog, and a success reads the list again. A failure, a 403
- * included, shows an error in this card only.
+ * included, shows an error in this part only.
  */
 export function ConsoleDeadLetters({ applications, locale }: ConsoleDeadLettersProps) {
   const t = useText()
@@ -131,7 +132,7 @@ export function ConsoleDeadLetters({ applications, locale }: ConsoleDeadLettersP
   }, [applications, locale, t])
 
   return (
-    <Card data-testid="console-dead-letters" title={t('shell.console.deadLetters.title')}>
+    <SectionPart testId="console-dead-letters" heading={{ title: t('shell.console.deadLetters.title') }}>
       <Flex vertical gap="middle">
         <Select
           data-testid="console-dead-letters-application"
@@ -191,6 +192,6 @@ export function ConsoleDeadLetters({ applications, locale }: ConsoleDeadLettersP
           onChanged={() => setReload((count) => count + 1)}
         />
       )}
-    </Card>
+    </SectionPart>
   )
 }

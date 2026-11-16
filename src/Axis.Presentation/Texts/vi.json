@@ -608,6 +608,7 @@
   "shell.task.reassignSend": "Giao lại",
   "shell.task.reassignCancel": "Hủy",
   "shell.inspector.open": "Mở",
+  "shell.inspector.details": "Thông tin",
   "shell.inspector.state": "Trạng thái",
   "shell.inspector.step": "Bước",
   "shell.inspector.subject": "Bản ghi",

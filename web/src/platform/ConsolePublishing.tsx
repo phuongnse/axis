@@ -1,4 +1,4 @@
-import { Card, Flex, Select, Tag, Typography } from 'antd'
+import { Flex, Select, Tag, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
@@ -10,6 +10,7 @@ import {
   type ConsoleReleaseItem,
 } from './console'
 import { ReleaseOffStandard } from './ReleaseOffStandard'
+import { SectionPart } from './SectionParts'
 import { releasePublisher } from './studio'
 import { useText } from './texts'
 
@@ -44,7 +45,7 @@ function formatTime(value: string | null, locale: string) {
  * The Publishing view of the operator console: the release history and the publish requests of one application, read
  * only. The picker starts on the first application of the tenant. The releases table marks the active release and every off-standard release with its relaxed points, and the
  * requests table lists the publish requests newest first, one page at a time. The view has no publish or activate
- * command, because those stay in Studio. A failure shows an error in this card only.
+ * command, because those stay in Studio. A failure shows an error in this part only.
  */
 export function ConsolePublishing({ applications, locale }: ConsolePublishingProps) {
   const t = useText()
@@ -179,7 +180,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
   )
 
   return (
-    <Card data-testid="console-publishing" title={t('shell.console.publishing.title')}>
+    <SectionPart testId="console-publishing" heading={{ title: t('shell.console.publishing.title') }}>
       <Flex vertical gap="middle">
         <Select
           style={{ minWidth: 200, maxWidth: 400 }}
@@ -230,6 +231,6 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
           </>
         )}
       </Flex>
-    </Card>
+    </SectionPart>
   )
 }

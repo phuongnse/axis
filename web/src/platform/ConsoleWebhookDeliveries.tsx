@@ -1,4 +1,4 @@
-import { Card, Flex, Select, Tag } from 'antd'
+import { Flex, Select, Tag } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
@@ -8,6 +8,7 @@ import {
   type ConsoleWebhookDelivery,
   type ConsoleWebhookDeliveryPage,
 } from './console'
+import { SectionPart } from './SectionParts'
 import { useText } from './texts'
 
 interface ConsoleWebhookDeliveriesProps {
@@ -37,7 +38,7 @@ const stateColors: Record<ConsoleWebhookDelivery['state'], string> = {
  * The Webhook deliveries view of the operator console: the recent deliveries of the tenant's webhooks, newest first,
  * with the state, the attempts and the last status code of each. Two filters narrow the list to one application or one
  * webhook. The webhook filter offers the webhooks of the answer, narrowed to the chosen application. A failure shows an
- * error in this card only.
+ * error in this part only.
  */
 export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhookDeliveriesProps) {
   const t = useText()
@@ -124,7 +125,7 @@ export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhoo
   )
 
   return (
-    <Card data-testid="console-webhook-deliveries" title={t('shell.console.webhooks.title')}>
+    <SectionPart testId="console-webhook-deliveries" heading={{ title: t('shell.console.webhooks.title') }}>
       <Flex vertical gap="middle">
         <Flex gap="small" wrap>
           <Select
@@ -178,6 +179,6 @@ export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhoo
           />
         )}
       </Flex>
-    </Card>
+    </SectionPart>
   )
 }

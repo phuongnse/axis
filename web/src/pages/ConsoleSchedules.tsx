@@ -1,8 +1,9 @@
-import { Card, Flex, Select } from 'antd'
+import { Flex, Select } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { fetchConsoleSchedules, type ConsoleApplication, type ConsoleScheduleItem } from '../platform/console'
+import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 
 interface ConsoleSchedulesProps {
@@ -27,7 +28,7 @@ interface LoadState {
  * The Schedules view of the operator console: the schedule triggers of the active release of every application, ordered
  * by application and trigger name and not paged, each with its process, its cron schedule and time zone, the last
  * occurrence that ran and the next occurrence. The application filter asks the server for one application. A failure, a
- * 403 included, shows an error in this card only.
+ * 403 included, shows an error in this part only.
  */
 export function ConsoleSchedules({ applications, locale }: ConsoleSchedulesProps) {
   const t = useText()
@@ -99,7 +100,7 @@ export function ConsoleSchedules({ applications, locale }: ConsoleSchedulesProps
   )
 
   return (
-    <Card data-testid="console-schedules" title={t('shell.console.schedules.title')}>
+    <SectionPart testId="console-schedules" heading={{ title: t('shell.console.schedules.title') }}>
       <Flex vertical gap="middle">
         <Select
           data-testid="console-schedules-application"
@@ -128,6 +129,6 @@ export function ConsoleSchedules({ applications, locale }: ConsoleSchedulesProps
           />
         )}
       </Flex>
-    </Card>
+    </SectionPart>
   )
 }

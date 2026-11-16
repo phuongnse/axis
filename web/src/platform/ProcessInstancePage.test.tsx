@@ -484,6 +484,20 @@ describe('ProcessInstancePage', () => {
     expect(assignLocation).not.toHaveBeenCalled()
   })
 
+  it('shows each section as a part, with the commands and the state in Details', async () => {
+    stubApi({ detail: { status: 200, body: detailWith(['cancel']) } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    const details = screen.getByRole('region', { name: 'Details' })
+    expect(within(details).getByText('State')).toBeInTheDocument()
+    expect(within(details).getByTestId('inspector-command-cancel')).toBeInTheDocument()
+    for (const title of ['Steps', 'History', 'Tasks', 'Calls', 'Sub-processes']) {
+      expect(screen.getByRole('region', { name: title })).toBeInTheDocument()
+    }
+  })
+
   it('shows only the command buttons the detail allows', async () => {
     stubApi({ detail: { status: 200, body: detailWith(['cancel']) } })
     const { unmount } = renderPage()

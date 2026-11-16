@@ -11,7 +11,11 @@ command, so the widget never decides who may inspect or act. The rest of the fro
 A page whose widget is a `processInspector` names one process.
 
 ```json
-{ "type": "processInspector", "name": "inspector", "process": "PurchaseRequestApproval" }
+{
+  "type": "processInspector",
+  "name": "inspector",
+  "process": "PurchaseRequestApproval"
+}
 ```
 
 - **Compile.** The `process` must name a loaded process, otherwise it is `AXC0192` at
@@ -50,6 +54,10 @@ step, release and times.
 
 A row opens `/{site}/{page}/{instanceId}`, with the page name in lower case. `new` and an id in the
 wrong form show the not-found page, and the instance is not requested.
+
+- **Parts.** The page is a column of parts, see [layout](shell.md#layout). A Details part comes first,
+  with the commands, then the state, step, record, release and times. Steps, History, Tasks, Calls
+  and Sub-processes follow as parts, each under its heading.
 
 - **Steps.** The page reads the instance detail and shows the steps as a list in graph order, each with
   its type and its transitions, with no diagram. Steps the instance has run are marked as taken, and

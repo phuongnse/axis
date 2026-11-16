@@ -28,18 +28,23 @@ export function SectionParts({ children }: { children: ReactNode }) {
 }
 
 /**
+ * The test id of a part, either the `testName` of `studio-section-<testName>` or a whole `testId` for a part that keeps
+ * the test id it had as a card. One of the two is required.
+ */
+type SectionPartName = { testName: string; testId?: undefined } | { testId: string; testName?: undefined }
+
+/**
  * A part of a page or a Studio section, see docs/reference/shell.md#layout and docs/reference/studio-resource-form.md#sections:
  * an optional heading, its optional line and a slot for an action on the right of the heading, with no panel. A part with no
  * heading is its fields alone. It draws the `divider` rule above itself when `SectionParts` says a part comes before it.
  */
 export function SectionPart({
   testName,
+  testId,
   heading,
   action,
   children,
-}: {
-  /** In `data-testid="studio-section-<testName>"`. */
-  testName: string
+}: SectionPartName & {
   /** The heading, and its line when it has one. None for the last section of unnamed properties. */
   heading?: { title: string; line?: string }
   /** On the right of the heading, such as a list's Add. A function child draws the slot in its place. */
@@ -51,6 +56,7 @@ export function SectionPart({
   const ruled = useContext(RuleAbove)
   const headingId = useId()
   const [slot, setSlot] = useState<HTMLElement | null>(null)
+  const dataTestId = testId ?? `studio-section-${testName}`
   const body = (
     <RuleAbove.Provider value={false}>{typeof children === 'function' ? children(slot) : children}</RuleAbove.Provider>
   )
@@ -59,14 +65,14 @@ export function SectionPart({
     return (
       <>
         {rule}
-        <div data-testid={`studio-section-${testName}`}>{body}</div>
+        <div data-testid={dataTestId}>{body}</div>
       </>
     )
   }
   return (
     <>
       {rule}
-      <section aria-labelledby={headingId} data-testid={`studio-section-${testName}`}>
+      <section aria-labelledby={headingId} data-testid={dataTestId}>
         <Flex justify="space-between" align="flex-start" gap="small" style={{ marginBottom: spacing.sm }}>
           <div>
             {/* Level two for the outline, at the 16px and 24px that a level-five heading has. */}
