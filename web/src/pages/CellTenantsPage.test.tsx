@@ -1,9 +1,10 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Outlet, Route, Routes } from 'react-router'
+import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { CellJob, CellTenant } from '../platform/cell'
+import { clickInDialog, pick } from '../test/tableFilter'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { CellTenantsPage } from './CellTenantsPage'
@@ -66,9 +67,13 @@ function stubTenants(status: number, items: CellTenant[] = []) {
   )
 }
 
-function renderPage(onRefused = vi.fn()) {
+function Address() {
+  return <output data-testid="address">{useLocation().search}</output>
+}
+
+function renderPage(onRefused = vi.fn(), address = '/') {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[address]}>
       <ThemeModeProvider>
         <PlatformContext.Provider value={platform}>
           <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
@@ -80,6 +85,7 @@ function renderPage(onRefused = vi.fn()) {
           </TextProvider>
         </PlatformContext.Provider>
       </ThemeModeProvider>
+      <Address />
     </MemoryRouter>,
   )
   return onRefused
@@ -163,6 +169,9 @@ function rowIds() {
   return dataRows().map((row) => within(row).getAllByRole('cell')[0].textContent)
 }
 
+const address = () => screen.getByTestId('address').textContent!
+const filterInAddress = () => JSON.parse(new URLSearchParams(address()).get('filter')!) as unknown
+
 describe('CellTenantsPage', () => {
   afterEach(() => vi.unstubAllGlobals())
 
@@ -224,35 +233,53 @@ describe('CellTenantsPage', () => {
     expect(within(rows[2]).getAllByRole('cell')[11]).not.toHaveTextContent('—')
   })
 
-  it('narrows the rows by id, ignoring case', async () => {
+  it('searches the ids on Enter, ignoring case, and keeps the search in the address', async () => {
     stubTenants(200, [acme, beta, gamma])
     renderPage()
 
     await screen.findByTestId('cell-tenants')
-    await userEvent.type(screen.getByLabelText('Search by ID or host'), 'BETA')
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'BETA{Enter}')
 
     expect(rowIds()).toEqual(['beta'])
+    expect(address()).toBe('?search=BETA')
   })
 
-  it('narrows the rows by any host', async () => {
+  it('searches the hosts on Enter and does not search on each key', async () => {
     stubTenants(200, [acme, beta, gamma])
     renderPage()
 
     await screen.findByTestId('cell-tenants')
-    await userEvent.type(screen.getByLabelText('Search by ID or host'), 'portal')
+    const search = screen.getByRole('searchbox', { name: 'Search' })
+    await userEvent.type(search, 'portal')
+    expect(rowIds()).toEqual(['acme', 'beta', 'gamma'])
 
+    await userEvent.type(search, '{Enter}')
     expect(rowIds()).toEqual(['acme'])
+    expect(address()).toContain('search=portal')
   })
 
-  it('keeps only the tenants with the chosen status', async () => {
+  it('keeps only the tenants with the chosen status, through Filter, and keeps the filter in the address', async () => {
     stubTenants(200, [acme, beta, gamma])
     renderPage()
 
     await screen.findByTestId('cell-tenants')
-    await userEvent.click(screen.getByRole('combobox', { name: 'Status' }))
-    await userEvent.click(await screen.findByRole('option', { name: 'Read only' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Value', 0, 'Suspended')
+    await clickInDialog('Apply')
 
-    expect(rowIds()).toEqual(['gamma'])
+    await waitFor(() => expect(rowIds()).toEqual(['beta']))
+    expect(filterInAddress()).toEqual({ all: [{ field: 'status', op: 'eq', value: 'suspended' }] })
+  })
+
+  it('opens at an address with a search and a filter and shows the same rows', async () => {
+    stubTenants(200, [acme, beta, gamma])
+    const filter = JSON.stringify({ all: [{ field: 'status', op: 'eq', value: 'suspended' }] })
+    renderPage(vi.fn(), `/?${new URLSearchParams({ search: 'example', filter })}`)
+
+    await screen.findByTestId('cell-tenants')
+    expect(rowIds()).toEqual(['beta'])
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('example')
+    expect(screen.getByText('Status is Suspended')).toBeInTheDocument()
   })
 
   it('reports a refusal to the console', async () => {

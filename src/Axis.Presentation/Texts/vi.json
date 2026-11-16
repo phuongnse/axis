@@ -339,8 +339,6 @@
   "shell.cell.jobs.runAgainBody": "Một tác vụ mới bắt đầu từ bước đầu tiên chưa thành công. Các bước đã thành công không chạy lại.",
   "shell.cell.jobs.runAgainOk": "Chạy lại",
   "shell.cell.tenants.title": "Tenant",
-  "shell.cell.tenants.search": "Tìm theo ID hoặc tên miền",
-  "shell.cell.tenants.statusFilter": "Trạng thái",
   "shell.cell.tenants.empty": "Cell chưa có tenant nào.",
   "shell.cell.tenants.loadFailed": "Không tải được danh sách tenant.",
   "shell.cell.tenants.id": "ID",
