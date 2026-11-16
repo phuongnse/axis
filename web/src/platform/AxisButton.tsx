@@ -1,5 +1,5 @@
 import { DownOutlined, EllipsisOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Flex, Tooltip, type ButtonProps, type FlexProps } from 'antd'
+import { Button, Dropdown, Flex, Space, Tooltip, type ButtonProps, type FlexProps } from 'antd'
 import {
   createContext,
   useContext,
@@ -298,4 +298,36 @@ export function AxisButton(props: AxisButtonProps) {
         />
       )
   }
+}
+
+/** One action of an `AxisButtonGroup`: its text, and what its button takes. */
+export interface AxisGroupAction {
+  key: string
+  label: string
+  loading?: boolean
+  disabled?: boolean
+  onClick: () => void
+}
+
+/**
+ * Proposed, see the review on #3650: actions of equal weight that together are the main action of a region, such as a
+ * task's outcomes, joined in one group in the `main` role, in the order given. The region keeps one main action, and no
+ * action of the group stands above another. Each action stays a button of its own, with no selected state, and the
+ * group is named by `nameKey`. A group of one action is a plain `main` button.
+ */
+export function AxisButtonGroup({ nameKey, actions }: { nameKey: string; actions: readonly AxisGroupAction[] }) {
+  const t = useText()
+  const buttons = actions.map(({ key, label, ...button }) => (
+    <AxisButton role="main" key={key} {...button}>
+      {label}
+    </AxisButton>
+  ))
+  if (buttons.length < 2) {
+    return <>{buttons}</>
+  }
+  return (
+    <Space.Compact role="group" aria-label={t(nameKey)}>
+      {buttons}
+    </Space.Compact>
+  )
 }

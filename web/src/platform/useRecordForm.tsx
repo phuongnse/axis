@@ -1,5 +1,5 @@
 import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
-import { Col, Flex, Form, Input, Row, Space, Typography } from 'antd'
+import { Col, Flex, Form, Input, Row, Space } from 'antd'
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
@@ -23,10 +23,11 @@ import {
   type RowLabels,
 } from './records'
 import { ReadOnlyValue } from './ReadOnlyValue'
+import { requiredMark } from './requiredMark'
 import { ReferenceLookup } from './ReferenceLookup'
 import { ReferencesInput } from './ReferencesInput'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
-import { PartRule } from './SectionParts'
+import { PartRule, SectionPart } from './SectionParts'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
@@ -447,7 +448,13 @@ export function useRecordForm(
     })
   }
 
-  const input = (field: FieldMetadata, readOnly: boolean, required: boolean, helpId: string | undefined): ReactNode => {
+  const input = (
+    field: FieldMetadata,
+    readOnly: boolean,
+    required: boolean,
+    helpId: string | undefined,
+    title?: ReactNode,
+  ): ReactNode => {
     const value = values[field.name] ?? null
     const id = field.name
     if (asText(field, readOnly)) {
@@ -543,6 +550,7 @@ export function useRecordForm(
             onChange={(rows, rowLabels) => setRows(field, rows, rowLabels)}
             errors={cellErrors[field.name] ?? {}}
             locale={locale}
+            title={title}
           />
         )
       default:
@@ -582,6 +590,74 @@ export function useRecordForm(
       }
       const ruleAbove = drawn > 0 && section.titleKey !== null
       drawn += 1
+      const grid = (
+        <Row gutter={[spacing.md, spacing.lg]} align="top">
+          {visible.map((entry) => {
+            const { field } = entry
+            const errors = errorsOf(field.name)
+            const required = stateOf(field.name)?.required ?? field.required
+            const helpId = field.helpKey ? `${field.name}-help` : undefined
+            const locked = lockedOf(entry)
+            const label = <span style={{ fontWeight: 500, color: colour.textMuted }}>{labelOf(field)}</span>
+            const help = (marginTop: number) =>
+              field.helpKey && (
+                <div
+                  id={helpId}
+                  style={{
+                    fontSize: 12,
+                    lineHeight: '20px',
+                    color: colour.textMuted,
+                    marginTop,
+                    marginBottom: spacing.xs,
+                  }}
+                >
+                  {t(field.helpKey)}
+                </div>
+              )
+            // Proposed: an editable child collection's label and help sit on its toolbar's left, on one row with
+            // Add row, see the review on #3650.
+            const onToolbar = field.type === 'child-collection' && !locked
+            const control = input(
+              field,
+              locked,
+              required,
+              helpId,
+              onToolbar ? (
+                <div>
+                  {requiredMark(label, { required })}
+                  {help(0)}
+                </div>
+              ) : undefined,
+            )
+            const item = (
+              <Form.Item
+                key={field.name}
+                label={onToolbar ? undefined : label}
+                // A child collection and a read-only value have no input for the label to point to.
+                htmlFor={field.type === 'child-collection' || asText(field, locked) ? undefined : field.name}
+                required={required}
+                validateStatus={errors ? 'error' : undefined}
+                help={
+                  errors && (
+                    <div role="alert" data-testid={`field-error-${field.name}`}>
+                      {errors.join(' ')}
+                    </div>
+                  )
+                }
+              >
+                {/* The label has Ant Design's 8px padding below it, so this pulls the help 4px under it. */}
+                {!onToolbar && help(-4)}
+                {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
+              </Form.Item>
+            )
+            return (
+              <Col key={field.name} xs={24} lg={narrow ? 24 : entry.width * 2}>
+                {canvas ? canvas.field(field.name, item) : item}
+              </Col>
+            )
+          })}
+        </Row>
+      )
       const content = (
         <div>
           {ruleAbove && (
@@ -590,57 +666,13 @@ export function useRecordForm(
             </div>
           )}
           {section.titleKey !== null &&
-            !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) && (
-              <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>
-            )}
-          <Row gutter={[spacing.md, spacing.lg]} align="top">
-            {visible.map((entry) => {
-              const { field } = entry
-              const errors = errorsOf(field.name)
-              const required = stateOf(field.name)?.required ?? field.required
-              const helpId = field.helpKey ? `${field.name}-help` : undefined
-              const control = input(field, lockedOf(entry), required, helpId)
-              const item = (
-                <Form.Item
-                  key={field.name}
-                  label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{labelOf(field)}</span>}
-                  // A child collection and a read-only value have no input for the label to point to.
-                  htmlFor={field.type === 'child-collection' || asText(field, lockedOf(entry)) ? undefined : field.name}
-                  required={required}
-                  validateStatus={errors ? 'error' : undefined}
-                  help={
-                    errors && (
-                      <div role="alert" data-testid={`field-error-${field.name}`}>
-                        {errors.join(' ')}
-                      </div>
-                    )
-                  }
-                >
-                  {field.helpKey && (
-                    // The label has Ant Design's 8px padding below it, so this pulls the help 4px under it.
-                    <div
-                      id={helpId}
-                      style={{
-                        fontSize: 12,
-                        lineHeight: '20px',
-                        color: colour.textMuted,
-                        marginTop: -4,
-                        marginBottom: spacing.xs,
-                      }}
-                    >
-                      {t(field.helpKey)}
-                    </div>
-                  )}
-                  {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
-                </Form.Item>
-              )
-              return (
-                <Col key={field.name} xs={24} lg={narrow ? 24 : entry.width * 2}>
-                  {canvas ? canvas.field(field.name, item) : item}
-                </Col>
-              )
-            })}
-          </Row>
+          !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) ? (
+            // Proposed: a titled group is drawn by the shared part, so its heading keeps the part's spacing, see the
+            // review on #3650.
+            <SectionPart title={t(section.titleKey)}>{grid}</SectionPart>
+          ) : (
+            grid
+          )}
         </div>
       )
       return <Fragment key={index}>{canvas ? canvas.section(index, content) : content}</Fragment>

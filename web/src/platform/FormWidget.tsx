@@ -347,8 +347,13 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
   ]
   return (
     <ConfigProvider locale={antLocaleFor(locale)}>
+      {/* Proposed: a saved record is headed by its name with its entity's label as the line, and a new record, which
+          has no name yet, by "New <entity>" with no line, see the review on #3650. */}
       {recordId !== null && typeof recordName === 'string' && recordName !== '' && (
         <PageHeading title={recordName} line={entity.labelKey ? t(entity.labelKey) : undefined} />
+      )}
+      {recordId === null && entity.labelKey && (
+        <PageHeading title={t('shell.form.newRecord').replace('{entity}', t(entity.labelKey))} />
       )}
       {recordActions.length > 0 && (
         <PageActions>

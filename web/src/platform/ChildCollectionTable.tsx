@@ -1,6 +1,6 @@
 import { CloseOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons'
 import { Form, Input, Space } from 'antd'
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { AxisButton } from './AxisButton'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { EmptyDash } from './EmptyValue'
@@ -33,6 +33,11 @@ interface ChildCollectionTableProps {
   locale: string
   /** Shows every cell read-only, with no add or remove buttons. */
   readOnly?: boolean
+  /**
+   * Proposed, see the review on #3650: the field's label and help, on the left of the toolbar, so they share one row
+   * with Add row. A read-only collection has no toolbar, so its label stays where the form or the detail puts it.
+   */
+  title?: ReactNode
 }
 
 // The types whose column is free text, as in a table widget. Every other type is a value of a fixed form.
@@ -68,6 +73,7 @@ export function ChildCollectionTable({
   errors,
   locale,
   readOnly = false,
+  title,
 }: ChildCollectionTableProps) {
   const t = useText()
   const childFields = useMemo(() => field.fields ?? [], [field.fields])
@@ -222,6 +228,7 @@ export function ChildCollectionTable({
           readOnly
             ? undefined
             : {
+                title,
                 main: (
                   <AxisButton role="main" onClick={add}>
                     {t('shell.form.addRow')}

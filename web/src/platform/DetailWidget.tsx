@@ -1,4 +1,4 @@
-import { Flex, Tag, Typography } from 'antd'
+import { Flex, Tag } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
@@ -22,7 +22,7 @@ import {
 import type { EntityWidgetMetadata, FieldMetadata, NavigateAction, StartProcessAction } from './site'
 import { PageHeading } from './PageLayout'
 import { RecordNotFound } from './RecordNotFound'
-import { PartRule } from './SectionParts'
+import { PartRule, SectionPart } from './SectionParts'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { sectionsOf } from './useRecordForm'
@@ -233,6 +233,34 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
   // Proposed: a saved record's page is headed by the record's name, its display field as saved, and the line under the
   // heading says what kind of record it is, see the review on #3650.
   const recordName = record && entity.displayField ? record.values[entity.displayField] : null
+  // The fields of one section, as a list of terms and their values.
+  const list = (section: (typeof sections)[number]) => (
+    <dl
+      style={{
+        margin: 0,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+        columnGap: spacing.md,
+        rowGap: spacing.md,
+        alignItems: 'start',
+      }}
+    >
+      {section.fields.map(({ field, width }) => (
+        <div
+          key={field.name}
+          style={{ gridColumn: `span ${narrow || width < 1 || width > 12 ? 12 : width}`, minWidth: 0 }}
+        >
+          <dt style={{ fontWeight: 500, color: colour.textMuted, fontSize: type.fontSize, lineHeight: '22px' }}>
+            {field.labelKey ? t(field.labelKey) : field.name}
+          </dt>
+          <dd style={{ margin: '6px 0 0', fontSize: type.fontSize, lineHeight: '22px', color: colour.text }}>
+            {valueOf(field)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  )
+
   return (
     <Flex vertical gap="middle" data-testid="detail" aria-busy="false">
       {typeof recordName === 'string' && recordName !== '' && (
@@ -242,33 +270,14 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
       {errors.length > 0 && <AxisAlert data-testid="detail-error" kind="error" message={errors.join(' ')} />}
       {sections.map((section, index) => (
         <Fragment key={index}>
-          {/* Proposed: a titled section after another is a part, a rule below it, see the review on #3650. */}
+          {/* Proposed: a titled section after another is a part, a rule below it, and the shared part draws its
+              heading, see the review on #3650. */}
           {index > 0 && section.titleKey !== null && <PartRule />}
-          {section.titleKey !== null && <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>}
-          <dl
-            style={{
-              margin: 0,
-              display: 'grid',
-              gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
-              columnGap: spacing.md,
-              rowGap: spacing.md,
-              alignItems: 'start',
-            }}
-          >
-            {section.fields.map(({ field, width }) => (
-              <div
-                key={field.name}
-                style={{ gridColumn: `span ${narrow || width < 1 || width > 12 ? 12 : width}`, minWidth: 0 }}
-              >
-                <dt style={{ fontWeight: 500, color: colour.textMuted, fontSize: type.fontSize, lineHeight: '22px' }}>
-                  {field.labelKey ? t(field.labelKey) : field.name}
-                </dt>
-                <dd style={{ margin: '6px 0 0', fontSize: type.fontSize, lineHeight: '22px', color: colour.text }}>
-                  {valueOf(field)}
-                </dd>
-              </div>
-            ))}
-          </dl>
+          {section.titleKey !== null ? (
+            <SectionPart title={t(section.titleKey)}>{list(section)}</SectionPart>
+          ) : (
+            list(section)
+          )}
         </Fragment>
       ))}
       {buttons.length > 0 && <Flex gap="small">{buttons}</Flex>}

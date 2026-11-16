@@ -114,6 +114,11 @@ export interface AxisBulkAction<T> {
  * Each is there only when the table has it.
  */
 export interface AxisTableToolbar {
+  /**
+   * Proposed, see the review on #3650: the name of a table that is one field of a form, such as a child collection's
+   * label, first on the left, so the label and the table's main action, such as Add row, share one row.
+   */
+  title?: ReactNode
   view?: ReactNode
   onRefresh?: () => void
   secondary?: ReactNode
@@ -453,6 +458,7 @@ export function AxisTable<T extends object>({
     searchable ||
     filterable ||
     arrangeable ||
+    toolbar.title !== undefined ||
     toolbar.view !== undefined ||
     toolbar.onRefresh !== undefined ||
     toolbar.secondary !== undefined ||
@@ -498,6 +504,7 @@ export function AxisTable<T extends object>({
     <Flex ref={tableRef} vertical gap="middle" aria-busy={loading} data-testid={testId}>
       {hasToolbar && (
         <Flex justify="space-between" align="center" gap="small" wrap>
+          {toolbar.title}
           {(searchable || filterable || arrangeable || toolbar.view !== undefined) && (
             <Flex gap="small" wrap>
               {searchable && (

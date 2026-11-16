@@ -1,6 +1,6 @@
 import { Flex, Form, Space, Tag } from 'antd'
 import { AxisAlert } from './AxisAlert'
-import { AxisActionRow, AxisButton } from './AxisButton'
+import { AxisActionRow, AxisButton, AxisButtonGroup } from './AxisButton'
 import { PageActions, PageHeading } from './PageLayout'
 import { RecordNotFound } from './RecordNotFound'
 import { SaveBar } from './SaveBar'
@@ -228,16 +228,21 @@ function TaskBody({
 }: TaskBodyProps) {
   const t = useText()
   const subject = task.subject.label ?? ''
-  // Proposed: the task heads its page, and its subject and due date are the heading's line, see the review on #3650.
+  const dueAt = task.dueAt === null ? null : (formatValue(dueAtField, task.dueAt, {}, { locale, text: t }) as string)
+  // Proposed: a page that shows one thing is headed by its name, and the line under it starts with its kind, then what
+  // it is about and when, then its state as a tag. A task's line is "Task on <subject>, due <date>", see the review on
+  // #3650.
+  const about =
+    subject === ''
+      ? dueAt === null
+        ? t('shell.task.kind')
+        : t('shell.task.lineDue').replace('{dueAt}', dueAt)
+      : dueAt === null
+        ? t('shell.task.lineSubject').replace('{subject}', subject)
+        : t('shell.task.line').replace('{subject}', subject).replace('{dueAt}', dueAt)
   const line = (
     <Space size="small" wrap>
-      <span>
-        {task.dueAt === null
-          ? subject
-          : t('shell.task.line')
-              .replace('{subject}', subject)
-              .replace('{dueAt}', formatValue(dueAtField, task.dueAt, {}, { locale, text: t }) as string)}
-      </span>
+      <span>{about}</span>
       {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
       {task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>}
     </Space>
@@ -493,23 +498,20 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
           </AxisActionRow>
         )}
         {/* Proposed: the outcomes act on the task, so they are the page's own actions on its heading's right, as a
-            record's Submit for approval is, the first outcome last as the main one; an outcome sends the changed
-            values with it. See the review on #3650. */}
+            record's Submit for approval is. They weigh the same, so they are one group in the main role, in the
+            order the process gives them; an outcome sends the changed values with it. See the review on #3650. */}
         {steps.last && (
           <PageActions>
-            <Flex gap="small">
-              {[...task.outcomes].reverse().map((outcome) => (
-                <AxisButton
-                  role={outcome === task.outcomes[0] ? 'main' : 'secondary'}
-                  key={outcome.name}
-                  loading={sending === outcome.name}
-                  disabled={(sending !== null && sending !== outcome.name) || saving}
-                  onClick={() => void complete(outcome.name)}
-                >
-                  {t(outcome.labelKey)}
-                </AxisButton>
-              ))}
-            </Flex>
+            <AxisButtonGroup
+              nameKey="shell.task.outcomes"
+              actions={task.outcomes.map((outcome) => ({
+                key: outcome.name,
+                label: t(outcome.labelKey),
+                loading: sending === outcome.name,
+                disabled: (sending !== null && sending !== outcome.name) || saving,
+                onClick: () => void complete(outcome.name),
+              }))}
+            />
           </PageActions>
         )}
         {/* Proposed: a change to the task's form saves through the save bar, as every form's does, with the task's own
