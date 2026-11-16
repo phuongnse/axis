@@ -296,7 +296,8 @@
         "person": true
       },
       "The change keeps docs/reference/shared-widgets.md#the-rule: for each thing it draws, loads or checks, search for the widget, helper or route that already does that job and check that the change uses or extends it, adds no second way to it, and gives a new shared widget its row in that page",
-      "A change that adds or changes a screen text keeps docs/reference/ui-writing.md and its glossary: read the page and check each text against each of its rules"
+      "A change that adds or changes a screen text keeps docs/reference/ui-writing.md and its glossary: read the page and check each text against each of its rules",
+      "A change that adds or changes a screen keeps docs/reference/actions-and-controls.md: read the page and check every screen the change draws against each of its rules"
     ]
   },
   "github_app": {
