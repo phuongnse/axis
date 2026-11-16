@@ -17,9 +17,11 @@ import type {
   StudioDiagnostic,
   StudioReference,
   StudioResourceActivity,
+  StudioReleases,
   StudioResourceItem,
 } from '../platform/studio'
 import { studioResourceAddress } from '../platform/studioAddress'
+import { releasePage } from '../designSystem/studioFixtures'
 import { PlatformContext, type Platform } from './context'
 import { StudioPage } from './StudioPage'
 import { editJson, jsonText } from '../test/jsonView'
@@ -197,7 +199,7 @@ function stubServer(
   let checkCalls = 0
   const entityPath = `${folder}/resources/${entityId}`
   const manifestPath = `${folder}/resources/${manifestId}`
-  const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit): Promise<Response> => {
     if ((input === entityPath || input === namesPath || input === '/api/me') && outage.down) {
       if (outage.down.status === null) {
         throw new TypeError('Failed to fetch')
@@ -235,6 +237,10 @@ function stubServer(
     }
     if (input === `${folder}/releases`) {
       return json({ active: null, folderContentHash: null, changes: null, items: [] })
+    }
+    // The server builds the release list from the same history, so a test that changes the history changes the list.
+    if (input === `${folder}/release-list`) {
+      return json(releasePage((await (await fetchMock(`${folder}/releases`)).json()) as StudioReleases))
     }
     if (input === `${folder}/diagnostics`) {
       return json({ diagnostics })

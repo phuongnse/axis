@@ -1202,6 +1202,31 @@ export interface StudioReleaseListRow {
   relaxed: StudioRelaxedPoint[]
 }
 
+/** One page of the release list, with how many releases match in all. */
+export interface StudioReleasePage {
+  items: StudioReleaseListRow[]
+  totalCount: number
+}
+
+/**
+ * Loads one page of the releases of an application, the highest number first unless `query` sorts them. `query` is the
+ * record API's `page`, `pageSize`, `sort`, `search` and `filter` as a query string, see docs/reference/authoring.md#release-list.
+ * A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function fetchStudioReleaseList(
+  application: string,
+  query: string,
+  signal?: AbortSignal,
+): Promise<StudioReleasePage> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/release-list${query ? `?${query}` : ''}`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  const { items, totalCount } = (await response.json()) as StudioReleasePage
+  return { items, totalCount }
+}
+
 /** A module or package that a release pins: its id, label and version, and its version in the release it compares with. */
 export interface StudioReleasePart {
   id: string
@@ -1402,36 +1427,6 @@ export async function saveStudioSettings(application: string, autoAccept: boolea
     throw new Error(`Saving '${path}' failed with status ${response.status}.`)
   }
   return (await response.json()) as { autoAccept: boolean }
-}
-
-/**
- * The rows of the release list: one for each release, the highest number first. A release that was activated more than
- * once has one row, which takes its details from its first activation, the earliest `activatedAt`. On equal times the
- * server's order decides.
- */
-export function releaseList(history: StudioReleases): StudioReleaseListRow[] {
-  const first = new Map<string, StudioReleaseItem>()
-  for (const item of history.items) {
-    const known = first.get(item.releaseId)
-    if (!known || Date.parse(item.activatedAt) < Date.parse(known.activatedAt)) {
-      first.set(item.releaseId, item)
-    }
-  }
-  const liveId = history.active?.releaseId
-  return [...first.values()]
-    .map((item) => ({
-      releaseId: item.releaseId,
-      number: item.number,
-      label: item.label,
-      note: item.note,
-      publishedAt: item.activatedAt,
-      actor: item.actor,
-      actorName: item.actorName,
-      live: item.releaseId === liveId,
-      offStandard: item.offStandard,
-      relaxed: item.relaxed,
-    }))
-    .sort((left, right) => right.number - left.number)
 }
 
 /**

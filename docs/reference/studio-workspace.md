@@ -190,9 +190,15 @@ The Overview's changes and a release's changes share one list.
 ## Releases
 
 The Releases entry lists the application's releases from
-[`GET .../releases`](authoring.md#release-history) on the
-[shared table](actions-and-controls.md#tables), one row per release, the highest number first: a publish
-gives a release its label and note, and activating goes to whichever release is wanted.
+[`GET .../release-list`](authoring.md#release-list) on the
+[shared table](actions-and-controls.md#tables), one row per release, the highest number first unless the
+view sorts them: a publish gives a release its label and note, and activating goes to whichever release is
+wanted. The table is paged on the server, [20 releases at a time](authoring.md#release-list), with Search,
+Filter, Columns, Refresh, a sort on Release, Label, Published and Published by, and a pager with a page size.
+Note does not sort, because it is long text. All of them live in the address, as
+[D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md)
+agrees. The page of releases loads again whenever the band's history does and when Refresh is pressed, so the
+Live tag is right after an activation.
 
 | Column       | Shows                                                                                                                                                       |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |

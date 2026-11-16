@@ -2,21 +2,25 @@ import { PlayCircleOutlined } from '@ant-design/icons'
 import { Flex, Modal, Spin, Tag, Typography } from 'antd'
 import { useContext, useEffect, useState, type HTMLAttributes } from 'react'
 import { Link } from 'react-router'
+import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { ReleaseOffStandard } from '../platform/ReleaseOffStandard'
 import {
   fetchStudioRelease,
-  releaseList,
+  fetchStudioReleaseList,
   releasePublisher,
   ServerUnreachableError,
   type StudioReleaseBlocker,
   type StudioReleaseListRow,
+  type StudioReleasePage,
   type StudioReleases,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { recordPageSize, recordQuery, tablePageSizes } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useTableView } from '../platform/useTableView'
 import { PlatformContext } from './context'
 
 /** The Live tag of the release that runs, in the release list and on the release page's heading. */
@@ -171,14 +175,28 @@ export function StudioActivateDialog({
   )
 }
 
+/** The columns the view's search, filter and sort can name, see docs/reference/authoring.md#release-list. */
+const releaseFields = [
+  { name: 'number', type: 'integer' },
+  { name: 'label', type: 'text' },
+  { name: 'publishedAt', type: 'date' },
+  { name: 'publishedBy', type: 'text' },
+  { name: 'note', type: 'text' },
+] as const
+// The list has no parameters of its own. A stable empty array keeps useTableView from recomputing on each render.
+const noParameters: readonly string[] = []
+
 /**
- * The release list of the open application: one row for each release, the highest number first, on one page. A row
- * shows the release number, a link to the release's page of `application`, with the Live tag when it is the release that runs, and the Off-standard tag with each
- * relaxed module, point and reason when it relaxed a contract point. The other columns are the label, the time it was
- * published, who published it and the note, from the release's first activation. An empty label or note shows the em
- * dash, and Published by is a name, never an id. When `canActivate`, every row but the live one has an Activate… icon
- * button, off while `busy`. The button opens a dialog that says which release replaces the live one, or why it cannot, and its
- * confirmation calls `onActivate`.
+ * The release list of the open application: one row for each release, the highest number first unless the view sorts
+ * them, paged on the server. A row shows the release number, a link to the release's page of `application`, with the Live
+ * tag when it is the release that runs, and the Off-standard tag with each relaxed module, point and reason when it
+ * relaxed a contract point. The other columns are the label, the time it was published, who published it and the note,
+ * from the release's first activation. An empty label or note shows the em dash, and Published by is a name, never an
+ * id. The table has Search, Filter, Columns, Refresh, a sort on Release, Label, Published and Published by, and a pager
+ * with a page size, all kept in the address, see docs/reference/actions-and-controls.md#tables and
+ * docs/reference/authoring.md#release-list. `history` gives the live number and reloads the page when it reloads. When
+ * `canActivate`, every row but the live one has an Activate… icon button, off while `busy`. The button opens a dialog
+ * that says which release replaces the live one, or why it cannot, and its confirmation calls `onActivate`.
  */
 export function StudioReleasesList({
   application,
@@ -195,9 +213,31 @@ export function StudioReleasesList({
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale
+  const { generation, lost } = useStudioConnection()
+  const { view, setView } = useTableView(releaseFields, recordPageSize, noParameters, true, true, true)
+  const query = recordQuery(view)
+  const [releases, setReleases] = useState<StudioReleasePage | 'failed'>()
+  const [reload, setReload] = useState(0)
   const [pending, setPending] = useState<StudioReleaseListRow | null>(null)
   const time = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' })
   const liveNumber = history.active?.number
+
+  // The page follows the band's history, so the Live tag is right after an activation without a second reload rule.
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchStudioReleaseList(application, query, controller.signal).then(setReleases, (error: unknown) => {
+      if (controller.signal.aborted) {
+        return
+      }
+      if (error instanceof ServerUnreachableError) {
+        lost()
+        return
+      }
+      console.warn(`Loading the releases of '${application}' failed`, error)
+      setReleases('failed')
+    })
+    return () => controller.abort()
+  }, [application, query, history, reload, generation, lost])
 
   function confirm() {
     const row = pending
@@ -209,9 +249,11 @@ export function StudioReleasesList({
 
   const columns: AxisColumn<StudioReleaseListRow>[] = [
     {
-      key: 'release',
+      key: 'number',
       kind: 'fixed',
       title: t('shell.studio.releases.release'),
+      filter: { kind: 'number' },
+      sorter: true,
       render: (_, row) => (
         <Flex wrap align="flex-start" gap="small">
           <Link
@@ -224,21 +266,39 @@ export function StudioReleasesList({
         </Flex>
       ),
     },
-    { key: 'label', kind: 'freeText', title: t('shell.studio.releases.label'), render: (_, row) => row.label || null },
     {
-      key: 'published',
+      key: 'label',
+      kind: 'freeText',
+      title: t('shell.studio.releases.label'),
+      filter: { kind: 'text' },
+      sorter: true,
+      render: (_, row) => row.label || null,
+    },
+    {
+      key: 'publishedAt',
       kind: 'fixed',
       title: t('shell.studio.releases.published'),
+      filter: { kind: 'date' },
+      sorter: true,
       render: (_, row) => time.format(new Date(row.publishedAt)),
     },
     {
       key: 'publishedBy',
       kind: 'freeText',
       title: t('shell.studio.releases.publishedBy'),
+      filter: { kind: 'text' },
+      sorter: true,
       render: (_, row) => releasePublisher(row, t),
     },
-    { key: 'note', kind: 'freeText', title: t('shell.studio.releases.note'), render: (_, row) => row.note || null },
+    {
+      key: 'note',
+      kind: 'freeText',
+      title: t('shell.studio.releases.note'),
+      filter: { kind: 'text' },
+      render: (_, row) => row.note || null,
+    },
   ]
+  const list = typeof releases === 'object' ? releases : undefined
 
   return (
     <section data-testid="studio-releases">
@@ -246,11 +306,27 @@ export function StudioReleasesList({
         <AxisTable<StudioReleaseListRow>
           columns={columns}
           rowKey={(row) => row.releaseId}
-          dataSource={releaseList(history)}
-          loading={false}
+          dataSource={list?.items ?? []}
+          loading={releases === undefined}
           emptyText={t('shell.studio.releases.empty')}
-          pagination={false}
-          toolbar={{}}
+          view={{
+            query: view,
+            onChange: setView,
+            pageSizes: tablePageSizes(),
+            total: list?.totalCount ?? 0,
+            search: true,
+            columns: true,
+          }}
+          toolbar={{ onRefresh: () => setReload((value) => value + 1) }}
+          failure={
+            releases === 'failed' ? (
+              <AxisAlert
+                data-testid="studio-releases-error"
+                kind="error"
+                message={t('shell.studio.releases.loadFailed')}
+              />
+            ) : undefined
+          }
           rowAttributes={(row) =>
             ({
               'data-testid': 'studio-release-row',
