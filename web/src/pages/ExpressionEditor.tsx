@@ -8,20 +8,24 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
 import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
-import { Typography } from 'antd'
+import { ExpandAltOutlined } from '@ant-design/icons'
+import { Flex, Modal, Typography } from 'antd'
 import { Fragment, useEffect, useRef, useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import {
   checkStudioExpression,
   fetchStudioExpressionScope,
   type ExpressionCheck,
   type ExpressionScope,
   type ExpressionScopeFunction,
+  type StudioNames,
 } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { callAt } from './expressionCall'
 import { expressionLanguage } from './expressionLanguage'
+import { ExpressionPanel } from './ExpressionPanel'
 import type { ScopeOption } from './expressionScope'
 
 /** How long the author must stop typing before the expression is checked. */
@@ -42,6 +46,12 @@ export interface ExpressionEditorProps {
   draft: Record<string, unknown>
   /** The names an author can complete at this place, apart from the functions, which the expression scope lists. */
   options: ScopeOption[]
+  /** The application's names, for the labels of the fields in the expanded panel. */
+  names?: StudioNames | null
+  /** Set for the editor inside the expanded dialog, which has no Expand button of its own. */
+  inDialog?: boolean
+  /** Called with the editor's view when it is made and with `null` when it is destroyed, so the panel of the dialog can insert at its cursor. */
+  onView?: (view: EditorView | null) => void
   onChange: (path: string, next: string | undefined) => void
 }
 
@@ -60,6 +70,9 @@ export default function ExpressionEditor({
   required,
   draft,
   options,
+  names,
+  inDialog = false,
+  onView,
   onChange,
 }: ExpressionEditorProps) {
   const t = useText()
@@ -67,6 +80,8 @@ export default function ExpressionEditor({
   const tokens = useDesignTokens()
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const dialogView = useRef<EditorView | null>(null)
+  const [expanded, setExpanded] = useState(false)
   const [themeCompartment] = useState(() => new Compartment())
   const [result, setResult] = useState<Result>({ type: null, error: null })
   const [checking, setChecking] = useState(true)
@@ -78,6 +93,7 @@ export default function ExpressionEditor({
   const scope = loaded?.placeKey === placeKey ? loaded.scope : null
   const latest = useRef({
     onChange,
+    onView,
     required,
     options,
     functions: functionOptions(scope),
@@ -90,6 +106,7 @@ export default function ExpressionEditor({
   useEffect(() => {
     latest.current = {
       onChange,
+      onView,
       required,
       options,
       functions: functionOptions(scope),
@@ -180,6 +197,7 @@ export default function ExpressionEditor({
       }),
     })
     viewRef.current = view
+    latest.current.onView?.(view)
     check(view)
 
     return () => {
@@ -189,6 +207,7 @@ export default function ExpressionEditor({
       setBefore('')
       view.destroy()
       viewRef.current = null
+      latest.current.onView?.(null)
     }
   }, [application, resourceId, path, name])
 
@@ -219,7 +238,17 @@ export default function ExpressionEditor({
 
   return (
     <div aria-busy={checking}>
-      <div ref={hostRef} />
+      <Flex gap={tokens.spacing.xs} align="flex-start">
+        <div ref={hostRef} style={{ flex: 1, minWidth: 0 }} />
+        {!inDialog && (
+          <AxisButton
+            role="icon"
+            nameKey="shell.studio.expression.expand"
+            icon={<ExpandAltOutlined />}
+            onClick={() => setExpanded(true)}
+          />
+        )}
+      </Flex>
       {call !== null && (
         <div data-testid="studio-expression-signature">
           <Typography.Text>
@@ -248,6 +277,46 @@ export default function ExpressionEditor({
             <Typography.Text data-testid="studio-expression-type">{line}</Typography.Text>
           </div>
         )
+      )}
+      {expanded && (
+        <Modal
+          open
+          width={tokens.size.dialog.large}
+          title={name}
+          footer={null}
+          onCancel={() => setExpanded(false)}
+          destroyOnHidden
+        >
+          <Flex vertical gap={tokens.spacing.md}>
+            <ExpressionEditor
+              application={application}
+              resourceId={resourceId}
+              path={path}
+              name={name}
+              value={value}
+              required={required}
+              draft={draft}
+              options={options}
+              names={names}
+              inDialog
+              onView={(view) => (dialogView.current = view)}
+              onChange={onChange}
+            />
+            <ExpressionPanel
+              scope={scope}
+              rules={options.filter((option) => option.type === 'rule')}
+              names={names}
+              onPick={(text, cursorInside) => {
+                const view = dialogView.current
+                if (view) {
+                  const { from, to } = view.state.selection.main
+                  insertAt(view, from, to, text, cursorInside)
+                  view.focus()
+                }
+              }}
+            />
+          </Flex>
+        </Modal>
       )}
     </div>
   )
@@ -305,11 +374,14 @@ function toCompletion(option: ScopeOption): Completion {
   return {
     label: option.label,
     type: option.type === 'field' || option.type === 'parameter' ? 'variable' : 'function',
-    apply: (view, completion, from, to) => {
-      const cursor = from + completion.label.length - (option.cursorInside ? 1 : 0)
-      view.dispatch({ changes: { from, to, insert: completion.label }, selection: { anchor: cursor } })
-    },
+    apply: (view, completion, from, to) => insertAt(view, from, to, completion.label, option.cursorInside),
   }
+}
+
+/** Replaces the range with the text and puts the cursor after it, or one character before the end where a value goes inside brackets or quotes. */
+function insertAt(view: EditorView, from: number, to: number, text: string, cursorInside: boolean) {
+  const cursor = from + text.length - (cursorInside ? 1 : 0)
+  view.dispatch({ changes: { from, to, insert: text }, selection: { anchor: cursor } })
 }
 
 const expressionTheme = sharedTheme((tokens, mode) => [
