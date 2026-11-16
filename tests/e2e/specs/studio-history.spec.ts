@@ -89,11 +89,11 @@ test.describe("Studio shows the history of an application and undoes a revision"
 
     await rows.first().getByTestId("studio-revision-link").click();
     await expect(page).toHaveURL(/[?&]revision=[0-9a-f]{40}(&|$)/);
+    const change = page.getByTestId("studio-changes-file");
+    await expect(change).toHaveCount(1);
     await expect(
       page.getByRole("link", { name: "Back to History", exact: true }),
     ).toHaveCount(0);
-    const change = page.getByTestId("studio-changes-file");
-    await expect(change).toHaveCount(1);
     await expect(change).toHaveAttribute("data-file", roleFile);
     await expect(change.getByTestId("json-diff-before")).toContainText(
       "role.employee.first",

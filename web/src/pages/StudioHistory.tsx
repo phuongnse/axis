@@ -202,7 +202,7 @@ export function StudioHistory({
 /**
  * The page of one revision: its summary as the heading, who made it, when and through which client under it, and then
  * every resource it added, changed or removed as `StudioChanges` draws it. A loaded revision has no
- * link back, because the sidebar and the breadcrumb lead back, see docs/reference/shell.md#layout. A revision that
+ * link back, because the sidebar's marked History entry and the browser's Back lead back, see docs/reference/studio.md. A revision that
  * cannot be loaded shows one line with a link to History.
  */
 export function StudioRevisionPage({
