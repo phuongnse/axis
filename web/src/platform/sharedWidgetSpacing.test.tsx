@@ -1,6 +1,6 @@
 import { DeleteOutlined } from '@ant-design/icons'
 import { render } from '@testing-library/react'
-import { ConfigProvider, Input } from 'antd'
+import { ConfigProvider, Form, Input } from 'antd'
 import type { ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { ExpressionField } from '../pages/ExpressionField'
@@ -11,6 +11,7 @@ import { Announcement } from './Announcement'
 import { antConfigFor } from './antTheme'
 import { AxisActionRow, AxisButton } from './AxisButton'
 import { AxisAlert } from './AxisAlert'
+import { AxisChoiceField } from './AxisChoiceField'
 import { AxisCheckboxField } from './AxisCheckboxField'
 import { AxisField } from './AxisField'
 import { AxisFieldGroup } from './AxisFieldGroup'
@@ -19,11 +20,12 @@ import { AxisTable } from './AxisTable'
 import { CardPage } from './CardPage'
 import { EmptyDash } from './EmptyValue'
 import { EmptyState } from './EmptyState'
+import { StartFromField } from './StartFromField'
 import { StepsBar } from './StepsBar'
 import { TextProvider } from './TextProvider'
 
 // The shared rule: a shared widget keeps no space around itself, see docs/reference/shared-widgets.md#the-rule.
-// AxisField in a form and the form-only fields are a later part of #4103, so they are not drawn here.
+// AcceptTermsField keeps Ant Design's form item margin, a later part of #4103, so it is not drawn here.
 
 const texts = {
   'shell.empty.noData': 'No data yet.',
@@ -116,6 +118,37 @@ const widgets: Record<string, ReactElement> = {
   Announcement: <Announcement>Saved</Announcement>,
 }
 
+// Named widgets draw inside a vertical form, where the form gives the space between its fields.
+const formWidgets: Record<string, ReactElement> = {
+  'AxisField with a name': (
+    <AxisField name="title" label="Title" help="The title">
+      <Input />
+    </AxisField>
+  ),
+  'AxisChoiceField with a name': (
+    <AxisChoiceField
+      name="choice"
+      label="Choice"
+      help="Pick one"
+      options={[
+        { value: 'a', label: 'Alpha', help: '' },
+        { value: 'b', label: 'Beta', help: '' },
+      ]}
+    />
+  ),
+  'StartFromField without choices': (
+    <StartFromField
+      name="start"
+      label="Start from"
+      help="Pick a start"
+      blank="Blank"
+      choices={undefined}
+      failedMessage=""
+    />
+  ),
+  'AxisCheckboxField with a name': <AxisCheckboxField name="enabled" label="Enabled" help="Turns the item on" />,
+}
+
 function renderWidget(element: ReactElement) {
   return render(
     <ConfigProvider {...antConfigFor('light')}>
@@ -162,4 +195,15 @@ describe('shared widgets keep no space around themselves', () => {
 
     expect(marginsOtherThanNone(root)).toEqual([])
   })
+
+  it.each(Object.entries(formWidgets))(
+    'draws %s in a vertical form with no margin on its form item',
+    (_name, element) => {
+      const { container } = renderWidget(<Form layout="vertical">{element}</Form>)
+      const root = container.querySelector('form')?.firstElementChild
+      if (!(root instanceof HTMLElement)) throw new Error('The form draws no item.')
+
+      expect(marginsOtherThanNone(root)).toEqual([])
+    },
+  )
 })

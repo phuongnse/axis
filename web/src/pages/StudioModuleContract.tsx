@@ -277,7 +277,7 @@ function AddStateDialog({
   onClose: () => void
 }) {
   const t = useText()
-  const { size } = useDesignTokens()
+  const { size, spacing } = useDesignTokens()
   const [form] = Form.useForm<{ name: string }>()
   const [initial, setInitial] = useState(false)
   const [deletable, setDeletable] = useState(false)
@@ -316,22 +316,24 @@ function AddStateDialog({
         scrollToFirstError={{ focus: true }}
         onFinish={add}
       >
-        <AxisField
-          name="name"
-          label={t('shell.studio.contract.name')}
-          help={t('shell.studio.contract.stateName.help')}
-          requiredMessage={t('shell.studio.contract.nameRequired')}
-          rules={[freeNameRule(names, t('shell.studio.contract.stateNameTaken'))]}
-        >
-          <Input aria-label={t('shell.studio.contract.name')} />
-        </AxisField>
-        <Flex vertical gap="small">
-          <Checkbox checked={initial} onChange={(event) => setInitial(event.target.checked)}>
-            {t('shell.studio.contract.initial')}
-          </Checkbox>
-          <Checkbox checked={deletable} onChange={(event) => setDeletable(event.target.checked)}>
-            {t('shell.studio.contract.deletable')}
-          </Checkbox>
+        <Flex vertical gap={spacing.lg}>
+          <AxisField
+            name="name"
+            label={t('shell.studio.contract.name')}
+            help={t('shell.studio.contract.stateName.help')}
+            requiredMessage={t('shell.studio.contract.nameRequired')}
+            rules={[freeNameRule(names, t('shell.studio.contract.stateNameTaken'))]}
+          >
+            <Input aria-label={t('shell.studio.contract.name')} />
+          </AxisField>
+          <Flex vertical gap="small">
+            <Checkbox checked={initial} onChange={(event) => setInitial(event.target.checked)}>
+              {t('shell.studio.contract.initial')}
+            </Checkbox>
+            <Checkbox checked={deletable} onChange={(event) => setDeletable(event.target.checked)}>
+              {t('shell.studio.contract.deletable')}
+            </Checkbox>
+          </Flex>
         </Flex>
       </Form>
     </Modal>
@@ -361,7 +363,7 @@ function AddTransitionDialog({
   onClose: () => void
 }) {
   const t = useText()
-  const { size } = useDesignTokens()
+  const { size, spacing } = useDesignTokens()
   const [form] = Form.useForm<TransitionValues>()
   const options = states.map((state) => ({ value: state, label: state }))
 
@@ -397,42 +399,44 @@ function AddTransitionDialog({
         onValuesChange={(changed) => 'from' in changed && form.setFields([{ name: 'to', errors: [] }])}
         onFinish={add}
       >
-        <AxisField
-          name="name"
-          label={t('shell.studio.contract.name')}
-          help={t('shell.studio.contract.transitionName.help')}
-          requiredMessage={t('shell.studio.contract.nameRequired')}
-          rules={[freeNameRule(names, t('shell.studio.contract.transitionNameTaken'))]}
-        >
-          <Input aria-label={t('shell.studio.contract.name')} />
-        </AxisField>
-        <AxisField
-          name="from"
-          label={t('shell.studio.contract.from')}
-          help={t('shell.studio.contract.from.help')}
-          requiredMessage={t('shell.studio.contract.fromRequired')}
-        >
-          <Select virtual={false} mode="multiple" aria-label={t('shell.studio.contract.from')} options={options} />
-        </AxisField>
-        <AxisField
-          name="to"
-          label={t('shell.studio.contract.to')}
-          help={t('shell.studio.contract.to.help')}
-          requiredMessage={t('shell.studio.contract.toRequired')}
-          rules={[
-            ({ getFieldValue }) => ({
-              validator: (_, value: string | undefined) =>
-                value !== undefined && (getFieldValue('from') as string[]).includes(value)
-                  ? Promise.reject(new Error(t('shell.studio.contract.toInFrom')))
-                  : Promise.resolve(),
-            }),
-          ]}
-        >
-          <Select virtual={false} aria-label={t('shell.studio.contract.to')} options={options} />
-        </AxisField>
-        <AxisField name="guard" label={t('shell.studio.contract.guard')} help={t('shell.studio.contract.guard.help')}>
-          <Input aria-label={t('shell.studio.contract.guard')} />
-        </AxisField>
+        <Flex vertical gap={spacing.lg}>
+          <AxisField
+            name="name"
+            label={t('shell.studio.contract.name')}
+            help={t('shell.studio.contract.transitionName.help')}
+            requiredMessage={t('shell.studio.contract.nameRequired')}
+            rules={[freeNameRule(names, t('shell.studio.contract.transitionNameTaken'))]}
+          >
+            <Input aria-label={t('shell.studio.contract.name')} />
+          </AxisField>
+          <AxisField
+            name="from"
+            label={t('shell.studio.contract.from')}
+            help={t('shell.studio.contract.from.help')}
+            requiredMessage={t('shell.studio.contract.fromRequired')}
+          >
+            <Select virtual={false} mode="multiple" aria-label={t('shell.studio.contract.from')} options={options} />
+          </AxisField>
+          <AxisField
+            name="to"
+            label={t('shell.studio.contract.to')}
+            help={t('shell.studio.contract.to.help')}
+            requiredMessage={t('shell.studio.contract.toRequired')}
+            rules={[
+              ({ getFieldValue }) => ({
+                validator: (_, value: string | undefined) =>
+                  value !== undefined && (getFieldValue('from') as string[]).includes(value)
+                    ? Promise.reject(new Error(t('shell.studio.contract.toInFrom')))
+                    : Promise.resolve(),
+              }),
+            ]}
+          >
+            <Select virtual={false} aria-label={t('shell.studio.contract.to')} options={options} />
+          </AxisField>
+          <AxisField name="guard" label={t('shell.studio.contract.guard')} help={t('shell.studio.contract.guard.help')}>
+            <Input aria-label={t('shell.studio.contract.guard')} />
+          </AxisField>
+        </Flex>
       </Form>
     </Modal>
   )

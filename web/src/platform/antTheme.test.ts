@@ -1,4 +1,5 @@
 import { theme } from 'antd'
+import type { CSSProperties } from 'react'
 import { describe, expect, it } from 'vitest'
 import { antConfigFor, antThemeFor, fieldRules, selectedItemTint, tableTheme } from './antTheme'
 import {
@@ -137,6 +138,21 @@ describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Des
       defaultActiveColor: colour.primaryText,
       defaultActiveBorderColor: colour.primaryText,
     })
+  })
+})
+
+describe.each(['light', 'dark'] as const)('the shared dialog frame in %s mode', (mode) => {
+  const { spacing } = designTokensFor(mode)
+  // The styles of the frame's parts, as antConfigFor gives them to every dialog.
+  const styles = antConfigFor(mode).modal?.styles as { body?: CSSProperties; footer?: CSSProperties } | undefined
+
+  it('keeps spacing-lg between the body and the buttons', () => {
+    // The body's bottom padding and the footer's top margin add up to the gap above the buttons.
+    expect(Number(styles?.footer?.marginTop) + spacing.xs).toBe(spacing.lg)
+  })
+
+  it('keeps spacing-xs under the body, so a focus ring has room', () => {
+    expect(styles?.body?.padding).toBe(`${spacing.xs}px ${spacing.lg}px`)
   })
 })
 
