@@ -289,7 +289,8 @@ function flagFilter(
  * memo component of stable props, so a key in one row draws that row's cells and no other. The table has a Filter on
  * Name, Label, Type, Required and Unique, kept in the address as `fields.filter`. A filter only hides rows: every row
  * shows on one page, an edit to a hidden row stays in the draft, and a field whose origin is `null`, one added since the
- * last save, stays shown, see docs/reference/entity-designer.md#fields.
+ * last save, stays shown. Each row's "…" menu has Move up, Move down and Remove, and a read-only designer has no menu,
+ * see docs/reference/entity-designer.md#fields.
  */
 const Fields = memo(function Fields({
   fields,
@@ -310,7 +311,7 @@ const Fields = memo(function Fields({
 }) {
   const t = useText()
   const { view, setView } = useTableView(fieldTableFields, recordPageSize, noParameters, false, true, false, 'fields.')
-  // What the buttons of a row read when they are pressed, so they stay the same between draws.
+  // What the entries of a row's menu read when they are pressed, so they stay the same between draws.
   const latest = useRef({ fields, origins, onOriginsChange, onChange })
   useLayoutEffect(() => {
     latest.current = { fields, origins, onOriginsChange, onChange }
@@ -447,17 +448,6 @@ const Fields = memo(function Fields({
         />
       ),
     },
-    ...(readOnly
-      ? []
-      : [
-          {
-            key: 'actions',
-            kind: 'fixed' as const,
-            render: (_: unknown, { index }: FieldRow) => (
-              <ActionsCell index={index} last={index === fields.length - 1} onMove={onMove} onRemove={onRemove} />
-            ),
-          },
-        ]),
   ]
 
   return (
@@ -482,6 +472,33 @@ const Fields = memo(function Fields({
             emptyText={t('shell.table.empty')}
             rowAttributes={(row) =>
               ({ 'data-testid': `studio-field-/fields/${row.index}` }) as React.HTMLAttributes<HTMLElement>
+            }
+            rowActions={
+              readOnly
+                ? undefined
+                : {
+                    configured: 3,
+                    actions: ({ index }) => [
+                      {
+                        key: 'moveUp',
+                        labelKey: 'shell.studio.entity.moveUp',
+                        disabled: index === 0,
+                        onClick: () => onMove(index, -1),
+                      },
+                      {
+                        key: 'moveDown',
+                        labelKey: 'shell.studio.entity.moveDown',
+                        disabled: index === fields.length - 1,
+                        onClick: () => onMove(index, 1),
+                      },
+                      {
+                        key: 'remove',
+                        labelKey: 'shell.studio.entity.removeField',
+                        destructive: true,
+                        onClick: () => onRemove(index),
+                      },
+                    ],
+                  }
             }
             columns={columns}
           />
@@ -593,36 +610,6 @@ const SettingsCell = memo(function SettingsCell({
           )}
         />
       )}
-    </Flex>
-  )
-})
-
-/** Move up, Move down and Remove of a field's row. */
-const ActionsCell = memo(function ActionsCell({
-  index,
-  last,
-  onMove,
-  onRemove,
-}: {
-  index: number
-  last: boolean
-  onMove: (index: number, offset: number) => void
-  onRemove: (index: number) => void
-}) {
-  const t = useText()
-  return (
-    <Flex gap="small">
-      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button disabled={index === 0} onClick={() => onMove(index, -1)}>
-        {t('shell.studio.entity.moveUp')}
-      </Button>
-      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button disabled={last} onClick={() => onMove(index, 1)}>
-        {t('shell.studio.entity.moveDown')}
-      </Button>
-      <AxisButton role="destructive" onClick={() => onRemove(index)}>
-        {t('shell.studio.entity.removeField')}
-      </AxisButton>
     </Flex>
   )
 })

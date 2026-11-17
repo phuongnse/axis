@@ -5,6 +5,7 @@ import { expect } from 'vitest'
 // The one place that knows Ant Design's class names. A change in Ant Design's markup should change only this file.
 
 const openDropdownSelector = '.ant-select-dropdown:not(.ant-select-dropdown-hidden):not(.ant-slide-up-leave)'
+const openMenuSelector = '.ant-dropdown:not(.ant-dropdown-hidden):not(.ant-slide-up-leave)'
 
 /** The first dropdown that is open and not leaving. */
 export function shownDropdown(): HTMLElement | null {
@@ -20,6 +21,23 @@ export function openDropdown(containing?: string): Promise<HTMLElement> {
     expect(dropdown).toBeDefined()
     return dropdown!
   })
+}
+
+/**
+ * Waits for the menu named `name` that is open and not leaving. A closed menu stays in the page, so the open one is the
+ * one to find. The name is the menu's `aria-label`.
+ */
+export function shownMenu(name: string): Promise<HTMLElement> {
+  return waitFor(
+    () => {
+      const menus = [...document.querySelectorAll<HTMLElement>(`${openMenuSelector} [role="menu"]`)].filter(
+        (menu) => menu.getAttribute('aria-label') === name,
+      )
+      expect(menus).toHaveLength(1)
+      return menus[0]
+    },
+    { timeout: 5000 },
+  )
 }
 
 /** The texts of the options in `scope`, the whole document by default. */

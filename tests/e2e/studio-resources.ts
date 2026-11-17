@@ -192,13 +192,18 @@ export async function addEntityField(page: Page, index: number) {
 }
 
 /**
- * Clicks Move up, Move down or Remove on the row of field `index` of the open entity. It closes an open field first.
- * Remove clicks the row's Remove field button, and the fields after a removed one move up an index.
+ * Clicks Move up, Move down or Remove in the "…" menu of the row of field `index` of the open entity. It closes an open
+ * field first. It waits until the menu has closed, so its entries do not match the next action. The fields after a
+ * removed one move up an index.
  */
 export async function entityFieldAction(page: Page, index: number, action: 'Move up' | 'Move down' | 'Remove') {
   await closeEntityField(page)
-  const name = action === 'Remove' ? 'Remove field' : action
-  await page.getByTestId(`studio-field-/fields/${index}`).getByRole('button', { name, exact: true }).click()
+  await page.getByTestId(`studio-field-/fields/${index}`).getByRole('button', { name: 'Actions', exact: true }).click()
+  await page
+    .getByRole('menu', { name: 'Actions', exact: true })
+    .getByRole('menuitem', { name: action, exact: true })
+    .click()
+  await expect(page.getByRole('menu', { name: 'Actions', exact: true })).toHaveCount(0)
 }
 
 /**

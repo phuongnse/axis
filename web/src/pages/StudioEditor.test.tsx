@@ -15,7 +15,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { loadKindSchema } from '../platform/studioSchemas'
 import { chooseOption, selectRoot } from '../test/antd'
-import { addEntityField, entityFieldAction, openEntityField } from '../test/entityFields'
+import { addEntityField, entityFieldAction, entityFieldMenuItem, openEntityField } from '../test/entityFields'
 import { editJson, jsonText, jsonView } from '../test/jsonView'
 import { buildProcessGraph } from './processGraph'
 import { StudioEditor } from './StudioEditor'
@@ -2465,7 +2465,8 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    expect(within(await openEntityField(0)).getByRole('button', { name: 'Move up' })).toBeDisabled()
+    expect(await entityFieldMenuItem(0, 'Move up')).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(document.body)
     await entityFieldAction(1, 'Move up')
     await entityFieldAction(1, 'Move down')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))

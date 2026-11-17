@@ -22,7 +22,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
 import { chooseOption, clearPicker, clearSelect, openDropdown, optionTexts, removeTag } from '../test/antd'
-import { addEntityField, entityFieldAction, openEntityField } from '../test/entityFields'
+import { addEntityField, entityFieldAction, entityFieldMenuItem, openEntityField } from '../test/entityFields'
 import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { EntityDesigner } from './EntityDesigner'
 import { ExpressionCheckContext } from './expressionCheckContext'
@@ -1142,19 +1142,37 @@ describe('EntityDesigner', () => {
 
   it('moves, removes and adds a field by replacing the whole array', async () => {
     const value = entity()
-    const onChange = renderDesigner(value)
+    const onChange = vi.fn()
+    const onOriginsChange = vi.fn()
+    render(
+      <Providers loaded={names}>
+        <EntityDesigner
+          value={value}
+          onChange={onChange}
+          origins={['total', 'code', 'note']}
+          onOriginsChange={onOriginsChange}
+        />
+      </Providers>,
+    )
     const fields = value.fields
-    const row = (index: number) => within(screen.getByTestId(`studio-field-/fields/${index}`))
 
-    expect(row(0).getByRole('button', { name: 'Move up' })).toBeDisabled()
-    expect(row(2).getByRole('button', { name: 'Move down' })).toBeDisabled()
+    // Escape does not close a row's menu here, as focus stays on the row's button, so a click outside closes it.
+    expect(await entityFieldMenuItem(0, 'Move up')).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(document.body)
+    expect(await entityFieldMenuItem(2, 'Move down')).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(document.body)
+    expect(await entityFieldMenuItem(1, 'Remove')).toHaveClass('ant-dropdown-menu-item-danger')
+    await userEvent.click(document.body)
 
     await entityFieldAction(1, 'Move up')
     expect(onChange).toHaveBeenLastCalledWith('/fields', [fields[1], fields[0], fields[2]])
+    expect(onOriginsChange).toHaveBeenLastCalledWith(['code', 'total', 'note'])
     await entityFieldAction(1, 'Move down')
     expect(onChange).toHaveBeenLastCalledWith('/fields', [fields[0], fields[2], fields[1]])
+    expect(onOriginsChange).toHaveBeenLastCalledWith(['total', 'note', 'code'])
     await entityFieldAction(0, 'Remove')
     expect(onChange).toHaveBeenLastCalledWith('/fields', [fields[1], fields[2]])
+    expect(onOriginsChange).toHaveBeenLastCalledWith(['code', 'note'], 'total')
     await addEntityField()
     expect(onChange).toHaveBeenLastCalledWith('/fields', [...fields, { name: '', type: 'text' }])
   })
@@ -1261,8 +1279,14 @@ describe('EntityDesigner', () => {
       expect(input).toBeDisabled()
     }
     expect(within(screen.getByTestId('studio-field-/label')).getByRole('textbox')).toHaveValue('Invoice')
-    for (const name of ['Add field', 'Remove field', 'Move up', 'Move down', 'Remove validation', 'Add validation']) {
+    for (const name of ['Add field', 'Move up', 'Move down', 'Remove validation', 'Add validation']) {
       expect(screen.queryByRole('button', { name })).toBeNull()
+    }
+    // A read-only designer has no row menu, so no row of its fields has an Actions button.
+    const fieldRows = screen.getAllByTestId(/^studio-field-\/fields\/\d+$/)
+    expect(fieldRows.length).toBeGreaterThan(0)
+    for (const fieldRow of fieldRows) {
+      expect(within(fieldRow).queryByRole('button', { name: 'Actions' })).toBeNull()
     }
 
     await userEvent.type(

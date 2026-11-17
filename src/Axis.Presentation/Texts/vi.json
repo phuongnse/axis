@@ -2501,7 +2501,7 @@
   "shell.studio.entity.addIndex": "Thêm chỉ mục",
   "shell.studio.entity.removeIndex": "Xóa chỉ mục",
   "shell.studio.entity.addField": "Thêm trường",
-  "shell.studio.entity.removeField": "Xóa trường",
+  "shell.studio.entity.removeField": "Xóa",
   "shell.studio.entity.moveUp": "Chuyển lên",
   "shell.studio.entity.moveDown": "Chuyển xuống",
   "shell.studio.entity.addValidation": "Thêm ràng buộc",
