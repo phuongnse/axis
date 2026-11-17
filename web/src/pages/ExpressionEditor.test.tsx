@@ -7,7 +7,7 @@ import { Profiler, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
-import { colourTokens } from '../platform/designTokens'
+import { colourTokens, sizeTokens } from '../platform/designTokens'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
 import ExpressionEditor from './ExpressionEditor'
@@ -628,8 +628,42 @@ describe.each(['light', 'dark'] as const)('ExpressionEditor in %s mode', (mode) 
     expect(screen.getByRole('button', { name: 'Next' })).toHaveFocus()
   })
 
+  it('shows Expand inside the expression box, in its bordered editor', () => {
+    renderEditor('title > 5')
+
+    const box = screen.getByRole('textbox', { name: 'expression' }).closest('.cm-editor') as HTMLElement
+    expect(within(box).getByRole('button', { name: 'Expand' })).toBeInTheDocument()
+  })
+
+  it('opens the expand dialog when Enter is pressed on Expand, reached from the box by Tab', async () => {
+    const user = userEvent.setup()
+    renderEditor('title > 5')
+
+    await user.click(screen.getByRole('textbox', { name: 'expression' }))
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Expand' })).toHaveFocus()
+    await user.keyboard('{Enter}')
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  })
+
   describe('with antd styles', () => {
     withAntdStyles()
+
+    it('leaves room at the end of each line in the box, and none in the dialog', async () => {
+      const user = userEvent.setup()
+      renderEditor('title > 5')
+      const boxLine = screen.getByRole('textbox', { name: 'expression' }).querySelector<HTMLElement>('.cm-line')!
+      expect(parseFloat(getComputedStyle(boxLine).paddingRight)).toBeGreaterThanOrEqual(sizeTokens.smallControl)
+
+      await user.click(screen.getByRole('button', { name: 'Expand' }))
+      const dialog = await screen.findByRole('dialog')
+      const content = within(dialog).getByRole('textbox', { name: 'expression' })
+      // Eight lines of 1.4 times the 14px font, plus 8px of padding, which jsdom resolves from the calc().
+      expect(getComputedStyle(content).minHeight).toBe('164.8px')
+      const dialogLine = content.querySelector<HTMLElement>('.cm-line')!
+      expect(parseFloat(getComputedStyle(dialogLine).paddingRight)).toBeLessThan(sizeTokens.smallControl)
+      expect(within(dialog).queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument()
+    })
 
     it('draws its tokens in the token colours, with none of the default highlight colours', async () => {
       renderEditor('title > 5 and true')
