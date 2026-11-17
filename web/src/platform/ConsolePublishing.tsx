@@ -79,6 +79,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
     true,
     true,
     'publishRequests.',
+    'console.publishRequests',
   )
   const query = recordQuery(view)
   const [reload, setReload] = useState(0)

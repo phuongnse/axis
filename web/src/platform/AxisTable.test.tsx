@@ -1,8 +1,9 @@
 import { DeleteOutlined } from '@ant-design/icons'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Button } from 'antd'
 import { useState, type HTMLAttributes } from 'react'
+import { MemoryRouter, useLocation, useNavigationType } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { chooseOption, tabTo } from '../test/antd'
 import { withAntdStyles } from '../test/antdStyles'
@@ -12,6 +13,7 @@ import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
 import type { TableQuery } from './tableQuery'
 import { narrowWidthQuery } from './useNarrowWidth'
+import { useTableView } from './useTableView'
 
 interface Row {
   id: string
@@ -704,6 +706,131 @@ describe('AxisTable', () => {
       renderTable({ view: { query: first, onChange: () => {} } })
 
       expect(screen.queryByRole('button', { name: 'Columns' })).not.toBeInTheDocument()
+    })
+
+    describe('kept columns', () => {
+      const keptFields = [
+        { name: 'name', type: 'text' },
+        { name: 'amount', type: 'integer' },
+        { name: 'note', type: 'text' },
+      ] as const
+      const tableUrl = '/api/me/tables/test.table'
+
+      /** A server that keeps the columns of one table. `read` is called when the answer to a read is taken. */
+      function serveChoices(kept: string[] | null, readStatus = 200) {
+        const server = { kept, read: vi.fn() }
+        const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+          const method = init?.method ?? 'GET'
+          if (url === tableUrl && method === 'GET') {
+            const response = new Response(null, { status: readStatus })
+            vi.spyOn(response, 'json').mockImplementation(async () => {
+              server.read()
+              return { columns: server.kept, views: [] }
+            })
+            return response
+          }
+          if (url === `${tableUrl}/columns` && method === 'PUT') {
+            server.kept = (JSON.parse(String(init?.body)) as { columns: string[] }).columns
+          } else if (url === `${tableUrl}/columns` && method === 'DELETE') {
+            server.kept = null
+          }
+          return new Response(null, { status: 204 })
+        })
+        vi.stubGlobal('fetch', fetchMock)
+        return { server, fetchMock }
+      }
+
+      function KeptHarness() {
+        const { view, setView } = useTableView(keptFields, 20, [], true, true, true, '', 'test.table')
+        return (
+          <TextProvider catalogs={catalogs} development={false}>
+            <AxisTable<Row>
+              columns={arranged}
+              rowKey={(row) => row.id}
+              dataSource={noted}
+              view={{ query: view, onChange: setView, columns: true }}
+            />
+          </TextProvider>
+        )
+      }
+
+      function Probe() {
+        return (
+          <>
+            <output data-testid="address">{useLocation().search}</output>
+            <output data-testid="navigation">{useNavigationType()}</output>
+          </>
+        )
+      }
+
+      const open = (address = '/') =>
+        render(
+          <MemoryRouter initialEntries={[address]}>
+            <KeptHarness />
+            <Probe />
+          </MemoryRouter>,
+        )
+
+      const applyColumns = async (change: () => Promise<void>) => {
+        await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+        await change()
+        await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Apply' }))
+      }
+
+      const mutations = (fetchMock: ReturnType<typeof serveChoices>['fetchMock']) =>
+        fetchMock.mock.calls.filter(([, init]) => init?.method !== undefined)
+
+      it('keeps the columns that Apply sets, and shows them again when the table opens with no columns', async () => {
+        const { server, fetchMock } = serveChoices(null)
+        const first = open()
+        await waitFor(() => expect(server.read).toHaveBeenCalled())
+
+        await applyColumns(() => userEvent.click(within(columnsDialog()).getByRole('checkbox', { name: 'Amount' })))
+
+        await waitFor(() => expect(server.kept).toEqual(['name', 'note']))
+        const [url, init] = mutations(fetchMock)[0]
+        expect(url).toBe(`${tableUrl}/columns`)
+        expect(init?.method).toBe('PUT')
+        expect(init?.body).toBe('{"columns":["name","note"]}')
+        expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
+        first.unmount()
+
+        open()
+
+        await waitFor(() => expect(headers()).toEqual(['Name', 'Note']))
+        expect(screen.getByTestId('address')).toHaveTextContent('columns=name%2Cnote')
+        expect(screen.getByTestId('navigation')).toHaveTextContent('REPLACE')
+      })
+
+      it('shows the columns of the address, not the kept ones, and forgets the choice on Reset and Apply', async () => {
+        const { server, fetchMock } = serveChoices(['name', 'note'])
+        open('/?columns=name,amount')
+        await waitFor(() => expect(server.read).toHaveBeenCalled())
+        await act(async () => {})
+
+        expect(headers()).toEqual(['Name', 'Amount'])
+        expect(mutations(fetchMock)).toHaveLength(0)
+
+        await applyColumns(() => userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Reset' })))
+
+        await waitFor(() => expect(server.kept).toBeNull())
+        const [url, init] = mutations(fetchMock)[0]
+        expect(url).toBe(`${tableUrl}/columns`)
+        expect(init?.method).toBe('DELETE')
+        expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
+        expect(headers()).toEqual(['Name', 'Amount', 'Note'])
+      })
+
+      it('shows every column and leaves the address alone when the choices are refused', async () => {
+        const { fetchMock } = serveChoices(['name', 'note'], 401)
+        open()
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(tableUrl, expect.anything()))
+        await act(async () => {})
+
+        expect(headers()).toEqual(['Name', 'Amount', 'Note'])
+        expect(screen.getByTestId('address')).toBeEmptyDOMElement()
+        expect(screen.getByTestId('navigation')).toHaveTextContent('POP')
+      })
     })
   })
 

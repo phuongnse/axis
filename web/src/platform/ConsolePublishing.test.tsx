@@ -94,7 +94,10 @@ function stubServer(answer: (url: string) => Response) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string, init?: RequestInit) => {
-      calls.push({ url: input, method: init?.method ?? 'GET' })
+      // The table's own choices of columns are not a request for its rows.
+      if (!input.startsWith('/api/me/tables/')) {
+        calls.push({ url: input, method: init?.method ?? 'GET' })
+      }
       return answer(input)
     }),
   )

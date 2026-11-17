@@ -39,7 +39,7 @@ function renderTable(
       <ThemeModeProvider>
         <ThemeRoot>
           <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-            <TextTable columns={data} onChange={onChange} onAdd={onAdd} />
+            <TextTable tableKey="test.texts" columns={data} onChange={onChange} onAdd={onAdd} />
           </TextProvider>
         </ThemeRoot>
       </ThemeModeProvider>

@@ -1073,6 +1073,7 @@ export function StudioEditor({
     // The table reads the address for its search and page, so it is mounted only while its tab is open, as Used by is.
     tab === 'form' ? (
       <TextTable
+        tableKey={`studio.${application}.texts`}
         columns={resources
           .filter((resource) => resource.kind === 'text')
           .map((resource) =>

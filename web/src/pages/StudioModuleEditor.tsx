@@ -438,6 +438,7 @@ export function StudioModuleEditor({
       ) : item.kind === 'text' ? (
         isObject(draft.texts) && (
           <TextTable
+            tableKey={`studio.${application}.moduleTexts`}
             columns={[{ id: item.id, locale: String(draft.locale ?? ''), texts: draft.texts, editable: true }]}
             onChange={change}
             onAdd={async (key, texts) => {

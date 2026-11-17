@@ -270,7 +270,7 @@ describe('WidgetTree', () => {
     )
     const renderReal = (widget: WidgetMetadata) =>
       widget.type === 'table' ? (
-        <TableWidget sitePath="e2e" widget={widget} locale="en" pageValues={{}} />
+        <TableWidget sitePath="e2e" pageName="Requests" widget={widget} locale="en" pageValues={{}} />
       ) : (
         <TaskInboxWidget sitePath="e2e" pageName="Tasks" widget={widget} locale="en" fallbackLocale="en" />
       )
@@ -303,7 +303,7 @@ describe('WidgetTree', () => {
     const fetchMock = vi.fn(async () => new Response('{"items":[],"page":1,"pageSize":20,"totalCount":0}'))
     vi.stubGlobal('fetch', fetchMock)
     const renderReal = (widget: WidgetMetadata) => (
-      <TableWidget sitePath="e2e" widget={widget} locale="en" pageValues={{}} />
+      <TableWidget sitePath="e2e" pageName="Requests" widget={widget} locale="en" pageValues={{}} />
     )
 
     renderTree(

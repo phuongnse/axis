@@ -237,7 +237,7 @@ be kept right.
   first, stays first and always shows. A hidden column is still searched and filtered on. The choice lives in
   the address as `columns`, the keys of the shown columns in order, and is left out when every column shows in
   its first order. A change of columns keeps the page.
-- **Each person's columns** _(planned for M33)_. The choice of columns is kept on the server for the person and the
+- **Each person's columns.** The choice of columns is kept on the server for the person and the
   table. Apply keeps it, and Reset followed by Apply forgets it. A table opened with no `columns` in its address puts
   the kept choice into the address, without a history entry. An address with `columns` always wins, and a kept key
   of a column the table no longer has is dropped.
@@ -247,7 +247,8 @@ be kept right.
   itself, and there is no default view. An address that already carries a value wins over a view.
 - **Which tables keep a choice** _(planned for M33)_. A table whose view `useTableView` keeps in the address, and that
   has a key, keeps its columns and views on the server. A table in a dialog keeps its view in the dialog and keeps
-  nothing. The cell console's tables pass no key, because its host has no tenant database. The key format and the
+  nothing. The cell console's tables pass no key, because its host has no tenant database. Studio's page canvas
+  passes no key either. The key format and the
   routes are in [table views and columns](frontend.md#table-views-and-columns).
 - **Columns.** A column whose values have a fixed form, such as a number, a date, a date and time, a
   status tag or the row's icon actions, is as wide as its content and never wraps. The columns of free

@@ -15,6 +15,7 @@ import {
 } from './inspection'
 import type { WidgetMetadata } from './site'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
+import { useSiteTableKey } from './tableChoices'
 import { useTableView } from './useTableView'
 import { useText } from './texts'
 import { siteAddress } from './siteLinks'
@@ -71,7 +72,16 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
   // The server sets the path on every process inspector.
   const instancesPath = widget.instancesPath!
   const instancePath = siteAddress(sitePath, pageName.toLowerCase())
-  const { view: query, setView } = useTableView(instanceFields, recordPageSize, noParameters, true, true, true)
+  const { view: query, setView } = useTableView(
+    instanceFields,
+    recordPageSize,
+    noParameters,
+    true,
+    true,
+    true,
+    '',
+    useSiteTableKey(sitePath, pageName),
+  )
   const requestQuery = recordQuery(query)
   const requestUrl = `${instancesPath}${requestQuery ? `?${requestQuery}` : ''}`
   // Refresh counts up, so the same URL loads again.

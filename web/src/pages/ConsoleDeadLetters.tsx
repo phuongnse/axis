@@ -68,6 +68,7 @@ export function ConsoleDeadLetters({ applications, locale }: ConsoleDeadLettersP
     true,
     true,
     'deadLetters.',
+    'console.deadLetters',
   )
   const query = recordQuery(view)
   const [reload, setReload] = useState(0)

@@ -33,6 +33,7 @@ import type {
   StartProcessAction,
   WidgetMetadata,
 } from './site'
+import { useSiteTableKey } from './tableChoices'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -42,6 +43,8 @@ import { setOwn } from './ownProperty'
 
 interface TableWidgetProps {
   sitePath: string
+  /** The page's name, which gives the table its key. */
+  pageName: string
   widget: WidgetMetadata
   /** The UI locale, for formatting values. */
   locale: string
@@ -149,7 +152,7 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * and leaves that page parameter in the URL as it is. A table whose rows can be searched has a search
  * box, which AxisTable draws and whose text lives in the URL as `search`. The text is sent as typed.
  */
-export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidgetProps) {
+export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: TableWidgetProps) {
   const t = useText()
   const { size } = useDesignTokens()
   const navigate = useNavigate()
@@ -174,7 +177,16 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   )
   const parameterNames = useMemo(() => parameters.map((parameter) => parameter.name), [parameters])
   const sizes = useMemo(() => tablePageSizes(defaultPageSize), [defaultPageSize])
-  const { view: query, setView } = useTableView(fields, defaultPageSize, parameterNames, searchable, true)
+  const { view: query, setView } = useTableView(
+    fields,
+    defaultPageSize,
+    parameterNames,
+    searchable,
+    true,
+    false,
+    '',
+    useSiteTableKey(sitePath, pageName),
+  )
   // The bound values and the filter values, in declaration order.
   const parameterValues = useMemo(() => {
     const values: Record<string, string> = {}

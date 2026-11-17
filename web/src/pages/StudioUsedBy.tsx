@@ -134,7 +134,16 @@ export function StudioUsedBy({
       ),
     [rows, locale, t],
   )
-  const { view, setView } = useTableView(usedByFields, recordPageSize, [], true, true)
+  const { view, setView } = useTableView(
+    usedByFields,
+    recordPageSize,
+    [],
+    true,
+    true,
+    false,
+    '',
+    `studio.${application}.usedBy`,
+  )
 
   const columns: AxisColumn<UsedByRow>[] = [
     {

@@ -277,7 +277,7 @@ function renderWidget(search = '', widget: WidgetMetadata = noteWidget, pageValu
   return render(
     <MemoryRouter initialEntries={[`/e2e/notes${search}`]}>
       <TextProvider catalogs={catalogs} development={false}>
-        <TableWidget sitePath="e2e" widget={widget} locale="en" pageValues={pageValues} />
+        <TableWidget sitePath="e2e" pageName="Requests" widget={widget} locale="en" pageValues={pageValues} />
       </TextProvider>
       <CurrentLocation />
     </MemoryRouter>,
@@ -289,7 +289,7 @@ function renderWidgetInDark(widget: WidgetMetadata) {
     <ThemeModeProvider initialMode="dark">
       <MemoryRouter initialEntries={['/e2e/notes']}>
         <TextProvider catalogs={catalogs} development={false}>
-          <TableWidget sitePath="e2e" widget={widget} locale="en" />
+          <TableWidget sitePath="e2e" pageName="Requests" widget={widget} locale="en" />
         </TextProvider>
       </MemoryRouter>
     </ThemeModeProvider>,
