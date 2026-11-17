@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
+import { AxisTable, type AxisColumn } from './AxisTable'
 import { CodeBlock } from './CodeBlock'
 import { BodyView, ValueTable } from './ValueTable'
 import { jsonRows, mappingRows, textRows } from './valueRows'
@@ -144,12 +145,6 @@ export function StepRunPanel({
     ) : (
       <EmptyDash />
     )
-  const leadsTo = (name: unknown) => (
-    <Flex align="center" gap={spacing.xs / 2}>
-      {muted('→')}
-      {stepName(name)}
-    </Flex>
-  )
   // An expression reads as code; a mapping inside a mapping, such as a list's fields, reads as a block of JSON.
   const code = (value: unknown) =>
     typeof value === 'object' && value !== null ? (
@@ -504,7 +499,7 @@ export function StepRunPanel({
 
   const definitionView = () => (
     <Flex vertical gap={spacing.xs}>
-      <TermList terms={definitionTerms()} />
+      {definitionTerms().length > 0 && <TermList terms={definitionTerms()} />}
       {definition.set !== undefined && (
         <>
           {heading(t('shell.stepRun.definition.set'))}
@@ -523,6 +518,14 @@ export function StepRunPanel({
           {writingTable(definition.output, t('shell.stepRun.definition.output'))}
         </>
       )}
+      {nextSteps().length > 0 && (
+        <>
+          {heading(t('shell.stepRun.next.title'))}
+          <section aria-label={t('shell.stepRun.next.title')}>
+            <AxisTable rowKey={(row) => row.key} dataSource={nextSteps()} columns={nextColumns} compact />
+          </section>
+        </>
+      )}
       <div style={{ marginTop: spacing.sm }}>
         <JsonFold value={definition} />
       </div>
@@ -533,21 +536,6 @@ export function StepRunPanel({
     const terms: Term[] = []
     const add = (key: string, value: ReactNode) =>
       terms.push({ key, term: t(`shell.stepRun.definition.${key}`), value })
-    if (Array.isArray(definition.branches)) {
-      for (const branch of list(definition.branches)) {
-        terms.push({
-          key: `branch-${words(branch.name)}`,
-          term: words(branch.name),
-          value: (
-            <Flex vertical align="flex-start">
-              {code(branch.when)}
-              {leadsTo(branch.next)}
-            </Flex>
-          ),
-        })
-      }
-      add('otherwise', stepName(definition.otherwise))
-    }
     if (definition.assignee !== undefined) {
       const assignee = record(definition.assignee)
       add(
@@ -560,15 +548,6 @@ export function StepRunPanel({
     if (definition.form !== undefined) add('form', words(definition.form))
     if (definition.dueIn !== undefined)
       add('dueIn', isoDurationText(definition.dueIn, locale) ?? words(definition.dueIn))
-    if (Array.isArray(definition.outcomes)) {
-      for (const outcome of list(definition.outcomes)) {
-        terms.push({
-          key: `outcome-${words(outcome.name)}`,
-          term: outcomeLabel(step, words(outcome.name)),
-          value: leadsTo(outcome.next),
-        })
-      }
-    }
     const connector = record(definition.connector)
     if (typeof connector.name === 'string') {
       add('connector', connector.name)
@@ -612,22 +591,62 @@ export function StepRunPanel({
     if (definition.subject !== undefined && typeof definition.process === 'string')
       add('subject', code(definition.subject))
     if (typeof definition.event === 'string') add('event', definition.event)
-    if (definition.when !== undefined && definition.branches === undefined) add('when', code(definition.when))
+    if (definition.when !== undefined && definition.branches === undefined) add('onlyWhen', code(definition.when))
     if (definition.wait !== undefined) add('wait', isoDurationText(definition.wait, locale) ?? words(definition.wait))
     if (definition.until !== undefined) add('until', code(definition.until))
-    if (definition.timeout !== undefined) {
-      const timeout = record(definition.timeout)
-      add(
-        'timeout',
-        t('shell.stepRun.definition.after')
-          .replace('{duration}', isoDurationText(timeout.after, locale) ?? words(timeout.after))
-          .replace('{step}', stepLabel(words(timeout.next))),
-      )
-    }
-    if (typeof definition.next === 'string') add('next', stepName(definition.next))
     if (graphStep?.type === 'end') add('end', t('shell.stepRun.definition.ends'))
     return terms
   }
+
+  // Proposed, see the review on #3650: where the step goes, for every type the same table of when and the step it goes
+  // to: a decision's branches in order then Otherwise, a task's outcomes, an event that comes or a wait that runs out,
+  // a timer, or the step after one that is done.
+  const nextSteps = (): { key: string; when: ReactNode; next: unknown }[] => {
+    const rows: { key: string; when: ReactNode; next: unknown }[] = []
+    const duration = (value: unknown) => isoDurationText(value, locale) ?? words(value)
+    for (const branch of list(definition.branches)) {
+      rows.push({ key: `branch-${words(branch.name)}`, when: code(branch.when), next: branch.next })
+    }
+    if (definition.otherwise !== undefined) {
+      rows.push({ key: 'otherwise', when: t('shell.stepRun.next.otherwise'), next: definition.otherwise })
+    }
+    for (const outcome of list(definition.outcomes)) {
+      rows.push({
+        key: `outcome-${words(outcome.name)}`,
+        when: t('shell.stepRun.next.chose').replace('{outcome}', outcomeLabel(step, words(outcome.name))),
+        next: outcome.next,
+      })
+    }
+    if (definition.next !== undefined) {
+      const when =
+        typeof definition.event === 'string'
+          ? t('shell.stepRun.next.eventCame').replace('{event}', definition.event)
+          : definition.wait !== undefined
+            ? t('shell.stepRun.next.after').replace('{duration}', duration(definition.wait))
+            : definition.until !== undefined
+              ? t('shell.stepRun.next.until')
+              : t('shell.stepRun.next.done')
+      rows.push({ key: 'next', when, next: definition.next })
+    }
+    if (definition.timeout !== undefined) {
+      const timeout = record(definition.timeout)
+      rows.push({
+        key: 'timeout',
+        when: t('shell.stepRun.next.timeout').replace('{duration}', duration(timeout.after)),
+        next: timeout.next,
+      })
+    }
+    return rows
+  }
+  const nextColumns: AxisColumn<{ key: string; when: ReactNode; next: unknown }>[] = [
+    { key: 'when', kind: 'freeText', title: t('shell.stepRun.next.when'), render: (_value, row) => row.when },
+    {
+      key: 'next',
+      kind: 'freeText',
+      title: t('shell.stepRun.next.goesTo'),
+      render: (_value, row) => stepName(row.next),
+    },
+  ]
 
   const body: Record<StepRunTab, () => ReactNode> = {
     overview: () => (chosen === undefined ? muted(t('shell.inspector.graph.notReached')) : overview(chosen)),

@@ -306,7 +306,17 @@ export function AxisButton(props: AxisButtonProps) {
             ...tinted(colour.primaryText),
             paddingInline: 0,
             ...(inline
-              ? { height: 'auto', padding: 0, border: 0, lineHeight: 'inherit', verticalAlign: 'baseline' }
+              ? {
+                  height: 'auto',
+                  padding: 0,
+                  border: 0,
+                  lineHeight: 'inherit',
+                  verticalAlign: 'baseline',
+                  // A long link wraps as the words round it do.
+                  whiteSpace: 'normal',
+                  textAlign: 'start',
+                  maxWidth: '100%',
+                }
               : {}),
             ...style,
           }}

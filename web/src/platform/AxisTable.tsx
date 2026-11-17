@@ -190,6 +190,8 @@ const freeTextMaxWidth = 320
 
 /** The least a free-text value is wide before a column moves under its row, in px, see docs/reference/actions-and-controls.md#tables. */
 const freeTextMinWidth = 160
+/** Proposed, see the review on #3650: the same least width in a compact table, which sits in a side panel. */
+const compactFreeTextMinWidth = 120
 
 /**
  * The row's actions fold into one menu from this many on, and at narrow width whatever their number, see
@@ -243,6 +245,7 @@ export function AxisTable<T extends object>({
   // The same theme object between draws, so the cells under the table are not drawn again for nothing.
   const theme = useMemo(() => tableTheme(tokens, compact), [tokens, compact])
   const padding = cellPaddingInline(tokens, compact)
+  const leastFreeText = compact ? compactFreeTextMinWidth : freeTextMinWidth
   const narrow = useNarrowWidth()
   // The widths the columns need when drawn and not stretched. A moved column is not drawn, so it is remembered.
   const naturalWidths = useRef(new Map<string, number>())
@@ -284,7 +287,7 @@ export function AxisTable<T extends object>({
       const sizes = shown.map((column) => {
         const head = heads.get(column.key)
         if (column.kind === 'freeText') {
-          return { key: column.key, width: freeTextMinWidth + 2 * padding, priority: column.priority }
+          return { key: column.key, width: leastFreeText + 2 * padding, priority: column.priority }
         }
         // With slack, a table with no free text stretches its last column past what it needs.
         const stretched = freeTexts === 0 && column.key === lastKey && drawn <= available
@@ -434,7 +437,7 @@ export function AxisTable<T extends object>({
                   style={{
                     // In a table with group rows, the first column's words sit beside the fold, not under it.
                     ...(grouped && position === 0 ? { display: 'inline-block', verticalAlign: 'top' } : {}),
-                    minWidth: freeTextMinWidth,
+                    minWidth: leastFreeText,
                     maxWidth: freeTextMaxWidth,
                     whiteSpace: 'normal',
                     overflowWrap: 'anywhere',
