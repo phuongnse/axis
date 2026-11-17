@@ -210,9 +210,9 @@ The root entity, the projection and the default order:
 The parameters and the filters:
 
 - A parameter name differs from every field of the root entity, because the filter reads both as
-  plain names. Parameter names are unique, and `page`, `pageSize`, `sort` and `search` are reserved.
-  All four compare ignoring letter case, so `Page` and `SORT` are reserved too. A bad name is
-  `AXC0054` at `/parameters/{i}/name`.
+  plain names. Parameter names are unique, and `page`, `pageSize`, `sort`, `search` and `filter` are
+  reserved. All five compare ignoring letter case, so `Page` and `SORT` are reserved too. A bad name
+  is `AXC0054` at `/parameters/{i}/name`.
 - A parameter's type is valid for its properties, as for entity fields, with the same codes at
   `/parameters/{i}/...`: `AXC0013` for a property its type does not take, `AXC0014` for an `enum`
   without `values` or a `reference` without `target`, `AXC0012` for an unknown target, `AXC0040` for
@@ -277,10 +277,10 @@ The fields that may not be sorted, grouped or filtered:
 
 One read-only route, in two forms, returns a page of a data source's rows:
 
-| Route                                                                                       | Response                                                                              |
-| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `GET /api/apps/{app}/data-sources/{dataSource}/rows?page=&pageSize=&sort=&search=`          | `200` with one page of rows                                                           |
-| `GET /api/apps/{app}/data-sources/{module}/{dataSource}/rows?page=&pageSize=&sort=&search=` | `200` with one page of rows of a module data source, see [the module form](#endpoint) |
+| Route                                                                                               | Response                                                                              |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `GET /api/apps/{app}/data-sources/{dataSource}/rows?page=&pageSize=&sort=&search=&filter=`          | `200` with one page of rows                                                           |
+| `GET /api/apps/{app}/data-sources/{module}/{dataSource}/rows?page=&pageSize=&sort=&search=&filter=` | `200` with one page of rows of a module data source, see [the module form](#endpoint) |
 
 Only `GET` is routed. `{app}` is the name of an active release, and `{dataSource}` a data source in
 that release. Both match ignoring letter case, as in the record API.
@@ -332,7 +332,8 @@ every projected field.
 
 ## Query parameters
 
-The query string pages and sorts the rows, searches them, and gives the data source's parameters.
+The query string pages and sorts the rows, searches and filters them, and gives the data source's
+parameters.
 
 - **`page`, `pageSize` and `sort`.** They follow [the record API](record-api.md#paging-and-sorting),
   except that the `pageSize` default is the data source's own. `sort` names an entry of `fields`, or
@@ -347,6 +348,14 @@ The query string pages and sorts the rows, searches them, and gives the data sou
   projected directly. On a grouped data source the search filters the root records before grouping,
   so groups, counts and measures cover only matching records. Without the option, a non-empty or
   repeated `search` is a `400`, and an empty one is ignored.
+- **`filter`.** It keeps only the rows that match, in the shape and with the rules of
+  [the record API's filter](record-api.md#paging-and-sorting). It applies on top of the data
+  source's own `filter` and the user's read filters. A condition names a projected field by its
+  `name` in `fields`, matched exactly, and compares the value that a row shows. On a grouped data
+  source it names group fields only, not measures or other projected fields, and it filters the root
+  records before grouping, so groups, counts, measures and `totalCount` cover only matching records.
+  A bucketed group field is a date, compared with the first date of its bucket. A `filter` that
+  names any other field or has a value of the wrong kind is a `400`, as it is in the record API.
 - **Data source parameters.** They are query parameters under their declared names. The names
   match exactly, so a declared name in another letter case is an unknown parameter.
 - **Empty value.** An empty value means the parameter was not given.
@@ -357,10 +366,10 @@ The query string pages and sorts the rows, searches them, and gives the data sou
   its stored value, which may come from an older expression, because a data source has no single
   read on which the record API would compute it. A query is refused with the `409` in
   [Errors](#errors) when its `sort`, its default `sort`, its `filter`, its `groupBy` field, its
-  measure or a measure `filter` reads a pending field, or a searched field of a given `search` is a
-  pending field. That includes a path through references, a filter that inlines a rule, a `count`
-  whose `filter` reads one and a field of a child row or a linked record that `any` or `count`
-  reads.
+  measure or a measure `filter` reads a pending field, or a searched field of a given `search` or a
+  field that a given `filter` names is a pending field. That includes a path through references, a
+  filter that inlines a rule, a `count` whose `filter` reads one and a field of a child row or a
+  linked record that `any` or `count` reads.
 - **Order.** Ties are broken by the root `id` ascending, or by the group fields in `groupBy` order,
   each ascending, when the data source is grouped. A bucketed group field orders by its bucket.
   `NULL` ordering and the count statement work as in the record API. Without a `sort`, grouped rows
@@ -463,14 +472,14 @@ the pending fields of the `sort`, `filter`, `aggregate` and `search`, then the d
   source. The path is resolved before the query is checked, so a path that names nothing is a `404`
   whatever its query.
 - **`400` for the query.** A validation problem whose `errors` is keyed `page`, `pageSize`, `sort`,
-  `search` and the parameter names. It covers a bad value, a missing required value, a repeated
-  parameter and a `search` on a data source without the option. Every invalid parameter is reported
-  in the same response.
+  `search`, `filter` and the parameter names. It covers a bad value, a missing required value, a
+  repeated parameter, a `search` on a data source without the option and a `filter` that is not
+  usable. Every invalid parameter is reported in the same response.
 - **`409` for a pending field.** The `sort`, default `sort`, `filter`, `groupBy` field, measure or
-  measure `filter` reads a field that is being recomputed, or a given `search` matches one. The
-  title is "A field is being recomputed." `errors` is keyed `sort`, `filter`, `aggregate` or
-  `search`, with a message that names the field, and a measure `filter` is keyed `aggregate` and
-  names the path it reads. The request is valid, so this is a state conflict, not a `400`, and a sum
+  measure `filter` reads a field that is being recomputed, or a given `search` matches one, or a
+  given `filter` names one. The title is "A field is being recomputed." `errors` is keyed `sort`,
+  `filter`, `aggregate` or `search`, with a message that names the field, and a measure `filter` is
+  keyed `aggregate` and names the path it reads. The request is valid, so this is a state conflict, not a `400`, and a sum
   over stale totals would be a silent failure.
 - **`409` for a policy that reads a pending field.** A root read filter of the user's grants reads a
   field that is being recomputed, and no rows come back. The title is "Your access to this entity
@@ -534,10 +543,10 @@ each binding.
   - A required data source parameter that is not bound is `AXC0060` at `/widgets/{i}/dataSource`.
     A chart or a KPI has no filter input, so every parameter that its `parameters` leaves unbound
     must be optional, otherwise it is `AXC0060` at `/widgets/{i}/dataSource`, naming the parameter.
-  - A page parameter named `page`, `pageSize`, `sort` or `search`, or with the same name as an
-    unbound parameter of its table, ignoring letter case, is `AXC0231` at `/parameters/{i}/name`,
-    because both live in the same URL query. A chart and a KPI have no filter input, so this check
-    applies only to a table.
+  - A page parameter named `page`, `pageSize`, `sort`, `search` or `filter`, or with the same name
+    as an unbound parameter of its table, ignoring letter case, is `AXC0231` at
+    `/parameters/{i}/name`, because both live in the same URL query. A chart and a KPI have no
+    filter input, so this check applies only to a table.
   - `parameters` on any widget that is not a table, a chart or a KPI over a data source is
     `AXC0060` at `/widgets/{i}/parameters`.
 - **Chart binding.** A [chart](detail-chart-kpi-widgets.md) reads only grouped data. Besides the

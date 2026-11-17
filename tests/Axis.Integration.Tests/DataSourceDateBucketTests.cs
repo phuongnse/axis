@@ -1,5 +1,6 @@
 using Axis.Configuration.Model;
 using Axis.Data.DataSources;
+using Axis.Data.Records;
 using Npgsql;
 using static Axis.Integration.Tests.RecordApiFixture;
 
@@ -90,6 +91,20 @@ public sealed class DataSourceDateBucketTests(RecordApiFixture fixture) : IClass
     }
 
     [Fact]
+    public async Task A_request_filter_on_a_bucketed_group_field_compares_the_first_date_of_the_bucket_and_keeps_the_matching_groups()
+    {
+        await SeedAsync();
+        var zone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
+        var (dataSource, _) = DataSource("orderedAt", DateBucket.Month);
+        Assert.True(DataSourceListFilter.TryParse("""{"all":[{"field":"orderedAt","op":"eq","value":"2026-11-01"}]}""", dataSource, out var filter, out _));
+
+        var page = await ListAsync(dataSource, zone, sort: null, filter);
+
+        Assert.Equal(["2026-11-01=3"], Buckets(page));
+        Assert.Equal(1L, page.TotalCount);
+    }
+
+    [Fact]
     public async Task A_measure_over_the_bucketed_field_reads_the_raw_values()
     {
         await SeedAsync();
@@ -130,12 +145,13 @@ public sealed class DataSourceDateBucketTests(RecordApiFixture fixture) : IClass
         return (dataSource, field);
     }
 
-    private async Task<DataSourceRowPage> ListAsync(DataSourceModel dataSource, TimeZoneInfo zone, DataSourceSort? sort)
+    private async Task<DataSourceRowPage> ListAsync(
+        DataSourceModel dataSource, TimeZoneInfo zone, DataSourceSort? sort, RecordListFilter? filter = null)
     {
         await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantA));
         await connection.OpenAsync(CancellationToken);
         var page = await DataSourceQueries.ListAsync(
-            connection, null, fixture.Model with { TimeZone = zone }, dataSource, 1, 100, sort, [], cancellationToken: CancellationToken);
+            connection, null, fixture.Model with { TimeZone = zone }, dataSource, 1, 100, sort, [], null, null, null, null, filter, CancellationToken);
         Assert.NotNull(page);
         return page;
     }

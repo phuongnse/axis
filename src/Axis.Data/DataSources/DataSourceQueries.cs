@@ -70,13 +70,14 @@ public static class DataSourceQueries
         RecordCondition? condition = null,
         string? search = null,
         CancellationToken cancellationToken = default) =>
-        ListAsync(connection, transaction, application, dataSource, page, pageSize, sort, parameters, condition, search, null, null, cancellationToken);
+        ListAsync(connection, transaction, application, dataSource, page, pageSize, sort, parameters, condition, search, null, null, null, cancellationToken);
 
     /// <summary>
     /// Lists a page as the list without a cipher does, and decrypts the value of each projected sensitive field with
     /// <paramref name="cipher"/>, also through a reference path. Without a cipher, a row that holds a stored sensitive
     /// value throws. <paramref name="userId"/> is the signed-in user's id, which a filter that calls <c>currentUser()</c>
-    /// compares with. The condition may already bind it, and then the data source adds nothing.
+    /// compares with. The condition may already bind it, and then the data source adds nothing. When
+    /// <paramref name="filter"/> is given, a root row passes only when it also matches it, before any grouping.
     /// </summary>
     public static async Task<DataSourceRowPage?> ListAsync(
         NpgsqlConnection connection,
@@ -91,6 +92,7 @@ public static class DataSourceQueries
         string? search,
         RecordCipher? cipher,
         string? userId,
+        RecordListFilter? filter,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -101,7 +103,7 @@ public static class DataSourceQueries
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
         var searching = !string.IsNullOrEmpty(search) && dataSource.SearchFields.Count > 0;
-        var statement = Statement(application, dataSource, sort, condition, searching);
+        var statement = Statement(application, dataSource, sort, condition, searching, filter);
         var lookups = await LookupsAsync(application, dataSource, statement, parameters, cipher, cancellationToken);
         try
         {
@@ -119,6 +121,7 @@ public static class DataSourceQueries
                 AddLookups(count, lookups);
                 AddTimeZone(count, statement);
                 condition?.AddTo(count);
+                filter?.AddTo(count);
                 AddCurrentUser(count, userId);
                 if (searching)
                 {
@@ -144,6 +147,7 @@ public static class DataSourceQueries
             AddLookups(command, lookups);
             AddTimeZone(command, statement);
             condition?.AddTo(command);
+            filter?.AddTo(command);
             AddCurrentUser(command, userId);
             if (searching)
             {
@@ -186,12 +190,13 @@ public static class DataSourceQueries
         string? search,
         int limit,
         CancellationToken cancellationToken = default) =>
-        ReadAllAsync(connection, application, dataSource, sort, parameters, condition, search, limit, null, null, cancellationToken);
+        ReadAllAsync(connection, application, dataSource, sort, parameters, condition, search, limit, null, null, null, cancellationToken);
 
     /// <summary>
     /// Streams the rows as the stream without a cipher does, and decrypts the value of each projected sensitive field with
-    /// <paramref name="cipher"/>. Without a cipher, a row that holds a stored sensitive value throws.
-    /// <paramref name="userId"/> is bound as <see cref="ListAsync(NpgsqlConnection, NpgsqlTransaction?, ApplicationModel, DataSourceModel, int, int, DataSourceSort?, IReadOnlyList{DataSourceParameterValue}, RecordCondition?, string?, RecordCipher?, string?, CancellationToken)"/> does.
+    /// <paramref name="cipher"/>. Without a cipher, a row that holds a stored sensitive value throws. When
+    /// <paramref name="filter"/> is given, a row passes only when it matches it, as in the list.
+    /// <paramref name="userId"/> is bound as <see cref="ListAsync(NpgsqlConnection, NpgsqlTransaction?, ApplicationModel, DataSourceModel, int, int, DataSourceSort?, IReadOnlyList{DataSourceParameterValue}, RecordCondition?, string?, RecordCipher?, string?, RecordListFilter?, CancellationToken)"/> does.
     /// </summary>
     public static async IAsyncEnumerable<DataSourceRow> ReadAllAsync(
         NpgsqlConnection connection,
@@ -204,6 +209,7 @@ public static class DataSourceQueries
         int limit,
         RecordCipher? cipher,
         string? userId,
+        RecordListFilter? filter,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -213,7 +219,7 @@ public static class DataSourceQueries
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
 
         var searching = !string.IsNullOrEmpty(search) && dataSource.SearchFields.Count > 0;
-        var statement = Statement(application, dataSource, sort, condition, searching);
+        var statement = Statement(application, dataSource, sort, condition, searching, filter);
         var lookups = await LookupsAsync(application, dataSource, statement, parameters, cipher, cancellationToken);
         await using var command = new NpgsqlCommand(statement.PageSql, connection);
         AddValues(command, statement.Values);
@@ -221,6 +227,7 @@ public static class DataSourceQueries
         AddLookups(command, lookups);
         AddTimeZone(command, statement);
         condition?.AddTo(command);
+        filter?.AddTo(command);
         AddCurrentUser(command, userId);
         if (searching)
         {
@@ -313,13 +320,15 @@ public static class DataSourceQueries
     /// and the sort both use its SQL. The page statement ends with <c>LIMIT @limit OFFSET @offset</c>. Both put the
     /// filter and <paramref name="condition"/>, joined with <c>AND</c>, in one <c>WHERE</c> clause
     /// over the root row before any grouping. When <paramref name="search"/> is set, they also hold
-    /// one term per search field, joined with <c>OR</c>, that matches <c>@search</c>. Neither holds a
-    /// value from a filter, a parameter, the condition or the search: each is a parameter that the caller adds.
+    /// one term per search field, joined with <c>OR</c>, that matches <c>@search</c>. When <paramref name="filter"/> is set,
+    /// they also hold its condition over the columns of <see cref="DataSourceListFilter"/>. Neither holds a
+    /// value from a filter, a parameter, the condition, the search or the request filter: each is a parameter that the caller adds.
     /// The count statement names no measure filter, so it ignores their values. The statement also lists the
     /// exact lookup tests of the filter and then of each measure filter, whose <c>bytea[]</c> parameters the caller binds.
     /// </summary>
     internal static DataSourceStatement Statement(
-        ApplicationModel application, DataSourceModel dataSource, DataSourceSort? sort, RecordCondition? condition, bool search = false)
+        ApplicationModel application, DataSourceModel dataSource, DataSourceSort? sort, RecordCondition? condition, bool search = false,
+        RecordListFilter? filter = null)
     {
         var table = EntityNaming.QualifiedTable(EntityNaming.Table(dataSource.Entity.Id));
         var row = EntityNaming.Quote(RowAlias);
@@ -356,7 +365,7 @@ public static class DataSourceQueries
             order = sort is null ? $"{id} ASC" : $"{OrderTerm(sort, joins, null)}, {id} ASC";
         }
 
-        var (filter, filterValues, filterLookups) = dataSource.Filter is { } dataSourceFilter
+        var (filterSql, filterValues, filterLookups) = dataSource.Filter is { } dataSourceFilter
             ? Translate(application, dataSource, dataSourceFilter, joins, "f")
             : (null, [], []);
         lookups.InsertRange(0, filterLookups);
@@ -365,7 +374,10 @@ public static class DataSourceQueries
         var searched = search
             ? $"({string.Join(" OR ", dataSource.SearchFields.Select(field => RecordQueries.SearchTerm(joins.ColumnOf(field.Path))))})"
             : null;
-        string[] conditions = [.. new[] { filter, condition?.Sql, searched }.OfType<string>()];
+
+        // The request filter compares the group fields, or else the projected fields, so a bucketed field is its bucket's first date.
+        var requested = filter?.Sql(field => GroupColumn(DataSourceListFilter.Columns(dataSource).First(column => column.Name == field.Name), joins));
+        string[] conditions = [.. new[] { filterSql, condition?.Sql, searched, requested }.OfType<string>()];
         var where = conditions.Length == 0 ? "" : $" WHERE {string.Join(" AND ", conditions)}";
         var from = $"{table} AS {row}{joins.Sql}{where}";
 
