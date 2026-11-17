@@ -24,6 +24,7 @@ third names what to read next.
 | [Product brief](product-brief.md)         | What Axis is, who uses it, the proving samples                            | You do product or architecture work                         |
 | [How Axis works](how-axis-works.md)       | A walk through the platform with diagrams, one part at a time             | You are new to Axis and want the whole picture first        |
 | [Roadmap](roadmap.md)                     | Milestones in their phases, what each delivers and its status             | You need the current milestone or a milestone's scope       |
+| [Capabilities](capabilities.md)           | Every capability an organization needs, and the doc or milestone of each  | You ask what Axis covers, or add or find a capability       |
 | [Decisions](decisions.md)                 | The index of decisions, each in its own file under `decisions/`           | A change touches a design choice; read only those decisions |
 | [Concepts](domain/concepts.md)            | The vocabulary and what each resource does                                | You name anything in code, APIs, UI or issues               |
 | [Knowledge](domain/knowledge.md)          | What business applications need and the pitfalls to avoid                 | You change configuration, execution, storage or security    |
