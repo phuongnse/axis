@@ -395,7 +395,7 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
   in the author's language. A group that holds a group reads as a list under "All of these:" or "At least one
   of these:", so `and` binding tighter than `or` shows. A `not` group always reads as a list, under "Not all of
   these:" for `and`, and under "None of these:" for `or`.
-- **The box is one line, with Expand inside it** _(planned for M33)_. The box starts one line high, like a text
+- **The box is one line, with Expand inside it.** The box starts one line high, like a text
   field. Expand is a small icon button inside the box, at the end of its first line, and each line keeps room at
   its end, so the text never runs under it. The box in the Expand dialog shows at least eight lines.
 - **An error in words.** An error reads first in words, with its code after it, small. An

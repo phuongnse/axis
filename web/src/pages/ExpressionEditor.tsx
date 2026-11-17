@@ -6,6 +6,7 @@ import { EditorView, keymap } from '@codemirror/view'
 import { ExpandAltOutlined } from '@ant-design/icons'
 import { Flex, Modal, Typography } from 'antd'
 import { Fragment, useContext, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AxisButton } from '../platform/AxisButton'
 import {
   checkStudioExpression,
@@ -81,6 +82,8 @@ export default function ExpressionEditor({
   const tokens = useDesignTokens()
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  // The editor's outer element, which holds the Expand button inside the box.
+  const [frame, setFrame] = useState<HTMLElement | null>(null)
   const dialogView = useRef<EditorView | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [themeCompartment] = useState(() => new Compartment())
@@ -107,7 +110,7 @@ export default function ExpressionEditor({
     t,
     draft,
     value,
-    theme: expressionTheme(tokens, mode),
+    theme: (inDialog ? dialogTheme : boxTheme)(tokens, mode),
     themeCompartment,
   })
 
@@ -124,7 +127,7 @@ export default function ExpressionEditor({
       t,
       draft,
       value,
-      theme: expressionTheme(tokens, mode),
+      theme: (inDialog ? dialogTheme : boxTheme)(tokens, mode),
       themeCompartment,
     }
   })
@@ -213,6 +216,7 @@ export default function ExpressionEditor({
       }),
     })
     viewRef.current = view
+    setFrame(view.dom)
     latest.current.onView?.(view)
     check(view)
 
@@ -223,13 +227,16 @@ export default function ExpressionEditor({
       setBefore('')
       view.destroy()
       viewRef.current = null
+      setFrame(null)
       latest.current.onView?.(null)
     }
   }, [application, resourceId, path, name])
 
   useEffect(() => {
-    viewRef.current?.dispatch({ effects: themeCompartment.reconfigure(expressionTheme(tokens, mode)) })
-  }, [themeCompartment, tokens, mode])
+    viewRef.current?.dispatch({
+      effects: themeCompartment.reconfigure((inDialog ? dialogTheme : boxTheme)(tokens, mode)),
+    })
+  }, [themeCompartment, tokens, mode, inDialog])
 
   useEffect(() => {
     const view = viewRef.current
@@ -254,17 +261,20 @@ export default function ExpressionEditor({
 
   return (
     <div aria-busy={checking}>
-      <Flex gap={tokens.spacing.xs} align="flex-start">
-        <div ref={hostRef} style={{ flex: 1, minWidth: 0 }} />
-        {!inDialog && (
+      <div ref={hostRef} />
+      {!inDialog &&
+        frame &&
+        createPortal(
           <AxisButton
             role="icon"
+            size="small"
             nameKey="shell.studio.expression.expand"
             icon={<ExpandAltOutlined />}
+            style={{ position: 'absolute', top: 3, right: 3 }}
             onClick={() => setExpanded(true)}
-          />
+          />,
+          frame,
         )}
-      </Flex>
       {call !== null && (
         <div data-testid="studio-expression-signature">
           <Typography.Text>
@@ -383,4 +393,17 @@ const expressionTheme = sharedTheme((tokens, mode) => [
     '.cm-content': { padding: '4px 0' },
     '.cm-completionInfo code': { fontFamily: tokens.type.codeFontFamily },
   }),
+])
+
+// The box in a form leaves room at the end of each line for Expand. The box in the dialog shows at least eight lines,
+// see docs/reference/studio.md#expression-editor.
+const boxTheme = sharedTheme((tokens, mode) => [
+  expressionTheme(tokens, mode),
+  EditorView.theme({ '.cm-line': { paddingRight: `${tokens.size.smallControl + 6}px` } }),
+])
+
+// Eight lines at CodeMirror's line height of 1.4, plus the 4px of padding above and below the content.
+const dialogTheme = sharedTheme((tokens, mode) => [
+  expressionTheme(tokens, mode),
+  EditorView.theme({ '.cm-content': { minHeight: `calc(${8 * 1.4}em + 8px)` } }),
 ])
