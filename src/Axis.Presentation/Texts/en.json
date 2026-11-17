@@ -2681,7 +2681,6 @@
   "shell.stepRun.cameFrom": "Came from",
   "shell.stepRun.wentTo": "Went to",
   "shell.stepRun.start": "The instance started here",
-  "shell.stepRun.stillHere": "The instance is still at this step",
   "shell.stepRun.ended.instance": "The instance ended here",
   "shell.stepRun.assignedTo": "Assigned to",
   "shell.stepRun.happened": "What happened",
@@ -2784,5 +2783,6 @@
   "shell.stepRun.attemptColumn": "#",
   "shell.stepRun.result": "Result",
   "shell.table.showDetails": "Show the details",
-  "shell.table.hideDetails": "Hide the details"
+  "shell.table.hideDetails": "Hide the details",
+  "shell.stepRun.thenGoesTo": "Then goes to"
 }

@@ -206,16 +206,11 @@ export function StepRunPanel({
       const timeout = record(definition.timeout)
       const due = after(timeout.after)
       if (due !== null) {
-        terms.push({
-          key: 'givesUp',
-          term: t('shell.stepRun.givesUp'),
-          value: (
-            <Flex vertical align="flex-start">
-              {dueTime(due)}
-              {muted(<>→ {stepName(timeout.next)}</>)}
-            </Flex>
-          ),
-        })
+        // Where the run goes when it gives up is a fact of its own, a step that opens in the panel as Went to's does.
+        terms.push(
+          { key: 'givesUp', term: t('shell.stepRun.givesUp'), value: dueTime(due) },
+          { key: 'thenGoesTo', term: t('shell.stepRun.thenGoesTo'), value: stepName(timeout.next) },
+        )
       }
     }
     const wake = after(definition.wait) ?? null
@@ -329,20 +324,25 @@ export function StepRunPanel({
         term: t('shell.stepRun.cameFrom'),
         value: before === undefined ? muted(t('shell.stepRun.start')) : runLink(before),
       },
-      {
-        key: 'wentTo',
-        term: t('shell.stepRun.wentTo'),
-        // The outcome or branch that chose the next step follows it on its line.
-        value:
-          after === undefined ? (
-            muted(shown.finishedAt === null ? t('shell.stepRun.stillHere') : t('shell.stepRun.ended.instance'))
-          ) : (
-            <span>
-              {runLink(after)}
-              {reason !== null && muted(` — ${reason}`)}
-            </span>
-          ),
-      },
+      // A run that has not ended has gone nowhere yet, which its state already says, so it has no Went to. The outcome
+      // or branch that chose the next step follows it on its line.
+      ...(shown.finishedAt === null
+        ? []
+        : [
+            {
+              key: 'wentTo',
+              term: t('shell.stepRun.wentTo'),
+              value:
+                after === undefined ? (
+                  muted(t('shell.stepRun.ended.instance'))
+                ) : (
+                  <span>
+                    {runLink(after)}
+                    {reason !== null && muted(` — ${reason}`)}
+                  </span>
+                ),
+            },
+          ]),
       { key: 'trace', term: t('shell.stepRun.traceId'), value: traceId(shown.traceId) },
     ]
     return (
@@ -702,36 +702,39 @@ export function StepRunPanel({
       kind={kind}
       closeKey="shell.graph.closeDetails"
       onClose={onClose}
+      // A run with one part and one run, such as a wait's, has nothing above its facts, and so no room kept for it.
       top={
-        <Flex vertical gap={spacing.xs}>
-          {own.length > 1 && chosen !== undefined && (
-            <Select
-              aria-label={t('shell.stepRun.chooseRun')}
-              value={chosen.number}
-              onChange={onRun}
-              options={own.map((candidate) => ({
-                value: candidate.number,
-                label: t('shell.stepRun.run')
-                  .replace('{number}', String(candidate.number))
-                  .replace('{count}', String(own.length)),
-              }))}
-            />
-          )}
-          {/* A run with one part, such as a wait's, shows it with no tab bar. */}
-          {shown.length > 1 && (
-            <Tabs
-              activeKey={current}
-              onChange={(key) => onTab(key as StepRunTab)}
-              items={shown.map((key) => ({ key, label: t(`shell.stepRun.tab.${key}`) }))}
-              // Narrow gaps, so the tabs of a call fit a panel `sidePanel` wide.
-              tabBarGutter={spacing.md}
-              tabBarStyle={{ marginBottom: 0 }}
-            />
-          )}
-        </Flex>
+        (own.length > 1 && chosen !== undefined) || shown.length > 1 ? (
+          <Flex vertical gap={spacing.xs}>
+            {own.length > 1 && chosen !== undefined && (
+              <Select
+                aria-label={t('shell.stepRun.chooseRun')}
+                value={chosen.number}
+                onChange={onRun}
+                options={own.map((candidate) => ({
+                  value: candidate.number,
+                  label: t('shell.stepRun.run')
+                    .replace('{number}', String(candidate.number))
+                    .replace('{count}', String(own.length)),
+                }))}
+              />
+            )}
+            {/* A run with one part, such as a wait's, shows it with no tab bar. */}
+            {shown.length > 1 && (
+              <Tabs
+                activeKey={current}
+                onChange={(key) => onTab(key as StepRunTab)}
+                items={shown.map((key) => ({ key, label: t(`shell.stepRun.tab.${key}`) }))}
+                // Narrow gaps, so the tabs of a call fit a panel `sidePanel` wide.
+                tabBarGutter={spacing.md}
+                tabBarStyle={{ marginBottom: 0 }}
+              />
+            )}
+          </Flex>
+        ) : undefined
       }
     >
-      <div style={{ paddingTop: spacing.xs }}>{body[current]()}</div>
+      {body[current]()}
     </SidePanel>
   )
 }

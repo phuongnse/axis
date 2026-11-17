@@ -2681,7 +2681,6 @@
   "shell.stepRun.cameFrom": "Đến từ",
   "shell.stepRun.wentTo": "Đi tiếp tới",
   "shell.stepRun.start": "Lượt chạy bắt đầu từ bước này",
-  "shell.stepRun.stillHere": "Lượt chạy vẫn đang ở bước này",
   "shell.stepRun.ended.instance": "Lượt chạy kết thúc ở bước này",
   "shell.stepRun.assignedTo": "Giao cho",
   "shell.stepRun.happened": "Diễn biến",
@@ -2784,5 +2783,6 @@
   "shell.stepRun.attemptColumn": "#",
   "shell.stepRun.result": "Kết quả",
   "shell.table.showDetails": "Xem chi tiết",
-  "shell.table.hideDetails": "Ẩn chi tiết"
+  "shell.table.hideDetails": "Ẩn chi tiết",
+  "shell.stepRun.thenGoesTo": "Sau đó đi tới"
 }
