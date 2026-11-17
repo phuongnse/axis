@@ -493,7 +493,7 @@ below answers `200`.
   `processInspector`, and the compiler checks this. `?search=&page=&pageSize=&sort=` and the data source parameter
   values belong to the page's one `table`. `/new` and `/{id}` belong to its one `form`. `/{taskId}` and
   `/{instanceId}` belong to its one `taskInbox` or `processInspector`. The instance list of a `processInspector`
-  also reads `search`, `filter`, `columns`, `sort`, `page` and `pageSize`. A `kpi`, a `detail` and a `chart` own no part
+  and the task list of a `taskInbox` also read `search`, `filter`, `columns`, `sort`, `page` and `pageSize`. A `kpi`, a `detail` and a `chart` own no part
   of the address and read only page parameters, so they do not count.
 - **Letter case.** `{site}` is the site path, and `{page}` is the page name in lower case, as navigation links write
   it. The server matches both ignoring letter case.

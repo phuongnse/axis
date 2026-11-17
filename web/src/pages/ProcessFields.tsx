@@ -63,16 +63,17 @@ export function NamePicker({
   label,
   help,
   kind,
+  required = false,
   value,
-  required,
   onPick,
 }: {
   pointer: string
   label: string
   help: string
   kind: string
-  value: unknown
+  /** Marks the field required, as for {@link AxisField}. Off unless the schema requires the key. */
   required?: boolean
+  value: unknown
   onPick: (next: string) => void
 }) {
   const names = useContext(StudioNamesContext)

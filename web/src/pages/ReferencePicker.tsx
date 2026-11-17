@@ -23,7 +23,7 @@ export function ReferencePicker({
   onChange,
 }: {
   name: string
-  /** The id, description and required mark that `AxisField` gives its input. */
+  /** The id, description, and required mark and state that `AxisField` gives its input. */
   id?: string
   'aria-describedby'?: string
   'aria-required'?: boolean

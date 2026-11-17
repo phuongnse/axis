@@ -570,7 +570,7 @@ test.describe("Studio edits a process in the process editor", () => {
         .getByRole("textbox", { name: "Step name", exact: true })
         .fill("coolDown");
       await expect(
-        card.getByRole("radio", { name: "Wait", exact: true }),
+        card.getByRole("radio", { name: /^Wait/ }),
       ).toBeChecked();
       await card
         .getByRole("textbox", { name: "Duration", exact: true })
