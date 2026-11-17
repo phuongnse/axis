@@ -14,7 +14,7 @@ first, and it must let widgets and layouts be added without a change to the page
 - **Layout is container widgets** that hold other widgets
   ([D159](d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md)).
 - **A `form` resource serves both a `form` widget and a process task**
-  ([D20](d20-human-tasks-task-inbox-and-forms.md)).
+  ([D160](d160-people-work-together-on-records-and-tasks-and-work-reaches-the-right-person-when-they-are-away.md)).
 
 Widgets read data through data sources ([D18](d18-data-sources.md)), and pages open each other
 through navigate actions ([D159](d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md)). The detail is in

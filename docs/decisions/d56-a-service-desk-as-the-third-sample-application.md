@@ -26,7 +26,7 @@ request then an approval.
 - **The committed folder records what the journey builds,** and CI activates it and runs its
   scenarios as it does for the other samples.
 - **A second, smaller journey starts from a built-in application** instead of a blank one, see
-  [D124](d124-the-organization-and-approvals-modules.md).
+  [D160](d160-people-work-together-on-records-and-tasks-and-work-reaches-the-right-person-when-they-are-away.md).
 
 Its data, flow, security, pages, scenarios and journeys are in the
 [product brief](../product-brief.md#third-application-service-desk).

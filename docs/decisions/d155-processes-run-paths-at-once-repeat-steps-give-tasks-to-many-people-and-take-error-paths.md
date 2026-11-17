@@ -18,7 +18,7 @@ puts this work first. This decision replaces D19 and D69 and keeps every part of
   [D70](d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md) agrees.
 - **One running instance per process and record,** pinned to the release active at its start.
 - **Steps name the step that follows.** The step types are `decision`, `task`
-  ([D20](d20-human-tasks-task-inbox-and-forms.md)), `operation`, `end`, `timer`, `waitEvent`,
+  ([D160](d160-people-work-together-on-records-and-tasks-and-work-reaches-the-right-person-when-they-are-away.md)), `operation`, `end`, `timer`, `waitEvent`,
   `subProcess`, and the blocks `parallel` and `repeat`. Decisions route by expressions and named
   rules, so a threshold is configuration.
 - **Paths at once and repeats are blocks with a structure,** as AWS Step Functions and Power Automate

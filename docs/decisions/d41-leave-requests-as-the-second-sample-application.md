@@ -14,7 +14,7 @@ around it.
   days off, and the department manager approves, returns or rejects the request.
 - **It is smaller than purchase requests and of the same shape,** a request then an approval. It
   uses tasks and policies as purchase requests do, takes its departments from the `organization`
-  module, see [D124](d124-the-organization-and-approvals-modules.md), and has no finance step,
+  module, see [D160](d160-people-work-together-on-records-and-tasks-and-work-reaches-the-right-person-when-they-are-away.md), and has no finance step,
   connector or extension package.
 - **It needs no platform code.** A platform change that it needs is a gap to raise, not to hide in
   the sample.

@@ -31,7 +31,7 @@ the files agree, title and status included.
 | [D17](decisions/d17-entity-logic-and-child-collections.md) | Entity logic and child collections | **Agreed** |
 | [D18](decisions/d18-data-sources.md) | Data sources | **Agreed** |
 | D19 | Process resource and worker host | Superseded by [D155](decisions/d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md), [last text](https://github.com/phuongnse/axis/blob/b7af8e40c52f8d650fa4f6d0a1a4b6e099aa96a0/docs/decisions/d19-process-resource-and-worker-host.md) |
-| [D20](decisions/d20-human-tasks-task-inbox-and-forms.md) | Human tasks, task inbox and forms | **Agreed** |
+| D20 | Human tasks, task inbox and forms | Superseded by [D160](decisions/d160-people-work-together-on-records-and-tasks-and-work-reaches-the-right-person-when-they-are-away.md), [last text](https://github.com/phuongnse/axis/blob/39fd77af1d7d7027212254c6ff4485ae0bee7cff/docs/decisions/d20-human-tasks-task-inbox-and-forms.md) |
 | [D21](decisions/d21-development-test-users-audit-records-and-sequences.md) | Development test users, audit records and sequences | **Agreed** |
 | [D22](decisions/d22-current-time-and-time-zones.md) | Current time and time zones | **Agreed** |
 | [D23](decisions/d23-sign-in-through-oidc-and-the-bff-session.md) | Sign-in through OIDC and the BFF session | **Agreed** |
@@ -135,7 +135,7 @@ the files agree, title and status included.
 | [D121](decisions/d121-how-a-module-contract-is-declared-and-checked.md) | How a module contract is declared and checked | **Agreed** |
 | [D122](decisions/d122-how-a-customization-layer-is-written-and-applied.md) | How a customization layer is written and applied | **Agreed** |
 | [D123](decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) | How an Axis SaaS cell keeps tenants apart, measured and recoverable | **Agreed** |
-| [D124](decisions/d124-the-organization-and-approvals-modules.md) | The organization and approvals modules | **Agreed** |
+| D124 | The organization and approvals modules | Superseded by [D160](decisions/d160-people-work-together-on-records-and-tasks-and-work-reaches-the-right-person-when-they-are-away.md), [last text](https://github.com/phuongnse/axis/blob/39fd77af1d7d7027212254c6ff4485ae0bee7cff/docs/decisions/d124-the-organization-and-approvals-modules.md) |
 | D125 | How AI authoring connects, runs and keeps its changes | Superseded by [D150](decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md), [last text](https://github.com/phuongnse/axis/blob/514687579949e77a807a36760fb4ecc7d29f90c5/docs/decisions/d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md) |
 | [D126](decisions/d126-sign-up-trials-and-the-control-plane.md) | Sign-up, trials and the control plane | **Agreed** |
 | [D127](decisions/d127-plans-payments-and-invoices.md) | Plans, payments and invoices | **Agreed** |
@@ -171,3 +171,4 @@ the files agree, title and status included.
 | [D157](decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md) | Files reach calls and emails, show in the page, keep their versions, and documents come from Word templates | **Agreed** |
 | [D158](decisions/d158-history-keeps-old-and-new-values-a-deleted-record-waits-in-a-recycle-bin-and-every-record-has-system-fields.md) | History keeps old and new values, a deleted record waits in a recycle bin, and every record has system fields | **Agreed** |
 | [D159](decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) | Pages show related lists, boards and calendars, forms take context and drafts, and each site has its brand | **Agreed** |
+| [D160](decisions/d160-people-work-together-on-records-and-tasks-and-work-reaches-the-right-person-when-they-are-away.md) | People work together on records and tasks, and work reaches the right person when they are away | **Agreed** |
