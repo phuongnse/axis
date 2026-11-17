@@ -251,14 +251,16 @@ Undo brings it back.
 
 _(planned for M38)_
 
-A `parallel` panel lists the branches, then a completion. Each rule of [parallel step](process-blocks.md#parallel-step)
-has a choice here.
+A `parallel` panel lists the branches, then a completion and a Next step. Each rule of
+[parallel step](process-blocks.md#parallel-step) has a choice here.
 
 - **Branches.** Each branch is a row with a Name, a When expression and a Start picker of the branch's steps. Add
   branch appends one with the first free name, `branch1`, `branch2` and so on, and an empty `start` and `steps`.
   Remove branch removes the branch and its steps, and one Undo brings them back.
 - **Completion.** A Completion choice offers All, Any, A number and A condition. A number shows a Count box, and A
   condition shows an expression editor for `condition`. All removes `completion`, which is the default rule.
+- **Next.** A Next step picker lists the steps of the same list as the block, and sets its `next`. It is the
+  keyboard way to set a block's transition, as the Transitions section says.
 
 ### Repeat
 

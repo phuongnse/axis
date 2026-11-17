@@ -132,10 +132,11 @@ The instance page runs the operator's commands on the instance and its calls, ea
   gets no warning.
 
 - **Cancel branch, Cancel pass and Cancel task.** _(planned for M38)_ A row of Paths whose `commands` lists `cancel`
-  has a Cancel branch button for a branch, or a Cancel pass button for a pass. A task row whose `commands` lists
-  `cancel` has a Cancel task button. Each text button opens the shared reason dialog, titled with its own name, and
-  posts the reason to `{instancesPath}/{id}/paths/{pathId}/cancel` or `{instancesPath}/{id}/tasks/{taskId}/cancel`.
-  The reason rules and the answer are those of Cancel instance.
+  has a Cancel branch icon button for a branch, or a Cancel pass icon button for a pass. A task row whose `commands`
+  lists `cancel` has a Cancel task icon button. Each is a stop icon with its name as a tooltip, as the dead letters'
+  buttons are. Each button opens the shared reason dialog, titled with its own name, and posts the reason to
+  `{instancesPath}/{id}/paths/{pathId}/cancel` or `{instancesPath}/{id}/tasks/{taskId}/cancel`. The reason rules
+  and the answer are those of Cancel instance.
 
 ### Resolve
 
