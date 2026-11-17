@@ -35,19 +35,10 @@ function ReadingNode({ node, ...labels }: Labels & { node: Reading }) {
     case 'phrase': {
       // The `in` phrase lists its values with `or`, and every other slot with a comma.
       const separator = node.words === 'in' ? ` ${t('shell.studio.expression.reads.join.or')} ` : ', '
-      const key = `shell.studio.expression.reads.${node.words}`
-      // A function whose words are not written yet reads as the call itself, such as `today()`.
-      if (node.words.startsWith('fn.') && t(key) === key) {
-        return (
-          <>
-            {node.words.slice(3)}({joined(node.slots.flat(), ', ', labels)})
-          </>
-        )
-      }
       const parts = Object.fromEntries(
         node.slots.map((slot, index) => [String(index), joined(slot, separator, labels)]),
       )
-      return <FilledText text={t(key)} parts={parts} />
+      return <FilledText text={t(`shell.studio.expression.reads.${node.words}`)} parts={parts} />
     }
     case 'name':
       return <strong>{(labels.names && labelText(labels.names, node.labelKey, labels.locale)) ?? node.name}</strong>

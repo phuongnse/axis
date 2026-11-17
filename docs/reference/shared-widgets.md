@@ -103,3 +103,8 @@ files are not checked. The plugin's rule for the end-to-end tests is on in `test
   `oxlint-disable-next-line <rule> -- <reason>` comment on the line before it. With
   `--report-unused-disable-directives`, a comment that its line no longer needs fails the lint, so the
   older uses only go down.
+
+A unit test, `web/src/platform/sharedWidgets.test.ts`, holds [which widget](#which-widget) to the code.
+Each name with a capital letter that a row without a planned marker names is exported by the SPA. Ant
+Design's names and the rows that name a server path are left out. Each `Axis` widget that the SPA exports
+is named in the table.

@@ -953,12 +953,26 @@ describe('ExpressionEditor reading', () => {
     expect(screen.queryByTestId('studio-expression-reading')).not.toBeInTheDocument()
   })
 
-  it('reads a function whose words are not written yet as the call, such as today()', async () => {
-    renderReading('en', () =>
-      json({ type: 'date', diagnostics: [], reading: { kind: 'phrase', words: 'fn.today', slots: [] } }),
+  it.each([
+    ['en', 'In words: today plus 7 days'],
+    ['vi', 'Nghĩa là: hôm nay cộng 7 ngày'],
+  ])('reads the function call addDays(today(), 7) in words in %s', async (locale, line) => {
+    renderReading(locale, () =>
+      json({
+        type: 'date',
+        diagnostics: [],
+        reading: {
+          kind: 'phrase',
+          words: 'fn.addDays',
+          slots: [
+            [{ kind: 'phrase', words: 'fn.today', slots: [] }],
+            [{ kind: 'value', type: 'integer', value: 7, labelKey: null }],
+          ],
+        },
+      }),
     )
 
-    await waitFor(() => expect(screen.getByTestId('studio-expression-reading')).toHaveTextContent('In words: today()'))
+    await waitFor(() => expect(screen.getByTestId('studio-expression-reading')).toHaveTextContent(line))
   })
 
   it('reads a field with no label as its name, and a text value between single quotes', async () => {

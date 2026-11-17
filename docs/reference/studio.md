@@ -389,8 +389,8 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
   ÷ and −, so `amount * 1.1` reads "Amount × 1.1". With an error the line is hidden, and the error shows. The
   reading comes from the [expression check](authoring.md#expression-check), and its words are texts in every
   locale, so a change of language needs no new check.
-- **Functions read in words** _(planned for M33)_. Each function has words of its own, such as "the days from
-  … to …" for `daysBetween`. `addDays(today(), 7)` reads "today plus 7 days".
+- **Functions read in words.** Each function has words of its own, such as "the days from … to …" for
+  `daysBetween`. `addDays(today(), 7)` reads "today plus 7 days".
 - **Groups read as the expression groups them.** A group of only `and`, or only `or`, reads on one line, joined
   in the author's language. A group that holds a group reads as a list under "All of these:" or "At least one
   of these:", so `and` binding tighter than `or` shows. A `not` group always reads as a list, under "Not all of
