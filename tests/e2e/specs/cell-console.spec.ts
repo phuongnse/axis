@@ -4,6 +4,7 @@ import { expect, test } from '../test'
 import { runAdmin } from '../admin-tool'
 import { startCell } from '../cell'
 import { confirmDialog, waitForDialog } from '../dialogs'
+import { fieldLabel } from '../fields'
 import { submitCode, submitPassword } from '../keycloak'
 import { psql } from '../postgres'
 import { addRealmAccount, type RealmAccount } from '../tenant-realm'
@@ -230,9 +231,9 @@ test('the platform operator creates a tenant, follows the create job and opens t
   await page.goto('https://console.localhost/tenants')
   await page.getByTestId('cell-tenants-create').click()
   const dialog = await waitForDialog(page)
-  await dialog.getByLabel('Tenant ID', { exact: true }).fill(created)
-  await dialog.getByLabel('Application', { exact: true }).fill('approvals')
-  await dialog.getByLabel("Administrator's email", { exact: true }).fill(`first-admin@${created}.test`)
+  await dialog.getByLabel(fieldLabel('Tenant ID')).fill(created)
+  await dialog.getByLabel(fieldLabel('Application')).fill('approvals')
+  await dialog.getByLabel(fieldLabel("Administrator's email")).fill(`first-admin@${created}.test`)
   await expectNoViolations(page)
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
 
@@ -255,9 +256,9 @@ test("the create dialog shows the title of the cell's refusal when a tenant alre
   await page.goto('https://console.localhost/tenants')
   await page.getByTestId('cell-tenants-create').click()
   const dialog = await waitForDialog(page)
-  await dialog.getByLabel('Tenant ID', { exact: true }).fill(tenant)
-  await dialog.getByLabel('Application', { exact: true }).fill('approvals')
-  await dialog.getByLabel("Administrator's email", { exact: true }).fill(`first-admin@${tenant}.test`)
+  await dialog.getByLabel(fieldLabel('Tenant ID')).fill(tenant)
+  await dialog.getByLabel(fieldLabel('Application')).fill('approvals')
+  await dialog.getByLabel(fieldLabel("Administrator's email")).fill(`first-admin@${tenant}.test`)
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
 
   await expect(dialog.getByTestId('cell-create-error')).toContainText('A tenant of the cell already has this id.')

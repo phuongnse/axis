@@ -121,18 +121,20 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   status is `idle`, which shows nothing, so the input stays in place as the status changes and keeps its
   focus. A field outside a form takes no status, because the form item is what draws the message, the
   border and the spinner.
-- **Every Studio and console field is drawn through them** _(planned for M33)_, with `AxisCheckboxField` as
+- **Every Studio and console field is drawn through them**, with `AxisCheckboxField` as
   a yes-or-no field with its help under its label and `AxisChoiceField` as a choice among a few ways, each
   with its help.
-- **Every field has help** _(planned for M33)_, as [platform field help](frontend.md#platform-field-help) says.
-- **Nothing between help and input** _(planned for M33)_. Guidance goes into the help, never on a line of
+- **Every field has help**, as [platform field help](frontend.md#platform-field-help) says.
+- **Nothing between help and input**. Guidance goes into the help, never on a line of
   its own.
-- **One field to a row** _(planned for M33)_. Two fields share a row only when they truly belong together,
-  such as a range's minimum and maximum, through `AxisFieldRow`, and they stack at narrow width.
-- **Every required field is marked** _(planned for M33)_. A platform field follows the form widget's
+- **One field to a row**. Two fields share a row only when they truly belong together,
+  such as a range's minimum and maximum, through `AxisFieldRow`, and they stack at narrow width. A key and its
+  value in one row of a titled list are one entry, so they share a row too.
+- **Every required field is marked**. A platform field follows the form widget's
   [required mark](form-widget.md#field-look), in every form and dialog, even where every field is
-  required, such as New resource. Only the sign-in page marks none, as everyone knows both its fields are
-  needed. A field never says "(optional)".
+  required, such as New resource. The sign-in pages mark none, since everyone knows their fields are needed.
+  A field never says "(optional)". Each form names the shared `requiredMark`, and a Vitest check refuses a form
+  outside the sign-in pages that does not.
 - **A field is checked on click**. A finish button is never disabled because the
   input is not valid: that says nothing of what is missing, has low contrast and cannot be focused. A
   click checks the fields, shows under each one that is wrong what to do, such as "Enter a name.", and

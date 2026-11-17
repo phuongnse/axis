@@ -1,6 +1,7 @@
 import { Flex, Form, Input, Modal } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisField } from '../platform/AxisField'
+import { requiredMark } from '../platform/requiredMark'
 import { useRef, useState } from 'react'
 import { CellJobTable } from '../platform/CellJobTable'
 import { createCellTenant, type CellJob, type CellTenantRequest } from '../platform/cell'
@@ -113,7 +114,7 @@ export function CreateCellTenantModal({ onClose, onEnded }: { onClose: () => voi
       ) : (
         <Flex vertical gap="middle">
           {error && <AxisAlert data-testid="cell-create-error" kind="error" message={error} />}
-          <Form form={form} layout="vertical" name="create-cell-tenant" requiredMark={false}>
+          <Form form={form} layout="vertical" name="create-cell-tenant" requiredMark={requiredMark}>
             <Flex vertical gap={spacing.lg}>
               <AxisField
                 name="id"

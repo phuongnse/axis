@@ -62,7 +62,7 @@ export function OperationPanel({
   return (
     <>
       <div data-testid={`studio-field-${pointer}/operation`}>
-        <Flex gap="small" wrap>
+        <Flex vertical gap="small">
           <AxisField {...field('steps.operation')}>
             <Select
               style={{ minWidth: 240 }}
@@ -383,7 +383,7 @@ function Retry({ pointer, value, onChange }: { pointer: string; value: unknown; 
   return (
     <div data-testid={`studio-field-${retryPointer}`}>
       <AxisFieldGroup {...group('steps.retry')}>
-        <Flex gap="small" wrap>
+        <Flex vertical gap="small">
           <AxisField {...field('steps.retry.attempts')}>
             <InputNumber
               min={1}
