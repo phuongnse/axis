@@ -192,9 +192,10 @@ export async function addEntityField(page: Page, index: number) {
 }
 
 /**
- * Clicks Move up, Move down or Remove in the "…" menu of the row of field `index` of the open entity. It closes an open
- * field first. It waits until the menu has closed, so its entries do not match the next action. The fields after a
- * removed one move up an index.
+ * Chooses Move up, Move down or Remove in the "…" menu of the row of field `index` of the open entity. It closes an open
+ * field first. It presses Enter on the entry instead of clicking it: the row's expression checks finish after the menu
+ * opens, add lines and move the menu, so a click can miss the entry. It waits until the menu has closed, so its entries
+ * do not match the next action. The fields after a removed one move up an index.
  */
 export async function entityFieldAction(page: Page, index: number, action: 'Move up' | 'Move down' | 'Remove') {
   await closeEntityField(page)
@@ -202,7 +203,7 @@ export async function entityFieldAction(page: Page, index: number, action: 'Move
   await page
     .getByRole('menu', { name: 'Actions', exact: true })
     .getByRole('menuitem', { name: action, exact: true })
-    .click()
+    .press('Enter')
   await expect(page.getByRole('menu', { name: 'Actions', exact: true })).toHaveCount(0)
 }
 

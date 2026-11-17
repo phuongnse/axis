@@ -102,9 +102,10 @@ nothing:
 - **Package runners.** A tenant administrator's [create and revoke of a package runner](user-administration.md#package-runners)
   are never refused over the `storage` quota. A create writes one small row and one audit record, and a revoke is a
   security action that a billing limit must never stop.
-- **A runner's registration.** A [customer-hosted runner](extension-packages.md#customer-hosted-runners)'s registration of
-  its packages is never refused over the `storage` quota. It adds to the list of its one row, and a billing limit must
-  never stop a runner from starting.
+- **A runner's registration and take.** A [customer-hosted runner](extension-packages.md#customer-hosted-runners)'s
+  registration of its packages and its take of a call are never refused over the `storage` quota. A registration adds
+  to the list of its one row, and a billing limit must never stop a runner from starting. A take marks a call as a
+  step's Mark does, and a billing limit must never stop running work.
 - **Table views and columns.** A person's writes under `/api/me/tables/{key}` are never refused over
   the `storage` quota. Each row is small and bounded by the route's limits, and a person can always tidy their views,
   see [table views and columns](frontend.md#table-views-and-columns).

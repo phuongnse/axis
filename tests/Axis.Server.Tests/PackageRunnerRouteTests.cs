@@ -18,7 +18,7 @@ public sealed class PackageRunnerRouteTests
     private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
 
     [Fact]
-    public async Task The_only_route_that_carries_the_runner_marker_is_the_registration()
+    public async Task The_only_routes_that_carry_the_runner_marker_are_the_runners_routes()
     {
         await using var factory = CreateFactory();
 
@@ -30,7 +30,7 @@ public sealed class PackageRunnerRouteTests
             .Order(StringComparer.Ordinal)
             .ToList();
 
-        Assert.Equal(["POST /api/package-runner/packages"], marked);
+        Assert.Equal(["POST /api/package-runner/calls/take", "POST /api/package-runner/packages"], marked);
     }
 
     private static WebApplicationFactory<Program> CreateFactory() =>
