@@ -109,6 +109,9 @@ nothing:
 - **Table views and columns.** A person's writes under `/api/me/tables/{key}` are never refused over
   the `storage` quota. Each row is small and bounded by the route's limits, and a person can always tidy their views,
   see [table views and columns](frontend.md#table-views-and-columns).
+- **Form drafts** _(planned for M42)_. A person's writes of a [form draft](record-form-state.md#form-drafts) are
+  never refused over the `storage` quota. Each person has one draft for each form, and it is bounded by the
+  route's size limit.
 - **`users`.** Inviting an account and enabling one on the [users page](user-administration.md) are
   refused when the count would pass the quota. A person who signs in through a brokered provider for
   the first time, and would pass the quota, is refused at the identity provider with a page that asks

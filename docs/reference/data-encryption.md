@@ -41,6 +41,12 @@ A sensitive value is encrypted by the server and the worker, so PostgreSQL only 
   [erasure path](record-audit.md#erasing-values-from-history) may change it, so a rotation leaves it alone and
   `retire` keeps every data key that a history value still names. An erasure removes the value's ciphertext from
   the audit record and leaves the tenant's data key alone.
+- **Form drafts** _(planned for M42)_. A sensitive field's value in a [form draft](record-form-state.md#form-drafts)
+  is encrypted in the same format with the tenant's data key, as base64 text in `values`. The associated data is
+  the tenant id, the entity `id`, the draft's `id` and the field path in lower case (`field` or
+  `collection/field`), each followed by one zero byte, so a draft value does not decrypt as another draft's or
+  another field's. A rotation and `retire` leave drafts alone, because a draft lives at most 30 days and only saves
+  typing. A value that no longer decrypts is left out of the read.
 
 ### Where the cipher runs
 
