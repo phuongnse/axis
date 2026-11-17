@@ -180,6 +180,16 @@ export interface AxisTableProps<T> {
   testId?: string
   /** Proposed, see the review on #3650: `spacing-sm` on each side of a cell, for a table in a side panel. */
   compact?: boolean
+  /**
+   * Proposed, see the review on #3650: no header row, for a table of names and their values, whose names say what each
+   * row is, as the browser's developer tools draw headers. Its columns never move under their row.
+   */
+  headless?: boolean
+  /**
+   * Proposed, see the review on #3650: what a row shows when it folds open, under it across the table, or `null` for a
+   * row with nothing more, as Stripe and GitHub list the deliveries of a webhook and open one to its request and answer.
+   */
+  details?: (row: T) => ReactNode | null
 }
 
 /** Column key of the row actions. A field name starts with a letter, so no field column has it. */
@@ -240,6 +250,8 @@ export function AxisTable<T extends object>({
   rowAttributes,
   testId,
   compact = false,
+  headless = false,
+  details,
 }: AxisTableProps<T>) {
   const t = useText()
   // The shell sets the locale of Ant Design's ConfigProvider. Outside it, there is none.
@@ -399,6 +411,40 @@ export function AxisTable<T extends object>({
   // its cells as they are.
   const grouped = (pageRows ?? []).some((row) => Array.isArray((row as { children?: unknown }).children))
   const foldRoom = tokens.spacing.xs / 2 + tokens.size.smallControl + tokens.spacing.xs / 2
+  // The fold of a group row hangs in the first column's padding; the fold of a row with details has a column of its own.
+  const foldIcon: NonNullable<TableProps<T>['expandable']>['expandIcon'] = ({
+    expandable,
+    expanded,
+    onExpand,
+    record,
+  }) =>
+    expandable ? (
+      <AxisButton
+        role="icon"
+        size="small"
+        nameKey={
+          grouped
+            ? expanded
+              ? 'shell.table.collapseRow'
+              : 'shell.table.expandRow'
+            : expanded
+              ? 'shell.table.hideDetails'
+              : 'shell.table.showDetails'
+        }
+        aria-expanded={expanded}
+        icon={<FoldIcon open={expanded} />}
+        style={
+          grouped
+            ? {
+                marginInlineStart: -(foldRoom - tokens.spacing.xs / 2),
+                marginInlineEnd: tokens.spacing.xs / 2,
+                verticalAlign: 'top',
+              }
+            : { verticalAlign: 'top' }
+        }
+        onClick={(event) => onExpand(record, event)}
+      />
+    ) : null
   const antColumns: TableColumnType<T>[] = shown
     .filter((column) => !room.moved.includes(column.key))
     .map(
@@ -646,27 +692,17 @@ export function AxisTable<T extends object>({
               // column's heading does, and each level of rows starts one such room further in.
               expandable={
                 grouped
-                  ? {
-                      indentSize: foldRoom,
-                      expandIcon: ({ expandable, expanded, onExpand, record }) =>
-                        expandable ? (
-                          <AxisButton
-                            role="icon"
-                            size="small"
-                            nameKey={expanded ? 'shell.table.collapseRow' : 'shell.table.expandRow'}
-                            aria-expanded={expanded}
-                            icon={<FoldIcon open={expanded} />}
-                            style={{
-                              marginInlineStart: -(foldRoom - tokens.spacing.xs / 2),
-                              marginInlineEnd: tokens.spacing.xs / 2,
-                              verticalAlign: 'top',
-                            }}
-                            onClick={(event) => onExpand(record, event)}
-                          />
-                        ) : null,
-                    }
-                  : undefined
+                  ? { indentSize: foldRoom, expandIcon: foldIcon }
+                  : details
+                    ? {
+                        expandedRowRender: (row) => details(row),
+                        rowExpandable: (row) => details(row) !== null,
+                        expandIcon: foldIcon,
+                        columnWidth: foldRoom,
+                      }
+                    : undefined
               }
+              showHeader={!headless}
               loading={loading}
               // The table gives the space that EmptyState no longer keeps, so an empty table keeps its height.
               locale={{

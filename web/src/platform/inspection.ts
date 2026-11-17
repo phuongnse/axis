@@ -122,6 +122,11 @@ export interface PathEntry {
   path?: string
   /** Proposed, see the review on #3650: what the run made or changed. */
   made?: RunOutput
+  /**
+   * Proposed, see the review on #3650: the values a decision's conditions read when it ran, as Camunda Operate shows a
+   * decision's inputs. A value the reader may not read comes as `null` with `hidden`.
+   */
+  read?: { field: string; labelKey: string | null; value: string | null; hidden?: boolean }[]
   step: string
   startedAt: string
   finishedAt: string

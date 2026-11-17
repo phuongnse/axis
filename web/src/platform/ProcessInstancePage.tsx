@@ -545,7 +545,7 @@ export function InstanceDetailView({
         </div>
       )}
       <div data-testid="studio-section-inspector-details" style={{ marginBottom: 16 }}>
-        <TermList terms={facts} row />
+        <TermList terms={facts} layout="row" />
       </div>
       <SectionParts>
         {/* Proposed: everything under the strip is in tabs, the graph first, the tab kept in the address, see the

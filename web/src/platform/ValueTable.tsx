@@ -10,32 +10,23 @@ import { jsonRows, parseJsonText, type ValueRow } from './valueRows'
  * developer tools show headers and Azure Logic Apps an action's inputs and outputs. It is an `AxisTable` with no
  * toolbar, compact, every row shown; a nested value is a row of its own named by its path, see `jsonRows`. A
  * value is shown as it was written, a number with its source digits; `null` and empty text read in muted
- * words, so neither passes for text. `nameTitle` and `valueTitle` name the columns, such as Input and Expression.
+ * words, so neither passes for text. It has no header row, as the developer tools' headers have none: each name, in
+ * `textMuted` as a term's, says what its row is.
  */
-export function ValueTable({
-  rows,
-  label,
-  nameTitle,
-  valueTitle,
-}: {
-  rows: readonly ValueRow[]
-  label: string
-  nameTitle?: string
-  valueTitle?: string
-}) {
+export function ValueTable({ rows, label }: { rows: readonly ValueRow[]; label: string }) {
   const t = useText()
   const muted = (text: string) => <Typography.Text type="secondary">{text}</Typography.Text>
   const columns: AxisColumn<ValueRow>[] = [
     {
       key: 'name',
       kind: 'fixed',
-      title: nameTitle ?? t('shell.valueTable.name'),
-      render: (_value, row) => row.name,
+      title: t('shell.valueTable.name'),
+      render: (_value, row) => <Typography.Text type="secondary">{row.name}</Typography.Text>,
     },
     {
       key: 'value',
       kind: 'freeText',
-      title: valueTitle ?? t('shell.valueTable.value'),
+      title: t('shell.valueTable.value'),
       render: (_value, row) => {
         const value = row.value
         switch (value.kind) {
@@ -75,6 +66,7 @@ export function ValueTable({
         columns={columns}
         emptyText={t('shell.valueTable.none')}
         compact
+        headless
       />
     </section>
   )

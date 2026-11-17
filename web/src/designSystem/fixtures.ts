@@ -1235,6 +1235,7 @@ const instanceDetail: InstanceDetail = {
       decision: 'managerApproval',
       output: null,
       error: null,
+      read: [{ field: 'withinBudget', labelKey: 'request.field.withinBudget', value: 'Yes' }],
       traceId: '0af7651916cd43dd8448eb211c80319c',
     },
     {
@@ -1244,6 +1245,16 @@ const instanceDetail: InstanceDetail = {
       decision: 'return',
       output: null,
       error: null,
+      made: {
+        changes: [
+          {
+            field: 'managerComment',
+            labelKey: 'request.field.managerComment',
+            before: null,
+            after: 'Please attach the supplier quote.',
+          },
+        ],
+      },
       traceId: '1b2c3d4e5f60718293a4b5c6d7e8f901',
     },
     {
@@ -1280,6 +1291,7 @@ const instanceDetail: InstanceDetail = {
       decision: 'managerApproval',
       output: null,
       error: null,
+      read: [{ field: 'withinBudget', labelKey: 'request.field.withinBudget', value: 'Yes' }],
       traceId: '3d4e5f60718293a4b5c6d7e8f9011223',
     },
     {
@@ -1289,6 +1301,16 @@ const instanceDetail: InstanceDetail = {
       decision: 'approve',
       output: null,
       error: null,
+      made: {
+        changes: [
+          {
+            field: 'managerComment',
+            labelKey: 'request.field.managerComment',
+            before: 'Please attach the supplier quote.',
+            after: 'Quote attached, within the quarter budget.',
+          },
+        ],
+      },
       traceId: '4e5f60718293a4b5c6d7e8f901122334',
     },
     {
@@ -1298,6 +1320,7 @@ const instanceDetail: InstanceDetail = {
       decision: 'financeApproval',
       output: null,
       error: null,
+      read: [{ field: 'amount', labelKey: 'request.amount', value: '18500' }],
       traceId: '4e5f60718293a4b5c6d7e8f901122334',
     },
     {
@@ -2356,6 +2379,7 @@ export const siteTexts: Record<string, string> = {
   'request.field.vendorStatus': 'Vendor status',
   'request.field.purchaseOrderNumber': 'Purchase order number',
   'request.field.status': 'Status',
+  'request.field.managerComment': 'Manager comment',
   'contract.step.submit': 'Submit the contract',
   'contract.step.reviews': 'Reviews',
   'contract.branch.legal': 'Legal',

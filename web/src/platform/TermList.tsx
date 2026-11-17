@@ -14,12 +14,46 @@ export interface Term {
  * Proposed, see the review on #3650: the facts of one thing as terms and their values, each label in `textMuted` above
  * its value, on a grid of 12 columns that takes every term to the full row at narrow width. A detail draws its fields
  * with it, and a page that shows one thing draws the facts the platform keeps about it, such as a task's due date.
- * `row` lays the terms in one line at their own widths, `spacing-xl` apart, wrapping when the line is full, as Camunda
- * Operate and the Azure portal's essentials head a page: a strip of short facts under a heading, each value one line.
+ * Its `layout` is one of three:
+ * - `stacked`, the default, on that grid, for terms whose values are long or are tables, such as a call's headers;
+ * - `row`, the terms in one line at their own widths, `spacing-xl` apart, wrapping when the line is full, as Camunda
+ *   Operate and the Azure portal's essentials head a page: a strip of short facts under a heading, each value one line;
+ * - `side`, one term a line with its label beside its value, the labels as wide as the longest up to 40 %, as AWS Step
+ *   Functions lists a state's details and the developer tools a request's: the facts of a side panel.
  */
-export function TermList({ terms, row = false }: { terms: readonly Term[]; row?: boolean }) {
+export function TermList({
+  terms,
+  layout = 'stacked',
+}: {
+  terms: readonly Term[]
+  layout?: 'stacked' | 'row' | 'side'
+}) {
   const { colour, spacing, type } = useDesignTokens()
   const narrow = useNarrowWidth()
+  const row = layout === 'row'
+  const side = layout === 'side'
+  const text = { fontSize: type.fontSize, lineHeight: '22px' }
+  if (side) {
+    return (
+      <dl
+        style={{
+          margin: 0,
+          display: 'grid',
+          gridTemplateColumns: 'fit-content(40%) minmax(0, 1fr)',
+          columnGap: spacing.md,
+          rowGap: spacing.sm,
+          alignItems: 'baseline',
+        }}
+      >
+        {terms.map(({ key, term, value }) => (
+          <div key={key} style={{ display: 'contents' }}>
+            <dt style={{ ...text, fontWeight: 500, color: colour.textMuted }}>{term}</dt>
+            <dd style={{ ...text, margin: 0, color: colour.text, minWidth: 0, overflowWrap: 'anywhere' }}>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    )
+  }
   return (
     <dl
       style={

@@ -19,6 +19,7 @@ import { useDesignTokens } from './themeMode'
 export function SidePanel({
   id,
   title,
+  status,
   kind,
   closeKey,
   onClose,
@@ -29,6 +30,8 @@ export function SidePanel({
 }: {
   id: string
   title: ReactNode
+  /** Proposed, see the review on #3650: the state of what the panel shows, a `StatusTag` beside its title. */
+  status?: ReactNode
   /** What the panel shows, under its title in muted text, such as a step's type. */
   kind?: ReactNode
   /** The text key of the close button's name. */
@@ -67,9 +70,12 @@ export function SidePanel({
           }}
         >
           <Flex vertical style={{ minWidth: 0 }}>
-            <Typography.Title id={`${id}-title`} level={5} style={{ margin: 0 }}>
-              {title}
-            </Typography.Title>
+            <Flex align="center" gap="small" wrap>
+              <Typography.Title id={`${id}-title`} level={5} style={{ margin: 0 }}>
+                {title}
+              </Typography.Title>
+              {status}
+            </Flex>
             {kind !== undefined && <Typography.Text type="secondary">{kind}</Typography.Text>}
           </Flex>
           <AxisButton

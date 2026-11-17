@@ -1,4 +1,4 @@
-import type { InstanceCall, InstanceDetail, InstanceTask, RunOutput, SubProcess } from './inspection'
+import type { InstanceCall, InstanceDetail, InstanceTask, PathEntry, RunOutput, SubProcess } from './inspection'
 import type { StepProblem } from './stepProblems'
 
 /**
@@ -13,6 +13,8 @@ export interface StepRun {
   path?: string
   /** Proposed, see the review on #3650: what the run made or changed. */
   made?: RunOutput
+  /** Proposed, see the review on #3650: the values a decision's conditions read. */
+  read?: PathEntry['read']
   number: number
   startedAt: string
   finishedAt: string | null
@@ -42,6 +44,7 @@ export function stepRuns(instance: InstanceDetail): StepRun[] {
       step: entry.step,
       path: entry.path,
       made: entry.made,
+      read: entry.read,
       number,
       startedAt: entry.startedAt,
       finishedAt: entry.finishedAt,
