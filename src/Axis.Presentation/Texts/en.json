@@ -672,6 +672,7 @@
   "shell.inspector.stepType.waitEvent": "Wait for an event",
   "shell.inspector.stepType.end": "End",
   "shell.inspector.graph.runs": "ran {count} times",
+  "shell.inspector.graph.runsLast": "{count} runs, the last {duration}",
   "shell.graph.zoomIn": "Zoom in",
   "shell.graph.zoomOut": "Zoom out",
   "shell.graph.fit": "Show the whole process",

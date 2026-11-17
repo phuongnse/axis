@@ -672,6 +672,7 @@
   "shell.inspector.stepType.waitEvent": "Chờ sự kiện",
   "shell.inspector.stepType.end": "Kết thúc",
   "shell.inspector.graph.runs": "đã chạy {count} lần",
+  "shell.inspector.graph.runsLast": "{count} lần, lần cuối {duration}",
   "shell.graph.zoomIn": "Phóng to",
   "shell.graph.zoomOut": "Thu nhỏ",
   "shell.graph.fit": "Xem toàn bộ quy trình",

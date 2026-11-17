@@ -35,9 +35,10 @@ import {
 } from 'react'
 import { ProcessGraphControls } from './ProcessGraphControls'
 import { StatusTag, type StatusTone } from './StatusTag'
+import { Tooltip } from 'antd'
 import { useDesignTokens, useThemeMode } from './themeMode'
 
-const nodeWidth = 240
+const nodeWidth = 272
 const nodeHeight = 72
 const handleSize = 10
 
@@ -59,15 +60,13 @@ export type ProcessGraphStep = {
   tone: ProcessGraphTone
   ariaLabel: string
   ariaCurrent?: boolean
-  /** Proposed, see the review on #3650: a count drawn at the node's corner, such as how many times an instance ran it. */
-  badge?: string
   /**
    * Proposed, see the review on #3650: the step's type as the process names it, such as `task` or `decision`, which
    * picks the icon the platform draws for it.
    */
   kind: string
   /** Proposed, see the review on #3650: the step's state on an instance, a `StatusTag` in its tone, and how long it lasted. */
-  status?: { tone: StatusTone; text: string; duration?: string }
+  status?: { tone: StatusTone; text: string; detail?: string }
   /** A mark shown after the type, such as a customization layer's Added, and its value for `data-layer-mark`. */
   note?: { text: string; kind: string }
   /** Whether a transition can be drawn from the step's bottom handle. */
@@ -94,6 +93,12 @@ type StepNode = Node<StepNodeData, 'step'>
 interface Point {
   x: number
   y: number
+}
+
+/** A step's place and size on the laid-out graph. */
+interface Rect extends Point {
+  width: number
+  height: number
 }
 
 /** Where ELK put each step and how it routed each transition: its points, and its label's centre. */
@@ -153,7 +158,17 @@ async function layOut(
   const routes = new Map(
     (laid.edges ?? []).map((edge) => {
       const section = edge.sections?.[0]
-      const points = section ? [section.startPoint, ...(section.bendPoints ?? []), section.endPoint] : []
+      const rectOf = (id: string | undefined) => {
+        const place = id === undefined ? undefined : places.get(id)
+        return place === undefined ? undefined : { ...place, width: nodeWidth, height: nodeHeight }
+      }
+      const points = section
+        ? straighten(
+            [section.startPoint, ...(section.bendPoints ?? []), section.endPoint],
+            rectOf(edge.sources[0]),
+            rectOf(edge.targets[0]),
+          )
+        : []
       const label = edge.labels?.[0]
       return [
         edge.id,
@@ -168,6 +183,48 @@ async function layOut(
     }),
   )
   return { places, routes }
+}
+
+/** The shortest a bend of a transition may be: a shorter jog at either end is straightened. */
+const shortestBend = 16
+
+/**
+ * Proposed, see the review on #3650: straightens a short jog at either end of a route, where ELK leaves a step at one
+ * height and bends a few pixels into its lane: the end moves along the step's side to the lane's height, as long as
+ * it stays on that side, so the bend goes and the line still touches no step.
+ */
+function straighten(points: Point[], from: Rect | undefined, to: Rect | undefined): Point[] {
+  const route = points.map((point) => ({ ...point }))
+  const onSide = (rect: Rect | undefined, y: number) =>
+    rect !== undefined && y >= rect.y + 8 && y <= rect.y + rect.height - 8
+  // [start, out, jog, ...]: the first part leaves the step level, then a short upright part reaches the lane.
+  if (route.length >= 4 && route[0].y === route[1].y && route[1].x === route[2].x) {
+    const jog = Math.abs(route[2].y - route[1].y)
+    if (jog > 0 && jog < shortestBend && onSide(from, route[2].y)) {
+      route[0].y = route[2].y
+      route[1].y = route[2].y
+    }
+  }
+  const n = route.length
+  if (n >= 4 && route[n - 1].y === route[n - 2].y && route[n - 2].x === route[n - 3].x) {
+    const jog = Math.abs(route[n - 3].y - route[n - 2].y)
+    if (jog > 0 && jog < shortestBend && onSide(to, route[n - 3].y)) {
+      route[n - 1].y = route[n - 3].y
+      route[n - 2].y = route[n - 3].y
+    }
+  }
+  // Points in a line with the ones either side of them, or the same as the one before, are no bends.
+  return route.filter((point, index) => {
+    const before = route[index - 1]
+    const after = route[index + 1]
+    if (before === undefined || after === undefined) {
+      return true
+    }
+    if (before.x === point.x && before.y === point.y) {
+      return false
+    }
+    return !((before.x === point.x && point.x === after.x) || (before.y === point.y && point.y === after.y))
+  })
 }
 
 /** A path through `points` in straight lines, each corner rounded by up to `radius`. */
@@ -248,7 +305,8 @@ function RoutedEdge({ id, data, markerEnd, style, interactionWidth }: EdgeProps<
               lineHeight: '16px',
               whiteSpace: 'nowrap',
               color: colour.text,
-              background: colour.surface,
+              // On the canvas's own colour, so the label cuts the line and sits on the graph's ground.
+              background: colour.canvas,
               pointerEvents: 'none',
             }}
           >
@@ -310,7 +368,8 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
   const muted = data.tone === 'idle'
   return (
     <>
-      <Handle type="target" position={Position.Left} isConnectable={false} />
+      {/* Hidden, not removed, so React Flow still measures where a transition comes in. */}
+      <Handle type="target" position={Position.Left} isConnectable={false} style={{ visibility: 'hidden' }} />
       <button
         type="button"
         data-testid={data.testId}
@@ -320,7 +379,7 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
         data-tone={data.tone}
         style={{
           display: 'flex',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           gap: spacing.sm,
           width: '100%',
           height: '100%',
@@ -337,22 +396,24 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
           cursor: 'pointer',
         }}
       >
-        <span
-          aria-hidden
-          style={{
-            display: 'flex',
-            flex: 'none',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 28,
-            height: 28,
-            borderRadius: radius.base,
-            color: data.tone === 'current' || data.tone === 'selected' ? colour.primaryText : colour.textMuted,
-            background: colour.canvas,
-          }}
-        >
-          <Icon />
-        </span>
+        <Tooltip title={data.type}>
+          <span
+            aria-hidden
+            style={{
+              display: 'flex',
+              flex: 'none',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28,
+              height: 28,
+              borderRadius: radius.base,
+              color: data.tone === 'current' || data.tone === 'selected' ? colour.primaryText : colour.textMuted,
+              background: colour.canvas,
+            }}
+          >
+            <Icon />
+          </span>
+        </Tooltip>
         <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
           <strong
             style={{
@@ -368,8 +429,17 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
           {data.status ? (
             <span style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, fontSize: 12, lineHeight: '20px' }}>
               <StatusTag tone={data.status.tone}>{data.status.text}</StatusTag>
-              {data.status.duration !== undefined && (
-                <span style={{ color: colour.textMuted, whiteSpace: 'nowrap' }}>{data.status.duration}</span>
+              {data.status.detail !== undefined && (
+                <span
+                  style={{
+                    color: colour.textMuted,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {data.status.detail}
+                </span>
               )}
             </span>
           ) : (
@@ -385,27 +455,6 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
           )}
         </span>
       </button>
-      {/* Outside the button, whose overflow is hidden, so the count overlaps the node's corner. */}
-      {data.badge !== undefined && (
-        <span
-          aria-hidden
-          style={{
-            position: 'absolute',
-            top: -10,
-            right: -10,
-            minWidth: 20,
-            padding: '0 6px',
-            borderRadius: 10,
-            fontSize: 12,
-            lineHeight: '20px',
-            textAlign: 'center',
-            color: colour.onPrimary,
-            background: colour.primary,
-          }}
-        >
-          {data.badge}
-        </span>
-      )}
       <Handle
         type="source"
         position={Position.Right}

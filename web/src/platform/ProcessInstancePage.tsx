@@ -309,18 +309,25 @@ export function InstanceDetailView({
     // Proposed: a step's node says its state on the instance and how long its last run lasted, see the review on
     // #3650; a step not reached shows its type.
     const last = instance.path.findLast((entry) => entry.step === step.name)
+    // A step run more than once says how many times, and how long its last run lasted.
+    const lasted = (duration: string) =>
+      runs > 1
+        ? t('shell.inspector.graph.runsLast').replace('{count}', String(runs)).replace('{duration}', duration)
+        : duration
     const status: ProcessGraphStep['status'] =
       tone === 'current' || tone === 'error'
         ? {
             tone: instanceTone(instance),
             text: stateText(t, instance.state),
-            duration: durationText(instance.path.at(-1)?.finishedAt ?? instance.createdAt, now.toISOString(), locale),
+            detail: lasted(
+              durationText(instance.path.at(-1)?.finishedAt ?? instance.createdAt, now.toISOString(), locale),
+            ),
           }
         : tone === 'taken' && last !== undefined
           ? {
               tone: 'success',
               text: t('shell.inspector.timeline.stateDone'),
-              duration: durationText(last.startedAt, last.finishedAt, locale),
+              detail: lasted(durationText(last.startedAt, last.finishedAt, locale)),
             }
           : undefined
     return {
@@ -332,7 +339,6 @@ export function InstanceDetailView({
       start: step.name === instance.graph.start,
       tone,
       ariaLabel: `${stepLabel(step.name)}, ${stepTypeText(step.type)}${state}${runs > 1 ? `, ${t('shell.inspector.graph.runs').replace('{count}', String(runs))}` : ''}`,
-      badge: runs > 1 ? `×${runs}` : undefined,
       ariaCurrent: tone === 'current',
       testId: `inspector-step-${step.name}`,
     }
