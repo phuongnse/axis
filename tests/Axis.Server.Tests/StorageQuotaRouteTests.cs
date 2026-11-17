@@ -65,6 +65,13 @@ public sealed class StorageQuotaRouteTests
         "POST /api/auth/sign-out",
         "POST /api/cell/auth/sign-out",
 
+        // A person's columns and saved views are never refused over the quota, see docs/reference/tenant-quotas.md#refusals.
+        "DELETE /api/me/tables/{key}/columns",
+        "DELETE /api/me/tables/{key}/views/{id}",
+        "POST /api/me/tables/{key}/views",
+        "PUT /api/me/tables/{key}/columns",
+        "PUT /api/me/tables/{key}/views/{id}",
+
         // An MCP session message writes nothing: the session id is a protected token, and no tenant data is stored.
         "POST /mcp",
 

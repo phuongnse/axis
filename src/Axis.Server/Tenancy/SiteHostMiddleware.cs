@@ -51,7 +51,8 @@ internal sealed class SiteHostMiddleware(
 
     // What a site's host serves: the SPA at the root and at the site's pages, except under the paths the platform keeps
     // for itself (Studio, the account page, the users page, the licences page), the web root's files, sign-in, who is signed in, what the
-    // SPA shell loads on every host, the site's own API and its application's API.
+    // SPA shell loads on every host, the site's own API and its application's API. A person's table views and columns are served for the
+    // keys that start with `site.{the site's path}.` only, see docs/reference/frontend.md#table-views-and-columns.
     private async Task<bool> IsServedAsync(HttpContext context, ActiveApplicationResolver resolver, string site)
     {
         var path = context.Request.Path;
@@ -63,6 +64,11 @@ internal sealed class SiteHostMiddleware(
         if (path.StartsWithSegments("/api/auth") || path == "/api/me" || path == "/api/site" || path.StartsWithSegments("/api/texts") || path == "/api/about")
         {
             return true;
+        }
+
+        if (path.StartsWithSegments("/api/me/tables", out var tables))
+        {
+            return FirstSegment(tables) is { } key && key.StartsWith($"site.{site.ToLowerInvariant()}.", StringComparison.Ordinal);
         }
 
         if (path.StartsWithSegments("/api/sites", out var rest))

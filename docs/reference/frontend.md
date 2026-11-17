@@ -516,20 +516,18 @@ below answers `200`.
 
 ## Table views and columns
 
-_(planned for M33)_
-
 A person's columns and saved views of a table are kept on the server for that person, so they come back on any
 browser. The address still wins, and [D153](../decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md)
 gives the reasons. The rules that a table follows are in [actions and controls](actions-and-controls.md#tables).
 
 | Route                                                        | What it does                                                                                                                              |
 | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/me/tables/{key}` _(planned for M33)_               | Answers `{ "columns": [..] or null, "views": [{ "id", "name", "search", "filter", "sort" }] }`, with the views ordered by name           |
-| `PUT /api/me/tables/{key}/columns` _(planned for M33)_       | Keeps the columns of `{ "columns": [..] }`, the keys of the shown columns in order, and answers `204`                                    |
-| `DELETE /api/me/tables/{key}/columns` _(planned for M33)_    | Forgets the kept columns and answers `204`                                                                                                |
-| `POST /api/me/tables/{key}/views` _(planned for M33)_        | Saves a view of `{ name, search, filter, sort }` and answers `201` with the view                                                          |
-| `PUT /api/me/tables/{key}/views/{id}` _(planned for M33)_    | Replaces all four fields of one view and answers `204`                                                                                    |
-| `DELETE /api/me/tables/{key}/views/{id}` _(planned for M33)_ | Deletes one view and answers `204`                                                                                                        |
+| `GET /api/me/tables/{key}` | Answers `{ "columns": [..] or null, "views": [{ "id", "name", "search", "filter", "sort" }] }`, with the views ordered by name           |
+| `PUT /api/me/tables/{key}/columns` | Keeps the columns of `{ "columns": [..] }`, the keys of the shown columns in order, and answers `204`                                    |
+| `DELETE /api/me/tables/{key}/columns` | Forgets the kept columns and answers `204`                                                                                                |
+| `POST /api/me/tables/{key}/views` | Saves a view of `{ name, search, filter, sort }` and answers `201` with the view                                                          |
+| `PUT /api/me/tables/{key}/views/{id}` | Replaces all four fields of one view and answers `204`                                                                                    |
+| `DELETE /api/me/tables/{key}/views/{id}` | Deletes one view and answers `204`                                                                                                        |
 
 - **The table key.** A key is 1 to 200 characters, made of segments of letters, digits, `-` and `_` joined by `.`,
   and it is compared exactly. A `table` widget's key is `site.{site path}.{page name}` in lower case, with the `/` of

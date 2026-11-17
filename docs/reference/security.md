@@ -360,9 +360,8 @@ details response with the title "Sign in to read or write this data.":
   learn which sites or pages exist;
 - `GET /api/me`, `GET /api/about` and `GET /api/licences`;
 - `GET /api/me/authenticators`;
-- `GET /api/me/sessions`, `DELETE /api/me/sessions/{id}` and `DELETE /api/me/sessions`.
-- **Table views and columns** _(planned for M33)_. `GET /api/me/tables/{key}` and the writes under it, see
-  [table views and columns](frontend.md#table-views-and-columns).
+- `GET /api/me/sessions`, `DELETE /api/me/sessions/{id}` and `DELETE /api/me/sessions`;
+- `GET /api/me/tables/{key}` and the writes under it, see [table views and columns](frontend.md#table-views-and-columns).
 
 Inbound endpoints under `/api/apps/{app}/endpoints/` are the exception: they take a bearer token and
 no session, see [machine callers](#machine-callers). The routes that stay open, because the shell

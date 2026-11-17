@@ -215,7 +215,7 @@ the server checks the answer again.
     `/api/apps/{app}` for the site's application. Everything else is a `404` problem there, such as
     `/api/sites`, other sites and applications, Studio, the users page, the account page and
     `/api/me/sessions`. The refusal comes before authentication, so it renews no session.
-  - **Table views and columns** _(planned for M33)_. That host also serves `/api/me/tables/{key}` and the routes under
+  - **Table views and columns.** That host also serves `/api/me/tables/{key}` and the routes under
     it for keys that start with `site.{its site's path}.`, see [table views and columns](frontend.md#table-views-and-columns).
     Any other key is a `404` problem there, before authentication.
   - `GET /api/site` names the host's site in `hostSite`, and `null` on a host that belongs to no site.
