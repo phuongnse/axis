@@ -175,6 +175,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Delete a record and restore it later | _(planned for M41)_ |
 | Two people never overwrite each other's changes | [Concurrency](reference/record-api.md#concurrency) |
 | Lock a record while one person edits it | _(planned for M53)_ |
+| Keep a ledger whose records are only added, never changed | _(planned for M53)_ |
 | Change many records at once | _(planned for M42)_ |
 | Find and merge duplicate records | _(planned for M53)_ |
 | Comments and activity on a record | _(planned for M43)_ |

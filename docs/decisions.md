@@ -169,3 +169,4 @@ the files agree, title and status included.
 | [D155](decisions/d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md) | Processes run paths at once, repeat steps, give tasks to many people and take error paths | **Agreed** |
 | [D156](decisions/d156-working-time-calendars-durations-in-working-hours-and-slas.md) | Working time: calendars, durations in working hours, and SLAs | **Agreed** |
 | [D157](decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md) | Files reach calls and emails, show in the page, keep their versions, and documents come from Word templates | **Agreed** |
+| [D158](decisions/d158-history-keeps-old-and-new-values-a-deleted-record-waits-in-a-recycle-bin-and-every-record-has-system-fields.md) | History keeps old and new values, a deleted record waits in a recycle bin, and every record has system fields | **Agreed** |
