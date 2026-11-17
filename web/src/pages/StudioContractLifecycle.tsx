@@ -2,6 +2,7 @@ import dagre from '@dagrejs/dagre'
 import { type Edge, Handle, MarkerType, type Node, type NodeProps, Position, ReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useMemo } from 'react'
+import { ReactFlowAttributionStyle } from '../platform/ReactFlowAttributionStyle'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import type { ContractEdge, ContractState } from './contractView'
@@ -128,11 +129,7 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
       aria-label={t('shell.studio.contract.lifecycle')}
       style={{ height: 360 }}
     >
-      {/* React Flow's attribution link is a fixed grey that misses the contrast of both modes, so it takes the tokens. */}
-      <style>
-        {`.studio-contract-lifecycle .react-flow__attribution { background: ${colour.surface}; }
-.studio-contract-lifecycle .react-flow__attribution a { color: ${colour.textMuted}; }`}
-      </style>
+      <ReactFlowAttributionStyle scope="studio-contract-lifecycle" />
       <ReactFlow
         nodes={flow.nodes}
         edges={flow.edges}

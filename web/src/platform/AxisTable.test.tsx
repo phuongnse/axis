@@ -460,6 +460,31 @@ describe('AxisTable', () => {
       expect(filter.compareDocumentPosition(refresh) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
+    describe('search box width', () => {
+      withAntdStyles()
+
+      it('keeps the search box at its own width so Filter and Columns follow it on one line, and wrap when there is no room', () => {
+        const searchable: AxisColumn<Row> = {
+          ...nameColumn,
+          searchText: (row) => row.name ?? '',
+          filter: { kind: 'text' },
+        }
+        renderTable({
+          columns: [searchable, amountColumn],
+          view: { query: { page: 1, pageSize: 20, sort: null }, onChange: vi.fn(), columns: true },
+          pagination: undefined,
+        })
+
+        const search = screen.getByRole('searchbox', { name: 'Search' }).closest('.ant-input-search') as HTMLElement
+        expect(search).toHaveStyle({ width: '320px', maxWidth: '100%' })
+        // Filter and Columns sit in the same wrapping container as the search box, so they wrap with it.
+        const controls = search.parentElement as HTMLElement
+        expect(within(controls).getByRole('button', { name: 'Filter' })).toBeInTheDocument()
+        expect(within(controls).getByRole('button', { name: 'Columns' })).toBeInTheDocument()
+        expect(controls).toHaveStyle({ flexWrap: 'wrap', minWidth: '0px' })
+      })
+    })
+
     it('has no slot for a control of its own', () => {
       // @ts-expect-error A table has no control of its own for a view, see docs/reference/actions-and-controls.md#tables.
       const toolbar: AxisTableToolbar = { view: <input aria-label="Search" /> }

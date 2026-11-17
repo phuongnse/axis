@@ -499,13 +499,15 @@ export function AxisTable<T extends object>({
     <Flex ref={tableRef} vertical gap="middle" aria-busy={loading} data-testid={testId}>
       {hasToolbar && (
         <Flex justify="space-between" align="center" gap="small" wrap>
+          {/* The search box keeps its own width, so Filter and Columns follow it on one line, see
+              docs/reference/actions-and-controls.md#tables. */}
           {(searchable || filterable || arrangeable) && (
-            <Flex gap="small" wrap>
+            <Flex gap="small" wrap style={{ minWidth: 0 }}>
               {searchable && (
                 <Input.Search
                   allowClear
                   maxLength={200}
-                  style={{ maxWidth: 320 }}
+                  style={{ width: 320, maxWidth: '100%' }}
                   aria-label={t('shell.table.search')}
                   placeholder={t('shell.table.search')}
                   value={draft}
