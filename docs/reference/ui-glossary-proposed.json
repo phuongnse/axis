@@ -307,6 +307,27 @@
       "vi": "điều kiện hoàn tất",
       "status": "proposed",
       "note": "The rule that says when a parallel step, or a task for several people, is done."
+    },
+    {
+      "concept": "Absence",
+      "en": "absence",
+      "vi": "vắng mặt",
+      "status": "proposed",
+      "note": "The dates a person is away, with the delegate who takes their open tasks meanwhile."
+    },
+    {
+      "concept": "Delegate",
+      "en": "delegate",
+      "vi": "người được ủy quyền",
+      "status": "proposed",
+      "note": "The person who takes over a task while the person it was given to is away."
+    },
+    {
+      "concept": "On behalf of",
+      "en": "on behalf of",
+      "vi": "thay mặt",
+      "status": "proposed",
+      "note": "The absent person that a task was moved from, or a decision was taken for."
     }
   ]
 }

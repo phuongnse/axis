@@ -256,6 +256,22 @@ and operations, and where each is described:
   The step's transaction evaluates the assignee, creates the task as `open` and sets the instance to
   `waiting`. A `user` expression that gives `null` or blank text fails the step. Completing the task
   resumes the instance, see [Completing a task](task-api.md#completing-a-task).
+  - **Users from a data source.** _(planned for M43)_ In place of `from`, `users` may be
+    `{ "dataSource", "parameters", "user" }`. `dataSource` names a data source, as `module/name` for a
+    module's, and `parameters` gives its parameters. The data source is read once, when the step starts,
+    as a repeat's `forEach` reads one, see [repeat step](process-blocks.md#repeat-step).
+  - **Holders of a role.** _(planned for M43)_ `users` may also take `role`, a role name. It keeps only the
+    listed people who hold that role. With a `department` parameter on `organization/Employees`, this gives
+    a role within one department.
+  - **Give.** _(planned for M43)_ A role assignee takes `give`, which is `claim` (the default), `fewestOpen`
+    or `turn`. See [sharing role tasks](task-api.md#sharing-role-tasks).
+  - **Exclude.** _(planned for M43)_ `exclude` lists people who may not decide the task. An entry is
+    `"creator"`, the person who created the subject record, `{ "step": "<earlier task step>" }`, the person
+    who completed that step's task and the person they acted for, or `{ "users": "<expression>" }`, a user id
+    or a list of them.
+  - **Excluded people.** _(planned for M43)_ The engine refuses an excluded person as
+    [who may act](task-api.md#who-may-act) says. A `user` assignee who is excluded fails the step, and
+    excluded people are left out of `users`.
 - **`operation` with `updateRecord`.** Its `set` maps fields of the subject record to expressions,
   and `next` names the step that follows. The step writes the values with the record update rules,
   in the step's transaction, so computed fields are recomputed and validations run, and a validation
@@ -417,6 +433,13 @@ Each code is in the [diagnostic code table](diagnostic-codes.md).
   [Error paths](#error-paths).
 - **Waits for several events.** _(planned for M38)_ A `waitEvent` step with `events` is checked with
   `AXC0391`, see [Wait for event step](process-flow.md#wait-for-event-step).
+- **Assignment and exclusion checks.** _(planned for M43)_ A task's `assignee.users` with a bad data source,
+  parameter or role is `AXC0393` at `/steps/{i}/assignee/users/...`. `give` on an assignee with no `role` is
+  `AXC0394` at `/steps/{i}/assignee/give`. An `exclude` entry of no known shape, a `step` that names no task
+  step or the task's own step, or `creator` in a process without a subject is `AXC0395` at
+  `/steps/{i}/exclude/{j}`. See [Steps](#steps).
+- **Task properties.** _(planned for M43)_ `exclude` is a task property too, and `give` is a property of a role
+  `assignee`, see [Steps](#steps).
 
 | Step                        | Has                                              | Has none of                                                                                                                              |
 | --------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |

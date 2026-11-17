@@ -55,6 +55,26 @@ A page whose widget is a `taskInbox` lists the signed-in user's open tasks in th
 - **Texts.** The platform texts `shell.tasks.*` hold the column headers, the empty text, the load error
   and the two tags.
 
+### Completed tasks
+
+_(planned for M43)_
+
+A choice between Open and Completed is kept in the address. The Completed view sends `state=completed` to the
+task API, see [list my tasks](task-api.md#list-my-tasks). Its table shows a Completed column and an Outcome
+column. Its rows have no outcome buttons, and each row opens the task page, which shows the decided task.
+The platform texts `shell.tasks.*` hold the choice and the two column headers.
+
+### Deciding several tasks
+
+_(planned for M43)_
+
+In the Open view, each row has a checkbox. A selection shows an "N selected" bar, as the
+[bulk actions rule](actions-and-controls.md#tables) says. The bar has one button for each outcome that the list
+items of every selected task name in `outcomes`. A click calls `complete-many` with that outcome and the selected
+ids, see [deciding several tasks](task-api.md#deciding-several-tasks). The page then shows a result for each task,
+with its subject and its outcome or its reason. It clears the selection and reloads the list. The platform texts
+`shell.tasks.*` hold the bar, its buttons and the results.
+
 ## Task page
 
 The address `/{site}/{inboxpage}/{taskId}` shows one task, under the page of its task inbox, with the
@@ -97,6 +117,15 @@ form of its step over the subject record and a button for each outcome.
 - **Texts.** The platform texts `shell.task.*` hold the assigned elsewhere, already completed and
   expired messages, the Claim, Release and Reassign labels, the refused and failed messages of those
   actions, the texts of the Reassign dialog, and the load and complete errors.
+
+### Deciding from an email
+
+_(planned for M43)_
+
+The link `/{site}/{inboxpage}/{taskId}?outcome=<name>` opens the task page with that outcome chosen. Signing in
+runs as usual, with its second step, and then the page shows the task. One Confirm button sends the completion.
+A form that needs a value shows it first. The link carries no token, so a forwarded link decides nothing for
+someone who may not act on the task. The texts are the `shell.task.*` texts.
 
 ### Answers
 
