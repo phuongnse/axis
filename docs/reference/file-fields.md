@@ -3,7 +3,7 @@
 A `file` field holds one uploaded file on a record. This page covers its value, the upload and
 download routes, where the bytes are stored and how they are cleaned up, the `fileStorage` manifest
 property and how the SPA shows a file. The reasons for the design are in
-[D76](../decisions/d76-file-money-and-enum-label-field-types.md).
+[D157](../decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md).
 
 ## Field and value
 

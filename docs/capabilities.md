@@ -458,7 +458,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | --- | --- |
 | Upload and download files under the record's policies | [Download](reference/file-fields.md#download) |
 | Refuse executables and files whose content does not match their type | [Field and value](reference/file-fields.md#field-and-value) |
-| Scan uploads for malware | [D76](decisions/d76-file-money-and-enum-label-field-types.md) |
+| Scan uploads for malware | [D157](decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md) |
 | Keep files outside the database | _(planned for M40)_ |
 | Pass a file to a connector, a package or an email | _(planned for M40)_ |
 | Have a document signed electronically | _(planned for M40)_ |

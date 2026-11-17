@@ -60,7 +60,7 @@ such as documents made from templates, as utilities the platform owes its applic
   - authentication on every route ([D137](d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md)),
     for public pages only, by M49;
   - publishing with no second person's approval ([D47](d47-publishing-from-studio.md)), by M51;
-  - no conversion between currencies ([D76](d76-file-money-and-enum-label-field-types.md)), by M53;
+  - no conversion between currencies ([D157](d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md)), by M53;
   - no compensation of earlier steps ([D35](d35-operator-retry-cancel-and-resolve.md)), by M56.
 
   Until such a decision is agreed, the old decision holds.
