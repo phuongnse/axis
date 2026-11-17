@@ -162,7 +162,8 @@ namespace Axis.Server.CellApi;
 /// ago had answers <c>409</c> too, with a title that names no tenant. A transaction
 /// lock on the tenant and host serializes parallel requests. A pending request does not hold the host, so another tenant may request it
 /// and the host still answers <c>404</c> until a later step verifies it. The insert goes over the reader role. The request's <c>actor</c>
-/// is the operator's id. The route queues no job and takes no <c>Idempotency-Key</c>.
+/// is the caller's id, here the operator's. The route queues no job and takes no <c>Idempotency-Key</c>. The code is <see cref="CellHostRequests"/>,
+/// which the tenant administrator's route shares, see <c>docs/reference/tenant-lifecycle.md#hosts-by-a-tenant-administrator</c>.
 /// </para>
 /// </summary>
 internal static partial class CellEndpoints
@@ -188,12 +189,6 @@ internal static partial class CellEndpoints
     };
 
     private const int MaxTenantIdLength = 50;
-
-    private const int MaxHostLength = 253;
-
-    private const int MaxHostLabelLength = 63;
-
-    private static readonly TimeSpan _hostRequestWindow = TimeSpan.FromDays(7);
 
     // The managed PostgreSQL's point-in-time recovery retention, after which a deletion is complete,
     // see docs/reference/tenant-lifecycle.md#deleting-a-tenant.
@@ -228,7 +223,8 @@ internal static partial class CellEndpoints
             QueueJobAsync("cancel-deletion", id, http, dataSource, cancellationToken));
         cell.MapPost("/tenants/{id}/exports", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
             QueueJobAsync("export", id, http, dataSource, cancellationToken));
-        cell.MapPost("/tenants/{id}/hosts", RequestHostAsync);
+        cell.MapPost("/tenants/{id}/hosts", (string id, CellHostRequest? request, HttpContext http, NpgsqlDataSource dataSource, CellOptions options, CancellationToken cancellationToken) =>
+            CellHostRequests.RequestAsync(id, request, http.User.FindFirst(CellOperator.IdClaim)!.Value, http, dataSource, options, cancellationToken));
         cell.MapGet("/tenants/{id}/exports/{exportId:guid}", GetExportAsync);
         cell.MapGet("/jobs", ListJobsAsync);
         cell.MapGet("/jobs/{id:guid}", GetJobAsync);
@@ -416,7 +412,7 @@ internal static partial class CellEndpoints
         var usage = await ReadUsageAsync(platform, [tenant.Id], quotas, latest, Today(time), cancellationToken);
         var archives = await ReadNewestArchivesAsync(platform, [tenant.Id], cancellationToken);
         var days = await usageStore.ListDaysAsync(tenant.Id, Today(time).AddMonths(-TenantUsageStore.RetentionMonths), cancellationToken);
-        var hostRequests = await ReadHostRequestsAsync(platform, tenant.Id, time.GetUtcNow(), cancellationToken);
+        var hostRequests = await CellHostRequests.ReadAsync(platform, tenant.Id, time.GetUtcNow(), cancellationToken);
         return Results.Ok(new CellTenantDetailResponse(
             tenant.Id,
             tenant.Status,
@@ -481,22 +477,6 @@ internal static partial class CellEndpoints
         }
 
         return Results.Ok(new CellDeletedTenantResponse(id, deletedAt.Value, deletedAt.Value + _pointInTimeRecovery));
-    }
-
-    // The token stays out of the select. A request whose expiry has passed is not pending, as in RequestHostAsync, see docs/reference/tenant-lifecycle.md#hosts.
-    private static async Task<List<CellHostRequestStateResponse>> ReadHostRequestsAsync(
-        PlatformDbContext platform, string tenantId, DateTimeOffset now, CancellationToken cancellationToken)
-    {
-        var rows = await platform.TenantHostRequests.AsNoTracking()
-            .Where(row => row.TenantId == tenantId)
-            .Select(row => new { row.Host, row.State, row.RequestedAt, row.ExpiresAt })
-            .ToListAsync(cancellationToken);
-        return [.. rows
-            .GroupBy(row => row.Host, StringComparer.Ordinal)
-            .Select(group => group.MaxBy(row => row.RequestedAt)!)
-            .OrderBy(row => row.Host, StringComparer.Ordinal)
-            .Select(row => new CellHostRequestStateResponse(
-                row.Host, row.State == "pending" && row.ExpiresAt <= now ? "expired" : row.State, row.ExpiresAt))];
     }
 
     // The tenant row, not the tenant catalog, which holds active tenants only. A suspended tenant has no pool, so the read opens one connection.
@@ -644,103 +624,6 @@ internal static partial class CellEndpoints
         await transaction.CommitAsync(cancellationToken);
         return Accepted(job);
     }
-
-    [SuppressMessage("Performance", "CA1862:Use the 'StringComparison' method overloads", Justification = "The query must translate to lower(host) to use the unique index on lower(host).")]
-    private static async Task<IResult> RequestHostAsync(
-        string id,
-        CellHostRequest? request,
-        HttpContext httpContext,
-        NpgsqlDataSource dataSource,
-        CellOptions cell,
-        CancellationToken cancellationToken)
-    {
-        var trimmed = request?.Host?.Trim();
-        if (trimmed is null || !IsValidHost(trimmed.ToLowerInvariant()))
-        {
-            return RefusedRequests.Problem(
-                httpContext, StatusCodes.Status400BadRequest, "The host must be a DNS name such as approvals.example.com.");
-        }
-
-        // Hosts are ASCII, so lower() in the database matches this lower case.
-        var host = trimmed.ToLowerInvariant();
-        await using var platform = Open(dataSource);
-        await using var transaction = await platform.Database.BeginTransactionAsync(cancellationToken);
-
-        // The lock keeps two parallel retries from inserting two pending requests with different tokens.
-        await platform.Database.ExecuteSqlAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended('axis-host-request:' || {id} || ':' || {host}, 0))",
-            cancellationToken);
-        if (!await platform.Tenants.AnyAsync(row => row.Id == id && row.PreviewOf == null, cancellationToken))
-        {
-            return RefusedRequests.Problem(httpContext, StatusCodes.Status404NotFound, "No tenant has this id.");
-        }
-
-        // The title names neither the host nor the tenant that holds it.
-        if (await platform.TenantHosts.AnyAsync(row => row.Host.ToLower() == host, cancellationToken))
-        {
-            return RefusedRequests.Problem(httpContext, StatusCodes.Status409Conflict, "This host already belongs to a tenant.");
-        }
-
-        // The title names neither the host nor the deleted tenant that held it.
-        if (await DeletedTenantHolds.IsHostHeldBackAsync(platform, [host], cancellationToken))
-        {
-            return RefusedRequests.Problem(httpContext, StatusCodes.Status409Conflict, "This host is held back after a tenant was deleted.");
-        }
-
-        // A request whose expiry has passed is not pending, although its state says so until a later step marks it expired.
-        var now = DateTimeOffset.UtcNow;
-        var pending = await platform.TenantHostRequests.AsNoTracking()
-            .Where(row => row.TenantId == id && row.Host == host && row.State == "pending" && row.ExpiresAt > now)
-            .OrderByDescending(row => row.RequestedAt)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (pending is not null)
-        {
-            await transaction.CommitAsync(cancellationToken);
-            return Results.Ok(HostResponse(pending, cell));
-        }
-
-        var created = new TenantHostRequestRow
-        {
-            TenantId = id,
-            Host = host,
-            Token = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32)),
-            State = "pending",
-            RequestedAt = now,
-            ExpiresAt = now + _hostRequestWindow,
-            Actor = httpContext.User.FindFirst(CellOperator.IdClaim)!.Value,
-        };
-        platform.TenantHostRequests.Add(created);
-        await platform.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return Results.Json(HostResponse(created, cell), statusCode: StatusCodes.Status201Created);
-    }
-
-    private static CellHostResponse HostResponse(TenantHostRequestRow request, CellOptions cell) =>
-        new(
-            request.Host,
-            request.Token,
-            request.State,
-            request.ExpiresAt,
-            new CellDnsRecord("_axis-verify." + request.Host, request.Token),
-            new CellCnameRecord(request.Host, $"{request.TenantId}.{cell.TenantDomain!.Trim()}"));
-
-    // A host of a tenant's own must be a public DNS name that can carry a CNAME, so it has at least two labels and is no IP address.
-    private static bool IsValidHost(string host)
-    {
-        if (host.Length is 0 or > MaxHostLength || Uri.CheckHostName(host) != UriHostNameType.Dns)
-        {
-            return false;
-        }
-
-        var labels = host.Split('.');
-        return labels.Length >= 2 && labels.All(IsValidHostLabel);
-    }
-
-    private static bool IsValidHostLabel(string label) =>
-        label.Length is >= 1 and <= MaxHostLabelLength
-        && label[0] != '-'
-        && label[^1] != '-'
-        && label.All(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-');
 
     // What the cap counts, see docs/reference/cells.md#cell-size: every directory row, previews included, and each unfinished create with no row yet.
     private static async Task<int> CountTowardsCapAsync(PlatformDbContext platform, CancellationToken cancellationToken)

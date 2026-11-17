@@ -23,7 +23,7 @@ namespace Axis.Server.Users;
 /// <c>Console:OperatorRole</c> names. It also says whether the user may administer users: the user holds the role that
 /// <c>Users:AdministratorRole</c> names and the tenant is not a preview tenant, which has no users page. It also says the
 /// tenant's status and, for an administrator in a cell, the address of the tenant's page in the billing portal. It also says
-/// whether the tenant has exports for the administrator, see <see cref="TenantExportEndpoints.ExportTenant"/>.
+/// whether the tenant has exports for the administrator, see <see cref="TenantExportEndpoints.CellTenant"/>.
 /// <para>
 /// <c>GET /api/users</c> lists the users of the tenant's realm to an administrator, as
 /// <c>{ "items": [...], "page", "pageSize", "totalCount" }</c>, see <c>docs/reference/user-administration.md#read-routes</c>. It reads every
@@ -212,7 +212,7 @@ internal static partial class UserEndpoints
                 users.Allows(user.Roles) && !IsPreview(catalog, tenants),
                 tenants.Current is { ReadOnly: true } ? "readOnly" : "active",
                 BillingUrl(users.Allows(user.Roles), cell, catalog, tenants),
-                users.Allows(user.Roles) && TenantExportEndpoints.ExportTenant(cell, catalog, tenants) is not null))
+                users.Allows(user.Roles) && TenantExportEndpoints.CellTenant(cell, catalog, tenants) is not null))
             : Grants.SignInRequired();
 
     private static string? BillingUrl(bool administrator, CellOptions cell, ITenantCatalog catalog, ITenantContextAccessor tenants) =>

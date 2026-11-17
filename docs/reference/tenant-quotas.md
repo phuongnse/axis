@@ -92,8 +92,9 @@ nothing:
   be read: the server logs a warning and the write goes on, because a quota is a billing limit and not
   a security boundary.
 - **Platform rows only.** The routes of a tenant administrator that write only platform rows, such as its
-  [model key](user-administration.md#the-tenants-model-key) and its
-  [outside clients](user-administration.md#outside-mcp-clients), are never refused over the `storage` quota,
+  [model key](user-administration.md#the-tenants-model-key), its
+  [outside clients](user-administration.md#outside-mcp-clients) and its
+  [host requests](tenant-lifecycle.md#hosts-by-a-tenant-administrator), are never refused over the `storage` quota,
   because they write no tenant data.
 - **Consent revokes.** A tenant administrator's [revoke of an outside client's consent](user-administration.md#outside-mcp-clients)
   is never refused over the `storage` quota. Revoking is a security action, and a billing limit must never stop it. It
