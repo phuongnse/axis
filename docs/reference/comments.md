@@ -38,9 +38,9 @@ A person comments on a record they may read. A comment is either internal, seen 
 
 - **Limits.** `text` has 1 to 10,000 characters. `mentions` lists at most 20 user ids, and `files` at most 10 file ids from [files](#files).
 - **Visibility.** `visibility` is `internal` or `shared`, and it is required. A missing value is a `400`, so a comment never reaches people by default.
-- **Grants.** Each entity has two new actions, which go in [roles and policies](roles-and-policies.md#policies):
+- **Grants.** Each entity has two actions for comments, which go in [roles and policies](roles-and-policies.md#policies):
   - `comment` posts a shared comment on a record that the person may read, and that matches the grant's filter.
-  - `internalComments` reads and posts internal comments. It alone is enough to do both.
+  - `internalComments` alone lets a person read and post internal comments.
 - **Answers.** The checks run in the order of the [record API's errors](record-api.md#errors). `401` is for no session, and `403` for a missing [CSRF header](record-api.md#create-update-and-delete) or a missing grant for the visibility. `404` is for a record that does not exist or cannot be read, and `400` for a bad body. A successful post answers `201` with the comment.
 - **Purge.** When a record is purged, its comments, their versions and their files go with it.
 
@@ -71,8 +71,9 @@ _(planned for M43)_
 
 A comment can carry files, which use the upload and download of [file fields](file-fields.md). The checks and the storage are the same.
 
+- **Who.** A record comment's upload needs a readable record and the `comment` or `internalComments` grant, with the same answers and order as a post, see [record comments](#record-comments). A task comment's upload needs a person who may act on an open task, see [task comments](#task-comments).
 - **Upload.** A comment's upload route takes one `file` part, as a file field's route does. It runs the checks of [upload](file-fields.md#upload), with `Files:MaxSize` and the media type table. The file is stored as `pending`, for the uploader and the record or task it is for, until a post attaches it.
-- **Clean-up.** A `pending` file that no post attaches is purged after 24 hours, as [storage and clean-up](file-fields.md#storage-and-clean-up) says.
+- **Clean-up.** A `pending` file that no post attaches is swept, as [storage and clean-up](file-fields.md#storage-and-clean-up) says.
 - **Download.** A file of a comment is downloaded from the file route, `GET /api/apps/{app}/files/{id}`. A person who may not read the comment gets the same `404` as for any file they may not read.
 
 ## Editing and deleting
@@ -83,7 +84,7 @@ A person may change a comment for a short time after posting it. Every version s
 
 - **Who.** Only the author may edit or delete a comment. The author must do it within `Comments:EditWindow`, a [host setting](host-settings.md#comment-and-live-page-settings), counted from the post. The author must also still hold the grant for the comment's visibility. Otherwise the answer is a `403`.
 - **Edit.** `PATCH` takes `text`, `mentions`, `files` and `version`, where `version` is the version the person edited. A stale `version` is a `409`, as [the record API](record-api.md#concurrency) answers a stale write.
-- **Visibility.** An edit never changes `visibility`. Making an internal comment shared would publish it, so the person posts a new comment instead.
+- **Visibility.** An edit never changes `visibility`. Making an internal comment shared would publish it, so a person who wants it shared posts a new comment.
 - **Delete.** `DELETE` answers `204` and hides the comment from the timeline. Its versions stay readable, see below.
 - **Versions.** `GET .../versions` lists every version of a comment, newest first, to anyone who may read the comment. A deleted comment keeps its versions.
 
@@ -100,7 +101,7 @@ A comment lives in the tenant database, with its earlier versions and its files.
 
 _(planned for M43)_
 
-The timeline shows one record's comments, changes, process steps and emails in one list. It replaces the history panel of the [form widget](form-widget.md#history) with this list.
+The timeline shows one record's comments, changes, process steps and emails in one list. The history panel of the [form widget](form-widget.md#history) shows it.
 
 - **Access.** The timeline needs the same access, `404` rules and paging as the [history route](record-audit.md#the-history-route).
 - **Kinds.** `kinds` is a comma list of `comment`, `change`, `step` and `email`. All four show when `kinds` is left out. An unknown kind is a `400` keyed `kinds`.

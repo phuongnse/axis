@@ -114,7 +114,7 @@ cannot use up a replica.
   its own: the `sign_up` partition of [sign-up](sign-up.md#bots-and-abuse), and the
   [billing portal](billing-portal.md#rules)'s. It counts its refusals in the same metric, with `sign_up` as
   `axis.partition`, see [the control plane's metrics](control-plane.md).
-- **Live streams** _(planned for M43)_. Opening a [live stream](frontend.md#live-pages) counts once in Session. The
+- **Live streams.** _(planned for M43)_ Opening a [live stream](frontend.md#live-pages) counts once in Session. The
   `Live:MaxStreamsPerSession` setting closes the oldest stream of a session when one more opens. The `Live:MaxStreams`
   setting caps the streams that one replica holds, and a stream past it answers `503`, see
   [live page settings](host-settings.md#comment-and-live-page-settings).

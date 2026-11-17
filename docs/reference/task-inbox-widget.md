@@ -54,7 +54,7 @@ A page whose widget is a `taskInbox` lists the signed-in user's open tasks in th
   prompt like any other call.
 - **Texts.** The platform texts `shell.tasks.*` hold the column headers, the empty text, the load error
   and the two tags.
-- **Live reloads** _(planned for M43)_. The inbox reloads its list when a `tasks` event arrives, see
+- **Live reloads.** _(planned for M43)_ The inbox reloads its list when a `tasks` event arrives, see
   [live pages](frontend.md#live-pages).
 
 ### Completed tasks

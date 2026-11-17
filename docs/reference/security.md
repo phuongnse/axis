@@ -731,7 +731,7 @@ without a grant. These rules say how grants combine into what a user may read an
   when its subject record is readable. The instance detail needs the same. It also shows a call's input
   only when the user may read every field its mapping reads or writes, and a `sensitive` field is never
   shown. See [process inspection](process-inspection.md#process-inspection).
-- **Comments.** _(planned for M43)_ A record comment needs the `comment` or `internalComments` grant of its entity, and a task comment needs the task's assignee check. See [record comments](comments.md#record-comments) and [task comments](comments.md#task-comments).
+- **Comments.** _(planned for M43)_ A record comment needs the `comment` or `internalComments` grant of its entity. A task comment needs a person who may act on the task, as [who may act](task-api.md#who-may-act) says. See [record comments](comments.md#record-comments) and [task comments](comments.md#task-comments).
 - **System work.** The worker, seed data and `updateRecord` steps run as `system`, and policies do not
   check them.
 - **Failures.** A filter that fails at run time adds no records through its grant. The server logs the
