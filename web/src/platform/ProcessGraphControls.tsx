@@ -35,8 +35,8 @@ export function ProcessGraphControls({
   focus?: string
   /** The steps Find a step offers, by their labels. */
   steps: readonly { id: string; label: string }[]
-  /** Called with the step Find a step moved to, so the graph marks it. */
-  onFound: (id: string) => void
+  /** Called with the step Find a step shows, or `null` once it is cleared, so the graph marks it. */
+  onFound: (id: string | null) => void
 }) {
   const { zoomIn, zoomOut, fitView } = useReactFlow()
   const t = useText()
@@ -62,7 +62,6 @@ export function ProcessGraphControls({
   const fitAll = () => void fitView({ padding: 0.1, duration: moving })
   const find = (id: string) => {
     void fitView({ nodes: [{ id }], minZoom: 1, maxZoom: 1, duration: moving })
-    onFound(id)
   }
 
   // The keys work while the graph or something in it has the focus, never while a box takes typing.
@@ -133,6 +132,7 @@ export function ProcessGraphControls({
           options={steps.map((step) => ({ value: step.id, label: step.label }))}
           onChange={(id: string | null | undefined) => {
             setChosen(id ?? null)
+            onFound(id ?? null)
             if (id !== null && id !== undefined) {
               find(id)
             }
@@ -179,7 +179,12 @@ export function ProcessGraphControls({
               role="icon"
               nameKey="shell.graph.current"
               icon={<AimOutlined />}
-              onClick={() => void fitView({ nodes: [{ id: focus }], minZoom: 1, maxZoom: 1, duration: moving })}
+              onClick={() => {
+                // Going back to the current step shows it in Find a step too.
+                setChosen(focus)
+                onFound(focus)
+                find(focus)
+              }}
             />
           )}
           <AxisButton

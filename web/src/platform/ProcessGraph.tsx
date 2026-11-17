@@ -363,8 +363,9 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
     taken: colour.successText,
     idle: colour.borderSubtle,
   }[data.tone]
-  // One emphasis only: the step an instance is at, 2 px in the primary colour; every other border is 1 px.
-  const width = data.tone === 'current' ? 2 : 1
+  // One weight of emphasis: the step an instance is at, and the step Find a step shows, take 2 px in their own colour;
+  // every other border is 1 px.
+  const width = data.tone === 'current' || found === data.id ? 2 : 1
   const Icon = stepIcons[data.kind] ?? ThunderboltOutlined
   const muted = data.tone === 'idle'
   return (
@@ -380,7 +381,7 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
         data-tone={data.tone}
         style={{
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           gap: spacing.sm,
           width: '100%',
           height: '100%',
@@ -392,8 +393,6 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
           background: colour.surface,
           border: `${width}px solid ${edge}`,
           borderRadius: radius.base,
-          boxShadow: found === data.id ? `0 0 0 4px ${colour.focusRing}` : undefined,
-          transition: 'box-shadow 200ms',
           cursor: 'pointer',
         }}
       >
@@ -415,7 +414,8 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
             <Icon />
           </span>
         </Tooltip>
-        <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+        {/* The label's first line sits level with the icon: 4 px down, half of the 28 px tile less its 20 px line. */}
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, paddingTop: 4 }}>
           <strong
             style={{
               display: '-webkit-box',
@@ -476,7 +476,7 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
   )
 }
 
-/** The step Find a step moved to, which its node rings for a moment. */
+/** The step Find a step shows, which its node marks while it stays chosen. */
 const FoundStep = createContext<string | null>(null)
 
 const nodeTypes = { step: StepNodeView }
@@ -524,12 +524,8 @@ export function ProcessGraphCanvas({
 }) {
   const { mode } = useThemeMode()
   const area = useRef<HTMLElement | null>(null)
-  // The step Find a step moved to, marked for a moment so the eye finds it.
-  const [found, setFound] = useState<string | null>(null)
-  const mark = (id: string) => {
-    setFound(id)
-    window.setTimeout(() => setFound((current) => (current === id ? null : current)), 2000)
-  }
+  // The step Find a step shows, marked as long as it stays chosen.
+  const [found, setFound] = useState<string | null>(focus ?? null)
   const { colour, radius } = useDesignTokens()
   const [layout, setLayout] = useState<Layout | null>(null)
 
@@ -642,7 +638,7 @@ export function ProcessGraphCanvas({
               area={area}
               focus={focus}
               steps={steps.map((step) => ({ id: step.id, label: step.name }))}
-              onFound={mark}
+              onFound={setFound}
             />
           )}
         </ReactFlow>
