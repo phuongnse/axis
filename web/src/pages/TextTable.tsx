@@ -44,11 +44,14 @@ export function TextTable({
   onChange,
   onAdd,
   layer,
+  tableKey,
 }: {
   columns: TextColumn[]
   onChange: ChangeHandler
   onAdd: (key: string, texts: Record<string, string>) => Promise<'added' | 'invalid' | 'failed'>
   layer?: DesignerLayer
+  /** The table's key, see docs/reference/frontend.md#table-views-and-columns. */
+  tableKey: string
 }) {
   const t = useText()
   const [newKey, setNewKey] = useState('')
@@ -57,7 +60,7 @@ export function TextTable({
   const [problem, setProblem] = useState<string>()
 
   const keys = [...new Set(columns.flatMap((column) => Object.keys(column.texts)))].sort()
-  const { view, setView } = useTableView(noFields, recordPageSize, [], true)
+  const { view, setView } = useTableView(noFields, recordPageSize, [], true, false, false, '', tableKey)
 
   async function add() {
     const key = newKey.trim()

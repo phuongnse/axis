@@ -119,7 +119,16 @@ export function StudioUsedBy({
     () => [...new Set(rows.map((row) => row.kind))].sort((left, right) => sidebarRank(left) - sidebarRank(right)),
     [rows],
   )
-  const { view, setView } = useTableView(usedByFields, recordPageSize, [], true, true)
+  const { view, setView } = useTableView(
+    usedByFields,
+    recordPageSize,
+    [],
+    true,
+    true,
+    false,
+    '',
+    `studio.${application}.usedBy`,
+  )
 
   const columns: AxisColumn<UsedByRow>[] = [
     {

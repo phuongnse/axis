@@ -59,6 +59,7 @@ export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhoo
     true,
     true,
     'webhookDeliveries.',
+    'console.webhookDeliveries',
   )
   const query = recordQuery(view)
   const [reload, setReload] = useState(0)

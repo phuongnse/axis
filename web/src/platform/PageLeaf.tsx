@@ -42,7 +42,9 @@ export function PageLeaf({
   const detailId = detailRecordId(widget, pageValues)
   switch (widget.type) {
     case 'table':
-      return <TableWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={pageValues} />
+      return (
+        <TableWidget sitePath={sitePath} pageName={pageName} widget={widget} locale={locale} pageValues={pageValues} />
+      )
     case 'form':
       return (
         hasEntity(widget) && (
