@@ -35,6 +35,20 @@ const texts = {
   'shell.table.columnsMoveUp': 'Move up',
   'shell.table.columnsMoveDown': 'Move down',
   'shell.form.cancel': 'Cancel',
+  'shell.form.save': 'Save',
+  'shell.table.views': 'Views',
+  'shell.table.viewsEmpty': 'No views yet.',
+  'shell.table.viewsName': 'Name',
+  'shell.table.viewsName.help': 'The name the view is listed under.',
+  'shell.table.viewsNameRequired': 'Enter a name.',
+  'shell.table.viewsNameTaken': 'Another view has this name.',
+  'shell.table.viewsSave': 'Save view',
+  'shell.table.viewsSaveFailed': 'The view could not be saved.',
+  'shell.table.viewsRename': 'Rename',
+  'shell.table.viewsRenameFailed': 'The view could not be renamed.',
+  'shell.table.viewsDelete': 'Delete',
+  'shell.table.viewsDeleteConfirm': 'Delete the view {name}?',
+  'shell.table.viewsDeleteFailed': 'The view could not be deleted.',
   'shell.table.selectRow': 'Select row',
   'row.archive': 'Archive',
   'row.delete': 'Delete',
@@ -830,6 +844,234 @@ describe('AxisTable', () => {
         expect(headers()).toEqual(['Name', 'Amount', 'Note'])
         expect(screen.getByTestId('address')).toBeEmptyDOMElement()
         expect(screen.getByTestId('navigation')).toHaveTextContent('POP')
+      })
+    })
+
+    describe('saved views', () => {
+      const keptFields = [
+        { name: 'name', type: 'text' },
+        { name: 'amount', type: 'integer' },
+        { name: 'note', type: 'text' },
+      ] as const
+      const tableUrl = '/api/me/tables/test.table'
+      const filter = JSON.stringify({ all: [{ field: 'note', op: 'contains', value: 'urgent' }] })
+
+      interface Stored {
+        id: string
+        name: string
+        search: string | null
+        filter: string | null
+        sort: string | null
+      }
+
+      /** A server that keeps the views of one table. `saveStatus` is what a POST answers. */
+      function serveViews(views: Stored[], saveStatus = 201) {
+        const server = { views, saveStatus }
+        const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+          const method = init?.method ?? 'GET'
+          if (url === tableUrl && method === 'GET') {
+            return Response.json({ columns: null, views: server.views })
+          }
+          if (url === `${tableUrl}/views` && method === 'POST') {
+            if (server.saveStatus !== 201) {
+              return new Response(null, { status: server.saveStatus })
+            }
+            const saved = { id: 'new', ...(JSON.parse(String(init?.body)) as Omit<Stored, 'id'>) }
+            server.views = [...server.views, saved]
+            return Response.json(saved, { status: 201 })
+          }
+          return new Response(null, { status: 204 })
+        })
+        vi.stubGlobal('fetch', fetchMock)
+        return { server, fetchMock }
+      }
+
+      function ViewsHarness() {
+        const { view, setView, saved } = useTableView(keptFields, 20, [], true, true, false, '', 'test.table')
+        return (
+          <TextProvider catalogs={catalogs} development={false}>
+            <AxisTable<Row>
+              columns={arranged}
+              rowKey={(row) => row.id}
+              dataSource={noted}
+              view={{ query: view, onChange: setView, saved }}
+            />
+          </TextProvider>
+        )
+      }
+
+      function Probe() {
+        return (
+          <>
+            <output data-testid="address">{useLocation().search}</output>
+            <output data-testid="navigation">{useNavigationType()}</output>
+          </>
+        )
+      }
+
+      const open = (address = '/') =>
+        render(
+          <MemoryRouter initialEntries={[address]}>
+            <ViewsHarness />
+            <Probe />
+          </MemoryRouter>,
+        )
+
+      const viewsDialog = () => screen.getByRole('dialog', { name: 'Views' })
+      const openViews = async () => {
+        await userEvent.click(await screen.findByRole('button', { name: 'Views' }))
+        return viewsDialog()
+      }
+      const mutations = (fetchMock: ReturnType<typeof serveViews>['fetchMock']) =>
+        fetchMock.mock.calls.filter(([, init]) => init?.method !== undefined)
+      const address = () => new URLSearchParams(screen.getByTestId('address').textContent ?? '')
+
+      it('saves the address as a view, and opens it again at page 1 with a history entry', async () => {
+        const { fetchMock } = serveViews([])
+        const first = open(`/?search=pen&filter=${encodeURIComponent(filter)}&sort=-amount&page=2`)
+
+        const dialog = await openViews()
+        await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Mine')
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Save view' }))
+
+        await waitFor(() => expect(mutations(fetchMock)).toHaveLength(1))
+        const [url, init] = mutations(fetchMock)[0]
+        expect(url).toBe(`${tableUrl}/views`)
+        expect(init?.method).toBe('POST')
+        expect(JSON.parse(String(init?.body))).toEqual({ name: 'Mine', search: 'pen', filter, sort: '-amount' })
+        expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
+        first.unmount()
+
+        open('/?page=3&pageSize=50')
+        await userEvent.click(within(await openViews()).getByRole('button', { name: 'Mine' }))
+
+        await waitFor(() => expect(address().get('search')).toBe('pen'))
+        expect(address().get('filter')).toBe(filter)
+        expect(address().get('sort')).toBe('-amount')
+        expect(address().has('page')).toBe(false)
+        expect(address().get('pageSize')).toBe('50')
+        expect(screen.getByTestId('navigation')).toHaveTextContent('PUSH')
+      })
+
+      it('clears the parts that a view leaves empty', async () => {
+        serveViews([{ id: 'a', name: 'Plain', search: null, filter: null, sort: null }])
+        open(`/?search=pen&filter=${encodeURIComponent(filter)}&sort=amount`)
+
+        await userEvent.click(within(await openViews()).getByRole('button', { name: 'Plain' }))
+
+        await waitFor(() => expect(screen.getByTestId('address')).toBeEmptyDOMElement())
+      })
+
+      it('drops the filter of a view that names a field the table no longer has', async () => {
+        const lost = JSON.stringify({ all: [{ field: 'gone', op: 'eq', value: 'x' }] })
+        serveViews([{ id: 'a', name: 'Old', search: 'pen', filter: lost, sort: null }])
+        open()
+
+        await userEvent.click(within(await openViews()).getByRole('button', { name: 'Old' }))
+
+        await waitFor(() => expect(address().get('search')).toBe('pen'))
+        expect(address().has('filter')).toBe(false)
+      })
+
+      it('shows no Views button before the views have loaded', async () => {
+        vi.stubGlobal(
+          'fetch',
+          vi.fn(async () => new Response(null, { status: 401 })),
+        )
+        open()
+        await act(async () => {})
+
+        expect(screen.queryByRole('button', { name: 'Views' })).not.toBeInTheDocument()
+      })
+
+      it('keeps the dialog open and the table as it was when the server refuses a save', async () => {
+        const { server } = serveViews([{ id: 'a', name: 'Old', search: null, filter: null, sort: null }], 409)
+        open('/?search=pen')
+
+        const dialog = await openViews()
+        await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Mine')
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Save view' }))
+
+        expect(await within(dialog).findByText('The view could not be saved.')).toBeInTheDocument()
+        expect(viewsDialog()).toBe(dialog)
+        expect(screen.getByTestId('address')).toHaveTextContent('?search=pen')
+        expect(screen.getByTestId('navigation')).toHaveTextContent('POP')
+        expect(within(dialog).getAllByRole('button', { name: /^(Rename|Delete) / })).toHaveLength(2)
+        expect(server.views).toHaveLength(1)
+      })
+
+      it('refuses an empty name and a name another view has, without sending anything', async () => {
+        const { fetchMock } = serveViews([{ id: 'a', name: 'Old', search: null, filter: null, sort: null }])
+        open()
+
+        const dialog = await openViews()
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Save view' }))
+        expect(await within(dialog).findByText('Enter a name.')).toBeInTheDocument()
+
+        await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), ' old ')
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Save view' }))
+        expect(await within(dialog).findByText('Another view has this name.')).toBeInTheDocument()
+        expect(mutations(fetchMock)).toHaveLength(0)
+      })
+
+      it('renames a view in its own line', async () => {
+        const { fetchMock } = serveViews([{ id: 'a b', name: 'Old', search: 'pen', filter: null, sort: '-amount' }])
+        open()
+
+        const dialog = await openViews()
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Rename Old' }))
+        const input = within(dialog).getByRole('textbox', { name: 'Name', description: '' })
+        await userEvent.clear(input)
+        await userEvent.type(input, 'New{Enter}')
+
+        expect(await within(dialog).findByRole('button', { name: 'New' })).toBeInTheDocument()
+        const [url, init] = mutations(fetchMock)[0]
+        expect(url).toBe(`${tableUrl}/views/a%20b`)
+        expect(init?.method).toBe('PUT')
+        expect(JSON.parse(String(init?.body))).toEqual({ name: 'New', search: 'pen', filter: null, sort: '-amount' })
+        expect(within(dialog).queryByRole('button', { name: 'Old' })).not.toBeInTheDocument()
+      })
+
+      it('deletes a view in its own line after the question, and keeps it when Cancel answers', async () => {
+        const { fetchMock } = serveViews([
+          { id: 'a', name: 'Old', search: null, filter: null, sort: null },
+          { id: 'b', name: 'Keep', search: null, filter: null, sort: null },
+        ])
+        open()
+
+        const dialog = await openViews()
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Delete Old' }))
+        expect(within(dialog).getByText('Delete the view Old?')).toBeInTheDocument()
+        expect(mutations(fetchMock)).toHaveLength(0)
+        // The line's Cancel comes before the dialog's own.
+        await userEvent.click(within(dialog).getAllByRole('button', { name: 'Cancel' })[0])
+        expect(within(dialog).getByRole('button', { name: 'Old' })).toBeInTheDocument()
+
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Delete Old' }))
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+        await waitFor(() => expect(within(dialog).queryByRole('button', { name: 'Old' })).not.toBeInTheDocument())
+        const [url, init] = mutations(fetchMock)[0]
+        expect(url).toBe(`${tableUrl}/views/a`)
+        expect(init?.method).toBe('DELETE')
+        expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
+        expect(within(dialog).getByRole('button', { name: 'Keep' })).toBeInTheDocument()
+      })
+
+      it('lists the views by name', async () => {
+        serveViews([
+          { id: 'a', name: 'Zed', search: null, filter: null, sort: null },
+          { id: 'b', name: 'Abe', search: null, filter: null, sort: null },
+        ])
+        open()
+
+        const dialog = await openViews()
+
+        const names = within(dialog)
+          .getAllByRole('button')
+          .map((button) => button.textContent)
+          .filter((name) => name === 'Abe' || name === 'Zed')
+        expect(names).toEqual(['Abe', 'Zed'])
       })
     })
   })

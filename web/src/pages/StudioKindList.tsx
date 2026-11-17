@@ -54,7 +54,7 @@ export function StudioKindList({
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { colour } = useDesignTokens()
   const { generation, lost } = useStudioConnection()
-  const { view, setView } = useTableView(
+  const { view, setView, saved } = useTableView(
     listFields,
     recordPageSize,
     noParameters,
@@ -163,6 +163,7 @@ export function StudioKindList({
       view={{
         query: view,
         onChange: setView,
+        saved,
         pageSizes: tablePageSizes(),
         total: loaded?.totalCount ?? 0,
         search: true,

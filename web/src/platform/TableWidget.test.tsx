@@ -237,18 +237,21 @@ const texts = {
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
-/** Stubs `fetch` with the record API and returns the requested URLs. */
+/** The route of a person's kept choices, which every table with a key asks for when it opens. The tests below do not read it. */
+const choicesRoute = '/api/me/tables/'
+
+/** Stubs `fetch` with the record API and returns the requested URLs, except the table's choices. */
 function stubRecords(body = notePage, status = 200) {
   const fetchMock = vi.fn(async (_input: string) => new Response(body, { status }))
   vi.stubGlobal('fetch', fetchMock)
-  return () => fetchMock.mock.calls.map(([url]) => url)
+  return () => fetchMock.mock.calls.map(([url]) => url).filter((url) => !url.startsWith(choicesRoute))
 }
 
-/** Stubs `fetch` with a handler per URL and returns the requested URLs. */
+/** Stubs `fetch` with a handler per URL and returns the requested URLs, except the table's choices. */
 function stubFetch(handler: (url: string) => Response) {
   const fetchMock = vi.fn(async (input: string) => handler(input))
   vi.stubGlobal('fetch', fetchMock)
-  return () => fetchMock.mock.calls.map(([url]) => url)
+  return () => fetchMock.mock.calls.map(([url]) => url).filter((url) => !url.startsWith(choicesRoute))
 }
 
 const emptyRows = '{"items":[],"page":1,"pageSize":10,"totalCount":0}'
@@ -1392,7 +1395,7 @@ describe('TableWidget', () => {
     }
     const closableWidget = { ...noteWidget, rowActions: [closeNote] }
 
-    /** Stubs `fetch`: GET answers the notes, POST answers `startStatus`. Returns the calls made. */
+    /** Stubs `fetch`: GET answers the notes, POST answers `startStatus`. Returns the calls made, except the table's choices. */
     function stubStart(startStatus: number, startBody = '') {
       const fetchMock = vi.fn(
         async (_input: string, init?: RequestInit) =>
@@ -1401,7 +1404,7 @@ describe('TableWidget', () => {
           }),
       )
       vi.stubGlobal('fetch', fetchMock)
-      return fetchMock.mock.calls
+      return () => fetchMock.mock.calls.filter(([url]) => !url.startsWith(choicesRoute))
     }
 
     it('posts the row id with an idempotency key, then requests the rows again', async () => {
@@ -1411,10 +1414,10 @@ describe('TableWidget', () => {
 
       await userEvent.click(within(row).getByRole('button', { name: 'Close note' }))
 
-      await waitFor(() => expect(calls.filter(([, init]) => init?.method !== 'POST')).toHaveLength(2))
-      const [first, second] = calls.filter(([, init]) => init?.method !== 'POST')
+      await waitFor(() => expect(calls().filter(([, init]) => init?.method !== 'POST')).toHaveLength(2))
+      const [first, second] = calls().filter(([, init]) => init?.method !== 'POST')
       expect(second[0]).toBe(first[0])
-      const posts = calls.filter(([, init]) => init?.method === 'POST')
+      const posts = calls().filter(([, init]) => init?.method === 'POST')
       expect(posts).toHaveLength(1)
       const [url, init] = posts[0]
       expect(url).toBe(closeNote.instancesPath)
@@ -1433,7 +1436,7 @@ describe('TableWidget', () => {
       expect(await screen.findByTestId('table-action-error')).toHaveTextContent(
         'This record is already in a running process.',
       )
-      expect(calls.filter(([, init]) => init?.method !== 'POST')).toHaveLength(1)
+      expect(calls().filter(([, init]) => init?.method !== 'POST')).toHaveLength(1)
     })
 
     it('shows a start condition message as text', async () => {
@@ -1456,8 +1459,8 @@ describe('TableWidget', () => {
       expect(await screen.findByTestId('table-action-error')).toHaveTextContent('The process could not be started.')
       await userEvent.click(within(row).getByRole('button', { name: 'Close note' }))
 
-      await waitFor(() => expect(calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(2))
-      const keys = calls
+      await waitFor(() => expect(calls().filter(([, init]) => init?.method === 'POST')).toHaveLength(2))
+      const keys = calls()
         .filter(([, init]) => init?.method === 'POST')
         .map(([, init]) => new Headers(init?.headers).get('Idempotency-Key'))
       expect(keys[0]).toBe(keys[1])
@@ -1483,7 +1486,8 @@ describe('TableWidget', () => {
       )
       vi.stubGlobal('fetch', fetchMock)
       return {
-        gets: () => fetchMock.mock.calls.filter(([, init]) => init?.method !== 'DELETE'),
+        gets: () =>
+          fetchMock.mock.calls.filter(([url, init]) => !url.startsWith(choicesRoute) && init?.method !== 'DELETE'),
         deletes: () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'DELETE'),
       }
     }

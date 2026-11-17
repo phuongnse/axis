@@ -72,7 +72,7 @@ export function StudioHistory({
   const t = useText()
   const time = useRevisionTime()
   const { generation, lost } = useStudioConnection()
-  const { view, setView } = useTableView(
+  const { view, setView, saved } = useTableView(
     revisionFields,
     recordPageSize,
     noParameters,
@@ -181,6 +181,7 @@ export function StudioHistory({
         view={{
           query: view,
           onChange: setView,
+          saved,
           pageSizes: tablePageSizes(),
           total: list?.totalCount ?? 0,
           search: true,

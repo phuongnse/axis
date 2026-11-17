@@ -300,8 +300,12 @@ describe('WidgetTree', () => {
   })
 
   it('asks for no rows from a table in a closed section or in a tab that is not selected', async () => {
-    const fetchMock = vi.fn(async () => new Response('{"items":[],"page":1,"pageSize":20,"totalCount":0}'))
+    const fetchMock = vi.fn(
+      async (_input: string) => new Response('{"items":[],"page":1,"pageSize":20,"totalCount":0}'),
+    )
     vi.stubGlobal('fetch', fetchMock)
+    // A table with a key also asks for the person's kept choices, which this test does not read.
+    const rowRequests = () => fetchMock.mock.calls.filter(([url]) => !url.startsWith('/api/me/tables/'))
     const renderReal = (widget: WidgetMetadata) => (
       <TableWidget sitePath="e2e" pageName="Requests" widget={widget} locale="en" pageValues={{}} />
     )
@@ -322,11 +326,11 @@ describe('WidgetTree', () => {
     )
 
     await screen.findByRole('tab', { name: 'Tasks' })
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(rowRequests()).toHaveLength(0)
 
     await userEvent.click(screen.getByRole('tab', { name: 'Tasks' }))
 
     expect(await screen.findByText('No records yet.')).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(rowRequests()).toHaveLength(1)
   })
 })

@@ -34,7 +34,7 @@ const noParameters: readonly string[] = []
  */
 export function ConsoleSchedules({ locale }: ConsoleSchedulesProps) {
   const t = useText()
-  const { view, setView } = useTableView(
+  const { view, setView, saved } = useTableView(
     scheduleFields,
     recordPageSize,
     noParameters,
@@ -128,6 +128,7 @@ export function ConsoleSchedules({ locale }: ConsoleSchedulesProps) {
         view={{
           query: view,
           onChange: setView,
+          saved,
           pageSizes: tablePageSizes(),
           total: page?.totalCount ?? 0,
           search: true,

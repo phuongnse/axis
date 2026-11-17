@@ -177,7 +177,11 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
   )
   const parameterNames = useMemo(() => parameters.map((parameter) => parameter.name), [parameters])
   const sizes = useMemo(() => tablePageSizes(defaultPageSize), [defaultPageSize])
-  const { view: query, setView } = useTableView(
+  const {
+    view: query,
+    setView,
+    saved,
+  } = useTableView(
     fields,
     defaultPageSize,
     parameterNames,
@@ -593,6 +597,7 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
       view={{
         query,
         onChange: setView,
+        saved,
         pageSizes: sizes,
         total: parameterErrors ? 0 : (state.page?.totalCount ?? 0),
         search: searchable,

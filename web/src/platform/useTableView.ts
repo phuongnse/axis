@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router'
 import type { FieldMetadata } from './site'
-import { useTableChoices } from './tableChoices'
+import { useTableChoices, type SavedTableView } from './tableChoices'
 import {
   columnsChoice,
   parseTableQuery,
@@ -10,6 +10,20 @@ import {
   writeTableQuery,
   type TableQuery,
 } from './tableQuery'
+
+/**
+ * The saved views of a table with a key, and the means to open, save, rename and delete them, see
+ * docs/reference/actions-and-controls.md#tables. The writes answer whether the server took them.
+ */
+export interface TableSavedViews {
+  views: SavedTableView[]
+  /** Writes the view's search, filter and sort into the address at page 1, with a history entry. An empty part clears that part. */
+  open: (view: SavedTableView) => void
+  /** Saves the address's search, filter and sort under `name`. */
+  save: (name: string) => Promise<boolean>
+  rename: (view: SavedTableView, name: string) => Promise<boolean>
+  remove: (view: SavedTableView) => Promise<boolean>
+}
 
 /**
  * A table's view, its search, filter, columns, sort, page, page size and data source parameter values, kept in the address, see
@@ -22,6 +36,8 @@ import {
  * and Reset followed by Apply forgets them. A table opened with no `columns` in the address gets the kept columns,
  * written without a history entry. `columns` in the address wins. A table without a key keeps nothing, see
  * docs/reference/frontend.md#table-views-and-columns.
+ * A table with a `tableKey` also gives `saved`, the person's saved views, once they have loaded. Opening a view reads
+ * its search, filter and sort as the address is read, so a filter that names a lost field is dropped.
  */
 export function useTableView(
   fields: readonly Pick<FieldMetadata, 'name' | 'type'>[],
@@ -32,9 +48,13 @@ export function useTableView(
   columnsControl = false,
   prefix = '',
   tableKey?: string,
-): { view: TableQuery; setView: (next: TableQuery, options?: { replace?: boolean }) => void } {
+): {
+  view: TableQuery
+  setView: (next: TableQuery, options?: { replace?: boolean }) => void
+  saved: TableSavedViews | undefined
+} {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { choices, keepColumns } = useTableChoices(columnsControl ? tableKey : undefined)
+  const { choices, keepColumns, saveView, renameView, deleteView } = useTableChoices(tableKey)
   const view = useMemo(
     () =>
       parseTableQuery(
@@ -61,7 +81,7 @@ export function useTableView(
   const settledKey = useRef<string>(undefined)
 
   useEffect(() => {
-    if (choices === undefined || settledKey.current === tableKey) {
+    if (!columnsControl || choices === undefined || settledKey.current === tableKey) {
       return
     }
     settledKey.current = tableKey
@@ -76,7 +96,18 @@ export function useTableView(
         preventScrollReset: true,
       })
     }
-  }, [choices, tableKey, searchParams, fields, view, defaultPageSize, parameterNames, prefix, setSearchParams])
+  }, [
+    columnsControl,
+    choices,
+    tableKey,
+    searchParams,
+    fields,
+    view,
+    defaultPageSize,
+    parameterNames,
+    prefix,
+    setSearchParams,
+  ])
 
   const setView = useCallback(
     (next: TableQuery, options?: { replace?: boolean }) => {
@@ -91,5 +122,52 @@ export function useTableView(
     },
     [view.columns, tableKey, keepColumns, searchParams, defaultPageSize, parameterNames, prefix, setSearchParams],
   )
-  return { view, setView }
+
+  const saved = useMemo<TableSavedViews | undefined>(() => {
+    if (choices === undefined) {
+      return undefined
+    }
+    return {
+      views: choices.views,
+      open: (opened) => {
+        const params = new URLSearchParams()
+        for (const [name, value] of [
+          ['search', opened.search],
+          ['filter', opened.filter],
+          ['sort', opened.sort],
+        ] as const) {
+          if (value !== null) {
+            params.set(prefix + name, value)
+          }
+        }
+        const parsed = parseTableQuery(params, fields, defaultPageSize, [], searchable, filterable, false, prefix)
+        setView({ ...view, page: 1, search: parsed.search, filter: parsed.filter, sort: parsed.sort })
+      },
+      save: (name) => {
+        const written = writeTableQuery(new URLSearchParams(), view, defaultPageSize, parameterNames, prefix)
+        return saveView({
+          name,
+          search: written.get(`${prefix}search`),
+          filter: written.get(`${prefix}filter`),
+          sort: written.get(`${prefix}sort`),
+        })
+      },
+      rename: renameView,
+      remove: deleteView,
+    }
+  }, [
+    choices,
+    fields,
+    view,
+    defaultPageSize,
+    parameterNames,
+    searchable,
+    filterable,
+    prefix,
+    setView,
+    saveView,
+    renameView,
+    deleteView,
+  ])
+  return { view, setView, saved }
 }
