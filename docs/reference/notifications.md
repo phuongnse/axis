@@ -45,6 +45,11 @@ It is a step of the [process resource](processes.md), and it looks like this:
   expression with the scope of a `when`, and a problem is reported at
   `/steps/{i}/message/values/{name}`. A value may have any type, because it is formatted by its type,
   so only its syntax, names and rules are checked.
+- **`attachments`** _(planned for M40)_ is optional, and it needs the `email` channel. It is a list of files that
+  the email carries. An entry is `{ "field": "<file field>" }`, which attaches the file that a `file` field of the
+  subject record holds, or `{ "template": "<documentTemplate>", "format": "pdf" }`, which attaches a document made
+  for this email, see [document templates](document-templates.md#document-step). An entry whose field is `null`
+  attaches nothing. An in-app notification carries no attachment.
 - **`open`** is optional. It names a page of the application and maps its page parameters, as a
   navigate action does (`AXC0232` to `AXC0234`, at `/steps/{i}/open`). The page is a `navigate page`
   edge in the reference index, and the in-app notification opens it.
@@ -232,6 +237,22 @@ own transaction, and the worker sends it later over SMTP, at least once.
   the tenant has no host. A step run stages at most one email per address, ignoring letter case, with
   the locale of the first recipient that gave it. The row also keeps the raw placeholder values of the
   step run in `values`, so a test scenario can check them. A role recipient gets no email.
+- **HTML.** _(planned for M40)_ A message may have `message.htmlBody`, a text key whose text is an HTML body,
+  beside the plain `body`. The worker then sends one `multipart/alternative` email that holds both, so a reader
+  that shows no HTML still has the text. An email with no `htmlBody` stays plain text.
+- **Placeholders in HTML.** _(planned for M40)_ The value of a placeholder is HTML-encoded where it is written
+  into the HTML body, so a value never adds a tag, a script or a link. The template's own HTML is the author's.
+- **Cleaning.** _(planned for M40)_ The step cleans the HTML body with an allow list of tags, attributes and URL
+  schemes before it stores it in `axis.email_outbox`. Script, event attributes, forms and `javascript:` links are
+  dropped, so what the worker sends is what was cleaned.
+- **Logo.** _(planned for M40)_ When the site that the email's link names has a logo, the HTML body shows it as
+  an image that the email carries inline, so it shows without a request to Axis's server.
+- **Attachments.** _(planned for M40)_ The worker reads each attachment's bytes when it sends, from the file's
+  storage, or asks the [document runner](document-templates.md#the-document-runner) for a document that the step
+  named. The outbox row holds the file ids and the template names, never the bytes.
+- **Size limit.** _(planned for M40)_ An email with its attachments may be at most `Email:MaxSize`. One over it
+  fails the send like a failed send, and becomes a dead letter after `Worker:DeliveryAttempts`, with a message
+  that names the limit and no file name. The step does not know the size of a document until it is made.
 - **Escalations.** A task escalation stages its emails in its own transaction, so one that rolls back,
   such as one whose `notify` expression fails, stages none. Its rows name the task step in `step`, and
   share the `notificationId` of the escalation's history row. The sending, the failure count and the

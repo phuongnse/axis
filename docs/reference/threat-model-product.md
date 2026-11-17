@@ -102,6 +102,36 @@ Open threats, which no issue closes, see [threat model method](threat-model-meth
 - (Denial of service, Medium) one change makes the worker count a very large number of due times again.
 - (Tampering, Medium) a change to the days of one application moves due times of another application.
 
+**Browser and file origin** _(planned for M40)_
+
+An inline preview loads from a file origin that is not the application's own, through a short-lived signed
+link that the server gives after the checks of a download, see [preview](file-fields.md#download) and
+[the file origin's headers](headers-and-rate-limits.md#security-headers).
+
+```mermaid
+flowchart LR
+    subgraph browser [Browser]
+        Page[SPA page]
+    end
+    subgraph server [Server]
+        Link[Preview route, signs a link]
+    end
+    subgraph origin [File origin]
+        Bytes[Serves one file inline]
+    end
+    Page -->|session cookie| Link
+    Page -->|signed link, no cookie| Bytes
+```
+
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
+
+- (Information disclosure, High) a signed link is leaked, in a log or a shared screen, or reused after the
+  person who got it lost the right to read the file.
+- (Elevation of privilege, High) a previewed file runs script that reaches the application's origin or the
+  session.
+- (Information disclosure, High) a preview of a file is served to a user who has no read grant on its record.
+- (Tampering, Medium) a page of another site frames or embeds a file from the origin.
+
 ### Server and databases
 
 The server finds each tenant from the host. It then reads and writes that tenant's database as the runtime role.
@@ -131,6 +161,37 @@ flowchart LR
 | P14 | A tenant's secret is read from the database in clear text. | Server and databases | Information disclosure | High | **Mitigated** | `TenantSecretCipherTests` (an encrypted value hides its plain text and does not decrypt for another tenant or field). |
 | P15 | A slow read or write holds a database connection for too long. | Server and databases | Denial of service | Medium | **Mitigated** | `QueryTimeoutTests` and `WriteTimeoutTests` (a slow read or write answers 503, and is logged and counted). |
 | P144 | A session's refresh token is read from the session row or used for another session. | Server and databases | Information disclosure | High | **Mitigated** | `SessionTokensTests` (the row holds the token encrypted, no response carries it, and a token copied to another row does not decrypt). See [the refresh token](security.md#sign-in-flow). |
+
+**Server and object storage** _(planned for M40)_
+
+A tenant's files may live in an S3 object storage that its `storage` binding names, outside the tenant database,
+see [object storage](file-fields.md#storage-and-clean-up). A command moves them, see
+[moving files](tenant-setting-commands.md#moving-files).
+
+```mermaid
+flowchart LR
+    subgraph server [Server and worker]
+        Files[File reads and writes]
+    end
+    subgraph secrets [Tenant secrets]
+        Cred[Credential binding]
+    end
+    subgraph bucket [Object storage]
+        Objects[(Bucket)]
+    end
+    Files -->|reads binding| Cred
+    Files -->|https, tenant's own keys| Objects
+```
+
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
+
+- (Information disclosure, High) the storage credential is stolen, or appears in a log or an audit record.
+- (Information disclosure, Critical) one tenant's files are read through a bucket or a key that another tenant
+  shares.
+- (Denial of service, High) a file is lost by the move command, or by a restore that has no bucket to match
+  its archive.
+- (Tampering, Medium) an object is replaced in the bucket and the download serves it, because nothing checks
+  its SHA-256.
 
 ### Caller and server
 
@@ -230,6 +291,33 @@ flowchart LR
 
 Spoofing does not apply to a package in the worker's process. The operator installs each package, and a caller does not send a package an identity. A package in a runner is reached over the network, see P151.
 
+**Worker and document runner** _(planned for M40)_
+
+Documents are made from a Word file in a runner that has a sandbox, never in the server or the worker, see
+[the document runner](document-templates.md#the-document-runner).
+
+```mermaid
+flowchart LR
+    subgraph worker [Worker and server]
+        Ask[Asks for a document]
+    end
+    subgraph runner [Document runner, in a sandbox]
+        Make[Makes one file from one template]
+    end
+    Ask -->|template file and values of one tenant| Make
+    Make -->|one file| Ask
+```
+
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
+
+- (Elevation of privilege, High) a crafted Word file escapes the runner and reaches the host, the network or
+  another tenant.
+- (Denial of service, Medium) a template that loops, nests or grows without end uses up the runner's memory or
+  time, and other documents wait.
+- (Information disclosure, High) a document holds another tenant's data, because a runner keeps a value between
+  two calls.
+- (Information disclosure, Medium) a document holds a field that the person who downloads it may not read.
+
 ### Package runner and an application's package
 
 _(planned for M37)_
@@ -276,6 +364,18 @@ Open threats, which no issue closes, see [threat model method](threat-model-meth
 - (Tampering, Medium) a runner posts a result for a call that it did not take, or after its lease ended. The planned
   control is the lease id that the result route needs, see
   [customer-hosted runners](extension-packages.md#customer-hosted-runners).
+
+**HTML email and attachments** _(planned for M40)_
+
+An email may carry an HTML body, the site's logo and attachments, see [email](notifications.md#email).
+
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
+
+- (Tampering, High) a placeholder's value adds script or a phishing link to an HTML email.
+- (Spoofing, Medium) an author's HTML template makes an email that looks like another sender's.
+- (Denial of service, Medium) an attachment over the size limit fails the send again and again, and the worker
+  keeps trying a dead email.
+- (Information disclosure, High) an attachment holds a file the recipient's record grant would not show.
 
 ### Worker and webhook receiver
 

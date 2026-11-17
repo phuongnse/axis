@@ -572,6 +572,29 @@ and can nest.
 A widget opens another page, and sets its parameters, through a `navigate` action. A table opens and creates records
 through its [navigate actions](table-widget.md#navigate).
 
+## Printing
+
+_(planned for M40)_
+
+A record page prints on paper, with a layout made for it, so a person can print a purchase request or a ticket
+without a screenshot. This section says what prints and what does not. A report as a PDF is in
+[reports as PDF](document-templates.md#reports-as-pdf), and the document of one record is in the
+[page download](document-templates.md#page-download).
+
+- **What prints.** The page's content: the title of the page and the widgets of its regions in reading order,
+  with a `detail` or a `form` laid out in one column and a `table` with the rows that it shows. A `columns` or
+  a `tabs` widget prints all of its panels, one after another, so a tab that is not selected is not lost.
+- **What hides.** The shell, which means the header, the sidebar and the bell, the actions and buttons of every
+  widget, the paging and the filters of a table, and a toast. What a person cannot use on paper is not drawn.
+- **Colours and breaks.** The print layout draws on white with dark text, whatever the colour mode of the screen.
+  A table header repeats on each sheet, and a row or a section does not split across two sheets when it fits on
+  one.
+- **The action.** A page with a `detail` or `form` widget shows a Print… action. It is a Secondary
+  [button](actions-and-controls.md#buttons), and it ends in an ellipsis because it opens the browser's print
+  dialog. A user without the grant to read the page sees no Print action, as for any page.
+- **Text.** The words of the action and of the page's footer, such as the date and time of printing, come from
+  the platform's texts in the user's locale, and name the concept as the [glossary](ui-glossary.json) does.
+
 ## Account button and sign-in prompt
 
 The account button and the sign-in prompt are parts of the shell, see [account button](shell.md#account-button) and

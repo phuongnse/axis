@@ -45,6 +45,13 @@ and behind any proxy.
   proxies carry the headers. A violation then shows up only in the E2E run, Docker Compose or the Helm chart.
 - **File download.** A file download keeps to this policy and adds `Content-Disposition: attachment`. A custom widget
   bundle is served from the server's own origin and calls no `eval`.
+- **The file origin.** _(planned for M40)_ An inline preview of a file is served from the origin that
+  `Files:PreviewOrigin` names, see [preview](file-fields.md#download). Its answers carry a
+  `Content-Security-Policy` with no script, a `sandbox` and a `frame-ancestors` that lists only the hosts of the
+  tenant, so only the application's own pages can frame a file. They send `Content-Disposition: inline` and
+  `X-Content-Type-Options: nosniff`, and a `Cross-Origin-Resource-Policy` that keeps a page of another site from
+  embedding the file. The SPA's `img-src` and `frame-src` list that origin and nothing else, so the origin needs
+  no change to `script-src`.
 
 ### Header tests
 

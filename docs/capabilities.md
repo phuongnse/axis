@@ -179,8 +179,8 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Change many records at once | _(planned for M42)_ |
 | Find and merge duplicate records | _(planned for M53)_ |
 | Comments and activity on a record | _(planned for M43)_ |
-| Preview a file in the page | _(planned for M40)_ |
-| Keep earlier versions of a file | _(planned for M40)_ |
+| Preview a file in the page | [Preview](reference/file-fields.md#download) _(planned for M40)_ |
+| Keep earlier versions of a file | [Versions](reference/file-fields.md#versions) _(planned for M40)_ |
 | Tell other systems when a record changes | [Outbound webhooks](reference/outbound-webhooks.md#outbound-webhooks) |
 
 ### Keeping and removing data
@@ -240,8 +240,8 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Pivot tables | _(planned for M54)_ |
 | Personal dashboards and ad hoc reports | _(planned for M54)_ |
 | Reports sent by email on a schedule | _(planned for M54)_ |
-| A report or a record as a PDF or a printed page | _(planned for M40)_ |
-| Documents made from a template, such as a purchase order | _(planned for M40)_ |
+| A report or a record as a PDF or a printed page | [Reports as PDF](reference/document-templates.md#reports-as-pdf) _(planned for M40)_ |
+| Documents made from a template, such as a purchase order | [Document template resource](reference/document-templates.md#document-template-resource) _(planned for M40)_ |
 | Read data from a business intelligence tool | _(planned for M54)_ |
 
 ### Across the organization
@@ -280,7 +280,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Format text with rich text | _(planned for M42)_ |
 | Upload a file | [In the SPA](reference/file-fields.md#in-the-spa) |
 | Attach several files to a record | [Field and value](reference/file-fields.md#field-and-value) |
-| Preview an image or a PDF without downloading it | _(planned for M40)_ |
+| Preview an image or a PDF without downloading it | [Preview](reference/file-fields.md#download) _(planned for M40)_ |
 | Sign with a signature input | _(planned for M58)_ |
 | Take a photo, scan a barcode or record a location in a form | _(planned for M58)_ |
 | Keep a form as a draft that saves by itself | _(planned for M42)_ |
@@ -351,8 +351,8 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | --- | --- |
 | Export a table to CSV or Excel | [Export](reference/table-widget.md#export) |
 | Send an email from text with placeholders | [Email](reference/notifications.md#email) |
-| Make PDF or Word documents from a template | _(planned for M40)_ |
-| Print a record in a print layout | _(planned for M40)_ |
+| Make PDF or Word documents from a template | [Document step](reference/document-templates.md#document-step) _(planned for M40)_ |
+| Print a record in a print layout | [Printing](reference/frontend.md#printing) _(planned for M40)_ |
 | Send SMS, chat and push notifications | _(planned for M46)_ |
 
 ### Sites and audiences
@@ -445,7 +445,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Email people from a process | [Email](reference/notifications.md#email) |
 | Fill message texts from the record in each person's language | [Placeholders](reference/notifications.md#placeholders) |
 | Send a tenant's email through its own mail server | [Mail settings](reference/notifications.md#mail-settings) |
-| Send email with formatting and attachments | _(planned for M40)_ |
+| Send email with formatting and attachments | [Email](reference/notifications.md#email) _(planned for M40)_ |
 | Email everyone who holds a role | _(planned for M46)_ |
 | Send a text message | _(planned for M46)_ |
 | Send a Zalo message | _(planned for M46)_ |
@@ -461,9 +461,9 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Upload and download files under the record's policies | [Download](reference/file-fields.md#download) |
 | Refuse executables and files whose content does not match their type | [Field and value](reference/file-fields.md#field-and-value) |
 | Scan uploads for malware | [D157](decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md) |
-| Keep files outside the database | _(planned for M40)_ |
-| Pass a file to a connector, a package or an email | _(planned for M40)_ |
-| Have a document signed electronically | _(planned for M40)_ |
+| Keep files outside the database | [Object storage](reference/file-fields.md#storage-and-clean-up) _(planned for M40)_ |
+| Pass a file to a connector, a package or an email | [Files in calls](reference/process-execution.md#files-in-calls) _(planned for M40)_ |
+| Have a document signed electronically | [E-signature through a connector](reference/document-templates.md#e-signature-through-a-connector) _(planned for M40)_ |
 | Read values out of a scanned or uploaded document | _(planned for M48)_ |
 
 ### Data for other systems

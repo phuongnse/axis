@@ -211,6 +211,25 @@
       "en": "quarter",
       "vi": "quý",
       "status": "proposed"
+    },
+    {
+      "concept": "Document template",
+      "en": "document template",
+      "vi": "mẫu tài liệu",
+      "status": "proposed"
+    },
+    {
+      "concept": "File version",
+      "en": "version",
+      "vi": "bản",
+      "status": "proposed",
+      "note": "An earlier copy of a file, listed with its number and when it was replaced. It takes the word of a module's version, and \"phiên bản\" stays the release of an application."
+    },
+    {
+      "concept": "Action: Print",
+      "en": "Print",
+      "vi": "In",
+      "status": "proposed"
     }
   ]
 }
