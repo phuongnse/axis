@@ -16,6 +16,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { type KeyboardEvent, useMemo, useRef } from 'react'
+import { ReactFlowAttributionStyle } from '../platform/ReactFlowAttributionStyle'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { type ProcessGraph, type ProcessGraphTransition, transitionName } from './processGraph'
@@ -323,11 +324,13 @@ export default function StudioProcessGraph({
         section.current = element
         setNodeRef(element)
       }}
+      className="studio-process-graph"
       data-testid="studio-process-graph"
       aria-label={t('shell.studio.processGraph')}
       style={{ height: 480, position: 'relative' }}
       onKeyDown={onKeyDown}
     >
+      <ReactFlowAttributionStyle scope="studio-process-graph" />
       <ReactFlow
         nodes={nodes}
         edges={edges}

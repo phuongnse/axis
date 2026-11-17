@@ -162,7 +162,7 @@ function deadLetter(id: string, applicationId: string, kind: string, processId: 
   }
 }
 
-// A dead letter view waits for its fetch and the table, which is slow while other test files run.
+// A console view waits for its fetch and the table, which is slow while other test files run.
 const slow = { timeout: 5000 }
 
 const allLetters: ConsoleDeadLetterPage = {
@@ -591,7 +591,7 @@ describe('ConsolePage', () => {
     stubServer(tenantAndFailedWork, undefined, () => new Response(null, { status: 500 }))
     renderPage()
 
-    expect(await screen.findByTestId('console-schedules-error')).toBeVisible()
+    expect(await screen.findByTestId('console-schedules-error', {}, slow)).toBeVisible()
     expect(screen.getByTestId('console-tenant')).toBeVisible()
   })
 })

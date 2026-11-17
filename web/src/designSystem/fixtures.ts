@@ -1250,7 +1250,7 @@ export const fixtureScopes = [
 ] as const
 
 /** A person's table choices when nothing is kept. */
-const noTableChoices = { columns: null, views: [] }
+export const noTableChoices = { columns: null, views: [] }
 
 /**
  * The answers of the fixture application's APIs, by path or by path and query. The page's own

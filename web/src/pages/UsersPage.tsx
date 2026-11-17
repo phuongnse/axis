@@ -25,6 +25,7 @@ import { InviteUserModal } from './InviteUserModal'
 import { NotFoundPage } from './NotFoundPage'
 import { TenantApplicationPackagesSection } from './TenantApplicationPackagesSection'
 import { TenantExportSection } from './TenantExportSection'
+import { TenantHostsSection } from './TenantHostsSection'
 import { TenantModelKeySection } from './TenantModelKeySection'
 import { TenantUsageSection } from './TenantUsageSection'
 
@@ -294,6 +295,7 @@ export function UsersPage() {
                   />
                   <TenantExportSection />
                   <TenantUsageSection />
+                  <TenantHostsSection />
                   <TenantModelKeySection />
                   <TenantApplicationPackagesSection />
                 </SectionParts>
