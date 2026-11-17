@@ -68,7 +68,8 @@ form serves both a page and a task.
   `userId` gives the signed-in person's id, and `"today"` on a `date` field gives today in the
   [application time zone](entity-logic-and-sequences.md#application-time-zone). It applies only to a new record, where
   it replaces the entity's default. A value that the page gives, see
-  [first values of a new record](resource-files.md#first-values-of-a-new-record), wins over it. The compiler refuses
+  [first values of a new record](resource-files.md#first-values-of-a-new-record), wins over it. A field that the person
+  may not set on create, because it is not in `createFields`, starts empty, as first values do. The compiler refuses
   any other value, a `default` on the wrong field type, and one on a read-only, computed, sequence, creator or matched
   field. As [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) agrees.
 

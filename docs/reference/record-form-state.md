@@ -75,7 +75,8 @@ a create does. Computed fields are calculated on it.
     [task form state](task-api.md) route.
   - **Context defaults** _(planned for M42)_. For a new record, a field whose form entry has `default` takes `user`
     or `today` in place of the entity's default. `today` is the date of this call, in the
-    [application time zone](entity-logic-and-sequences.md#application-time-zone).
+    [application time zone](entity-logic-and-sequences.md#application-time-zone). A field outside `createFields`
+    takes no context default, as [defaults from the context](form-widget.md#form-resource) says.
 - A value that does not fit its field, or a computed field that cannot be
   computed, is a message in `errors` of a `200` answer, so that one bad value
   does not stop the other fields from getting their states. A `400` is only for
