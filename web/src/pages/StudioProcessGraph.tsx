@@ -94,6 +94,7 @@ export default function StudioProcessGraph({
           id: String(step.index),
           name: step.name ?? '',
           type: step.type ?? '',
+          kind: step.type ?? '',
           start: graph.start === step.index,
           tone: step.marked ? 'error' : selected === step.index ? 'selected' : 'plain',
           ariaLabel: step.marked ? `${label}, ${t('shell.studio.processGraph.hasDiagnostics')}` : label,

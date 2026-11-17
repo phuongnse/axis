@@ -15,6 +15,15 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import {
+  ApartmentOutlined,
+  BranchesOutlined,
+  ClockCircleOutlined,
+  FlagOutlined,
+  HourglassOutlined,
+  ThunderboltOutlined,
+  UserOutlined,
+} from '@ant-design/icons'
+import {
   type ComponentType,
   createContext,
   type KeyboardEvent,
@@ -25,10 +34,11 @@ import {
   useState,
 } from 'react'
 import { ProcessGraphControls } from './ProcessGraphControls'
+import { StatusTag, type StatusTone } from './StatusTag'
 import { useDesignTokens, useThemeMode } from './themeMode'
 
 const nodeWidth = 240
-const nodeHeight = 56
+const nodeHeight = 72
 const handleSize = 10
 
 /**
@@ -51,6 +61,13 @@ export type ProcessGraphStep = {
   ariaCurrent?: boolean
   /** Proposed, see the review on #3650: a count drawn at the node's corner, such as how many times an instance ran it. */
   badge?: string
+  /**
+   * Proposed, see the review on #3650: the step's type as the process names it, such as `task` or `decision`, which
+   * picks the icon the platform draws for it.
+   */
+  kind: string
+  /** Proposed, see the review on #3650: the step's state on an instance, a `StatusTag` in its tone, and how long it lasted. */
+  status?: { tone: StatusTone; text: string; duration?: string }
   /** A mark shown after the type, such as a customization layer's Added, and its value for `data-layer-mark`. */
   note?: { text: string; kind: string }
   /** Whether a transition can be drawn from the step's bottom handle. */
@@ -261,8 +278,24 @@ function FitOnLayout({ layout, focus }: { layout: Layout | null; focus?: string 
   return null
 }
 
+/** The icon the platform draws for each type of step, as it picks the icons of what it knows. */
+const stepIcons: Record<string, ComponentType> = {
+  task: UserOutlined,
+  decision: BranchesOutlined,
+  operation: ThunderboltOutlined,
+  subProcess: ApartmentOutlined,
+  timer: ClockCircleOutlined,
+  waitEvent: HourglassOutlined,
+  end: FlagOutlined,
+}
+
+/**
+ * Proposed, see the review on #3650: a step's node, a card on the surface: its type's icon in a tile, its label in
+ * bold on up to two lines, and under it its state on an instance, a `StatusTag` and how long it lasted, or its type
+ * in a designer. Its border says where an instance went: run, at, not reached or failed, or the step a designer edits.
+ */
 function StepNodeView({ data }: NodeProps<StepNode>) {
-  const { colour, radius } = useDesignTokens()
+  const { colour, radius, spacing } = useDesignTokens()
   const found = useContext(FoundStep)
   const edge = {
     plain: colour.border,
@@ -273,6 +306,8 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
     idle: colour.borderSubtle,
   }[data.tone]
   const width = data.start || data.tone === 'current' ? 3 : 1
+  const Icon = stepIcons[data.kind] ?? ThunderboltOutlined
+  const muted = data.tone === 'idle'
   return (
     <>
       <Handle type="target" position={Position.Left} isConnectable={false} />
@@ -284,18 +319,16 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
         data-marked={data.tone === 'error' ? 'true' : undefined}
         data-tone={data.tone}
         style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: spacing.sm,
           width: '100%',
           height: '100%',
-          padding: '8px',
+          padding: spacing.sm,
           overflow: 'hidden',
           textAlign: 'left',
-          // A long name takes two lines before it is cut, so a step's label reads whole.
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
           font: 'inherit',
-          lineHeight: '20px',
-          color: data.tone === 'idle' ? colour.textMuted : colour.text,
+          color: muted ? colour.textMuted : colour.text,
           background: colour.surface,
           border: `${width}px solid ${edge}`,
           borderRadius: radius.base,
@@ -304,13 +337,53 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
           cursor: 'pointer',
         }}
       >
-        <strong>{data.name}</strong> <span>{data.type}</span>
-        {data.note !== undefined && (
-          <>
-            {' '}
-            <span data-layer-mark={data.note.kind}>{data.note.text}</span>
-          </>
-        )}
+        <span
+          aria-hidden
+          style={{
+            display: 'flex',
+            flex: 'none',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 28,
+            height: 28,
+            borderRadius: radius.base,
+            color: data.tone === 'current' || data.tone === 'selected' ? colour.primaryText : colour.textMuted,
+            background: colour.canvas,
+          }}
+        >
+          <Icon />
+        </span>
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+          <strong
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: data.status ? 1 : 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              lineHeight: '20px',
+            }}
+          >
+            {data.name}
+          </strong>
+          {data.status ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, fontSize: 12, lineHeight: '20px' }}>
+              <StatusTag tone={data.status.tone}>{data.status.text}</StatusTag>
+              {data.status.duration !== undefined && (
+                <span style={{ color: colour.textMuted, whiteSpace: 'nowrap' }}>{data.status.duration}</span>
+              )}
+            </span>
+          ) : (
+            <span style={{ fontSize: 12, lineHeight: '16px', color: colour.textMuted }}>
+              {data.type}
+              {data.note !== undefined && (
+                <>
+                  {' '}
+                  <span data-layer-mark={data.note.kind}>{data.note.text}</span>
+                </>
+              )}
+            </span>
+          )}
+        </span>
       </button>
       {/* Outside the button, whose overflow is hidden, so the count overlaps the node's corner. */}
       {data.badge !== undefined && (

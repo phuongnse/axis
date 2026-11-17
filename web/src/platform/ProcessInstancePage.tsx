@@ -18,7 +18,8 @@ import {
 } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { InstanceTimeline } from './InstanceTimeline'
-import { instanceTone } from './instanceRuns'
+import { durationText, instanceTone } from './instanceRuns'
+import { useMinuteClock } from './relativeTime'
 import { StatusTag } from './StatusTag'
 import { useInstanceStatus } from './instanceStatus'
 import { PageActions, PageHeading } from './PageLayout'
@@ -294,6 +295,7 @@ export function InstanceDetailView({
     const key = `shell.inspector.stepType.${type}`
     return t(key) === key ? type : t(key)
   }
+  const now = useMinuteClock()
   const graphSteps = instance.graph.steps.map((step): ProcessGraphStep => {
     const failed = instance.state === 'failed' && step.name === instance.step
     const tone = failed ? 'error' : step.name === instance.step ? 'current' : taken.has(step.name) ? 'taken' : 'idle'
@@ -304,10 +306,29 @@ export function InstanceDetailView({
         : tone === 'taken'
           ? `, ${t('shell.inspector.taken')}`
           : ''
+    // Proposed: a step's node says its state on the instance and how long its last run lasted, see the review on
+    // #3650; a step not reached shows its type.
+    const last = instance.path.findLast((entry) => entry.step === step.name)
+    const status: ProcessGraphStep['status'] =
+      tone === 'current' || tone === 'error'
+        ? {
+            tone: instanceTone(instance),
+            text: stateText(t, instance.state),
+            duration: durationText(instance.path.at(-1)?.finishedAt ?? instance.createdAt, now.toISOString(), locale),
+          }
+        : tone === 'taken' && last !== undefined
+          ? {
+              tone: 'success',
+              text: t('shell.inspector.timeline.stateDone'),
+              duration: durationText(last.startedAt, last.finishedAt, locale),
+            }
+          : undefined
     return {
       id: step.name,
       name: stepLabel(step.name),
       type: stepTypeText(step.type),
+      kind: step.type,
+      status,
       start: step.name === instance.graph.start,
       tone,
       ariaLabel: `${stepLabel(step.name)}, ${stepTypeText(step.type)}${state}${runs > 1 ? `, ${t('shell.inspector.graph.runs').replace('{count}', String(runs))}` : ''}`,
