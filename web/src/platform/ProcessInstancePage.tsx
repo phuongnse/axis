@@ -314,10 +314,10 @@ export function InstanceDetailView({
         startedBy === undefined ? (
           <NotSet />
         ) : (
-          <Flex vertical>
-            <span>{t(`shell.inspector.startedBy.${startedBy.kind}`).replace('{name}', startedBy.name)}</span>
-            {startedBy.via && <Typography.Text type="secondary">{startedBy.via}</Typography.Text>}
-          </Flex>
+          <span>
+            {t(`shell.inspector.startedBy.${startedBy.kind}`).replace('{name}', startedBy.name)}
+            {startedBy.via && <Typography.Text type="secondary"> · {startedBy.via}</Typography.Text>}
+          </span>
         ),
       width: 2,
     },
@@ -540,7 +540,7 @@ export function InstanceDetailView({
         </div>
       )}
       <div data-testid="studio-section-inspector-details" style={{ marginBottom: 16 }}>
-        <TermList terms={facts} />
+        <TermList terms={facts} row />
       </div>
       <SectionParts>
         {/* Proposed: everything under the strip is in tabs, the graph first, the tab kept in the address, see the
