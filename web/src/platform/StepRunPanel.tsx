@@ -14,7 +14,7 @@ import { inspectorPath } from './inspectorPages'
 import type { CallAttempt, InstanceCall, InstanceDetail, RunOutput, StepDefinition } from './inspection'
 import { durationText, stepRuns, type StepRun } from './instanceRuns'
 import { RecordLink } from './RecordLink'
-import { formatTimeUntil, useMinuteClock } from './relativeTime'
+import { useMinuteClock } from './relativeTime'
 import { useRunWords } from './runWords'
 import { SidePanel } from './SidePanel'
 import { StatusTag, type StatusTone } from './StatusTag'
@@ -159,16 +159,9 @@ export function StepRunPanel({
     )
   const muted = (text: ReactNode) => <Typography.Text type="secondary">{text}</Typography.Text>
   const notSet = muted(t('shell.value.notSet'))
-  // A due time is data, so it keeps the system's date and time, with how far ahead it is while it is to come.
-  const dueTime = (at: string) => {
-    const until = formatTimeUntil(at, locale, now)
-    return (
-      <span>
-        {formatValue({ name: 'due', type: 'date-time' }, at, {}, { locale, text: t }) as string}
-        {until !== null && <> {muted(`(${until})`)}</>}
-      </span>
-    )
-  }
+  // A time set ahead, such as a due time, is data, not an event that happened, so it keeps the system's date and time
+  // alone and never takes a time ago or ahead, as `EventTime` says.
+  const dueTime = (at: string) => formatValue({ name: 'due', type: 'date-time' }, at, {}, { locale, text: t }) as string
   // Proposed, see the review on #3650: a trace ID shows its first 8 characters and copies whole, as the instance's ID.
   const traceId = (id: string | null) =>
     id === null ? (
@@ -208,8 +201,8 @@ export function StepRunPanel({
       if (due !== null) {
         // Where the run goes when it gives up is a fact of its own, a step that opens in the panel as Went to's does.
         terms.push(
-          { key: 'givesUp', term: t('shell.stepRun.givesUp'), value: dueTime(due) },
-          { key: 'thenGoesTo', term: t('shell.stepRun.thenGoesTo'), value: stepName(timeout.next) },
+          { key: 'givesUp', term: t('shell.stepRun.givesUp'), value: dueTime(due), width: 6 },
+          { key: 'thenGoesTo', term: t('shell.stepRun.thenGoesTo'), value: stepName(timeout.next), width: 6 },
         )
       }
     }
@@ -244,7 +237,8 @@ export function StepRunPanel({
       </AxisButton>
     )
     const terms: Term[] = [
-      // When it started and how long it took belong together, so they share a row; every other fact has its own.
+      // Facts that belong together share a row: when it started and how long it took, when a wait gives up and where it
+      // goes then, where the run came from and where it went; every other fact has its own.
       {
         key: 'started',
         term: t('shell.stepRun.started'),
@@ -323,6 +317,7 @@ export function StepRunPanel({
         key: 'cameFrom',
         term: t('shell.stepRun.cameFrom'),
         value: before === undefined ? muted(t('shell.stepRun.start')) : runLink(before),
+        width: 6,
       },
       // A run that has not ended has gone nowhere yet, which its state already says, so it has no Went to. The outcome
       // or branch that chose the next step follows it on its line.
@@ -332,6 +327,7 @@ export function StepRunPanel({
             {
               key: 'wentTo',
               term: t('shell.stepRun.wentTo'),
+              width: 6,
               value:
                 after === undefined ? (
                   muted(t('shell.stepRun.ended.instance'))

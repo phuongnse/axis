@@ -59,21 +59,3 @@ export function useMinuteClock(): Date {
  * running application gives none and reads the browser's clock.
  */
 export const FixedClock = createContext<Date | null>(null)
-
-/**
- * Proposed, see the review on #3650: how far ahead `at` is, in the locale's words, such as "in 27 days", for a due time
- * beside its date and time; `null` once it has passed.
- */
-export function formatTimeUntil(at: string | Date, locale: string, now: Date = new Date()): string | null {
-  const seconds = (new Date(at).getTime() - now.getTime()) / 1000
-  if (seconds <= 0) {
-    return null
-  }
-  const format = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
-  for (const [unit, size] of units) {
-    if (seconds >= size) {
-      return format.format(Math.floor(seconds / size), unit)
-    }
-  }
-  return format.format(1, 'minute')
-}
