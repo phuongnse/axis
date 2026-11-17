@@ -7,7 +7,13 @@ import { startServer } from "../activate";
 import { confirmDialog, waitForDialog } from "../dialogs";
 import { e2eApp } from "../server-settings";
 import { useSession } from "../sessions";
-import { openKind, openProblemsIfAny } from "../studio-resources";
+import {
+  closeEntityField,
+  entityFieldAction,
+  openEntityField,
+  openKind,
+  openProblemsIfAny,
+} from "../studio-resources";
 
 // Each journey starts a second server and publishes once, which takes a while.
 test.setTimeout(240_000);
@@ -111,10 +117,12 @@ test.describe("Studio adds a migration for a renamed, removed or converted field
       "RenameField",
     );
     try {
+      await openEntityField(page, 1);
       await page
         .getByTestId("studio-field-/fields/1/name")
         .getByRole("textbox")
         .fill("remark");
+      await closeEntityField(page);
       await page.getByRole("button", { name: "Save", exact: true }).click();
       const question = page.getByTestId("studio-migration-question");
       await expect(question).toContainText("note → remark");
@@ -148,10 +156,8 @@ test.describe("Studio adds a migration for a renamed, removed or converted field
       "DropField",
     );
     try {
-      await page
-        .getByTestId("studio-field-/fields/1")
-        .getByRole("button", { name: "Remove field", exact: true })
-        .click();
+      await entityFieldAction(page, 1, "Remove");
+      await closeEntityField(page);
       await page.getByRole("button", { name: "Save", exact: true }).click();
       await expect(page.getByTestId("studio-migration-question")).toContainText(
         "note",
@@ -176,10 +182,12 @@ test.describe("Studio adds a migration for a renamed, removed or converted field
       "ConvertField",
     );
     try {
+      await openEntityField(page, 0);
       await page
         .getByTestId("studio-field-/fields/0/maxLength")
         .getByRole("spinbutton")
         .fill("10");
+      await closeEntityField(page);
       await page.getByRole("button", { name: "Save", exact: true }).click();
       await expect(page.getByTestId("studio-migration-question")).toContainText(
         "number",

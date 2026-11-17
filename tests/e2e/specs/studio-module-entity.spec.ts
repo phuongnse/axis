@@ -7,7 +7,12 @@ import { expect, test } from "../test";
 import { startServer } from "../activate";
 import { e2eApp, leaveRequests } from "../server-settings";
 import { useSession } from "../sessions";
-import { openKind, openModuleResource } from "../studio-resources";
+import {
+  addEntityField,
+  closeEntityField,
+  openKind,
+  openModuleResource,
+} from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -56,11 +61,12 @@ test.describe("Studio edits a module entity as a layer", () => {
     await expect(page.getByTestId("studio-module-layer")).toHaveCount(0);
     await expect(page.getByTestId("studio-save")).toBeDisabled();
 
-    await page.getByRole("button", { name: "Add field", exact: true }).click();
+    await addEntityField(page, 5);
     await page
       .getByTestId("studio-field-/fields/5/name")
       .getByRole("textbox")
       .fill("costCentre");
+    await closeEntityField(page);
     await page.getByTestId("studio-save").click();
 
     await expect(page.getByTestId("studio-saved")).toBeVisible();
@@ -95,11 +101,12 @@ test.describe("Studio edits a module entity as a layer", () => {
     await openModuleResource(page, "entity", "Organization", "Department");
     await expect(page.getByTestId("studio-entity-designer")).toBeVisible();
 
-    await page.getByRole("button", { name: "Add field", exact: true }).click();
+    await addEntityField(page, 5);
     await page
       .getByTestId("studio-field-/fields/5/name")
       .getByRole("textbox")
       .fill("costCentre");
+    await closeEntityField(page);
     await page.getByTestId("studio-save").click();
 
     await expect(page.getByTestId("studio-saved")).toBeVisible();

@@ -7,11 +7,14 @@ import { pickAction, pickOption } from '../select'
 import { journeyURL } from '../server-settings'
 import { useJourneySession } from '../sessions'
 import {
+  addEntityField,
   addListItem,
   addListRow,
+  closeEntityField,
   createResource,
   doneListItem,
   grantIn,
+  openEntityField,
   openFormTab,
   openKind,
   openListItem,
@@ -60,6 +63,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
   }
 
   async function save(page: Page, answers: [field: string, choice: string][] = []) {
+    await closeEntityField(page)
     // A save without a migration patches the resource, and a save with one posts one changes call.
     const answer = page.waitForResponse(
       (response) => {
@@ -164,15 +168,16 @@ test.describe('the tutorial builds a first application in Studio', () => {
     await writeLabel(page, 'studio-field-/label', { en: en['expense.label'] })
 
     // Row 0 is the starter `name` field, which keeps its name. The display field must be required.
+    await openEntityField(page, 0)
     await page.getByTestId('studio-field-/fields/0/required').getByRole('checkbox').check()
     await pick(page, 'studio-field-/fields/0/label', 'expense.name', 'expense.name')
 
-    await page.getByRole('button', { name: 'Add field', exact: true }).click()
+    await addEntityField(page, 1)
     await page.getByTestId('studio-field-/fields/1/name').getByRole('textbox').fill('amount')
     await pick(page, 'studio-field-/fields/1/type', 'decimal')
     await pick(page, 'studio-field-/fields/1/label', 'expense.amount', 'expense.amount')
 
-    await page.getByRole('button', { name: 'Add field', exact: true }).click()
+    await addEntityField(page, 2)
     await page.getByTestId('studio-field-/fields/2/name').getByRole('textbox').fill('status')
     await pick(page, 'studio-field-/fields/2/type', 'enum')
     const values = page.getByTestId('studio-field-/fields/2/values').getByRole('combobox')
@@ -186,6 +191,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
     await status.getByRole('textbox').fill("'draft'")
     await pick(page, 'studio-field-/fields/2/label', 'expense.status', 'expense.status')
 
+    await closeEntityField(page)
     await pick(page, 'studio-field-/displayField', 'name')
     // The expense has no records yet, so the required name leaves its nulls as they are.
     const diagnostics = await save(page, [['name', 'Leave nulls']])

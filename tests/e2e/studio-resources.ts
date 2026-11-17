@@ -159,11 +159,55 @@ export async function waitForExpressions(page: Page) {
 }
 
 /**
+ * Closes the field drawer of the open entity, when one is open, and waits until it is gone. The Fields table has no
+ * drawer yet, so this does nothing for now.
+ */
+export async function closeEntityField(page: Page) {
+  const drawer = page.getByTestId('studio-field-drawer')
+  if ((await drawer.count()) === 0) {
+    return
+  }
+  await page.keyboard.press('Escape')
+  await expect(drawer).toHaveCount(0)
+}
+
+/**
+ * Makes field `index` of the open entity ready to edit. It closes an open field, scrolls the field's row into view and
+ * waits until its name box shows. The Fields table holds each field's settings in its row, so the row is the editor.
+ */
+export async function openEntityField(page: Page, index: number) {
+  await closeEntityField(page)
+  await page.getByTestId(`studio-field-/fields/${index}`).scrollIntoViewIfNeeded()
+  await expect(page.getByTestId(`studio-field-/fields/${index}/name`)).toBeVisible()
+}
+
+/**
+ * Clicks Add field in the open entity and waits until the new field, at `index`, shows its name box. It closes an open
+ * field first, because a drawer could cover the button.
+ */
+export async function addEntityField(page: Page, index: number) {
+  await closeEntityField(page)
+  await page.getByRole('button', { name: 'Add field', exact: true }).click()
+  await expect(page.getByTestId(`studio-field-/fields/${index}/name`)).toBeVisible()
+}
+
+/**
+ * Clicks Move up, Move down or Remove on the row of field `index` of the open entity. It closes an open field first.
+ * Remove clicks the row's Remove field button, and the fields after a removed one move up an index.
+ */
+export async function entityFieldAction(page: Page, index: number, action: 'Move up' | 'Move down' | 'Remove') {
+  await closeEntityField(page)
+  const name = action === 'Remove' ? 'Remove field' : action
+  await page.getByTestId(`studio-field-/fields/${index}`).getByRole('button', { name, exact: true }).click()
+}
+
+/**
  * Clicks Save and waits for the save to finish. A save waits for the Studio write lock, which can take up to 10 seconds,
  * and the server then compiles the application, so this waits up to 30 seconds. A save error or a conflict fails at once
- * with the alert's text.
+ * with the alert's text. It closes an open field first, so the save is not made from inside one.
  */
 export async function saveResource(page: Page) {
+  await closeEntityField(page)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   const saved = page.getByTestId('studio-saved')
   const error = page.getByTestId('studio-save-error')
