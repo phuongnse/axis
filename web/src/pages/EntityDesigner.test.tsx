@@ -46,6 +46,8 @@ const english: Record<string, string> = platformEnglish
 
 const labelOf = (path: string) => english[`shell.studio.field.entity.${path}`]
 const helpOf = (path: string) => english[`shell.studio.field.entity.${path}.help`]
+/** The title of a section, or its line when the path ends in `.line`, from `shell.studio.section.entity.`. */
+const sectionOf = (path: string) => english[`shell.studio.section.entity.${path}`]
 
 /** The paths under `shell.studio.field.entity.` that the designer draws, each with a label and a help. */
 const drawnPaths = [
@@ -63,9 +65,6 @@ const drawnPaths = [
   'fields.maxSize',
   'fields.accept',
   'fields.target',
-  'fields',
-  'indexes',
-  'validations',
   'fields.currencySource',
   'fields.currencySource.code',
   'fields.currencySource.field',
@@ -431,15 +430,55 @@ describe('EntityDesigner', () => {
     },
   )
 
-  it('shows Fields, Indexes and Validations as groups named by their title and described by their help', () => {
+  it('shows General, Fields, Validations and Indexes as sections in that order, each with its line and a rule before all but the first', () => {
     renderDesigner(entity())
 
-    for (const path of ['fields', 'indexes', 'validations']) {
-      const group = screen.getByRole('group', { name: labelOf(path) })
-      expect(group).toHaveAccessibleDescription(helpOf(path))
-      expect(within(group).getByText(helpOf(path))).toBeVisible()
-      expect(screen.getByTestId(`studio-field-/${path}`).contains(group)).toBe(true)
+    const names = ['general', 'fields', 'validations', 'indexes'] as const
+    const regions = screen.getAllByRole('region')
+    expect(regions.map((region) => region.dataset.testid)).toEqual(names.map((name) => `studio-section-${name}`))
+    names.forEach((name, position) => {
+      const region = screen.getByRole('region', { name: sectionOf(name) })
+      expect(region).toBe(regions[position])
+      expect(within(region).getByText(sectionOf(`${name}.line`))).toBeVisible()
+      const previous = region.previousElementSibling
+      if (position === 0) {
+        expect(previous).toBeNull()
+      } else {
+        expect(previous).toHaveAttribute('role', 'separator')
+      }
+    })
+  })
+
+  it('shows the name, label, description and display field in General, and no id, kind or formatVersion', () => {
+    renderDesigner(entity({ description: { textKey: 'entity.invoice.description' } }))
+
+    const general = within(screen.getByTestId('studio-section-general'))
+    expect(general.getByRole('textbox', { name: labelOf('name') })).toHaveAccessibleDescription(helpOf('name'))
+    expect(general.getByRole('group', { name: labelOf('label') })).toHaveAccessibleDescription(helpOf('label'))
+    expect(general.getByRole('group', { name: labelOf('description') })).toHaveAccessibleDescription(
+      helpOf('description'),
+    )
+    expect(general.getByRole('combobox', { name: labelOf('displayField') })).toHaveAccessibleDescription(
+      helpOf('displayField'),
+    )
+    for (const key of ['id', 'kind', 'formatVersion']) {
+      expect(screen.queryByTestId(`studio-field-/${key}`), key).toBeNull()
     }
+  })
+
+  it('puts Add field on the right of the Fields heading, and a click appends an empty text field', async () => {
+    const fields = renderEditing(entity({ fields: [{ name: 'a', type: 'text' }] }))
+    const section = screen.getByTestId('studio-section-fields')
+    const heading = within(section).getByRole('heading', { name: sectionOf('fields') })
+    const add = within(section).getByRole('button', { name: 'Add field' })
+
+    expect(follows(heading, add)).toBe(true)
+    expect(follows(add, screen.getByTestId('studio-field-/fields'))).toBe(true)
+    await userEvent.click(add)
+    expect(fields()).toEqual([
+      { name: 'a', type: 'text' },
+      { name: '', type: 'text' },
+    ])
   })
 
   it('marks the keys that the entity schema requires and no others, and announces them as required', () => {
@@ -1168,6 +1207,16 @@ describe('the texts of the entity designer', () => {
       expect(catalogue[`shell.studio.field.entity.${path}.help`]).toBeTruthy()
     }
   })
+
+  it.each(['general', 'fields', 'validations', 'indexes'])(
+    'has a title and a line for the %s section in English and Vietnamese',
+    (name) => {
+      for (const catalogue of [platformEnglish, platformVietnamese] as Record<string, string>[]) {
+        expect(catalogue[`shell.studio.section.entity.${name}`]).toBeTruthy()
+        expect(catalogue[`shell.studio.section.entity.${name}.line`]).toBeTruthy()
+      }
+    },
+  )
 })
 
 describe('EntityDesigner with a customization layer', () => {

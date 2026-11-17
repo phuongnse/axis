@@ -12,7 +12,9 @@ import {
   fetchStudioDiagnostics,
   fetchStudioNames,
   fetchStudioResource,
+  fetchStudioResourceActivity,
   fetchStudioResources,
+  moduleResourceTitle,
   moduleResources,
   resourceTitle,
   ServerUnreachableError,
@@ -22,6 +24,7 @@ import {
   type StudioDiagnostic,
   type StudioNames,
   type StudioResource,
+  type StudioResourceActivityItem,
   type StudioResourceItem,
   waitForServer,
 } from '../platform/studio'
@@ -110,6 +113,9 @@ type FolderState =
 
 /** The names of one application, or null when they did not load. `application` says which one they were loaded for. */
 type NamesState = { application: string; names: StudioNames | null }
+
+/** The resource activity of one application, or none when it did not load. `application` says which one it was loaded for. */
+type ActivityState = { application: string; items: StudioResourceActivityItem[] }
 
 /** The `application.json` of one application, or null when it did not load. `application` says which one it was loaded for. */
 type ManifestState = { application: string; resource: StudioResource | null }
@@ -223,6 +229,7 @@ function StudioWorkspace() {
   const [previewHost, setPreviewHost] = useState<string | null>(null)
   const [folderRevision, setFolderRevision] = useState(0)
   const [namesState, setNamesState] = useState<NamesState>()
+  const [activityState, setActivityState] = useState<ActivityState>()
   const [manifestState, setManifestState] = useState<ManifestState>()
   const [manifestReload, setManifestReload] = useState(0)
   const publishing = useRef<StudioPublishingHandle>(null)
@@ -364,6 +371,31 @@ function StudioWorkspace() {
       : allModuleGroups
           .flatMap((group) => group.items)
           .find((item) => item.id.toLowerCase() === resourceId.toLowerCase())
+
+  // The activity of the open module resource holds its label, which its heading shows. Other resources need none.
+  const selectedModuleId = selectedModuleItem?.id
+  useEffect(() => {
+    if (application === null || selectedModuleId === undefined) {
+      return
+    }
+    const controller = new AbortController()
+    fetchStudioResourceActivity(application, controller.signal).then(
+      (items) => setActivityState({ application, items }),
+      (error: unknown) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        if (error instanceof ServerUnreachableError) {
+          lost()
+          return
+        }
+        console.warn(`Loading the resource activity of '${application}' failed`, error)
+        setActivityState({ application, items: [] })
+      },
+    )
+    return () => controller.abort()
+  }, [application, selectedModuleId, generation, folderRevision, lost])
+  const activity = activityState?.application === application ? activityState.items : undefined
 
   function pickApplication(name: string) {
     setParams({ app: name })
@@ -651,7 +683,14 @@ function StudioWorkspace() {
               ) : selectedModuleItem ? (
                 <div data-testid="studio-resource-details" style={{ minWidth: 0 }}>
                   <Flex vertical gap="middle">
-                    <StudioPageHeading title={selectedModuleItem.name} line={selectedModuleItem.module} />
+                    <StudioPageHeading
+                      title={moduleResourceTitle(
+                        selectedModuleItem,
+                        activity?.find((item) => item.id.toLowerCase() === selectedModuleItem.id.toLowerCase())?.titles,
+                        locale,
+                      )}
+                      line={selectedModuleItem.module}
+                    />
                     <Descriptions
                       column={1}
                       items={[

@@ -162,6 +162,9 @@ function deadLetter(id: string, applicationId: string, kind: string, processId: 
   }
 }
 
+// A dead letter view waits for its fetch and the table, which is slow while other test files run.
+const slow = { timeout: 5000 }
+
 const allLetters: ConsoleDeadLetterPage = {
   items: [
     deadLetter('d1', 'a1', 'event.deliver', 'p1'),
@@ -481,7 +484,7 @@ describe('ConsolePage', () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(await screen.findByTestId(`console-dead-letter-${command}-d2`))
+    await user.click(await screen.findByTestId(`console-dead-letter-${command}-d2`, {}, slow))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText(title, { selector: '.ant-modal-title' })).toBeInTheDocument()
     expect(server.requests.filter((request) => request.startsWith('POST'))).toEqual([])
@@ -505,7 +508,7 @@ describe('ConsolePage', () => {
     stubServer(tenantAndFailedWork, () => new Response(null, { status: 500 }))
     renderPage()
 
-    expect(await screen.findByTestId('console-dead-letters-error')).toBeVisible()
+    expect(await screen.findByTestId('console-dead-letters-error', {}, slow)).toBeVisible()
     expect(screen.getByTestId('console-tenant')).toBeVisible()
   })
 

@@ -108,7 +108,7 @@ resource opens it alone, under its [name](studio-workspace.md#names), with its e
 
 A module resource opens in its kind's editor with the application's layer applied, as
 [customization layers in Studio](customization-layers.md#in-studio) describes. A module data source, rule, trigger,
-sequence, event or seed draws the same [parts](studio-resource-form.md#sections) as a local resource's Form tab, with
+sequence, event, seed or entity draws the same [parts](studio-resource-form.md#sections) as a local resource's Form tab, with
 its Customized tag and Reset all above them. A module contract opens in its contract editor, with Relax and Undo relax,
 as [module contracts in Studio](module-contracts.md#in-studio) describes, and draws its lifecycle as a state diagram
 that marks the initial and deletable states and labels each arrow with its transition's name and whether it has a
@@ -138,7 +138,7 @@ what changed.
   keys stay as they are.
 - **The form's layout.** The generic form and the typed editors that use [Studio resource form](studio-resource-form.md)
   share its sections, field names, labels, lists and save bar.
-- **Every form's layout** _(planned for M33)_. The entity designer follows it too, see
+- **Every form's layout.** The entity designer follows it too, see
   [sections](entity-designer.md#sections).
 - **A description.** Every kind that may have a
   [`description`](resource-files.md#resource-file-shape) shows it in the form, and each editor of its own
