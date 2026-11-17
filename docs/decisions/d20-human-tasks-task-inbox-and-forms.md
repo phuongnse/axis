@@ -12,8 +12,8 @@ assignment with ordinary records, inconsistently and hard to secure, as
 
 - **A task is a step,** with a label, an assignee (a user from an expression, or a role), a form, an
   optional due time and its outcomes.
-  [D71](d71-task-deadlines-escalation-claim-and-reassign.md) adds deadlines, escalation, claim and
-  reassign.
+  [D156](d156-working-time-calendars-durations-in-working-hours-and-slas.md) adds deadlines, escalation,
+  claim and reassign.
 - **Exactly one decision.** An open task is completed once, with one of its outcomes, and the task
   form saves with it in the same transaction.
 - **Who may act is checked at the moment of action:** the assignee or a holder of the assignee role.

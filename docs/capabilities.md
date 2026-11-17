@@ -51,7 +51,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Wait for the first of several events | _(planned for M38)_ |
 | Match an event to a case by a key other than its record | _(planned for M45)_ |
 | Count due dates, deadlines, escalations and timers in working hours, skipping holidays | _(planned for M39)_ |
-| Wait for a calendar month or year | _(planned for M39)_ |
+| Wait for a calendar month or year | [D156](decisions/d156-working-time-calendars-durations-in-working-hours-and-slas.md) |
 
 ### Errors and cancelling
 
