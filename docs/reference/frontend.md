@@ -2,7 +2,7 @@
 
 The frontend is one single-page application (SPA) that draws every site, page and widget of every application from
 metadata the server serves. This page covers the rules every widget follows, the design tokens, the endpoints that
-describe sites and pages, the routes, the table widget and narrow width. The frame around a page, the account button and
+describe sites and pages, the routes, a person's table views and columns, the table widget and narrow width. The frame around a page, the account button and
 the sign-in prompt included, is in [shell and home page](shell.md), and buttons, menus, fields, tables and dialogs are
 in [actions and controls](actions-and-controls.md).
 
@@ -513,6 +513,45 @@ below answers `200`.
   [shell and home page](shell.md). The page header, the app switcher and the language and theme menu work as they do
   on the platform site, see [page header](shell.md#page-header) and
   [app switcher and preferences](shell.md#app-switcher-and-preferences).
+
+## Table views and columns
+
+_(planned for M33)_
+
+A person's columns and saved views of a table are kept on the server for that person, so they come back on any
+browser. The address still wins, and [D153](../decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md)
+gives the reasons. The rules that a table follows are in [actions and controls](actions-and-controls.md#tables).
+
+| Route                                                        | What it does                                                                                                                              |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/me/tables/{key}` _(planned for M33)_               | Answers `{ "columns": [..] or null, "views": [{ "id", "name", "search", "filter", "sort" }] }`, with the views ordered by name           |
+| `PUT /api/me/tables/{key}/columns` _(planned for M33)_       | Keeps the columns of `{ "columns": [..] }`, the keys of the shown columns in order, and answers `204`                                    |
+| `DELETE /api/me/tables/{key}/columns` _(planned for M33)_    | Forgets the kept columns and answers `204`                                                                                                |
+| `POST /api/me/tables/{key}/views` _(planned for M33)_        | Saves a view of `{ name, search, filter, sort }` and answers `201` with the view                                                          |
+| `PUT /api/me/tables/{key}/views/{id}` _(planned for M33)_    | Replaces all four fields of one view and answers `204`                                                                                    |
+| `DELETE /api/me/tables/{key}/views/{id}` _(planned for M33)_ | Deletes one view and answers `204`                                                                                                        |
+
+- **The table key.** A key is 1 to 200 characters, made of segments of letters, digits, `-` and `_` joined by `.`,
+  and it is compared exactly. A `table` widget's key is `site.{site path}.{page name}` in lower case, with the `/` of
+  a module page written as `.`. A platform table's key is a fixed name for its screen, such as `console.deadLetters`,
+  `studio.{application}.history` or `studio.{application}.{kind}`. A platform page with a second table gives that
+  table a key of its own. A key in any other form answers `400`.
+- **The answer.** Every route needs a session, see [sign-in needed](security.md#sign-in-needed), and answers `401`
+  without one. The `GET` route never answers `404` for a key with nothing kept. It answers `columns: null` and
+  `views: []` instead, so the SPA needs one call when a table opens.
+- **The bodies.** A `PUT` of columns answers `400` for more than 100 keys, an empty key or a repeated key. A view's
+  `search`, `filter` and `sort` are the address's values as they are, a string or null, and the SPA checks them as it
+  checks the address.
+- **The limits.** A view's name is trimmed and is 1 to 80 characters, and a person has at most 50 views for each
+  table. `search`, `filter` and `sort` together are at most 8,192 bytes of UTF-8. A body past a limit answers `400`.
+  A name that another of the person's views of the table already has, ignoring letter case, answers `409`, and so
+  does a 51st view.
+- **Not found.** An id that is not one of the person's own views for that key answers `404`, even when another
+  person's view has that id.
+- **Writes.** Every write needs the [CSRF header](security.md#csrf-header). No write is refused over the `storage`
+  quota, see [refusals](tenant-quotas.md#refusals).
+- **A site's own host.** There the routes serve only the keys that start with `site.{that site's path}.`. Any other
+  key answers a `404` problem before authentication, see [a host of its own](identity-provider.md#sites-and-sign-in).
 
 ## Widgets
 

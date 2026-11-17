@@ -237,8 +237,18 @@ be kept right.
   first, stays first and always shows. A hidden column is still searched and filtered on. The choice lives in
   the address as `columns`, the keys of the shown columns in order, and is left out when every column shows in
   its first order. A change of columns keeps the page.
-- **Each person's columns** _(planned for M33)_. The platform keeps each person's choice of columns.
-- **Saved views** _(planned for M33)_. A person saves a table's search, filter and sort as a view.
+- **Each person's columns** _(planned for M33)_. The choice of columns is kept on the server for the person and the
+  table. Apply keeps it, and Reset followed by Apply forgets it. A table opened with no `columns` in its address puts
+  the kept choice into the address, without a history entry. An address with `columns` always wins, and a kept key
+  of a column the table no longer has is dropped.
+- **Saved views** _(planned for M33)_. A person saves a table's search, filter and sort under a name, and the view is
+  kept on the server for that person and table. A person can rename, overwrite and delete their own views. Choosing
+  a view writes its search, filter and sort into the address at page 1, with a history entry. No view applies by
+  itself, and there is no default view. An address that already carries a value wins over a view.
+- **Which tables keep a choice** _(planned for M33)_. A table whose view `useTableView` keeps in the address, and that
+  has a key, keeps its columns and views on the server. A table in a dialog keeps its view in the dialog and keeps
+  nothing. The cell console's tables pass no key, because its host has no tenant database. The key format and the
+  routes are in [table views and columns](frontend.md#table-views-and-columns).
 - **Columns.** A column whose values have a fixed form, such as a number, a date, a date and time, a
   status tag or the row's icon actions, is as wide as its content and never wraps. The columns of free
   text share the width left in equal parts, and their text wraps. A table with no free text gives the
@@ -280,7 +290,8 @@ be kept right.
 - **Group rows.** A row that heads a group shows its heading and leaves its other cells blank, with no dash,
   as `AxisTable`'s `blankRow` draws them.
 
-The reasons for the table standard are in [D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md).
+The reasons for the table standard are in [D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md),
+and the reasons for each person's columns and saved views are in [D153](../decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md).
 
 ## Opening things
 

@@ -44,6 +44,8 @@ Core migrations shipped with Axis.
 | `axis.package_runners`               | `Axis.Data`          | A customer-hosted runner of the tenant, with its name, client id, registered packages, last call time and revoke time, see [package runners](user-administration.md#package-runners) |
 | `axis.files`, `axis.file_contents`   | `Axis.Data`          | The details and the bytes of an uploaded file of a [file field](file-fields.md#storage-and-clean-up)                                                                        |
 | `axis.user_profiles`                 | `Axis.Data`          | A user who signed in, see [user profiles](notifications.md#user-profiles)                                                                                                   |
+| `axis.table_views`                   | `Axis.Data`          | A view that a person saved for one table, see [table views and columns](frontend.md#table-views-and-columns) _(planned for M33)_                                           |
+| `axis.table_columns`                 | `Axis.Data`          | A person's columns of one table, see [table views and columns](frontend.md#table-views-and-columns) _(planned for M33)_                                                    |
 | `axis.process_*` and the others      | `Axis.Processes`     | Process instances, steps, tasks, staged calls, events, notifications, emails, webhook deliveries, receipts and work items, see [process tables](process-tables.md#tables)   |
 
 The tables of `Axis.Processes` include `axis.process_instances`, `axis.process_step_history`,
@@ -120,6 +122,11 @@ erDiagram
   updates and deletes their rows.
 - **User profiles.** A row of `axis.user_profiles` holds the display name, email, locale and the
   first and last sign-in of a user. Each sign-in upserts it through `UserProfiles.UpsertAsync`.
+- **Table views and columns** _(planned for M33)_. A row of `axis.table_views` holds `id` (`uuid`, the primary key),
+  `user_id`, `table_key`, `name`, `search`, `filter` and `sort` (`text`, nullable), `created_at` and `updated_at`
+  (`timestamptz`), with a unique index on `user_id`, `table_key` and `lower(name)`. A row of `axis.table_columns`
+  holds `user_id` and `table_key`, which together are the primary key, `columns` (`text[]`) and `updated_at`. The
+  server reads and writes both through the routes of [table views and columns](frontend.md#table-views-and-columns).
 
 ## Entity tables
 
