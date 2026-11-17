@@ -2771,5 +2771,8 @@
   "shell.stepRun.subject": "Tiêu đề",
   "shell.stepRun.created": "Bản ghi đã tạo",
   "shell.valueTable.hidden": "Đã ẩn",
-  "shell.valueTable.before": "Trước: {value}"
+  "shell.valueTable.before": "Trước: {value}",
+  "shell.inspector.graph.overdue": "quá hạn",
+  "shell.inspector.graph.attempts": "{count} lần thử",
+  "shell.inspector.stateFor": "{state} {since}"
 }

@@ -2771,5 +2771,8 @@
   "shell.stepRun.subject": "Subject",
   "shell.stepRun.created": "Record created",
   "shell.valueTable.hidden": "Hidden",
-  "shell.valueTable.before": "Before: {value}"
+  "shell.valueTable.before": "Before: {value}",
+  "shell.inspector.graph.overdue": "overdue",
+  "shell.inspector.graph.attempts": "{count} attempts",
+  "shell.inspector.stateFor": "{state} for {since}"
 }

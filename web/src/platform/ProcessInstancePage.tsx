@@ -1,4 +1,4 @@
-import { Flex, Tabs } from 'antd'
+import { Flex, Tabs, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -19,7 +19,7 @@ import {
 import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { InstanceTimeline } from './InstanceTimeline'
 import { durationText, instanceTone, stepRuns } from './instanceRuns'
-import { useMinuteClock } from './relativeTime'
+import { formatTimeUntil, useMinuteClock } from './relativeTime'
 import { StatusTag } from './StatusTag'
 import { useInstanceStatus } from './instanceStatus'
 import { PageActions, PageHeading } from './PageLayout'
@@ -30,6 +30,7 @@ import {
   type ProcessGraphTransitionView,
 } from './ProcessGraph'
 import { RecordLink } from './RecordLink'
+import { problemText } from './stepProblems'
 import { RecordNotFound } from './RecordNotFound'
 import { StepRunPanel } from './StepRunPanel'
 import { stepRunTabs, type StepRunTab } from './stepRunTabs'
@@ -228,6 +229,34 @@ export function InstanceDetailView({
     return labelKey ? t(labelKey) : name
   }
   const status = useInstanceStatus(instance, stepLabel, locale)
+  // Proposed, see the review on #3650: how long the instance has been at its step, under the step in General, as a
+  // waiting instance has no banner.
+  const clock = useMinuteClock()
+  const atSince = (step: string) => {
+    if (instance.endedAt !== null) {
+      return null
+    }
+    const run = stepRuns(instance).find((candidate) => candidate.finishedAt === null && candidate.step === step)
+    return run === undefined
+      ? null
+      : t('shell.inspector.stateFor')
+          .replace(
+            '{state}',
+            stateText(t, run.state === 'failed' ? 'failed' : run.state === 'running' ? 'running' : 'waiting'),
+          )
+          .replace('{since}', durationText(run.startedAt, clock.toISOString(), locale))
+  }
+  const stepValue = (step: string) => {
+    const since = atSince(step)
+    return since === null ? (
+      stepLabel(step)
+    ) : (
+      <Flex vertical>
+        <span>{stepLabel(step)}</span>
+        <Typography.Text type="secondary">{since}</Typography.Text>
+      </Flex>
+    )
+  }
   // Proposed: the timeline's search, filter, sort and page live in the address, and a click on a step in the graph
   // opens the timeline filtered to that step through the same filter, see the review on #3650.
   const { view: timelineView, setView: setTimelineView } = useTableView(
@@ -305,11 +334,15 @@ export function InstanceDetailView({
       ? {
           key: 'step',
           term: t('shell.inspector.steps'),
-          value: new Intl.ListFormat(locale, { type: 'conjunction' }).format(
-            instance.paths.map((path) => stepLabel(path.step)),
+          value: (
+            <Flex vertical gap={4}>
+              {instance.paths.map((path) => (
+                <span key={path.id}>{stepValue(path.step)}</span>
+              ))}
+            </Flex>
           ),
         }
-      : { key: 'step', term: t('shell.inspector.step'), value: stepLabel(instance.step) },
+      : { key: 'step', term: t('shell.inspector.step'), value: stepValue(instance.step) },
     {
       key: 'parent',
       term: t('shell.inspector.parent'),
@@ -342,11 +375,8 @@ export function InstanceDetailView({
   }
   // Proposed, see D155 and the review on #3650: every step the instance is at, one for each of its paths.
   const atSteps = instance.paths?.map((path) => path.step) ?? [instance.step]
-  const atRuns = new Map(
-    stepRuns(instance)
-      .filter((run) => run.finishedAt === null)
-      .map((run) => [run.step, run]),
-  )
+  const allRuns = stepRuns(instance)
+  const atRuns = new Map(allRuns.filter((run) => run.finishedAt === null).map((run) => [run.step, run]))
   const blockOf = (name: string) => instance.graph.steps.find((candidate) => candidate.name === name)?.inBlock?.block
   // The transitions the instance took: from each step of a path to the next on that path, and from the last to the
   // step it is at. A transition into a block was taken when a step in it was reached.
@@ -412,12 +442,41 @@ export function InstanceDetailView({
       runs > 1
         ? t('shell.inspector.graph.runsLast').replace('{count}', String(runs)).replace('{duration}', duration)
         : duration
+    // Proposed, see the review on #3650: a card's second line adds the one detail that matters most for its step:
+    // whom a waiting task waits for and when it is due, the attempts a call needed, the error a step stopped on, or
+    // the state of the sub-process it started.
+    const run =
+      tone === 'current' || tone === 'error'
+        ? atRuns.get(step.name)
+        : allRuns.findLast((candidate) => candidate.step === step.name)
+    const open = run?.tasks.find((task) => task.outcome === null)
+    const due =
+      open?.dueAt == null
+        ? null
+        : open.dueAt < now.toISOString()
+          ? t('shell.inspector.graph.overdue')
+          : (formatTimeUntil(open.dueAt, locale, now) ?? '')
+    const attempts = Math.max(
+      0,
+      ...(run?.calls.map((call) => call.attempts.filter((a) => a.kind === 'attempt').length) ?? []),
+    )
+    const child = run?.subProcesses.at(-1)
+    const extra = [
+      // A card has little room, so a role reads by its name alone; the panel and the timeline say it is a role.
+      open === undefined ? null : open.assignee,
+      due,
+      attempts > 1 ? t('shell.inspector.graph.attempts').replace('{count}', String(attempts)) : null,
+      child === undefined ? null : stateText(t, child.state).toLowerCase(),
+      tone === 'error' && run !== undefined ? problemText(t, run.problem, run.error) : null,
+    ].filter((part): part is string => part !== null && part !== '')
+    // A waiting task's line names whom it waits for and when it is due, which matter more than how long it has waited.
+    const withExtra = (duration: string) => (open === undefined ? [lasted(duration), ...extra] : extra).join(' · ')
     const status: ProcessGraphStep['status'] =
       tone === 'current' || tone === 'error'
         ? {
             tone: instanceTone(instance),
             text: stateText(t, instance.state),
-            detail: lasted(
+            detail: withExtra(
               durationText(
                 atRuns.get(step.name)?.startedAt ?? instance.path.at(-1)?.finishedAt ?? instance.createdAt,
                 now.toISOString(),
@@ -429,7 +488,7 @@ export function InstanceDetailView({
           ? {
               tone: 'success',
               text: t('shell.inspector.timeline.stateDone'),
-              detail: lasted(durationText(last.startedAt, last.finishedAt, locale)),
+              detail: withExtra(durationText(last.startedAt, last.finishedAt, locale)),
             }
           : undefined
     return [
@@ -476,9 +535,9 @@ export function InstanceDetailView({
       <PageActions>
         <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
       </PageActions>
-      {/* Proposed: where the instance stands, a failure or what it waits for, is said at the top of its page, see the
-          review on #3650. */}
-      {status && (
+      {/* Proposed: a failed instance says at the top of its page where it stopped and why, as AWS Step Functions and
+          Camunda Operate do; a waiting one says nothing more than its tag and General, see the review on #3650. */}
+      {status?.kind === 'error' && (
         <div style={{ marginBottom: 16 }}>
           <AxisAlert data-testid="inspector-status" kind={status.kind} message={status.text} />
         </div>
