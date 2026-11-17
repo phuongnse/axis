@@ -299,7 +299,6 @@ export function InstanceDetailView({
             width: 3,
           },
         ]),
-    { key: 'createdAt', term: t('shell.inspector.createdAt'), value: time('createdAt', instance.createdAt), width: 2 },
     // Proposed, see the review on #3650: who or what started the instance reads one way for every kind: its name,
     // then how, muted: a person and the action they took, or a trigger, an endpoint, a schedule or the parent process,
     // whose instance the name opens.
@@ -333,6 +332,8 @@ export function InstanceDetailView({
         ),
       width: 2,
     },
+    // What it is about and who started it come first, then its times in their order: started, ended, how long.
+    { key: 'createdAt', term: t('shell.inspector.createdAt'), value: time('createdAt', instance.createdAt), width: 2 },
     // A fact the instance always has always shows, Not set while it has not ended, see the rule on #3650.
     {
       key: 'endedAt',
