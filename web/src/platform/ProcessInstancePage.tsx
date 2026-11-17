@@ -364,34 +364,37 @@ export function InstanceDetailView({
           },
         ]),
   ]
-  // Proposed, see the review on #3650: the data the instance started with and, once it has ended, the end step it
-  // reached and the values it ended with, as AWS Step Functions' input and output and Temporal's input and result.
+  // Proposed, see the review on #3650: the instance's Input, what it started with, and its Output, once it has ended the
+  // end step it reached and the values it ended with, as AWS Step Functions names an execution's; they are facts of the
+  // instance, so they read as terms, as the strip does.
   const dataTab = (
-    <Flex vertical gap={16}>
-      <div>
-        <Typography.Title level={5} style={{ margin: 0, marginBottom: 8, fontSize: 14 }}>
-          {t('shell.inspector.startParameters')}
-        </Typography.Title>
-        {instance.input === undefined || instance.input === null || Object.keys(instance.input).length === 0 ? (
-          <Typography.Text type="secondary">{t('shell.inspector.noParameters')}</Typography.Text>
-        ) : (
-          <ValueTable label={t('shell.inspector.startParameters')} rows={jsonRows(instance.input)} />
-        )}
-      </div>
-      <div>
-        <Typography.Title level={5} style={{ margin: 0, marginBottom: 8, fontSize: 14 }}>
-          {t('shell.inspector.result')}
-        </Typography.Title>
-        {instance.result === undefined || instance.result === null ? (
-          <Typography.Text type="secondary">{t('shell.inspector.notEnded')}</Typography.Text>
-        ) : (
-          <Flex vertical gap={8}>
-            <span>{t('shell.inspector.endedAtStep').replace('{step}', stepLabel(instance.result.step))}</span>
-            <ValueTable label={t('shell.inspector.result')} rows={jsonRows(instance.result.values)} />
-          </Flex>
-        )}
-      </div>
-    </Flex>
+    <TermList
+      terms={[
+        {
+          key: 'input',
+          term: t('shell.inspector.input'),
+          value:
+            instance.input === undefined || instance.input === null || Object.keys(instance.input).length === 0 ? (
+              <Typography.Text type="secondary">{t('shell.inspector.noInput')}</Typography.Text>
+            ) : (
+              <ValueTable label={t('shell.inspector.input')} rows={jsonRows(instance.input)} />
+            ),
+        },
+        {
+          key: 'output',
+          term: t('shell.inspector.output'),
+          value:
+            instance.result === undefined || instance.result === null ? (
+              <Typography.Text type="secondary">{t('shell.inspector.notEnded')}</Typography.Text>
+            ) : (
+              <Flex vertical gap={8}>
+                <span>{t('shell.inspector.endedAtStep').replace('{step}', stepLabel(instance.result.step))}</span>
+                <ValueTable label={t('shell.inspector.output')} rows={jsonRows(instance.result.values)} />
+              </Flex>
+            ),
+        },
+      ]}
+    />
   )
   const taken = new Set(instance.path.map((entry) => entry.step))
   // How many times each step ran, so a step run again shows it.

@@ -2786,9 +2786,8 @@
   "shell.inspector.startedBy.parent": "Process: {name}",
   "shell.inspector.duration": "Duration",
   "shell.inspector.instanceId": "Instance ID",
-  "shell.inspector.startParameters": "Start parameters",
-  "shell.inspector.noParameters": "It started with no parameters.",
-  "shell.inspector.result": "Result",
   "shell.inspector.notEnded": "The instance has not ended yet.",
-  "shell.inspector.endedAtStep": "Ended at {step}."
+  "shell.inspector.endedAtStep": "Ended at {step}.",
+  "shell.inspector.output": "Output",
+  "shell.inspector.noInput": "It started with no input."
 }

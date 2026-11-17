@@ -2786,9 +2786,8 @@
   "shell.inspector.startedBy.parent": "Quy trình: {name}",
   "shell.inspector.duration": "Thời lượng",
   "shell.inspector.instanceId": "ID lượt chạy",
-  "shell.inspector.startParameters": "Tham số khởi chạy",
-  "shell.inspector.noParameters": "Khởi chạy không kèm tham số.",
-  "shell.inspector.result": "Kết quả",
   "shell.inspector.notEnded": "Lượt chạy chưa kết thúc.",
-  "shell.inspector.endedAtStep": "Kết thúc ở bước {step}."
+  "shell.inspector.endedAtStep": "Kết thúc ở bước {step}.",
+  "shell.inspector.output": "Đầu ra",
+  "shell.inspector.noInput": "Khởi chạy không có đầu vào."
 }
