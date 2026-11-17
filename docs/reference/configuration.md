@@ -237,8 +237,11 @@ is reported at the widget's own pointer, such as `/widgets/0/columns/1/widgets/0
   otherwise the container that would hold a list on level 5 is `AXC0221`.
 - **Columns.** The `width` of the columns of one `columns` widget add up to 12, otherwise it is
   `AXC0222` at `/widgets/{i}/columns`.
-- **One of each.** A second `table` is `AXC0223`, and a second `form`, `taskInbox` or
-  `processInspector` is `AXC0224`, both at the second widget.
+- **One owner for each part of the address** _(planned for M42)_. A page may hold several `table`
+  widgets, each with a `prefix` of its own. A second `form`, `taskInbox` or `processInspector` is
+  refused at the second widget. A table `prefix` that is not letters and digits starting with a
+  letter is refused at the later table. So is a prefix that another table of the page has, ignoring
+  letter case, and a second table without a prefix.
 - **Labels.** A tab label and a section title join the `AXC0028` check.
 - **Shape.** The page schema requires `columns` on a `columns` widget, `tabs` on a `tabs` widget,
   and `title` with `widgets` on a `section` widget. It does not allow them on any other widget, and
@@ -257,8 +260,10 @@ A page's `parameters` are checked in file order, at `/parameters/{i}`.
   target is `AXC0012` at `/target`, a child entity target is `AXC0040` and a target without a display
   field is `AXC0030`. A `reference` parameter's `target` is a `field target` edge in the
   [reference index](#reference-index).
-- **Form pages.** A page that holds a `form` widget declares no parameters, otherwise it is
-  `AXC0236` at `/parameters`.
+- **Form pages** _(planned for M42)_. A page that holds a `form` widget may declare parameters. A
+  parameter with a field's name must have that field's type, and a `reference` the same target,
+  otherwise it is refused at `/parameters/{i}`. See
+  [first values of a new record](resource-files.md#first-values-of-a-new-record).
 
 ### Widget parameters
 

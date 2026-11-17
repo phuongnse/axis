@@ -129,6 +129,8 @@ A page holds one or more widgets. A leaf widget's `type` is `table`, `form`, `ta
 - **Chart.** A `chart` names a `dataSource` grouped by one field, its `kind` (`bar`, `line` or
   `pie`), the `category` that is that field, one or more `measures` with a `label` each, and a
   `title`, see [detail, chart and KPI widgets](detail-chart-kpi-widgets.md).
+- **Content** _(planned for M42)_. A `content` widget shows fixed text, an image, a link or a note, see
+  [content widget](content-widget.md#content-widget).
 - **Form and detail actions.** A `form` or `detail` widget may list `actions`. Each is
   `{ "type": "startProcess", "name": "submit", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
   a button that starts the process for the form's record, or a `navigate` action, see
@@ -168,8 +170,9 @@ opens a page with values for them.
   lists its `values`, and a `reference` parameter names its `target` entity. The type is checked by
   the same rules as an entity field. The compiled page lists its parameters in file order. A value
   lives in the URL query under the parameter name, and a table can bind it to a data source
-  parameter. A page whose widget is a form declares no parameters. The checks and their codes are in
-  [page parameters](configuration.md#page-parameters).
+  parameter. The checks and their codes are in [page parameters](configuration.md#page-parameters).
+- **Filter bar** _(planned for M42)_. A page may list a `filterBar` whose inputs set its parameters,
+  see [filter bar](data-sources.md#filter-bar).
 - **Navigate actions.** A `navigate` action opens another page. It sits in a table's `rowActions` or
   `toolbarActions`, or in a form's `actions`:
   `{ "type": "navigate", "name": "open", "page": "TicketDetail", "label": { "textKey": "tickets.open" }, "parameters": { "ticket": "id" } }`.
@@ -180,6 +183,18 @@ opens a page with values for them.
   to the form's entity, instead of `parameters`. The button opens `/{page}/{id}` with `record`, and
   `/{page}/new` without it. A table on the target page reads the parameter values through its
   `parameters` map.
+
+#### First values of a new record
+
+_(planned for M42)_
+
+A page whose widget is a form may declare parameters. A `navigate` action to that page without `record`
+may give them, such as `"parameters": { "customer": "id" }` in the actions of a customer's `detail`. It
+opens `/{page}/new?customer=<id>`. On `/new`, each field of the form's entity whose name matches a parameter,
+ignoring letter case, starts with the parameter's value, and the person may change it. A parameter with a
+field's name must have that field's type, and a `reference` the same target, otherwise it is refused. A
+field that the person may not set on create, because it is not in `createFields`, starts empty. The server
+checks the save as it checks every save. `/{id}` gives no field a value.
 
 ### Widget trees
 
@@ -243,9 +258,11 @@ widgets:
   defaults to `false`.
 - **Labels.** A label and a title are `{ "textKey": ... }`, like a page title.
 - **Depth.** Containers nest to at most 4 levels. The page's own `widgets` list is level 1.
-- **One of each.** A page holds at most one `table` of any kind, and at most one `form`, `taskInbox`
-  or `processInspector`, so the URL state stays unambiguous. Every `widgets`, `columns` and `tabs`
-  list has at least one entry.
+- **One owner for each part of the address** _(planned for M42)_. A page may hold several `table`
+  widgets, such as a record's related lists. Each owns its part of the address under a `prefix` of its
+  own, see [address prefix](table-widget.md#address-prefix). A page holds at most one `form`, `taskInbox`
+  or `processInspector`, so the URL state stays unambiguous, as [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) says.
+- **Not empty.** Every `widgets`, `columns` and `tabs` list has at least one entry.
 - **Every depth is checked.** The compiler checks every widget at any depth, and a problem is
   reported at the widget's own JSON pointer, such as `/widgets/0/columns/1/widgets/0/entity`.
 - **Names.** A widget, an action, a row action, a toolbar action, a column and a tab require a
