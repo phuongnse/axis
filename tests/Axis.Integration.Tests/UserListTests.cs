@@ -102,6 +102,28 @@ public sealed class UserListTests(KeycloakFixture keycloak) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_filter_without_a_search_keeps_only_the_users_that_match_it()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var main = await _database.CreateDatabaseAsync("user_list_filter", CancellationToken);
+        await using var factory = await NewFactoryAsync(folder.Path, main);
+        using var author = factory.CreateClient().SignedInAs("author");
+
+        // Creating the client starts the server, which migrates the tenant database. Only this user has signed in.
+        await InsertProfileAsync(main, "administrator", "Administrator", "administrator@axis.local");
+        var byEmail = Uri.EscapeDataString("""{"all":[{"field":"email","op":"eq","value":"auditor@axis.local"}]}""");
+        var bySignIn = Uri.EscapeDataString("""{"all":[{"field":"lastSignedInAt","op":"notEmpty"}]}""");
+
+        using var email = await GetAsync(author, $"/api/users?filter={byEmail}&pageSize=100", HostA);
+        using var signedIn = await GetAsync(author, $"/api/users?filter={bySignIn}&pageSize=100", HostA);
+
+        Assert.Equal(["auditor"], Ids(email));
+        Assert.Equal(1, email.RootElement.GetProperty("totalCount").GetInt32());
+        Assert.Equal(["administrator"], Ids(signedIn));
+        Assert.Equal(1, signedIn.RootElement.GetProperty("totalCount").GetInt32());
+    }
+
+    [Fact]
     public async Task Without_a_sort_the_users_are_ordered_by_display_name()
     {
         using var folder = StudioPublishTests.NewFolder();
