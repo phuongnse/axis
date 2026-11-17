@@ -178,9 +178,8 @@ Set quotas and Add a host apply at once.
   then shows the quotas that the route answered.
 - **Add a host.** The Tenant view shows Add a host for every status of a live tenant, and a purged tenant's view shows none. A dialog that names the tenant asks for a
   host and calls `POST /api/cell/tenants/{id}/hosts`, see [hosts](tenant-lifecycle.md#hosts). It then shows the
-  TXT and CNAME records that the customer must add and when the request expires. The records table has Filter on every
-  column, kept in the dialog and not in the address. Once the request is answered, the view loads the tenant again, so
-  the host shows as pending under Host verification.
+  TXT and CNAME records that the customer must add and when the request expires. Once the request is answered, the
+  view loads the tenant again, so the host shows as pending under Host verification.
 - **Run again.** The Jobs view shows Run again on a `failed` job that is not a `purge` job, since the publisher
   queues a failed purge again on its own. Its confirmation names the job's kind and its tenant, and says that
   the new job starts at the first step that did not succeed. Confirming it calls

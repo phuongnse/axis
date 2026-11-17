@@ -931,32 +931,6 @@ describe('CellTenantPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
-  it('filters the host records in the dialog, and the address does not change', async () => {
-    stubWrites({ '/api/cell/tenants/acme/hosts': { status: 201, body: hostRequest } })
-    const user = userEvent.setup()
-    renderPage('/tenants/acme')
-
-    await user.click(await screen.findByTestId('cell-tenant-add-host'))
-    const dialog = await screen.findByRole('dialog')
-    await user.type(within(dialog).getByRole('textbox', { name: 'Host' }), 'portal.acme.test')
-    await user.click(within(dialog).getByRole('button', { name: 'Add' }))
-    const records = await within(dialog).findByTestId('cell-tenant-host-records')
-
-    await user.click(within(records).getByRole('button', { name: 'Filter' }))
-    // The builder is a second dialog over the Add a host dialog, so it is the last one.
-    const builder = screen.getAllByRole('dialog').at(-1)!
-    await pick('Column', 0, 'Type', builder)
-    await pick('Value', 0, 'CNAME', builder)
-    await clickInDialog('Apply', 0, builder)
-
-    await waitFor(() =>
-      expect(within(records).getAllByRole('row').slice(1).map(cellTexts)).toEqual([
-        ['CNAME', 'portal.acme.test', 'acme.localhost'],
-      ]),
-    )
-    expect(screen.getByTestId('address').textContent).toBe('')
-  })
-
   it('loads the tenant again once a host is added', async () => {
     stubWrites({ '/api/cell/tenants/acme/hosts': { status: 201, body: hostRequest } })
     const tenantReads = () =>
