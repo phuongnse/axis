@@ -1,4 +1,5 @@
 // A table's filter has the record API's JSON shape and operators, see docs/reference/record-api.md#paging-and-sorting.
+import dayjs from 'dayjs'
 
 /** The kind of value a column filters on: the record API's `text`, `enum`, number and date field types. */
 export type FilterKind = 'text' | 'enum' | 'number' | 'date'
@@ -194,4 +195,12 @@ export function matchesFilter<T>(
   }
   const nodes = groupNodes(group)
   return groupMode(group) === 'all' ? nodes.every(test) : nodes.some(test)
+}
+
+/**
+ * The local calendar day of a time as `YYYY-MM-DD`, or `null` for no time. A date column of a table that holds its rows
+ * filters on it, so the day is the person's own and not the UTC day, see docs/reference/actions-and-controls.md#tables.
+ */
+export function localDay(time: string | null): string | null {
+  return time === null ? null : dayjs(time).format('YYYY-MM-DD')
 }

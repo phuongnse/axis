@@ -1,9 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import dayjs from 'dayjs'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import { formItem } from '../test/antd'
+import { formItem, optionTexts } from '../test/antd'
+import { dialog } from '../test/tableFilter'
 import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
 import { ProcessInstancePage } from './ProcessInstancePage'
@@ -280,9 +282,9 @@ function stubApi({
   return fetchMock
 }
 
-function renderPage() {
+function renderPage(search = '') {
   return render(
-    <MemoryRouter initialEntries={[`/e2e/inspector/${instanceId}`]}>
+    <MemoryRouter initialEntries={[`/e2e/inspector/${instanceId}${search}`]}>
       <TextProvider catalogs={catalogs} development={false}>
         <ProcessInstancePage
           sitePath="e2e"
@@ -295,6 +297,19 @@ function renderPage() {
       </TextProvider>
     </MemoryRouter>,
   )
+}
+
+/** The address part that filters a table's `field` to `value`, under the table's `prefix`. */
+function filterSearch(prefix: string, field: string, value: string) {
+  const filter = encodeURIComponent(JSON.stringify({ all: [{ field, op: 'eq', value }] }))
+  return `?${prefix}filter=${filter}`
+}
+
+/** The detail text with a second task, as given over the first task's own properties. */
+function detailWithTasks(second: Record<string, unknown>) {
+  const detail = JSON.parse(detailText) as { tasks: Record<string, unknown>[] }
+  detail.tasks.push({ ...detail.tasks[0], id: '0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f02', ...second })
+  return JSON.stringify(detail)
 }
 
 describe('ProcessInstancePage', () => {
@@ -795,5 +810,79 @@ describe('ProcessInstancePage', () => {
 
     await screen.findByTestId('inspector-instance')
     expect(screen.queryByTestId(/^inspector-resolve-/)).not.toBeInTheDocument()
+  })
+  it('offers every column of the tasks in Filter', async () => {
+    stubApi()
+    renderPage()
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(
+      within(screen.getByTestId('studio-section-inspector-tasks')).getByRole('button', { name: 'Filter' }),
+    )
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+    expect(optionTexts()).toEqual(['Step', 'Assignee', 'State', 'Outcome', 'Completed by', 'Started', 'Completed'])
+  })
+
+  it('keeps only the tasks that match the filter in the address', async () => {
+    stubApi({
+      detail: {
+        status: 200,
+        body: detailWithTasks({ assignee: 'clerk', state: 'completed', outcome: 'approve', completedBy: 'ann' }),
+      },
+    })
+    renderPage(filterSearch('tasks.', 'state', 'completed'))
+
+    const tasks = within((await screen.findAllByTestId('studio-section-inspector-tasks')).at(-1)!)
+    expect(await tasks.findByRole('row', { name: /role: clerk/ })).toBeInTheDocument()
+    expect(tasks.queryByRole('row', { name: /role: manager/ })).not.toBeInTheDocument()
+  })
+
+  it('leaves the tasks and the sub-processes unchanged under a history filter that matches nothing', async () => {
+    const detail = JSON.parse(detailWithRelatives()) as Record<string, unknown>
+    stubApi({
+      detail: {
+        status: 200,
+        body: JSON.stringify({ ...detail, tasks: (JSON.parse(detailText) as { tasks: unknown[] }).tasks }),
+      },
+    })
+
+    renderPage(filterSearch('history.', 'step', 'nothing'))
+
+    await screen.findByTestId('inspector-instance')
+    expect(
+      within(screen.getByTestId('studio-section-inspector-history')).getByText('No history yet.'),
+    ).toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('studio-section-inspector-tasks')).getByRole('row', { name: /role: manager/ }),
+    ).toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('studio-section-inspector-sub-processes')).getByRole('row', { name: /ChildJob/ }),
+    ).toBeInTheDocument()
+  })
+
+  it("filters one call's attempts under its own prefix and leaves another call's attempts shown", async () => {
+    const detail = JSON.parse(detailText) as {
+      calls: { id: string; attempts: Record<string, unknown>[] }[]
+    }
+    detail.calls[1].attempts = [{ ...detail.calls[0].attempts[0], outcome: 'succeeded', httpStatus: 200 }]
+    stubApi({ detail: { status: 200, body: JSON.stringify(detail) } })
+
+    renderPage(filterSearch(`attempts.${detail.calls[0].id}.`, 'outcome', 'succeeded'))
+
+    await screen.findByTestId('inspector-instance')
+    const first = within(screen.getByTestId(`inspector-call-${detail.calls[0].id}`))
+    const second = within(screen.getByTestId(`inspector-call-${detail.calls[1].id}`))
+    expect(first.queryByRole('row', { name: /retryable/ })).not.toBeInTheDocument()
+    expect(second.getByRole('row', { name: /succeeded/ })).toBeInTheDocument()
+  })
+
+  it('filters a date column by the local day of its time', async () => {
+    const createdAt = '2026-10-12T01:00:00Z'
+    stubApi({ detail: { status: 200, body: detailWithTasks({ assignee: 'clerk', createdAt }) } })
+
+    renderPage(filterSearch('tasks.', 'createdAt', dayjs(createdAt).format('YYYY-MM-DD')))
+
+    const tasks = within(await screen.findByTestId('studio-section-inspector-tasks'))
+    expect(await tasks.findByRole('row', { name: /role: clerk/ })).toBeInTheDocument()
+    expect(tasks.queryByRole('row', { name: /role: manager/ })).not.toBeInTheDocument()
   })
 })

@@ -4,6 +4,15 @@ import { parseRecordJson, type RecordProblem } from './records'
 /** The states of a process instance, as the inspection API's `state` filter takes them. */
 export const instanceStates = ['running', 'waiting', 'completed', 'failed', 'cancelled'] as const
 
+/** The states of a task, see docs/reference/process-states.md#task-states. */
+export const taskStates = ['open', 'completed', 'cancelled', 'expired'] as const
+
+/** The kinds of a call's attempt, see docs/reference/process-inspection.md#attempts. */
+export const attemptKinds = ['attempt', 'lookup'] as const
+
+/** The outcomes of an attempt or a lookup, see docs/reference/process-inspection.md#attempts. */
+export const attemptOutcomes = ['succeeded', 'retryable', 'unknown', 'failed', 'found', 'notFound'] as const
+
 /** The platform text of an instance state. A state this build does not know shows as the API sends it. */
 export function stateText(t: (key: string) => string, state: string): string {
   return (instanceStates as readonly string[]).includes(state) ? t(`shell.inspector.states.${state}`) : state
