@@ -36,18 +36,65 @@ import {
 import { ProcessGraphControls } from './ProcessGraphControls'
 import { StatusTag, type StatusTone } from './StatusTag'
 import { Tooltip, Typography } from 'antd'
+import { typeTokens } from './designTokens'
 import { useDesignTokens, useThemeMode } from './themeMode'
 
 const nodeWidth = 272
 /**
- * Proposed, see the review on #3650: every card is one height, room for a label on two lines and the line under it with
- * a status tag's 22 px: 8 + 4 + 2 × 20 + 2 + 22 + 8 px and the borders. A longer label ends in an ellipsis on its
- * second line, and its card's tooltip and accessible name hold it whole. One height needs no measuring of labels, so
- * the graph never moves as fonts load.
+ * Proposed, see the review on #3650: a card is as tall as its label needs, one line or two with the line under it and a
+ * status tag's 22 px: 8 + 4 + 20 or 40 + 2 + 22 + 8 px and the borders. A longer label ends in an ellipsis on its
+ * second line, and its tooltip and accessible name hold it whole. The label's font is loaded before the graph is
+ * measured and laid out, once, so the graph never moves as fonts load.
  */
-const nodeHeight = 88
-/** The label's type. */
+const cardHeight = { one: 68, two: 88 }
+/** The label's type, which the card draws it in and the measure uses, so both wrap alike. */
 const labelType = { size: 14, weight: 600, lineHeight: 20 }
+/** The room a label has on a card: its width less the padding, the icon's tile, the gap and the borders. */
+const labelRoom = nodeWidth - 2 * 12 - 28 - 12 - 2
+
+let measurer: HTMLElement | null | undefined
+/** How many lines a label takes on a card, measured by the browser in a hidden copy of the same width and type. */
+const measured = new Map<string, number>()
+function labelLines(label: string): number {
+  // A label is measured once, after its font has loaded, so a page drawn again does not measure it again.
+  const known = measured.get(label)
+  if (known !== undefined) {
+    return known
+  }
+  if (measurer === undefined) {
+    measurer = typeof document === 'undefined' ? null : document.createElement('span')
+    if (measurer) {
+      measurer.style.cssText = `position: absolute; visibility: hidden; left: -10000px; top: 0; width: ${labelRoom}px; font-family: ${typeTokens.fontFamily}; font-size: ${labelType.size}px; font-weight: ${labelType.weight}; line-height: ${labelType.lineHeight}px; white-space: normal; overflow-wrap: break-word;`
+      document.body.appendChild(measurer)
+    }
+  }
+  if (!measurer) {
+    return label.length * 8 > labelRoom ? 2 : 1
+  }
+  measurer.textContent = label
+  const lines = Math.max(1, Math.round(measurer.getBoundingClientRect().height / labelType.lineHeight))
+  measured.set(label, lines)
+  return lines
+}
+
+/** A card's height: the taller one only when its label does not fit on one line. */
+function heightOf(step: ProcessGraphStep): number {
+  return labelLines(step.name) > 1 ? cardHeight.two : cardHeight.one
+}
+
+/**
+ * Loads the face the labels are drawn in before anything is measured: a browser loads a face only when text needs it,
+ * so `document.fonts.ready` alone may settle first. A face that fails to load leaves the fallback, which the cards and
+ * the measure then share.
+ */
+async function labelFontLoaded(): Promise<void> {
+  try {
+    await document.fonts?.load(`${labelType.weight} ${labelType.size}px ${typeTokens.fontFamily}`)
+  } catch {
+    // The fallback font draws and measures alike.
+  }
+}
+
 const handleSize = 10
 
 /**
@@ -151,6 +198,7 @@ async function layOut(
   transitions: readonly ProcessGraphTransitionView[],
   frames: readonly ProcessGraphFrame[] = [],
 ): Promise<Layout> {
+  await labelFontLoaded()
   // Proposed, see D155: a frame is a node that holds its steps and frames, laid out inside it, and every transition is
   // routed across them, with its points in the graph's own coordinates.
   const nodes = new Map<string, ElkNode>()
@@ -178,7 +226,7 @@ async function layOut(
     }
     ;(parent !== undefined && nodes.has(parent) ? nodes.get(parent)!.children! : roots).push(node)
   }
-  for (const step of steps) place({ id: step.id, width: nodeWidth, height: nodeHeight }, step.parent)
+  for (const step of steps) place({ id: step.id, width: nodeWidth, height: heightOf(step) }, step.parent)
   for (const frame of frames) {
     if (!placed.has(frame.id)) {
       placed.add(frame.id)
@@ -231,7 +279,7 @@ async function layOut(
         x: origin.x + at.x,
         y: origin.y + at.y,
         width: child.width ?? nodeWidth,
-        height: child.height ?? nodeHeight,
+        height: child.height ?? cardHeight.one,
       }
       absolute.set(child.id, rect)
       if (nodes.has(child.id)) {
@@ -706,7 +754,7 @@ export function ProcessGraphCanvas({
     }
     // A frame comes before what it holds, as React Flow needs a parent before its children.
     const frameNodes = frames.map((frame): FrameNode => {
-      const size = layout.sizes.get(frame.id) ?? { width: nodeWidth, height: nodeHeight }
+      const size = layout.sizes.get(frame.id) ?? { width: nodeWidth, height: cardHeight.one }
       return {
         id: frame.id,
         type: 'frame',
@@ -734,17 +782,17 @@ export function ProcessGraphCanvas({
           parentId: step.parent,
           position: layout.places.get(step.id) ?? { x: 0, y: 0 },
           width: nodeWidth,
-          height: nodeHeight,
+          height: heightOf(step),
           // The card's size is known, so it is given as measured too: a node drawn again keeps it, and Find a step and
           // the fit can place it without waiting for the browser to measure it again.
-          measured: { width: nodeWidth, height: nodeHeight },
+          measured: { width: nodeWidth, height: heightOf(step) },
           handles: [
-            { type: 'target', position: Position.Left, x: 0, y: nodeHeight / 2, width: 1, height: 1 },
+            { type: 'target', position: Position.Left, x: 0, y: heightOf(step) / 2, width: 1, height: 1 },
             {
               type: 'source',
               position: Position.Right,
               x: nodeWidth - handleSize / 2,
-              y: nodeHeight / 2 - handleSize / 2,
+              y: heightOf(step) / 2 - handleSize / 2,
               width: handleSize,
               height: handleSize,
             },
