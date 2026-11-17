@@ -177,7 +177,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Two people never overwrite each other's changes | [Concurrency](reference/record-api.md#concurrency) |
 | Lock a record while one person edits it | _(planned for M53)_ |
 | Keep a ledger whose records are only added, never changed | _(planned for M53)_ |
-| Change many records at once | _(planned for M42)_ |
+| Change many records at once | [Bulk actions](reference/record-api.md#bulk-actions) _(planned for M42)_ |
 | Find and merge duplicate records | _(planned for M53)_ |
 | Comments and activity on a record | _(planned for M43)_ |
 | Preview a file in the page | [Preview](reference/file-fields.md#download) _(planned for M40)_ |
@@ -299,11 +299,11 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Save a table's search, filter and sort as a named view | [Tables](reference/actions-and-controls.md#tables) |
 | Overwrite a saved view | _(planned for M33)_ |
 | Keep each person's columns of a table | [Table views and columns](reference/frontend.md#table-views-and-columns) |
-| Choose the columns of an application's table | _(planned for M42)_ |
+| Choose the columns of an application's table | [Column chooser](reference/table-widget.md#column-chooser) _(planned for M42)_ |
 | Act on one row, or from the toolbar | [Row and toolbar actions](reference/table-widget.md#row-and-toolbar-actions) |
 | Delete a record from a table | [Delete](reference/table-widget.md#delete) |
-| Act on several selected rows at once | _(planned for M42)_ |
-| Edit values in the table | _(planned for M42)_ |
+| Act on several selected rows at once | [Bulk actions](reference/table-widget.md#bulk-actions) _(planned for M42)_ |
+| Edit values in the table | [Inline edit](reference/table-widget.md#inline-edit) _(planned for M42)_ |
 | Import records from CSV or Excel into a table | [Import](reference/table-widget.md#import) |
 | Show records on a calendar | _(planned for M42)_ |
 | Show records on a kanban board | _(planned for M42)_ |

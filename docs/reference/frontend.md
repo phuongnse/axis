@@ -459,6 +459,9 @@ and which fields each write action covers. A `taskInbox`, a `processInspector`, 
   without the action it needs, `create` on a new record and `update` on a saved one. Cancel and the start process
   buttons stay.
 - **On a table.** A toolbar action to a form without `record` shows only with `create`.
+- **Bulk actions and inline edit** _(planned for M42)_. A table's metadata lists only the
+  [bulk actions](table-widget.md#bulk-actions) the person may run. It also says whether the table has
+  [inline edit](table-widget.md#inline-edit). A cell is editable only for a field in `updateFields`.
 
 ## Routing
 

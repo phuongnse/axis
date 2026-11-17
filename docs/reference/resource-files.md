@@ -147,6 +147,13 @@ A page holds one or more widgets. A leaf widget's `type` is `table`, `form`, `ta
   schema refuses it in `toolbarActions`, in a form's `actions` and on a kpi's `navigate`. It refuses
   a `delete` with a `process`, `page`, `parameters` or `record`, and a `delete` in `toolbarActions`
   or a form's `actions`.
+- **Bulk actions and inline edit** _(planned for M42)_. A `table` may list `bulkActions`. Each entry is a `startProcess`
+  with a `process`, a `setFields` with `fields`, a list of field names, or a `delete`. Each has a `name` and a `label`,
+  such as `{ "type": "setFields", "name": "close", "fields": ["status"], "label": { "textKey": "tickets.close" } }`.
+  The schema refuses `visibleWhen`, `page`, `parameters` and `record` on these entries. A table over an `entity` may
+  set `"inlineEdit": true`. A table over a data source may not. The compiler checks that a `process` takes the table's
+  entity as its subject. It also checks that each field in `fields` is a field of that entity that is not computed,
+  a sequence or a creator. See [bulk actions](table-widget.md#bulk-actions) and [inline edit](table-widget.md#inline-edit).
 
 ### Page parameters and navigate actions
 
