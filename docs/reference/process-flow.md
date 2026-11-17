@@ -96,6 +96,11 @@ Events are raised by `raiseEvent` steps and by an inbound endpoint call that nam
   `process.stepCompleted` audit record as a timer resume does. An item that
   finds the instance moved on changes nothing. The event and the timeout race,
   and the first to commit wins.
+- **The first of several events.** _(planned for M38)_ A step may hold `events`, a list of
+  `{ "event", "when", "next" }`, in place of `event`, `when` and `next`. Each entry names an event about the
+  subject record, and each of its `when`s is checked as above. The step takes the earliest match across all
+  the entries and goes to that entry's `next`. Its history output adds the matched `event`. An event named
+  twice in `events` is `AXC0391`.
 - History output: `{ "state": "waiting" }` when it waits, `{ "next", "eventId" }` for a match and
   `{ "next", "timeout": true }` for a timeout.
 - **Graph and Studio.** The instance graph shows the step as `waitEvent`, with a transition to `next`
@@ -184,6 +189,8 @@ it. See [Compile checks](processes.md#compile-checks).
   inspector lists every pass's calls, oldest first.
 - **Service desk.** A reopened ticket loops back to the agent's resolve task,
   and its status goes back to `assigned`.
+- **Repeats.** _(planned for M38)_ A [repeat step](process-blocks.md#repeat-step) needs no waiting step in
+  its loop, because its own limits end it.
 
 ## Create record operation
 

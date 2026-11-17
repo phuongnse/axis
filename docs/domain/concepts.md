@@ -81,6 +81,8 @@ what the engine cannot finish alone.
 | --- | --- | --- |
 | **Process** | A versioned definition of steps and transitions, executed durably. It explicitly declares the entities it works on. A process names one entity, its subject, and runs for one record of it, or has no subject and takes typed parameters, see [processes without a subject](../reference/process-flow.md#processes-without-a-subject). | M3, M14 (without a subject) |
 | **Process instance** | One run of a process. It is pinned to its release and records every step occurrence with its input, output, decision and error. | M3 |
+| **Path** | _(planned for M38)_ One route of steps that an instance runs. An instance has one path, or several at once while a [parallel](../reference/process-blocks.md#parallel-step) or [repeat](../reference/process-blocks.md#repeat-step) step runs. Each path keeps its own position, revision and history. | M38 |
+| **Process variable** | _(planned for M38)_ A typed value that a process declares beside its subject and that its steps read and set. It belongs to the instance, and inspection shows it under the masking rule that a call's input follows. See [variables](../reference/processes.md#variables). | M38 |
 | **Human task** | A step that waits for a person. It has an assignee, a form, a due date and allowed outcomes such as approve, return or reject. Exactly one final decision is recorded. The assignee is a user or a role, and a role holder can claim the task and release it. A task can be reassigned, a deadline can expire it and move the process on, and an escalation of a late task notifies people in-app and by email or reassigns it. See the [task API](../reference/task-api.md) and [task deadlines and claims](../reference/task-deadlines.md). | M3, M14 (deadlines and claims) |
 | **Operator command** | An authorized, audited command on process work that the engine cannot finish alone. **Cancel** ends a `running` or `waiting` instance as `cancelled` and cancels its open tasks. **Retry** runs a `failed` instance again from its failed step, on its pinned release. **Resolve** settles a connector call or a package call whose outcome is `unknown`, as succeeded with output values or as failed. Each needs its own `process` grant and a reason, and writes a history row and an audit record. Cancel does not undo steps that already ran. See [operator commands](../reference/process-inspection.md#operator-commands). | M7 |
 | **Retry policy** | A `callConnector` step and a package operation step declare their attempts and their backoff. The platform fixes which errors are retried, and the instance fails when attempts run out. An operator can then [retry](../reference/process-inspection.md#retry) it. See [call outcomes](../reference/process-execution.md#call-outcomes) and [package call outcomes](../reference/process-execution.md#package-call-outcomes). | M5 |
@@ -93,6 +95,10 @@ what the engine cannot finish alone.
 [steps](../reference/processes.md#steps), and [process flow](../reference/process-flow.md) for the
 waiting steps, loops through a waiting step, the `createRecord` operation and the email of the
 `notify` operation.
+
+**Blocks.** _(planned for M38)_ The `parallel` and `repeat` steps are blocks. Each holds steps of its own in
+a branch or a body, and a path leaves its block only by reaching an `end` step. See
+[process blocks](../reference/process-blocks.md).
 
 ## Triggers and integration
 

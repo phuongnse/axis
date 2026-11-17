@@ -20,18 +20,18 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | --- | --- |
 | Run steps one after another | [Steps](reference/processes.md#steps) |
 | Choose one path by condition | [Steps](reference/processes.md#steps) |
-| Run several paths at once and wait for all of them | _(planned for M38)_ |
-| Choose one or more paths by condition and wait for those taken | _(planned for M38)_ |
-| Go on when some of several paths have finished | _(planned for M38)_ |
+| Run several paths at once and wait for all of them | [Parallel step](reference/process-blocks.md#parallel-step) _(planned for M38)_ |
+| Choose one or more paths by condition and wait for those taken | [Parallel step](reference/process-blocks.md#parallel-step) _(planned for M38)_ |
+| Go on when some of several paths have finished | [Parallel step](reference/process-blocks.md#parallel-step) _(planned for M38)_ |
 | Go back to an earlier step through a task or a wait | [Loops](reference/process-flow.md#loops) |
-| Repeat steps for each item of a list, one after another | _(planned for M38)_ |
-| Repeat steps for each item of a list, all at once | _(planned for M38)_ |
+| Repeat steps for each item of a list, one after another | [Repeat step](reference/process-blocks.md#repeat-step) _(planned for M38)_ |
+| Repeat steps for each item of a list, all at once | [Repeat step](reference/process-blocks.md#repeat-step) _(planned for M38)_ |
 | Run another process and wait until it ends | [Sub-process step](reference/process-flow.md#sub-process-step) |
 | Call a process from itself, directly or through others | [Sub-process step](reference/process-flow.md#sub-process-step) |
 | Run two cases of one process on the same record at once | [D155](decisions/d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md) |
 | Run two cases of one job without a subject record at once | [D70](decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md) |
 | Run work that concerns no single record, such as a daily job | [Processes without a subject](reference/process-flow.md#processes-without-a-subject) |
-| Keep values of a case beyond the fields of its record | _(planned for M38)_ |
+| Keep values of a case beyond the fields of its record | [Variables](reference/processes.md#variables) _(planned for M38)_ |
 | Update the record a case runs for | [Steps](reference/processes.md#steps) |
 | Create a record of another entity from a step | [Create record operation](reference/process-flow.md#create-record-operation) |
 | Call another system from a step | [Connector calls](reference/process-execution.md#connector-calls) |
@@ -48,7 +48,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Wait for a length of time or until a moment | [Timer step](reference/process-flow.md#timer-step) |
 | Wait for an event about the record, with a timeout | [Wait for event step](reference/process-flow.md#wait-for-event-step) |
 | Keep an event that comes before the case waits for it | [Wait for event step](reference/process-flow.md#wait-for-event-step) |
-| Wait for the first of several events | _(planned for M38)_ |
+| Wait for the first of several events | [Wait for event step](reference/process-flow.md#wait-for-event-step) _(planned for M38)_ |
 | Match an event to a case by a key other than its record | _(planned for M45)_ |
 | Count due dates, deadlines, escalations and timers in working hours, skipping holidays | _(planned for M39)_ |
 | Wait for a calendar month or year | _(planned for M39)_ |
@@ -60,7 +60,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Retry a call to another system on its own, with a wait between tries | [Step shape](reference/process-execution.md#step-shape) |
 | Let an operator run a failed step again | [Retry](reference/process-inspection.md#retry) |
 | Settle a call whose outcome is unknown | [Resolve](reference/process-inspection.md#resolve) |
-| Take another path when a step fails | _(planned for M38)_ |
+| Take another path when a step fails | [Error paths](reference/processes.md#error-paths) _(planned for M38)_ |
 | Redeliver work that failed too many times | [Dead letters](reference/process-events.md#dead-letters) |
 | Cancel a whole case and its sub-processes | [Cancel](reference/process-inspection.md#cancel) |
 | Cancel one path or one task while the case goes on | _(planned for M38)_ |
