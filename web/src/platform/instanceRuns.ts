@@ -80,7 +80,7 @@ export function stepRuns(instance: InstanceDetail): StepRun[] {
 
 /** A span of time in its two largest units, such as "1 day 5 hr", in the locale's words for them. */
 export function durationText(from: string, to: string, locale: string): string {
-  const seconds = Math.max(0, Math.round((Date.parse(to) - Date.parse(from)) / 1000))
+  const seconds = Math.max(0, Math.floor((Date.parse(to) - Date.parse(from)) / 1000))
   const unit = (value: number, name: 'day' | 'hour' | 'minute' | 'second') =>
     new Intl.NumberFormat(locale, { style: 'unit', unit: name, unitDisplay: 'short' }).format(value)
   const days = Math.floor(seconds / 86400)
@@ -89,7 +89,8 @@ export function durationText(from: string, to: string, locale: string): string {
   if (days > 0) return hours > 0 ? `${unit(days, 'day')} ${unit(hours, 'hour')}` : unit(days, 'day')
   if (hours > 0) return minutes > 0 ? `${unit(hours, 'hour')} ${unit(minutes, 'minute')}` : unit(hours, 'hour')
   if (minutes > 0) return unit(minutes, 'minute')
-  return unit(seconds % 60, 'second')
+  // A run that took no whole second reads as under one, never as 0.
+  return seconds < 1 ? `< ${unit(1, 'second')}` : unit(seconds % 60, 'second')
 }
 
 /**

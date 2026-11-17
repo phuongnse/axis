@@ -42,6 +42,8 @@ export function ProcessGraphControls({
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
   const [full, setFull] = useState(false)
+  // The step Find a step shows: the one an instance is at, until another is chosen.
+  const [chosen, setChosen] = useState<string | null>(focus ?? null)
 
   useEffect(() => {
     const follow = () => setFull(document.fullscreenElement !== null && document.fullscreenElement === area.current)
@@ -123,13 +125,14 @@ export function ProcessGraphControls({
         <Select
           showSearch
           allowClear
-          value={null}
+          value={chosen}
           placeholder={t('shell.graph.find')}
           aria-label={t('shell.graph.find')}
           style={{ width: 240 }}
           optionFilterProp="label"
           options={steps.map((step) => ({ value: step.id, label: step.label }))}
-          onChange={(id: string | null) => {
+          onChange={(id: string | null | undefined) => {
+            setChosen(id ?? null)
             if (id !== null && id !== undefined) {
               find(id)
             }

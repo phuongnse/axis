@@ -55,7 +55,7 @@ export type ProcessGraphStep = {
   id: string
   name: string
   type: string
-  /** The process's start step, drawn with a thick border. */
+  /** The process's start step, which the layout places first on the left. */
   start: boolean
   tone: ProcessGraphTone
   ariaLabel: string
@@ -363,7 +363,8 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
     taken: colour.successText,
     idle: colour.borderSubtle,
   }[data.tone]
-  const width = data.start || data.tone === 'current' ? 3 : 1
+  // One emphasis only: the step an instance is at, 2 px in the primary colour; every other border is 1 px.
+  const width = data.tone === 'current' ? 2 : 1
   const Icon = stepIcons[data.kind] ?? ThunderboltOutlined
   const muted = data.tone === 'idle'
   return (
