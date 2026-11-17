@@ -236,8 +236,13 @@ be kept right.
   filter never hides, such as a row added since the last save, so the author always sees what they just added. Only
   a table that holds all its rows reads `keep`, and only for the filter. A column whose header is not plain text
   names itself in the builder and its chips through `filter`'s `title`, and without one they show the header text.
-- **Filter on every table** _(planned for M33)_. Every column of every table can be filtered on, a data source
-  table's included.
+- **Filter on every table.** In every table, each column that shows a row's value can be filtered on.
+  This includes the columns of a data source table. A column of row actions has no value, so it has no filter.
+  A `table` widget leaves out boolean, reference, file and date-time columns, and a measure column of a grouped
+  data source. [Its filter](table-widget.md#filter) gives the reasons. A list column holds several values, such as
+  a cell job's Steps, so it has no filter. Some tables have no Filter at all. A child collection on a form or a
+  detail and a list of objects in a Studio form are part of one thing. The users page's Hosts and Usage tables have
+  none, and neither does the cell console's job table on a tenant's view or in Create a tenant.
 - **Columns control.** A table whose view turns it on has Columns, an icon button after Search and Filter. It
   opens a dialog that shows, hides and orders the columns, with Reset, Cancel and Apply. Reset sets the dialog
   back to every column in its first order, and nothing takes effect until Apply. The identifying column, the
