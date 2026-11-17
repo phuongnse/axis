@@ -18,6 +18,7 @@ import {
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
+import { flexOf } from '../test/antd'
 import { ScenarioEditor } from './ScenarioEditor'
 
 const english: Record<string, string> = platformEnglish
@@ -558,6 +559,26 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
 
     expect(onChange).not.toHaveBeenCalledWith('/users', expect.anything())
     expect(input).toHaveValue('author')
+  })
+
+  it('stacks a user ID and its roles, with Remove under them', () => {
+    renderEditor(scenario([fixtures.advanceTime]))
+
+    const row = screen.getByTestId('studio-field-/users/author')
+    const id = within(row).getByRole('textbox', { name: labelOf('users.id') })
+    const stack = flexOf(id)
+    expect(stack).toHaveClass('ant-flex-vertical')
+    expect(stack.children[0]).toContainElement(id)
+    expect(stack.children[1]).toContainElement(within(row).getByRole('combobox', { name: 'Roles' }))
+    expect(stack.lastElementChild).toContainElement(within(row).getByRole('button', { name: 'Remove' }))
+  })
+
+  it('stacks the connector name and the operation of a stub', () => {
+    renderEditor(withStub(stubConnector))
+
+    const name = screen.getByTestId('studio-field-/stubs/0/connector/name')
+    expect(name.parentElement).toHaveClass('ant-flex-vertical')
+    expect(screen.getByTestId('studio-field-/stubs/0/connector/operation').parentElement).toBe(name.parentElement)
   })
 
   it('picks the roles of a user from the application roles', async () => {

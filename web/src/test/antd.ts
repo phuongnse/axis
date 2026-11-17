@@ -83,6 +83,13 @@ export function formItem(element: HTMLElement): HTMLElement {
   return item
 }
 
+/** The flex that holds `element`, whose children are the fields of one row. */
+export function flexOf(element: HTMLElement): HTMLElement {
+  const flex = element.closest<HTMLElement>('.ant-flex')
+  if (!flex) throw new Error('The element is not inside a flex')
+  return flex
+}
+
 export function hasFieldError(element: HTMLElement): boolean {
   return formItem(element).classList.contains('ant-form-item-has-error')
 }
