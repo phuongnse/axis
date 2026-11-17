@@ -8,7 +8,8 @@ import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import { useUnsavedChanges } from '../platform/unsavedChanges'
 import { renderGuarded } from '../test/leaveGuard'
-import { clickInDialog, pick } from '../test/tableFilter'
+import { chooseOption, optionTexts } from '../test/antd'
+import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { StudioUsedBy } from './StudioUsedBy'
 
 const application = 'PurchaseRequests'
@@ -214,6 +215,7 @@ describe('StudioUsedBy', () => {
 
     const table = await loadedTable()
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'Kind')
     await pick('Value', 0, 'Form')
     await clickInDialog('Apply')
 
@@ -228,6 +230,39 @@ describe('StudioUsedBy', () => {
       all: [{ field: 'kind', op: 'eq', value: 'form' }],
     })
     expect(screen.queryByRole('combobox', { name: 'Kind' })).not.toBeInTheDocument()
+  })
+
+  it('offers Filter on Name, Kind and How it is used, and a How filter narrows the rows', async () => {
+    stubReferences()
+    const router = renderGuarded(
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <StudioUsedBy application={application} resourceId={targetId} resources={resources} />
+      </TextProvider>,
+    )
+
+    const table = await loadedTable()
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+    expect(optionTexts()).toEqual(['Name', 'Kind', 'How it is used'])
+    await chooseOption('Name')
+    expect(within(dialog()).getByRole('textbox', { name: 'Value' })).toBeVisible()
+
+    await pick('Column', 0, 'Kind')
+    expect(within(dialog()).getByRole('combobox', { name: 'Value' })).toBeVisible()
+    await pick('Column', 0, 'How it is used')
+    await pick('Value', 0, 'A field refers to it')
+    await clickInDialog('Apply')
+
+    await waitFor(() =>
+      expect(
+        within(table)
+          .getAllByRole('link')
+          .map((link) => link.textContent),
+      ).toEqual(['Department', 'Purchase request']),
+    )
+    expect(JSON.parse(new URLSearchParams(router.state.location.search).get('filter')!)).toEqual({
+      all: [{ field: 'how', op: 'eq', value: 'field target' }],
+    })
   })
 
   it('sorts and searches without asking to leave, though a draft is unsaved', async () => {
@@ -271,6 +306,7 @@ describe('StudioUsedBy', () => {
 
     const table = await loadedTable()
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'Kind')
     await pick('Value', 0, 'Form')
     await clickInDialog('Apply')
 

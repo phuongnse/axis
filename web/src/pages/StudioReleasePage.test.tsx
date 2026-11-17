@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type {
@@ -13,7 +13,8 @@ import type {
 } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
-import { emptyDescription } from '../test/antd'
+import { chooseOption, emptyDescription, optionTexts } from '../test/antd'
+import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { StudioReleasePage } from './StudioReleasePage'
 
 const approve: StudioRelaxedPoint = {
@@ -113,6 +114,11 @@ function answer(body: StudioRelease | number) {
   )
 }
 
+/** The address of the page, which holds each table's filter. */
+function LocationProbe() {
+  return <output data-testid="location">{useLocation().search}</output>
+}
+
 function renderPage(props: Partial<Parameters<typeof StudioReleasePage>[0]> = {}) {
   const onActivate = vi.fn()
   render(
@@ -129,6 +135,7 @@ function renderPage(props: Partial<Parameters<typeof StudioReleasePage>[0]> = {}
             onActivate={onActivate}
             {...props}
           />
+          <LocationProbe />
         </MemoryRouter>
       </TextProvider>
     </ThemeModeProvider>,
@@ -228,6 +235,51 @@ describe('StudioReleasePage', () => {
       '1',
       time('2026-05-03T10:00:00Z'),
     ])
+  })
+
+  it('filters the modules and packages on Name, Type and Version, each by its kind of value', async () => {
+    answer(release)
+    renderPage()
+    await screen.findByRole('heading', { name: 'Release 3' })
+
+    await userEvent.click(section('Modules and packages').getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+    expect(optionTexts()).toEqual(['Name', 'Type', 'Version'])
+    await chooseOption('Name')
+    expect(within(dialog()).getByRole('textbox', { name: 'Value' })).toBeVisible()
+    await pick('Column', 0, 'Version')
+    expect(within(dialog()).getByRole('textbox', { name: 'Value' })).toBeVisible()
+    await pick('Column', 0, 'Type')
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Value' }))
+    expect(optionTexts().slice(-2)).toEqual(['Module', 'Package'])
+    await chooseOption('Package')
+    await clickInDialog('Apply')
+
+    const parts = section('Modules and packages')
+    expect(parts.queryByText('Department budgets')).not.toBeInTheDocument()
+    expect(parts.getByText('PDF export')).toBeInTheDocument()
+    expect(new URLSearchParams(screen.getByTestId('location').textContent!).get('filter')).toContain('"type"')
+  })
+
+  it('keeps the filter of the activations under its own prefix and leaves the parts alone', async () => {
+    answer(release)
+    renderPage()
+    await screen.findByRole('heading', { name: 'Release 3' })
+
+    await userEvent.click(section('Activations').getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'By')
+    await pick('Operator', 0, 'contains')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Value' }), 'Author')
+    await clickInDialog('Apply')
+
+    const activations = section('Activations').getAllByTestId('studio-release-activation')
+    expect(activations).toHaveLength(1)
+    expect(activations[0]).toHaveTextContent('Author User')
+    const address = new URLSearchParams(screen.getByTestId('location').textContent!)
+    expect(address.get('activations.filter')).toContain('"by"')
+    expect(address.has('filter')).toBe(false)
+    expect(section('Modules and packages').getByText('Department budgets')).toBeInTheDocument()
+    expect(section('Modules and packages').getByText('PDF export')).toBeInTheDocument()
   })
 
   it('titles the changes of a live release by the release below it and says it is live since its last activation', async () => {

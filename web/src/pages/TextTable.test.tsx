@@ -7,6 +7,8 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
+import { chooseOption, optionTexts } from '../test/antd'
+import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { TextTable, type TextColumn } from './TextTable'
 
 const columns: TextColumn[] = [
@@ -26,9 +28,14 @@ function LocationProbe() {
   return <output data-testid="location">{useLocation().search}</output>
 }
 
-function renderTable(data: TextColumn[] = columns, onChange = vi.fn(), onAdd = vi.fn<Add>(async () => 'added')) {
+function renderTable(
+  data: TextColumn[] = columns,
+  onChange = vi.fn(),
+  onAdd = vi.fn<Add>(async () => 'added'),
+  address = '/',
+) {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[address]}>
       <ThemeModeProvider>
         <ThemeRoot>
           <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
@@ -85,6 +92,48 @@ describe('TextTable', () => {
     renderTable()
 
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'FARE{Enter}')
+
+    expect(shownKeys()).toEqual(['farewell'])
+  })
+
+  it('filters the text of a locale through Filter and keeps the filter in the address', async () => {
+    renderTable()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+    expect(optionTexts()).toEqual(['Key', 'en', 'vi'])
+    await chooseOption('vi')
+    await pick('Operator', 0, 'contains')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Value' }), 'chào')
+    await clickInDialog('Apply')
+
+    expect(shownKeys()).toEqual(['greeting'])
+    expect(screen.getByTestId('location')).toHaveTextContent('filter=')
+  })
+
+  it('keeps the keys that a locale lacks when the filter on that locale is empty', async () => {
+    renderTable([
+      { id: 'en-id', locale: 'en', texts: { greeting: 'Hello', farewell: 'Goodbye' }, editable: true },
+      { id: 'vi-id', locale: 'vi', texts: { greeting: 'Xin chào' }, editable: false },
+    ])
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'vi')
+    await pick('Operator', 0, 'is empty')
+    await clickInDialog('Apply')
+
+    expect(shownKeys()).toEqual(['farewell'])
+    expect(screen.getByTestId('location')).toHaveTextContent('filter=')
+  })
+
+  it('opens the same rows from a link with a filter on the key', () => {
+    const filter = JSON.stringify({ all: [{ field: 'key', op: 'contains', value: 'fare' }] })
+    renderTable(
+      columns,
+      vi.fn(),
+      vi.fn<Add>(async () => 'added'),
+      `/?${new URLSearchParams({ filter })}`,
+    )
 
     expect(shownKeys()).toEqual(['farewell'])
   })
