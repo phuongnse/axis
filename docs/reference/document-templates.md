@@ -177,17 +177,20 @@ _(planned for M40)_
 
 A contract is signed by a person outside the application, through a signing service such as a Vietnamese
 certificate authority or DocuSign. Axis holds no signing service of its own. A process puts the pieces that
-exist together, and the signed file ends in a `file` field of the record.
+exist today together, and the signed file ends in a `file` field of the record. The process learns that the
+contract is signed by asking the service, not by waiting for its call.
 
 1. A [`makeDocument`](#document-step) step makes the contract and writes it to a `file` field.
 2. A `callConnector` step sends that file to the signing service. The connector's operation has an input of the
    type `file`, see [files in calls](process-execution.md#files-in-calls), and the service answers with the id
    of its signing request, which the step writes to a field.
-3. A `waitEvent` step waits, with a `timeout`, for the event that the signing service's call raises when the
-   document is signed. The call reaches an [inbound endpoint](inbound-endpoints.md) that names that event.
-4. A second `callConnector` step fetches the signed file. The operation's `file` output writes it to another
+3. A `timer` step waits, then a second `callConnector` step asks the service for the status of the request and
+   writes it to a field.
+4. A `decision` step reads that status. While it is still pending, the step goes back to the timer. When it is
+   signed, the process goes on. When it is declined or expired, the process takes its own path, such as a task
+   for a person.
+5. A third `callConnector` step fetches the signed file. The operation's `file` output writes it to another
    `file` field, and the outcome's transaction attaches it to the record.
-5. The process goes on, with the signed file kept on the record.
 
 ```json
 [
@@ -206,14 +209,26 @@ exist together, and the signed file ends in a `file` field of the record.
     "connector": { "name": "SigningService", "operation": "sendForSignature" },
     "input": { "document": "contractDocument", "signerEmail": "customer.email" },
     "output": { "requestId": "signingRequestId" },
-    "next": "awaitSignature"
+    "next": "pauseForSigner"
+  },
+  { "name": "pauseForSigner", "type": "timer", "wait": "PT4H", "next": "askStatus" },
+  {
+    "name": "askStatus",
+    "type": "operation",
+    "operation": "callConnector",
+    "connector": { "name": "SigningService", "operation": "getStatus" },
+    "input": { "requestId": "signingRequestId" },
+    "output": { "status": "signingStatus" },
+    "next": "checkStatus"
   },
   {
-    "name": "awaitSignature",
-    "type": "waitEvent",
-    "event": "ContractSigned",
-    "timeout": { "after": "P14D", "next": "chaseSigner" },
-    "next": "fetchSigned"
+    "name": "checkStatus",
+    "type": "decision",
+    "branches": [
+      { "name": "signed", "when": "signingStatus == 'signed'", "next": "fetchSigned" },
+      { "name": "refused", "when": "signingStatus == 'declined' or signingStatus == 'expired'", "next": "chaseSigner" }
+    ],
+    "otherwise": "pauseForSigner"
   },
   {
     "name": "fetchSigned",
@@ -227,9 +242,14 @@ exist together, and the signed file ends in a `file` field of the record.
 ]
 ```
 
+- **Why not wait for the call.** A call to an [inbound endpoint](inbound-endpoints.md) always creates a new
+  record and raises its event about that record, and an event wakes only the instances that wait on its own
+  record, see [wait for event](process-events.md#waking-waiting-instances). So the signing service's call cannot wake
+  the process that waits on the contract.
+- **A wake from the callback.** _(planned for M45)_ Waking a waiting process from another system's callback,
+  and matching an event by another key, replace the timer loop with a `waitEvent` step that the service's call
+  wakes. They are in the [capability map](../capabilities.md#other-systems-calling-in), and M40 does not
+  depend on them.
 - **No signing in Axis.** The service checks who signs and holds the certificate. Axis sends a file and keeps
   the file that comes back, so a signature's legal weight is the service's.
-- **The callback.** It is an inbound call like any other, and its caller is a [service
-  account](security.md#service-accounts) that the endpoint's grant admits, so only the signing service can say
-  that a contract is signed.
 - **The signed file.** It goes to a `file` field of its own, so the unsigned contract stays as it was.
