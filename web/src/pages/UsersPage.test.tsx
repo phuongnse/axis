@@ -6,7 +6,8 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import type { UserList, UserRoles } from '../platform/users'
 import { TextProvider } from '../platform/TextProvider'
-import { isRequiredLabel } from '../test/antd'
+import { isRequiredLabel, openDropdown, optionTexts } from '../test/antd'
+import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { PlatformContext, type Platform } from './context'
 import { UsersPage } from './UsersPage'
 
@@ -361,6 +362,47 @@ describe('UsersPage', () => {
           .some((input) => input.includes('pageSize=50')),
       ).toBe(true),
     )
+  })
+
+  it('offers every column in the filter, each with the value control of its kind', async () => {
+    stubServer(() => json(users))
+    renderPage()
+    await screen.findByText('Ann Invited')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    const column = () => within(dialog()).getByRole('combobox', { name: 'Column' })
+    await userEvent.click(column())
+    expect([...optionTexts(await openDropdown())].sort()).toEqual(
+      ['Name', 'Email', 'Signs in with', 'Status', 'Last sign-in'].sort(),
+    )
+    // The list is closed again, so the picks below open it as a person does.
+    await userEvent.click(column())
+
+    await pick('Column', 0, 'Name')
+    expect(within(dialog()).getByRole('textbox', { name: 'Value' })).toBeInTheDocument()
+    await pick('Column', 0, 'Status')
+    expect(within(dialog()).getByRole('combobox', { name: 'Value' })).toBeInTheDocument()
+    await pick('Column', 0, 'Last sign-in')
+    expect(dialog().querySelector('.ant-picker')).not.toBeNull()
+  })
+
+  it('sends the filter built in Filter to the server as filter, from page 1', async () => {
+    const fetchMock = stubServer(() => json(users))
+    renderPage('/users?page=2')
+    await screen.findByText('Ann Invited')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'Status')
+    await pick('Value', 0, 'Invited')
+    await clickInDialog('Apply')
+
+    const filter = JSON.stringify({ all: [{ field: 'status', op: 'eq', value: 'invited' }] })
+    await vi.waitFor(() => {
+      const query = new URLSearchParams(requested(fetchMock).filter(isList).at(-1)!.split('?')[1])
+      expect(query.get('filter')).toBe(filter)
+      expect(query.has('page')).toBe(false)
+    })
+    expect(new URLSearchParams(screen.getByTestId('location').textContent!).get('filter')).toBe(filter)
   })
 
   it('says the page is for administrators on a 403', async () => {
