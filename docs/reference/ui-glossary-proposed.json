@@ -328,6 +328,13 @@
       "vi": "thay mặt",
       "status": "proposed",
       "note": "The absent person that a task was moved from, or a decision was taken for."
+    },
+    {
+      "concept": "Form draft",
+      "en": "form draft",
+      "vi": "bản nháp biểu mẫu",
+      "status": "proposed",
+      "note": "On a form, \"draft\" alone may name it."
     }
   ]
 }

@@ -284,7 +284,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Preview an image or a PDF without downloading it | [Preview](reference/file-fields.md#download) _(planned for M40)_ |
 | Sign with a signature input | _(planned for M58)_ |
 | Take a photo, scan a barcode or record a location in a form | _(planned for M58)_ |
-| Keep a form as a draft that saves by itself | _(planned for M42)_ |
+| Keep a form as a draft that saves by itself | [Form drafts](reference/form-widget.md#form-drafts) _(planned for M42)_ |
 | Save and start a process from a form | [Start process actions](reference/form-widget.md#start-process-actions) |
 | Show the record's history under its form | [History](reference/form-widget.md#history) |
 | Tell the person when someone else changed the record first | [Saving](reference/form-widget.md#saving) |
