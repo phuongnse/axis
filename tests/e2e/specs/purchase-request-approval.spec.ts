@@ -178,6 +178,10 @@ test('a request at the threshold needs the finance reviewer after the manager be
 })
 
 test('a returned request is edited and submitted again, and the manager then approves it', async ({ page }) => {
+  // The restart test in this file stops the worker that every spec shares. Under load its new worker can take
+  // longer than the 30 second test budget to start, and the approval waits for that worker. The test allows the
+  // restart's own 60 second wait, plus the rest of the steps.
+  test.setTimeout(120_000)
   await useSession(page, 'requester')
   const { title, id } = await createRequest(page, 'Return', 500)
   await submit(page, id, title)
