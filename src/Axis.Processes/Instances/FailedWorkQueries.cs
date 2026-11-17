@@ -1,3 +1,4 @@
+using Axis.Data.Records;
 using Axis.Tenancy.Platform;
 using Npgsql;
 using NpgsqlTypes;
@@ -52,7 +53,7 @@ public static class FailedWorkQueries
 
     /// <summary>
     /// Counts the failed instances, the calls with an unknown outcome and the open dead letters of the tenant. The first
-    /// two counts together are the total of <see cref="ListAsync"/> without an application.
+    /// two counts together are the total of <see cref="ListAsync"/> without an application or a filter.
     /// </summary>
     public static async Task<TenantFailedWorkCounts> CountAsync(NpgsqlConnection connection, CancellationToken cancellationToken = default)
     {
@@ -75,25 +76,34 @@ public static class FailedWorkQueries
     }
 
     /// <summary>
-    /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> items of failed work, newest first, and
-    /// counts them. <paramref name="applicationId"/> narrows the list to one application when set. A page past the
-    /// last one has no items.
+    /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> items of failed work and counts them.
+    /// <paramref name="applicationId"/> narrows the list to one application when set, and <paramref name="list"/> filters,
+    /// searches and sorts it. Without a sort the items are newest first, and a sorted list breaks ties newest first. A page
+    /// past the last one has no items.
     /// </summary>
     public static async Task<FailedWorkPage> ListAsync(
         NpgsqlConnection connection,
         Guid? applicationId,
+        ListSql list,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(list);
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
+        var where = $"{ApplicationFilter} AND {list.Condition}";
+        var order = list.Order is null
+            ? "failed_at DESC, COALESCE(call_id, instance_id) DESC"
+            : $"{list.Order}, failed_at DESC, COALESCE(call_id, instance_id) DESC";
+
         long totalCount;
-        await using (var count = new NpgsqlCommand($"{WorkSql} SELECT count(*) FROM work {ApplicationFilter}", connection))
+        await using (var count = new NpgsqlCommand($"{WorkSql} SELECT count(*) FROM work {where}", connection))
         {
             AddParameters(count, applicationId);
+            list.AddTo(count);
             totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
         }
 
@@ -101,12 +111,13 @@ public static class FailedWorkQueries
             $"""
             {WorkSql}
             SELECT kind, application_id, process_id, release_id, instance_id, call_id, step, connector, package, operation, failed_at, error
-            FROM work {ApplicationFilter}
-            ORDER BY failed_at DESC, COALESCE(call_id, instance_id) DESC
+            FROM work {where}
+            ORDER BY {order}
             LIMIT @limit OFFSET @offset
             """,
             connection);
         AddParameters(command, applicationId);
+        list.AddTo(command);
         command.Parameters.AddWithValue("limit", pageSize);
         command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 

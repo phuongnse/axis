@@ -26,11 +26,16 @@ namespace Axis.Server.Console;
 /// application of the tenant, see <see cref="ConsoleDeadLetterEndpoints"/>.
 /// </para>
 /// <para>
-/// <c>GET /api/console/failed-work</c> lists the failed work of the tenant, newest first, in the paging shape of the record
-/// API: the instances that are <c>failed</c> and the connector and package calls whose outcome is <c>unknown</c>, across every
-/// application. <c>application</c> (an application id) narrows it to one application. An item names the application, the
-/// process, the instance and the step, and for a call its connector or package and operation, when it failed and its stored
-/// error. It never holds a call input, a history input or output, or a record value.
+/// <c>GET /api/console/failed-work</c> lists the failed work of the tenant: the instances that are <c>failed</c> and the
+/// connector and package calls whose outcome is <c>unknown</c>, across every application. It takes the record API's
+/// <c>page</c>, <c>pageSize</c>, <c>sort</c>, <c>search</c> and <c>filter</c> over the fields <c>application</c>,
+/// <c>process</c>, <c>instance</c>, <c>stepOrCall</c>, <c>failedAt</c> and <c>error</c>, which PostgreSQL applies, see
+/// <see cref="ListQuery{T}"/>. A search looks in <c>stepOrCall</c> and <c>error</c>, and a sort or filter on another field is
+/// a 400. The <c>failedAt</c> field filters by its UTC day and sorts by its instant. Without a sort the list is newest
+/// first, and a sorted list breaks ties newest first. <c>application</c> (an application id) narrows it to one application.
+/// An item names the application, the process, the instance and the step, and for a call its connector or package and
+/// operation, when it failed and its stored error. It never holds a call input, a history input or output, or a record
+/// value. The answer also lists the processes of every active release with their application.
 /// </para>
 /// <para>
 /// <c>GET /api/console/webhook-deliveries</c> answers one page of the webhook deliveries of the tenant. It takes the record
@@ -116,14 +121,13 @@ internal static class ConsoleEndpoints
 
     private static async Task<IResult> ListFailedWorkAsync(
         string? application,
-        string? page,
-        string? pageSize,
+        HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
+        var query = ListQuery<FailedWorkItem>.Read(httpContext.Request, _failedWorkColumns, errors);
         Guid? applicationId = null;
         if (application is not null)
         {
@@ -142,7 +146,7 @@ internal static class ConsoleEndpoints
             return Results.ValidationProblem(errors);
         }
 
-        var work = await FailedWorkQueries.ListAsync(await database.GetConnectionAsync(cancellationToken), applicationId, pageNumber, size, cancellationToken);
+        var work = await FailedWorkQueries.ListAsync(await database.GetConnectionAsync(cancellationToken), applicationId, query.Sql(), query.Page, query.PageSize, cancellationToken);
         var activeNames = (await new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken)).ListAsync(cancellationToken))
             .ToDictionary(active => active.ApplicationId, active => active.Name);
 
@@ -172,12 +176,43 @@ internal static class ConsoleEndpoints
                 item.Error));
         }
 
-        return Results.Ok(new ConsoleFailedWorkResponse(items, pageNumber, size, work.TotalCount));
+        var processes = new List<ConsoleProcess>();
+        foreach (var model in await resolver.ListAsync(cancellationToken))
+        {
+            processes.AddRange(model.Processes
+                .OrderBy(process => process.Name, StringComparer.Ordinal)
+                .Select(process => new ConsoleProcess(process.Id, process.Name, model.Manifest.Id, model.Manifest.Name)));
+        }
+
+        return Results.Ok(new ConsoleFailedWorkResponse(items, query.Page, query.PageSize, work.TotalCount, processes));
     }
+
+    // The columns the failed work list's search, filter and sort can name, see docs/reference/operator-console.md#api. The
+    // stepOrCall column is the text the table shows, and the failedAt column filters by its UTC day and sorts by its instant.
+    private static readonly IReadOnlyList<ListColumn<FailedWorkItem>> _failedWorkColumns =
+    [
+        new("application", ListColumnKind.Text, row => row.ApplicationId.ToString("D"), Sql: "application_id::text"),
+        new("process", ListColumnKind.Text, row => row.ProcessId.ToString("D"), Sql: "process_id::text"),
+        new("instance", ListColumnKind.Text, row => row.InstanceId.ToString("D"), Sql: "instance_id::text"),
+        new(
+            "stepOrCall",
+            ListColumnKind.Text,
+            row => row.Step,
+            Searchable: true,
+            Sql: "CASE WHEN kind = 'instance' THEN step ELSE step || ': ' || COALESCE(connector, package) || ' ' || operation END"),
+        new(
+            "failedAt",
+            ListColumnKind.Date,
+            row => DateOnly.FromDateTime(row.FailedAt.UtcDateTime),
+            Order: row => row.FailedAt,
+            Sql: "(failed_at AT TIME ZONE 'UTC')::date",
+            OrderSql: "failed_at"),
+        new("error", ListColumnKind.Text, row => row.Error, Searchable: true, Sql: "error"),
+    ];
 
     // The columns the list's search, filter and sort can name, over the webhook deliveries, see docs/reference/operator-console.md#api.
     // The deliveredAt column filters by its UTC day and sorts by its instant.
-    private static readonly IReadOnlyList<ListColumn<WebhookDeliveryListRow>> _columns =
+    private static readonly IReadOnlyList<ListColumn<WebhookDeliveryListRow>> _deliveryColumns =
     [
         new("application", ListColumnKind.Text, row => row.ApplicationId.ToString("D"), Sql: "application_id::text"),
         new("webhook", ListColumnKind.Text, row => row.WebhookId.ToString("D"), Sql: "webhook_id::text"),
@@ -203,7 +238,7 @@ internal static class ConsoleEndpoints
         CancellationToken cancellationToken)
     {
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        var query = ListQuery<WebhookDeliveryListRow>.Read(httpContext.Request, _columns, errors);
+        var query = ListQuery<WebhookDeliveryListRow>.Read(httpContext.Request, _deliveryColumns, errors);
         var applicationId = ReadId(application, "application", errors);
         var webhookId = ReadId(webhook, "webhook", errors);
         if (errors.Count > 0)
@@ -309,7 +344,9 @@ internal sealed record ConsoleTenantResponse(string Id, string Status, IReadOnly
 
 internal sealed record ConsoleApplication(Guid Id, string Name, Guid ReleaseId, int? ReleaseNumber, string? ReleaseLabel, DateTimeOffset ActivatedAt);
 
-internal sealed record ConsoleFailedWorkResponse(IReadOnlyList<ConsoleFailedWorkItem> Items, int Page, int PageSize, long TotalCount);
+internal sealed record ConsoleFailedWorkResponse(IReadOnlyList<ConsoleFailedWorkItem> Items, int Page, int PageSize, long TotalCount, IReadOnlyList<ConsoleProcess> Processes);
+
+internal sealed record ConsoleProcess(Guid Id, string Name, Guid ApplicationId, string Application);
 
 internal sealed record ConsoleFailedWorkItem(
     string Kind,
