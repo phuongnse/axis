@@ -389,6 +389,9 @@ memory. `null` fits every type, so the compile always type checks the place. The
 - **The language.** `description` is in the best `Accept-Language` match the platform has: `vi-VN` gives `vi`, else `en`.
 - **No type check.** A place checked without one, such as a migration value whose field types are not
   known yet, answers `{ type: null, fields: [], functions: [] }`.
+- **Reading words** _(planned for M33)_. Each function also has `words`, the key of its reading words under
+  `shell.studio.expression.reads.`, such as `fn.daysBetween`. It is the key that a phrase of the
+  [reading](#expression-check) names.
 
 ## Expression check
 
@@ -423,6 +426,14 @@ may be left out.
   `reference` or `null`. It is the expression's own type, so a text literal is `text` even where an
   enum is expected. `type` is null when there is a diagnostic, and when the compile cannot find the
   type yet, as for a migration value whose type check waits for activation.
+- **The reading** _(planned for M33)_. The answer also holds `reading`, the expression as a tree that Studio says in
+  words, so the browser keeps no second grammar, as [D52](../decisions/d52-reference-pickers-label-texts-and-the-expression-editor.md)
+  says. It is `null` while there is a diagnostic. A node is a group `{ kind, items }`, where `all` and `any` join a run
+  of `and` or of `or`, and `notAll` and `none` are `not` before them, or a phrase `{ kind: "phrase", words, slots }`.
+  `words` names the phrase's text under `shell.studio.expression.reads.`, such as `equal`, `less.date`, `is-null`,
+  `in`, `of` or `fn.daysBetween`. Each slot is a list of parts: `{ kind: "name", name, labelKey }`, where a path's
+  step is named by the field it resolves to; `{ kind: "value", type, value, labelKey }`, where `value` is the literal
+  as JSON (a date as ISO 8601 text) and `labelKey` is an enum value's label key or null; or a nested phrase.
 - **Diagnostics.** There is at most one, because the compile stops at the first problem. It is
   `{ code, message, start, end }`. `start` and `end` are offsets into the expression text after JSON
   decoding, in UTF-16 code units, and `end` is exclusive.
