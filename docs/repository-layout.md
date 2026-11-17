@@ -7,8 +7,8 @@ follows, so that a new project or folder lands in the right place. How the hosts
 ## Repository layout
 
 The tree below names each top-level folder and the projects in it. A project is created when the
-first issue needs it, so the tree holds only projects that exist, and planned ones are listed under
-it. The .NET projects are in the solution `Axis.slnx`.
+first issue needs it, and the tree lists only folders that exist. The .NET projects are in the
+solution `Axis.slnx`.
 
 ```text
 src/
@@ -48,10 +48,17 @@ tests/
   Axis.LoadData/          generator of the load test's typical-size application with seeds
   Axis.OpenApiDocument/   console that writes the server's OpenAPI document with the unit tests' host settings
   Axis.PurchasingStub/    purchasing system stub for tests, scripts/dev.sh and Docker Compose
-  packages/               test-only extension packages: a C# package built as three versions, which
-                          covers the capability limits, a C# package whose code writes marker files
-                          when it runs, a Node.js package with a local dependency, and a Python test
-                          package of plain files
+  ai-eval/                the cases of the authoring eval, and the JSON Schemas that they and the supported models list follow
+  alerts/                 tests of the alert rules in deploy/helm/axis/alerts, run with promtool
+  packages/               test-only extension packages:
+    InitializerPackage/   a C# package whose code writes marker files when it runs
+    TestPackage/          the C# sources of the test package, which covers the capability limits
+    TestPackage.V1/       version 1.0.0 of the test package
+    TestPackage.V1_1/     version 1.1.0 of the test package
+    TestPackage.V2/       version 2.0.0 of the test package
+    PythonPackage/        a Python test package of plain files, with a local dependency
+    node-probe-package/   a Node.js package of probe operations, for the runner tests
+    node-test-package/    a Node.js package with a local dependency
   load/                   the k6 scenarios of the load tests
   smoke/                  fixture applications that the smoke tests activate
   e2e/                    Playwright journeys against the running server, and their fixtures
@@ -59,25 +66,34 @@ controlplane/
   src/Axis.ControlPlane/  the control plane service: its settings, its own schema and migrations,
                           its job queue and audit records, health and telemetry
   src/Axis.ControlPlane.Admin/  the operator's commands of the control plane
-  tests/                  its unit tests, and its integration tests on PostgreSQL (Testcontainers)
+  tests/
+    Axis.ControlPlane.Tests/ its unit tests
+    Axis.ControlPlane.Integration.Tests/ its integration tests on PostgreSQL (Testcontainers)
 modules/                  built-in modules, as configuration, installed with Axis: organization and
                           approvals
 applications/             built-in applications, as configuration, installed with Axis: approvals
 samples/
   apps/                   the sample applications, as configuration only
   modules/                the sample module department-budgets, as configuration
-  templates/              the sample templates, as configuration, when there are any
-  packages/               the sample extension packages: the C# package PaymentReferences with its unit tests and the
-                          Python package phone-numbers and the TypeScript package payment-terms
+  packages/               the sample extension packages:
+    PaymentReferences/    the C# package with a creditor reference operation
+    PaymentReferences.Tests/ unit tests of PaymentReferences
+    payment-terms/        the TypeScript package
+    phone-numbers/        the Python package
   keycloak/               the development Keycloak realms and their keys
   postgres/               init-roles.sql: the development database roles and the preview tenant's
                           database
 deploy/
   compose/                production Compose example
   helm/axis/              Helm chart for Kubernetes
+  helm/axis-controlplane/ Helm chart that installs the Axis control plane of a region on Kubernetes
   keycloak/               the breached-password list that tenant realms check
+docs/                     the docs, and the map of them in README.md
 scripts/                  the scripts of AGENTS.md and the checks that lint runs
 ```
+
+Sample templates, as configuration, go in `samples/templates/`. That folder does not exist yet, so the
+tree does not list it.
 
 - **`src/Axis.PackageHost/`**. The package host. Its `build` command checks, scans and writes a C#, Node.js or
   Python package, see [building a package](reference/extension-packages.md#building-a-package). Its `host`
