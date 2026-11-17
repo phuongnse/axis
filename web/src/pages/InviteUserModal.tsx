@@ -1,9 +1,11 @@
 import { Checkbox, Flex, Form, Input, Modal, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisField } from '../platform/AxisField'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { useEffect, useState } from 'react'
 import { EmptyDash } from '../platform/EmptyValue'
 import { fetchCurrentUser } from '../platform/currentUser'
+import { requiredMark } from '../platform/requiredMark'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { fetchUserRoles, inviteUser, type RoleChange, type UserRoles } from '../platform/users'
@@ -142,7 +144,7 @@ export function InviteUserModal({
               message={t('shell.users.invite.rolesFailed')}
             />
           )}
-          <Form form={form} layout="vertical" name="invite" requiredMark={false}>
+          <Form form={form} layout="vertical" name="invite" requiredMark={requiredMark}>
             <Flex vertical gap={spacing.lg}>
               <AxisField
                 name="email"
@@ -164,8 +166,7 @@ export function InviteUserModal({
             </Flex>
           </Form>
           {sections.length > 0 && (
-            <Flex vertical gap="small">
-              <Typography.Text strong>{t('shell.users.invite.roles')}</Typography.Text>
+            <AxisFieldGroup title={t('shell.users.invite.roles')} help={t('shell.users.invite.roles.help')}>
               {sections.map((section) => (
                 <section key={section.key} aria-label={section.title}>
                   <Typography.Title level={5}>{section.title}</Typography.Title>
@@ -186,7 +187,7 @@ export function InviteUserModal({
                   </Flex>
                 </section>
               ))}
-            </Flex>
+            </AxisFieldGroup>
           )}
         </Flex>
       </Modal>

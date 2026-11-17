@@ -89,7 +89,7 @@ function renderTab(initial: TenantOutsideClients) {
 
 /** Chooses Allow list and adds `clientId` to the list. */
 async function allowClient(user: ReturnType<typeof userEvent.setup>, clientId: string) {
-  await user.click(screen.getByRole('radio', { name: 'Allow list' }))
+  await user.click(screen.getByRole('radio', { name: /^Allow list/ }))
   await user.type(await screen.findByRole('combobox', { name: 'Allowed client IDs' }), `${clientId}{Enter}`)
 }
 
@@ -103,10 +103,23 @@ describe('ConnectedAppsTab', () => {
     const user = userEvent.setup()
     renderTab({ outsideClients: 'allowList', allowedClients: ['claude'] })
 
-    expect(screen.getByRole('radio', { name: 'Allow list' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /^Allow list/ })).toBeChecked()
     expect(screen.getByText('claude')).toBeVisible()
-    await user.click(screen.getByRole('radio', { name: 'None' }))
+    await user.click(screen.getByRole('radio', { name: /^None/ }))
     expect(screen.queryByRole('combobox', { name: 'Allowed client IDs' })).toBeNull()
+  })
+
+  it('draws the choice with its label, its help and the help of each option', () => {
+    renderTab(none)
+
+    const group = screen.getByRole('radiogroup', { name: 'Outside MCP clients' })
+    expect(group).toHaveAccessibleDescription('Choose which MCP clients from outside Axis may connect to this tenant.')
+    const [all, allowList, noClients] = within(group).getAllByRole('radio')
+    expect(all).toHaveAccessibleDescription('Any MCP client from outside Axis may register itself and connect.')
+    expect(allowList).toHaveAccessibleDescription(
+      'Only the clients whose IDs are listed below may connect. New clients cannot register.',
+    )
+    expect(noClients).toHaveAccessibleDescription('No MCP client from outside Axis may connect.')
   })
 
   it('sends both values, then reads them again and shows what the server stored', async () => {
@@ -134,7 +147,7 @@ describe('ConnectedAppsTab', () => {
     const fetchMock = stubServer({ stored: { outsideClients: 'none', allowedClients: ['claude'] } })
     renderTab({ outsideClients: 'allowList', allowedClients: ['claude'] })
 
-    await user.click(screen.getByRole('radio', { name: 'None' }))
+    await user.click(screen.getByRole('radio', { name: /^None/ }))
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText('The setting was saved.')).toBeVisible()
@@ -153,7 +166,7 @@ describe('ConnectedAppsTab', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByText('The setting was not saved.')).toBeVisible()
-    expect(screen.getByRole('radio', { name: 'Allow list' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /^Allow list/ })).toBeChecked()
     expect(screen.getByText('claude')).toBeVisible()
   })
 
@@ -170,7 +183,7 @@ describe('ConnectedAppsTab', () => {
         'The setting was stored, but the identity provider did not apply it. Save again to apply it.',
       ),
     ).toBeVisible()
-    expect(screen.getByRole('radio', { name: 'Allow list' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /^Allow list/ })).toBeChecked()
     expect(screen.getByText('claude')).toBeVisible()
   })
 

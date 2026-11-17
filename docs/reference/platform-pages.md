@@ -81,7 +81,8 @@ sorts and pages them, see [the list route](user-administration.md#read-routes).
 ### Inviting and resending
 
 - **Invite.** The "Invite" button next to the search box opens a form with the email, the display name
-  and optional roles. The roles are in one section for each active application and one for the
+  and optional roles. The email and the display name are marked required. The roles sit in a "Roles" group
+  with its help, in one section for each active application and one for the
   platform, as on [a user's roles](#a-users-roles). The form gets them from the
   [roles route](user-administration.md#read-routes), called with the signed-in administrator's own id,
   and uses only `applications` and `platformRoles`. When they cannot be loaded, the form says so and
@@ -234,7 +235,7 @@ when the route answers `200`. That keeps it hidden from a user who is not an adm
 tenant with no directory row. A `403` or `404` is not logged, and any other failure is logged. Its texts are
 `shell.users.connectedApps.*`.
 
-- **Mode.** A choice of "All", "Allow list" or "None" shows the stored mode.
+- **Mode.** A choice of "All", "Allow list" or "None" shows the stored mode. Each option has its own help.
 - **Client IDs.** Under "Allow list", an editable list of client IDs shows. A typed ID is added with Enter. The tab keeps
   the list when another mode is chosen and sends it under every mode, because the server stores it under every mode.
 - **Save.** The "Save" button sends both values with `PUT /api/tenant/outside-clients`, then reads

@@ -1,9 +1,9 @@
-import { Flex, Modal, Radio, Select, Typography } from 'antd'
+import { Flex, Modal, Select, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
+import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
-import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { AxisTable } from '../platform/AxisTable'
 import { FilledText } from '../platform/FilledText'
 import { useText } from '../platform/texts'
@@ -30,11 +30,11 @@ const modes: TenantOutsideClients['outsideClients'][] = ['all', 'allowList', 'no
  * under every mode, because the server stores it under every mode. Save sends both values with
  * `PUT /api/tenant/outside-clients`, then reads them again, so the tab shows what the server stored, with the ids trimmed
  * and without repeats. A failed save keeps the edited values on screen, and a `502` says that the change is stored and
- * that saving again applies it. Below the switch, a table lists the apps that people consented to, read with
+ * that saving again applies it. Each option has its own help. Below the choice, a table lists the apps that people consented to, read with
  * `GET /api/tenant/connected-apps`: the name, the client ID, the people who consented and the last use. Each row has a
  * Revoke button that asks for a confirmation naming the client, then sends
  * `POST /api/tenant/connected-apps/{clientId}/revoke` and reads the list again. A failed revoke keeps the row, and a
- * `502` says that revoking again finishes it. A list that does not load shows a message and leaves the switch working.
+ * `502` says that revoking again finishes it. A list that does not load shows a message and leaves the choice working.
  * The users page shows the tab only when the outside clients route answers `200`.
  * See docs/reference/platform-pages.md#connected-apps.
  */
@@ -120,17 +120,22 @@ export function ConnectedAppsTab({ initial }: { initial: TenantOutsideClients })
 
   return (
     <Flex vertical gap="middle" data-testid="connected-apps">
-      <AxisFieldGroup title={t('shell.users.connectedApps.mode')} help={t('shell.users.connectedApps.modeHelp')}>
-        <Radio.Group value={mode} onChange={(event) => setMode(event.target.value)}>
-          <Flex vertical>
-            {modes.map((value) => (
-              <Radio key={value} value={value}>
-                {t(`shell.users.connectedApps.${value}`)}
-              </Radio>
-            ))}
-          </Flex>
-        </Radio.Group>
-      </AxisFieldGroup>
+      <AxisChoiceField
+        label={t('shell.users.connectedApps.mode')}
+        help={t('shell.users.connectedApps.modeHelp')}
+        value={mode}
+        onChange={(value) => {
+          const next = modes.find((candidate) => candidate === value)
+          if (next) {
+            setMode(next)
+          }
+        }}
+        options={modes.map((value) => ({
+          value,
+          label: t(`shell.users.connectedApps.${value}`),
+          help: t(`shell.users.connectedApps.${value}Help`),
+        }))}
+      />
       {mode === 'allowList' && (
         <AxisField label={t('shell.users.connectedApps.clients')} help={t('shell.users.connectedApps.clientsHelp')}>
           <Select
