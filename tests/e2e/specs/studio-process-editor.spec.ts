@@ -863,7 +863,7 @@ test.describe("Studio edits a process in the process editor", () => {
       await page
         .getByTestId(`studio-field-${notify}/to/0`)
         .locator("label")
-        .filter({ has: page.getByRole("radio", { name: "Role", exact: true }) })
+        .filter({ has: page.getByRole("radio", { name: /^Role/ }) })
         .click();
       await pick(
         page,
@@ -949,12 +949,12 @@ test.describe("Studio edits a process in the process editor", () => {
       await addMapping(input);
       await page
         .getByTestId(`studio-field-/steps/${index}/input/`)
-        .getByRole("textbox", { name: "Input name", exact: true })
+        .getByRole("textbox", { name: "Name", exact: true })
         .fill("lines");
 
       const row = page.getByTestId(`studio-field-/steps/${index}/input/lines`);
       await row
-        .getByRole("radio", { name: "List", exact: true })
+        .getByRole("radio", { name: /^List/ })
         .locator("xpath=ancestor::label")
         .click();
       await pick(
@@ -971,7 +971,7 @@ test.describe("Studio edits a process in the process editor", () => {
         await addMapping(nested);
         await page
           .getByTestId(`studio-field-/steps/${index}/input/lines/fields/`)
-          .getByRole("textbox", { name: "Nested field", exact: true })
+          .getByRole("textbox", { name: "Name", exact: true })
           .fill(name);
         const field = page.getByTestId(
           `studio-field-/steps/${index}/input/lines/fields/${name}`,

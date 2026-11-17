@@ -325,7 +325,6 @@ function ConnectorMappings({
         <ConnectorInputRows
           pointer={`${pointer}/input`}
           {...group('steps.input')}
-          keyLabel={t('shell.studio.process.inputName')}
           value={step.input}
           entity={entity}
           onChange={onChange}

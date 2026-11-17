@@ -1,5 +1,7 @@
-import { Button, Checkbox, Flex, Radio, Typography } from 'antd'
+import { Button, Checkbox, Flex, Typography } from 'antd'
 import { useContext } from 'react'
+import { AxisCheckboxField } from '../platform/AxisCheckboxField'
+import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { StudioNamesContext } from '../platform/studioNames'
@@ -15,8 +17,6 @@ type Content = Record<string, unknown>
 const channelOptions = ['inApp', 'email'] as const
 
 const recipientKinds = ['user', 'role', 'email'] as const
-
-type RecipientKind = (typeof recipientKinds)[number]
 
 function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -67,7 +67,10 @@ export function NotifyFields({
   )
 }
 
-/** The recipients as rows. A row is a user expression, a role or an email expression, and a switch keeps one key. */
+/**
+ * The recipients as rows. A row is a choice of its recipient type, User, Role or Email, then the field of that type: a
+ * user expression, a role picker or an email expression. A switch keeps one key, and each field sits on its own line.
+ */
 function Recipients({
   pointer,
   path,
@@ -86,11 +89,6 @@ function Recipients({
     return <JsonOnly pointer={pointer} {...recipientsGroup} />
   }
   const recipients: unknown[] = value ?? []
-  const labels: Record<RecipientKind, string> = {
-    user: t('shell.studio.process.recipientUser'),
-    role: t('shell.studio.process.recipientRole'),
-    email: t('shell.studio.process.recipientEmail'),
-  }
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
@@ -102,37 +100,38 @@ function Recipients({
             const kind = recipientKinds.find((candidate) => row[candidate] !== undefined) ?? 'user'
             const entry = field(`${path}.to.${kind}`)
             return (
-              <Flex key={index} gap="small" align="flex-start" wrap data-testid={`studio-field-${rowPointer}`}>
-                <Radio.Group
-                  name={`recipient-${rowPointer}`}
-                  optionType="button"
-                  aria-label={recipientsGroup.title}
+              <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
+                <AxisChoiceField
+                  {...field(`${path}.to.kind`)}
+                  required
                   value={kind}
-                  options={recipientKinds.map((candidate) => ({ value: candidate, label: labels[candidate] }))}
-                  onChange={(event) => onChange(rowPointer, { [event.target.value]: text(row[event.target.value]) })}
+                  options={recipientKinds.map((candidate) => ({
+                    value: candidate,
+                    ...field(`${path}.to.kind.${candidate}`),
+                  }))}
+                  onChange={(next) => onChange(rowPointer, { [next]: text(row[next]) })}
                 />
-                <div style={{ flex: 1, minWidth: 240 }}>
-                  {kind === 'role' ? (
-                    <NamePicker
-                      pointer={`${rowPointer}/role`}
-                      {...field(`${path}.to.role`)}
-                      kind="role"
-                      value={row.role}
-                      onPick={(next) => onChange(`${rowPointer}/role`, next)}
-                    />
-                  ) : (
-                    <div data-testid={`studio-field-${rowPointer}/${kind}`}>
-                      <AxisField {...entry}>
-                        <Expression
-                          pointer={`${rowPointer}/${kind}`}
-                          name={entry.label}
-                          value={text(row[kind])}
-                          onChange={onChange}
-                        />
-                      </AxisField>
-                    </div>
-                  )}
-                </div>
+                {kind === 'role' ? (
+                  <NamePicker
+                    pointer={`${rowPointer}/role`}
+                    {...field(`${path}.to.role`)}
+                    kind="role"
+                    value={row.role}
+                    required
+                    onPick={(next) => onChange(`${rowPointer}/role`, next)}
+                  />
+                ) : (
+                  <div data-testid={`studio-field-${rowPointer}/${kind}`}>
+                    <AxisField {...entry} required>
+                      <Expression
+                        pointer={`${rowPointer}/${kind}`}
+                        name={entry.label}
+                        value={text(row[kind])}
+                        onChange={onChange}
+                      />
+                    </AxisField>
+                  </div>
+                )}
                 {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button onClick={() => onChange(rowPointer, undefined)}>
                   {t('shell.studio.process.removeRecipient')}
@@ -269,12 +268,11 @@ function OpenPage({
   return (
     <div data-testid={`studio-field-${pointer}`}>
       <Flex vertical gap="small">
-        <AxisField {...field(`${path}.open`)}>
-          <Checkbox
-            checked={open !== undefined}
-            onChange={(event) => onChange(pointer, event.target.checked ? { page: '' } : undefined)}
-          />
-        </AxisField>
+        <AxisCheckboxField
+          {...field(`${path}.open`)}
+          checked={open !== undefined}
+          onChange={(checked) => onChange(pointer, checked ? { page: '' } : undefined)}
+        />
         {open !== undefined && (
           <>
             <NamePicker
@@ -282,6 +280,7 @@ function OpenPage({
               {...field(`${path}.open.page`)}
               kind="page"
               value={open.page}
+              required
               onPick={(next) => onChange(`${pointer}/page`, next)}
             />
             <MappingRows
