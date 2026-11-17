@@ -23,6 +23,11 @@ These principles hold in every language.
   makes Axis the subject of a help text, which needs none, and never calls what a business gets "your Axis",
   which reads as the product, an account or an address at once: it names the address the person signs in
   at, or the trial.
+- **A screen that cannot show says so in the person's words.** _(planned for M35)_ A screen never says that a page or a
+  widget is "drawn" or "compiled": "The page cannot show until its errors are fixed." A field that the platform fills
+  names Axis, not the server: "Axis fills this field, so it is always read-only."
+- **Each failure names what failed.** _(planned for M35)_ A failure has its own text that names the thing, such as "The
+  policy {policy} could not be loaded.", and never the text of the whole screen.
 - **A setting by what it means.** Name a setting by what it is to the person, not by the English word for it: what
   people see as a field's name is its display name, and what a field holds is its data type.
 - **One term for one concept.** Use the glossary's term. Never bring in a synonym, and never change an approved term in
@@ -63,19 +68,19 @@ These principles hold in every language.
 
 Each kind of text has its own shape, the same on every screen:
 
-| Kind               | How it reads                                                                  | Example (en)                                                                  |
-| ------------------ | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Button, menu item  | A verb and its object, no period. A button that opens a dialog ends with "…". | Add field, New entity…, Publish…                                              |
-| Dialog title       | The question or the task, as the finish button names it.                      | Delete the role?                                                              |
-| Field label        | A noun phrase, no period, no colon.                                           | Display field                                                                 |
-| Help text          | One sentence that says what the field is for or what to enter, with a period. | The field that names a record in lists and pickers.                           |
-| Placeholder        | Not used: what a placeholder would say goes into the help text.               |                                                                               |
-| Validation message | What to do, as a short imperative, with a period.                             | Enter a name.                                                                 |
-| Error message      | What happened, why if known, and what to do, with a period.                   | The entity could not be saved because its name is taken. Choose another name. |
-| Empty state        | What is not there, then what to do.                                           | No fields yet. Add the first field.                                           |
-| Confirmation       | What will happen and what is lost, then the verb on the button.               | The role and its grants are deleted. This cannot be undone.                   |
-| Tooltip            | The name of an icon button, no "…", no period.                                | Filter                                                                        |
-| Status             | A short state, as a noun or an adjective.                                     | Live, Not published                                                           |
+| Kind                      | How it reads                                                                  | Example (en)                                                                  |
+| ------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Button, menu item         | A verb and its object, no period. A button that opens a dialog ends with "…". | Add field, New entity…, Publish…                                              |
+| Dialog title              | The question or the task, as the finish button names it.                      | Delete the role?                                                              |
+| Field label               | A noun phrase, no period, no colon.                                           | Display field                                                                 |
+| Help text                 | One sentence that says what the field is for or what to enter, with a period. | The field that names a record in lists and pickers.                           |
+| Placeholder (of an input) | Not used: what a placeholder would say goes into the help text.               |                                                                               |
+| Validation message        | What to do, as a short imperative, with a period.                             | Enter a name.                                                                 |
+| Error message             | What happened, why if known, and what to do, with a period.                   | The entity could not be saved because its name is taken. Choose another name. |
+| Empty state               | What is not there, then what to do.                                           | No fields yet. Add the first field.                                           |
+| Confirmation              | What will happen and what is lost, then the verb on the button.               | The role and its grants are deleted. This cannot be undone.                   |
+| Tooltip                   | The name of an icon button, no "…", no period.                                | Filter                                                                        |
+| Status                    | A short state, as a noun or an adjective.                                     | Live, Not published                                                           |
 
 A label, a title and a button take sentence case in English: "Display field", not "Display Field".
 
@@ -83,6 +88,33 @@ A label or a column title does not repeat what its section, table, row or dialog
 are Name, Label and Type, not Field name, Field label and Field type, and a step's settings say Name, not Step name. An
 accessible name that no visible heading explains, such as an input's `aria-label` in a row with no title, keeps the
 noun.
+
+Help text follows these rules as well:
+
+- **An example says what it means.** _(planned for M35)_ "such as P3D for three days" / "như P3D là 3 ngày", or "such as
+  2026-01-15T09:00:00Z for 9:00 UTC on 15 January 2026" / "như 2026-01-15T09:00:00Z là 9:00 UTC ngày 15/1/2026".
+- **An empty value has its own sentence.** _(planned for M35)_ The sentence says what empty does, and it is true:
+  "Leave it empty for thirty seconds." / "Để trống thì là 30 giây."
+- **A condition says what happens when it is true.** _(planned for M35)_ "When this expression is true, the field shows.
+  Leave it empty to always show it." / "Khi biểu thức này đúng, trường được hiển thị. Để trống thì trường luôn hiển thị.".
+  The other two conditions read "the field must be filled in" / "trường bắt buộc phải điền" and "the field is read-only"
+  / "trường chỉ đọc".
+- **A checkbox says what turning it on does.** _(planned for M35)_ "Turn on so people see the field but cannot change it."
+  / "Bật để người dùng chỉ xem được trường, không sửa được."
+- **A choice that clears another names what it clears.** _(planned for M35)_ It names the clear in the person's words:
+  "Choosing it clears the data source or form chosen before.", never "the widget's other binding".
+- **A text that the author writes in each language says so.** _(planned for M35)_ Its help ends "in each language of the
+  application" / "bằng từng ngôn ngữ của ứng dụng", as a page's title does.
+- **A width counts twelfths of a row.** _(planned for M35)_ The label is "Width (of 12)" / "Độ rộng (trên 12 cột)", and the
+  help gives 12 and 6 as examples: 12 fills the row, 6 takes half of it.
+- **A limit is stated plainly.** _(planned for M35)_ "up to 2000 characters" / "tối đa 2000 ký tự".
+- **A sample name is Contoso.** _(planned for M35)_ A help text that names a sample company or person uses Contoso.
+- **A setting shown in two places has one label and help.** _(planned for M35)_ A grant's "Record filter" / "Bộ lọc bản
+  ghi", "Every record" / "Mọi bản ghi" and "All fields" / "Mọi trường" read the same in the matrix and in a policy's form.
+- **A label in a named group does not repeat the group.** _(planned for M35)_ The labels of an input, an output and a
+  nested field are "Name" / "Tên" and "Type" / "Kiểu dữ liệu", because the group's name says the rest. A label outside
+  a group keeps what it labels, so no two fields of one screen share a name: "Authentication type" / "Kiểu xác thực",
+  "Operation name" / "Tên thao tác".
 
 ## Placeholders and numbers
 
@@ -94,6 +126,14 @@ A text that holds a value reads as a whole sentence in every locale.
   an entity's label, keeps its own capitals: "Tham chiếu tới Phòng ban".
 - A count reads naturally: English needs "1 field" and "3 fields"; a language without plural forms writes one text.
 - Dates, times and numbers come from the locale's formats, never from words in a text.
+- **A text that holds a value is one text.** _(planned for M35)_ An announcement or an accessible name is one text with
+  placeholders, never words and names joined in code: "Added step {name} after {after}." / "Đã thêm bước {name} sau
+  {after}.". `fillText` fills a string text, and `FilledText` fills a text with nodes. A text that already holds
+  placeholders is never a piece of another text.
+- **A list of marks joins through the locale's list format.** _(planned for M35)_ `Intl.ListFormat` joins the items, so
+  each language writes its own "and" or its own comma.
+- **A kind in a text is its name, never its code.** _(planned for M35)_ The name comes from `kindSingular` or from
+  `shell.studio.nav.kindOne.<kind>`: "{kind}, from {module}" / "{kind}, từ {module}". The capitals rule above applies.
 
 ## The glossary
 
@@ -122,6 +162,8 @@ These rules add to the principles for the `en` texts.
 - Plain international English, with British spelling where it differs: "behaviour", "licence" for the noun.
 - Address the person as "you" only when a sentence needs a subject; most texts need none.
 - An action is a verb: "Add field", not "Field addition".
+- **A button names the thing it makes.** _(planned for M35)_ A button does not name a thing that the row points to: a
+  row that maps a claim value to a role is added by "Add claim value", not "Add role".
 
 ## Vietnamese
 
@@ -184,6 +226,21 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   and one after; a non-breaking space between a number and its unit, "250 GB", and none before "%": "80%".
 - **Acronyms stay in English**, ID, URL, PIN, JSON, and an English term the glossary keeps is not mixed with a
   translation of the same concept on one screen.
+- **The person a task goes to is "người được giao".** _(planned for M35)_ An expression that lets a user pick that person
+  reads "Biểu thức chọn người làm công việc.". A role's people read "Những người có vai trò này …", never "Vai trò mà
+  những người có vai trò đó …".
+- **A code keeps its name, with its meaning in brackets.** _(planned for M35)_ "như read (đọc) hoặc update (cập nhật)",
+  "object (nhóm trường)". "header" stays "header", never "tiêu đề".
+- **An empty field that falls back to a code names the code's kind.** _(planned for M35)_ "Để trống thì dùng claim name.".
+- **Axis is the subject of what it refuses or ignores.** _(planned for M35)_ Studio's help says what Axis refuses or
+  ignores, actively and without "bị": "Axis từ chối lần đăng nhập ở mức khác.", "Axis bỏ qua giá trị claim không ứng với
+  vai trò nào của ứng dụng.". A claim value "ứng với" a role. This applies to Studio's help. The sign-up rule under
+  Principles covers sign-up texts only.
+- **Used by's relations are the verb alone.** _(planned for M35)_ Where the row names the resource, a relation is the verb
+  alone: "Phát ra", "Chờ", "Gửi đi", "Gọi thao tác", "Giả lập thao tác", "Kiểm thử". It names the resource only where the
+  verb needs "cho" or "với": "Cấp quyền cho vai trò này", "Kiểm thử với vai trò này". An action is "hành động", never "nút".
+- **A scenario's fixed time names its event.** _(planned for M35)_ Its label is "Runs at" / "Chạy lúc", as the time bullet
+  above asks, and its example says what the time means.
 
 ## Checks
 

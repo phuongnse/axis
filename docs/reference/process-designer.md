@@ -123,7 +123,7 @@ removal.
 
 - **A step** is removed by its panel's Remove step button, or by Delete or Backspace in the canvas.
   Removing the selected step clears the selection.
-- **An edge.** With an edge selected, the panel shows a Remove transition button above the step's panel,
+- **An edge.** _(planned for M35)_ With an edge selected, the panel shows a Remove line button above the step's panel,
   and Delete or Backspace in the canvas clears that transition instead of removing the step.
 - **A block.** _(planned for M38)_ Removing a block removes the steps in its branches or body too, in one edit, so
   one Undo brings them all back.
@@ -217,9 +217,10 @@ The assignee of a task has a kind choice of User, Role or Several people. A task
 
 ### Timer
 
-A timer's panel has a Wait or Until choice, a duration box for `wait`, an expression editor for `until`,
-and a Next step picker. Switching removes the other key and puts the chosen key, empty, in its place, and
-one Undo brings the old key back. A timer with neither key or both opens in Wait.
+- **The choice.** _(planned for M35)_ A timer's panel has a For a time or Until a time choice, a duration box for
+  `wait`, an expression editor for `until`, and a Next step picker. Switching removes the other key and puts the
+  chosen key, empty, in its place, and one Undo brings the old key back. A timer with neither key or both opens in
+  For a time.
 
 ### Sub-process
 
@@ -286,8 +287,8 @@ A `repeat` panel has a Kind choice, with one field under it for that kind. The k
 
 _(planned for M38)_
 
-A `setVariables` panel has one Set row for each process variable, as the updateRecord panel has one row for each
-field. A row shows the variable's name and type, and an expression for its value, which must fit that type. A Next
+A `setVariables` panel has one row for each process variable, under Field values, as the updateRecord panel has one
+row for each field. A row shows the variable's name and type, and an expression for its value, which must fit that type. A Next
 step picker follows the rows.
 
 ### Error paths
@@ -314,12 +315,12 @@ Every add, move and remove has a keyboard way, and a hidden live region says wha
   and nodes in step order. Enter selects a node's step and opens its panel, and Enter or Space on an edge
   selects that edge. Delete or Backspace removes the selection.
 - **Edge names.** Each edge has a name made of its two steps and its branch or outcome.
-- **What the live region says.** "Removed step remind", "Removed transition financeCheck to
-  markApproved", "Step remind added after resolve", or "Step remind added" for an unconnected step, "An
-  end step cannot be inserted into a transition", and "submit now goes to done". A choice from the
-  transition menu also names its branch or outcome. A move names the step now before the moved step, such
-  as "Step financeCheck moved after submit", and a step moved to the first place in `steps` says "Step
-  financeCheck moved to the start". That place is the top of the list, not the process's `start` step.
+- **What the live region says.** _(planned for M35)_ "Removed step remind.", "Removed the line financeCheck to
+  markApproved.", "Added step remind after resolve.", or "Added step remind." for an unconnected step, "An end step
+  cannot go on a line.", and "submit now goes to done.". A choice from the transition menu also names its branch or
+  outcome. A move names the step now before the moved step, such as "Moved step financeCheck after submit.", and a
+  step moved to the first place in `steps` says "Moved step financeCheck to the start.". That place is the top of
+  the list, not the process's `start` step.
 - **Parts of a name join with a comma**. A node's name and type, an edge's steps and
   its branch or outcome, and a transition menu's choice join as peers, as in "financeCheck to
   markApproved, otherwise" and "managerApproval, approve now goes to done", see
@@ -334,9 +335,11 @@ Every add, move and remove has a keyboard way, and a hidden live region says wha
 ## Diagnostics
 
 A step of the open process is marked when a diagnostic of the open resource names its path, `/steps/{i}`
-or a path inside it. A marked node has an error-coloured border, "has diagnostics" in its text label, and
+or a path inside it. A marked node has an error-coloured border, its text label, and
 `data-marked`. The marks come from the Problems panel's last loaded list, so they change on a load, a
 save or a request, not on every edit.
+
+- **The text label.** _(planned for M35)_ A marked node's text label reads "{step}, has problems", with the step's name.
 
 - **Nested steps.** _(planned for M38)_ A diagnostic at a path inside a nested step marks that nested node, and not
   the frame around it. A diagnostic at a block's own path marks the frame, and not the steps inside it.
