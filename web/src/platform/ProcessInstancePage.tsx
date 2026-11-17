@@ -1,8 +1,9 @@
 import { Flex, Tabs, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
+import { studioResourceAddress } from './studioAddress'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { NotSet } from './EmptyValue'
 import { formatValue } from './formatValue'
 import {
@@ -41,7 +42,7 @@ import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
 import { useAddressTab } from './addressTab'
-import { recordPageSize, writeTableQuery } from './tableQuery'
+import { recordPageSize } from './tableQuery'
 import { useReleaseTexts } from './useReleaseTexts'
 import { useTableView } from './useTableView'
 
@@ -207,6 +208,7 @@ export function InstanceDetailView({
   stepNames = false,
 }: InstanceDetailViewProps) {
   const t = useText()
+  const navigate = useNavigate()
   const stepsByName = useMemo(
     () => new Map(instance.graph.steps.map((step) => [step.name, step])),
     [instance.graph.steps],
@@ -268,15 +270,6 @@ export function InstanceDetailView({
   const openRun = (step: string, run: number | null = null) => {
     setChosenStep(step)
     showRun(step, run)
-  }
-  const showStep = (step: string) => {
-    const next = writeTableQuery(
-      searchParams,
-      { ...timelineView, page: 1, filter: { all: [{ field: 'step', op: 'eq', value: step }] } },
-      recordPageSize,
-    )
-    next.set('tab', 'history')
-    setSearchParams(next, { preventScrollReset: true })
   }
 
   // Proposed, see the review on #3650: the instance is headed by its process, its state a tag beside it and its kind the
@@ -544,7 +537,23 @@ export function InstanceDetailView({
         tags={<StatusTag tone={instanceTone(instance)}>{stateText(t, instance.state)}</StatusTag>}
       />
       <PageActions>
-        <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
+        <Flex gap="small">
+          {/* Proposed, see the review on #3650: an author opens the instance's process in Studio's designer from its
+              heading, as AWS Step Functions and Power Automate do from a run; the server tells only an author where. */}
+          {instance.studio && (
+            <AxisButton
+              role="secondary"
+              data-testid="inspector-open-in-studio"
+              onClick={() =>
+                instance.studio &&
+                navigate(studioResourceAddress(instance.studio.application, instance.studio.resource))
+              }
+            >
+              {t('shell.inspector.openInStudio')}
+            </AxisButton>
+          )}
+          <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
+        </Flex>
       </PageActions>
       {/* Proposed: a failed instance says at the top of its page where it stopped and why, as AWS Step Functions and
           Camunda Operate do; a waiting one says nothing more than its tag and the graph, see the review on #3650. */}
@@ -635,7 +644,6 @@ export function InstanceDetailView({
           onTab={(tab) => showRun(panelStep, panelRun, tab)}
           onOpen={openRun}
           onClose={() => showRun(null)}
-          onShowInTimeline={showStep}
           stepLabel={stepLabel}
           outcomeLabel={outcomeLabel}
           inspectors={inspectors}

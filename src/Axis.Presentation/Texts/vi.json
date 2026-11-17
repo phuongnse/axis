@@ -711,7 +711,6 @@
   "shell.inspector.graph.runsLast": "{count} lần, lần cuối {duration}",
   "shell.graph.closeDetails": "Đóng",
   "shell.inspector.graph.notReached": "Lượt chạy chưa tới bước này.",
-  "shell.inspector.graph.showInTimeline": "Xem trong dòng thời gian",
   "shell.graph.zoomIn": "Phóng to",
   "shell.graph.zoomOut": "Thu nhỏ",
   "shell.graph.fit": "Xem toàn bộ quy trình",
@@ -2742,7 +2741,6 @@
   "shell.stepRun.waitingFor": "Chờ",
   "shell.stepRun.givesUp": "Thôi chờ lúc",
   "shell.stepRun.goesOn": "Chạy tiếp lúc",
-  "shell.stepRun.openInStudio": "Mở bước trong Studio",
   "shell.inspector.status.waitingAtSteps": "Đang chờ ở {count} bước trong {since}: {steps}.",
   "shell.inspector.status.stepFor": "{step}, chờ {assignee}",
   "shell.graph.currents": "Tới một bước lượt chạy đang ở",
@@ -2755,7 +2753,6 @@
   "shell.stepRun.eventRaised": "Sự kiện đã phát",
   "shell.stepRun.eventFields": "Trường của sự kiện",
   "shell.stepRun.notified": "Đã thông báo",
-  "shell.stepRun.sentTo": "Gửi tới",
   "shell.stepRun.channels": "Kênh",
   "shell.stepRun.subject": "Tiêu đề",
   "shell.stepRun.created": "Bản ghi đã tạo",
@@ -2785,5 +2782,6 @@
   "shell.table.showDetails": "Xem chi tiết",
   "shell.table.hideDetails": "Ẩn chi tiết",
   "shell.stepRun.thenGoesTo": "Sau đó đi tới",
-  "shell.stepRun.ended": "Kết thúc"
+  "shell.stepRun.ended": "Kết thúc",
+  "shell.inspector.openInStudio": "Mở trong Studio"
 }

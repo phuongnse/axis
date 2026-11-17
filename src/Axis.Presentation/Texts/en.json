@@ -711,7 +711,6 @@
   "shell.inspector.graph.runsLast": "{count} runs, last {duration}",
   "shell.graph.closeDetails": "Close",
   "shell.inspector.graph.notReached": "The instance has not reached this step.",
-  "shell.inspector.graph.showInTimeline": "Show in the timeline",
   "shell.graph.zoomIn": "Zoom in",
   "shell.graph.zoomOut": "Zoom out",
   "shell.graph.fit": "Show the whole process",
@@ -2742,7 +2741,6 @@
   "shell.stepRun.waitingFor": "Waits for",
   "shell.stepRun.givesUp": "Gives up at",
   "shell.stepRun.goesOn": "Goes on at",
-  "shell.stepRun.openInStudio": "Open the step in Studio",
   "shell.inspector.status.waitingAtSteps": "Waiting at {count} steps for {since}: {steps}.",
   "shell.inspector.status.stepFor": "{step} for {assignee}",
   "shell.graph.currents": "Go to a step the instance is at",
@@ -2755,7 +2753,6 @@
   "shell.stepRun.eventRaised": "Event raised",
   "shell.stepRun.eventFields": "Event fields",
   "shell.stepRun.notified": "Notified",
-  "shell.stepRun.sentTo": "Sent to",
   "shell.stepRun.channels": "Channels",
   "shell.stepRun.subject": "Subject",
   "shell.stepRun.created": "Record created",
@@ -2785,5 +2782,6 @@
   "shell.table.showDetails": "Show the details",
   "shell.table.hideDetails": "Hide the details",
   "shell.stepRun.thenGoesTo": "Then goes to",
-  "shell.stepRun.ended": "Ended"
+  "shell.stepRun.ended": "Ended",
+  "shell.inspector.openInStudio": "Open in Studio"
 }

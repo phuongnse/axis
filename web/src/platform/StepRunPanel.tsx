@@ -9,7 +9,6 @@ import { jsonRows, textRows } from './valueRows'
 import { EmptyDash } from './EmptyValue'
 import { EventTime } from './EventTime'
 import { formatValue } from './formatValue'
-import { studioResourceAddress } from './studioAddress'
 import { inspectorPath } from './inspectorPages'
 import type { CallAttempt, InstanceCall, InstanceDetail, RunOutput, StepDefinition } from './inspection'
 import { durationText, stepRuns, type StepRun } from './instanceRuns'
@@ -84,7 +83,6 @@ export function StepRunPanel({
   onTab,
   onOpen,
   onClose,
-  onShowInTimeline,
   stepLabel,
   outcomeLabel,
   inspectors,
@@ -101,7 +99,6 @@ export function StepRunPanel({
   /** Opens another step's run, such as the one this run came from, or its last run with `null`. */
   onOpen: (step: string, run: number | null) => void
   onClose: () => void
-  onShowInTimeline: (step: string) => void
   stepLabel: (name: string) => string
   outcomeLabel: (step: string, name: string) => string
   inspectors: ReadonlyMap<string, string> | undefined
@@ -171,7 +168,6 @@ export function StepRunPanel({
         {id.slice(0, 8)}
       </Typography.Text>
     )
-  const stepIndex = instance.graph.steps.findIndex((candidate) => candidate.name === step)
   // Proposed, see the review on #3650: what a wait's run waits for, and until when, whether it still waits or not: an
   // event, and when the wait gives up and where it goes then; or a timer, and when it goes on. The engine keeps the time as the run's due time;
   // the prototype works it out from the step.
@@ -341,25 +337,7 @@ export function StepRunPanel({
       },
       { key: 'trace', term: t('shell.stepRun.traceId'), value: traceId(shown.traceId) },
     ]
-    return (
-      <Flex vertical gap={spacing.md}>
-        <TermList terms={terms} />
-        <Flex gap={spacing.md} wrap>
-          <AxisButton role="link" inline onClick={() => onShowInTimeline(step)}>
-            {t('shell.inspector.graph.showInTimeline')}
-          </AxisButton>
-          {/* Proposed: how the step is set lives in Studio's process designer, so an author opens it there, see the
-              review on #3650; the server tells only an author where. */}
-          {instance.studio && stepIndex >= 0 && (
-            <Link
-              to={studioResourceAddress(instance.studio.application, instance.studio.resource, `/steps/${stepIndex}`)}
-            >
-              {t('shell.stepRun.openInStudio')}
-            </Link>
-          )}
-        </Flex>
-      </Flex>
-    )
+    return <TermList terms={terms} />
   }
 
   const hidden = muted(t('shell.stepRun.hidden'))
@@ -569,24 +547,17 @@ export function StepRunPanel({
         ),
       })
     }
+    // The people a step notified, by which channels and with which subject, are facts of their own, as every other.
     if (made?.notified !== undefined) {
-      terms.push({
-        key: 'notified',
-        term: t('shell.stepRun.notified'),
-        value: (
-          <TermList
-            terms={[
-              { key: 'to', term: t('shell.stepRun.sentTo'), value: made.notified.to.join(', ') },
-              {
-                key: 'channels',
-                term: t('shell.stepRun.channels'),
-                value: made.notified.channels.map((channel) => t(`shell.stepRun.channel.${channel}`)).join(', '),
-              },
-              { key: 'subject', term: t('shell.stepRun.subject'), value: made.notified.subject },
-            ]}
-          />
-        ),
-      })
+      terms.push(
+        { key: 'notified', term: t('shell.stepRun.notified'), value: made.notified.to.join(', ') },
+        {
+          key: 'channels',
+          term: t('shell.stepRun.channels'),
+          value: made.notified.channels.map((channel) => t(`shell.stepRun.channel.${channel}`)).join(', '),
+        },
+        { key: 'subject', term: t('shell.stepRun.subject'), value: made.notified.subject },
+      )
     }
     if (made?.created !== undefined) {
       terms.push({
