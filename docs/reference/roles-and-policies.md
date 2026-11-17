@@ -157,6 +157,8 @@ outcomes. Operators inspect the approvals and change nothing:
   - an `endpoint` takes `invoke`;
   - **a `calendar`** _(planned for M39)_ takes `read` and `update`, see
     [days off and make-up days](working-time.md#days-off-and-make-up-days).
+  - **`comment` and `internalComments`** _(planned for M43)_ take the comment actions of an entity, see
+    [record comments](comments.md#record-comments).
   - `export` stays within the user's `read` grants and `import` within their
     `create` and `update` grants, as [import and export](import-export.md#grants)
     says.

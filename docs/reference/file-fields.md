@@ -232,6 +232,8 @@ purged by the worker.
 - **Audit of a file in a call.** _(planned for M40)_ A call input of the type `file` maps a file field by its
   name. Step history, logs and audit hold the file's id and size, never its name or bytes, see
   [files in calls](process-execution.md#files-in-calls).
+- **Comment files.** _(planned for M43)_ A file of a comment is a file of its owner comment, with the same upload,
+  download and clean-up, see [comment files](comments.md#files).
 
 ## The `fileStorage` manifest property
 

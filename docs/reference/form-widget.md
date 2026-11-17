@@ -400,6 +400,12 @@ A new record has no history panel.
   is the panel's own and stays out of the URL.
 - **Failure.** When the history fails to load, an error shows inside the panel, and the form still
   works.
+- **Timeline.** _(planned for M43)_ The panel reads the [timeline](comments.md#the-timeline) route. A filter by kind
+  shows the comments, changes, steps or emails, or all of them.
+- **Comment box.** _(planned for M43)_ The box shows with the `comment` or `internalComments` grant. Its visibility is
+  an `AxisChoiceField` of Internal and Shared, shown only to a person who holds both grants. Mentions use the
+  reassign user picker, and files use the upload control of a file field. A person edits or deletes their own
+  comment within `Comments:EditWindow`, see [editing and deleting](comments.md#editing-and-deleting).
 
 ## Form metadata
 

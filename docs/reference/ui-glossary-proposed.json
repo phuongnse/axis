@@ -361,6 +361,48 @@
       "vi": "màu chính",
       "status": "proposed",
       "note": "A site's colour, from which its other colours follow."
+    },
+    {
+      "concept": "Comment",
+      "en": "comment",
+      "vi": "bình luận",
+      "status": "proposed",
+      "note": "A message that a person posts on a record or a task. Name it comment, not note or remark."
+    },
+    {
+      "concept": "Internal comment",
+      "en": "internal",
+      "vi": "nội bộ",
+      "status": "proposed",
+      "note": "A comment that only people with the internal comments grant see."
+    },
+    {
+      "concept": "Shared comment",
+      "en": "shared",
+      "vi": "chia sẻ",
+      "status": "proposed",
+      "note": "A comment that people who may read the record see, as opposed to an internal one."
+    },
+    {
+      "concept": "Mention",
+      "en": "mention",
+      "vi": "nhắc đến",
+      "status": "proposed",
+      "note": "A name of a person in a comment. It tells that person only when they may read the comment."
+    },
+    {
+      "concept": "Timeline",
+      "en": "timeline",
+      "vi": "dòng thời gian",
+      "status": "proposed",
+      "note": "The list of a record's comments, changes, process steps and emails on its page."
+    },
+    {
+      "concept": "Digest",
+      "en": "digest",
+      "vi": "bản tổng hợp",
+      "status": "proposed",
+      "note": "One email that lists the emails a person chose to receive together, once a day."
     }
   ]
 }

@@ -288,6 +288,7 @@ browser holds only a cookie with a random session id.
 - **Lifetimes.** A request reads the row and updates the time of the last request. A row ends 8 hours
   after sign-in, or after 1 hour without requests, whichever comes first. A request past either limit
   counts as no session, and the row is deleted. Every request with a session renews the cookie.
+- **Live streams.** _(planned for M43)_ A [live stream](frontend.md#live-pages) does not count as a request for the idle limit. The server checks the session row at each keep-alive, and closes the stream when the session ends, signs out or passes a limit.
 - **Bound to the tenant.** The row has no tenant id, because each tenant has its own database, so a
   cookie taken to another tenant's host finds no row there. The server also checks that the session's
   tenant is the tenant [resolved from the host](../architecture.md#request-resolution), so such a
@@ -730,6 +731,7 @@ without a grant. These rules say how grants combine into what a user may read an
   when its subject record is readable. The instance detail needs the same. It also shows a call's input
   only when the user may read every field its mapping reads or writes, and a `sensitive` field is never
   shown. See [process inspection](process-inspection.md#process-inspection).
+- **Comments.** _(planned for M43)_ A record comment needs the `comment` or `internalComments` grant of its entity. A task comment needs a person who may act on the task, as [who may act](task-api.md#who-may-act) says. See [record comments](comments.md#record-comments) and [task comments](comments.md#task-comments).
 - **System work.** The worker, seed data and `updateRecord` steps run as `system`, and policies do not
   check them.
 - **Failures.** A filter that fails at run time adds no records through its grant. The server logs the
