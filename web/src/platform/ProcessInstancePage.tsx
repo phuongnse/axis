@@ -57,8 +57,11 @@ type InstanceState = InstanceDetail | null | typeof forbidden | 'failed'
 
 const dateTime = (name: string) => ({ name, type: 'date-time' }) as const
 
-/** The tabs of an instance, in order: its steps on the process's graph, then its history, tasks, calls and sub-processes. */
-const instanceTabs = ['steps', 'history', 'tasks', 'calls', 'subProcesses']
+/**
+ * The tabs of an instance, in order: its facts, its steps on the process's graph, then its history, tasks, calls and
+ * sub-processes.
+ */
+const instanceTabs = ['general', 'steps', 'history', 'tasks', 'calls', 'subProcesses']
 
 /**
  * Shows one instance under the page of its process inspector: its state and step, the steps of
@@ -433,18 +436,24 @@ export function InstanceDetailView({
         <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
       </PageActions>
       <SectionParts>
-        {/* Proposed: what the platform keeps of the instance is its first part, with no heading, see the review on
-            #3650. */}
-        <SectionPart testName="inspector-details">
-          <TermList terms={facts} />
-        </SectionPart>
-        {/* Proposed: the instance's steps and what it did are in tabs, as content of different kinds with nothing to fill
-            in, the tab kept in the address, see the review on #3650. */}
+        {/* Proposed: a page with nothing to fill in has everything under its heading in tabs, its facts first as General,
+            the tab kept in the address, see the review on #3650. */}
         <SectionPart testName="inspector-tabs">
           <Tabs
             activeKey={tab}
             onChange={selectTab}
             items={[
+              {
+                key: 'general',
+                label: t('shell.inspector.general'),
+                // Proposed: what the platform keeps of the instance, each fact on a row of its own, is its first tab,
+                // see the review on #3650.
+                children: (
+                  <div data-testid="studio-section-inspector-details">
+                    <TermList terms={facts} />
+                  </div>
+                ),
+              },
               {
                 key: 'steps',
                 label: t('shell.inspector.steps'),

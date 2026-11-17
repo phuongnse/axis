@@ -634,6 +634,7 @@
   "shell.inspector.notFound": "This process instance does not exist, or you cannot open it.",
   "shell.inspector.loadFailed": "The instances could not be loaded.",
   "shell.inspector.steps": "Steps",
+  "shell.inspector.general": "General",
   "shell.inspector.taken": "Taken",
   "shell.inspector.current": "Current",
   "shell.inspector.history": "History",
