@@ -16,6 +16,7 @@ import { tableTheme } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { EmptyDash } from './EmptyValue'
 import { EmptyState } from './EmptyState'
+import { FoldIcon } from './FoldIcon'
 import { nameCompare } from './listOrder'
 import { markCurrentPage } from './pagination'
 import { matchesFilter, type FilterGroup, type FilterKind } from './tableFilter'
@@ -161,6 +162,12 @@ export interface AxisTableProps<T> {
   rowAttributes?: (row: T, index?: number) => HTMLAttributes<HTMLElement>
   /** The test id of the table's outer element. */
   testId?: string
+  /**
+   * Proposed, see the review on #3650: what a row shows when it is opened, under it across the table, or `null` for a
+   * row with nothing more. Each such row has an expand button before its first cell, named Show details or Hide details
+   * with the row's name, and a click on the row opens it too.
+   */
+  details?: { content: (row: T) => ReactNode | null; name: (row: T) => string }
 }
 
 /** Column key of the row actions. A field name starts with a letter, so no field column has it. */
@@ -217,6 +224,7 @@ export function AxisTable<T extends object>({
   blankRow,
   rowAttributes,
   testId,
+  details,
 }: AxisTableProps<T>) {
   const t = useText()
   // The shell sets the locale of Ant Design's ConfigProvider. Outside it, there is none.
@@ -623,6 +631,29 @@ export function AxisTable<T extends object>({
                   : false
               }
               onRow={rowAttributes}
+              expandable={
+                details
+                  ? {
+                      expandedRowRender: (row) => details.content(row),
+                      rowExpandable: (row) => details.content(row) !== null,
+                      expandRowByClick: true,
+                      expandIcon: ({ expanded, expandable, record, onExpand }) =>
+                        expandable ? (
+                          <AxisButton
+                            role="icon"
+                            nameKey={expanded ? 'shell.table.hideDetails' : 'shell.table.showDetails'}
+                            nameSuffix={details.name(record)}
+                            icon={<FoldIcon open={expanded} />}
+                            aria-expanded={expanded}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              onExpand(record, event)
+                            }}
+                          />
+                        ) : null,
+                    }
+                  : undefined
+              }
               onChange={view ? onViewChange : onChange}
               styles={{ header: { row }, body: { row } }}
             />

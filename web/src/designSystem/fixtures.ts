@@ -749,7 +749,7 @@ const instanceDetail: InstanceDetail = {
       {
         name: 'checkPolicy',
         type: 'decision',
-        labelKey: null,
+        labelKey: 'approval.step.checkPolicy',
         transitions: [
           {
             next: 'autoApprove',
@@ -764,7 +764,7 @@ const instanceDetail: InstanceDetail = {
       {
         name: 'autoApprove',
         type: 'operation',
-        labelKey: null,
+        labelKey: 'approval.step.autoApprove',
         transitions: [
           {
             next: 'vendorRisk',
@@ -775,7 +775,7 @@ const instanceDetail: InstanceDetail = {
       {
         name: 'budgetCheck',
         type: 'operation',
-        labelKey: null,
+        labelKey: 'approval.step.budgetCheck',
         transitions: [
           {
             next: 'checkBudget',
@@ -786,7 +786,7 @@ const instanceDetail: InstanceDetail = {
       {
         name: 'checkBudget',
         type: 'decision',
-        labelKey: null,
+        labelKey: 'approval.step.checkBudget',
         transitions: [
           {
             next: 'managerApproval',
@@ -806,10 +806,12 @@ const instanceDetail: InstanceDetail = {
           {
             next: 'managerApproval',
             on: 'approve',
+            labelKey: 'approval.outcome.approve',
           },
           {
             next: 'notifyRejected',
             on: 'reject',
+            labelKey: 'approval.outcome.reject',
           },
         ],
       },
@@ -821,14 +823,17 @@ const instanceDetail: InstanceDetail = {
           {
             next: 'routeByAmount',
             on: 'approve',
+            labelKey: 'approval.outcome.approve',
           },
           {
             next: 'notifyRejected',
             on: 'reject',
+            labelKey: 'approval.outcome.reject',
           },
           {
             next: 'reviseRequest',
             on: 'return',
+            labelKey: 'approval.outcome.return',
           },
         ],
       },
@@ -840,17 +845,19 @@ const instanceDetail: InstanceDetail = {
           {
             next: 'checkPolicy',
             on: 'resubmit',
+            labelKey: 'approval.outcome.resubmit',
           },
           {
             next: 'withdrawn',
             on: 'withdraw',
+            labelKey: 'approval.outcome.withdraw',
           },
         ],
       },
       {
         name: 'routeByAmount',
         type: 'decision',
-        labelKey: null,
+        labelKey: 'approval.step.routeByAmount',
         transitions: [
           {
             next: 'cfoApproval',
@@ -874,10 +881,12 @@ const instanceDetail: InstanceDetail = {
           {
             next: 'vendorRisk',
             on: 'approve',
+            labelKey: 'approval.outcome.approve',
           },
           {
             next: 'notifyRejected',
             on: 'reject',
+            labelKey: 'approval.outcome.reject',
           },
         ],
       },
@@ -889,17 +898,19 @@ const instanceDetail: InstanceDetail = {
           {
             next: 'vendorRisk',
             on: 'approve',
+            labelKey: 'approval.outcome.approve',
           },
           {
             next: 'notifyRejected',
             on: 'reject',
+            labelKey: 'approval.outcome.reject',
           },
         ],
       },
       {
         name: 'vendorRisk',
         type: 'operation',
-        labelKey: null,
+        labelKey: 'approval.step.vendorRisk',
         transitions: [
           {
             next: 'vendorCheck',
@@ -910,7 +921,7 @@ const instanceDetail: InstanceDetail = {
       {
         name: 'vendorCheck',
         type: 'decision',
-        labelKey: null,
+        labelKey: 'approval.step.vendorCheck',
         transitions: [
           {
             next: 'createPurchaseOrder',
@@ -925,7 +936,7 @@ const instanceDetail: InstanceDetail = {
       {
         name: 'onboardVendor',
         type: 'subProcess',
-        labelKey: null,
+        labelKey: 'approval.step.onboardVendor',
         transitions: [
           {
             next: 'createPurchaseOrder',
@@ -936,7 +947,7 @@ const instanceDetail: InstanceDetail = {
       {
         name: 'createPurchaseOrder',
         type: 'operation',
-        labelKey: null,
+        labelKey: 'approval.step.createPurchaseOrder',
         transitions: [
           {
             next: 'notifyRequester',
@@ -947,7 +958,7 @@ const instanceDetail: InstanceDetail = {
       {
         name: 'notifyRequester',
         type: 'operation',
-        labelKey: null,
+        labelKey: 'approval.step.notifyRequester',
         transitions: [
           {
             next: 'waitGoodsReceipt',
@@ -958,7 +969,7 @@ const instanceDetail: InstanceDetail = {
       {
         name: 'waitGoodsReceipt',
         type: 'waitEvent',
-        labelKey: null,
+        labelKey: 'approval.step.waitGoodsReceipt',
         transitions: [
           {
             next: 'threeWayMatch',
@@ -973,7 +984,7 @@ const instanceDetail: InstanceDetail = {
       {
         name: 'remindReceipt',
         type: 'operation',
-        labelKey: null,
+        labelKey: 'approval.step.remindReceipt',
         transitions: [
           {
             next: 'waitGoodsReceipt',
@@ -984,7 +995,7 @@ const instanceDetail: InstanceDetail = {
       {
         name: 'threeWayMatch',
         type: 'operation',
-        labelKey: null,
+        labelKey: 'approval.step.threeWayMatch',
         transitions: [
           {
             next: 'done',
@@ -995,7 +1006,7 @@ const instanceDetail: InstanceDetail = {
       {
         name: 'notifyRejected',
         type: 'operation',
-        labelKey: null,
+        labelKey: 'approval.step.notifyRejected',
         transitions: [
           {
             next: 'rejected',
@@ -1006,19 +1017,19 @@ const instanceDetail: InstanceDetail = {
       {
         name: 'done',
         type: 'end',
-        labelKey: null,
+        labelKey: 'approval.step.done',
         transitions: [],
       },
       {
         name: 'rejected',
         type: 'end',
-        labelKey: null,
+        labelKey: 'approval.step.rejected',
         transitions: [],
       },
       {
         name: 'withdrawn',
         type: 'end',
-        labelKey: null,
+        labelKey: 'approval.step.withdrawn',
         transitions: [],
       },
     ],
@@ -1897,6 +1908,28 @@ export const siteTexts: Record<string, string> = {
   'approval.task.revise': 'Revise the request',
   'approval.task.finance': 'Finance approval',
   'approval.task.cfo': 'CFO approval',
+  'approval.step.checkPolicy': 'Check the purchasing policy',
+  'approval.step.autoApprove': 'Approve automatically',
+  'approval.step.budgetCheck': 'Check the budget in Finance',
+  'approval.step.checkBudget': 'Within budget?',
+  'approval.step.routeByAmount': 'Route by amount',
+  'approval.step.vendorRisk': 'Score the vendor risk',
+  'approval.step.vendorCheck': 'Known vendor?',
+  'approval.step.onboardVendor': 'Onboard the vendor',
+  'approval.step.createPurchaseOrder': 'Create the order in ERP',
+  'approval.step.notifyRequester': 'Tell the requester',
+  'approval.step.waitGoodsReceipt': 'Wait for the goods',
+  'approval.step.remindReceipt': 'Remind about the goods',
+  'approval.step.threeWayMatch': 'Match order, receipt and invoice',
+  'approval.step.notifyRejected': 'Tell the requester it was rejected',
+  'approval.step.done': 'Done',
+  'approval.step.rejected': 'Rejected',
+  'approval.step.withdrawn': 'Withdrawn',
+  'approval.outcome.approve': 'Approve',
+  'approval.outcome.reject': 'Reject',
+  'approval.outcome.return': 'Return for changes',
+  'approval.outcome.resubmit': 'Resubmit',
+  'approval.outcome.withdraw': 'Withdraw',
   'chart.requestsByStatus': 'Requests by status',
   'chart.requests': 'Requests',
   'chart.urgentRequests': 'Urgent requests',

@@ -55,6 +55,11 @@ export interface InstancePage {
 export interface GraphTransition {
   next: string
   on: string | null
+  /**
+   * Proposed, see the review on #3650: the text key of the transition's label, a task outcome's label or a decision
+   * branch's, from the instance's release, or `null` when it has none.
+   */
+  labelKey?: string | null
 }
 
 /** A step of the graph. `labelKey` is set only for a task step. */

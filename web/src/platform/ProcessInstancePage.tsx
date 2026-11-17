@@ -1,10 +1,8 @@
-import { Button, Descriptions, Flex, Tabs, Tag, Typography } from 'antd'
+import { Flex, Tabs, Tag } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { AxisTable, type AxisColumn } from './AxisTable'
-import { EmptyState } from './EmptyState'
 import { NotSet } from './EmptyValue'
 import { formatValue } from './formatValue'
 import {
@@ -15,27 +13,22 @@ import {
   sendCommand,
   stateText,
   timerDueAt,
-  type CallAttempt,
   type InstanceCommand,
-  type InstanceCall,
   type InstanceDetail,
-  type InstanceTask,
-  type PathEntry,
-  type SubProcess,
 } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
+import { InstanceTimeline } from './InstanceTimeline'
+import { useInstanceStatus } from './instanceStatus'
 import { PageActions, PageHeading } from './PageLayout'
 import { ProcessGraphCanvas, type ProcessGraphStep, type ProcessGraphTransitionView } from './ProcessGraph'
 import { RecordLink } from './RecordLink'
 import { RecordNotFound } from './RecordNotFound'
 import { TermList, type Term } from './TermList'
 import { ReasonDialog } from './ReasonDialog'
-import { ResolveDialog } from './ResolveDialog'
 import { SectionPart, SectionParts } from './SectionParts'
 import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
-import { useDesignTokens } from './themeMode'
 import { useAddressTab } from './addressTab'
 import { useReleaseTexts } from './useReleaseTexts'
 
@@ -61,7 +54,7 @@ const dateTime = (name: string) => ({ name, type: 'date-time' }) as const
  * The tabs of an instance, in order: its facts, its steps on the process's graph, then its history, tasks, calls and
  * sub-processes.
  */
-const instanceTabs = ['general', 'steps', 'history', 'tasks', 'calls', 'subProcesses']
+const instanceTabs = ['general', 'timeline', 'steps']
 
 /**
  * Shows one instance under the page of its process inspector: its state and step, the steps of
@@ -159,17 +152,6 @@ function isInstanceDetail(instance: InstanceState | undefined): instance is Inst
   return typeof instance === 'object' && instance !== null
 }
 
-/** The top-level properties of a call's input as text. Objects are JSON, and numbers keep their digits. */
-function inputEntries(input: unknown): [string, string][] {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
-    return []
-  }
-  return Object.entries(input).map(([key, value]) => [
-    key,
-    typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value),
-  ])
-}
-
 interface InstanceDetailViewProps {
   instance: InstanceDetail
   instancesPath: string
@@ -208,132 +190,15 @@ export function InstanceDetailView({
   const due = timerDueAt(instance)
   const parentPage = instance.parent === null ? undefined : inspectors?.get(instance.parent.process)
 
-  const traceIdColumn = {
-    key: 'traceId',
-    kind: 'fixed' as const,
-    title: t('shell.inspector.traceId'),
-    render: (_v: unknown, row: { traceId: string | null }) =>
-      row.traceId === null ? null : (
-        <Typography.Text code copyable>
-          {row.traceId}
-        </Typography.Text>
-      ),
+  // The label of a transition out of a step, such as a task's outcome, from the process's texts, else its name.
+  const outcomeLabel = (step: string, name: string) => {
+    const labelKey = stepNames
+      ? undefined
+      : stepsByName.get(step)?.transitions.find((transition) => transition.on === name)?.labelKey
+    return labelKey ? t(labelKey) : name
   }
-  const historyColumns: AxisColumn<PathEntry>[] = [
-    {
-      key: 'step',
-      kind: 'freeText',
-      title: t('shell.inspector.step'),
-      render: (_v, row) => stepLabel(row.step),
-    },
-    {
-      key: 'startedAt',
-      kind: 'fixed',
-      title: t('shell.inspector.startedAt'),
-      render: (_v, row) => time('startedAt', row.startedAt),
-    },
-    {
-      key: 'finishedAt',
-      kind: 'fixed',
-      title: t('shell.inspector.finishedAt'),
-      render: (_v, row) => time('finishedAt', row.finishedAt),
-    },
-    {
-      key: 'decision',
-      kind: 'fixed',
-      title: t('shell.inspector.decision'),
-      render: (_v, row) => row.decision ?? null,
-    },
-    { key: 'error', kind: 'freeText', title: t('shell.inspector.error'), render: (_v, row) => row.error ?? null },
-    traceIdColumn,
-  ]
-  const taskColumns: AxisColumn<InstanceTask>[] = [
-    { key: 'step', kind: 'freeText', title: t('shell.inspector.step'), render: (_v, row) => stepLabel(row.step) },
-    {
-      key: 'assignee',
-      kind: 'freeText',
-      title: t('shell.inspector.assignee'),
-      render: (_v, row) => `${row.assigneeKind}: ${row.assignee}`,
-    },
-    { key: 'state', kind: 'fixed', title: t('shell.inspector.state'), render: (_v, row) => row.state },
-    { key: 'outcome', kind: 'fixed', title: t('shell.inspector.outcome'), render: (_v, row) => row.outcome ?? null },
-    {
-      key: 'completedBy',
-      kind: 'freeText',
-      title: t('shell.inspector.completedBy'),
-      render: (_v, row) => row.completedBy ?? null,
-    },
-    {
-      key: 'createdAt',
-      kind: 'fixed',
-      title: t('shell.inspector.createdAt'),
-      render: (_v, row) => time('createdAt', row.createdAt),
-    },
-    {
-      key: 'completedAt',
-      kind: 'fixed',
-      title: t('shell.inspector.completedAt'),
-      render: (_v, row) => time('completedAt', row.completedAt),
-    },
-  ]
-  const attemptColumns: AxisColumn<CallAttempt>[] = [
-    { key: 'kind', kind: 'fixed', title: t('shell.inspector.kind'), render: (_v, row) => row.kind },
-    { key: 'number', kind: 'fixed', title: t('shell.inspector.number'), render: (_v, row) => row.number },
-    {
-      key: 'startedAt',
-      kind: 'fixed',
-      title: t('shell.inspector.startedAt'),
-      render: (_v, row) => time('startedAt', row.startedAt),
-    },
-    {
-      key: 'finishedAt',
-      kind: 'fixed',
-      title: t('shell.inspector.finishedAt'),
-      render: (_v, row) => time('finishedAt', row.finishedAt),
-    },
-    { key: 'outcome', kind: 'fixed', title: t('shell.inspector.outcome'), render: (_v, row) => row.outcome },
-    {
-      key: 'httpStatus',
-      kind: 'fixed',
-      title: t('shell.inspector.httpStatus'),
-      render: (_v, row) => row.httpStatus ?? null,
-    },
-    { key: 'error', kind: 'freeText', title: t('shell.inspector.error'), render: (_v, row) => row.error ?? null },
-    traceIdColumn,
-  ]
-
-  const subProcessColumns: AxisColumn<SubProcess>[] = [
-    {
-      key: 'process',
-      kind: 'freeText',
-      title: t('shell.inspector.process'),
-      // Proposed: the identifying cell opens the child, as a table's rows open, see the review on #3650.
-      render: (_v, row) => {
-        const page = inspectors?.get(row.process)
-        return page === undefined ? (
-          row.process
-        ) : (
-          <Link to={inspectorPath(sitePath, page, row.id)} data-testid={`inspector-subprocess-${row.id}`}>
-            {row.process}
-          </Link>
-        )
-      },
-    },
-    { key: 'step', kind: 'freeText', title: t('shell.inspector.step'), render: (_v, row) => stepLabel(row.step) },
-    { key: 'state', kind: 'fixed', title: t('shell.inspector.state'), render: (_v, row) => stateText(t, row.state) },
-    {
-      key: 'createdAt',
-      kind: 'fixed',
-      title: t('shell.inspector.createdAt'),
-      render: (_v, row) => time('createdAt', row.createdAt),
-    },
-    {
-      key: 'endedAt',
-      kind: 'fixed',
-      title: t('shell.inspector.endedAt'),
-      render: (_v, row) => time('endedAt', row.endedAt),
-    },
-  ]
+  const status = useInstanceStatus(instance, stepLabel, time)
+  const [only, setOnly] = useState<string | null>(null)
 
   // Proposed, see the review on #3650: the instance is headed by its process, its state a tag beside it and its kind the
   // line; what the platform keeps of it is the first part, each fact on a row of its own, and each part after it is a
@@ -383,12 +248,19 @@ export function InstanceDetailView({
     { key: 'release', term: t('shell.inspector.release'), value: instance.releaseNumber ?? instance.releaseId },
   ]
   const taken = new Set(instance.path.map((entry) => entry.step))
+  // How many times each step ran, so a step run again shows it.
+  const runCounts = new Map<string, number>()
+  for (const entry of instance.path) {
+    runCounts.set(entry.step, (runCounts.get(entry.step) ?? 0) + 1)
+  }
   // The transitions the instance took: from each step of its path to the next, and from the last to the step it is at.
   const walked = [...instance.path.map((entry) => entry.step), instance.step]
   const tookTransition = new Set(walked.slice(1).map((step, index) => `${walked[index]}>${step}`))
   const to = t('shell.studio.processGraph.to')
   const graphSteps = instance.graph.steps.map((step): ProcessGraphStep => {
-    const tone = step.name === instance.step ? 'current' : taken.has(step.name) ? 'taken' : 'idle'
+    const failed = instance.state === 'failed' && step.name === instance.step
+    const tone = failed ? 'error' : step.name === instance.step ? 'current' : taken.has(step.name) ? 'taken' : 'idle'
+    const runs = runCounts.get(step.name) ?? 0
     const state =
       tone === 'current'
         ? `, ${t('shell.inspector.current')}`
@@ -401,7 +273,8 @@ export function InstanceDetailView({
       type: step.type,
       start: step.name === instance.graph.start,
       tone,
-      ariaLabel: `${stepLabel(step.name)}, ${step.type}${state}`,
+      ariaLabel: `${stepLabel(step.name)}, ${step.type}${state}${runs > 1 ? `, ${t('shell.inspector.graph.runs').replace('{count}', String(runs))}` : ''}`,
+      badge: runs > 1 ? `×${runs}` : undefined,
       ariaCurrent: tone === 'current',
       testId: `inspector-step-${step.name}`,
     }
@@ -435,6 +308,13 @@ export function InstanceDetailView({
       <PageActions>
         <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
       </PageActions>
+      {/* Proposed: where the instance stands, a failure or what it waits for, is said at the top of its page, see the
+          review on #3650. */}
+      {status && (
+        <div style={{ marginBottom: 16 }}>
+          <AxisAlert data-testid="inspector-status" kind={status.kind} message={status.text} />
+        </div>
+      )}
       <SectionParts>
         {/* Proposed: a page with nothing to fill in has everything under its heading in tabs, its facts first as General,
             the tab kept in the address, see the review on #3650. */}
@@ -455,11 +335,32 @@ export function InstanceDetailView({
                 ),
               },
               {
+                key: 'timeline',
+                label: t('shell.inspector.timeline'),
+                // Proposed: what the instance did is one timeline of its step runs, with the tasks, calls and
+                // sub-processes each started inside it, see the review on #3650.
+                children: (
+                  <InstanceTimeline
+                    instance={instance}
+                    instancesPath={instancesPath}
+                    sitePath={sitePath}
+                    inspectors={inspectors}
+                    locale={locale}
+                    stepLabel={stepLabel}
+                    outcomeLabel={outcomeLabel}
+                    time={time}
+                    only={only}
+                    onShowAll={() => setOnly(null)}
+                    onChanged={onChanged}
+                  />
+                ),
+              },
+              {
                 key: 'steps',
                 label: t('shell.inspector.steps'),
-                // Proposed: the steps are the process's graph, drawn as the process designer draws it, with the steps
-                // the instance has run and the transitions it took in the success colour and the step it is at in the
-                // primary colour, see the review on #3650.
+                // Proposed: the steps are the process's graph, drawn as the process designer draws it, focused on the
+                // step the instance is at, each step run more than once marked with its count; a click on a step
+                // shows its runs in the timeline, see the review on #3650.
                 children: (
                   <ProcessGraphCanvas
                     steps={graphSteps}
@@ -467,74 +368,13 @@ export function InstanceDetailView({
                     ariaLabel={t('shell.inspector.steps')}
                     testId="inspector-graph"
                     height={560}
+                    focus={instance.step}
+                    controls
+                    onStepClick={(step) => {
+                      setOnly(step)
+                      selectTab('timeline')
+                    }}
                   />
-                ),
-              },
-              {
-                key: 'history',
-                label: t('shell.inspector.history'),
-                children: (
-                  <div data-testid="studio-section-inspector-history">
-                    <AxisTable<PathEntry>
-                      rowKey={(row) => `${row.step}|${row.startedAt}|${row.finishedAt}`}
-                      columns={historyColumns}
-                      dataSource={instance.path}
-                      emptyText={t('shell.inspector.noHistory')}
-                    />
-                  </div>
-                ),
-              },
-              {
-                key: 'tasks',
-                label: t('shell.inspector.tasks'),
-                children: (
-                  <div data-testid="studio-section-inspector-tasks">
-                    <AxisTable<InstanceTask>
-                      rowKey={(row) => row.id}
-                      columns={taskColumns}
-                      dataSource={instance.tasks}
-                      emptyText={t('shell.inspector.noTasks')}
-                    />
-                  </div>
-                ),
-              },
-              {
-                key: 'calls',
-                label: t('shell.inspector.calls'),
-                children: (
-                  <div data-testid="studio-section-inspector-calls">
-                    {instance.calls.length === 0 ? (
-                      <EmptyState text={t('shell.inspector.noCalls')} />
-                    ) : (
-                      <Flex vertical>
-                        {instance.calls.map((call) => (
-                          <CallItem
-                            key={call.id}
-                            call={call}
-                            instanceId={instance.id}
-                            instancesPath={instancesPath}
-                            onChanged={onChanged}
-                            stepLabel={stepLabel}
-                            attemptColumns={attemptColumns}
-                          />
-                        ))}
-                      </Flex>
-                    )}
-                  </div>
-                ),
-              },
-              {
-                key: 'subProcesses',
-                label: t('shell.inspector.subProcesses'),
-                children: (
-                  <div data-testid="studio-section-inspector-sub-processes">
-                    <AxisTable<SubProcess>
-                      rowKey={(row) => row.id}
-                      columns={subProcessColumns}
-                      dataSource={instance.subProcesses}
-                      emptyText={t('shell.inspector.noSubProcesses')}
-                    />
-                  </div>
                 ),
               },
             ]}
@@ -587,78 +427,6 @@ function InstanceCommands({ instance, instancesPath, onChanged }: InstanceComman
           )}
         </ReasonDialog>
       )}
-    </Flex>
-  )
-}
-
-interface CallItemProps {
-  call: InstanceCall
-  instanceId: string
-  instancesPath: string
-  /** Called after a resolve was accepted, so the page reads the instance again. */
-  onChanged: () => void
-  stepLabel: (name: string) => string
-  attemptColumns: AxisColumn<CallAttempt>[]
-}
-
-/**
- * One call: where it goes, its state, its input and its attempts. A call the server marks resolvable
- * also has a Resolve button. The page never decides who may resolve.
- */
-function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attemptColumns }: CallItemProps) {
-  const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  const [resolving, setResolving] = useState(false)
-  const target = call.connector ?? `${call.package}@${call.version}`
-  const input = call.inputHidden ? null : inputEntries(call.input)
-  return (
-    <Flex
-      vertical
-      gap="small"
-      data-testid={`inspector-call-${call.id}`}
-      style={{ width: '100%', paddingBlock: spacing.sm, borderBlockEnd: `1px solid ${colour.divider}` }}
-    >
-      <Flex gap="small" align="center" wrap>
-        <Tag>{call.kind}</Tag>
-        <Typography.Text strong>{stepLabel(call.step)}</Typography.Text>
-        <Typography.Text>{target}</Typography.Text>
-        <Typography.Text>{call.operation}</Typography.Text>
-        <Tag>{call.state}</Tag>
-        {call.resolvable && call.outputs && (
-          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-          <Button size="small" data-testid={`inspector-resolve-${call.id}`} onClick={() => setResolving(true)}>
-            {t('shell.inspector.commands.resolve')}
-          </Button>
-        )}
-      </Flex>
-      {resolving && call.outputs && (
-        <ResolveDialog
-          call={call}
-          outputs={call.outputs}
-          instanceId={instanceId}
-          instancesPath={instancesPath}
-          onClose={() => setResolving(false)}
-          onChanged={onChanged}
-        />
-      )}
-      {call.inputHidden && (
-        <Typography.Text type="secondary">{`${t('shell.inspector.input')}: ${t('shell.inspector.hidden')}`}</Typography.Text>
-      )}
-      {input !== null && input.length > 0 && (
-        <Descriptions
-          size="small"
-          column={1}
-          title={t('shell.inspector.input')}
-          items={input.map(([key, value]) => ({ key, label: key, children: value }))}
-        />
-      )}
-      <Typography.Text type="secondary">{t('shell.inspector.attempts')}</Typography.Text>
-      <AxisTable<CallAttempt>
-        rowKey={(row) => `${row.kind}|${row.number}|${row.startedAt}`}
-        columns={attemptColumns}
-        dataSource={call.attempts}
-        emptyText={t('shell.inspector.noAttempts')}
-      />
     </Flex>
   )
 }

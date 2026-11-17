@@ -9,13 +9,14 @@ import {
   type OnConnectEnd,
   Position,
   ReactFlow,
+  Controls,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { type KeyboardEvent, type Ref, useMemo } from 'react'
 import { useDesignTokens, useThemeMode } from './themeMode'
 
-const nodeWidth = 200
-const nodeHeight = 48
+const nodeWidth = 240
+const nodeHeight = 56
 const handleSize = 10
 
 /**
@@ -36,6 +37,8 @@ export type ProcessGraphStep = {
   tone: ProcessGraphTone
   ariaLabel: string
   ariaCurrent?: boolean
+  /** Proposed, see the review on #3650: a count drawn at the node's corner, such as how many times an instance ran it. */
+  badge?: string
   /** A mark shown after the type, such as a customization layer's Added, and its value for `data-layer-mark`. */
   note?: { text: string; kind: string }
   /** Whether a transition can be drawn from the step's bottom handle. */
@@ -102,12 +105,15 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
         style={{
           width: '100%',
           height: '100%',
-          padding: '0 8px',
+          padding: '8px',
           overflow: 'hidden',
           textAlign: 'left',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
+          // A long name takes two lines before it is cut, so a step's label reads whole.
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
           font: 'inherit',
+          lineHeight: '20px',
           color: data.tone === 'idle' ? colour.textMuted : colour.text,
           background: colour.surface,
           border: `${width}px solid ${edge}`,
@@ -123,6 +129,27 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
           </>
         )}
       </button>
+      {/* Outside the button, whose overflow is hidden, so the count overlaps the node's corner. */}
+      {data.badge !== undefined && (
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            top: -10,
+            right: -10,
+            minWidth: 20,
+            padding: '0 6px',
+            borderRadius: 10,
+            fontSize: 12,
+            lineHeight: '20px',
+            textAlign: 'center',
+            color: colour.onPrimary,
+            background: colour.primary,
+          }}
+        >
+          {data.badge}
+        </span>
+      )}
       <Handle
         type="source"
         position={Position.Bottom}
@@ -165,6 +192,8 @@ export function ProcessGraphCanvas({
   onStepClick,
   onTransitionClick,
   onConnectEnd,
+  focus,
+  controls = false,
 }: {
   steps: readonly ProcessGraphStep[]
   transitions: readonly ProcessGraphTransitionView[]
@@ -177,6 +206,10 @@ export function ProcessGraphCanvas({
   onStepClick?: (id: string) => void
   onTransitionClick?: (id: string) => void
   onConnectEnd?: OnConnectEnd
+  /** Proposed, see the review on #3650: the step the view opens on, at the size it is drawn at, else the whole graph. */
+  focus?: string
+  /** Proposed, see the review on #3650: zoom in, zoom out and fit buttons, for a graph too large to read whole. */
+  controls?: boolean
 }) {
   const { mode } = useThemeMode()
   const { colour } = useDesignTokens()
@@ -249,6 +282,7 @@ export function ProcessGraphCanvas({
         edgeTypes={edgeTypes}
         colorMode={mode}
         fitView
+        fitViewOptions={focus === undefined ? undefined : { nodes: [{ id: focus }], minZoom: 1, maxZoom: 1 }}
         minZoom={0.1}
         // A small process is drawn at its own size, never zoomed in past it, so its text keeps the body size.
         maxZoom={1}
@@ -262,7 +296,9 @@ export function ProcessGraphCanvas({
         onConnectEnd={onConnectEnd}
         onNodeClick={onStepClick ? (_, node) => onStepClick(node.id) : undefined}
         onEdgeClick={onTransitionClick ? (_, edge) => onTransitionClick(edge.id) : undefined}
-      />
+      >
+        {controls && <Controls showInteractive={false} />}
+      </ReactFlow>
     </section>
   )
 }
