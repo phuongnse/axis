@@ -54,6 +54,8 @@ A page whose widget is a `taskInbox` lists the signed-in user's open tasks in th
   prompt like any other call.
 - **Texts.** The platform texts `shell.tasks.*` hold the column headers, the empty text, the load error
   and the two tags.
+- **Live reloads** _(planned for M43)_. The inbox reloads its list when a `tasks` event arrives, see
+  [live pages](frontend.md#live-pages).
 
 ### Completed tasks
 
@@ -110,6 +112,8 @@ form of its step over the subject record and a button for each outcome.
   user's id.
 - **Reassign.** The task page shows Reassign, see
   [inbox and task page](task-deadlines.md#inbox-and-task-page).
+- **Comments.** _(planned for M43)_ An open task has a comments section, for the people who may act on it, see
+  [task comments](comments.md#task-comments).
 - **Expired task.** An `expired` task, whose deadline passed before anyone decided it, shows only a
   message that the deadline passed, with no form, outcome buttons, Claim or Release.
 - **Decided task.** A task that is neither `open` nor `expired` shows only the already completed

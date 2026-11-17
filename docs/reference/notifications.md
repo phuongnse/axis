@@ -225,6 +225,8 @@ A bell in the header shows the signed-in user's unread count and opens their not
   and after any mark read. There is no timer. A failure to read the list hides the bell and never
   shows the sign-in prompt.
 
+- **Live reloads** _(planned for M43)_. The bell also reloads when a `notifications` event arrives, see [live pages](frontend.md#live-pages).
+
 ## Task notices
 
 _(planned for M43)_
@@ -237,6 +239,41 @@ A person hears in the application and by email when a task is given to them, mov
   `fewestOpen` or `turn`, notifies that holder.
 - **Email links.** The email lists one link for each outcome. Each link opens the
   [task page](task-inbox-widget.md#deciding-from-an-email) with that outcome chosen.
+
+## Notification preferences
+
+_(planned for M43)_
+
+A person chooses how each kind of notice reaches them, and whether its emails come together in a daily digest. A choice only narrows the channels that a notice would use. It never adds one.
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/me/notification-preferences` _(planned for M43)_ | Reads the signed-in person's preferences |
+| `PUT /api/me/notification-preferences` _(planned for M43)_ | Replaces the signed-in person's preferences |
+
+- **Sources.** A source is a kind of notice. `task` is the [task notices](#task-notices), `mention` is the [mentions](comments.md#mentions) and `process` is the message of a `notify` step, see [the notify operation](#notify-operation).
+- **Body.** `PUT` takes the three sources, `digestHour` and `timeZone`. Each source has `channels`, with `application` and `email` set to `true` or `false`, and `digest`, set to `true` or `false`. For example:
+
+  ```json
+  {
+    "sources": {
+      "task": { "channels": { "application": true, "email": true }, "digest": true },
+      "mention": { "channels": { "application": true, "email": false }, "digest": false },
+      "process": { "channels": { "application": true, "email": true }, "digest": false }
+    },
+    "digestHour": 8,
+    "timeZone": "Europe/Berlin"
+  }
+  ```
+
+- **Defaults.** With no saved choice, each source has both channels and no digest.
+- **Own preferences only.** The routes read and write the signed-in person's preferences. No route names another person.
+- **Digest hour and time zone.** `digestHour` is a whole hour from 0 to 23. `timeZone` is an IANA time zone name. The account page sends the browser's time zone, because a tenant has no time zone of its own, as [absences](user-administration.md#absences) do.
+- **Refusals.** A bad value is a `400` keyed by its path, such as `/digestHour` for an hour outside 0 to 23, or `/timeZone` for a name that is not an IANA time zone.
+- **In-app off.** A source with the `application` channel off does not show in the person's bell or its counts.
+- **Email and digest.** An email for a source with `email` on is sent as [email](#email) says. With `digest` on, the email waits in `axis.email_outbox` instead. The worker then sends the waiting emails as one digest, at `digestHour` in `timeZone`. The digest lists the subject and link of each waiting email.
+- **Tenant notices.** Tenant notices always show in the application, whatever the preferences say. See [tenant notices](#tenant-notices).
+- **Storage.** `axis.notification_preferences` holds one row for each person who has saved a choice.
 
 ## Email
 

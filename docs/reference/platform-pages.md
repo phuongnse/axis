@@ -61,6 +61,19 @@ Save sends the dates and the delegate with `PUT`, and End absence sends `DELETE`
 `placeProblemErrors`. The dates follow [absences](user-administration.md#absences). Its texts are
 `shell.account.absence.*`.
 
+### Notifications
+
+_(planned for M43)_
+
+The Notifications section shows the person's [notification preferences](notifications.md#notification-preferences)
+from `GET /api/me/notification-preferences`. Each of the three sources has its own `AxisFieldGroup`, with two
+`AxisCheckboxField`s, In the application and Email. One more group, Daily digest, has a checkbox for each source and
+an hour field, an `AxisField`, for the hour of the digest. The page sends the browser's time zone with the choices.
+
+Save is an `AxisButton` and sends every choice with `PUT`. A refused request shows its errors in place, with
+`placeProblemErrors`. The section says that tenant notices always show in the application. Its texts are
+`shell.account.notifications.*`.
+
 ## Users page
 
 The platform route `/users` is the users page, where an administrator manages the tenant's users and

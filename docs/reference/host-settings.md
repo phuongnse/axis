@@ -487,6 +487,19 @@ minute for one replica. The rules of the limits are in
 - **Defaults.** The weekly [load test](performance.md#load-test) never reaches the defaults, and it
   can tune them.
 
+## Comment and live page settings
+
+_(planned for M43)_
+
+These settings set how long an author may edit a comment, and how many live streams a session and a replica hold.
+The server reads them, and a bad value stops the start.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Comments:EditWindow` _(planned for M43)_ | — | How long after posting an author may edit or delete a comment, see [editing and deleting](comments.md#editing-and-deleting). The server reads it. |
+| `Live:MaxStreamsPerSession` _(planned for M43)_ | — | The most live streams one session holds, see [live pages](frontend.md#live-pages). The server reads it. |
+| `Live:MaxStreams` _(planned for M43)_ | — | The most live streams one replica holds, see [rate limits](headers-and-rate-limits.md#rate-limits). The server reads it. |
+
 ## AI settings
 
 The agent host reads the `Ai` settings: the model bindings, the default and review bindings, the

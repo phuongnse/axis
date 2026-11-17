@@ -163,6 +163,8 @@ cell puts PgBouncer in front of it.
     session advisory locks and change tables;
   - the worker's one `LISTEN` connection on the platform database, see
     [waking a tenant](worker-scheduling.md#waking-a-tenant);
+  - **The live connection.** _(planned for M43)_ The server's one `LISTEN axis_live` connection on the platform
+    database, see [live pages](frontend.md#live-pages).
   - the platform database connections of the server and the worker, which are few.
 - **Tested.** The integration tests run the record API and a worker process, a task step then an
   operation step, through PgBouncer in transaction mode with the same pool sizes, for the runtime

@@ -611,6 +611,36 @@ without a screenshot. This section says what prints and what does not. A report 
 - **Text.** The words of the action and of the page's footer, such as the date and time of printing, come from
   the platform's texts in the user's locale, and name the concept as the [glossary](ui-glossary.json) does.
 
+## Live pages
+
+_(planned for M43)_
+
+Some pages change while a person has them open, such as the bell, the task inbox and a list of records. The server
+tells the open page when the data changes, and the page reloads through its usual routes.
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/live` _(planned for M43)_ | Opens the live event stream of the signed-in session |
+
+- **Stream.** The SPA opens one stream for each browser tab. It uses server-sent events on the person's session, which
+  go one way, from the server to the page.
+- **Events.** An event is `{ "kind": "records" | "tasks" | "notifications", "application": "...", "entity": "..." }`.
+  It names what changed and never carries an id or a value.
+- **Who gets an event.** The server sends an event only when the session's roles give a `read` grant on the entity,
+  or when the person, or one of their roles, is addressed by the change.
+- **Reloads.** The bell, the task inbox and the open tables of the entity reload through their usual routes. The
+  [notifications](notifications.md#the-bell), the [task inbox](task-inbox-widget.md) and the
+  [table widget](table-widget.md) say which routes those are.
+- **Reconnect.** When a stream breaks and comes back, the page reloads its data once, since it may have missed events.
+- **Replicas.** A change on one replica reaches the others through `NOTIFY axis_live` on the platform database. The
+  server and the worker send it after the commit, as [waking a tenant](worker-scheduling.md#waking-a-tenant) does. The
+  signal may name the user or role that a task or a notification is for, so only their sessions reload. Each server
+  holds one `LISTEN` connection, see [connections](cells.md#connections).
+- **Without a platform database.** With `Tenancy:Source=configuration`, events come only from changes on the same
+  replica.
+- **Limits.** Opening a stream counts once in the session's rate limit. The streams that a session and a replica hold
+  are capped, see [rate limits](headers-and-rate-limits.md#rate-limits).
+
 ## Account button and sign-in prompt
 
 The account button and the sign-in prompt are parts of the shell, see [account button](shell.md#account-button) and

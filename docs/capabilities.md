@@ -92,7 +92,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | --- | --- |
 | Show a form on a task | [Steps](reference/processes.md#steps) |
 | Write a decision comment in a task's form | [Completing a task](reference/task-api.md#completing-a-task) |
-| Comments and mentions on a task | _(planned for M43)_ |
+| Comments and mentions on a task | [Task comments](reference/comments.md#task-comments) _(planned for M43)_ |
 | Attach a file to the record a task decides | [Field and value](reference/file-fields.md#field-and-value) |
 | Set a due date and show overdue tasks | [Task states](reference/task-deadlines.md#task-states) |
 | Remind or escalate a task after a time | [Escalations and deadline](reference/task-deadlines.md#escalations-and-deadline) |
@@ -179,7 +179,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Keep a ledger whose records are only added, never changed | _(planned for M53)_ |
 | Change many records at once | [Bulk actions](reference/record-api.md#bulk-actions) _(planned for M42)_ |
 | Find and merge duplicate records | _(planned for M53)_ |
-| Comments and activity on a record | _(planned for M43)_ |
+| Comments and activity on a record | [The timeline](reference/comments.md#the-timeline) _(planned for M43)_ |
 | Preview a file in the page | [Preview](reference/file-fields.md#download) _(planned for M40)_ |
 | Keep earlier versions of a file | [Versions](reference/file-fields.md#versions) _(planned for M40)_ |
 | Tell other systems when a record changes | [Outbound webhooks](reference/outbound-webhooks.md#outbound-webhooks) |
@@ -342,9 +342,9 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Use every page at phone width | [Narrow width](reference/frontend.md#narrow-width) |
 | Read notifications under a bell | [The bell](reference/notifications.md#the-bell) |
 | Mark notifications as needing action and clear them | _(planned for M35)_ |
-| Choose which notifications arrive and get digests | _(planned for M43)_ |
-| See changes by others without reloading | _(planned for M43)_ |
-| Comment on and mention people in records and tasks | _(planned for M43)_ |
+| Choose which notifications arrive and get digests | [Notification preferences](reference/notifications.md#notification-preferences) _(planned for M43)_ |
+| See changes by others without reloading | [Live pages](reference/frontend.md#live-pages) _(planned for M43)_ |
+| Comment on and mention people in records and tasks | [Mentions](reference/comments.md#mentions) _(planned for M43)_ |
 
 ### Output
 
@@ -685,4 +685,4 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Set the tenant's mail | _(planned for M44)_ |
 | Set the tenant's legal links | _(planned for M44)_ |
 | See how much each application is used | _(planned for M54)_ |
-| Each person chooses which notifications they get | _(planned for M43)_ |
+| Each person chooses which notifications they get | [Notification preferences](reference/notifications.md#notification-preferences) _(planned for M43)_ |
