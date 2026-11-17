@@ -176,7 +176,7 @@ After the instance's new state, step 5 stores what the step adds or writes:
 - **Record update.** An `updateRecord` operation writes the values the way a record update does. Each
   value must fit its field, and a `null` for a required field is refused. Computed fields are
   recomputed, validations run, and the record's version goes up by one. A refused write is an error,
-  keyed and worded as in the [record API](record-api.md#child-rows-computed-fields-and-validations).
+  keyed and worded as in [child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations).
 - **Record create.** A `createRecord` operation creates its record in the step's transaction, as
   `system`, the way a record create does after its grant check: it applies the defaults of the fields
   `set` leaves out, sets each creator field to `system`, computes the computed fields, runs the

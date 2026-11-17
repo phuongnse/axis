@@ -19,7 +19,7 @@ Each use is type-checked by the compiler and runs on one back end:
 
 | Use                                                                                                                        | Runs on                                                                                                                                           |
 | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Entity [validations](resource-files.md#entity-logic) and [computed fields](resource-files.md#entity-logic), field defaults | The interpreter, when the record API writes a record                                                                                              |
+| Entity [validations](entity-logic-and-sequences.md#entity-logic) and [computed fields](entity-logic-and-sequences.md#entity-logic), field defaults | The interpreter, when the record API writes a record                                                                                              |
 | Named [rules](resource-files.md#resource-file-shape)                                                                       | The interpreter runs the rule's expression for a caller it evaluates, and a filter's SQL inlines it                                               |
 | Data source [filters](data-sources.md#resource-shape) and measure filters                                                  | SQL, which the data source endpoint runs                                                                                                          |
 | [Policy](roles-and-policies.md) filters                                                                                    | SQL, which the record API and the data source endpoint run                                                                                        |
@@ -382,7 +382,7 @@ signatures, `n` is an integer or a decimal. Unless the table says otherwise, a f
 - **Text.** The text functions take `text` only. An enum value is not text to them, because no
   conversion is implicit except integer to decimal.
 - **The application time zone.** `today()` and `toDate(date-time)` use the
-  [application time zone](resource-files.md#application-time-zone), which is `UTC` when the
+  [application time zone](entity-logic-and-sequences.md#application-time-zone), which is `UTC` when the
   application names none. The time zone is part of the release, so a change applies to work that
   runs on the new release. The SQL translation converts with `AT TIME ZONE` and the time zone id as
   a bound parameter, so the interpreter and SQL agree. For example, at 18:00 UTC on 31 December
@@ -679,7 +679,7 @@ field defaults, data source filters, [process](processes.md#resource-shape) cond
 ```
 
 The property name above is only an example. For `expression` on a field, on a validation and on a
-rule, see [Entity logic](resource-files.md#entity-logic), and for `filter` on a data source, see
+rule, see [Entity logic](entity-logic-and-sequences.md#entity-logic), and for `filter` on a data source, see
 [data sources](data-sources.md#resource-shape).
 
 - **Quotes.** Text literals use single quotes, so they need no JSON escaping.

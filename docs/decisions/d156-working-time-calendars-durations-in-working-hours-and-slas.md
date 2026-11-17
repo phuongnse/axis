@@ -55,7 +55,7 @@ them that still holds.
 
 The detail is in [working time and SLAs](../reference/working-time.md),
 [task deadlines and claims](../reference/task-deadlines.md),
-[application time zone](../reference/resource-files.md#application-time-zone) and the
+[application time zone](../reference/entity-logic-and-sequences.md#application-time-zone) and the
 [expression functions](../reference/expressions.md#functions).
 
 ## Consequences

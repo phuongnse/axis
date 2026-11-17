@@ -121,7 +121,7 @@ A required field's label is marked, but the mark blocks nothing: the server stil
 | Any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | The value the server returned, formatted as a table cell shows it, as plain text, see [field look](#field-look). An empty value shows "Not set" in muted italics. It changes only when the record is saved and loaded again                                                                                                                                                                                                           |
 
 - **Sequence fields.** Page metadata marks a field that names a
-  [sequence](resource-files.md#sequences), so the form shows it read-only. It is empty on a new record,
+  [sequence](entity-logic-and-sequences.md#sequences), so the form shows it read-only. It is empty on a new record,
   and the form never sends it.
 - **Creator fields.** Page metadata marks a field that declares
   [`creator`](roles-and-policies.md#record-creator), so the form shows it read-only. It is empty on a
@@ -225,7 +225,7 @@ A child collection field shows its rows as a table under the field's label.
   [buttons](actions-and-controls.md#buttons). It appends a row with every child field `null`, and
   focus moves to the row's first input. Rows cannot be reordered.
 - **Sending.** When rows were added, removed or edited, the form sends the whole row list, as
-  [child rows](record-api.md#child-rows-computed-fields-and-validations) describes. Each row holds its
+  [child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations) describes. Each row holds its
   non-null child fields in declaration order, without its computed fields. Rows are compared by value
   with the rows the form started from, so an edit that is typed and then undone leaves the collection
   out of the body.

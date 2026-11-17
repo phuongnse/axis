@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Axis.Configuration.Resources;
 using Axis.Server.Mcp;
@@ -73,6 +74,22 @@ public sealed partial class McpReferenceTopicsDocumentationTests
             var (output, error) = McpReference.Read(topic);
             Assert.True(output is not null && error is null, $"Topic '{topic}' cannot be read.");
         }
+    }
+
+    [Theory]
+    [InlineData("application")]
+    [InlineData("entity")]
+    [InlineData("sequence")]
+    public void The_entity_logic_topics_answer_the_entity_logic_page(string topic)
+    {
+        var (output, error) = McpReference.Read(topic);
+
+        Assert.Null(error);
+        var pages = JsonSerializer.SerializeToNode(output)!["pages"]!.AsArray();
+        var page = Assert.Single(pages, entry => entry!["page"]!.GetValue<string>() == "entity-logic-and-sequences.md");
+        Assert.Equal(
+            File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "reference", "entity-logic-and-sequences.md")),
+            page!["text"]!.GetValue<string>());
     }
 
     [Fact]

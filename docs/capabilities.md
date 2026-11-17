@@ -129,13 +129,13 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | --- | --- |
 | Text, whole numbers, decimals with a set precision, yes or no, dates and instants | [Entity field types](reference/resource-files.md#entity-field-types-and-constraints) |
 | Amounts in a fixed currency or in the currency of another field | [Entity field types](reference/resource-files.md#entity-field-types-and-constraints) |
-| One date for "today" in the application's time zone | [Application time zone](reference/resource-files.md#application-time-zone) |
+| One date for "today" in the application's time zone | [Application time zone](reference/entity-logic-and-sequences.md#application-time-zone) |
 | A fixed list of values with a label for each | [More field types](reference/resource-files.md#more-field-types-and-properties) |
 | A file on a record, and several files through child rows | [File fields](reference/file-fields.md#field-and-value) |
 | Multi-line and rich text | _(planned for M42)_ |
 | Duration, location, JSON and multi-select fields | _(planned for M53)_ |
 | A record that points to another record | [Entity field types](reference/resource-files.md#entity-field-types-and-constraints) |
-| Rows owned by a record, such as line items | [Entity logic](reference/resource-files.md#entity-logic) |
+| Rows owned by a record, such as line items | [Entity logic](reference/entity-logic-and-sequences.md#entity-logic) |
 | A set of records, many to many | [More field types](reference/resource-files.md#more-field-types-and-properties) |
 | A reference found by a unique field instead of being written | [Matched references](reference/resource-files.md#matched-references) |
 | A reference that points to one of several kinds of record | _(planned for M53)_ |
@@ -147,14 +147,14 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 
 | Capability | Where |
 | --- | --- |
-| Values computed from the record and its own rows | [Entity logic](reference/resource-files.md#entity-logic) |
+| Values computed from the record and its own rows | [Entity logic](reference/entity-logic-and-sequences.md#entity-logic) |
 | Values that depend on today's date, such as age or overdue | _(planned for M53)_ |
 | Totals over the records that point to this record | _(planned for M53)_ |
-| Checks on the record and its own rows | [Entity logic](reference/resource-files.md#entity-logic) |
+| Checks on the record and its own rows | [Entity logic](reference/entity-logic-and-sequences.md#entity-logic) |
 | Checks that read a referenced record, such as stock on hand | _(planned for M53)_ |
 | Unique values, on one field or on several together | [Indexes](reference/resource-files.md#indexes) |
 | Indexes for fast lists | [Indexes](reference/resource-files.md#indexes) |
-| Business numbers that restart each year | [Sequences](reference/resource-files.md#sequences) |
+| Business numbers that restart each year | [Sequences](reference/entity-logic-and-sequences.md#sequences) |
 | Business numbers per month or per prefix | _(planned for M53)_ |
 | Default values from a fixed value, a rule or the current time | [More field types](reference/resource-files.md#more-field-types-and-properties) |
 | Default values from the user or the page | _(planned for M42)_ |

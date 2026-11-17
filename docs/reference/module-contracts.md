@@ -173,7 +173,7 @@ be created and deleted, and which changes of state are allowed and by whom.
 
 `validations` holds the module's core validations, which always run, whatever validations an
 application adds. Each has a `name`, an `expression`, a `message` and a `field`, with the meaning of
-an [entity validation](resource-files.md#entity-logic), plus the [`previous`](#previous-values),
+an [entity validation](entity-logic-and-sequences.md#entity-logic), plus the [`previous`](#previous-values),
 [`accountableUser`](#the-accountable-user) and [`decisionTask`](#the-deciding-task) functions. A core
 validation reads `id`, the record's own id, and on a create that is the id the new record gets, so
 `parent == null or parent != id` keeps a record from referring to itself. A field named `id` is hidden

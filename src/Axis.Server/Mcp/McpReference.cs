@@ -19,15 +19,15 @@ internal static class McpReference
     /// <summary>The page file names of each topic, in the order the answer lists them.</summary>
     internal static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> Pages = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
     {
-        [ResourceKinds.Application] = ["resource-files.md"],
-        [ResourceKinds.Entity] = ["resource-files.md"],
+        [ResourceKinds.Application] = ["resource-files.md", "entity-logic-and-sequences.md"],
+        [ResourceKinds.Entity] = ["resource-files.md", "entity-logic-and-sequences.md"],
         [ResourceKinds.Site] = ["resource-files.md"],
         [ResourceKinds.Page] = ["resource-files.md", "frontend.md"],
         [ResourceKinds.Text] = ["resource-files.md"],
         [ResourceKinds.Seed] = ["resource-files.md"],
         [ResourceKinds.DataSource] = ["data-sources.md"],
         [ResourceKinds.Rule] = ["resource-files.md"],
-        [ResourceKinds.Sequence] = ["resource-files.md"],
+        [ResourceKinds.Sequence] = ["resource-files.md", "entity-logic-and-sequences.md"],
         [ResourceKinds.Process] = ["processes.md", "process-flow.md"],
         [ResourceKinds.Form] = ["form-widget.md", "form-conditions.md"],
         [ResourceKinds.Role] = ["roles-and-policies.md"],
