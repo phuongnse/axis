@@ -52,6 +52,8 @@ public static class RuntimeRoleGrants
         "mcp_clients",
         "package_runners",
         "given_roles",
+        "table_views",
+        "table_columns",
         "application_settings",
         "resource_writes",
         "files",

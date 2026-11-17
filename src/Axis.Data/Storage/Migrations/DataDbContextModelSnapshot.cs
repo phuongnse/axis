@@ -582,6 +582,84 @@ namespace Axis.Data.Storage.Migrations
                     b.ToTable("sessions", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Data.Storage.TableColumnsRow", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("TableKey")
+                        .HasColumnType("text")
+                        .HasColumnName("table_key");
+
+                    b.PrimitiveCollection<string[]>("Columns")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("columns");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("UserId", "TableKey")
+                        .HasName("pk_table_columns");
+
+                    b.ToTable("table_columns", "axis");
+                });
+
+            modelBuilder.Entity("Axis.Data.Storage.TableViewRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Filter")
+                        .HasColumnType("text")
+                        .HasColumnName("filter");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Search")
+                        .HasColumnType("text")
+                        .HasColumnName("search");
+
+                    b.Property<string>("Sort")
+                        .HasColumnType("text")
+                        .HasColumnName("sort");
+
+                    b.Property<string>("TableKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("table_key");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_table_views");
+
+                    b.ToTable("table_views", "axis");
+                });
+
             modelBuilder.Entity("Axis.Data.Storage.UserProfileRow", b =>
                 {
                     b.Property<string>("UserId")
