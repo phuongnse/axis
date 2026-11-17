@@ -27,8 +27,8 @@ namespace Axis.Server.Studio;
 /// <see cref="ExpressionReader"/> and docs/reference/authoring.md#expression-check.
 /// <c>POST /api/studio/apps/{application}/expressions/scope</c> answers what the same place offers. Its body is
 /// <c>{ resourceId, path, draft }</c> and the answer is <c>{ type, fields, functions }</c>, from the compile's type check at
-/// the place. Each function carries its parameters, result, group and example, and a description in the language of the
-/// request's <c>Accept-Language</c> header, or in <c>en</c>, see <see cref="RequestLocale"/>. The checks run in the order of the rest of the authoring API for both routes: session (401), author role (403),
+/// the place. Each function carries its parameters, result, group and example, a description in the language of the
+/// request's <c>Accept-Language</c> header, or in <c>en</c>, see <see cref="RequestLocale"/>, and its reading <c>words</c>. The checks run in the order of the rest of the authoring API for both routes: session (401), author role (403),
 /// application (404), then 415 for a content type other than
 /// <c>application/json</c>, 400 for a body that is not an expression check or a <c>draft</c> that is not an object, 404 for a
 /// resource id the application does not have, and 400 for a path that holds no expression. A path holds no expression when
@@ -257,7 +257,8 @@ internal static class StudioExpressionEndpoints
             signature.Result,
             signature.Group,
             signature.Example,
-            texts.Texts[FunctionDescriptionKey(signature.Name)]);
+            texts.Texts[FunctionDescriptionKey(signature.Name)],
+            ExpressionReader.FunctionWords(signature.Name));
     }
 
     /// <summary>
@@ -344,9 +345,12 @@ internal sealed record StudioExpressionScopeResponse(
 /// <summary>One name in scope. <c>LabelKey</c> is null for a name with no label, such as a parameter.</summary>
 internal sealed record StudioExpressionScopeField(string Name, string? LabelKey, string? Type);
 
-/// <summary>One function or aggregate a place allows, with its signature, its result, its group, an example and what it does.</summary>
+/// <summary>
+/// One function or aggregate a place allows, with its signature, its result, its group, an example, what it does and the
+/// key of its reading words, <c>Words</c>, see docs/reference/authoring.md#expression-scope.
+/// </summary>
 internal sealed record StudioExpressionScopeFunction(
-    string Name, IReadOnlyList<string> Parameters, string Result, string Group, string Example, string Description);
+    string Name, IReadOnlyList<string> Parameters, string Result, string Group, string Example, string Description, string Words);
 
 /// <summary>
 /// The answer to an expression check: the expression's type, the problem with its range when there is one, and the
