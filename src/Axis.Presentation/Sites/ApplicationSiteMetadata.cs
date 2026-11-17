@@ -369,12 +369,14 @@ public sealed record DataSourceParameterMetadata(
 /// at. <see cref="Values"/> is set for enum and <see cref="Target"/> for reference. A measure column
 /// has the type of its result and no label key, values or target, so its header is its name. A
 /// money measure gives its fixed <see cref="Currency"/> or the <see cref="CurrencyColumn"/> that holds the
-/// currency code in each grouped row. Both are left out of the JSON when null.
+/// currency code in each grouped row. Both are left out of the JSON when null. A measure column is marked
+/// <see cref="Measure"/>, which is left out of the JSON on every other column.
 /// </summary>
 /// <param name="Name">The projected name: the column's key in a row.</param>
 /// <param name="Currency">The fixed currency code of a money column or measure.</param>
 /// <param name="CurrencyColumn">The name of the column that holds the currency code of a money column or measure.</param>
 /// <param name="ValueLabelKeys">Maps each enum value to the text key of its label, or is null when the enum has no labels.</param>
+/// <param name="Measure">True on a measure column of a grouped data source, false on every other column.</param>
 public sealed record DataSourceColumnMetadata(
     string Name,
     string Type,
@@ -383,7 +385,8 @@ public sealed record DataSourceColumnMetadata(
     IReadOnlyDictionary<string, string>? ValueLabelKeys,
     ReferenceTarget? Target,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Currency = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CurrencyColumn = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CurrencyColumn = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Measure = false);
 
 /// <summary>
 /// One field. Properties the field's type does not have are null: <see cref="MaxLength"/> and

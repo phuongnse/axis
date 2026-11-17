@@ -16,7 +16,7 @@ namespace Axis.Admin;
 /// request twice, and a restart does not repeat a lookup before the interval is up. For each claimed request it reads the <c>TXT</c> records
 /// of <c>_axis-verify.</c> and the host. A wrong token, no record or a failed lookup leaves the request <c>pending</c> and writes one line.
 /// When a record equals the token, the host is added to the tenant with the platform audit record <c>tenant host verify</c> that names the
-/// operator who asked for it, then the realm's redirect addresses are written, then the certificate of the host is written when the publisher has a writer, then its route is written
+/// operator or the tenant administrator who asked for it, then the realm's redirect addresses are written, then the certificate of the host is written when the publisher has a writer, then its route is written
 /// when the publisher has a route writer, and last the request becomes <c>verified</c>, see
 /// <see href="docs/reference/cells.md#hosts-and-certificates">hosts and certificates</see>. A host that the tenant
 /// already holds is not added again, but only a request whose record still matches is verified. A host that another tenant holds, a

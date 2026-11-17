@@ -92,8 +92,9 @@ nothing:
   be read: the server logs a warning and the write goes on, because a quota is a billing limit and not
   a security boundary.
 - **Platform rows only.** The routes of a tenant administrator that write only platform rows, such as its
-  [model key](user-administration.md#the-tenants-model-key) and its
-  [outside clients](user-administration.md#outside-mcp-clients), are never refused over the `storage` quota,
+  [model key](user-administration.md#the-tenants-model-key), its
+  [outside clients](user-administration.md#outside-mcp-clients) and its
+  [host requests](tenant-lifecycle.md#hosts-by-a-tenant-administrator), are never refused over the `storage` quota,
   because they write no tenant data.
 - **Consent revokes.** A tenant administrator's [revoke of an outside client's consent](user-administration.md#outside-mcp-clients)
   is never refused over the `storage` quota. Revoking is a security action, and a billing limit must never stop it. It
@@ -101,7 +102,7 @@ nothing:
 - **Package runners.** A tenant administrator's [create and revoke of a package runner](user-administration.md#package-runners)
   are never refused over the `storage` quota. A create writes one small row and one audit record, and a revoke is a
   security action that a billing limit must never stop.
-- **Table views and columns** _(planned for M33)_. A person's writes under `/api/me/tables/{key}` are never refused over
+- **Table views and columns.** A person's writes under `/api/me/tables/{key}` are never refused over
   the `storage` quota. Each row is small and bounded by the route's limits, and a person can always tidy their views,
   see [table views and columns](frontend.md#table-views-and-columns).
 - **`users`.** Inviting an account and enabling one on the [users page](user-administration.md) are

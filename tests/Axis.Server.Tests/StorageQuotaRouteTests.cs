@@ -65,6 +65,13 @@ public sealed class StorageQuotaRouteTests
         "POST /api/auth/sign-out",
         "POST /api/cell/auth/sign-out",
 
+        // A person's columns and saved views are never refused over the quota, see docs/reference/tenant-quotas.md#refusals.
+        "DELETE /api/me/tables/{key}/columns",
+        "DELETE /api/me/tables/{key}/views/{id}",
+        "POST /api/me/tables/{key}/views",
+        "PUT /api/me/tables/{key}/columns",
+        "PUT /api/me/tables/{key}/views/{id}",
+
         // An MCP session message writes nothing: the session id is a protected token, and no tenant data is stored.
         "POST /mcp",
 
@@ -83,6 +90,10 @@ public sealed class StorageQuotaRouteTests
         // A tenant administrator's export writes only platform rows (a job and an audit record), and a tenant over its
         // quota must still be able to take its data.
         "POST /api/tenant/exports",
+
+        // A tenant administrator's host request writes one platform row and no tenant data, see
+        // docs/reference/tenant-quotas.md#refusals.
+        "POST /api/tenant/hosts",
 
         // The tenant's model key is a platform row and no tenant data, so the storage quota does not count it.
         "DELETE /api/tenant/model-key",

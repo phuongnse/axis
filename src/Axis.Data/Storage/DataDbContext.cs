@@ -6,7 +6,7 @@ namespace Axis.Data.Storage;
 /// The data module's tables in a tenant database: what has been provisioned in the
 /// <c>entities</c> schema, the migrations applied to it, the counters of the sequences, the audit records, the user
 /// profiles, the computed fields whose expression failed for a record, the signed-in sessions, the MCP clients, the uploaded
-/// files with their bytes, and the uploads of record imports. The caller supplies the connection to the tenant
+/// files with their bytes, the uploads of record imports, and each person's table views and columns. The caller supplies the connection to the tenant
 /// database.
 /// </summary>
 public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbContext(options)
@@ -48,6 +48,10 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
     public DbSet<FileContentRow> FileContents => Set<FileContentRow>();
 
     public DbSet<RecordImportRow> RecordImports => Set<RecordImportRow>();
+
+    public DbSet<TableViewRow> TableViews => Set<TableViewRow>();
+
+    public DbSet<TableColumnsRow> TableColumns => Set<TableColumnsRow>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
         optionsBuilder.UseNpgsql(npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema));
@@ -198,6 +202,32 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             runner.Property(r => r.LastCallAt).HasColumnName("last_call_at");
             runner.Property(r => r.RevokedAt).HasColumnName("revoked_at");
             runner.HasIndex(r => r.ClientId).IsUnique().HasDatabaseName("ux_package_runners_client_id");
+        });
+
+        // The unique index on user_id, table_key and lower(name) is raw SQL in the migration, which EF Core cannot model.
+        modelBuilder.Entity<TableViewRow>(view =>
+        {
+            view.ToTable("table_views");
+            view.HasKey(v => v.Id).HasName("pk_table_views");
+            view.Property(v => v.Id).HasColumnName("id").ValueGeneratedNever();
+            view.Property(v => v.UserId).HasColumnName("user_id");
+            view.Property(v => v.TableKey).HasColumnName("table_key");
+            view.Property(v => v.Name).HasColumnName("name");
+            view.Property(v => v.Search).HasColumnName("search");
+            view.Property(v => v.Filter).HasColumnName("filter");
+            view.Property(v => v.Sort).HasColumnName("sort");
+            view.Property(v => v.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            view.Property(v => v.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+        });
+
+        modelBuilder.Entity<TableColumnsRow>(columns =>
+        {
+            columns.ToTable("table_columns");
+            columns.HasKey(c => new { c.UserId, c.TableKey }).HasName("pk_table_columns");
+            columns.Property(c => c.UserId).HasColumnName("user_id");
+            columns.Property(c => c.TableKey).HasColumnName("table_key");
+            columns.Property(c => c.Columns).HasColumnName("columns").HasColumnType("text[]");
+            columns.Property(c => c.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
         });
 
         modelBuilder.Entity<GivenRoleRow>(given =>
