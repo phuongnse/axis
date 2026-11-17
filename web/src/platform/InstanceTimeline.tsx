@@ -9,7 +9,7 @@ import { durationText, stepRuns, type StepRun } from './instanceRuns'
 import { filled } from './instanceStatus'
 import { ResolveDialog } from './ResolveDialog'
 import { useText } from './texts'
-import { TimeAgo } from './TimeAgo'
+import { EventTime } from './EventTime'
 
 /** One row of the timeline, with the rows inside it, which the table folds. */
 interface TimelineRow {
@@ -301,7 +301,7 @@ export function InstanceTimeline({
       kind: 'fixed',
       title: t('shell.inspector.startedAt'),
       // Proposed: a run's start is how long ago it was, the exact time its tooltip, see the review on #3650.
-      render: (_v, row) => (row.startedAt === null ? null : <TimeAgo at={row.startedAt} locale={locale} />),
+      render: (_v, row) => (row.startedAt === null ? null : <EventTime at={row.startedAt} locale={locale} />),
     },
     {
       // Proposed: how long a run, a call or an attempt lasted is its Duration, the one term for it, see the review on

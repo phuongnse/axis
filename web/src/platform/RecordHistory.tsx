@@ -11,7 +11,7 @@ import { PartRule, SectionPart } from './SectionParts'
 import { fetchHistory, historyPageSize, type HistoryItem, type HistoryPage } from './records'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
-import { TimeAgo } from './TimeAgo'
+import { EventTime } from './EventTime'
 import { useDesignTokens } from './themeMode'
 
 interface RecordHistoryProps {
@@ -119,7 +119,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
                         </Typography.Text>
                         <Typography.Text>{actorOf(item, t)}</Typography.Text>
                         <Typography.Text type="secondary">
-                          <TimeAgo at={item.occurredAt} locale={locale} />
+                          <EventTime at={item.occurredAt} locale={locale} />
                         </Typography.Text>
                         {target !== null && inspectorPage !== undefined && (
                           <Link

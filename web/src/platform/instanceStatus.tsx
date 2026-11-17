@@ -1,8 +1,8 @@
 import { Fragment, type ReactNode } from 'react'
 import type { InstanceDetail } from './inspection'
-import { stepRuns } from './instanceRuns'
+import { durationText, stepRuns } from './instanceRuns'
+import { useMinuteClock } from './relativeTime'
 import { useText } from './texts'
-import { TimeAgo } from './TimeAgo'
 
 /** One text whose placeholders, such as `{process}`, take a node, so a link stays inside its sentence. */
 export function filled(text: string, values: Record<string, ReactNode>): ReactNode {
@@ -15,7 +15,7 @@ export function filled(text: string, values: Record<string, ReactNode>): ReactNo
 
 /**
  * Proposed, see the review on #3650: where the instance stands, in one sentence, for the top of its page: the step a
- * failed instance stopped at and why, whom or what a waiting instance waits for and since when, or nothing once it
+ * failed instance stopped at and why, whom or what a waiting instance waits for and for how long, or nothing once it
  * has ended.
  */
 export function useInstanceStatus(
@@ -24,6 +24,7 @@ export function useInstanceStatus(
   locale: string,
 ): { kind: 'error' | 'info'; text: ReactNode } | null {
   const t = useText()
+  const now = useMinuteClock()
   if (instance.endedAt !== null && instance.state !== 'failed') {
     return null
   }
@@ -32,7 +33,8 @@ export function useInstanceStatus(
   if (current === undefined) {
     return null
   }
-  const since = <TimeAgo at={current.startedAt} locale={locale} />
+  // How long it has waited reads in one sentence at any age, where a time ago or a date would not.
+  const since = durationText(current.startedAt, now.toISOString(), locale)
   if (instance.state === 'failed') {
     const call = current.calls.findLast((candidate) => candidate.state === 'failed')
     const error = current.error ?? call?.attempts.at(-1)?.error ?? null
