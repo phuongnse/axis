@@ -1,4 +1,5 @@
 import { Button, Checkbox, Descriptions, Flex, Tag, Typography } from 'antd'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { useText } from '../platform/texts'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { targetActions } from './policyMatrixDraft'
@@ -17,8 +18,8 @@ function asGrant(value: unknown): Grant {
 
 /**
  * The editor of a policy of a module the application uses, with the application's layer applied: its role slots and its
- * grants, each with the target, a checkbox for each action the target takes, the filter and the fields. An author ticks
- * actions and removes grants, and the filter and the fields are read-only. A grant the layer added, changed or removed
+ * grants, each with the target, an Actions group with a checkbox for each action the target takes, the filter and the
+ * fields. An author ticks actions and removes grants, and the filter and the fields are read-only. A grant the layer added, changed or removed
  * carries a mark with Reset to module. The parent owns the draft and the save.
  */
 export function StudioModulePolicy({
@@ -61,24 +62,6 @@ export function StudioModulePolicy({
                 {layer !== undefined && typeof grant.name === 'string' && (
                   <LayerMarkTag layer={layer} list="/grants" index={index} name={grant.name} />
                 )}
-              </Flex>
-              <Flex gap="small" align="center" wrap>
-                <Checkbox.Group
-                  options={accepted}
-                  value={actions.filter((action) => accepted.includes(action))}
-                  onChange={(ticked) =>
-                    onChange(`/grants/${index}/actions`, [
-                      ...accepted.filter((action) => ticked.includes(action)),
-                      ...unaccepted,
-                    ])
-                  }
-                />
-                {unaccepted.map((action) => (
-                  // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
-                  <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
-                    {t('shell.studio.matrix.unacceptedAction')} {action}
-                  </Tag>
-                ))}
                 {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button
                   size="small"
@@ -93,6 +76,26 @@ export function StudioModulePolicy({
                   {t('shell.studio.matrix.removeGrant')}
                 </Button>
               </Flex>
+              <AxisFieldGroup title={t('shell.studio.matrix.actions')} help={t('shell.studio.matrix.actions.help')}>
+                <Flex gap="small" align="center" wrap>
+                  <Checkbox.Group
+                    options={accepted}
+                    value={actions.filter((action) => accepted.includes(action))}
+                    onChange={(ticked) =>
+                      onChange(`/grants/${index}/actions`, [
+                        ...accepted.filter((action) => ticked.includes(action)),
+                        ...unaccepted,
+                      ])
+                    }
+                  />
+                  {unaccepted.map((action) => (
+                    // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
+                    <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
+                      {t('shell.studio.matrix.unacceptedAction')} {action}
+                    </Tag>
+                  ))}
+                </Flex>
+              </AxisFieldGroup>
               <Flex gap="small" align="center" wrap>
                 {typeof grant.filter === 'string' && grant.filter !== '' ? (
                   <Typography.Text code>{grant.filter}</Typography.Text>

@@ -1,7 +1,8 @@
-import { Button, Checkbox, Flex, Form, Input, Modal, Select, Tag, Typography } from 'antd'
+import { Button, Flex, Form, Input, Modal, Select, Tag, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { createContext, lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
 import { AxisTable } from '../platform/AxisTable'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
@@ -278,18 +279,14 @@ function AddStateDialog({
 }) {
   const t = useText()
   const { size, spacing } = useDesignTokens()
-  const [form] = Form.useForm<{ name: string }>()
-  const [initial, setInitial] = useState(false)
-  const [deletable, setDeletable] = useState(false)
+  const [form] = Form.useForm<{ name: string; initial: boolean; deletable: boolean }>()
 
   function close() {
     form.resetFields()
-    setInitial(false)
-    setDeletable(false)
     onClose()
   }
 
-  function add({ name }: { name: string }) {
+  function add({ name, initial, deletable }: { name: string; initial: boolean; deletable: boolean }) {
     onAdd({
       name: name.trim(),
       ...(initial ? { initial: true } : {}),
@@ -312,7 +309,7 @@ function AddStateDialog({
         form={form}
         layout="vertical"
         requiredMark={requiredMark}
-        initialValues={{ name: '' }}
+        initialValues={{ name: '', initial: false, deletable: false }}
         scrollToFirstError={{ focus: true }}
         onFinish={add}
       >
@@ -326,14 +323,16 @@ function AddStateDialog({
           >
             <Input aria-label={t('shell.studio.contract.name')} />
           </AxisField>
-          <Flex vertical gap="small">
-            <Checkbox checked={initial} onChange={(event) => setInitial(event.target.checked)}>
-              {t('shell.studio.contract.initial')}
-            </Checkbox>
-            <Checkbox checked={deletable} onChange={(event) => setDeletable(event.target.checked)}>
-              {t('shell.studio.contract.deletable')}
-            </Checkbox>
-          </Flex>
+          <AxisCheckboxField
+            name="initial"
+            label={t('shell.studio.contract.initial')}
+            help={t('shell.studio.contract.initial.help')}
+          />
+          <AxisCheckboxField
+            name="deletable"
+            label={t('shell.studio.contract.deletable')}
+            help={t('shell.studio.contract.deletable.help')}
+          />
         </Flex>
       </Form>
     </Modal>

@@ -440,12 +440,12 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
 - **Editable grants.** In an editable row, the cell's own grants, those of `<Role>Access` that name
   exactly this target, are editable. The panel reads that policy with the resource route, so every
   edit fits the file that a save patches. While the policy loads, the panel says so.
-  - Each grant has a checkbox for each action its target takes, as
-    [roles and policies](roles-and-policies.md) lists them, which Studio reads from
-    `policy.schema.json`. An action the target does not take stays in the file and shows as a warning
-    tag, and only Validate reports it.
-  - An entity grant, and no other, also edits its record filter and its fields. An empty field list
-    means all fields, so clearing the picker removes the `fields` key.
+  - Each grant has an **Actions** group with help, on a line of its own, that holds a checkbox for
+    each action its target takes, as [roles and policies](roles-and-policies.md) lists them, which
+    Studio reads from `policy.schema.json`. An action the target does not take stays in the file and
+    shows as a warning tag, and only Validate reports it.
+  - An entity grant, and no other, also edits its record filter and its fields. The **Fields** picker's
+    help says an empty list grants every field, so clearing it removes the `fields` key.
   - Add grant adds a grant named after the cell's target with the first free number in the policy,
     ignoring letter case, such as `purchaseRequest1`. A grant shows its name read-only. Remove deletes a
     grant, but not the policy's last one.
