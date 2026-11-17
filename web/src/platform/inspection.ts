@@ -68,6 +68,13 @@ export interface GraphStep {
   type: string
   labelKey: string | null
   transitions: GraphTransition[]
+  /**
+   * Proposed, see the review on #3650: the step as the release the instance is pinned to defines it, its JSON without
+   * `name`, `type` and `label`, such as a decision's branches, a task's assignee and outcomes, or a call's mapping and
+   * retry. A connector call also has `endpoint`, its operation's method and path from the connector resource. It holds
+   * expressions and names, never a value.
+   */
+  definition?: StepDefinition
 }
 
 /** One occurrence of a step in the instance's history. */
@@ -106,6 +113,35 @@ export interface CallAttempt {
   error: string | null
   /** The trace id of the run that wrote the row, or `null` when it stored none. */
   traceId: string | null
+  /** Proposed, see the review on #3650: the answer to a connector call's attempt, `null` when none came back. */
+  response?: CallResponse | null
+}
+
+/** Proposed, see the review on #3650: a step's definition, see `GraphStep.definition`. */
+export type StepDefinition = Record<string, unknown> & { endpoint?: { method: string; path: string } }
+
+/**
+ * Proposed, see the review on #3650: the request a connector call sent, kept as its input is and shown under the same
+ * masking rule, with every secret, such as an `Authorization` header or a `secret` binding's value, as `[secret]`.
+ */
+export interface CallRequest {
+  method: string
+  url: string
+  headers: Record<string, string>
+  /** The body as it was sent, its text unchanged, or `null` for none. */
+  body: string | null
+}
+
+/**
+ * Proposed, see the review on #3650: what the external system answered an attempt, under the input's masking rule,
+ * with secrets as `[secret]`. A body over the size limit is cut, and `truncated` says so.
+ */
+export interface CallResponse {
+  status: number
+  headers: Record<string, string>
+  /** The body as it came back, its text unchanged, or `null` for none. */
+  body: string | null
+  truncated: boolean
 }
 
 /** An output the operation of a resolvable call declares. `type` is the field type, such as `text` or `decimal`. */
@@ -134,6 +170,8 @@ export interface InstanceCall {
   attempts: CallAttempt[]
   input: unknown
   inputHidden: boolean
+  /** Proposed, see the review on #3650: the request a connector call sent, `null` while hidden or not kept. */
+  request?: CallRequest | null
   /** Whether the signed-in user may resolve the call now. The server decides. */
   resolvable: boolean
   /** The outputs the operation declares. Only a resolvable call has them. */

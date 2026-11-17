@@ -10,7 +10,6 @@ import {
   type NodeProps,
   type OnConnectEnd,
   Position,
-  Panel,
   ReactFlow,
   useReactFlow,
 } from '@xyflow/react'
@@ -27,7 +26,6 @@ import {
 import {
   type ComponentType,
   createContext,
-  type ReactNode,
   type KeyboardEvent,
   useContext,
   useEffect,
@@ -553,7 +551,6 @@ export function ProcessGraphCanvas({
   controls = false,
   selected,
   onSelect,
-  aside,
 }: {
   steps: readonly ProcessGraphStep[]
   transitions: readonly ProcessGraphTransitionView[]
@@ -577,8 +574,6 @@ export function ProcessGraphCanvas({
    */
   selected?: string | null
   onSelect?: (id: string | null) => void
-  /** Proposed, see the review on #3650: what the graph shows beside it at its top right, such as the chosen step's runs. */
-  aside?: ReactNode
 }) {
   const { mode } = useThemeMode()
   const area = useRef<HTMLElement | null>(null)
@@ -735,11 +730,6 @@ export function ProcessGraphCanvas({
           onEdgeClick={onTransitionClick ? (_, edge) => onTransitionClick(edge.id) : undefined}
         >
           <FitOnLayout layout={layout} focus={focus} />
-          {aside && (
-            <Panel position="top-right" style={{ margin: 12 }}>
-              {aside}
-            </Panel>
-          )}
           {controls && (
             <ProcessGraphControls
               area={area}

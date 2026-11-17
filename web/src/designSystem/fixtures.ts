@@ -3,7 +3,7 @@ import type { CurrentUser } from '../platform/currentUser'
 import type { LegalLinks } from '../platform/LegalLine'
 import type { NotificationPage } from '../platform/notifications'
 import type { HistoryPage, RecordItem, RecordPage } from '../platform/records'
-import type { DeadLetterPage, InstanceDetail, InstancePage } from '../platform/inspection'
+import type { DeadLetterPage, GraphStep, InstanceDetail, InstancePage, StepDefinition } from '../platform/inspection'
 import type {
   ApplicationSite,
   DataSourceMetadata,
@@ -722,6 +722,171 @@ const instancePage: InstancePage = {
 /** A request's approval waiting at its review task, which the `shell` preview opens from the Instances page. */
 export const instanceId = 'be6b7f80-92a3-4eb5-bfc6-e708192a3b4c'
 
+/** The body the ERP call sent for the purchase request. */
+const purchaseOrderBody = {
+  requestNumber: 'PR-2026-0142',
+  supplierCode: 'ERGO-VN',
+  amount: 18500,
+  lines: [{ description: 'Standing desk, 160 × 80 cm', quantity: 10, unitPrice: 1850, amount: 18500 }],
+}
+
+/**
+ * Proposed, see the review on #3650: each step of the purchase approval as its release defines it, as the instance
+ * detail would carry it for the step's Definition tab.
+ */
+const stepDefinitions: Record<string, StepDefinition> = {
+  checkPolicy: {
+    branches: [{ name: 'catalogItem', when: 'catalogItem and totalAmount < 1000', next: 'autoApprove' }],
+    otherwise: 'budgetCheck',
+  },
+  autoApprove: { operation: 'updateRecord', set: { status: "'approved'", approvedAt: 'now()' }, next: 'vendorRisk' },
+  budgetCheck: {
+    operation: 'callConnector',
+    connector: { name: 'Finance', operation: 'getBudget' },
+    endpoint: { method: 'GET', path: '/budgets/{costCentre}' },
+    input: { costCentre: 'costCentre', amount: 'totalAmount' },
+    output: { remaining: 'budgetRemaining', withinBudget: 'withinBudget' },
+    retry: { attempts: 3, backoff: 'PT30S' },
+    next: 'checkBudget',
+  },
+  checkBudget: {
+    branches: [{ name: 'withinBudget', when: 'withinBudget', next: 'managerApproval' }],
+    otherwise: 'budgetException',
+  },
+  budgetException: {
+    assignee: { role: 'finance-reviewer' },
+    form: 'BudgetException',
+    dueIn: 'P2D',
+    outcomes: [
+      { name: 'approve', next: 'managerApproval' },
+      { name: 'reject', next: 'notifyRejected' },
+    ],
+  },
+  managerApproval: {
+    assignee: { user: 'department.head.user' },
+    form: 'PurchaseRequestReview',
+    dueIn: 'P3D',
+    outcomes: [
+      { name: 'approve', next: 'routeByAmount' },
+      { name: 'reject', next: 'notifyRejected' },
+      { name: 'return', next: 'reviseRequest' },
+    ],
+  },
+  reviseRequest: {
+    assignee: { user: 'createdBy' },
+    form: 'PurchaseRequestEdit',
+    outcomes: [
+      { name: 'resubmit', next: 'checkPolicy' },
+      { name: 'withdraw', next: 'withdrawn' },
+    ],
+  },
+  routeByAmount: {
+    branches: [
+      { name: 'cfo', when: 'totalAmount > 50000', next: 'cfoApproval' },
+      { name: 'finance', when: 'totalAmount > 10000', next: 'financeApproval' },
+    ],
+    otherwise: 'vendorRisk',
+  },
+  financeApproval: {
+    assignee: { role: 'finance-reviewer' },
+    form: 'PurchaseRequestReview',
+    dueIn: 'P3D',
+    outcomes: [
+      { name: 'approve', next: 'vendorRisk' },
+      { name: 'reject', next: 'notifyRejected' },
+    ],
+  },
+  cfoApproval: {
+    assignee: { role: 'cfo' },
+    form: 'PurchaseRequestReview',
+    dueIn: 'P5D',
+    outcomes: [
+      { name: 'approve', next: 'vendorRisk' },
+      { name: 'reject', next: 'notifyRejected' },
+    ],
+  },
+  vendorRisk: {
+    operation: 'vendor-risk/score',
+    input: { vendor: 'supplier.name', country: 'supplier.country', amount: 'totalAmount' },
+    output: { score: 'vendorRiskScore', status: 'vendorStatus' },
+    retry: { attempts: 3, backoff: 'PT10S' },
+    next: 'vendorCheck',
+  },
+  vendorCheck: {
+    branches: [{ name: 'approvedVendor', when: "vendorStatus = 'approved'", next: 'createPurchaseOrder' }],
+    otherwise: 'onboardVendor',
+  },
+  onboardVendor: { process: 'VendorOnboarding', subject: 'supplier', next: 'createPurchaseOrder' },
+  createPurchaseOrder: {
+    operation: 'callConnector',
+    connector: { name: 'ERP', operation: 'createPurchaseOrder' },
+    endpoint: { method: 'POST', path: '/purchase-orders' },
+    input: {
+      requestNumber: 'number',
+      supplierCode: 'supplier.code',
+      amount: 'totalAmount',
+      lines: {
+        from: 'lineItems',
+        fields: { description: 'description', quantity: 'quantity', unitPrice: 'unitPrice', amount: 'amount' },
+      },
+    },
+    output: { orderNumber: 'purchaseOrderNumber' },
+    retry: { attempts: 5, backoff: 'PT30S' },
+    next: 'notifyRequester',
+  },
+  notifyRequester: {
+    operation: 'notify',
+    to: [{ user: 'createdBy' }],
+    channels: ['inApp', 'email'],
+    message: {
+      subject: { textKey: 'purchaseRequest.ordered.subject' },
+      body: { textKey: 'purchaseRequest.ordered.body' },
+    },
+    next: 'waitGoodsReceipt',
+  },
+  waitGoodsReceipt: {
+    event: 'GoodsReceived',
+    when: 'purchaseOrderNumber = event.orderNumber',
+    timeout: { after: 'P30D', next: 'remindReceipt' },
+    next: 'threeWayMatch',
+  },
+  remindReceipt: {
+    operation: 'notify',
+    to: [{ user: 'createdBy' }],
+    channels: ['email'],
+    message: {
+      subject: { textKey: 'purchaseRequest.remind.subject' },
+      body: { textKey: 'purchaseRequest.remind.body' },
+    },
+    next: 'waitGoodsReceipt',
+  },
+  threeWayMatch: {
+    operation: 'invoice-matching/match',
+    input: { order: 'purchaseOrderNumber', receipt: 'goodsReceipt', invoice: 'invoice' },
+    output: { matched: 'invoiceMatched' },
+    retry: { attempts: 3, backoff: 'PT10S' },
+    next: 'done',
+  },
+  notifyRejected: {
+    operation: 'notify',
+    to: [{ user: 'createdBy' }],
+    channels: ['inApp', 'email'],
+    message: {
+      subject: { textKey: 'purchaseRequest.rejected.subject' },
+      body: { textKey: 'purchaseRequest.rejected.body' },
+    },
+    next: 'rejected',
+  },
+  done: {},
+  rejected: {},
+  withdrawn: {},
+}
+
+/** The graph's steps, each with its definition. */
+function withDefinitions(steps: GraphStep[]): GraphStep[] {
+  return steps.map((step) => ({ ...step, definition: stepDefinitions[step.name] }))
+}
+
 /**
  * A purchase request's approval as a business runs it: a policy check, a budget call to Finance retried once, a
  * manager who returned the request for changes and then approved it, an escalation-free route to Finance by amount,
@@ -745,7 +910,7 @@ const instanceDetail: InstanceDetail = {
   endedAt: null,
   graph: {
     start: 'checkPolicy',
-    steps: [
+    steps: withDefinitions([
       {
         name: 'checkPolicy',
         type: 'decision',
@@ -1032,7 +1197,7 @@ const instanceDetail: InstanceDetail = {
         labelKey: 'approval.step.withdrawn',
         transitions: [],
       },
-    ],
+    ]),
   },
   path: [
     {
@@ -1244,6 +1409,17 @@ const instanceDetail: InstanceDetail = {
           httpStatus: 503,
           error: 'Service Unavailable',
           traceId: '0af7651916cd43dd8448eb211c80319c',
+          response: {
+            status: 503,
+            headers: { 'Content-Type': 'application/problem+json', 'Retry-After': '30' },
+            body: JSON.stringify({
+              type: 'https://finance.example.com/problems/maintenance',
+              title: 'Service Unavailable',
+              status: 503,
+              detail: 'The budget service is under maintenance until 09:00 UTC.',
+            }),
+            truncated: false,
+          },
         },
         {
           kind: 'attempt',
@@ -1254,6 +1430,12 @@ const instanceDetail: InstanceDetail = {
           httpStatus: 200,
           error: null,
           traceId: '7c1e2a9d3b4f4e5a8c6d0f1e2a3b4c5d',
+          response: {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ costCentre: 'CC-204', remaining: 42000, currency: 'EUR', withinBudget: true }),
+            truncated: false,
+          },
         },
       ],
       input: {
@@ -1261,6 +1443,12 @@ const instanceDetail: InstanceDetail = {
         amount: 18500,
       },
       inputHidden: false,
+      request: {
+        method: 'GET',
+        url: 'https://finance.example.com/api/budgets/CC-204?amount=18500',
+        headers: { Accept: 'application/json', Authorization: '[secret]' },
+        body: null,
+      },
       resolvable: false,
     },
     {
@@ -1280,6 +1468,12 @@ const instanceDetail: InstanceDetail = {
           httpStatus: 200,
           error: null,
           traceId: '3d4e5f60718293a4b5c6d7e8f9011223',
+          response: {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ costCentre: 'CC-204', remaining: 42000, currency: 'EUR', withinBudget: true }),
+            truncated: false,
+          },
         },
       ],
       input: {
@@ -1287,6 +1481,12 @@ const instanceDetail: InstanceDetail = {
         amount: 18500,
       },
       inputHidden: false,
+      request: {
+        method: 'GET',
+        url: 'https://finance.example.com/api/budgets/CC-204?amount=18500',
+        headers: { Accept: 'application/json', Authorization: '[secret]' },
+        body: null,
+      },
       resolvable: false,
     },
     {
@@ -1335,6 +1535,18 @@ const instanceDetail: InstanceDetail = {
           httpStatus: 500,
           error: 'Internal Server Error',
           traceId: '8293a4b5c6d7e8f90112233445566778',
+          response: {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              error: {
+                code: 'INTERNAL',
+                message: 'The order service could not reach its database.',
+                correlationId: 'erp-7f3a91',
+              },
+            }),
+            truncated: false,
+          },
         },
         {
           kind: 'attempt',
@@ -1345,6 +1557,7 @@ const instanceDetail: InstanceDetail = {
           httpStatus: null,
           error: 'The request timed out after 60 seconds.',
           traceId: '93a4b5c6d7e8f9011223344556677889',
+          response: null,
         },
         {
           kind: 'attempt',
@@ -1355,10 +1568,32 @@ const instanceDetail: InstanceDetail = {
           httpStatus: 201,
           error: null,
           traceId: 'a4b5c6d7e8f901122334455667788990',
+          response: {
+            status: 201,
+            headers: { 'Content-Type': 'application/json', Location: '/api/v2/purchase-orders/PO-88412' },
+            body: JSON.stringify({
+              orderNumber: 'PO-88412',
+              status: 'open',
+              createdAt: '2026-03-09T15:07:11Z',
+              total: 18500,
+              currency: 'EUR',
+            }),
+            truncated: false,
+          },
         },
       ],
-      input: null,
-      inputHidden: true,
+      input: purchaseOrderBody,
+      inputHidden: false,
+      request: {
+        method: 'POST',
+        url: 'https://erp.example.com/api/v2/purchase-orders',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: '[secret]',
+          'Idempotency-Key': '0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b04',
+        },
+        body: JSON.stringify(purchaseOrderBody),
+      },
       resolvable: false,
     },
   ],

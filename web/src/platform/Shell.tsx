@@ -14,6 +14,9 @@ import { PreferencesMenu } from './PreferencesMenu'
 import { sizeTokens } from './designTokens'
 import { ShellFooter } from './ShellFooter'
 import { ShellNavigation } from './ShellNavigation'
+import { ShellAsideColumn } from './shellAside'
+import { useSidePanelWidth } from './sidePanelWidth'
+import { ShellAsideContext } from './shellAsideContext'
 import { ShellSidebarContext } from './shellSidebarContext'
 import { SiteMark } from './SiteMark'
 import type { NavigationItem, SiteLegal } from './site'
@@ -100,6 +103,17 @@ export function Shell({
     return () => setClaims((count) => count - 1)
   }, [])
   const claimed = claims > 0
+  // Proposed: a page claims the right column by rendering ShellAside, which draws its side panel into `asideTarget`,
+  // see the reviews on #3263 and #3650.
+  const [asideClaims, setAsideClaims] = useState(0)
+  const [asideTarget, setAsideTarget] = useState<HTMLElement | null>(null)
+  const claimAside = useCallback(() => {
+    setAsideClaims((count) => count + 1)
+    return () => setAsideClaims((count) => count - 1)
+  }, [])
+  const asideContext = useMemo(() => ({ target: asideTarget, claim: claimAside }), [asideTarget, claimAside])
+  const [asideWidth, setAsideWidth] = useSidePanelWidth()
+  const aside = asideClaims > 0
   const sidebarContext = useMemo(
     () => ({ target, collapsed: collapsed && !narrow, claim }),
     [target, collapsed, narrow, claim],
@@ -216,7 +230,7 @@ export function Shell({
               {preferences}
             </nav>
           )}
-          <Layout hasSider={sidebar}>
+          <Layout hasSider={sidebar} style={{ position: 'relative' }}>
             {sidebar && (
               <Layout.Sider
                 id="shell-sidebar"
@@ -240,17 +254,30 @@ export function Shell({
                 </nav>
               </Layout.Sider>
             )}
-            <Layout>
+            {/* Proposed: beside a side panel the content leaves the panel's width free, as the panel lies over the row. */}
+            <Layout style={{ marginInlineEnd: aside && !narrow ? asideWidth : undefined }}>
               {!hasAccount && <ReadOnlyBanner />}
               <Layout.Content style={{ background: colour.surface, padding: claimed ? spacing.md : spacing.lg }}>
                 <ShellSidebarContext.Provider value={sidebarContext}>
-                  <ShellBarSlot.Provider value={barSlot}>{children}</ShellBarSlot.Provider>
+                  <ShellAsideContext.Provider value={asideContext}>
+                    <ShellBarSlot.Provider value={barSlot}>{children}</ShellBarSlot.Provider>
+                  </ShellAsideContext.Provider>
                 </ShellSidebarContext.Provider>
               </Layout.Content>
               {/* Proposed: the save bar's place, right above the footer, see the review on #3650. */}
               <div ref={setBarSlot} style={{ position: 'sticky', bottom: 0, zIndex: 10 }} />
               {sidebar && <ShellFooter legal={legal} />}
             </Layout>
+            {aside && (
+              <ShellAsideColumn
+                narrow={narrow}
+                height={`calc(var(--shell-min-height, 100vh) - ${headerHeight}px)`}
+                headerHeight={headerHeight}
+                width={asideWidth}
+                onWidth={setAsideWidth}
+                onTarget={setAsideTarget}
+              />
+            )}
           </Layout>
           {!sidebar && <ShellFooter legal={legal} />}
         </Layout>

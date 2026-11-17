@@ -26,7 +26,8 @@ import { PageActions, PageHeading } from './PageLayout'
 import { ProcessGraphCanvas, type ProcessGraphStep, type ProcessGraphTransitionView } from './ProcessGraph'
 import { RecordLink } from './RecordLink'
 import { RecordNotFound } from './RecordNotFound'
-import { StepRunsPanel } from './StepRunsPanel'
+import { StepRunPanel } from './StepRunPanel'
+import { stepRunTabs, type StepRunTab } from './stepRunTabs'
 import { TermList, type Term } from './TermList'
 import { ReasonDialog } from './ReasonDialog'
 import { SectionPart, SectionParts } from './SectionParts'
@@ -227,10 +228,36 @@ export function InstanceDetailView({
     true,
   )
   const [searchParams, setSearchParams] = useSearchParams()
-  // The step chosen on the graph, first the one the instance is at, and whether its panel is open: only a click on a
-  // step opens it, and it then follows the step chosen until it is closed.
+  // The step chosen on the graph, first the one the instance is at.
   const [chosenStep, setChosenStep] = useState<string | null>(instance.step)
-  const [panelOpen, setPanelOpen] = useState(false)
+  // Proposed, see the review on #3650: the step run in the side panel, kept in the address as `step`, `run` and
+  // `stepTab`, so a reload, Back or a link shows the same run. Only a click on a step or on its run opens it; while it is
+  // open it follows the step chosen on the graph.
+  const addressStep = searchParams.get('step')
+  const panelStep = instance.graph.steps.some((step) => step.name === addressStep) ? addressStep : null
+  const panelRun = Number(searchParams.get('run')) || null
+  const addressTab = searchParams.get('stepTab')
+  const panelTab: StepRunTab = stepRunTabs.find((tab) => tab === addressTab) ?? 'overview'
+  const showRun = (step: string | null, run: number | null = null, tab: StepRunTab = panelTab) => {
+    const next = new URLSearchParams(searchParams)
+    for (const name of ['step', 'run', 'stepTab']) {
+      next.delete(name)
+    }
+    if (step !== null) {
+      next.set('step', step)
+      if (run !== null) {
+        next.set('run', String(run))
+      }
+      if (tab !== 'overview') {
+        next.set('stepTab', tab)
+      }
+    }
+    setSearchParams(next, { preventScrollReset: true })
+  }
+  const openRun = (step: string, run: number | null = null) => {
+    setChosenStep(step)
+    showRun(step, run)
+  }
   const showStep = (step: string) => {
     const next = writeTableQuery(
       searchParams,
@@ -420,6 +447,7 @@ export function InstanceDetailView({
                     view={timelineView}
                     onViewChange={setTimelineView}
                     onChanged={onChanged}
+                    onOpenRun={openRun}
                   />
                 ),
               },
@@ -438,28 +466,17 @@ export function InstanceDetailView({
                     height={graphHeight}
                     focus={instance.step}
                     controls
-                    // Proposed: only a click on a step chooses it and shows its runs beside the graph, which stays in view,
-                    // as Camunda Operate shows a flow node's details; its runs in the timeline are a link away, see the
-                    // review on #3650.
-                    selected={chosenStep}
-                    onSelect={setChosenStep}
-                    onStepClick={() => setPanelOpen(true)}
-                    aside={
-                      chosenStep === null || !panelOpen ? undefined : (
-                        <StepRunsPanel
-                          instance={instance}
-                          step={chosenStep}
-                          stepLabel={stepLabel}
-                          outcomeLabel={outcomeLabel}
-                          inspectors={inspectors}
-                          sitePath={sitePath}
-                          locale={locale}
-                          maxHeight={graphHeight - 24 - 160}
-                          onClose={() => setPanelOpen(false)}
-                          onShowInTimeline={showStep}
-                        />
-                      )
-                    }
+                    // Proposed: a click on a step chooses it and opens its last run in the side panel, while the graph
+                    // stays in view, as AWS Step Functions and Camunda Operate show a state's details beside its
+                    // diagram, see the review on #3650.
+                    selected={panelStep ?? chosenStep}
+                    onSelect={(id) => {
+                      setChosenStep(id)
+                      if (panelStep !== null) {
+                        showRun(id)
+                      }
+                    }}
+                    onStepClick={(id) => openRun(id)}
                   />
                 ),
               },
@@ -467,6 +484,24 @@ export function InstanceDetailView({
           />
         </SectionPart>
       </SectionParts>
+      {panelStep !== null && (
+        <StepRunPanel
+          instance={instance}
+          step={panelStep}
+          run={panelRun}
+          tab={panelTab}
+          onRun={(run) => showRun(panelStep, run)}
+          onTab={(tab) => showRun(panelStep, panelRun, tab)}
+          onOpen={openRun}
+          onClose={() => showRun(null)}
+          onShowInTimeline={showStep}
+          stepLabel={stepLabel}
+          outcomeLabel={outcomeLabel}
+          inspectors={inspectors}
+          sitePath={sitePath}
+          locale={locale}
+        />
+      )}
     </div>
   )
 }

@@ -41,6 +41,8 @@ interface InstanceTimelineProps {
   view: TableQuery
   onViewChange: (next: TableQuery) => void
   onChanged: () => void
+  /** Proposed, see the review on #3650: opens a step's run in the side panel, from the run's step label. */
+  onOpenRun?: (step: string, run: number) => void
 }
 
 /**
@@ -61,6 +63,7 @@ export function InstanceTimeline({
   view,
   onViewChange,
   onChanged,
+  onOpenRun,
 }: InstanceTimelineProps) {
   const t = useText()
   const [resolving, setResolving] = useState<InstanceCall | null>(null)
@@ -251,7 +254,13 @@ export function InstanceTimeline({
         ...children.map((child) => `${child.stepText} ${child.words}`),
       ].join(' '),
       name: named(
-        stepLabel(run.step),
+        onOpenRun ? (
+          <AxisButton role="link" onClick={() => onOpenRun(run.step, run.number)}>
+            {stepLabel(run.step)}
+          </AxisButton>
+        ) : (
+          stepLabel(run.step)
+        ),
         run.number > 1
           ? t('shell.inspector.timeline.typeRun')
               .replace('{type}', typeText(typeOf(run.step)))
