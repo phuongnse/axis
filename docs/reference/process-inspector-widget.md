@@ -69,6 +69,10 @@ wrong form show the not-found page, and the instance is not requested.
 - **Steps.** The page reads the instance detail and shows the steps as a list in graph order, each with
   its type and its transitions, with no diagram. Steps the instance has run are marked as taken, and
   the step it is at is marked as current, whatever the instance state.
+- **Every current step.** _(planned for M38)_ A step is marked Current when the root path is at it, or when a
+  running or waiting path is at it. A step that several paths are at is marked once, with the number of paths, as in
+  "Current, 3 paths". Steps inside a block are listed under the block, indented, each with its branch's name. A
+  repeat's steps show no branch.
 - **History, tasks and calls.** Below the steps come the history rows with the step, the times, the
   decision, the error and the trace ID, then the tasks, then the calls with their attempts. The
   trace ID of a history row and of an attempt is copyable text, and the muted dash when there is none.
@@ -96,9 +100,17 @@ wrong form show the not-found page, and the instance is not requested.
   navigation page whose process inspector names its process, with the same lookup as the record
   history's links. A relative whose process no navigation page inspects shows without a link. The page
   loads the pages' metadata only when the instance has a parent or a child.
-- **Paths and variables.** _(planned for M38)_ After the calls, a Paths part lists the instance's `paths`
-  with the block, the branch or pass, the step, the state, the revision and the start and end times. A
-  Variables part lists each variable with its value, and a hidden one shows "hidden", as a call input does.
+- **Paths.** _(planned for M38)_ After the calls, a Paths part is a table of the instance's `paths`. Its columns are
+  Branch or pass, Step, State, Revision, Started and Ended. A branch shows its name, and a pass shows "Pass 3". Step
+  shows the step's label, as the Steps list does. Each column has Filter under the `paths.` prefix.
+- **Variables.** _(planned for M38)_ After the Paths part, a Variables part lists each variable with its Name, Type and
+  Value. A list shows its values as a list, a `null` value shows the muted dash, and a hidden value shows "hidden", as
+  a call input does.
+- **Parts left out.** _(planned for M38)_ A part is left out only when it does not apply: Paths when the pinned graph
+  has no block, and Variables when the process declares no variables. Otherwise a part with no rows shows its empty text.
+- **Path column.** _(planned for M38)_ History, tasks and calls have a Path column with the path of their `pathId`,
+  shown as Paths shows it, and the muted dash for the root path. Filter on the column works on the text the cell shows,
+  as a step's does.
 - **Labels.** Step labels come from the texts of the instance's `releaseId`, loaded with
   `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, as the inbox does. A step without a label
   shows its name.
@@ -119,8 +131,11 @@ The instance page runs the operator's commands on the instance and its calls, ea
   `failed`, and that call is a package call whose `idempotent` is not `true`. A failed connector call
   gets no warning.
 
-- **Cancel one path or one task.** _(planned for M38)_ Each path and task whose `commands` lists `cancel`
-  has a Cancel button, which opens the same reason dialog as the instance's.
+- **Cancel branch, Cancel pass and Cancel task.** _(planned for M38)_ A row of Paths whose `commands` lists `cancel`
+  has a Cancel branch button for a branch, or a Cancel pass button for a pass. A task row whose `commands` lists
+  `cancel` has a Cancel task button. Each text button opens the shared reason dialog, titled with its own name, and
+  posts the reason to `{instancesPath}/{id}/paths/{pathId}/cancel` or `{instancesPath}/{id}/tasks/{taskId}/cancel`.
+  The reason rules and the answer are those of Cancel instance.
 
 ### Resolve
 
@@ -184,3 +199,5 @@ The widget shows a failure where it happens, and its words come from the platfor
   section's title, column headers, empty text and load error. `shell.inspector.commands.*` hold the
   command buttons, the dialog's labels, the reason errors, the retry warning and the resolve labels and
   errors.
+- **New texts.** _(planned for M38)_ The Current mark, the Paths and Variables labels and the Path column are platform
+  texts under `shell.inspector.*`. The three cancel buttons and their dialog titles are under `shell.inspector.commands.*`.

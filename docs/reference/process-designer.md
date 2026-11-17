@@ -19,9 +19,30 @@ panel, the Form tab or the JSON view redraws the graph at once.
 - **Not in the address.** The selected step and edge are not written to the URL, because a path in the
   URL opens the Form tab. A path that is `/steps/{i}` or inside it opens the Form tab and also selects
   step `{i}`, so the Design tab shows it on return.
+- **Nested steps in the address.** _(planned for M38)_ A path under `/steps/{i}/branches/{j}/steps/{k}` or
+  `/steps/{i}/steps/{k}` opens the Form tab and selects that nested step, as `/steps/{i}` selects a top-level step.
 - **Names.** Each node has a text label with the step's name and type.
 - **No invented parts.** A transition to a step that does not exist draws no edge, and the graph never
   invents a node.
+
+## Frames
+
+_(planned for M38)_
+
+A block is drawn as a frame around the steps it holds, so the author sees what runs inside it. The frame's
+header shows the block's name and type, and a repeat also shows its kind, such as For each item. The rules of
+the blocks are in [process blocks](process-blocks.md).
+
+- **Parallel.** A `parallel` frame holds one lane for each branch, side by side. Each lane's head shows the
+  branch's name and its `when`, when it has one.
+- **Repeat.** A `repeat` frame holds one area, headed Steps to repeat, for the steps of its body.
+- **Edges.** An edge runs from a lane's head, or the area's head, to the `start` step of that list. No edge is
+  drawn while `start` is empty.
+- **Nesting.** Frames nest. A block inside a lane or an area is drawn as a smaller frame inside it.
+- **Layout.** dagre lays out the steps of each lane or area inside its frame, and no position is stored, as
+  [the canvas](#canvas) says.
+- **Leaving a block.** A block's handle sits at the frame's bottom and sets its `next`, as the other steps'
+  handles do. No transition leaves a block, as [structure](process-blocks.md#structure) says.
 
 ## Loading and redraw
 
@@ -59,6 +80,17 @@ operation is missing from the palette.
   selected edge, else after the selected step's `next`, else unconnected. A `decision`, `task` or `end`
   step has no `next`, so a step added while one is selected is unconnected. Enter on an edge selects it,
   so the keyboard reaches every transition.
+- **Blocks and variables.** _(planned for M38)_ The palette also lists `parallel`, `repeat` and `setVariables`.
+  A new `parallel` step starts with one branch, `branch1`, which has an empty `start` and `steps`. A new `repeat`
+  step starts with an empty `forEach`, `start`, `steps` and `next`. A new `setVariables` step starts with an
+  empty `set` and `next`.
+- **Into a frame.** _(planned for M38)_ Dropping on a lane, or on a repeat's area, adds an unconnected step to
+  that list. The step becomes the list's `start` when the list is empty. Dropping on an edge inside a frame inserts
+  the step into that list's transition.
+- **By keyboard, into a frame.** _(planned for M38)_ Enter on a lane or an area selects that list, and a palette
+  button pressed then adds its step there, in place of the rule for a selected edge or step.
+- **Names across lists.** _(planned for M38)_ A new step goes at the end of its own list. Its first free name is
+  free across every list of the process.
 - **One Undo.** Each add is one change of `steps`, so one Undo removes it.
 
 ## Transitions
@@ -76,6 +108,10 @@ way, and the panel's pickers set the same transitions by keyboard.
   and so on, an empty `when` and the target. New outcome adds an outcome with the first free name
   `outcome1`, `outcome2` and so on, an empty label key and the target. The diagnostics mark both until
   the author fills them in.
+- **Inside its block.** _(planned for M38)_ A drop on a step of another list changes nothing, and the live region
+  says "A transition cannot leave its block."
+- **A wait for several events.** _(planned for M38)_ A `waitEvent` with `events` opens the menu with its events, and
+  a choice sets that event's `next`.
 - **One Undo.** Each drag, or each menu choice, is one edit and so one Undo.
 
 ## Remove
@@ -89,6 +125,8 @@ removal.
   Removing the selected step clears the selection.
 - **An edge.** With an edge selected, the panel shows a Remove transition button above the step's panel,
   and Delete or Backspace in the canvas clears that transition instead of removing the step.
+- **A block.** _(planned for M38)_ Removing a block removes the steps in its branches or body too, in one edit, so
+  one Undo brings them all back.
 - **The selection, not the focus.** Delete acts on the selection, not on the focused element, and a key
   pressed outside the canvas, such as in the panel's text fields, removes nothing.
 
@@ -103,6 +141,12 @@ The type picker in the panel and the Add step choice list every type in
 schema's conditional for the new type forbids and adds its required keys, empty, while keys that the
 schema allows stay. The conditionals that also test the operation are left to the operation panel. A
 type with no panel shows its keys as "Edit in JSON" markers.
+
+- **Within its list.** _(planned for M38)_ Move up and Move down move a step within its own list: `steps`, a lane's
+  `steps` or a repeat's body. A step never moves to another list, and every picker of a panel lists only the steps
+  of its own list.
+- **A block's type.** _(planned for M38)_ Changing a block's type removes its branches or body, and so the steps in
+  them, by the rule above.
 
 The step types and operations below have a panel of their own, beside the operation panels that
 [Studio](studio.md) describes for the Form tab.
@@ -156,6 +200,21 @@ an empty `after`, and Remove escalation removes it. Each escalation has a Reassi
 [notify](#notify) editor. Turning a switch off removes its key, and removing the last escalation removes
 `escalations`. A new escalation has neither key yet, so the compiler marks it until one switch is on.
 
+### Several assignees
+
+_(planned for M38)_
+
+The assignee of a task has a kind choice of User, Role or Several people. A task for several people is one of the
+[steps](processes.md#steps) of a process, with its `users` and its `completion`.
+
+- **Several people.** The choice writes `users`, with a From picker of the subject's child collections and of its
+  `references` fields, and a User expression over each item, as the List row of a [connector input](#connector-input)
+  does.
+- **Completion.** The choice also writes `completion` as `{ "rule": "all", "otherwise": "" }`. A Rule choice offers
+  All, Any, Majority and A number, and A number shows a Count box. An Otherwise outcome picker lists the task's
+  outcomes.
+- **Switching back.** Choosing User or Role removes `users` and `completion` in one edit, so one Undo brings them back.
+
 ### Timer
 
 A timer's panel has a Wait or Until choice, a duration box for `wait`, an expression editor for `until`,
@@ -183,6 +242,63 @@ fields, and clearing it removes the key. Add timeout adds a `timeout` with an Af
 step on timeout picker, both empty until filled. Remove timeout takes the whole `timeout` out, and one
 Undo brings it back.
 
+- **Several events.** _(planned for M38)_ Add event moves `event`, `when` and `next` into the first entry of `events`,
+  and adds a second, empty entry, in one edit. Each entry has the same event picker, `when` and Next step picker as a
+  single wait. Removing an entry leaves the rest, and when one entry is left the step turns back into `event`, `when`
+  and `next`. One Undo reverses each switch. The canvas draws one edge for each entry, named by its event.
+
+### Parallel
+
+_(planned for M38)_
+
+A `parallel` panel lists the branches, then a completion. Each rule of [parallel step](process-blocks.md#parallel-step)
+has a choice here.
+
+- **Branches.** Each branch is a row with a Name, a When expression and a Start picker of the branch's steps. Add
+  branch appends one with the first free name, `branch1`, `branch2` and so on, and an empty `start` and `steps`.
+  Remove branch removes the branch and its steps, and one Undo brings them back.
+- **Completion.** A Completion choice offers All, Any, A number and A condition. A number shows a Count box, and A
+  condition shows an expression editor for `condition`. All removes `completion`, which is the default rule.
+
+### Repeat
+
+_(planned for M38)_
+
+A `repeat` panel has a Kind choice, with one field under it for that kind. The kinds are those of
+[repeat step](process-blocks.md#repeat-step).
+
+- **Kind.** For each item takes a picker of the subject's child collections, its `references` fields and the loaded
+  data sources, and a data source is written as `{ "dataSource" }`. A number of times, While and Until take an
+  expression. Switching kind removes the keys that the new kind refuses, in one edit, so one Undo restores them.
+- **Order.** In order, or At once with a Passes at a time box for `atOnce`. At once is offered for For each item and
+  A number of times only.
+- **Limits.** Largest number of passes, which is required for While and Until, and Longest time, a duration that is
+  offered for While and Until only.
+- **Waits and stops.** Wait between passes, a duration, and Stop when, an expression checked after each pass.
+- **Pass name.** A Pass name box for `as`, which defaults to `pass`.
+- **Gather.** A list variable picker and a Value expression, which write `gather`.
+- **Start and Next.** Start picks a step of the body, and Next picks a step of the block's own list.
+- **Skipping.** An `end` step inside the body shows a Skip item checkbox, which writes `skip`.
+
+### Set variables
+
+_(planned for M38)_
+
+A `setVariables` panel has one Set row for each process variable, as the updateRecord panel has one row for each
+field. A row shows the variable's name and type, and an expression for its value, which must fit that type. A Next
+step picker follows the rows.
+
+### Error paths
+
+_(planned for M38)_
+
+Every step but `end` has an Error paths list, which writes `onError`, see [error paths](processes.md#error-paths).
+
+- **Add error path.** Appends `{ "error": "", "next": "" }`, which the diagnostics mark until both are filled in.
+- **Each row.** A Kind choice of Call fails, Record write fails, Expression fails, Limit reached and Any failure, and
+  a Next step picker of the same list.
+- **Remove.** Remove error path removes its row, and removing the last row removes `onError`.
+
 ## Undo
 
 The page designer's undo and redo cover every edit of a process on all three tabs, with 100 steps,
@@ -206,6 +322,12 @@ Every add, move and remove has a keyboard way, and a hidden live region says wha
   its branch or outcome, and a transition menu's choice join as peers, as in "financeCheck to
   markApproved, otherwise" and "managerApproval, approve now goes to done", see
   [text](actions-and-controls.md#text).
+- **Frames.** _(planned for M38)_ With frames, Tab goes depth first, in file order: a block, then each lane and its
+  steps in turn, then the next step. A frame's name is like "reviews, parallel". A lane's name is like "legal, branch
+  of reviews", and a repeat's area is like "checkLines, steps to repeat".
+- **Live region for frames.** _(planned for M38)_ The live region says, for example, "Step legalReview added in branch
+  legal of reviews", "Step checkLine added to the steps to repeat of checkLines", "A transition cannot leave its
+  block." and "Removed step reviews and its 4 steps".
 
 ## Diagnostics
 
@@ -213,6 +335,9 @@ A step of the open process is marked when a diagnostic of the open resource name
 or a path inside it. A marked node has an error-coloured border, "has diagnostics" in its text label, and
 `data-marked`. The marks come from the Problems panel's last loaded list, so they change on a load, a
 save or a request, not on every edit.
+
+- **Nested steps.** _(planned for M38)_ A diagnostic at a path inside a nested step marks that nested node, and not
+  the frame around it. A diagnostic at a block's own path marks the frame, and not the steps inside it.
 
 ## Module processes
 
