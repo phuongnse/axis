@@ -65,7 +65,7 @@ const endedAtField = { name: 'endedAt', type: 'date-time' } as const
  * inspection API's 401 shows the sign-in prompt.
  *
  * The step column shows the step's name, because a list row carries no label key. Under the list, the
- * process's open dead letters have their own list, which has its own page number.
+ * process's open dead letters have their own list, which keeps its view in the address under the `deadLetters.` prefix.
  */
 export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: ProcessInspectorWidgetProps) {
   const t = useText()

@@ -25,35 +25,42 @@ public static class DeadLetters
         "id, kind, event_id, trigger_id, process_instance_id, email_id, occurrence_at, attempts, last_error, state, reason, settled_by, created_at, settled_at, webhook_id, application_id, process_id";
 
     /// <summary>
-    /// Reads one page of the dead letters of the process, newest first, and the number of them on every
-    /// page. <paramref name="state"/> keeps one state, or every state when it is <see langword="null"/>.
+    /// Reads one page of the dead letters of the process, and the number of them on every page.
+    /// <paramref name="state"/> keeps one state, or every state when it is <see langword="null"/>. <paramref name="list"/> adds
+    /// a filter, a search and a sort over the columns of <c>axis.dead_letters</c>. The order is newest first when it has no sort,
+    /// and a sort breaks its ties newest first.
     /// </summary>
     public static async Task<DeadLetterPage> ListAsync(
         NpgsqlConnection connection,
         Guid applicationId,
         Guid processId,
         string? state,
+        ListSql list,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(list);
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
-        const string where = "WHERE application_id = @application AND process_id = @process AND (@state::text IS NULL OR state = @state)";
+        var where = $"WHERE application_id = @application AND process_id = @process AND (@state::text IS NULL OR state = @state) AND {list.Condition}";
+        var order = list.Order is null ? "created_at DESC, id DESC" : $"{list.Order}, created_at DESC, id DESC";
 
         long totalCount;
         await using (var count = new NpgsqlCommand($"SELECT count(*) FROM axis.dead_letters {where}", connection))
         {
             AddFilter(count, applicationId, processId, state);
+            list.AddTo(count);
             totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
         }
 
         await using var command = new NpgsqlCommand(
-            $"SELECT {Columns} FROM axis.dead_letters {where} ORDER BY created_at DESC, id DESC LIMIT @limit OFFSET @offset",
+            $"SELECT {Columns} FROM axis.dead_letters {where} ORDER BY {order} LIMIT @limit OFFSET @offset",
             connection);
         AddFilter(command, applicationId, processId, state);
+        list.AddTo(command);
         command.Parameters.AddWithValue("limit", pageSize);
         command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
