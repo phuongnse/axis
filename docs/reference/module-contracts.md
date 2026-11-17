@@ -330,7 +330,7 @@ promise that each step is decided once.
   the counter twice.
 - **A task for several people.** _(planned for M38)_ Only the answer that decides the task replaces the
   instance's deciding task and accountable user. An answer that does not decide it changes neither, and
-  the tasks that are `closed` afterwards never do. So a contract counts a task for several people as
+  the tasks that are `closed` afterwards never do. A cancel that decides the task replaces both with the group's latest completed task, and keeps both when no task of the group is completed. So a contract counts a task for several people as
   decided once, whatever the number of people. See
   [a task for several people](task-api.md#a-task-for-several-people).
 - **Allowed where.** Where `accountableUser()` is allowed, and `AXC0341` elsewhere.

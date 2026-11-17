@@ -19,7 +19,8 @@ The rest of the process reference is on these pages:
 | [Notifications](notifications.md)             | The `notify` operation, in-app notifications and email                                           |
 | [Process execution](process-execution.md)     | How the worker runs steps, connector calls, package operations and the worker settings          |
 | [Process events](process-events.md)           | Raised events, triggers and schedules                                                            |
-| [Process inspection](process-inspection.md)   | Inspecting instances and the operator commands                                                   |
+| [Process inspection](process-inspection.md)   | Inspecting instances, their paths and variables                                                  |
+| [Process operator commands](process-operator-commands.md) | The operator commands retry, cancel and resolve, and cancelling one path or one task   |
 | [Process tables](process-tables.md)           | The tables that `Axis.Processes` owns                                                            |
 
 A process names one entity, its subject, and each **process instance**, one run of the process, runs
@@ -314,7 +315,7 @@ system that cannot take an order is one case.
 - **Next step.** `next` names a step of the same list, see [structure](process-blocks.md#structure). The
   history keeps the error that was taken.
 - **No error path.** When no entry matches, the path fails. Its block then fails, and the instance fails.
-  Only an operator can retry it, see [retry](process-inspection.md#retry).
+  Only an operator can retry it, see [retry](process-operator-commands.md#retry).
 - **Checks.** `AXC0389` reports an unknown kind, a kind that the step already has, and an `onError` on an
   `end` step.
 
@@ -628,9 +629,9 @@ The **start lock** keeps a start from running on a release that is being replace
 - A server request that finds a different active release under the lock runs again on the new
   release. The process start endpoint, the [inbound endpoint](inbound-endpoints.md#responses), task
   completion and record creates, updates and deletes answer `503` after three release changes.
-- Operator [retry](process-inspection.md#retry) takes the lock as the first statement of its
+- Operator [retry](process-operator-commands.md#retry) takes the lock as the first statement of its
   transaction and answers `503` after three release changes, and
-  [resolve](process-inspection.md#resolve) takes it the same way.
+  [resolve](process-operator-commands.md#resolve) takes it the same way.
 - Event delivery reads the active release again in each trigger's transaction, and skips a trigger
   that the new release does not have.
 

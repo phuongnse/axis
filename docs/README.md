@@ -83,7 +83,8 @@ Read by people who change how records, files, processes, tasks and notifications
 | [Task deadlines and claims](reference/task-deadlines.md)   | Task escalations and deadlines, overdue tasks, claim, release and reassign               | You change escalations, deadlines, claims or reassignment              |
 | [Working time and SLAs](reference/working-time.md)         | Calendars, days off and make-up days, durations in working time, SLAs                    | You change calendars, working-time durations or SLAs                   |
 | [Notifications](reference/notifications.md)                | The `notify` operation, in-app and email notifications, user profiles, mail settings     | You change the notify operation or notification settings               |
-| [Process inspection](reference/process-inspection.md)      | Inspecting instances and the operator commands retry, cancel and resolve                 | You change how instances are inspected, retried, cancelled or resolved |
+| [Process inspection](reference/process-inspection.md)      | Inspecting instances, their paths and variables                                          | You change how instances are inspected |
+| [Process operator commands](reference/process-operator-commands.md) | The operator commands retry, cancel and resolve, and cancelling one path or one task | You change how instances are retried, cancelled or resolved |
 
 ### Integration and extension packages
 

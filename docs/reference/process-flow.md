@@ -167,7 +167,7 @@ A `subProcess` step starts another process, its child, and waits until the child
   `process.failed` is written as `system`.
 - **Cancel.** Cancelling the parent cancels its `running` and `waiting`
   children, in the same transaction, see
-  [Cancel](process-inspection.md#cancel). The parent ends `cancelled`, not
+  [Cancel](process-operator-commands.md#cancel). The parent ends `cancelled`, not
   `failed`.
 - History output: `{ "state": "waiting", "childInstanceId" }`, then
   `{ "next", "childInstanceId" }`, or `{ "childInstanceId" }` with the error

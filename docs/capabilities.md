@@ -58,12 +58,12 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Capability | Where |
 | --- | --- |
 | Retry a call to another system on its own, with a wait between tries | [Step shape](reference/process-execution.md#step-shape) |
-| Let an operator run a failed step again | [Retry](reference/process-inspection.md#retry) |
-| Settle a call whose outcome is unknown | [Resolve](reference/process-inspection.md#resolve) |
+| Let an operator run a failed step again | [Retry](reference/process-operator-commands.md#retry) |
+| Settle a call whose outcome is unknown | [Resolve](reference/process-operator-commands.md#resolve) |
 | Take another path when a step fails | [Error paths](reference/processes.md#error-paths) _(planned for M38)_ |
 | Redeliver work that failed too many times | [Dead letters](reference/process-events.md#dead-letters) |
-| Cancel a whole case and its sub-processes | [Cancel](reference/process-inspection.md#cancel) |
-| Cancel one path or one task while the case goes on | _(planned for M38)_ |
+| Cancel a whole case and its sub-processes | [Cancel](reference/process-operator-commands.md#cancel) |
+| Cancel one path or one task while the case goes on | [Cancel one path or one task](reference/process-operator-commands.md#cancel-one-path-or-one-task) _(planned for M38)_ |
 | Undo earlier steps when a case is cancelled | _(planned for M56)_ |
 | Suspend a case and resume it later | _(planned for M56)_ |
 

@@ -204,10 +204,10 @@ grant lets a machine caller invoke an inbound endpoint. Neither takes a
 `filter` or `fields`.
 
 The `cancel` action of a `process` grant lets a user cancel that process's
-instances, see [Cancel](process-inspection.md#cancel). The `retry` action lets a user
-retry its failed instances, see [Retry](process-inspection.md#retry). The `resolve`
+instances, see [Cancel](process-operator-commands.md#cancel). The `retry` action lets a user
+retry its failed instances, see [Retry](process-operator-commands.md#retry). The `resolve`
 action lets a user settle an unknown connector call, see
-[Resolve](process-inspection.md#resolve). That covers a connector call and a package call.
+[Resolve](process-operator-commands.md#resolve). That covers a connector call and a package call.
 Each is checked on its own, and none implies another, and `start` implies none
 of them. The finance reviewer policy above lets its reviewers inspect, cancel,
 retry and resolve an approval. An operator role that may retry, cancel and
