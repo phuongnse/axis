@@ -7,7 +7,16 @@ import { startServer } from '../activate'
 import { pickOption, pickOptions } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { createResource, openFormTab, openKind, openProblemsIfAny, writeLabel } from '../studio-resources'
+import {
+  addEntityField,
+  closeEntityField,
+  createResource,
+  openEntityField,
+  openFormTab,
+  openKind,
+  openProblemsIfAny,
+  writeLabel,
+} from '../studio-resources'
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -42,6 +51,7 @@ test.describe('Studio creates a resource from a starter', () => {
   }
 
   async function save(page: Page) {
+    await closeEntityField(page)
     const answer = page.waitForResponse(
       (response) =>
         response.request().method() === 'PATCH' && response.url().includes('/api/studio/apps/PurchaseRequests/resources/'),
@@ -54,7 +64,7 @@ test.describe('Studio creates a resource from a starter', () => {
   }
 
   async function addField(page: Page, index: number, name: string, type: string) {
-    await page.getByRole('button', { name: 'Add field', exact: true }).click()
+    await addEntityField(page, index)
     await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(name)
     await pick(page, `studio-field-/fields/${index}/type`, type)
   }
@@ -154,6 +164,7 @@ test.describe('Studio creates a resource from a starter', () => {
     const diagnostics = await save(page)
     expect(diagnostics.filter((diagnostic) => diagnostic.file === 'entities/project.json')).toEqual([])
 
+    await openEntityField(page, 4)
     await field.getByRole('textbox').fill('name > 5')
     await expect(field.locator('.cm-lintRange-error')).toBeVisible()
     await expect(field.getByTestId('studio-expression-error')).toBeVisible()
@@ -257,6 +268,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await addField(page, 3, 'code', 'text')
     await page.getByTestId('studio-field-/fields/3/searchable').getByRole('switch', { name: 'Searchable', exact: true }).click()
 
+    await closeEntityField(page)
     await page.getByRole('button', { name: 'Add index', exact: true }).click()
     await pickOptions(page.getByTestId('studio-field-/indexes/0/fields').getByRole('combobox'), ['stage', 'count'])
     await page.getByTestId('studio-field-/indexes/0/unique').getByRole('checkbox', { name: 'Unique index', exact: true }).check()

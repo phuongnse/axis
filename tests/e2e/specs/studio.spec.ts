@@ -7,7 +7,16 @@ import { startServer } from '../activate'
 import { openSelect, pickOption } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { openFormTab, openKind, openListItem, openProblems, openTab, writeLabel } from '../studio-resources'
+import {
+  closeEntityField,
+  openEntityField,
+  openFormTab,
+  openKind,
+  openListItem,
+  openProblems,
+  openTab,
+  writeLabel,
+} from '../studio-resources'
 
 // A server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -123,7 +132,9 @@ test.describe('Studio on a copy of its own', () => {
     const next = before.fields[index].maxLength + 1
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${entity.id}`)
+    await openEntityField(page, index)
     await page.getByTestId(`studio-field-/fields/${index}/maxLength`).getByRole('spinbutton').fill(String(next))
+    await closeEntityField(page)
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     // This is the first write on a fresh server. It compiles the sample with its modules, which can take longer than the
     // default wait on a busy machine.
@@ -389,7 +400,9 @@ test.describe('Studio on a copy of its own', () => {
       const next = before.fields[1].maxLength + 1
 
       await page.goto(`${restarted.url}/studio?app=PurchaseRequests&resource=${supplier.id}`)
+      await openEntityField(page, 1)
       await page.getByTestId('studio-field-/fields/1/maxLength').getByRole('spinbutton').fill(String(next))
+      await closeEntityField(page)
       await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-saved')).toBeVisible()
 
@@ -406,6 +419,7 @@ test.describe('Studio on a copy of its own', () => {
       await expect(page.getByTestId('studio-reconnecting')).toBeHidden({ timeout: 90_000 })
       await openKind(page, 'entity')
       await page.getByTestId(`studio-resource-${supplier.id}`).click()
+      await openEntityField(page, 1)
       await expect(page.getByTestId('studio-field-/fields/1/maxLength').getByRole('spinbutton')).toHaveValue(
         String(next),
       )
