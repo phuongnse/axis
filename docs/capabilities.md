@@ -28,7 +28,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Repeat steps for each item of a list, all at once | _(planned for M38)_ |
 | Run another process and wait until it ends | [Sub-process step](reference/process-flow.md#sub-process-step) |
 | Call a process from itself, directly or through others | [Sub-process step](reference/process-flow.md#sub-process-step) |
-| Run two cases of one process on the same record at once | [D19](decisions/d19-process-resource-and-worker-host.md) |
+| Run two cases of one process on the same record at once | [D155](decisions/d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md) |
 | Run two cases of one job without a subject record at once | [D70](decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md) |
 | Run work that concerns no single record, such as a daily job | [Processes without a subject](reference/process-flow.md#processes-without-a-subject) |
 | Keep values of a case beyond the fields of its record | _(planned for M38)_ |
