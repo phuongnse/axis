@@ -94,8 +94,8 @@ describe('TenantUsageSection', () => {
     stubServer(json(usage))
     renderSection()
 
-    const section = await screen.findByTestId('tenant-usage')
-    expect(within(section).getByRole('heading', { name: 'Usage' })).toBeVisible()
+    const section = await screen.findByRole('region', { name: 'Usage' })
+    expect(within(section).getByRole('heading', { name: 'Usage', level: 2 })).toBeVisible()
     expect(within(screen.getByTestId('tenant-usage-quota-storage')).getByText('512 MB of 1 GB')).toBeVisible()
     expect(within(screen.getByTestId('tenant-usage-quota-applications')).getByText('3 of 10')).toBeVisible()
     expect(within(screen.getByTestId('tenant-usage-quota-emailsPerDay')).getByText('0 of 100')).toBeVisible()
@@ -138,7 +138,7 @@ describe('TenantUsageSection', () => {
 
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/tenant/usage', expect.anything()))
     await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
-    expect(screen.queryByTestId('tenant-usage')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Usage' })).toBeNull()
     expect(screen.queryByText('Usage')).toBeNull()
   })
 
@@ -149,6 +149,6 @@ describe('TenantUsageSection', () => {
 
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/tenant/usage', expect.anything()))
     await vi.waitFor(() => expect(warn).toHaveBeenCalledWith('Reading the usage failed with status 503.'))
-    expect(screen.queryByTestId('tenant-usage')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Usage' })).toBeNull()
   })
 })

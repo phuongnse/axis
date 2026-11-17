@@ -113,6 +113,8 @@ export interface AxisFoldAction {
   key: string
   labelKey: string
   disabled?: boolean
+  /** Proposed, see the review on #3650: an action that throws something away, a `destructive` button or a danger entry. */
+  destructive?: boolean
   onClick: () => void
   attributes?: object
 }
@@ -208,6 +210,7 @@ export function AxisActionRow({
                   key: action.key,
                   label: t(action.labelKey),
                   disabled: action.disabled,
+                  danger: action.destructive,
                   onClick: action.onClick,
                 })),
                 'aria-label': t('shell.actionRow.more'),
@@ -219,7 +222,7 @@ export function AxisActionRow({
             fold.map((action) => (
               <AxisButton
                 key={action.key}
-                role="secondary"
+                role={action.destructive ? 'destructive' : 'secondary'}
                 disabled={action.disabled}
                 onClick={action.onClick}
                 {...action.attributes}

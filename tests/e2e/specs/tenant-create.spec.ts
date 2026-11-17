@@ -115,7 +115,7 @@ test('the administrator disables an account on the users page, its next sign-in 
 
     const main = adminPage.getByRole('main')
     async function findMember() {
-      await main.getByRole('searchbox', { name: 'Search by name or email', exact: true }).fill(memberEmail)
+      await main.getByRole('searchbox', { name: 'Search', exact: true }).fill(memberEmail)
       await adminPage.keyboard.press('Enter')
       const row = main.getByRole('row').filter({ hasText: memberEmail })
       // The list before the search holds the member too, so wait until the search left only the header and the member.
@@ -123,7 +123,8 @@ test('the administrator disables an account on the users page, its next sign-in 
       await expect(row).toHaveCount(1)
       return row
     }
-    await (await findMember()).getByRole('button', { name: 'Disable', exact: true }).click()
+    await (await findMember()).getByRole('button', { name: 'Actions', exact: true }).click()
+    await adminPage.getByRole('menuitem', { name: 'Disable', exact: true }).click()
     const disableDialog = await waitForDialog(adminPage, 'Disable this person?')
     await disableDialog.getByRole('button', { name: 'Disable', exact: true }).click()
     await expect(adminPage.getByTestId('users-done')).toHaveText('The person was disabled.')
@@ -136,7 +137,8 @@ test('the administrator disables an account on the users page, its next sign-in 
     await expect(memberPage.getByRole('alert')).toBeVisible()
     expect(new URL(memberPage.url()).origin).toBe(new URL(process.env.AXIS_E2E_KEYCLOAK_URL ?? '').origin)
 
-    await (await findMember()).getByRole('button', { name: 'Enable', exact: true }).click()
+    await (await findMember()).getByRole('button', { name: 'Actions', exact: true }).click()
+    await adminPage.getByRole('menuitem', { name: 'Enable', exact: true }).click()
     const enableDialog = await waitForDialog(adminPage, 'Enable this person?')
     await enableDialog.getByRole('button', { name: 'Enable', exact: true }).click()
     await expect(adminPage.getByTestId('users-done')).toHaveText('The person was enabled.')

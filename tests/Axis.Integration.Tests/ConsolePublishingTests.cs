@@ -109,6 +109,58 @@ public sealed class ConsolePublishingTests(RecordApiFixture fixture) : IClassFix
     }
 
     [Fact]
+    public async Task Publishing_filters_searches_sorts_and_pages_the_requests_in_postgresql()
+    {
+        await using var factory = OperatorOnly();
+        using var client = factory.CreateClient().SignedInAs("rita");
+        var application = Guid.NewGuid();
+        var oldest = await InsertRequestAsync(application, status: "failed", label: "Spring import", requestedAt: At(2026, 11, 1, 10));
+        var namedAfterSpring = await InsertRequestAsync(application, status: "failed", label: "Autumn", requestedByName: "Sam Spring", requestedAt: At(2026, 11, 2, 8));
+        await InsertRequestAsync(application, status: "succeeded", label: "Spring import", requestedAt: At(2026, 11, 2, 9));
+        var retried = await InsertRequestAsync(application, status: "failed", label: "Spring import retry", requestedAt: At(2026, 11, 3, 9));
+        var activated = await InsertRequestAsync(application, kind: "activate", status: "failed", label: "Spring import", requestedAt: At(2026, 11, 3, 15));
+        await InsertRequestAsync(application, status: "failed", label: "Autumn", requestedByName: "Ada Author", requestedAt: At(2026, 11, 4, 8));
+        var failed = Uri.EscapeDataString("""{"all":[{"field":"status","op":"eq","value":"failed"}]}""");
+        var query = $"{Path(application)}?filter={failed}&search=Spring&sort=-requestedAt&pageSize=2";
+
+        using var first = await SendAsync(client, query);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        using var firstBody = JsonDocument.Parse(await first.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal([activated, retried], RequestIds(firstBody));
+        Assert.Equal(4, firstBody.RootElement.GetProperty("totalCount").GetInt64());
+        Assert.Equal(1, firstBody.RootElement.GetProperty("page").GetInt32());
+        Assert.Equal(2, firstBody.RootElement.GetProperty("pageSize").GetInt32());
+        Assert.Empty(firstBody.RootElement.GetProperty("releases").EnumerateArray());
+
+        using var second = await SendAsync(client, query + "&page=2");
+
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        using var secondBody = JsonDocument.Parse(await second.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal([namedAfterSpring, oldest], RequestIds(secondBody));
+        Assert.Equal(4, secondBody.RootElement.GetProperty("totalCount").GetInt64());
+        Assert.Equal(2, secondBody.RootElement.GetProperty("page").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("sort")]
+    [InlineData("filter")]
+    public async Task Publishing_answers_400_for_an_unknown_field(string parameter)
+    {
+        await using var factory = OperatorOnly();
+        using var client = factory.CreateClient().SignedInAs("rita");
+        var query = parameter == "sort"
+            ? "sort=snapshot"
+            : "filter=" + Uri.EscapeDataString("""{"all":[{"field":"snapshot","op":"eq","value":"x"}]}""");
+
+        using var response = await SendAsync(client, Path(Guid.NewGuid()) + "?" + query);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal([parameter], body.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
+    }
+
+    [Fact]
     public async Task Publishing_answers_empty_lists_for_an_application_nothing_names()
     {
         await using var factory = OperatorOnly();
@@ -156,6 +208,11 @@ public sealed class ConsolePublishingTests(RecordApiFixture fixture) : IClassFix
 
     private static string Path(Guid application) => $"/api/console/applications/{application:D}/publishing";
 
+    private static DateTimeOffset At(int year, int month, int day, int hour) => new(year, month, day, hour, 0, 0, TimeSpan.Zero);
+
+    private static IEnumerable<Guid> RequestIds(JsonDocument body) =>
+        body.RootElement.GetProperty("requests").EnumerateArray().Select(row => row.GetProperty("id").GetGuid());
+
     private static async Task<HttpResponseMessage> SendAsync(HttpClient client, string path)
     {
         using var request = Request(path, HostA);
@@ -178,19 +235,31 @@ public sealed class ConsolePublishingTests(RecordApiFixture fixture) : IClassFix
         new(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(fixture.ConnectionString(TenantA)).Options);
 
     // A request of an application only this test names, or of an active application, which the test reads back by id.
-    private async Task<Guid> InsertRequestAsync(Guid application)
+    // The time is the database clock's unless the test gives one, so requests inserted in turn read back newest last.
+    private async Task<Guid> InsertRequestAsync(
+        Guid application,
+        string kind = "publish",
+        string status = "succeeded",
+        string? label = null,
+        string requestedByName = "Author User",
+        DateTimeOffset? requestedAt = null)
     {
         await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantA));
         await connection.OpenAsync(CancellationToken);
         var id = Guid.CreateVersion7();
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO axis.publish_requests (id, application_id, kind, status, requested_by, requested_by_name, requested_at, finished_at)
-            VALUES (@id, @application, 'publish', 'succeeded', 'author', 'Author User', clock_timestamp(), clock_timestamp())
+            INSERT INTO axis.publish_requests (id, application_id, kind, status, label, requested_by, requested_by_name, requested_at, finished_at)
+            VALUES (@id, @application, @kind, @status, @label, 'author', @requestedByName, COALESCE(@requestedAt, clock_timestamp()), clock_timestamp())
             """,
             connection);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("application", application);
+        command.Parameters.AddWithValue("kind", kind);
+        command.Parameters.AddWithValue("status", status);
+        command.Parameters.AddWithValue("label", (object?)label ?? DBNull.Value);
+        command.Parameters.AddWithValue("requestedByName", requestedByName);
+        command.Parameters.AddWithValue("requestedAt", (object?)requestedAt ?? DBNull.Value);
         await command.ExecuteNonQueryAsync(CancellationToken);
         return id;
     }

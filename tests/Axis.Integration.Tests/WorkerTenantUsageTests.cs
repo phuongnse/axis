@@ -59,7 +59,9 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
         await using var app = BuildWorker(platform, clock, _cellSettings);
 
         await app.StartAsync(CancellationToken);
-        await WaitUntilAsync(async () => await LatestAsync(platform, "a") is not null, "The worker did not sample the tenant.");
+
+        // The counts are written after the storage.
+        await WaitUntilAsync(async () => (await DayAsync(platform, "a", clock.Today)).SingleOrDefault()?.Applications is not null, "The worker did not sample the tenant.");
 
         var latest = (await LatestAsync(platform, "a"))!.Value;
         Assert.True(latest.FileBytes >= FileSize, $"{latest.FileBytes} file bytes");
@@ -69,8 +71,10 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
         Assert.Equal(latest.DatabaseBytes, day.DatabaseBytes);
         Assert.Equal(latest.FileBytes, day.FileBytes);
         Assert.Equal((0L, 0L, 0), (day.ConnectorCalls, day.WorkItemsRun, day.EmailsSent));
+
+        // The tenant has no realm details, so nothing counts its users, and no Studio path and no active release give no applications.
         Assert.Null(day.Users);
-        Assert.Null(day.Applications);
+        Assert.Equal(0, day.Applications);
     }
 
     [Fact]
@@ -137,6 +141,40 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
 
         await store.RecordSampleAsync("a", 200, 60, default, now.AddHours(2), CancellationToken);
         Assert.Equal((200L, 60L), DayTotals((await DayAsync(platform, "a", DateOnly.FromDateTime(now.UtcDateTime))).Single()));
+    }
+
+    [Fact]
+    public async Task A_count_of_null_keeps_the_rows_earlier_value_and_a_sample_copies_the_previous_days_emails_into_its_existing_row()
+    {
+        var platform = await database.CreateDatabaseAsync("usage_platform", CancellationToken);
+        await SeedPlatformAsync(platform, await PrepareTenantAsync("a"));
+        var store = new TenantUsageStore(NpgsqlDataSource.Create(PostgreSqlServer.RuntimeConnectionString(platform)));
+        var now = new DateTimeOffset(2026, 6, 15, 0, 5, 0, TimeSpan.Zero);
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var yesterday = today.AddDays(-1);
+        await PostgreSqlServer.AdminScalarAsync(
+            platform,
+            $"""
+            INSERT INTO platform.tenant_usage (tenant_id, day, users, applications, emails_sent) VALUES ('a', '{yesterday:yyyy-MM-dd}', 7, 6, 2);
+            INSERT INTO platform.tenant_daily_counters (tenant_id, day, counter, value)
+            VALUES ('a', '{yesterday:yyyy-MM-dd}', 'emails', 9), ('a', '{today:yyyy-MM-dd}', 'emails', 1)
+            """,
+            CancellationToken);
+
+        await store.RecordCountsAsync("a", 3, 2, now, CancellationToken);
+        await store.RecordCountsAsync("a", null, 5, now.AddHours(1), CancellationToken);
+
+        var days = await DayAsync(platform, "a", null);
+        var todayRow = days.Single(row => row.Day == today);
+        Assert.Equal((3, 5, 1), (todayRow.Users, todayRow.Applications, todayRow.EmailsSent));
+
+        // The previous day's counter is copied into its row, and its other counts stay.
+        var yesterdayRow = days.Single(row => row.Day == yesterday);
+        Assert.Equal((7, 6, 9), (yesterdayRow.Users, yesterdayRow.Applications, yesterdayRow.EmailsSent));
+
+        // A day without a row gets none from the copy of the day after it.
+        await store.RecordCountsAsync("a", 1, 1, now.AddDays(2), CancellationToken);
+        Assert.Equal([yesterday, today, today.AddDays(2)], (await DayAsync(platform, "a", null)).Select(row => row.Day));
     }
 
     [Fact]
@@ -324,6 +362,13 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
                 record => record.Level == LogLevel.Warning && record.Message.Contains("users quota step of tenant a ", StringComparison.Ordinal));
             Assert.NotNull(await LatestAsync(platform, "a"));
 
+            // The count of the failing realm fails too, so its day row holds no users, and the good realm's count is its one user.
+            Assert.Null((await DayAsync(platform, "a", clock.Today)).Single().Users);
+            Assert.Equal(1, (await DayAsync(platform, id, clock.Today)).Single().Users);
+            Assert.Contains(
+                logs.Records,
+                record => record.Level == LogLevel.Warning && record.Message.Contains("users of tenant a ", StringComparison.Ordinal));
+
             // The quota is raised above the user count. The worker reads it at the next directory refresh, and acts on it at the next hourly pass.
             await PostgreSqlServer.AdminScalarAsync(platform, $"UPDATE platform.tenant_quotas SET value = 5 WHERE tenant_id = '{id}'", CancellationToken);
             var refreshes = RefreshCount(logs);
@@ -338,6 +383,89 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
         }
 
         static int RefreshCount(LogCollector logs) => logs.Entries.Count(entry => entry.Contains("Read the tenant directory again", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task The_hourly_pass_writes_the_days_users_applications_and_emails_sent_and_a_later_pass_replaces_them()
+    {
+        var clock = new ManualClock();
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var realms = await UpstreamRealms.CreateAsync(baseAddress);
+        var studio = Path.Combine(Path.GetTempPath(), $"axis-usage-studio-{Guid.NewGuid():N}");
+        try
+        {
+            var id = realms.NewRealmName();
+            var secrets = new TenantRealmSecrets("platform-secret-1", "activation-secret-1", "users-secret-1", "agent-secret-1");
+            using var http = new HttpClient();
+            await new TenantRealm(http, new IdentityProviderAdmin(baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
+                .EnsureAsync(id, "Acme", secrets, new Dictionary<string, string>(), CancellationToken);
+            var first = await realms.AddUpstreamUserAsync(id);
+            await AddUserAsync(realms, id, "second");
+            await AddUserAsync(realms, id, "third");
+            AddApplication(studio, id, "one");
+            AddApplication(studio, id, "two");
+
+            var tenant = await PrepareTenantAsync(id);
+            var platform = await database.CreateDatabaseAsync("usage_platform", CancellationToken);
+            await SeedPlatformAsync(platform, tenant);
+            await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options))
+            {
+                var row = await context.Tenants.SingleAsync(candidate => candidate.Id == id, CancellationToken);
+                row.OidcAuthority = new Uri(baseAddress, $"realms/{id}").ToString();
+                row.RealmActivationClientSecret = _cipher.Encrypt(id, TenantSecretFields.RealmActivationClientSecret, secrets.Activation);
+                row.RealmUsersClientSecret = _cipher.Encrypt(id, TenantSecretFields.RealmUsersClientSecret, secrets.Users);
+                await context.SaveChangesAsync(CancellationToken);
+            }
+
+            await SetEmailsAsync(platform, id, clock.Today, 4);
+            await using var app = BuildWorker(platform, clock, [.. _cellSettings, ("Studio:ApplicationsPath", studio)]);
+
+            await app.StartAsync(CancellationToken);
+            await WaitUntilAsync(async () => (await DayAsync(platform, id, clock.Today)).SingleOrDefault()?.Users is not null, "The worker did not count the tenant.");
+
+            var day = (await DayAsync(platform, id, clock.Today)).Single();
+            Assert.Equal((3, 2, 4), (day.Users, day.Applications, day.EmailsSent));
+
+            // One user is disabled, an application and an email are added, and the next pass is due one hour later.
+            using var disabled = await realms.SendAsync(HttpMethod.Put, $"admin/realms/{id}/users/{first}", new { enabled = false });
+            Assert.Equal(System.Net.HttpStatusCode.NoContent, disabled.StatusCode);
+            AddApplication(studio, id, "three");
+            await SetEmailsAsync(platform, id, clock.Today, 5);
+            clock.Advance(TimeSpan.FromHours(1));
+            await WaitUntilAsync(
+                async () => (await DayAsync(platform, id, clock.Today)).Single() is { Users: 2, Applications: 3, EmailsSent: 5 },
+                "The worker did not replace the counts of the day.");
+        }
+        finally
+        {
+            await realms.DeleteRealmsAsync();
+            if (Directory.Exists(studio))
+            {
+                Directory.Delete(studio, recursive: true);
+            }
+        }
+
+        static async Task AddUserAsync(UpstreamRealms realms, string realm, string username)
+        {
+            using var created = await realms.SendAsync(HttpMethod.Post, $"admin/realms/{realm}/users", new { username, enabled = true });
+            Assert.Equal(System.Net.HttpStatusCode.Created, created.StatusCode);
+        }
+
+        static void AddApplication(string root, string tenant, string name)
+        {
+            var folder = Path.Combine(root, tenant, name);
+            Directory.CreateDirectory(folder);
+            File.WriteAllText(Path.Combine(folder, "application.json"), $$"""{"name":"{{name}}"}""");
+        }
+
+        static async Task SetEmailsAsync(string platform, string tenant, DateOnly day, int value) =>
+            await PostgreSqlServer.AdminScalarAsync(
+                platform,
+                $"""
+                INSERT INTO platform.tenant_daily_counters (tenant_id, day, counter, value) VALUES ('{tenant}', '{day:yyyy-MM-dd}', 'emails', {value})
+                ON CONFLICT (tenant_id, day, counter) DO UPDATE SET value = EXCLUDED.value
+                """,
+                CancellationToken);
     }
 
     private static async Task<string?> DenyStepAsync(UpstreamRealms realms, string realm)

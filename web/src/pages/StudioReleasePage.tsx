@@ -1,5 +1,5 @@
 import { Descriptions, Flex, Spin, Typography } from 'antd'
-import { type HTMLAttributes, type ReactNode, useContext, useEffect, useId, useState } from 'react'
+import { type HTMLAttributes, useContext, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
@@ -25,6 +25,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import { relaxedPointLabel } from './relaxEntries'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { StudioActivateDialog, StudioLiveTag, StudioReleaseBlockers } from './StudioReleases'
 import { StudioChangeList } from './StudioChangeList'
 import { StudioPageHeading } from './StudioPageHeading'
@@ -50,11 +51,11 @@ interface PartRow {
  * The page of one release, at `&view=release&release=N`: the heading "Release N" with the Live and Off-standard tags,
  * and Activate… on its right for a publisher (`canActivate`) when the release is not live, which asks for the same
  * confirmation as the release list and calls `onActivate` with the release's id. A release with blockers cannot replace
- * the live one: a sentence and each blocking module's line follow the heading, and Activate… is off. Under it, in order, come the facts
- * (Label, Status, Published, Published by and Note), the relaxed points in words grouped by module, the changes under
+ * the live one: a sentence and each blocking module's line follow the heading, and Activate… is off. Under it, in order, come the parts, with a
+ * rule between them: the Details part (Label, Status, Published, Published by and Note), the relaxed points in words grouped by module, the changes under
  * a title that names the release they compare with, where the modules and packages that differ follow the files, then
  * the modules and packages the release pins, and every activation of
- * the release. The facts and the activations come from `history`, and the rest from the release route, which loads
+ * the release. The Details part and the activations come from `history`, and the rest from the release route, which loads
  * again when `history` does. A number that the history lacks shows one line and a link to every release, and so does a
  * failed load.
  */
@@ -266,63 +267,71 @@ function ReleaseContent({
           blockers={release.blockers}
         />
       )}
-      <Descriptions
-        column={1}
-        items={[
-          { key: 'label', label: t('shell.studio.releases.label'), children: first.label || <EmptyDash /> },
-          { key: 'status', label: t('shell.studio.release.status'), children: status ?? <EmptyDash /> },
-          { key: 'published', label: t('shell.studio.releases.published'), children: format(first.activatedAt) },
-          { key: 'publishedBy', label: t('shell.studio.releases.publishedBy'), children: releasePublisher(first, t) },
-          { key: 'note', label: t('shell.studio.releases.note'), children: first.note || <EmptyDash /> },
-        ]}
-      />
-      {release.modules.length > 0 && (
-        <ReleaseBlock title={t('shell.studio.release.relaxed')}>
-          <RelaxedPoints relaxed={first.relaxed} locale={locale} />
-        </ReleaseBlock>
-      )}
-      <ReleaseBlock title={compareTitle(release, t)}>
-        {release.previous === null || release.changes === null ? (
-          <Typography.Text>{t('shell.studio.release.changes.first')}</Typography.Text>
-        ) : (
-          <>
-            {release.changes.length === 0 && (
-              <EmptyState
-                text={t('shell.studio.release.changes.none').replace('{previous}', String(release.previous))}
-              />
-            )}
-            <StudioChangeList
-              plainChanged
-              rows={changeRows(release.changes, resources, locale, t)}
-              parts={release.partChanges ?? []}
-              application={application}
-            />
-          </>
+      <SectionParts>
+        <SectionPart testName="details" heading={{ title: t('shell.studio.release.details') }}>
+          <Descriptions
+            column={1}
+            items={[
+              { key: 'label', label: t('shell.studio.releases.label'), children: first.label || <EmptyDash /> },
+              { key: 'status', label: t('shell.studio.release.status'), children: status ?? <EmptyDash /> },
+              { key: 'published', label: t('shell.studio.releases.published'), children: format(first.activatedAt) },
+              {
+                key: 'publishedBy',
+                label: t('shell.studio.releases.publishedBy'),
+                children: releasePublisher(first, t),
+              },
+              { key: 'note', label: t('shell.studio.releases.note'), children: first.note || <EmptyDash /> },
+            ]}
+          />
+        </SectionPart>
+        {release.modules.length > 0 && (
+          <SectionPart testName="relaxed" heading={{ title: t('shell.studio.release.relaxed') }}>
+            <RelaxedPoints relaxed={first.relaxed} locale={locale} />
+          </SectionPart>
         )}
-      </ReleaseBlock>
-      <ReleaseBlock title={t('shell.studio.release.parts')}>
-        <AxisTable<PartRow>
-          columns={partColumns}
-          rowKey={(row) => row.key}
-          dataSource={parts}
-          loading={false}
-          emptyText={t('shell.studio.release.parts.none')}
-          pagination={false}
-          toolbar={{}}
-        />
-      </ReleaseBlock>
-      <ReleaseBlock title={t('shell.studio.release.activations')}>
-        <AxisTable<ActivationRow>
-          columns={activationColumns}
-          rowKey={(row) => row.key}
-          dataSource={activations}
-          loading={false}
-          emptyText={t('shell.studio.releases.empty')}
-          pagination={false}
-          toolbar={{}}
-          rowAttributes={() => ({ 'data-testid': 'studio-release-activation' }) as HTMLAttributes<HTMLElement>}
-        />
-      </ReleaseBlock>
+        <SectionPart testName="changes" heading={{ title: compareTitle(release, t) }}>
+          {release.previous === null || release.changes === null ? (
+            <Typography.Text>{t('shell.studio.release.changes.first')}</Typography.Text>
+          ) : (
+            <>
+              {release.changes.length === 0 && (
+                <EmptyState
+                  text={t('shell.studio.release.changes.none').replace('{previous}', String(release.previous))}
+                />
+              )}
+              <StudioChangeList
+                plainChanged
+                rows={changeRows(release.changes, resources, locale, t)}
+                parts={release.partChanges ?? []}
+                application={application}
+              />
+            </>
+          )}
+        </SectionPart>
+        <SectionPart testName="parts" heading={{ title: t('shell.studio.release.parts') }}>
+          <AxisTable<PartRow>
+            columns={partColumns}
+            rowKey={(row) => row.key}
+            dataSource={parts}
+            loading={false}
+            emptyText={t('shell.studio.release.parts.none')}
+            pagination={false}
+            toolbar={{}}
+          />
+        </SectionPart>
+        <SectionPart testName="activations" heading={{ title: t('shell.studio.release.activations') }}>
+          <AxisTable<ActivationRow>
+            columns={activationColumns}
+            rowKey={(row) => row.key}
+            dataSource={activations}
+            loading={false}
+            emptyText={t('shell.studio.releases.empty')}
+            pagination={false}
+            toolbar={{}}
+            rowAttributes={() => ({ 'data-testid': 'studio-release-activation' }) as HTMLAttributes<HTMLElement>}
+          />
+        </SectionPart>
+      </SectionParts>
     </Flex>
   )
 }
@@ -338,21 +347,6 @@ function compareTitle(release: StudioRelease, t: (key: string) => string): strin
   return t(
     release.previousIsLive ? 'shell.studio.release.changes.ifActivated' : 'shell.studio.release.changes.from',
   ).replace('{previous}', String(release.previous))
-}
-
-function ReleaseBlock({ title, children }: { title: string; children: ReactNode }) {
-  const { spacing } = useDesignTokens()
-  const headingId = useId()
-  return (
-    <section aria-labelledby={headingId}>
-      <Flex vertical gap={spacing.sm}>
-        <Typography.Title level={5} id={headingId} style={{ margin: 0 }}>
-          {title}
-        </Typography.Title>
-        {children}
-      </Flex>
-    </section>
-  )
 }
 
 /** The relaxed points in words, grouped by the label of their module. */

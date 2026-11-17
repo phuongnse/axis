@@ -1,10 +1,10 @@
-import { Input, Modal } from 'antd'
+import { Modal } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { fetchRecords, type RecordItem, type RecordPage, type RecordValue } from './records'
 import type { FieldMetadata } from './site'
-import { recordQuery } from './tableQuery'
+import { recordQuery, type TableQuery } from './tableQuery'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
@@ -29,14 +29,12 @@ interface LoadState {
 
 const pageSize = 20
 
-/** How long after the last key press the search applies, in milliseconds. */
-const searchDelay = 300
-
 /**
  * A dialog that lists the records of a reference field's target entity, sorted by its display
- * field, to pick one. A search box filters the records to those whose display field contains the
- * trimmed text, ignoring case. It applies once typing pauses and starts again at page 1. Paging and
- * search are the dialog's own and stay out of the URL.
+ * field, to pick one. Its Search box is AxisTable's, so the search applies on Enter, on the search
+ * button or when the box is cleared, as every table's search does. The trimmed text filters the
+ * records to those whose display field contains it, ignoring case. Paging and search are the
+ * dialog's own state, not the page's address, see docs/reference/form-widget.md#lookup.
  */
 export function ReferenceLookup({ field, title, open, onPick, onClose }: ReferenceLookupProps) {
   const { size } = useDesignTokens()
@@ -52,32 +50,18 @@ function LookupList({ field, onPick }: Pick<ReferenceLookupProps, 'field' | 'onP
   const t = useText()
   const target = field.target!
   const { displayField, recordsPath } = target
-  const [page, setPage] = useState(1)
-  // The typed text, and the search applied to the request once typing pauses.
-  const [text, setText] = useState('')
-  const [search, setSearch] = useState('')
+  // The view is the dialog's own state. The sort stays out of it, as the column has no sorter to set it.
+  const [query, setQuery] = useState<TableQuery>({ page: 1, pageSize, sort: null })
   const requestQuery = recordQuery({
-    page,
-    pageSize,
+    ...query,
+    // AxisTable passes the search as typed, so the spaces around it are taken off here.
+    search: query.search?.trim() || undefined,
     sort: displayField ? { field: displayField, descending: false } : null,
-    parameters: search ? { search } : {},
   })
   const requestUrl = `${recordsPath}?${requestQuery}`
   const [state, setState] = useState<LoadState>({ failed: false })
   const loading = state.url !== requestUrl
   const failed = state.failed && !loading
-
-  useEffect(() => {
-    const next = text.trim()
-    if (next === search) {
-      return
-    }
-    const timer = setTimeout(() => {
-      setSearch(next)
-      setPage(1)
-    }, searchDelay)
-    return () => clearTimeout(timer)
-  }, [text, search])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -115,20 +99,7 @@ function LookupList({ field, onPick }: Pick<ReferenceLookupProps, 'field' | 'onP
       dataSource={state.page?.items}
       loading={loading}
       emptyText={t('shell.table.empty')}
-      pagination={{ current: page, pageSize, total: state.page?.totalCount ?? 0 }}
-      onChange={(next) => setPage(next.current ?? 1)}
-      toolbar={{
-        view: (
-          <Input
-            allowClear
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            aria-label={t('shell.lookup.search')}
-            placeholder={t('shell.lookup.search')}
-            data-testid="reference-lookup-search"
-          />
-        ),
-      }}
+      view={{ query, onChange: setQuery, total: state.page?.totalCount ?? 0, search: true }}
       failure={
         failed ? (
           <AxisAlert data-testid="reference-lookup-error" kind="error" message={t('shell.table.loadFailed')} />

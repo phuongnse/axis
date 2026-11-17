@@ -60,6 +60,14 @@ describe('CellPage', () => {
     expect(overview).toHaveTextContent('12 of 50')
   })
 
+  it('draws the overview with no card', async () => {
+    stubCell(200, { id: 'vn-1', region: 'vn', tenants: 12, cap: 50, restoreCheck: null })
+    renderPage()
+
+    expect(await screen.findByTestId('cell-overview')).toBeInTheDocument()
+    expect(document.querySelector('.ant-card')).toBeNull()
+  })
+
   it('shows the count alone when the cell has no cap', async () => {
     stubCell(200, { id: 'vn-1', region: 'vn', tenants: 12, cap: null, restoreCheck: null })
     renderPage()

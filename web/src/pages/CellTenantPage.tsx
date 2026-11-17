@@ -1,4 +1,4 @@
-import { Card, Descriptions, Flex, Input, Modal, Typography } from 'antd'
+import { Descriptions, Flex, Input, Modal, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
@@ -8,9 +8,11 @@ import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { CellJobTable } from '../platform/CellJobTable'
 import {
   downloadCellTenantExport,
+  fetchCellDeletedTenant,
   fetchCellJobs,
   fetchCellTenant,
   queueCellTenantJob,
+  type CellDeletedTenant,
   type CellHostRequestState,
   type CellJob,
   type CellQuota,
@@ -21,7 +23,7 @@ import { EmptyDash } from '../platform/EmptyValue'
 import { saveFile } from '../platform/exports'
 import { PageLayout } from '../platform/PageLayout'
 import { newIdempotencyKey } from '../platform/processes'
-import { TenantUsageDayTable } from '../platform/TenantUsageDayTable'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useFollowCellJob } from '../platform/useFollowCellJob'
@@ -29,6 +31,7 @@ import { usePlatform } from './context'
 import { useCellConsole } from './cellConsoleContext'
 import { CellTenantHostDialog } from './CellTenantHostDialog'
 import { CellTenantQuotasDialog } from './CellTenantQuotasDialog'
+import { CellTenantUsage } from './CellTenantUsage'
 import { NotFoundPage } from './NotFoundPage'
 
 interface QuotaRow extends CellQuota {
@@ -70,10 +73,12 @@ const actionTexts = {
 } as const
 
 /**
- * The Tenant view of the cell console: one tenant's status, application and hosts, the state of each host the operator
- * asked for, its quotas with the ones it overrides,
- * its usage of the last 13 months by day in the table of the users page's "Usage" section, and its jobs in the shared job
- * table. An unknown id shows the not-found page. An `active` or `readOnly` tenant offers
+ * The Tenant view of the cell console, in parts a rule apart, see docs/reference/shell.md#layout: Details with one tenant's
+ * status, application, hosts and actions, then Host verification with the state of each host the operator asked for,
+ * Quotas with the ones it overrides, Usage of the last 13 months by day in the table of the users page's "Usage" section, paged on the server from the tenant's own usage days route,
+ * and Jobs in the shared job table. A `deleting` tenant shows its purge date after its status. An id that is no tenant
+ * but a purged one shows only Deleted, the date of the purge, the date its deletion is complete and its jobs, with no
+ * action, see docs/reference/cell-console.md#views. An id that is neither shows the not-found page. An `active` or `readOnly` tenant offers
  * Suspend and a `suspended` or `readOnly` one offers Resume. Any tenant but a `provisioning` one offers Export. An `active`,
  * `readOnly` or `suspended` tenant offers Delete, which stays off until the operator types the tenant id exactly, and a
  * `deleting` one offers Cancel deletion in place of Suspend, Resume and Delete. Each action is behind a confirmation. An
@@ -91,6 +96,8 @@ export function CellTenantPage() {
   const { onRefused } = useCellConsole()
   const { id = '' } = useParams()
   const [tenant, setTenant] = useState<CellTenantDetail | null>()
+  // The purged tenant, read only when the id is no tenant. `null` is an id that was never a tenant.
+  const [deleted, setDeleted] = useState<CellDeletedTenant | null>()
   const [tenantFailed, setTenantFailed] = useState(false)
   const [jobs, setJobs] = useState<CellJob[]>()
   const [jobsFailed, setJobsFailed] = useState(false)
@@ -112,25 +119,36 @@ export function CellTenantPage() {
 
   useEffect(() => {
     const controller = new AbortController()
-    fetchCellTenant(id, controller.signal).then(
-      (result) => {
-        if (result.kind === 'ok') {
-          setTenant(result.value)
-        } else {
+    fetchCellTenant(id, controller.signal)
+      .then((result) => {
+        if (result.kind !== 'ok') {
           onRefused(result.kind)
+          return
         }
-      },
-      (error: unknown) => {
+        setTenant(result.value)
+        if (result.value !== null) {
+          setDeleted(undefined)
+          return
+        }
+        return fetchCellDeletedTenant(id, controller.signal).then((purged) => {
+          if (purged.kind === 'ok') {
+            setDeleted(purged.value)
+          } else {
+            onRefused(purged.kind)
+          }
+        })
+      })
+      .catch((error: unknown) => {
         if (!controller.signal.aborted) {
           console.warn('Loading the cell tenant failed', error)
           setTenantFailed(true)
         }
-      },
-    )
-    fetchCellJobs(controller.signal, id).then(
+      })
+    // The tenant's 50 newest jobs, see docs/reference/cell-console.md#views.
+    fetchCellJobs(new URLSearchParams({ tenant: id, pageSize: '50' }).toString(), controller.signal).then(
       (result) => {
         if (result.kind === 'ok') {
-          setJobs(result.value)
+          setJobs(result.value.items)
         } else {
           onRefused(result.kind)
         }
@@ -154,7 +172,7 @@ export function CellTenantPage() {
     onRefused,
   })
 
-  if (tenant === null) {
+  if (tenant === null && deleted === null) {
     return <NotFoundPage />
   }
 
@@ -228,6 +246,7 @@ export function CellTenantPage() {
     setConfirming(action)
   }
 
+  const when = (time: string) => new Date(time).toLocaleString(locale)
   const quotas: QuotaRow[] = tenant ? Object.entries(tenant.quotas).map(([key, quota]) => ({ key, ...quota })) : []
   const quotaColumns: AxisColumn<QuotaRow>[] = [
     {
@@ -269,7 +288,7 @@ export function CellTenantPage() {
       key: 'expiresAt',
       kind: 'fixed',
       title: t('shell.cell.tenant.hostRequest.expiresAt'),
-      render: (_value, row) => (row.state === 'pending' ? new Date(row.expiresAt).toLocaleString(locale) : null),
+      render: (_value, row) => (row.state === 'pending' ? when(row.expiresAt) : null),
     },
   ]
 
@@ -278,9 +297,9 @@ export function CellTenantPage() {
       {tenantFailed && (
         <AxisAlert data-testid="cell-tenant-error" kind="error" message={t('shell.cell.tenant.loadFailed')} />
       )}
-      {tenant && (
-        <>
-          <Card>
+      <SectionParts>
+        {tenant && (
+          <SectionPart testName="cell-tenant-details" heading={{ title: t('shell.cell.tenant.details') }}>
             <Descriptions
               data-testid="cell-tenant"
               column={1}
@@ -290,6 +309,15 @@ export function CellTenantPage() {
                   label: t('shell.cell.tenant.status'),
                   children: t(`shell.cell.tenants.status.${tenant.status}`),
                 },
+                ...(tenant.status === 'deleting' && tenant.deleteAfter
+                  ? [
+                      {
+                        key: 'deleteAfter',
+                        label: t('shell.cell.tenant.deleteAfter'),
+                        children: when(tenant.deleteAfter),
+                      },
+                    ]
+                  : []),
                 {
                   key: 'application',
                   label: t('shell.cell.tenant.application'),
@@ -373,8 +401,23 @@ export function CellTenantPage() {
                 {t('shell.cell.tenant.addHost')}
               </AxisButton>
             </Flex>
-          </Card>
-          <Card title={t('shell.cell.tenant.hostRequests')}>
+          </SectionPart>
+        )}
+        {deleted && (
+          <SectionPart testName="cell-tenant-details" heading={{ title: t('shell.cell.tenant.details') }}>
+            <Descriptions
+              data-testid="cell-tenant-deleted"
+              column={1}
+              items={[
+                { key: 'status', label: t('shell.cell.tenant.status'), children: t('shell.cell.tenant.deleted') },
+                { key: 'purgedAt', label: t('shell.cell.tenant.purgedAt'), children: when(deleted.deletedAt) },
+                { key: 'completeAt', label: t('shell.cell.tenant.completeAt'), children: when(deleted.completeAt) },
+              ]}
+            />
+          </SectionPart>
+        )}
+        {tenant && (
+          <SectionPart testName="cell-tenant-host-requests" heading={{ title: t('shell.cell.tenant.hostRequests') }}>
             <AxisTable<CellHostRequestState>
               testId="cell-tenant-host-requests"
               rowKey={(row) => row.host}
@@ -382,8 +425,10 @@ export function CellTenantPage() {
               columns={hostRequestColumns}
               emptyText={t('shell.cell.tenant.noHostRequests')}
             />
-          </Card>
-          <Card title={t('shell.cell.tenant.quotas')}>
+          </SectionPart>
+        )}
+        {tenant && (
+          <SectionPart testName="cell-tenant-quotas" heading={{ title: t('shell.cell.tenant.quotas') }}>
             <AxisTable<QuotaRow>
               testId="cell-tenant-quotas"
               rowKey={(row) => row.key}
@@ -391,12 +436,24 @@ export function CellTenantPage() {
               columns={quotaColumns}
               emptyText={t('shell.cell.tenant.noQuotas')}
             />
-          </Card>
-          <Card title={t('shell.cell.tenant.usage')}>
-            <TenantUsageDayTable days={tenant.days} locale={locale} testId="cell-tenant-usage" />
-          </Card>
-        </>
-      )}
+          </SectionPart>
+        )}
+        {tenant && (
+          <SectionPart testName="cell-tenant-usage" heading={{ title: t('shell.cell.tenant.usage') }}>
+            <CellTenantUsage tenant={id} locale={locale} />
+          </SectionPart>
+        )}
+        <SectionPart testName="cell-tenant-jobs" heading={{ title: t('shell.cell.tenant.jobs') }}>
+          {jobsFailed && (
+            <AxisAlert
+              data-testid="cell-tenant-jobs-error"
+              kind="error"
+              message={t('shell.cell.tenant.jobsLoadFailed')}
+            />
+          )}
+          {jobs && <CellJobTable jobs={jobs} locale={locale} />}
+        </SectionPart>
+      </SectionParts>
       {tenant && openDialog === 'quotas' && (
         <CellTenantQuotasDialog
           tenant={id}
@@ -471,16 +528,6 @@ export function CellTenantPage() {
           </Flex>
         </Modal>
       )}
-      <Card title={t('shell.cell.tenant.jobs')}>
-        {jobsFailed && (
-          <AxisAlert
-            data-testid="cell-tenant-jobs-error"
-            kind="error"
-            message={t('shell.cell.tenant.jobsLoadFailed')}
-          />
-        )}
-        {jobs && <CellJobTable jobs={jobs} locale={locale} />}
-      </Card>
     </PageLayout>
   )
 }

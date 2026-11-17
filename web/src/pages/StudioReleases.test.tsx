@@ -1,68 +1,46 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
-import type { StudioRelease, StudioReleaseBlocker, StudioReleaseItem, StudioReleases } from '../platform/studio'
+import type { StudioRelease, StudioReleaseBlocker, StudioReleaseListRow, StudioReleases } from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioReleasesList } from './StudioReleases'
 
-function item(
-  releaseId: string,
-  number: number,
-  activatedAt: string,
-  details: Partial<StudioReleaseItem> = {},
-): StudioReleaseItem {
+const listPath = '/api/studio/apps/PurchaseRequests/release-list'
+
+function item(releaseId: string, number: number, details: Partial<StudioReleaseListRow> = {}): StudioReleaseListRow {
   return {
     releaseId,
     number,
-    contentHash: `hash-${number}`,
-    activatedAt,
-    actor: 'user-1',
-    actorName: null,
     label: null,
     note: null,
-    requestId: null,
+    publishedAt: `2026-05-0${number}T10:00:00Z`,
+    actor: 'user-1',
+    actorName: null,
+    live: false,
     offStandard: false,
     relaxed: [],
     ...details,
   }
 }
 
-// Out of order. Release 1 was activated again with no label, and release 2 is live.
+// What the server answers: one row for each release, the highest number first, and release 2 is live.
+const answered: StudioReleaseListRow[] = [
+  item('r4', 4, { actor: 'unknown' }),
+  item('r3', 3, { actor: 'operator' }),
+  item('r2', 2, { actor: 'startup', note: 'Second note', live: true }),
+  item('r1', 1, { actorName: 'Author User', label: 'First' }),
+]
+
+// The list reads only the live number from the band's history.
 const history: StudioReleases = {
   active: { releaseId: 'r2', number: 2, contentHash: 'hash-2' },
   folderContentHash: null,
   changes: null,
   partChanges: null,
-  items: [
-    item('r2', 2, '2026-05-02T10:00:00Z', { actor: 'startup', note: 'Second note' }),
-    item('r4', 4, '2026-05-04T10:00:00Z', { actor: 'unknown' }),
-    item('r1', 1, '2026-05-05T10:00:00Z'),
-    item('r1', 1, '2026-05-01T10:00:00Z', { actorName: 'Author User', label: 'First' }),
-    item('r3', 3, '2026-05-03T10:00:00Z', { actor: 'operator' }),
-  ],
-}
-
-function renderList(overrides: { history?: StudioReleases; canActivate?: boolean; busy?: boolean } = {}) {
-  const onActivate = vi.fn()
-  render(
-    <ThemeModeProvider>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <MemoryRouter>
-          <StudioReleasesList
-            application="PurchaseRequests"
-            history={overrides.history ?? history}
-            canActivate={overrides.canActivate ?? true}
-            busy={overrides.busy ?? false}
-            onActivate={onActivate}
-          />
-        </MemoryRouter>
-      </TextProvider>
-    </ThemeModeProvider>,
-  )
-  return onActivate
+  items: [],
 }
 
 function release(number: number, blockers: StudioReleaseBlocker[] = []): StudioRelease {
@@ -79,25 +57,76 @@ function release(number: number, blockers: StudioReleaseBlocker[] = []): StudioR
   }
 }
 
-function answer(body: StudioRelease | number) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () =>
-      typeof body === 'number' ? new Response(null, { status: body }) : new Response(JSON.stringify(body)),
-    ),
+/**
+ * Stubs the server: the release list answers `page` with `total` as its count, and a release's page answers `detail`,
+ * or its status when that is a number, or never when it is 'pending'. It returns the URLs asked for the list.
+ */
+function stubServer(
+  page: StudioReleaseListRow[] = answered,
+  total = page.length,
+  detail: StudioRelease | number | 'pending' = release(1),
+) {
+  const fetchMock = vi.fn(async (input: string) => {
+    if (input.startsWith(listPath)) {
+      return new Response(JSON.stringify({ items: page, page: 1, pageSize: 20, totalCount: total }), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+    if (detail === 'pending') {
+      return new Promise<Response>(() => {})
+    }
+    return typeof detail === 'number' ? new Response(null, { status: detail }) : new Response(JSON.stringify(detail))
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return () => fetchMock.mock.calls.map(([input]) => input).filter((input) => input.startsWith(listPath))
+}
+
+const Location = () => <output data-testid="location">{useLocation().search}</output>
+
+async function renderList(
+  overrides: { history?: StudioReleases; canActivate?: boolean; busy?: boolean; address?: string; wait?: boolean } = {},
+) {
+  const onActivate = vi.fn()
+  render(
+    <ThemeModeProvider>
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <MemoryRouter initialEntries={[overrides.address ?? '/studio?app=PurchaseRequests&view=releases']}>
+          <StudioReleasesList
+            application="PurchaseRequests"
+            history={overrides.history ?? history}
+            canActivate={overrides.canActivate ?? true}
+            busy={overrides.busy ?? false}
+            onActivate={onActivate}
+          />
+          <Location />
+        </MemoryRouter>
+      </TextProvider>
+    </ThemeModeProvider>,
   )
+  if (overrides.wait !== false) {
+    await waitFor(() =>
+      expect(
+        screen.queryAllByTestId('studio-release-row').length + screen.queryAllByText('No release yet.').length,
+      ).toBeGreaterThan(0),
+    )
+  }
+  return onActivate
 }
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
   localStorage.clear()
 })
 
 describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
-  beforeEach(() => localStorage.setItem('axis.themeMode', mode))
+  beforeEach(() => {
+    localStorage.setItem('axis.themeMode', mode)
+    stubServer()
+  })
 
-  it('has one row for each release, the highest number first, with the columns and no Status', () => {
-    renderList()
+  it('shows one row for each release the server answers, in its order, with the columns and no Status', async () => {
+    await renderList()
 
     const rows = screen.getAllByTestId('studio-release-row')
     expect(rows.map((row) => row.getAttribute('data-number'))).toEqual(['4', '3', '2', '1'])
@@ -112,8 +141,8 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     expect(screen.queryByRole('columnheader', { name: 'Status' })).not.toBeInTheDocument()
   })
 
-  it('takes the label, note and time of a release from its first activation', () => {
-    renderList()
+  it('shows the label, note and time that the server answers for a release', async () => {
+    await renderList()
 
     const rows = screen.getAllByTestId('studio-release-row')
     expect(within(rows[3]).getByText('First')).toBeInTheDocument()
@@ -121,8 +150,8 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     expect(within(rows[2]).getByText('Second note')).toBeInTheDocument()
   })
 
-  it('shows the Live tag in the Release cell of the live row only', () => {
-    renderList()
+  it('shows the Live tag in the Release cell of the live row only', async () => {
+    await renderList()
 
     const rows = screen.getAllByTestId('studio-release-row')
     expect(rows.filter((row) => row.hasAttribute('data-active'))).toEqual([rows[2]])
@@ -132,8 +161,8 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     expect(releaseCell).toHaveTextContent('2')
   })
 
-  it('links each release number to the release page', () => {
-    renderList()
+  it('links each release number to the release page', async () => {
+    await renderList()
 
     for (const number of ['1', '2', '3', '4']) {
       expect(screen.getByRole('link', { name: number })).toHaveAttribute(
@@ -143,16 +172,16 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     }
   })
 
-  it('shows the em dash for an empty label and an empty note', () => {
-    renderList()
+  it('shows the em dash for an empty label and an empty note', async () => {
+    await renderList()
 
     const cells = within(screen.getAllByTestId('studio-release-row')[1]).getAllByRole('cell')
     expect(cells[1]).toHaveTextContent('—')
     expect(cells[4]).toHaveTextContent('—')
   })
 
-  it('names who published each release in words, never an id', () => {
-    renderList()
+  it('names who published each release in words, never an id', async () => {
+    await renderList()
 
     const publishedBy = screen
       .getAllByTestId('studio-release-row')
@@ -161,8 +190,8 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     expect(screen.queryByText('user-1')).not.toBeInTheDocument()
   })
 
-  it('marks an off-standard release in its Release cell with each relaxed module, point and reason', () => {
-    const relaxed = item('r3', 3, '2026-05-03T10:00:00Z', {
+  it('marks an off-standard release in its Release cell with each relaxed module, point and reason', async () => {
+    const relaxed = item('r3', 3, {
       offStandard: true,
       relaxed: [
         {
@@ -194,7 +223,8 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
         },
       ],
     })
-    renderList({ history: { ...history, items: [history.items[0], relaxed] } })
+    stubServer([relaxed, answered[2]])
+    await renderList()
 
     const rows = screen.getAllByTestId('studio-release-row')
     expect(rows.map((row) => row.getAttribute('data-off-standard'))).toEqual(['true', null])
@@ -210,20 +240,21 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     expect(within(rows[1]).queryByTestId('release-relaxed-point')).not.toBeInTheDocument()
   })
 
-  it('shows an empty text without releases', () => {
-    renderList({ history: { active: null, folderContentHash: null, changes: null, partChanges: null, items: [] } })
+  it('shows an empty text without releases', async () => {
+    stubServer([])
+    await renderList({ history: { ...history, active: null } })
 
     expect(screen.getByText('No release yet.')).toBeInTheDocument()
   })
 
-  it('shows no Activate… button to a user who is not a publisher', () => {
-    renderList({ canActivate: false })
+  it('shows no Activate… button to a user who is not a publisher', async () => {
+    await renderList({ canActivate: false })
 
     expect(screen.queryByRole('button', { name: /^Activate release/ })).not.toBeInTheDocument()
   })
 
-  it('shows Activate… on every row but the live one, named with the release number', () => {
-    renderList()
+  it('shows Activate… on every row but the live one, named with the release number', async () => {
+    await renderList()
 
     const rows = screen.getAllByTestId('studio-release-row')
     expect(
@@ -231,8 +262,8 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     ).toEqual(['Activate release 4', 'Activate release 3', null, 'Activate release 1'])
   })
 
-  it('turns the buttons off while busy', () => {
-    renderList({ busy: true })
+  it('turns the buttons off while busy', async () => {
+    await renderList({ busy: true })
 
     const buttons = screen.getAllByRole('button', { name: /^Activate release/ })
     expect(buttons).toHaveLength(3)
@@ -242,9 +273,9 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
   })
 
   it('names the release that replaces the live one and activates it on confirmation', async () => {
-    answer(release(1))
+    stubServer(answered, answered.length, release(1))
     const user = userEvent.setup()
-    const onActivate = renderList()
+    const onActivate = await renderList()
 
     await user.click(screen.getByRole('button', { name: 'Activate release 1' }))
 
@@ -263,9 +294,9 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
   })
 
   it('does not activate when the dialog is cancelled', async () => {
-    answer(release(3))
+    stubServer(answered, answered.length, release(3))
     const user = userEvent.setup()
-    const onActivate = renderList()
+    const onActivate = await renderList()
 
     await user.click(screen.getByRole('button', { name: 'Activate release 3' }))
     const dialog = await screen.findByRole('dialog')
@@ -276,14 +307,16 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
   })
 
   it('titles the dialog with the cannot-replace sentence, lists the blockers and offers Close alone', async () => {
-    answer(
+    stubServer(
+      answered,
+      answered.length,
       release(1, [
         { module: 'a', label: 'Assets', liveVersion: '1.2.0', version: null },
         { module: 'b', label: 'Budgets', liveVersion: '2.0.0', version: '1.0.0' },
       ]),
     )
     const user = userEvent.setup()
-    const onActivate = renderList()
+    const onActivate = await renderList()
 
     await user.click(screen.getByRole('button', { name: 'Activate release 1' }))
 
@@ -309,12 +342,9 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
   })
 
   it('turns Activate off with a spinner while the release loads', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => new Promise<Response>(() => {})),
-    )
+    stubServer(answered, answered.length, 'pending')
     const user = userEvent.setup()
-    renderList()
+    await renderList()
 
     await user.click(screen.getByRole('button', { name: 'Activate release 1' }))
 
@@ -326,9 +356,9 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
 
   it('falls back to the replaces sentence and Activate when the release does not load', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    answer(500)
+    stubServer(answered, answered.length, 500)
     const user = userEvent.setup()
-    const onActivate = renderList()
+    const onActivate = await renderList()
 
     await user.click(screen.getByRole('button', { name: 'Activate release 1' }))
 
@@ -339,5 +369,69 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     await user.click(within(dialog).getByRole('button', { name: 'Activate' }))
 
     expect(onActivate).toHaveBeenCalledTimes(1)
+  })
+
+  it('asks the server for the search, the filter and the sort of the address and shows the rows it answers', async () => {
+    const filter = JSON.stringify({ all: [{ field: 'number', op: 'gte', value: 3 }] })
+    const requested = stubServer([answered[1]], 1)
+
+    await renderList({
+      address: `/studio?app=PurchaseRequests&view=releases&search=cut&filter=${encodeURIComponent(filter)}&sort=-label`,
+    })
+
+    expect(screen.getAllByTestId('studio-release-row').map((row) => row.getAttribute('data-number'))).toEqual(['3'])
+    const query = new URLSearchParams(requested()[0].slice(listPath.length + 1))
+    expect(query.get('search')).toBe('cut')
+    expect(query.get('filter')).toBe(filter)
+    expect(query.get('sort')).toBe('-label')
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('cut')
+  })
+
+  it('sorts from the Label header into the address and asks the server again', async () => {
+    const requested = stubServer()
+    const user = userEvent.setup()
+    await renderList()
+
+    await user.click(screen.getByRole('columnheader', { name: 'Label' }))
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('sort=label'))
+    await waitFor(() => expect(requested().some((url) => url.includes('sort=label'))).toBe(true))
+  })
+
+  it('does not sort from the Note header', async () => {
+    const requested = stubServer()
+    const user = userEvent.setup()
+    await renderList()
+
+    await user.click(screen.getByRole('columnheader', { name: 'Note' }))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(requested()).toHaveLength(1)
+    expect(screen.getByTestId('location')).not.toHaveTextContent('sort=')
+  })
+
+  it('shows the pager as 1–20 of 45 and keeps a page size in the address', async () => {
+    const requested = stubServer(answered, 45)
+    const user = userEvent.setup()
+    await renderList()
+
+    expect(screen.getByText('1–20 of 45')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByTitle('50 / page'))
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('pageSize=50'))
+    await waitFor(() => expect(requested()).toContain(`${listPath}?pageSize=50`))
+  })
+
+  it('says the releases could not be loaded when the list fails', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 500 })),
+    )
+    await renderList({ wait: false })
+
+    expect(await screen.findByText('The releases could not be loaded.')).toBeInTheDocument()
   })
 })

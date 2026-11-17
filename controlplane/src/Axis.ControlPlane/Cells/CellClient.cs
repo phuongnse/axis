@@ -15,7 +15,7 @@ namespace Axis.ControlPlane.Cells;
 /// <see cref="CellOperation"/>, and so does a <c>DELETE</c>. A failure throws <see cref="CellCallException"/> with a fixed text: it never holds a
 /// response body, a token, the client secret or a request body, and none of them is logged. A <c>409</c> titled
 /// <see cref="FullTitle"/> sets <see cref="CellCallException.CellFull"/>, and any other <c>409</c> is an ordinary failure.
-/// <see cref="ListTenantsAsync"/> reads the cell's tenant list, <see cref="GetTenantStatusAsync"/> one tenant's status and
+/// <see cref="ListTenantsAsync"/> reads the cell's whole tenant list, page by page, <see cref="GetTenantStatusAsync"/> one tenant's status and
 /// <see cref="ListAdministratorsAsync"/> its administrators, with the same token and the same failures. <see cref="PutQuotasAsync"/> sets a
 /// tenant's quotas with a <c>PUT</c> that carries no idempotency key: it sets every key it names, so a repeat gives the same rows.
 /// </summary>
@@ -23,6 +23,9 @@ internal sealed class CellClient : IDisposable
 {
     /// <summary>The title of the problem that a cell answers with <c>409</c> when it holds as many tenants as its cap.</summary>
     public const string FullTitle = "This cell is full.";
+
+    /// <summary>How many tenants <see cref="ListTenantsAsync"/> asks for in one request.</summary>
+    public const int TenantPageSize = 100;
 
     private readonly CellOptions _cell;
     private readonly string _clientSecret;
@@ -105,10 +108,48 @@ internal sealed class CellClient : IDisposable
 
     /// <summary>
     /// Reads the cell's tenant list, <c>GET /api/cell/tenants</c>, as each tenant's id and hosts. The status, the application
-    /// and the failed work that the cell also sends are left out.
+    /// and the failed work that the cell also sends are left out. The cell answers the list in pages, so the call reads
+    /// <see cref="TenantPageSize"/> tenants at a time until it has them all, see <c>docs/reference/control-plane.md#reaching-the-cells</c>.
+    /// It throws when the cell's total changes between pages or the ids it collected do not add up to the total, so a partial list is
+    /// never returned.
     /// </summary>
-    public Task<IReadOnlyList<CellTenant>> ListTenantsAsync(CancellationToken cancellationToken) =>
-        CallAsync(HttpMethod.Get, "/api/cell/tenants", null, null, ReadTenantsAsync, cancellationToken);
+    public async Task<IReadOnlyList<CellTenant>> ListTenantsAsync(CancellationToken cancellationToken)
+    {
+        var tenants = new Dictionary<string, CellTenant>(StringComparer.Ordinal);
+        long? total = null;
+        for (var page = 1; total is null || tenants.Count < total; page++)
+        {
+            var read = await CallAsync(
+                HttpMethod.Get,
+                $"/api/cell/tenants?page={page.ToString(CultureInfo.InvariantCulture)}&pageSize={TenantPageSize.ToString(CultureInfo.InvariantCulture)}",
+                null,
+                null,
+                ReadTenantsAsync,
+                cancellationToken);
+            total ??= read.TotalCount;
+            if (read.TotalCount != total)
+            {
+                throw new CellCallException($"The cell '{CellId}' changed its tenant total while its tenant list was read.", 200);
+            }
+
+            foreach (var tenant in read.Tenants)
+            {
+                tenants.TryAdd(tenant.Id, tenant);
+            }
+
+            if (read.Tenants.Count == 0)
+            {
+                break;
+            }
+        }
+
+        if (tenants.Count != total)
+        {
+            throw new CellCallException($"The tenant list of the cell '{CellId}' does not add up to its total.", 200);
+        }
+
+        return [.. tenants.Values];
+    }
 
     /// <summary>
     /// Reads one tenant, <c>GET /api/cell/tenants/{id}</c>, and returns its <c>status</c>, <c>deleting</c> while a deletion is
@@ -269,7 +310,7 @@ internal sealed class CellClient : IDisposable
         return Task.FromResult(true);
     }
 
-    private async Task<IReadOnlyList<CellTenant>> ReadTenantsAsync(HttpResponseMessage response, string call, CancellationToken cancellationToken)
+    private async Task<CellTenantPage> ReadTenantsAsync(HttpResponseMessage response, string call, CancellationToken cancellationToken)
     {
         var status = (int)response.StatusCode;
         if (response.StatusCode != HttpStatusCode.OK)
@@ -280,9 +321,9 @@ internal sealed class CellClient : IDisposable
         try
         {
             var list = await response.Content.ReadFromJsonAsync<CellTenantList>(JsonSerializerOptions.Web, cancellationToken);
-            if (list?.Items is { } items && items.All(item => !string.IsNullOrEmpty(item?.Id)))
+            if (list is { Items: { } items, TotalCount: >= 0 and var totalCount } && items.All(item => !string.IsNullOrEmpty(item?.Id)))
             {
-                return [.. items.Select(item => new CellTenant(item!.Id!, item.Hosts ?? []))];
+                return new CellTenantPage([.. items.Select(item => new CellTenant(item!.Id!, item.Hosts ?? []))], totalCount);
             }
         }
         catch (JsonException)

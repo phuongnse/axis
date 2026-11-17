@@ -24,8 +24,8 @@ A page whose widget is a `taskInbox` lists the signed-in user's open tasks in th
 - **Metadata.** The widget has `"entity": null`, `"dataSource": null`, `"form": null` and a
   `tasksPath`, such as `"/api/apps/PurchasingApp/tasks"`. `tasksPath` is `null` on every other widget
   and never left out.
-- **Order.** Rows keep the task API's order: the earliest due date first, and tasks with no due date
-  last. The SPA does not sort them again, and there is no sort.
+- **Order.** Rows keep the task API's order until the person sorts by Subject or Due: the earliest due
+  date first, and tasks with no due date last. The SPA never sorts them itself.
 - **Columns.** The columns are the task's label, from the step's label text key, the subject's label
   and the due date, formatted as a `date-time` cell. An empty subject label or due date shows the muted
   em dash, see [no value is a dash](actions-and-controls.md#text).
@@ -36,7 +36,12 @@ A page whose widget is a `taskInbox` lists the signed-in user's open tasks in th
 - **Tags.** An overdue task shows a red "Overdue" tag beside its due date. A task with `claimedBy` set
   shows a "Claimed by you" tag beside its label. The task list returns a claimed task only to its
   claimer, so the signed-in user is always the claimer, and the inbox does not fetch the user.
-- **Paging.** `page` and `pageSize` live in the URL, as for a table.
+- **View.** The table has Search, Filter on Subject and Due, Columns, a sort on Subject and Due, Refresh
+  and paging, see [tables](actions-and-controls.md#tables). Search, filter, sort, columns, page and page
+  size live in the URL, and the widget sends `search`, `filter`, `sort`, `page` and `pageSize` to the
+  task API, see [list my tasks](task-api.md#list-my-tasks). The Task column stays first, with no sort or
+  filter, because its label is resolved in the browser. A new view starts at page 1, and a failed load
+  shows under the toolbar.
 - **Links.** Each row opens the task page at `/{site}/{inboxpage}/{taskId}`, with the inbox page name
   in lower case.
 - **Signed out.** With nobody signed in, the task API answers `401`, and the widget shows the sign-in

@@ -1,9 +1,9 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Outlet, Route, Routes } from 'react-router'
+import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import type { CellJob, CellTenantDetail } from '../platform/cell'
+import type { CellJob, CellTenantDetail, CellTenantUsageDayPage } from '../platform/cell'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { CellTenantPage } from './CellTenantPage'
@@ -36,6 +36,7 @@ const acme: CellTenantDetail = {
     emailsPerDay: { limit: null, used: null },
   },
   newestArchiveAt: null,
+  deleteAfter: null,
   quotas: {
     users: { value: 100, overridden: true },
     applications: { value: 10, overridden: false },
@@ -62,9 +63,30 @@ interface Answer {
 const ok = (body: unknown): Answer => ({ status: 200, body })
 const fail = (status: number): Answer => ({ status, body: { status } })
 
-function stubRoutes(tenant: Answer, jobs: Answer = ok({ items: [job] })) {
+const noDays: CellTenantUsageDayPage = { items: [], page: 1, pageSize: 20, totalCount: 0 }
+
+/** The answer to a read of the usage days route, which the stubs give before the tenant. */
+const usageDays = (input: string, page: CellTenantUsageDayPage = noDays) =>
+  input.startsWith('/api/cell/tenants/acme/usage-days')
+    ? new Response(JSON.stringify(page), { status: 200 })
+    : undefined
+
+function stubRoutes(
+  tenant: Answer,
+  jobs: Answer = ok({ items: [job] }),
+  deleted: Answer = fail(404),
+  days: CellTenantUsageDayPage = noDays,
+) {
   const fetchMock = vi.fn(async (input: string) => {
-    const answer = input.startsWith('/api/cell/jobs') ? jobs : tenant
+    const daysAnswer = usageDays(input, days)
+    if (daysAnswer) {
+      return daysAnswer
+    }
+    const answer = input.startsWith('/api/cell/jobs')
+      ? jobs
+      : input.startsWith('/api/cell/deleted-tenants/')
+        ? deleted
+        : tenant
     return new Response(JSON.stringify(answer.body), { status: answer.status })
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -95,6 +117,9 @@ function stubActions(
       }
       return new Response(JSON.stringify(answer.body), { status: answer.status })
     }
+    if (usageDays(input)) {
+      return usageDays(input)!
+    }
     if (input.startsWith('/api/cell/jobs/')) {
       return new Response(JSON.stringify({ ...job, id: input.split('/').pop() }), { status: 200 })
     }
@@ -118,6 +143,9 @@ function stubWrites(answers: Record<string, Answer>) {
       writes.push({ method: init.method, path: input, body: JSON.parse(init.body as string) })
       const answer = answers[input]!
       return new Response(JSON.stringify(answer.body), { status: answer.status })
+    }
+    if (usageDays(input)) {
+      return usageDays(input)!
     }
     if (input.startsWith('/api/cell/jobs')) {
       return new Response(JSON.stringify({ items: [] }), { status: 200 })
@@ -158,6 +186,9 @@ function stubDownload(jobs: CellJob[], downloads: Response[] = []) {
       accepts.push(new Headers(init?.headers).get('Accept'))
       return downloads.shift()!
     }
+    if (usageDays(input)) {
+      return usageDays(input)!
+    }
     if (input.startsWith('/api/cell/jobs')) {
       return new Response(JSON.stringify({ items: jobs }), { status: 200 })
     }
@@ -165,6 +196,10 @@ function stubDownload(jobs: CellJob[], downloads: Response[] = []) {
   })
   vi.stubGlobal('fetch', fetchMock)
   return { accepts, fetchMock }
+}
+
+function Address() {
+  return <output data-testid="address">{useLocation().search}</output>
 }
 
 function renderPage(path: string, onRefused = vi.fn()) {
@@ -181,6 +216,7 @@ function renderPage(path: string, onRefused = vi.fn()) {
           </TextProvider>
         </PlatformContext.Provider>
       </ThemeModeProvider>
+      <Address />
     </MemoryRouter>,
   )
   return onRefused
@@ -216,7 +252,7 @@ describe('CellTenantPage', () => {
     const jobRows = within(await screen.findByTestId('cell-jobs')).getAllByRole('row')
     expect(jobRows).toHaveLength(2)
     expect(jobRows[1]).toHaveTextContent('suspend')
-    expect(fetchMock).toHaveBeenCalledWith('/api/cell/jobs?tenant=acme', expect.anything())
+    expect(fetchMock).toHaveBeenCalledWith('/api/cell/jobs?tenant=acme&pageSize=50', expect.anything())
   })
 
   it('lists each requested host as pending with its expiry, verified or expired', async () => {
@@ -251,7 +287,7 @@ describe('CellTenantPage', () => {
     )
   })
 
-  it('lists the days of the tenant read in the usage table', async () => {
+  it('lists the days of the usage days route in the usage table', async () => {
     const day = {
       day: '2026-11-04',
       databaseBytes: 2048,
@@ -262,19 +298,67 @@ describe('CellTenantPage', () => {
       connectorCalls: 9,
       workItemsRun: 4321,
     }
-    stubRoutes(ok({ ...acme, days: [day] }))
+    stubRoutes(ok(acme), undefined, undefined, { ...noDays, items: [day], totalCount: 1 })
     renderPage('/tenants/acme')
 
-    const rows = within(await screen.findByTestId('cell-tenant-usage')).getAllByRole('row')
+    const table = await screen.findByTestId('cell-tenant-usage')
+    expect(await within(table).findByText('4,321')).toBeVisible()
+    const rows = within(table).getAllByRole('row')
     expect(rows).toHaveLength(2)
     expect(rows[1]).toHaveTextContent('4,321')
   })
 
-  it('shows the empty text when the tenant read has no days', async () => {
+  it('shows the empty text when the usage days route has no days', async () => {
     stubRoutes(ok(acme))
     renderPage('/tenants/acme')
 
     expect(await screen.findByTestId('cell-tenant-usage')).toHaveTextContent('No usage recorded yet.')
+  })
+
+  it('keeps the filter, sort and page size of the usage table in the address and the request', async () => {
+    const filter = JSON.stringify({ all: [{ field: 'workItemsRun', op: 'gte', value: 300 }] })
+    const fetchMock = stubRoutes(ok(acme), undefined, undefined, { ...noDays, totalCount: 45 })
+    const user = userEvent.setup()
+    renderPage(`/tenants/acme?${new URLSearchParams({ filter, sort: '-day' })}`)
+
+    const table = await screen.findByTestId('cell-tenant-usage')
+    expect(await within(table).findByText('1–20 of 45')).toBeVisible()
+    const requests = () =>
+      fetchMock.mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.startsWith('/api/cell/tenants/acme/usage-days'))
+    const first = new URL(requests()[0]!, 'http://localhost').searchParams
+    expect(first.get('filter')).toBe(filter)
+    expect(first.get('sort')).toBe('-day')
+
+    await user.click(within(table).getByRole('combobox'))
+    await user.click(await screen.findByTitle('50 / page'))
+
+    await waitFor(() => expect(screen.getByTestId('address').textContent).toContain('pageSize=50'))
+    await waitFor(() =>
+      expect(requests().some((url) => new URL(url, 'http://localhost').searchParams.get('pageSize') === '50')).toBe(
+        true,
+      ),
+    )
+  })
+
+  it('shows an error in the usage part only when the days fail to load', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) =>
+        input.startsWith('/api/cell/tenants/acme/usage-days')
+          ? new Response('{}', { status: 500 })
+          : input.startsWith('/api/cell/jobs')
+            ? new Response(JSON.stringify({ items: [] }), { status: 200 })
+            : new Response(JSON.stringify(acme), { status: 200 }),
+      ),
+    )
+    renderPage('/tenants/acme')
+
+    expect(await screen.findByTestId('cell-tenant-usage-error')).toHaveTextContent('The usage could not be loaded.')
+    expect(screen.getByTestId('cell-tenant')).toHaveTextContent('crm')
+    warn.mockRestore()
   })
 
   it('shows the not-found page and no quotas for an unknown id', async () => {
@@ -283,6 +367,60 @@ describe('CellTenantPage', () => {
 
     expect(await screen.findByTestId('not-found')).toBeInTheDocument()
     expect(screen.queryByTestId('cell-tenant-quotas')).not.toBeInTheDocument()
+  })
+
+  it('shows the purge date of a deleting tenant next to its status', async () => {
+    stubRoutes(ok({ ...acme, status: 'deleting', deleteAfter: '2026-11-12T10:00:00Z' }))
+    renderPage('/tenants/acme')
+
+    const details = await screen.findByTestId('cell-tenant')
+    expect(details).toHaveTextContent('Deleting')
+    expect(details).toHaveTextContent(`Purge after${new Date('2026-11-12T10:00:00Z').toLocaleString('en')}`)
+  })
+
+  it('shows no purge date for a tenant that is not deleting', async () => {
+    stubRoutes(ok(acme))
+    renderPage('/tenants/acme')
+
+    expect(await screen.findByTestId('cell-tenant')).not.toHaveTextContent('Purge after')
+  })
+
+  it('shows a purged id as Deleted with both dates, its jobs and no action', async () => {
+    const fetchMock = stubRoutes(
+      fail(404),
+      ok({ items: [{ ...job, kind: 'purge', tenantId: 'gone' }] }),
+      ok({ id: 'gone', deletedAt: '2026-11-01T00:00:00Z', completeAt: '2026-11-08T00:00:00Z' }),
+    )
+    renderPage('/tenants/gone')
+
+    const details = await screen.findByTestId('cell-tenant-deleted')
+    expect(details).toHaveTextContent('Deleted')
+    expect(details).toHaveTextContent(`Purged${new Date('2026-11-01T00:00:00Z').toLocaleString('en')}`)
+    expect(details).toHaveTextContent(`Deletion complete${new Date('2026-11-08T00:00:00Z').toLocaleString('en')}`)
+    expect(await screen.findByText('purge')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/cell/deleted-tenants/gone', expect.anything())
+    for (const action of [
+      'suspend',
+      'resume',
+      'export',
+      'delete',
+      'cancel-deletion',
+      'download',
+      'set-quotas',
+      'add-host',
+    ]) {
+      expect(screen.queryByTestId(`cell-tenant-${action}`)).not.toBeInTheDocument()
+    }
+    expect(screen.queryByTestId('cell-tenant-quotas')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('not-found')).not.toBeInTheDocument()
+  })
+
+  it('shows the not-found page for an id that is neither a tenant nor a purged tenant', async () => {
+    stubRoutes(fail(404), ok({ items: [] }), fail(404))
+    renderPage('/tenants/never')
+
+    expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+    expect(screen.queryByTestId('cell-tenant-deleted')).not.toBeInTheDocument()
   })
 
   it('reports a refusal of the tenant call to the console', async () => {
@@ -308,6 +446,32 @@ describe('CellTenantPage', () => {
 
     expect(await screen.findByTestId('cell-tenant-jobs-error')).toHaveTextContent('The jobs could not be loaded.')
     expect(await screen.findByTestId('cell-tenant')).toBeInTheDocument()
+  })
+
+  it('shows Details, Host verification, Quotas, Usage and Jobs as parts with no card', async () => {
+    stubRoutes(ok(acme))
+    renderPage('/tenants/acme')
+
+    for (const name of ['Details', 'Host verification', 'Quotas', 'Usage', 'Jobs']) {
+      const region = await screen.findByRole('region', { name })
+      expect(within(region).getByRole('heading', { level: 2, name })).toBeInTheDocument()
+    }
+    expect(screen.getAllByRole('separator')).toHaveLength(4)
+    expect(document.querySelector('.ant-card')).toBeNull()
+  })
+
+  it('shows only the Jobs part, with no rule, when the tenant fails to load', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubRoutes(fail(500))
+    renderPage('/tenants/acme')
+
+    expect(await screen.findByTestId('cell-tenant-error')).toBeInTheDocument()
+    const jobs = await screen.findByTestId('cell-jobs')
+    const regions = screen.getAllByRole('region')
+    expect(regions).toHaveLength(1)
+    expect(regions[0]).toContainElement(jobs)
+    expect(within(regions[0]).getByRole('heading', { level: 2, name: 'Jobs' })).toBeInTheDocument()
+    expect(screen.queryByRole('separator')).not.toBeInTheDocument()
   })
 
   it('offers Suspend and no Resume for an active tenant, and neither for a provisioning one', async () => {

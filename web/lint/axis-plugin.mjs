@@ -145,7 +145,8 @@ const noPresetTagColour = {
   },
 }
 
-const noAntdComponent = (component, message) => ({
+// `allowed` names the elements of the component that the rule lets through.
+const noAntdComponent = (component, message, allowed = () => false) => ({
   meta: {
     type: 'problem',
     messages: { component: message },
@@ -166,15 +167,35 @@ const noAntdComponent = (component, message) => ({
         }
       },
       JSXOpeningElement(node) {
-        if (node.name?.type === 'JSXIdentifier' && names.has(node.name.name))
+        if (node.name?.type === 'JSXIdentifier' && names.has(node.name.name) && !allowed(node))
           context.report({ node, messageId: 'component' })
       },
     }
   },
 })
 
+// A card with size="small" is an item in a list, such as a Studio step. The last size or spread wins, as it does in
+// React, so a size that comes from a spread, a variable or a condition is not small.
+const isSmallCard = (node) => {
+  const last = node.attributes.findLast(
+    (attribute) => attribute.type === 'JSXSpreadAttribute' || attribute.name?.name === 'size',
+  )
+  if (last?.type !== 'JSXAttribute') return false
+  const value = last.value
+  return (
+    (isString(value) && value.value === 'small') ||
+    (value?.type === 'JSXExpressionContainer' && isString(value.expression) && value.expression.value === 'small')
+  )
+}
+
 const noAntdButton = noAntdComponent('Button', 'Use AxisButton with a role, not the Button of antd.')
 const noAntdAlert = noAntdComponent('Alert', 'Use AxisAlert with a kind, not the Alert of antd.')
+// A page's parts sit a rule apart, so a page draws its panels through SectionParts, see docs/reference/shell.md#layout.
+const noCardPanel = noAntdComponent(
+  'Card',
+  'A full-size Card draws a page panel. Draw the part through SectionPart, or give an item in a list size="small".',
+  isSmallCard,
+)
 
 // A field label drawn through AxisField, see docs/reference/frontend.md#platform-field-help.
 const antdInputs = new Set([
@@ -420,6 +441,7 @@ export default {
     'no-preset-tag-colour': noPresetTagColour,
     'no-antd-button': noAntdButton,
     'no-antd-alert': noAntdAlert,
+    'no-card-panel': noCardPanel,
     'field-label-through-axis-field': fieldLabelThroughAxisField,
     'exact-locators': exactLocators,
   },

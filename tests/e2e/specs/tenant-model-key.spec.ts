@@ -34,7 +34,7 @@ test('an administrator sets the tenant model key and sees it masked with only it
     await page.waitForURL(`https://${host}/`)
     await page.goto(`https://${host}/users`)
 
-    const section = page.getByTestId('tenant-model-key')
+    const section = page.getByRole('region', { name: 'Model key', exact: true })
     await expect(section.getByRole('heading', { name: 'Model key', exact: true })).toBeVisible()
     await expect(section.getByText('No key is set.', { exact: true })).toBeVisible()
 

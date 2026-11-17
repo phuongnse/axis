@@ -5,7 +5,6 @@
       "shell.locale.en",
       "shell.locale.vi",
       "shell.studio.process.channelEmail",
-      "shell.studio.process.recipientEmail",
       "shell.table.exportXlsx",
       "shell.users.email",
       "shell.users.invite.email"

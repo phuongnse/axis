@@ -3,7 +3,10 @@ import type { HTMLAttributes } from 'react'
 import { useState } from 'react'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { escapePointerSegment } from '../platform/jsonPatch'
+import type { FieldMetadata } from '../platform/site'
+import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
+import { useTableView } from '../platform/useTableView'
 import { LayerMarkTag, type DesignerLayer } from './LayerMarkViews'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -19,6 +22,9 @@ interface Row {
   key: string
 }
 
+// The text table has no fields or parameters of its own. Stable empty arrays keep useTableView from recomputing on each render.
+const noFields: readonly Pick<FieldMetadata, 'name' | 'type'>[] = []
+
 function textOf(column: TextColumn, key: string): string {
   const value = column.texts[key]
   return typeof value === 'string' ? value : ''
@@ -27,9 +33,11 @@ function textOf(column: TextColumn, key: string): string {
 /**
  * The text keys of an application as a table: a row per key and a column per locale, in the order of `columns`. Only
  * an editable column takes input, and it edits the draft through `onChange`. A key that a column lacks shows as
- * missing, and typing in an editable cell adds it. The search box keeps the rows whose key or text contains the
- * search, ignoring letter case. `onAdd` writes a new key in every locale and answers how that went. With a `layer`,
- * each key that the layer changed or added shows its mark and Reset to module after the key.
+ * missing, and typing in an editable cell adds it. The search is AxisTable's own, see
+ * docs/reference/actions-and-controls.md#tables: it keeps the rows whose key or text in any locale contains the
+ * search, ignoring letter case, and lives in the address as `search`. The table pages, so a key past page 1 needs a
+ * search. `onAdd` writes a new key in every locale and answers how that went. With a `layer`, each key that the
+ * layer changed or added shows its mark and Reset to module after the key.
  */
 export function TextTable({
   columns,
@@ -43,22 +51,13 @@ export function TextTable({
   layer?: DesignerLayer
 }) {
   const t = useText()
-  const [search, setSearch] = useState('')
   const [newKey, setNewKey] = useState('')
   const [newTexts, setNewTexts] = useState<Record<string, string>>({})
   const [adding, setAdding] = useState(false)
   const [problem, setProblem] = useState<string>()
 
   const keys = [...new Set(columns.flatMap((column) => Object.keys(column.texts)))].sort()
-  const needle = search.toLowerCase()
-  const rows: Row[] = keys
-    .filter(
-      (key) =>
-        needle === '' ||
-        key.toLowerCase().includes(needle) ||
-        columns.some((column) => textOf(column, key).toLowerCase().includes(needle)),
-    )
-    .map((key) => ({ key }))
+  const { view, setView } = useTableView(noFields, recordPageSize, [], true)
 
   async function add() {
     const key = newKey.trim()
@@ -93,20 +92,9 @@ export function TextTable({
       <AxisTable<Row>
         testId="studio-text-table"
         rowKey={(row) => row.key}
-        dataSource={rows}
+        dataSource={keys.map((key) => ({ key }))}
+        view={{ query: view, onChange: setView }}
         emptyText={t('shell.table.empty')}
-        toolbar={{
-          view: (
-            <Input.Search
-              aria-label={t('shell.studio.texts.search')}
-              placeholder={t('shell.studio.texts.search')}
-              allowClear
-              style={{ maxWidth: 320 }}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          ),
-        }}
         rowAttributes={(row) =>
           ({ 'data-testid': 'studio-text-row', 'data-key': row.key }) as HTMLAttributes<HTMLElement>
         }
@@ -115,6 +103,7 @@ export function TextTable({
             key: 'key',
             kind: 'fixed',
             title: t('shell.studio.texts.key'),
+            searchText: (row) => row.key,
             render: (_, row) => <Typography.Text code>{row.key}</Typography.Text>,
           },
           ...(layer
@@ -132,6 +121,7 @@ export function TextTable({
             key: column.id,
             kind: 'freeText',
             title: column.locale,
+            searchText: (row) => textOf(column, row.key),
             render: (_, row) => {
               const missing = !Object.hasOwn(column.texts, row.key)
               if (!column.editable) {

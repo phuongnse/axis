@@ -1,7 +1,8 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { EditorView } from '@codemirror/view'
 import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
-import { useState, type ReactNode } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
@@ -24,6 +25,23 @@ import { EntityDesigner } from './EntityDesigner'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { LabelTextsContext } from './labelTextsContext'
 
+// The pointer of each expression editor that draws, in order. The tests that count draws read it.
+const draws = vi.hoisted(() => [] as string[])
+
+vi.mock('./ProcessFields', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./ProcessFields')>()
+  const { Profiler } = await import('react')
+  // A plain function, not a memo, so a draw of its parent always draws it and a skipped parent never does.
+  return {
+    ...actual,
+    Expression: (props: ComponentProps<typeof actual.Expression>) => (
+      <Profiler id={props.pointer} onRender={(id) => draws.push(id)}>
+        <actual.Expression {...props} />
+      </Profiler>
+    ),
+  }
+})
+
 const english: Record<string, string> = platformEnglish
 
 const labelOf = (path: string) => english[`shell.studio.field.entity.${path}`]
@@ -45,7 +63,12 @@ const drawnPaths = [
   'fields.maxSize',
   'fields.accept',
   'fields.target',
+  'fields',
+  'indexes',
+  'validations',
   'fields.currencySource',
+  'fields.currencySource.code',
+  'fields.currencySource.field',
   'fields.currency',
   'fields.currencyField',
   'fields.values',
@@ -361,6 +384,153 @@ describe('EntityDesigner', () => {
     ).toHaveAccessibleDescription(helpOf('fields.currencyField'))
   })
 
+  it('describes each option of the currency source by its help', async () => {
+    const fields = renderEditing(entity({ fields: [{ name: 'amount', type: 'money', currency: 'USD' }] }))
+    const amount = within(screen.getByTestId('studio-field-/fields/0'))
+
+    for (const [option, label] of [
+      ['code', /^Fixed code/],
+      ['field', /^From a field/],
+    ] as const) {
+      const radio = amount.getByRole('radio', { name: label })
+      const description = radio.getAttribute('aria-describedby')
+      expect(description).not.toBeNull()
+      expect(document.getElementById(description!)).toHaveTextContent(helpOf(`fields.currencySource.${option}`))
+      expect(radio).toHaveAccessibleDescription(helpOf(`fields.currencySource.${option}`))
+    }
+    expect(amount.getByRole('radio', { name: /^Fixed code/ })).toBeChecked()
+    expect(amount.getByText(labelOf('fields.currencySource.field'))).toBeVisible()
+
+    await userEvent.click(amount.getByRole('radio', { name: /^From a field/ }))
+    expect(fields()[0]).toEqual({ name: 'amount', type: 'money', currencyField: '' })
+    expect(amount.getByRole('radio', { name: /^From a field/ })).toBeChecked()
+  })
+
+  it.each([
+    ['searchable', 'switch', 'Searchable', undefined],
+    ['creator', 'checkbox', 'Creator', false],
+    ['sensitive', 'checkbox', 'Sensitive', false],
+    ['exactLookup', 'checkbox', 'Exact lookup', undefined],
+  ] as const)(
+    'draws %s as a field with its help and writes its pointer when it is toggled',
+    async (setting, role, label, off) => {
+      const fields = renderEditing(entity({ fields: [{ name: 'code', type: 'text' }] }))
+      const code = within(screen.getByTestId('studio-field-/fields/0'))
+
+      const input = code.getByRole(role, { name: label })
+      expect(label).toBe(labelOf(`fields.${setting}`))
+      expect(input).toHaveAccessibleDescription(helpOf(`fields.${setting}`))
+      expect(input).not.toBeChecked()
+
+      await userEvent.click(input)
+      expect(fields()[0]).toEqual({ name: 'code', type: 'text', [setting]: true })
+      expect(code.getByRole(role, { name: label })).toBeChecked()
+
+      await userEvent.click(code.getByRole(role, { name: label }))
+      expect(fields()[0]).toEqual({ name: 'code', type: 'text', ...(off === undefined ? {} : { [setting]: off }) })
+    },
+  )
+
+  it('shows Fields, Indexes and Validations as groups named by their title and described by their help', () => {
+    renderDesigner(entity())
+
+    for (const path of ['fields', 'indexes', 'validations']) {
+      const group = screen.getByRole('group', { name: labelOf(path) })
+      expect(group).toHaveAccessibleDescription(helpOf(path))
+      expect(within(group).getByText(helpOf(path))).toBeVisible()
+      expect(screen.getByTestId(`studio-field-/${path}`).contains(group)).toBe(true)
+    }
+  })
+
+  it('marks the keys that the entity schema requires and no others, and announces them as required', () => {
+    renderDesigner(
+      entity({
+        indexes: [{ name: 'index1', fields: ['code'], unique: true }],
+        validations: [
+          { name: 'totalPositive', expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' },
+        ],
+      }),
+    )
+
+    const marked = (testId: string, role: string, label: string) => {
+      const area = within(screen.getByTestId(testId))
+      expect(area.getByText('*'), label).toBeInTheDocument()
+      expect(area.getByRole(role, { name: label }), label).toHaveAttribute('aria-required', 'true')
+    }
+    const unmarked = (testId: string, role: string, label: string) => {
+      const area = within(screen.getByTestId(testId))
+      expect(area.queryByText('*'), label).toBeNull()
+      expect(area.getByRole(role, { name: label }), label).not.toHaveAttribute('aria-required')
+    }
+    marked('studio-field-/name', 'textbox', labelOf('name'))
+    marked('studio-field-/indexes/0/fields', 'combobox', labelOf('indexes.fields'))
+    marked('studio-field-/validations/0/expression', 'textbox', labelOf('validations.expression'))
+    marked('studio-field-/validations/0/message/textKey', 'combobox', labelOf('validations.message'))
+    marked('studio-field-/validations/0/field', 'combobox', labelOf('validations.field'))
+    unmarked('studio-field-/displayField', 'combobox', labelOf('displayField'))
+    unmarked('studio-field-/indexes/0/unique', 'checkbox', labelOf('indexes.unique'))
+  })
+
+  it('marks the target of a reference field and the currency field of a money field as required', () => {
+    renderDesigner(
+      entity({
+        fields: [
+          { name: 'code', type: 'text' },
+          { name: 'supplier', type: 'reference', target: 'Supplier' },
+          { name: 'amount', type: 'money', currencyField: 'code' },
+        ],
+      }),
+    )
+
+    const target = within(screen.getByTestId('studio-field-/fields/1/target'))
+    expect(target.getByText('*')).toBeInTheDocument()
+    expect(target.getByRole('combobox', { name: labelOf('fields.target') })).toHaveAttribute('aria-required', 'true')
+    const currency = within(screen.getByTestId('studio-field-/fields/2/currencyField'))
+    expect(currency.getByText('*')).toBeInTheDocument()
+    expect(currency.getByRole('combobox', { name: labelOf('fields.currencyField') })).toHaveAttribute(
+      'aria-required',
+      'true',
+    )
+  })
+
+  it('lays each index and validation out as a column: its name, one field to a line, then its buttons', () => {
+    renderDesigner(
+      entity({
+        indexes: [{ name: 'index1', fields: ['code'] }],
+        validations: [
+          { name: 'totalPositive', expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' },
+        ],
+      }),
+    )
+
+    const order = (row: HTMLElement, ids: string[]) => {
+      const parts = ids.map((id) => within(row).getByTestId(id))
+      parts.slice(1).forEach((part, position) => expect(follows(parts[position], part)).toBe(true))
+    }
+    order(screen.getByTestId('studio-field-/indexes/0'), [
+      'studio-field-/indexes/0/name',
+      'studio-field-/indexes/0/fields',
+      'studio-field-/indexes/0/unique',
+    ])
+    order(screen.getByTestId('studio-field-/validations/0'), [
+      'studio-field-/validations/0/name',
+      'studio-field-/validations/0/expression',
+      'studio-field-/validations/0/message/textKey',
+      'studio-field-/validations/0/field',
+    ])
+    const index = within(screen.getByTestId('studio-field-/indexes/0'))
+    expect(
+      follows(index.getByTestId('studio-field-/indexes/0/unique'), index.getByRole('button', { name: 'Move up' })),
+    ).toBe(true)
+    const validation = within(screen.getByTestId('studio-field-/validations/0'))
+    expect(
+      follows(
+        validation.getByTestId('studio-field-/validations/0/field'),
+        validation.getByRole('button', { name: 'Remove validation' }),
+      ),
+    ).toBe(true)
+  })
+
   it('names the index inputs by their labels and describes them by their help', () => {
     renderDesigner(entity({ indexes: [{ name: 'index1', fields: ['code'], unique: true }] }))
 
@@ -518,7 +688,7 @@ describe('EntityDesigner', () => {
     )
     const amount = within(screen.getByTestId('studio-field-/fields/2'))
 
-    await userEvent.click(amount.getByRole('radio', { name: 'Field' }))
+    await userEvent.click(amount.getByRole('radio', { name: /^From a field/ }))
     expect(fields()[2]).toEqual({ name: 'amount', type: 'money', currencyField: '' })
 
     await userEvent.click(amount.getByRole('combobox', { name: 'Currency field' }))
@@ -526,7 +696,7 @@ describe('EntityDesigner', () => {
     await chooseOption('code')
     expect(fields()[2]).toEqual({ name: 'amount', type: 'money', currencyField: 'code' })
 
-    await userEvent.click(amount.getByRole('radio', { name: 'Fixed code' }))
+    await userEvent.click(amount.getByRole('radio', { name: /^Fixed code/ }))
     expect(fields()[2]).toEqual({ name: 'amount', type: 'money' })
     await userEvent.type(amount.getByRole('textbox', { name: 'Currency' }), 'vnd')
     expect(fields()[2]).toEqual({ name: 'amount', type: 'money', currency: 'VND' })
@@ -806,7 +976,7 @@ describe('EntityDesigner', () => {
     render(
       <Providers loaded={names}>
         <ExpressionCheckContext.Provider
-          value={{ application: 'Shop', resourceId: 'b5a5f1cb', kind: 'entity', draft, names }}
+          value={{ application: 'Shop', resourceId: 'b5a5f1cb', kind: 'entity', draft: () => draft, names }}
         >
           <EntityDesigner value={draft} onChange={vi.fn()} />
         </ExpressionCheckContext.Provider>
@@ -952,7 +1122,7 @@ describe('EntityDesigner', () => {
     ]
     expect(screen.getAllByRole('spinbutton').length).toBeGreaterThan(0)
     expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(0)
-    for (const name of ['Fixed code', 'Field']) {
+    for (const name of [/^Fixed code/, /^From a field/]) {
       expect(screen.getByRole('radio', { name })).toBeDisabled()
     }
     for (const name of ['Max size (bytes)']) {
@@ -1058,5 +1228,107 @@ describe('EntityDesigner with a customization layer', () => {
 
     expect(screen.getByTestId('studio-layer-removed-/indexes/byCode')).toHaveTextContent('byCode')
     expect(screen.getByRole('button', { name: 'Reset to module byCode' })).toBeDisabled()
+  })
+})
+
+describe('typing in the entity designer', () => {
+  const field = (name: string, type: string) => ({ name, type, default: "'1'" })
+  const content = entity({
+    fields: [field('a', 'text'), field('b', 'text'), field('c', 'decimal'), field('d', 'decimal')],
+    validations: [0, 1, 2].map((index) => ({
+      name: `v${index}`,
+      expression: `a = '${index}'`,
+      message: { textKey: 'validation.total' },
+      field: 'a',
+    })),
+  })
+
+  /** The designer over a draft that the edits change, with one expression check context that stays the same, as the editor gives it. */
+  function renderStable() {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) =>
+        input.endsWith('/expressions/scope')
+          ? new Response(JSON.stringify({ type: 'text', fields: [], functions: [] }), { status: 200 })
+          : new Response(JSON.stringify({ type: null, diagnostics: [] }), { status: 200 }),
+      ),
+    )
+    function Harness() {
+      const [value, setValue] = useState<Record<string, unknown>>(content)
+      const latest = useRef(value)
+      useLayoutEffect(() => {
+        latest.current = value
+      })
+      const check = useMemo(
+        () => ({
+          application: 'Shop',
+          resourceId: 'b5a5f1cb',
+          kind: 'entity',
+          draft: () => latest.current,
+          names: null,
+        }),
+        [],
+      )
+      const onChange = useCallback(
+        (pointer: string, next: unknown) =>
+          setValue((current) => setAt(current, pointer, next) as Record<string, unknown>),
+        [],
+      )
+      return (
+        <ExpressionCheckContext.Provider value={check}>
+          <EntityDesigner value={value} onChange={onChange} />
+          <output data-testid="entity-content">{JSON.stringify(value)}</output>
+        </ExpressionCheckContext.Provider>
+      )
+    }
+    render(
+      <Providers loaded={null}>
+        <Harness />
+      </Providers>,
+    )
+  }
+
+  /**
+   * Waits until every expression editor is drawn and has both answers, then forgets the draws so far. An editor shows
+   * the type its place needs only once its scope has loaded, and the check answers with no type of its own.
+   */
+  async function settled() {
+    await waitFor(() => {
+      // A default and an expression for each of the four fields, and the three validations.
+      expect(document.querySelectorAll('.cm-editor')).toHaveLength(11)
+      expect(screen.getAllByTestId('studio-expression-type')).toHaveLength(11)
+      for (const editor of document.querySelectorAll('.cm-editor')) {
+        expect(editor.closest('[aria-busy]')).toHaveAttribute('aria-busy', 'false')
+      }
+    })
+    draws.length = 0
+  }
+
+  const saved = () => JSON.parse(screen.getByTestId('entity-content').textContent ?? '') as Record<string, any>
+
+  beforeEach(() => {
+    draws.length = 0
+  })
+
+  it('draws no other field row and no validation when a key goes into a field label', async () => {
+    renderStable()
+    await settled()
+
+    await userEvent.type(within(screen.getByTestId('studio-field-/fields/1/label')).getByRole('textbox'), 'x')
+
+    expect(saved().fields[1].label).toEqual({ textKey: 'x' })
+    expect(draws.filter((pointer) => !pointer.startsWith('/fields/1/'))).toEqual([])
+  })
+
+  it('draws no other validation and no field row when a key goes into a validation expression', async () => {
+    renderStable()
+    await settled()
+
+    const editor = screen.getByTestId('studio-field-/validations/0/expression').querySelector('.cm-editor')!
+    const view = EditorView.findFromDOM(editor as HTMLElement)!
+    act(() => view.dispatch({ changes: { from: view.state.doc.length, insert: 'x' } }))
+
+    await waitFor(() => expect(saved().validations[0].expression).toBe("a = '0'x"))
+    expect(draws.filter((pointer) => pointer !== '/validations/0/expression')).toEqual([])
   })
 })

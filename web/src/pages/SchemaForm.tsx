@@ -1,4 +1,4 @@
-import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
+import { Button, Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { Link } from 'react-router'
 import { createContext, useContext, useState, type ReactElement, type ReactNode } from 'react'
 import { textIn, type StudioCatalog, type StudioFolderRelaxedPoint, type StudioNames } from '../platform/studio'
@@ -22,6 +22,7 @@ import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { AxisButton } from '../platform/AxisButton'
+import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { PlatformContext } from './context'
@@ -34,7 +35,7 @@ import { LabelTextsContext } from './labelTextsContext'
 import { ObjectListTable, type ObjectListColumn } from './ObjectListTable'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { ReferencePicker } from './ReferencePicker'
-import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { SchemaLayerContext } from './schemaLayerContext'
 import { sectionsByKind } from './schemaFormSections'
 
@@ -120,7 +121,7 @@ function Sections({
     { name: undefined, properties: shown.filter((name) => !named.has(name)) },
   ].filter((group) => group.properties.length > 0)
   return (
-    <ResourceFormSections>
+    <SectionParts>
       {groups.map((group) => {
         const single = group.name !== undefined && group.properties.length === 1 ? group.properties[0] : undefined
         const singleSchema = single === undefined ? undefined : resolveSchema(schema.properties![single], schema)
@@ -153,14 +154,14 @@ function Sections({
         )
         if (group.name === undefined) {
           return (
-            <ResourceFormSection key="rest" testName="rest">
+            <SectionPart key="rest" testName="rest">
               {fieldsIn(undefined)}
-            </ResourceFormSection>
+            </SectionPart>
           )
         }
         const prefix = `shell.studio.section.${String(kind)}.${group.name}`
         return (
-          <ResourceFormSection
+          <SectionPart
             key={group.name}
             testName={group.name}
             heading={{ title: t(prefix), line: t(`${prefix}.line`) }}
@@ -181,10 +182,10 @@ function Sections({
             }
           >
             {tableInHeading ? fieldsIn : fieldsIn(undefined)}
-          </ResourceFormSection>
+          </SectionPart>
         )
       })}
-    </ResourceFormSections>
+    </SectionParts>
   )
 }
 
@@ -325,6 +326,8 @@ function SchemaNode({
   let input
   // Whether the input holds several inputs, rows or a table, which a group names by its title and a label cannot.
   let grouped = false
+  // Whether the input draws its own label and help, as the yes-or-no field does.
+  let drawsField = false
   if (unsupported) {
     input = (
       <Typography.Text type="secondary" data-testid="studio-json-only">
@@ -409,7 +412,15 @@ function SchemaNode({
       />
     )
   } else if (schema.type === 'boolean') {
-    input = <Checkbox checked={value === true} onChange={(event) => onChange(pointer, event.target.checked)} />
+    drawsField = true
+    input = (
+      <AxisCheckboxField
+        label={name}
+        help={help ?? ''}
+        checked={value === true}
+        onChange={(checked) => onChange(pointer, checked)}
+      />
+    )
   } else if (isMarkedMap) {
     grouped = true
     input = (
@@ -528,8 +539,9 @@ function SchemaNode({
   }
 
   // A group or a field draws the label and the help, so the heading of a section that names this field leaves them out.
+  // A yes-or-no input is a field already.
   const drawn =
-    named || input === undefined ? (
+    named || input === undefined || drawsField ? (
       input
     ) : grouped ? (
       <AxisFieldGroup title={name} help={help ?? ''}>
@@ -945,7 +957,9 @@ function ObjectList({
             return name === undefined ? null : problem(name)
           }
           const fields = (
-            <ExpressionCheckContext.Provider value={check && { ...check, draft: view as Record<string, unknown> }}>
+            <ExpressionCheckContext.Provider
+              value={check && { ...check, draft: () => view as Record<string, unknown> }}
+            >
               <ItemDialogContext.Provider value>
                 <ItemProblemContext.Provider value={problemAt}>
                   <Properties

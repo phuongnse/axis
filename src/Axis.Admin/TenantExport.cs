@@ -243,21 +243,10 @@ internal static class TenantExport
         await transaction.CommitAsync(cancellationToken);
     }
 
-    // Every user of the realm by user name. A page shorter than the page size is the last one.
+    // Every user of the realm by user name.
     private static async Task<List<RealmUser>> ReadRealmUsersAsync(RealmUsers realm, CancellationToken cancellationToken)
     {
-        const int pageSize = 100;
-        var users = new List<RealmUser>();
-        for (var first = 0; ; first += pageSize)
-        {
-            var page = await realm.ListAsync(null, first, pageSize, cancellationToken);
-            users.AddRange(page.Users);
-            if (page.Users.Count < pageSize)
-            {
-                break;
-            }
-        }
-
+        var users = new List<RealmUser>(await realm.ListAllAsync(cancellationToken));
         users.Sort((left, right) => string.CompareOrdinal(left.Username, right.Username));
         return users;
     }

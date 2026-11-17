@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -109,9 +110,9 @@ export interface AxisBulkAction<T> {
 }
 
 /**
- * The toolbar of every table, see docs/reference/actions-and-controls.md#tables. The view controls, such as search, sit
- * on the left. On the right come Refresh, the secondary actions such as Import and Export, and the main action last.
- * Each is there only when the table has it.
+ * The toolbar of every table, see docs/reference/actions-and-controls.md#tables. AxisTable draws the view's Search, Filter
+ * and Columns on the left. The toolbar gives the right side: Refresh, the secondary actions such as Import and Export, and
+ * the main action last. Each is there only when the table has it.
  */
 export interface AxisTableToolbar {
   /**
@@ -119,7 +120,6 @@ export interface AxisTableToolbar {
    * label, first on the left, so the label and the table's main action, such as Add row, share one row.
    */
   title?: ReactNode
-  view?: ReactNode
   onRefresh?: () => void
   secondary?: ReactNode
   main?: ReactNode
@@ -236,6 +236,8 @@ export function AxisTable<T extends object>({
     tableRef.current?.querySelector('.ant-table-content')?.setAttribute('tabindex', '0')
   })
   const tokens = useDesignTokens()
+  // The same theme object between draws, so the cells under the table are not drawn again for nothing.
+  const theme = useMemo(() => tableTheme(tokens), [tokens])
   const narrow = useNarrowWidth()
   // The widths the columns need when drawn and not stretched. A moved column is not drawn, so it is remembered.
   const naturalWidths = useRef(new Map<string, number>())
@@ -459,7 +461,6 @@ export function AxisTable<T extends object>({
     filterable ||
     arrangeable ||
     toolbar.title !== undefined ||
-    toolbar.view !== undefined ||
     toolbar.onRefresh !== undefined ||
     toolbar.secondary !== undefined ||
     toolbar.main !== undefined
@@ -505,7 +506,7 @@ export function AxisTable<T extends object>({
       {hasToolbar && (
         <Flex justify="space-between" align="center" gap="small" wrap>
           {toolbar.title}
-          {(searchable || filterable || arrangeable || toolbar.view !== undefined) && (
+          {(searchable || filterable || arrangeable) && (
             <Flex gap="small" wrap>
               {searchable && (
                 <Input.Search
@@ -532,7 +533,6 @@ export function AxisTable<T extends object>({
                   onApply={onColumns}
                 />
               )}
-              {toolbar.view}
             </Flex>
           )}
           <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
@@ -573,7 +573,7 @@ export function AxisTable<T extends object>({
               ))}
             </Flex>
           )}
-          <ConfigProvider theme={tableTheme(tokens)}>
+          <ConfigProvider theme={theme}>
             <Table<T>
               rowKey={rowKey}
               rowSelection={

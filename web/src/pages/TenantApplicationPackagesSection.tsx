@@ -1,7 +1,8 @@
 import { Flex, Modal, Typography } from 'antd'
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
+import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import {
@@ -21,7 +22,6 @@ import {
 export function TenantApplicationPackagesSection() {
   const t = useText()
   const { size } = useDesignTokens()
-  const headingId = useId()
   const [packages, setPackages] = useState<TenantApplicationPackages | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -70,11 +70,8 @@ export function TenantApplicationPackagesSection() {
   }
 
   return (
-    <section aria-labelledby={headingId} data-testid="tenant-application-packages">
+    <SectionPart testName="tenant-application-packages" heading={{ title: t('shell.users.applicationPackages.title') }}>
       <Flex vertical gap="small">
-        <Typography.Title level={3} id={headingId}>
-          {t('shell.users.applicationPackages.title')}
-        </Typography.Title>
         <Typography.Text>{t(`shell.users.applicationPackages.${packages.on ? 'on' : 'off'}`)}</Typography.Text>
         {failure && <AxisAlert data-testid="tenant-application-packages-notice" kind="error" message={failure} />}
         <Flex gap="small">
@@ -101,6 +98,6 @@ export function TenantApplicationPackagesSection() {
       >
         <Typography.Text>{t(`shell.users.applicationPackages.${next}Effect`)}</Typography.Text>
       </Modal>
-    </section>
+    </SectionPart>
   )
 }

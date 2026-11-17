@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { chooseOption, tabTo } from '../test/antd'
 import { withAntdStyles } from '../test/antdStyles'
 import { dialog, filterTexts } from '../test/tableFilter'
-import { AxisTable, type AxisColumn, type AxisRowAction, type AxisTableProps } from './AxisTable'
+import { AxisTable, type AxisColumn, type AxisRowAction, type AxisTableProps, type AxisTableToolbar } from './AxisTable'
 import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
 import type { TableQuery } from './tableQuery'
@@ -423,10 +423,17 @@ describe('AxisTable', () => {
       expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument()
     })
 
-    it('puts the view first, then Refresh, the secondary actions and the main action last', () => {
-      const { container } = renderTable({
+    it('puts Search and Filter on the left, then Refresh, the secondary actions and the main action last', () => {
+      const searchable: AxisColumn<Row> = {
+        ...nameColumn,
+        searchText: (row) => row.name ?? '',
+        filter: { kind: 'text' },
+      }
+      renderTable({
+        columns: [searchable, amountColumn],
+        view: { query: { page: 1, pageSize: 20, sort: null }, onChange: vi.fn() },
+        pagination: undefined,
         toolbar: {
-          view: <input aria-label="Search" />,
           onRefresh: () => {},
           secondary: (
             <>
@@ -438,16 +445,25 @@ describe('AxisTable', () => {
         },
       })
 
+      const search = screen.getByRole('searchbox', { name: 'Search' })
+      const filter = screen.getByRole('button', { name: 'Filter' })
       const refresh = screen.getByRole('button', { name: 'Refresh' })
+      const right = refresh.parentElement!
       expect(
-        within(refresh.parentElement!)
+        within(right)
           .getAllByRole('button')
           .map((button) => button.textContent || button.getAttribute('aria-label')),
       ).toEqual(['Refresh', 'Import', 'Export', 'Add'])
-      const order = [...container.querySelectorAll('input, button')].map(
-        (element) => element.getAttribute('aria-label') ?? element.textContent,
-      )
-      expect(order.slice(0, 5)).toEqual(['Search', 'Refresh', 'Import', 'Export', 'Add'])
+      expect(within(right).queryByRole('searchbox')).not.toBeInTheDocument()
+      expect(within(right).queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
+      expect(search.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(filter.compareDocumentPosition(refresh) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('has no slot for a control of its own', () => {
+      // @ts-expect-error A table has no control of its own for a view, see docs/reference/actions-and-controls.md#tables.
+      const toolbar: AxisTableToolbar = { view: <input aria-label="Search" /> }
+      expect(toolbar).toBeDefined()
     })
 
     it('calls onRefresh from the Refresh button', async () => {

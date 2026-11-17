@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "../test";
 import { csrfHeaders } from "../csrf";
 import { waitForDialog } from "../dialogs";
+import { fieldLabel } from "../fields";
 import { logInAtKeycloak } from "../keycloak";
 import { useSession } from "../sessions";
 
@@ -31,7 +32,7 @@ test("an administrator opens Users from the app switcher and finds a user by ema
   ).toBeVisible();
 
   await main
-    .getByRole("searchbox", { name: "Search by name or email", exact: true })
+    .getByRole("searchbox", { name: "Search", exact: true })
     .fill("auditor@axis.local");
   await page.keyboard.press("Enter");
 
@@ -101,7 +102,7 @@ test("an administrator reads the warning, confirms the start of an export and do
   await useSession(page, "administrator");
   await page.goto("/users");
 
-  const section = page.getByTestId("tenant-export");
+  const section = page.getByRole("region", { name: "Export data", exact: true });
   await expect(
     section.getByRole("heading", { name: "Export data", exact: true }),
   ).toBeVisible();
@@ -147,7 +148,7 @@ test.describe("roles of a user", () => {
     await page.goto("/users");
     const main = page.getByRole("main");
     await main
-      .getByRole("searchbox", { name: "Search by name or email", exact: true })
+      .getByRole("searchbox", { name: "Search", exact: true })
       .fill("auditor@axis.local");
     await page.keyboard.press("Enter");
     // The list is replaced by the search result, so wait for the header and the one row.
@@ -212,7 +213,7 @@ test.describe("invitations", () => {
   async function findRow(page: Page, email: string) {
     const main = page.getByRole("main");
     await main
-      .getByRole("searchbox", { name: "Search by name or email", exact: true })
+      .getByRole("searchbox", { name: "Search", exact: true })
       .fill(email);
     await page.keyboard.press("Enter");
     const row = main.getByRole("row").filter({ hasText: email });
@@ -232,9 +233,9 @@ test.describe("invitations", () => {
       .click();
 
     const form = await waitForDialog(page, "Invite a person");
-    await form.getByLabel("Email", { exact: true }).fill(email);
+    await form.getByLabel(fieldLabel("Email")).fill(email);
     await form
-      .getByLabel("Display name", { exact: true })
+      .getByLabel(fieldLabel("Display name"))
       .fill("Invited Person");
     await form.getByRole("button", { name: "Invite", exact: true }).click();
     const confirmation = await waitForDialog(page, "Invite this person?");
@@ -264,8 +265,9 @@ test.describe("invitations", () => {
     await page.goto("/users");
 
     const row = await findRow(page, email);
-    await row
-      .getByRole("button", { name: "Resend invitation", exact: true })
+    await row.getByRole("button", { name: "Actions", exact: true }).click();
+    await page
+      .getByRole("menuitem", { name: "Resend invitation", exact: true })
       .click();
     const confirmation = await waitForDialog(page, "Resend the invitation?");
     await expect(confirmation).toContainText(email);
@@ -304,7 +306,8 @@ test.describe("invitations", () => {
       await page.goto("/users");
 
       const row = await findRow(page, email);
-      await row.getByRole("button", { name: "Disable", exact: true }).click();
+      await row.getByRole("button", { name: "Actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Disable", exact: true }).click();
       const disableDialog = await waitForDialog(page, "Disable this person?");
       await expect(disableDialog).toContainText(email);
       await disableDialog
@@ -318,8 +321,9 @@ test.describe("invitations", () => {
       await (
         await findRow(page, email)
       )
-        .getByRole("button", { name: "Enable", exact: true })
+        .getByRole("button", { name: "Actions", exact: true })
         .click();
+      await page.getByRole("menuitem", { name: "Enable", exact: true }).click();
       const enableDialog = await waitForDialog(page, "Enable this person?");
       await expect(enableDialog).toContainText(email);
       await enableDialog

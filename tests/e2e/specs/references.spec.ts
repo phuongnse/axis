@@ -21,7 +21,9 @@ async function createRecord(request: APIRequestContext, entity: string, values: 
 async function addSoftware(page: Page, name: string, run: string) {
   await page.getByRole('button', { name: 'Add Software', exact: true }).click()
   const dialog = await waitForDialog(page)
-  await dialog.getByTestId('reference-lookup-search').fill(run)
+  const search = dialog.getByRole('searchbox', { name: 'Search', exact: true })
+  await search.fill(run)
+  await search.press('Enter')
   await dialog.getByRole('row', { name: new RegExp(name) }).click()
   await expect(dialog).toBeHidden()
 }

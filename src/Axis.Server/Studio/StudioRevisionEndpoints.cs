@@ -1,5 +1,6 @@
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Studio;
@@ -7,8 +8,12 @@ using Axis.Studio;
 namespace Axis.Server.Studio;
 
 /// <summary>
-/// The routes of an application's history. <c>GET /api/studio/apps/{application}/revisions</c> lists the folder's revisions,
-/// newest first, as <c>{ items: [{ id, summary, author, userId, client, request, time }] }</c>.
+/// The routes of an application's history. <c>GET /api/studio/apps/{application}/revisions</c> lists the folder's revisions
+/// as <c>{ items: [{ id, summary, author, userId, client, request, time }], page, pageSize, totalCount, start }</c>: one page,
+/// newest first unless <c>sort</c> says otherwise, for the record API's <c>page</c>, <c>pageSize</c>, <c>sort</c>,
+/// <c>search</c> and <c>filter</c> over the columns <c>summary</c>, <c>author</c>, <c>time</c> and <c>client</c>, and 400
+/// for an invalid parameter. <c>start</c> is the id of the start of history, or null for none. See
+/// <c>docs/reference/authoring-revisions.md#list</c>.
 /// <c>GET .../revisions/{revision}</c> answers one revision with its files as <c>{ revision, resources: [{ file, change,
 /// id, kind, name, before, after }] }</c>. <c>POST .../revisions/{revision}/undo</c> puts back the files the revision changed,
 /// records the revert as a new revision and answers <c>{ id, diagnostics }</c>. A revision is named by its full commit id.
@@ -65,6 +70,15 @@ internal static class StudioRevisionEndpoints
         };
     }
 
+    // A time filters by its day in UTC, as a date column does, and sorts by its instant.
+    private static readonly IReadOnlyList<ListColumn<StudioRevision>> _listColumns =
+    [
+        new("summary", ListColumnKind.Text, revision => revision.Summary, Searchable: true),
+        new("author", ListColumnKind.Text, revision => revision.Author, Searchable: true),
+        new("time", ListColumnKind.Date, revision => DateOnly.FromDateTime(revision.Time.UtcDateTime), Order: revision => revision.Time),
+        new("client", ListColumnKind.Text, revision => revision.Client),
+    ];
+
     private static async Task<IResult> ListAsync(string application, HttpContext httpContext, StudioOptions options)
     {
         var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
@@ -73,8 +87,19 @@ internal static class StudioRevisionEndpoints
             return refusal!;
         }
 
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var query = ListQuery<StudioRevision>.Read(httpContext.Request, _listColumns, errors);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
         var revisions = await StudioEndpoints.RevisionsAsync(httpContext, options, folder);
-        return Results.Ok(new StudioRevisionListResponse(revisions?.List() ?? []));
+        var all = revisions?.List() ?? [];
+        var page = query.Apply(all);
+
+        // The start of history is the oldest revision, which the list holds last.
+        return Results.Ok(new StudioRevisionListResponse(page.Items, page.Page, page.PageSize, page.TotalCount, all.Count > 0 ? all[^1].Id : null));
     }
 
     private static async Task<IResult> GetAsync(string application, string revision, HttpContext httpContext, StudioOptions options)
@@ -136,8 +161,8 @@ internal static class StudioRevisionEndpoints
     private static bool IsCommitId(string value) => value.Length == 40 && value.All(char.IsAsciiHexDigit);
 }
 
-/// <summary>The revisions of an application folder, newest first.</summary>
-internal sealed record StudioRevisionListResponse(IReadOnlyList<StudioRevision> Items);
+/// <summary>One page of the revisions of an application folder, with the id of the start of history.</summary>
+internal sealed record StudioRevisionListResponse(IReadOnlyList<StudioRevision> Items, int Page, int PageSize, long TotalCount, string? Start);
 
 /// <summary>The answer to an undo: the id of the revision it recorded and the folder's compile diagnostics.</summary>
 internal sealed record StudioUndoResponse(string? Id, IReadOnlyList<StudioDiagnostic> Diagnostics);

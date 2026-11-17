@@ -89,30 +89,30 @@ resource opens it alone, under its [name](studio-workspace.md#names), with its e
 
 - **One list for every kind**. A kind's list is the
   [standard table](actions-and-controls.md#tables), with the same columns for every kind: Name,
-  Description, Status, Last modified by and Last modified at. Every column always shows, and a cell with
-  no value shows the dash. Name is a link. A list does not show the inside of a resource, such as its
+  Description, Status, Last modified by and Last modified at. Every column shows unless Columns hides it, and a
+  cell with no value shows the dash. Name is a link. A list does not show the inside of a resource, such as its
   fields or references, a file name, or a count that leads nowhere.
-- **A module's resources** _(planned for M33)_. The resources of the modules that the application uses
-  are in the same list, from the application's [names](authoring.md#names), named without the
-  `<module>/` prefix and with a neutral tag of the module's label beside the name. There is no Module
-  column. A kind with no label in its format, such as a policy, keeps its name. A module's resource has a
-  status, as a new module version or a layer changes it.
-- **Status**. New, Changed or Published, from the
-  [resource activity route](studio-resource-form.md#resource-activity). While it loads the cell says so, and when it
-  fails it says Unavailable.
-- **Its controls** _(planned for M33)_. The list has Refresh and page sizes of 10, 20, 50 and 100, and sorts by
-  Name, Status, in the order New, Changed, Published, Last modified by and Last modified at. It searches
-  the name, the description, the module and the status, and filters on its columns in the browser, so the
-  module, a tag and not a column, is not a filter.
+- **The server builds the rows**. The [kind list route](studio-resource-form.md#kind-list) answers one page with
+  its names in the UI locale. A failed load shows one error above the table.
+- **A module's resources**. The resources of the modules that the application uses are in the same list. Each is
+  named by its label, else without the `<module>/` prefix, and has a neutral tag of its module's label, else the
+  module's id. There is no Module column. A kind with no label, such as a policy, keeps its name. A text resource
+  shows its language, such as Vietnamese. A module's resource has a status, as a new module version or a layer changes it.
+- **Status**. New, Changed or Published, as the [resource activity](studio-resource-form.md#resource-activity) reads
+  it, and none for a scenario. The whole list loads at once, so the cell never says it is loading.
+- **Its controls**. Search, Filter, Columns, Refresh, a pager that says "1–20 of 45" with page sizes of 10, 20, 50
+  and 100, and a sort on Name, Status, Last modified by and Last modified at, all kept in the address and done on the
+  server. With no sort the rows are in name order. Description does not sort, because it is long text. Search looks in
+  the name, the description and the module, and Status is a filter, not a search term. The module, a tag and not a
+  column, is not a filter.
 
-A module resource opens in its
-kind's editor with the application's layer applied, as
-[customization layers in Studio](customization-layers.md#in-studio) describes. A module contract opens
-in its contract editor, with Relax and Undo relax, as
-[module contracts in Studio](module-contracts.md#in-studio) describes, and draws its lifecycle as a
-state diagram that marks the initial and deletable states and labels each arrow with its transition's
-name and whether it has a guard. A module scenario opens read-only, as formatted JSON under a notice in
-the alert role.
+A module resource opens in its kind's editor with the application's layer applied, as
+[customization layers in Studio](customization-layers.md#in-studio) describes. A module data source, rule, trigger,
+sequence, event or seed draws the same [parts](studio-resource-form.md#sections) as a local resource's Form tab, with
+its Customized tag and Reset all above them. A module contract opens in its contract editor, with Relax and Undo relax,
+as [module contracts in Studio](module-contracts.md#in-studio) describes, and draws its lifecycle as a state diagram
+that marks the initial and deletable states and labels each arrow with its transition's name and whether it has a
+guard. A module scenario opens read-only, as formatted JSON under a notice in the alert role.
 
 ## Editor
 
@@ -138,7 +138,7 @@ what changed.
   keys stay as they are.
 - **The form's layout.** The generic form and the typed editors that use [Studio resource form](studio-resource-form.md)
   share its sections, field names, labels, lists and save bar.
-- **Every form's layout** _(planned for M33)_. The entity designer and the seed editor follow it too, see
+- **Every form's layout** _(planned for M33)_. The entity designer follows it too, see
   [sections](entity-designer.md#sections).
 - **A description.** Every kind that may have a
   [`description`](resource-files.md#resource-file-shape) shows it in the form, and each editor of its own
@@ -159,8 +159,8 @@ what changed.
   `SaveBar` calls, so every editor with a save bar is guarded, and the module editors and contract pages
   join it. A reload or closing the tab asks the browser's own question. A link opened in a new tab is not
   asked about, and neither is the move that Studio makes after a delete, because the draft went with the resource.
-  A move that only changes the `search`, `sort`, `page` or `pageSize` of a [table](actions-and-controls.md#tables)
-  is not asked about either, because the editor stays on screen.
+  A move that only changes the `search`, `filter`, `sort`, `page` or `pageSize` of a
+  [table](actions-and-controls.md#tables) is not asked about either, because the editor stays on screen.
 
 ## References
 
@@ -243,11 +243,11 @@ its end.
 
 ## Releases
 
-The Releases entry lists the release history from `GET .../releases`, as
+The Releases entry lists the releases from `GET .../release-list`, as
 [releases](studio-workspace.md#releases) describes, and Activate… makes another release live.
 
 - **A row's facts.** A release's label, note, time and publisher are those of its first activation,
-  which is the publish. The list has one page.
+  which is the publish. The list is paged on the server, and its view is kept in the address.
 - **Activate….** Confirming its dialog sends `POST .../releases/{id}/activate`, see
   [publishing](authoring.md#publishing), and the status line follows the request as it follows a
   publish. A failed activation puts its diagnostics in the Problems panel, and the list still marks
@@ -441,12 +441,12 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
 - **Editable grants.** In an editable row, the cell's own grants, those of `<Role>Access` that name
   exactly this target, are editable. The panel reads that policy with the resource route, so every
   edit fits the file that a save patches. While the policy loads, the panel says so.
-  - Each grant has a checkbox for each action its target takes, as
-    [roles and policies](roles-and-policies.md) lists them, which Studio reads from
-    `policy.schema.json`. An action the target does not take stays in the file and shows as a warning
-    tag, and only Validate reports it.
-  - An entity grant, and no other, also edits its record filter and its fields. An empty field list
-    means all fields, so clearing the picker removes the `fields` key.
+  - Each grant has an **Actions** group with help, on a line of its own, that holds a checkbox for
+    each action its target takes, as [roles and policies](roles-and-policies.md) lists them, which
+    Studio reads from `policy.schema.json`. An action the target does not take stays in the file and
+    shows as a warning tag, and only Validate reports it.
+  - An entity grant, and no other, also edits its record filter and its fields. The **Fields** picker's
+    help says an empty list grants every field, so clearing it removes the `fields` key.
   - Add grant adds a grant named after the cell's target with the first free number in the policy,
     ignoring letter case, such as `purchaseRequest1`. A grant shows its name read-only. Remove deletes a
     grant, but not the policy's last one.
@@ -570,9 +570,9 @@ itself with other parameters.
 The Parameters section sits between General and Widgets. Its Add parameter button sits on the right of the
 heading, and a page with no parameters says so in one line. Each parameter has a name, a type picker over
 `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and `reference`, a Required switch
-and Remove, and Add parameter appends a `text` parameter with an empty name. A `reference` parameter
-also has a target entity picker, and an `enum` parameter its values. A type change removes the `target`
-or the `values` that the new type does not take, and switching Required off removes the `required` key.
+and Remove. The name, type and Required switch sit one to a row. Add parameter appends a `text` parameter
+with an empty name. A `reference` parameter also has a target entity picker, and an `enum` parameter its
+values. A type change removes the `target` or the `values` that the new type does not take, and switching Required off removes the `required` key.
 The names answer lists each page's parameters, which is how a navigate action knows them. A
 `parameters` that is not a list points to the JSON view.
 
@@ -789,9 +789,9 @@ Operations heading, and the JSON view stays as the second view of the same draft
   Token URL, a URL binding, a Client ID and a Client secret, both secret bindings, and Scope and
   Audience boxes that remove their key when empty, see [OAuth2 auth](integration-resources.md#oauth2-auth).
 - **Operations.** A card per operation shows its name, method, path and `lookup`, which is picked from
-  the connector's other operations. Its input and output fields are rows of name, type and required.
-  Operations and rows can be added and removed. A `GET` with a body row keeps it and shows a hint, and
-  the compiler reports the error.
+  the connector's other operations. Its input and output fields are rows of name, type and required,
+  one field to a line, and the schema's required keys carry the shared required mark. Operations and rows
+  can be added and removed. A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
 - **Placement and nesting.** A scalar input has a Placement choice of `body`, `path`, `query` or
   `header`, which shows `body` when the file has no `in` key and removes the key when `body` is chosen.
   `object` and `list` inputs show nested field rows instead, down to four levels with the input as
@@ -816,14 +816,15 @@ the Assurance heading, and the JSON view stays as the second view of the same dr
   bindings it requires, with an empty name. An `accounts` provider shows only General, Roles and Assurance.
 - **Bindings.** A binding is a name box, and its help says which kind it is and that only the name is
   stored. No value is shown or stored. `oidc` shows the issuer, the client ID, and a choice of client
-  credential: a client secret, or a client key for `private_key_jwt`. `saml` shows the metadata.
+  credential: a client secret, or a client key for `private_key_jwt`, each option with its own help.
+  `saml` shows the metadata. Name and Type carry the shared required mark.
 - **Label.** The "Continue with" label sits in Sign-in, after the bindings, and has its texts in every locale, see [label texts](#label-texts).
 - **Claims.** The display name, email and locale claims are name boxes that show their defaults,
   `name`, `email` and `locale`, until the author types another name.
 - **Roles.** The roles claim is a name box that shows `roles` by default. `values` are rows of a claim
-  value and a role picked from the application's roles, with add and remove. With no rows, a claim
+  value and a role picked from the application's roles, one field to a line, with add and remove. With no rows, a claim
   value gives the role of the same name, and the editor says so.
-- **Assurance.** `acr` is a list of text rows, and with none the key is removed.
+- **Assurance.** `acr` is a list of text rows, each with Remove below, and with none the key is removed.
 - **Unknown keys.** A key the editor does not show is saved unchanged.
 
 ### A site's sign-in
@@ -856,9 +857,9 @@ draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
 
 ## Seed editor
 
-The seed editor's Form tab shows the seed's name, entity and `sync`, then its records as a grid, with a
-row for each record and a column for each field of the seed's `entity`, and the JSON view stays as the
-second view of the same draft.
+The seed editor's Form tab shows the seed's name, entity and `sync`, then its records as a grid in a part
+headed Records, with a rule above it. The grid has a row for each record and a column for each field of the
+seed's `entity`, and the JSON view stays as the second view of the same draft.
 
 - **Columns.** The input fits the field's type: a text box for `text`, `date`, `date-time` and
   `reference`, a text box that stores a number for `integer`, `decimal` and `money`, a true or false
@@ -880,8 +881,8 @@ second view of the same draft.
 
 An endpoint keeps the generic form for its entity, process, input and output, and shows its `values`
 as rows of a field and an expression in the [expression editor](#expression-editor). The rows sit in a
-titled group, with help that says what they are. An endpoint with no values says so in one line, above
-Add mapping.
+part headed Values, with help that says what they are. An endpoint with no values says so in one line, above
+Add mapping. Its `event` sits in a part headed Event, below the values.
 
 The field is picked from the fields of the endpoint's entity, found by name among the application's
 names, and is typed while those are unknown. Add mapping lists the fields that have no row. Renaming a
@@ -893,8 +894,8 @@ A form keeps the generic form for its entity, sections and fields, with an
 [expression editor](#expression-editor) for each `visibleWhen`, `requiredWhen` and `readOnlyWhen`, and
 shows its `steps` as cards. The [form designer](form-designer.md) edits the same draft on a canvas.
 
-Each step card has a title, a section picker, Move up, Move down and Remove, and Add step appends a
-card. The picker lists the sections that have a `name`, so an unnamed section is not offered. Removing
-the last step removes `steps`, and the form goes back to one page. A condition offers the fields that
-the form lists, because a condition reads only those. A `steps` value that is not a list is left to
+The cards sit in a part headed Steps. Each step card has a title, a section picker, Move up, Move down and
+Remove, and Add step appends a card. The picker lists the sections that have a `name`, so an unnamed section is
+not offered. Removing the last step removes `steps`, and the form goes back to one page. A condition offers the
+fields that the form lists, because a condition reads only those. A `steps` value that is not a list is left to
 the JSON view.

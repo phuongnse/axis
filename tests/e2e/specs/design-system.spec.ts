@@ -15,6 +15,7 @@ import {
   repositoryRoot,
 } from "../design-system";
 import { contrast } from "../../../web/src/test/contrast";
+import { designTokensFor } from "../../../web/src/platform/designTokens";
 
 const productionBuild = path.join(
   repositoryRoot,
@@ -40,7 +41,7 @@ const previews: Record<string, (page: Page | FrameLocator) => Locator> = {
   taskInbox: (page) =>
     page.getByRole("link", { name: "Review the request", exact: true }).first(),
   processInspector: (page) =>
-    page.getByRole("combobox", { name: "State", exact: true }),
+    page.getByRole("button", { name: "Filter", exact: true }),
   detail: (page) =>
     page.getByText("Standing desks for the new office", { exact: true }),
   "chart-bar": (page) =>
@@ -776,6 +777,8 @@ for (const mode of modes) {
       // The harness wraps the previews in a main landmark, which takes the footer out of the contentinfo role.
       const footer = figure(frame, caption).locator("footer");
       await expect(footer).toBeVisible();
+      // The page scrolls inside its frame, so the footer can lie below the frame's visible part.
+      await footer.scrollIntoViewIfNeeded();
       const figureBox = await figure(frame, caption).boundingBox();
       const footerBox = await footer.boundingBox();
       if (!figureBox || !footerBox) {
@@ -789,6 +792,258 @@ for (const mode of modes) {
     expect(recording.errors).toEqual([]);
   });
 }
+
+// The captions of each framed preview's states. A preview with a Fixtures control draws one state at a time, so its
+// states are picked there.
+const framedPreviews: Record<
+  string,
+  { captions: readonly string[]; pickedInFixtures: boolean }
+> = {
+  shell: { captions: Object.keys(stateKeys.shell), pickedInFixtures: false },
+  signIn: { captions: Object.keys(stateKeys.signIn), pickedInFixtures: false },
+  identitySignIn: {
+    captions: Object.keys(stateKeys.identitySignIn),
+    pickedInFixtures: false,
+  },
+  signUp: { captions: ["Typical"], pickedInFixtures: false },
+  studio: {
+    captions: [
+      "Typical",
+      "Empty",
+      "Loading",
+      "Failed",
+      "Many rows",
+      "Long names",
+      "Access denied",
+      "Overview with errors and changes not live",
+      "Overview of a new application",
+      "Entity",
+      "Policy matrix",
+      "Releases",
+      "History",
+      "Revision",
+      "Release page",
+    ],
+    pickedInFixtures: true,
+  },
+  studioPageDesign: { captions: ["Typical"], pickedInFixtures: true },
+  studioFormDesign: { captions: ["Typical"], pickedInFixtures: true },
+  studioProcessDesign: { captions: ["Typical"], pickedInFixtures: true },
+};
+
+for (const [name, { captions, pickedInFixtures }] of Object.entries(
+  framedPreviews,
+)) {
+  test(`the ${name} preview draws each state in a frame exactly as tall as its height, with the page scrolling inside it, in light mode`, async ({
+    page,
+  }) => {
+    const recording = await openHarness(page, `?preview=${name}&mode=light`, {
+      sandboxed: true,
+      frameWidth: 992,
+    });
+    const frame = page.frameLocator("iframe");
+    const fixtures = frame.getByRole("radiogroup", {
+      name: "Fixtures",
+      exact: true,
+    });
+
+    for (const caption of captions) {
+      if (pickedInFixtures) {
+        await fixtures.getByText(caption, { exact: true }).click();
+      }
+      const state = figure(frame, caption);
+      const screen = state.locator(":scope > div > :first-child");
+      await expect(screen).toBeVisible();
+      // The frame sets its height in --shell-min-height, so the spec reads it rather than copying the heights.
+      const height = await state
+        .locator(":scope > div")
+        .evaluate((element) =>
+          parseFloat(
+            getComputedStyle(element).getPropertyValue("--shell-min-height"),
+          ),
+        );
+      const box = await screen.boundingBox();
+      if (!box) {
+        throw new Error(`The ${caption} state has no screen box`);
+      }
+      expect(Math.abs(box.height - height)).toBeLessThanOrEqual(0.5);
+      expect(
+        await screen.evaluate((element) => getComputedStyle(element).overflowY),
+      ).toBe("auto");
+    }
+    expect(recording.errors).toEqual([]);
+  });
+}
+
+test("a dialog opened in the scrolled entity state of studio shows inside the frame", async ({
+  page,
+}) => {
+  const recording = await openHarness(
+    page,
+    "?preview=studio&mode=light&state=entity",
+  );
+  const screen = figure(page, "Entity").locator(":scope > div > :first-child");
+
+  await expect(page.getByTestId("studio-entity-designer")).toBeVisible();
+  await page
+    .getByTestId("studio-field-/label")
+    .getByRole("textbox", { name: "English", exact: true })
+    .pressSequentially("!");
+  await expect(page.getByTestId("studio-save-bar")).toBeVisible();
+
+  expect(
+    await screen.evaluate((element) => element.scrollHeight > element.clientHeight),
+  ).toBe(true);
+  await screen.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect
+    .poll(() => screen.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+
+  await page
+    .getByTestId("studio-save-bar")
+    .getByRole("button", { name: "Discard", exact: true })
+    .click();
+  const dialog = await waitForDialog(page, "Discard all unsaved changes?");
+
+  const dialogBox = await dialog.boundingBox();
+  const screenBox = await screen.boundingBox();
+  if (!dialogBox || !screenBox) {
+    throw new Error("The dialog or the screen has no box");
+  }
+  expect(dialogBox.x).toBeGreaterThanOrEqual(screenBox.x);
+  expect(dialogBox.y).toBeGreaterThanOrEqual(screenBox.y);
+  expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(
+    screenBox.x + screenBox.width,
+  );
+  expect(dialogBox.y + dialogBox.height).toBeLessThanOrEqual(
+    screenBox.y + screenBox.height,
+  );
+  expect(
+    await screen.evaluate((element) => element.scrollTop),
+  ).toBeGreaterThan(0);
+  expect(recording.errors).toEqual([]);
+});
+
+/**
+ * What a Studio editor draws, read in the page: each element that has the panel's style, a surface background with a
+ * 1px border of borderSubtle on all four sides, and each part whose box is not bare, which is a background, a border,
+ * a padding or a radius. The panel's colours come from a probe element, so the browser's own form of each colour is
+ * compared. `testIds` lists the parts in order.
+ */
+function panelReport(
+  root: HTMLElement,
+  colour: { surface: string; borderSubtle: string },
+) {
+  const document = root.ownerDocument;
+  const probe = document.createElement("div");
+  probe.style.background = colour.surface;
+  probe.style.border = `1px solid ${colour.borderSubtle}`;
+  document.body.append(probe);
+  const expected = getComputedStyle(probe);
+  const background = expected.backgroundColor;
+  const sides = ["top", "right", "bottom", "left"];
+  const borders = sides.map((side) =>
+    expected.getPropertyValue(`border-${side}-color`),
+  );
+  probe.remove();
+
+  const panels = [root, ...root.querySelectorAll<HTMLElement>("*")]
+    .filter((element) => {
+      const style = getComputedStyle(element);
+      return (
+        style.backgroundColor === background &&
+        sides.every(
+          (side, index) =>
+            style.getPropertyValue(`border-${side}-width`) === "1px" &&
+            style.getPropertyValue(`border-${side}-style`) === "solid" &&
+            style.getPropertyValue(`border-${side}-color`) === borders[index],
+        )
+      );
+    })
+    .map((element) => element.dataset.testid ?? element.tagName);
+
+  const parts = [
+    ...root.querySelectorAll<HTMLElement>('[data-testid^="studio-section-"]'),
+  ];
+  const styled = parts
+    .filter((part) => {
+      const style = getComputedStyle(part);
+      return (
+        style.backgroundColor !== "rgba(0, 0, 0, 0)" ||
+        style.borderRadius !== "0px" ||
+        sides.some(
+          (side) =>
+            style.getPropertyValue(`border-${side}-width`) !== "0px" ||
+            style.getPropertyValue(`padding-${side}`) !== "0px",
+        )
+      );
+    })
+    .map((part) => part.dataset.testid!);
+
+  return {
+    panels,
+    styled,
+    testIds: parts.map((part) => part.dataset.testid!),
+  };
+}
+
+test("the studio preview draws no panel on its Settings page or its Entity state in light mode", async ({
+  page,
+}) => {
+  const { surface, borderSubtle } = designTokensFor("light").colour;
+  const colour = { surface, borderSubtle };
+
+  const settingsQuery = "?preview=studio&mode=light";
+  const settings = await openHarness(page, settingsQuery, {
+    sandboxed: true,
+    frameWidth: 992,
+  });
+  const state = figure(page.frameLocator("iframe"), "Typical");
+  await state
+    .getByRole("menu")
+    .getByRole("menuitem", { name: "Settings", exact: true })
+    .click();
+  await expect(
+    state.getByRole("heading", {
+      name: fixtureMarker,
+      exact: true,
+      level: 4,
+    }),
+  ).toBeVisible();
+  const settingsEditor = state.getByTestId("studio-editor");
+  await expect(settingsEditor).toBeVisible();
+  const settingsReport = await settingsEditor.evaluate(panelReport, colour);
+  expect(settingsReport.panels).toEqual([]);
+  expect(settingsReport.styled).toEqual([]);
+  expect(settingsReport.testIds.at(-1)).toBe("studio-section-autoAccept");
+  expect(settings.errors).toEqual([]);
+  expect(
+    settings.requests.filter((url) => !url.startsWith("data:")),
+  ).toEqual([
+    `${origin}/sandboxed.html`,
+    `${harnessUrl}${settingsQuery}`,
+    bundleUrl,
+  ]);
+
+  const entityQuery = "?preview=studio&mode=light&state=entity";
+  const entity = await openHarness(page, entityQuery, {
+    sandboxed: true,
+    frameWidth: 992,
+  });
+  const entityFrame = page.frameLocator("iframe");
+  await expect(entityFrame.getByTestId("studio-entity-designer")).toBeVisible();
+  const entityEditor = entityFrame.getByTestId("studio-editor");
+  await expect(entityEditor).toBeVisible();
+  const entityReport = await entityEditor.evaluate(panelReport, colour);
+  expect(entityReport.panels).toEqual([]);
+  expect(entityReport.styled).toEqual([]);
+  expect(entity.errors).toEqual([]);
+  expect(
+    entity.requests.filter((url) => !url.startsWith("data:")),
+  ).toEqual([`${origin}/sandboxed.html`, `${harnessUrl}${entityQuery}`, bundleUrl]);
+});
 
 for (const mode of modes) {
   test(`the studio preview moves between Overview, Settings, a kind list and Releases from the sidebar in ${mode} mode`, async ({
@@ -880,6 +1135,33 @@ for (const [slug, expectKeyElement] of [
       await expect(
         state.getByTestId("studio-matrix-cell-Requester-entity-Request"),
       ).toBeVisible();
+    },
+  ],
+  [
+    "releases",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-releases")).toBeVisible();
+      await expect(state.getByTestId("studio-release-row")).toHaveCount(2);
+    },
+  ],
+  [
+    "history",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-history")).toBeVisible();
+      await expect(state.getByTestId("studio-revision-row")).toHaveCount(3);
+    },
+  ],
+  [
+    "revision",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-revision")).toBeVisible();
+      await expect(state.getByTestId("studio-changes-file")).toHaveCount(3);
+    },
+  ],
+  [
+    "release-page",
+    async (state: FrameLocator) => {
+      await expect(state.getByTestId("studio-release")).toBeVisible();
     },
   ],
 ] as const) {

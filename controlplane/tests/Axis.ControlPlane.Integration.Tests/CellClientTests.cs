@@ -217,6 +217,30 @@ public sealed class CellClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_tenant_list_of_250_tenants_is_read_in_three_requests()
+    {
+        _server.Tenants = [.. Enumerable.Range(0, 250).Select(i => ($"t{i:D3}", (string[])[]))];
+        var cell = Build().Get("vn-1");
+
+        var tenants = await cell.ListTenantsAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(_server.Tenants.Select(t => t.Id), tenants.Select(t => t.Id));
+        Assert.Equal(3, _server.TenantListReads);
+    }
+
+    [Fact]
+    public async Task A_tenant_total_that_changes_between_pages_throws()
+    {
+        var all = Enumerable.Range(0, 250).Select(i => ($"t{i:D3}", (string[])[])).ToList();
+        _server.TenantsForRead = read => read == 1 ? all : all[..249];
+        var cell = Build().Get("vn-1");
+
+        var exception = await Assert.ThrowsAsync<CellCallException>(() => cell.ListTenantsAsync(TestContext.Current.CancellationToken));
+
+        Assert.Contains("vn-1", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_tenant_list_answered_with_an_error_throws_with_the_status_and_no_body()
     {
         _server.TenantListStatus = 500;

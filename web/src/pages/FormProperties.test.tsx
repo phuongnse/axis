@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { setAt } from '../platform/jsonPatch'
+import type { FieldMetadata } from '../platform/site'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { FormProperties } from './FormProperties'
@@ -16,7 +17,15 @@ const english: Record<string, string> = platformEnglish
 const helpOf = (path: string) => english[`shell.studio.field.form.${path}.help`]
 
 /** Keeps the draft in state, like the editor does, and exposes it as JSON. */
-function Harness({ initial, selected }: { initial: Content; selected: string }) {
+function Harness({
+  initial,
+  selected,
+  entityFields,
+}: {
+  initial: Content
+  selected: string
+  entityFields: FieldMetadata[]
+}) {
   const [draft, setDraft] = useState(initial)
   const [announcement, setAnnouncement] = useState('')
   const [current, setCurrent] = useState<string | null>(selected)
@@ -25,7 +34,7 @@ function Harness({ initial, selected }: { initial: Content; selected: string }) 
       <FormProperties
         draft={draft}
         selected={current}
-        entityFields={[]}
+        entityFields={entityFields}
         onSelect={setCurrent}
         onAnnounce={setAnnouncement}
         onChange={(pointer, next) => setDraft((previous) => setAt(previous, pointer, next) as Content)}
@@ -37,11 +46,11 @@ function Harness({ initial, selected }: { initial: Content; selected: string }) 
   )
 }
 
-function renderHarness(initial: Content, selected: string) {
+function renderHarness(initial: Content, selected: string, entityFields: FieldMetadata[] = []) {
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <Harness initial={initial} selected={selected} />
+        <Harness initial={initial} selected={selected} entityFields={entityFields} />
       </TextProvider>
     </ThemeModeProvider>,
   )
@@ -217,6 +226,17 @@ describe('FormProperties field', () => {
     expect(screen.getByRole('textbox', { name: 'Read-only when' })).toHaveAccessibleDescription(
       helpOf('sections.fields.readOnlyWhen'),
     )
+  })
+
+  it('shows a read-only box the server locks checked and disabled, with the reason as its help', () => {
+    const computed = { name: 'x', computed: true, sequence: false, creator: false, required: false } as FieldMetadata
+    renderHarness({ sections: [{ name: 's', fields: [{ field: 'x' }] }] }, '/sections/0/fields/0', [computed])
+
+    const box = screen.getByRole('checkbox', { name: 'Read-only' })
+    expect(box).toBeChecked()
+    expect(box).toBeDisabled()
+    expect(box).toHaveAccessibleDescription(platformEnglish['shell.studio.design.readOnlyLocked'])
+    expect(screen.getAllByText(platformEnglish['shell.studio.design.readOnlyLocked'])).toHaveLength(1)
   })
 
   it('writes the width of the field under width and removes it when the box is cleared', async () => {

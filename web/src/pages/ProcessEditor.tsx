@@ -1,5 +1,7 @@
-import { Button, Card, Flex, Input, Radio, Select, Switch, Typography } from 'antd'
+import { Button, Card, Flex, Input, Select, Typography } from 'antd'
 import { useContext } from 'react'
+import { AxisCheckboxField } from '../platform/AxisCheckboxField'
+import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { StudioNamesContext } from '../platform/studioNames'
@@ -17,7 +19,7 @@ import { Expression, NamePicker } from './ProcessFields'
 import { moved, requiredStepKeys, uniqueStepName } from './processPalette'
 import { stepTypes, withType } from './processStepSchema'
 import { ReferencePicker } from './ReferencePicker'
-import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { SchemaForm, type ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -97,16 +99,16 @@ export function ProcessEditor({
 
   return (
     <div data-testid="studio-process-editor">
-      <ResourceFormSections>
+      <SectionParts>
         {/* The form draws the General section: the name, the description and the start condition. */}
         <SchemaForm schema={withoutSubject(schema)} value={value} onChange={onChange} />
-        <ResourceFormSection testName="subject" heading={heading('subject')}>
+        <SectionPart testName="subject" heading={heading('subject')}>
           <Subject value={value} onChange={onChange} />
-        </ResourceFormSection>
-        <ResourceFormSection testName="steps" heading={heading('steps')}>
+        </SectionPart>
+        <SectionPart testName="steps" heading={heading('steps')}>
           <Flex vertical gap="small">
             <div data-testid="studio-field-/start">
-              <AxisField {...field('start')}>
+              <AxisField {...field('start')} required>
                 <ReferencePicker
                   name={field('start').label}
                   value={text(value.start)}
@@ -153,8 +155,8 @@ export function ProcessEditor({
               </Flex>
             </div>
           </Flex>
-        </ResourceFormSection>
-      </ResourceFormSections>
+        </SectionPart>
+      </SectionParts>
     </div>
   )
 }
@@ -170,7 +172,7 @@ function withoutSubject(schema: JsonSchema): JsonSchema {
 }
 
 /**
- * The subject of a process: a choice of an entity or parameters. A switch replaces the draft, so that it holds only the
+ * The subject of a process: a choice of an entity or parameters. A choice replaces the draft, so that it holds only the
  * chosen key, and one undo step brings the other back.
  */
 function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
@@ -183,20 +185,16 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
     // The entity picker carries the `/entity` field marker itself.
     <div data-testid={mode === 'parameters' ? 'studio-field-/parameters' : undefined}>
       <Flex vertical gap="small">
-        <Radio.Group
-          // A name of its own keeps the assignee radios of a task from joining this group when ids are not unique.
-          name="process-subject"
-          optionType="button"
-          // The section's heading names the one choice, see docs/reference/studio-resource-form.md#sections.
-          aria-label={t('shell.studio.section.process.subject')}
+        <AxisChoiceField
+          {...field('subject')}
           value={mode}
           options={[
-            { value: 'entity', label: t('shell.studio.process.subjectEntity') },
-            { value: 'parameters', label: t('shell.studio.process.subjectParameters') },
+            { value: 'entity', ...field('subject.entity') },
+            { value: 'parameters', ...field('subject.parameters') },
           ]}
-          onChange={(event) => {
-            if (event.target.value !== mode) {
-              onChange('', withSubject(value, event.target.value))
+          onChange={(next) => {
+            if (next !== mode) {
+              onChange('', withSubject(value, next as 'entity' | 'parameters'))
             }
           }}
         />
@@ -214,9 +212,9 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
               const pointer = `/parameters/${index}`
               const content = isContent(parameter) ? parameter : {}
               return (
-                <Flex key={index} gap="small" align="flex-start" wrap data-testid={`studio-field-${pointer}`}>
+                <Flex key={index} vertical gap="small" data-testid={`studio-field-${pointer}`}>
                   <div data-testid={`studio-field-${pointer}/name`}>
-                    <AxisField {...field('parameters.name')}>
+                    <AxisField {...field('parameters.name')} required>
                       <Input
                         value={text(content.name)}
                         onChange={(event) => onChange(`${pointer}/name`, event.target.value)}
@@ -224,7 +222,7 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
                     </AxisField>
                   </div>
                   <div data-testid={`studio-field-${pointer}/type`}>
-                    <AxisField {...field('parameters.type')}>
+                    <AxisField {...field('parameters.type')} required>
                       <Select
                         style={{ minWidth: 160 }}
                         virtual={false}
@@ -234,10 +232,12 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
                       />
                     </AxisField>
                   </div>
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button onClick={() => onChange(pointer, undefined)}>
-                    {t('shell.studio.process.removeParameter')}
-                  </Button>
+                  <div>
+                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                    <Button onClick={() => onChange(pointer, undefined)}>
+                      {t('shell.studio.process.removeParameter')}
+                    </Button>
+                  </div>
                 </Flex>
               )
             })}
@@ -348,12 +348,12 @@ function Step({
         <Flex vertical gap="small">
           {layer && <LayerMarkTag layer={layer} list="/steps" index={index} name={text(step.name)} />}
           <div data-testid={`studio-field-${pointer}/name`}>
-            <AxisField {...field('steps.name')}>
+            <AxisField {...field('steps.name')} required>
               <Input value={text(step.name)} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
             </AxisField>
           </div>
           <div data-testid={`studio-field-${pointer}/type`}>
-            <AxisField {...field('steps.type')}>
+            <AxisField {...field('steps.type')} required>
               <Select
                 style={{ minWidth: 240 }}
                 virtual={false}
@@ -413,7 +413,7 @@ function Transition({
   const { field } = useFieldTexts('process')
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <AxisField {...field(path)}>
+      <AxisField {...field(path)} required>
         <ReferencePicker
           name={field(path).label}
           value={text(value)}
@@ -439,10 +439,10 @@ function JsonOnlyKeys({ pointer, keys }: { pointer: string; keys: string[] }) {
 }
 
 /**
- * The editor of an assignee: a user expression or a role, and a switch replaces the object at `pointer` so that it holds
- * only the chosen key. A task's `assignee` and an escalation's `reassign` both use it. The radios have a name of their
- * own per pointer, so two editors in one panel never join one group. `path` is the path of its field texts. A task's
- * assignee is a titled group, and an escalation's `reassign` is named by the switch above it, so it is not titled.
+ * The editor of an assignee: a user expression or a role, and a choice replaces the object at `pointer` so that it holds
+ * only the chosen key. A task's `assignee` and an escalation's `reassign` both use it. The choice names its own radio
+ * group, so two editors in one panel never join one group. `path` is the path of its field texts. A task's assignee is a
+ * titled group, and an escalation's `reassign` is named by the Reassign switch above it, so it is not titled.
  */
 function AssigneeEditor({
   pointer,
@@ -457,7 +457,6 @@ function AssigneeEditor({
   value: unknown
   onChange: ChangeHandler
 }) {
-  const t = useText()
   const { field, group } = useFieldTexts('process')
   const assignee = isContent(value) ? value : {}
   const mode = assignee.role !== undefined && assignee.user === undefined ? 'role' : 'user'
@@ -469,16 +468,14 @@ function AssigneeEditor({
 
   const choice = (
     <Flex vertical gap="small">
-      <Radio.Group
-        name={`assignee-mode-${pointer}`}
-        optionType="button"
-        aria-label={field(path).label}
+      <AxisChoiceField
+        {...field(`${path}.mode`)}
         value={mode}
         options={[
-          { value: 'user', label: t('shell.studio.process.assigneeUser') },
-          { value: 'role', label: t('shell.studio.process.assigneeRole') },
+          { value: 'user', ...field(`${path}.mode.user`) },
+          { value: 'role', ...field(`${path}.mode.role`) },
         ]}
-        onChange={(event) => switchTo(event.target.value)}
+        onChange={(next) => switchTo(next as 'user' | 'role')}
       />
       {mode === 'user' ? (
         <div data-testid={`studio-field-${pointer}/user`}>
@@ -534,6 +531,7 @@ function Task({
       <NamePicker
         pointer={`${pointer}/label/textKey`}
         {...field('steps.label')}
+        required
         kind="text"
         value={label.textKey}
         onPick={(next) => onChange(`${pointer}/label/textKey`, next)}
@@ -548,6 +546,7 @@ function Task({
       <NamePicker
         pointer={`${pointer}/form`}
         {...field('steps.form')}
+        required
         kind="form"
         value={step.form}
         onPick={(next) => onChange(`${pointer}/form`, next)}
@@ -603,9 +602,9 @@ function Deadline({
             </Button>
           </div>
         ) : (
-          <Flex gap="small" align="flex-start" wrap>
+          <Flex vertical gap="small">
             <div data-testid={`studio-field-${deadlinePointer}/after`}>
-              <AxisField {...field('steps.deadline.after')}>
+              <AxisField {...field('steps.deadline.after')} required>
                 <Input
                   value={text(deadline.after)}
                   onChange={(event) => onChange(`${deadlinePointer}/after`, event.target.value)}
@@ -619,10 +618,12 @@ function Deadline({
               names={names}
               onChange={onChange}
             />
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange(deadlinePointer, undefined)}>
-              {t('shell.studio.process.removeDeadline')}
-            </Button>
+            <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+              <Button onClick={() => onChange(deadlinePointer, undefined)}>
+                {t('shell.studio.process.removeDeadline')}
+              </Button>
+            </div>
           </Flex>
         )}
       </AxisFieldGroup>
@@ -665,7 +666,7 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
               >
                 <Flex gap="small" align="flex-end" wrap>
                   <div data-testid={`studio-field-${rowPointer}/after`}>
-                    <AxisField {...field('steps.escalations.after')}>
+                    <AxisField {...field('steps.escalations.after')} required>
                       <Input
                         value={text(row.after)}
                         onChange={(event) => onChange(`${rowPointer}/after`, event.target.value)}
@@ -679,12 +680,12 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
                     {t('shell.studio.process.removeEscalation')}
                   </Button>
                 </Flex>
-                <AxisField {...field('steps.escalations.reassign')}>
-                  <Switch
-                    checked={row.reassign !== undefined}
-                    onChange={(checked) => onChange(`${rowPointer}/reassign`, checked ? { user: '' } : undefined)}
-                  />
-                </AxisField>
+                <AxisCheckboxField
+                  kind="switch"
+                  {...field('steps.escalations.reassign')}
+                  checked={row.reassign !== undefined}
+                  onChange={(checked) => onChange(`${rowPointer}/reassign`, checked ? { user: '' } : undefined)}
+                />
                 {row.reassign !== undefined &&
                   (isContent(row.reassign) ? (
                     <AssigneeEditor
@@ -697,14 +698,14 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
                   ) : (
                     <JsonOnlyKeys pointer={rowPointer} keys={['reassign']} />
                   ))}
-                <AxisField {...field('steps.escalations.notify')}>
-                  <Switch
-                    checked={row.notify !== undefined}
-                    onChange={(checked) =>
-                      onChange(`${rowPointer}/notify`, checked ? structuredClone(emptyNotify) : undefined)
-                    }
-                  />
-                </AxisField>
+                <AxisCheckboxField
+                  kind="switch"
+                  {...field('steps.escalations.notify')}
+                  checked={row.notify !== undefined}
+                  onChange={(checked) =>
+                    onChange(`${rowPointer}/notify`, checked ? structuredClone(emptyNotify) : undefined)
+                  }
+                />
                 {row.notify !== undefined &&
                   (isContent(row.notify) ? (
                     <NotifyFields
@@ -739,7 +740,7 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
 }
 
 /**
- * The panel of a timer: Wait for a duration or Until a time, and the next step. A switch replaces the other key in
+ * The panel of a timer: Wait for a duration or Until a time, and the next step. A choice replaces the other key in
  * place with the chosen key, which keeps a value it already holds. A timer with neither key or both opens in Wait.
  */
 function Timer({
@@ -754,7 +755,6 @@ function Timer({
   onChange: ChangeHandler
 }) {
   const { field, group } = useFieldTexts('process')
-  const t = useText()
   const mode = step.until !== undefined && step.wait === undefined ? 'until' : 'wait'
 
   function switchTo(chosen: 'wait' | 'until') {
@@ -780,17 +780,14 @@ function Timer({
       <div data-testid={`studio-field-${pointer}/timer`}>
         <AxisFieldGroup {...group('steps.timer')}>
           <Flex vertical gap="small">
-            <Radio.Group
-              // A name of its own per step keeps the radios of two timers from joining one group.
-              name={`timer-mode-${pointer}`}
-              optionType="button"
-              aria-label={field('steps.timer').label}
+            <AxisChoiceField
+              {...field('steps.timer.mode')}
               value={mode}
               options={[
-                { value: 'wait', label: t('shell.studio.process.timerWait') },
-                { value: 'until', label: t('shell.studio.process.timerUntil') },
+                { value: 'wait', ...field('steps.timer.mode.wait') },
+                { value: 'until', ...field('steps.timer.mode.until') },
               ]}
-              onChange={(event) => switchTo(event.target.value)}
+              onChange={(next) => switchTo(next as 'wait' | 'until')}
             />
             {mode === 'wait' ? (
               <div data-testid={`studio-field-${pointer}/wait`}>
@@ -848,7 +845,7 @@ function WaitEvent({
   return (
     <>
       <div data-testid={`studio-field-${pointer}/event`}>
-        <AxisField {...field('steps.event')}>
+        <AxisField {...field('steps.event')} required>
           {studioNames === undefined ? (
             <Input value={text(step.event)} onChange={(event) => onChange(`${pointer}/event`, event.target.value)} />
           ) : (
@@ -883,7 +880,7 @@ function WaitEvent({
           <AxisFieldGroup {...group('steps.timeout')}>
             <Flex vertical gap="small">
               <div data-testid={`studio-field-${timeoutPointer}/after`}>
-                <AxisField {...field('steps.timeout.after')}>
+                <AxisField {...field('steps.timeout.after')} required>
                   <Input
                     value={text(timeout.after)}
                     onChange={(event) => onChange(`${timeoutPointer}/after`, event.target.value)}
@@ -987,6 +984,7 @@ function SubProcess({
       <NamePicker
         pointer={`${pointer}/process`}
         {...field('steps.process')}
+        required
         kind="process"
         value={step.process}
         onPick={(next) => onChange(pointer, withChild(step, next, childOf(next)))}
@@ -1044,9 +1042,9 @@ function Decision({
               const whenPointer = `${branchPointer}/when`
               const when = text(isContent(branch) ? branch.when : undefined)
               return (
-                <Flex key={index} gap="small" align="flex-start" wrap data-testid={`studio-field-${branchPointer}`}>
-                  <div data-testid={`studio-field-${whenPointer}`} style={{ flex: 1, minWidth: 240 }}>
-                    <AxisField {...field('steps.branches.when')}>
+                <Flex key={index} vertical gap="small" data-testid={`studio-field-${branchPointer}`}>
+                  <div data-testid={`studio-field-${whenPointer}`}>
+                    <AxisField {...field('steps.branches.when')} required>
                       <Expression
                         pointer={whenPointer}
                         name={field('steps.branches.when').label}
@@ -1062,10 +1060,12 @@ function Decision({
                     names={names}
                     onChange={onChange}
                   />
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button onClick={() => onChange(branchPointer, undefined)}>
-                    {t('shell.studio.process.removeBranch')}
-                  </Button>
+                  <div>
+                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                    <Button onClick={() => onChange(branchPointer, undefined)}>
+                      {t('shell.studio.process.removeBranch')}
+                    </Button>
+                  </div>
                 </Flex>
               )
             })}
@@ -1121,9 +1121,9 @@ function Outcomes({
             const outcomePointer = `${outcomesPointer}/${index}`
             const content = isContent(outcome) ? outcome : {}
             return (
-              <Flex key={index} gap="small" align="flex-start" wrap data-testid={`studio-field-${outcomePointer}`}>
+              <Flex key={index} vertical gap="small" data-testid={`studio-field-${outcomePointer}`}>
                 <div data-testid={`studio-field-${outcomePointer}/name`}>
-                  <AxisField {...field('steps.outcomes.name')}>
+                  <AxisField {...field('steps.outcomes.name')} required>
                     <Input
                       value={text(content.name)}
                       onChange={(event) => onChange(`${outcomePointer}/name`, event.target.value)}
@@ -1133,6 +1133,7 @@ function Outcomes({
                 <NamePicker
                   pointer={`${outcomePointer}/label/textKey`}
                   {...field('steps.outcomes.label')}
+                  required
                   kind="text"
                   value={isContent(content.label) ? content.label.textKey : undefined}
                   onPick={(next) => onChange(`${outcomePointer}/label/textKey`, next)}
@@ -1144,10 +1145,12 @@ function Outcomes({
                   names={names}
                   onChange={onChange}
                 />
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button onClick={() => onChange(outcomePointer, undefined)}>
-                  {t('shell.studio.process.removeOutcome')}
-                </Button>
+                <div>
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                  <Button onClick={() => onChange(outcomePointer, undefined)}>
+                    {t('shell.studio.process.removeOutcome')}
+                  </Button>
+                </div>
               </Flex>
             )
           })}

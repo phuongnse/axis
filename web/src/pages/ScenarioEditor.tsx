@@ -9,7 +9,7 @@ import { useText } from '../platform/texts'
 import { useFieldTexts } from './fieldTexts'
 import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
-import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { KeyInput, KeyValueRows, ScenarioStep } from './ScenarioStep'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -157,17 +157,17 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
   function section(name: string, children: ReactNode, action?: ReactNode) {
     const prefix = `shell.studio.section.scenario.${name}`
     return (
-      <ResourceFormSection testName={name} heading={{ title: t(prefix), line: t(`${prefix}.line`) }} action={action}>
+      <SectionPart testName={name} heading={{ title: t(prefix), line: t(`${prefix}.line`) }} action={action}>
         <Flex vertical gap="small">
           {children}
         </Flex>
-      </ResourceFormSection>
+      </SectionPart>
     )
   }
 
   return (
     <div data-testid="studio-scenario">
-      <ResourceFormSections>
+      <SectionParts>
         {section(
           'general',
           <>
@@ -250,7 +250,7 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
             {t('shell.studio.scenario.addStep')}
           </AxisButton>,
         )}
-      </ResourceFormSections>
+      </SectionParts>
     </div>
   )
 }

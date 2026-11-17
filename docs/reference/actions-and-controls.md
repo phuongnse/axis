@@ -19,7 +19,7 @@ widget names a role, never an Ant Design button type.
 | Secondary   | The default grey outline                    | Other actions, such as Cancel and Import                                                                                                                                         |
 | Icon        | A text button with only an icon             | Small actions such as Refresh. Choose and Clear of a `reference` field are bordered and joined                                                                                   |
 | Plain       | A borderless text button in the text colour | Header controls, such as the account button                                                                                                                                      |
-| Link | Text in `primaryText` with no border | An action that reads as a link but goes to no address, such as the first cell of a [list of objects](studio-resource-form.md#lists-of-objects) |
+| Link        | Text in `primaryText` with no border        | An action that reads as a link but goes to no address, such as the first cell of a [list of objects](studio-resource-form.md#lists-of-objects)                                   |
 | Destructive | `dangerText` at any level                   | Actions that remove, such as Delete row and Delete                                                                                                                               |
 
 - **Text colours, not fill colours.** Ant Design writes the text of text, outlined and danger buttons
@@ -34,9 +34,9 @@ widget names a role, never an Ant Design button type.
 - **An action row folds into a menu.** An `AxisActionRow` with `fold` keeps one line. When its content does not
   fit, the actions named in `fold` become the entries of one "…" icon menu, More actions, in their order, each
   keeping its disabled state. They are buttons again when the room comes back. A row without `fold` wraps.
-- **An action bar folds into More** _(planned for M35)_. An `ActionBar`, the bar of actions above a
-  footer, folds its actions into one More menu through `AxisActionRow`'s `fold`, as a table's row
-  actions fold at narrow width.
+- **An action bar folds into More.** An `ActionBar`, a bar of actions at the foot of a page on `surface`
+  with a `borderSubtle` rule above it, folds the actions it names into one More actions menu through
+  `AxisActionRow`'s `fold`, as a table's row actions fold at narrow width.
 - **Text or an icon, never both.** An action shows its text or its icon. An icon goes with text only
   where it does what text cannot: navigation that collapses to icons, a status or a severity, and the
   mark that identifies an application or a site.
@@ -101,11 +101,16 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
 - **One field for the platform's screens.** `AxisField` draws a field: its label, its help and its input, as a
   group that its help describes. Inside a vertical form it takes the form's value and checks. Outside an
   Ant Design form, where a screen keeps its draft itself, the caller gives the input its value and change
-  handler, and `AxisField` still ties the label to the input and makes the help its description.
+  handler, and `AxisField` still ties the label to the input and makes the help its description. Such a field
+  takes `required`, which draws the shared required mark after its label and sets `aria-required` on the input,
+  while a field inside a form is marked by its `requiredMessage` alone.
   `AxisFieldGroup` draws a titled group of fields with its help, such as an object's fields or a table, as a
   group that its title names and its help describes. A field that holds one input uses `AxisField`, and a
   field that holds several inputs, or rows, uses `AxisFieldGroup`, because a label names only one input.
   `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` are built on `AxisField` and `AxisFieldGroup`.
+  `AxisCheckboxField` and `AxisChoiceField` take the same two modes: with a `name` inside a form, or with the
+  value and `onChange` the screen holds. A choice the screen holds gives its radio group a name of its own, so
+  two choices on one panel never join.
 - **A field's status.** A field inside a form takes a `status`, what the screen found about the
   field beyond its rules: a check run while the person types, such as whether a subdomain is free, or
   choices that could not load. Running shows the input busy. A status that passed leaves the field as it
@@ -203,7 +208,8 @@ be kept right.
   actions its author configures.
 - **Every control in one table.** `AxisTable` has every control below, and each view
   turns on what it needs. Search, filter, sort, page and columns live in the address. A view is only a
-  filter kept there, so a link opens the same rows for anyone who follows it.
+  filter kept there, so a link opens the same rows for anyone who follows it. A second table on a page puts a
+  prefix of its own before each address name, as the console's Dead letters view does with `deadLetters.filter`.
 - **Sort.** A column sorts from its header when its values have an order a person uses: names, people,
   statuses, dates and numbers. Long text, files, lists and actions do not. A header only sorts, as there is
   one place to filter. A table that holds all its rows sorts them by the value its column gives through
@@ -212,7 +218,8 @@ be kept right.
   in the record API, and search looks in all of them. `AxisTable` draws the box, which says Search, and a
   table that holds all its rows searches them by itself, while a table paged on the server sends the text to
   the server. The text applies on Enter, on the search button and when the box is cleared, never on each
-  key, and a new search starts at page 1. Search, sort, page and page size live in the address.
+  key, and a new search starts at page 1. Search, sort, page and page size live in the address. A table in a
+  dialog, such as the [lookup](form-widget.md#lookup), keeps them in the dialog instead.
 - **Filter.** Filter is an icon button that carries the count of conditions in force, and
   opens a builder of conditions in groups of All or Any, with no limit on depth. A column can be filtered
   on when it gives its kind of value through `filter`, and conditions follow that kind, text, enum, number
@@ -264,7 +271,7 @@ be kept right.
 - **Named exceptions** _(planned for M35)_. A table that is part of one thing is the exception to the growth
   test. Its rows belong to that one thing, such as the lines of a child collection on a form, so a search or
   a filter of its own would split them from it.
-- **No control of its own** _(planned for M35)_. A table gets no control for one view. A view is a filter
+- **No control of its own**. A table gets no control for one view. A view is a filter
   kept in the address, so the page offers it beside the table and a link opens the same rows.
 - **View controls on one line** _(planned for M35)_. The view controls sit on one line beside the search box,
   which keeps its own width.

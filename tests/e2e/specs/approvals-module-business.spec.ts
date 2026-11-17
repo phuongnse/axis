@@ -15,7 +15,7 @@ import { fieldLabel } from '../fields'
 import { journeyURL } from '../server-settings'
 import { pickOption } from '../select'
 import { useJourneySession } from '../sessions'
-import { openKind, openProblems } from '../studio-resources'
+import { openKind, openModuleResource, openProblems } from '../studio-resources'
 
 // Publishing waits behind the other journeys on the shared publisher, so the two tests each get their own budget.
 test.setTimeout(420_000)
@@ -35,10 +35,7 @@ test.describe('the second business changes the module', () => {
     sitePath = await createFromBuiltIn(page, name)
 
     await openKind(page, 'entity')
-    await page
-      .getByTestId('studio-group-module-entities')
-      .getByRole('button', { name: 'approvals/Request', exact: true })
-      .click()
+    await openModuleResource(page, 'entity', 'Approvals', 'Request')
     await expect(page.getByTestId('studio-entity-designer')).toBeVisible()
 
     await page.getByRole('button', { name: 'Add field', exact: true }).click()

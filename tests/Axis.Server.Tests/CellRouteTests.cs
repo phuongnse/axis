@@ -66,7 +66,7 @@ public sealed class CellRouteTests
     }
 
     [Fact]
-    public async Task The_provisioning_API_reads_the_cell_the_tenants_jobs_and_exports_sets_quotas_queues_create_suspend_resume_delete_and_cancel_deletion_runs_a_failed_job_again_takes_host_requests_and_has_the_session_routes_sign_in_and_out_the_session_read_and_the_administrators_read()
+    public async Task The_provisioning_API_reads_the_cell_the_tenants_the_deleted_tenants_jobs_and_exports_sets_quotas_queues_create_suspend_resume_delete_and_cancel_deletion_runs_a_failed_job_again_takes_host_requests_and_has_the_session_routes_sign_in_and_out_the_session_read_and_the_administrators_read()
     {
         await using var factory = CreateFactory();
 
@@ -77,6 +77,7 @@ public sealed class CellRouteTests
                 "DELETE /api/cell/tenants/{id}",
                 "GET /api/cell/",
                 "GET /api/cell/auth/sign-in",
+                "GET /api/cell/deleted-tenants/{id}",
                 "GET /api/cell/jobs",
                 "GET /api/cell/jobs/{id:guid}",
                 "GET /api/cell/session",
@@ -84,6 +85,7 @@ public sealed class CellRouteTests
                 "GET /api/cell/tenants/{id}",
                 "GET /api/cell/tenants/{id}/administrators",
                 "GET /api/cell/tenants/{id}/exports/{exportId:guid}",
+                "GET /api/cell/tenants/{id}/usage-days",
                 "POST /api/cell/auth/sign-out",
                 "POST /api/cell/jobs/{id:guid}/run-again",
                 "POST /api/cell/tenants",

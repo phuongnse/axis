@@ -1,21 +1,27 @@
 import { Flex } from 'antd'
-import { useContext, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
-import { ShellBarSlot } from './shellBar'
+import type { ReactNode } from 'react'
+import { AxisActionRow, type AxisFoldAction } from './AxisButton'
 import { useDesignTokens } from './themeMode'
 
 /**
- * Proposed, see the reviews on #3263 and #3650: the bar that holds what finishes a page's task, such as Save or a
- * task's outcomes, with what it says at its start and its actions at its end. It draws in the shell's place right
- * above the footer, which sticks to the window's foot while the page scrolls, as wide as the content. `SaveBar` draws
- * in it. Outside a shell it draws where it stands.
+ * A bar of actions at the foot of a page, see docs/reference/actions-and-controls.md#buttons. It is drawn on `surface`
+ * with a `borderSubtle` rule above it. `start` is drawn at its start edge. The `fold` actions and `end` are drawn at its
+ * end edge, and the `fold` actions become the entries of one More actions menu when the bar is too narrow, as
+ * `AxisActionRow` folds them. The bar has no margin and no position, so its caller places it.
  */
-export function ActionBar({ testId, start, children }: { testId: string; start?: ReactNode; children: ReactNode }) {
+export function ActionBar({
+  start,
+  fold,
+  end,
+}: {
+  start?: ReactNode
+  fold?: AxisFoldAction[]
+  end?: ReactNode
+}): ReactNode {
   const { size, colour, spacing } = useDesignTokens()
-  const slot = useContext(ShellBarSlot)
-  const bar = (
+  return (
     <Flex
-      data-testid={testId}
+      data-action-bar
       align="center"
       justify="space-between"
       gap="middle"
@@ -28,9 +34,8 @@ export function ActionBar({ testId, start, children }: { testId: string; start?:
         borderTop: `1px solid ${colour.borderSubtle}`,
       }}
     >
-      <div>{start}</div>
-      {children}
+      {start !== undefined && <AxisActionRow align="center">{start}</AxisActionRow>}
+      <AxisActionRow align="center" justify="flex-end" fold={fold ?? []} end={end} />
     </Flex>
   )
-  return slot ? createPortal(bar, slot) : bar
 }

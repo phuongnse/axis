@@ -1,20 +1,10 @@
-import {
-  Button,
-  Checkbox,
-  ConfigProvider,
-  Flex,
-  Input,
-  InputNumber,
-  Radio,
-  Select,
-  Switch,
-  Typography,
-  DatePicker,
-} from 'antd'
+import { Button, Checkbox, ConfigProvider, Flex, Input, InputNumber, Select, Typography, DatePicker } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import dayjs from 'dayjs'
-import { useContext } from 'react'
+import { memo, useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react'
+import { AxisCheckboxField } from '../platform/AxisCheckboxField'
+import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
@@ -62,6 +52,9 @@ const settingColumns: FieldSetting[] = [
   'exactLookup',
 ]
 
+/** Joins the field names into one text that tells whether the list changed. */
+const nameSeparator = '\u0000'
+
 function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -91,7 +84,7 @@ function groupTexts(t: (key: string) => string, path: string) {
  * A picker over `options`, or over the application's names of `kind` when `options` is not given. It is a plain box
  * while the application's names have not loaded and `options` is not given.
  */
-function Picker({
+const Picker = memo(function Picker({
   pointer,
   label,
   help,
@@ -117,7 +110,7 @@ function Picker({
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <AxisField label={label} help={help}>
+      <AxisField label={label} help={help} required={required}>
         {choices === undefined ? (
           <Input
             value={text(value)}
@@ -135,7 +128,7 @@ function Picker({
       </AxisField>
     </div>
   )
-}
+})
 
 /**
  * The designer of an entity. It shows the entity's name, label and display field, then its fields as a table of
@@ -180,14 +173,17 @@ export function EntityDesigner({
 }) {
   const t = useText()
   const fields = Array.isArray(value.fields) ? value.fields : undefined
-  const fieldNames = (fields ?? []).flatMap((field) =>
-    isContent(field) && typeof field.name === 'string' && field.name !== '' ? [field.name] : [],
-  )
+  // The names, the same list while no name changes, so the rows that pick among them stay as they are on a key elsewhere.
+  const joinedNames = (fields ?? [])
+    .flatMap((field) => (isContent(field) && typeof field.name === 'string' && field.name !== '' ? [field.name] : []))
+    .join(nameSeparator)
+  const fieldNames = useMemo(() => (joinedNames === '' ? [] : joinedNames.split(nameSeparator)), [joinedNames])
+  const pickDisplayField = useCallback((next: string | undefined) => onChange('/displayField', next), [onChange])
 
   const designer = (
     <Flex vertical gap="middle" data-testid="studio-entity-designer">
       <div data-testid="studio-field-/name">
-        <AxisField {...fieldTexts(t, 'name')}>
+        <AxisField {...fieldTexts(t, 'name')} required>
           <Input value={text(value.name)} onChange={(event) => onChange('/name', event.target.value)} />
         </AxisField>
       </div>
@@ -207,7 +203,7 @@ export function EntityDesigner({
         options={fieldNames}
         value={value.displayField}
         required={false}
-        onPick={(next) => onChange('/displayField', next)}
+        onPick={pickDisplayField}
       />
       <Fields
         fields={fields}
@@ -237,8 +233,16 @@ interface FieldRow {
   field: unknown
 }
 
-/** The fields of the entity as a table, with Add field below it. */
-function Fields({
+/** The origin of each row, `null` for a row that has none. */
+function rowOrigins(fields: unknown[], origins: FieldOrigin[] | undefined): FieldOrigin[] {
+  return fields.map((_, index) => origins?.[index] ?? null)
+}
+
+/**
+ * The fields of the entity as a table, with Add field below it. Every cell is a memo component of stable props, so a
+ * key in one row draws that row's cells and no other.
+ */
+const Fields = memo(function Fields({
   fields,
   readOnly,
   origins,
@@ -256,6 +260,50 @@ function Fields({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  // What the buttons of a row read when they are pressed, so they stay the same between draws.
+  const latest = useRef({ fields, origins, onOriginsChange, onChange })
+  useLayoutEffect(() => {
+    latest.current = { fields, origins, onOriginsChange, onChange }
+  })
+  // The names a money field can take its currency from, by row: a text or enum field's name, else `null`.
+  const currencySignature = (fields ?? [])
+    .map((other) =>
+      isContent(other) &&
+      (other.type === 'enum' || other.type === 'text') &&
+      typeof other.name === 'string' &&
+      other.name !== ''
+        ? other.name
+        : '',
+    )
+    .join(nameSeparator)
+  const currencyNames = useMemo(
+    () => currencySignature.split(nameSeparator).map((name) => (name === '' ? null : name)),
+    [currencySignature],
+  )
+
+  const onMove = useCallback((index: number, offset: number) => {
+    const { fields, origins, onOriginsChange, onChange } = latest.current
+    const next = [...fields!]
+    ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
+    onChange('/fields', next)
+    if (onOriginsChange) {
+      const moved = rowOrigins(fields!, origins)
+      ;[moved[index], moved[index + offset]] = [moved[index + offset], moved[index]]
+      onOriginsChange(moved)
+    }
+  }, [])
+
+  const onRemove = useCallback((index: number) => {
+    const { fields, origins, onOriginsChange, onChange } = latest.current
+    onChange(
+      '/fields',
+      fields!.filter((_, position) => position !== index),
+    )
+    onOriginsChange?.(
+      rowOrigins(fields!, origins).filter((_, position) => position !== index),
+      origins?.[index] ?? undefined,
+    )
+  }, [])
 
   if (fields === undefined) {
     return (
@@ -265,36 +313,9 @@ function Fields({
     )
   }
 
-  function move(index: number, offset: number) {
-    const next = [...fields!]
-    ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
-    onChange('/fields', next)
-    if (onOriginsChange) {
-      const moved = rowOrigins()
-      ;[moved[index], moved[index + offset]] = [moved[index + offset], moved[index]]
-      onOriginsChange(moved)
-    }
-  }
-
-  /** The origin of each row, `null` for a row that has none. */
-  function rowOrigins(): FieldOrigin[] {
-    return fields!.map((_, index) => origins?.[index] ?? null)
-  }
-
   function addField() {
     onChange('/fields', [...fields!, { name: '', type: 'text' }])
-    onOriginsChange?.([...rowOrigins(), null])
-  }
-
-  function removeField(index: number) {
-    onChange(
-      '/fields',
-      fields!.filter((_, position) => position !== index),
-    )
-    onOriginsChange?.(
-      rowOrigins().filter((_, position) => position !== index),
-      origins?.[index] ?? undefined,
-    )
+    onOriginsChange?.([...rowOrigins(fields!, origins), null])
   }
 
   const columns: AxisColumn<FieldRow>[] = [
@@ -302,21 +323,7 @@ function Fields({
       key: 'name',
       kind: 'freeText',
       title: t('shell.studio.entity.fieldName'),
-      render: (_, { field, index }) => {
-        const name = text(isContent(field) ? field.name : undefined)
-        return (
-          <Flex vertical gap="small">
-            <div data-testid={`studio-field-/fields/${index}/name`}>
-              <Input
-                aria-label={t('shell.studio.entity.fieldName')}
-                value={name}
-                onChange={(event) => onChange(`/fields/${index}/name`, event.target.value)}
-              />
-            </div>
-            {layer && <LayerMarkTag layer={layer} list="/fields" index={index} name={name} />}
-          </Flex>
-        )
-      },
+      render: (_, { field, index }) => <NameCell index={index} field={field} layer={layer} onChange={onChange} />,
     },
     {
       key: 'label',
@@ -335,23 +342,7 @@ function Fields({
       key: 'type',
       kind: 'fixed',
       title: t('shell.studio.entity.fieldType'),
-      render: (_, { field, index }) => {
-        const content = isContent(field) ? field : {}
-        return (
-          <div data-testid={`studio-field-/fields/${index}/type`}>
-            <Select
-              aria-label={t('shell.studio.entity.fieldType')}
-              showSearch
-              optionFilterProp="label"
-              virtual={false}
-              style={{ minWidth: 160 }}
-              value={typeof content.type === 'string' ? content.type : undefined}
-              options={fieldTypes.map((option) => ({ value: option, label: option }))}
-              onChange={(next: string) => onChange(`/fields/${index}`, changeFieldType(content, next))}
-            />
-          </div>
-        )
-      },
+      render: (_, { field, index }) => <TypeCell index={index} field={field} onChange={onChange} />,
     },
     {
       key: 'required',
@@ -374,34 +365,14 @@ function Fields({
       kind: 'freeText',
       title: t('shell.studio.entity.settings'),
       render: (_, { field, index }) => (
-        <Flex vertical gap="small">
-          <AxisField {...fieldTexts(t, 'fields.helpText')}>
-            <FieldLabel
-              name={fieldTexts(t, 'fields.helpText').label}
-              pointer={`/fields/${index}/help`}
-              value={isContent(field) ? field.help : undefined}
-              onChange={onChange}
-            />
-          </AxisField>
-          <Settings
-            index={index}
-            field={isContent(field) ? field : {}}
-            fields={fields}
-            readOnly={readOnly}
-            onChange={onChange}
-          />
-          {warnings?.get(index) && (
-            <AxisAlert
-              kind="warning"
-              data-testid={`studio-migration-warning-/fields/${index}`}
-              message={t(
-                warnings.get(index) === 'enum'
-                  ? 'shell.studio.entity.migration.enumWarning'
-                  : 'shell.studio.entity.migration.uniqueWarning',
-              )}
-            />
-          )}
-        </Flex>
+        <SettingsCell
+          index={index}
+          field={field}
+          currencyNames={isContent(field) && editableSettings(field).includes('currency') ? currencyNames : undefined}
+          readOnly={readOnly}
+          warning={warnings?.get(index)}
+          onChange={onChange}
+        />
       ),
     },
     ...(readOnly
@@ -411,19 +382,7 @@ function Fields({
             key: 'actions',
             kind: 'fixed' as const,
             render: (_: unknown, { index }: FieldRow) => (
-              <Flex gap="small">
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button disabled={index === 0} onClick={() => move(index, -1)}>
-                  {t('shell.studio.entity.moveUp')}
-                </Button>
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button disabled={index === fields.length - 1} onClick={() => move(index, 1)}>
-                  {t('shell.studio.entity.moveDown')}
-                </Button>
-                <AxisButton role="destructive" onClick={() => removeField(index)}>
-                  {t('shell.studio.entity.removeField')}
-                </AxisButton>
-              </Flex>
+              <ActionsCell index={index} last={index === fields.length - 1} onMove={onMove} onRemove={onRemove} />
             ),
           },
         ]),
@@ -431,31 +390,167 @@ function Fields({
 
   return (
     <div data-testid="studio-field-/fields">
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.entity.fields')}</Typography.Text>
-        <AxisTable<FieldRow>
-          dataSource={fields.map((field, index) => ({ field, index }))}
-          rowKey={(row) => String(row.index)}
-          emptyText={t('shell.table.empty')}
-          rowAttributes={(row) =>
-            ({ 'data-testid': `studio-field-/fields/${row.index}` }) as React.HTMLAttributes<HTMLElement>
-          }
-          columns={columns}
-        />
-        {readOnly ? null : (
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={addField}>{t('shell.studio.entity.addField')}</Button>
-          </div>
-        )}
-        <RemovedRows layer={layer} list="/fields" />
-      </Flex>
+      <AxisFieldGroup {...groupTexts(t, 'fields')}>
+        <Flex vertical gap="small">
+          <AxisTable<FieldRow>
+            dataSource={fields.map((field, index) => ({ field, index }))}
+            rowKey={(row) => String(row.index)}
+            emptyText={t('shell.table.empty')}
+            rowAttributes={(row) =>
+              ({ 'data-testid': `studio-field-/fields/${row.index}` }) as React.HTMLAttributes<HTMLElement>
+            }
+            columns={columns}
+          />
+          {readOnly ? null : (
+            <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+              <Button onClick={addField}>{t('shell.studio.entity.addField')}</Button>
+            </div>
+          )}
+          <RemovedRows layer={layer} list="/fields" />
+        </Flex>
+      </AxisFieldGroup>
     </div>
   )
-}
+})
+
+/** The name box of a field's row, with the mark of a customization layer. */
+const NameCell = memo(function NameCell({
+  index,
+  field,
+  layer,
+  onChange,
+}: {
+  index: number
+  field: unknown
+  layer: DesignerLayer | undefined
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const name = text(isContent(field) ? field.name : undefined)
+  return (
+    <Flex vertical gap="small">
+      <div data-testid={`studio-field-/fields/${index}/name`}>
+        <Input
+          aria-label={t('shell.studio.entity.fieldName')}
+          value={name}
+          onChange={(event) => onChange(`/fields/${index}/name`, event.target.value)}
+        />
+      </div>
+      {layer && <LayerMarkTag layer={layer} list="/fields" index={index} name={name} />}
+    </Flex>
+  )
+})
+
+/** The type picker of a field's row. */
+const TypeCell = memo(function TypeCell({
+  index,
+  field,
+  onChange,
+}: {
+  index: number
+  field: unknown
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const content = isContent(field) ? field : {}
+  return (
+    <div data-testid={`studio-field-/fields/${index}/type`}>
+      <Select
+        aria-label={t('shell.studio.entity.fieldType')}
+        showSearch
+        optionFilterProp="label"
+        virtual={false}
+        style={{ minWidth: 160 }}
+        value={typeof content.type === 'string' ? content.type : undefined}
+        options={fieldTypes.map((option) => ({ value: option, label: option }))}
+        onChange={(next: string) => onChange(`/fields/${index}`, changeFieldType(content, next))}
+      />
+    </div>
+  )
+})
+
+/** The help text, the settings and the migration warning of a field's row. */
+const SettingsCell = memo(function SettingsCell({
+  index,
+  field,
+  currencyNames,
+  readOnly,
+  warning,
+  onChange,
+}: {
+  index: number
+  field: unknown
+  currencyNames: (string | null)[] | undefined
+  readOnly: boolean
+  warning: FieldWarning | undefined
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  return (
+    <Flex vertical gap="small">
+      <AxisField {...fieldTexts(t, 'fields.helpText')}>
+        <FieldLabel
+          name={fieldTexts(t, 'fields.helpText').label}
+          pointer={`/fields/${index}/help`}
+          value={isContent(field) ? field.help : undefined}
+          onChange={onChange}
+        />
+      </AxisField>
+      <Settings
+        index={index}
+        field={isContent(field) ? field : {}}
+        currencyNames={currencyNames}
+        readOnly={readOnly}
+        onChange={onChange}
+      />
+      {warning && (
+        <AxisAlert
+          kind="warning"
+          data-testid={`studio-migration-warning-/fields/${index}`}
+          message={t(
+            warning === 'enum'
+              ? 'shell.studio.entity.migration.enumWarning'
+              : 'shell.studio.entity.migration.uniqueWarning',
+          )}
+        />
+      )}
+    </Flex>
+  )
+})
+
+/** Move up, Move down and Remove of a field's row. */
+const ActionsCell = memo(function ActionsCell({
+  index,
+  last,
+  onMove,
+  onRemove,
+}: {
+  index: number
+  last: boolean
+  onMove: (index: number, offset: number) => void
+  onRemove: (index: number) => void
+}) {
+  const t = useText()
+  return (
+    <Flex gap="small">
+      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+      <Button disabled={index === 0} onClick={() => onMove(index, -1)}>
+        {t('shell.studio.entity.moveUp')}
+      </Button>
+      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+      <Button disabled={last} onClick={() => onMove(index, 1)}>
+        {t('shell.studio.entity.moveDown')}
+      </Button>
+      <AxisButton role="destructive" onClick={() => onRemove(index)}>
+        {t('shell.studio.entity.removeField')}
+      </AxisButton>
+    </Flex>
+  )
+})
 
 /** The text key picker of a field's label or help, named `name`. Clearing it removes the text. */
-function FieldLabel({
+const FieldLabel = memo(function FieldLabel({
   name,
   id,
   'aria-describedby': describedBy,
@@ -502,10 +597,10 @@ function FieldLabel({
       )}
     </div>
   )
-}
+})
 
 /** The checkbox of `required` or `unique`, shown only when the field's type takes the setting. */
-function Flag({
+const Flag = memo(function Flag({
   field,
   setting,
   pointer,
@@ -530,19 +625,19 @@ function Flag({
       />
     </div>
   )
-}
+})
 
 /** The settings of one field that its type takes, each with its own input and id. */
 function Settings({
   index,
   field,
-  fields,
+  currencyNames,
   readOnly,
   onChange,
 }: {
   index: number
   field: Content
-  fields: unknown[]
+  currencyNames: (string | null)[] | undefined
   readOnly: boolean
   onChange: ChangeHandler
 }) {
@@ -564,15 +659,18 @@ function Settings({
     )
   }
 
-  function flag(setting: 'creator' | 'sensitive' | 'exactLookup') {
+  /** The yes-or-no setting `setting`: a switch for searchable, a checkbox for the others. */
+  function flag(setting: 'creator' | 'sensitive' | 'exactLookup' | 'searchable') {
     return (
-      <Checkbox
+      <AxisCheckboxField
+        {...settingTexts(setting)}
+        kind={setting === 'searchable' ? 'switch' : 'checkbox'}
         checked={field[setting] === true}
-        // Even a false exactLookup is refused on a field that is not sensitive, so unchecking removes it.
-        onChange={(event) =>
+        // Even a false exactLookup is refused on a field that is not sensitive, so unchecking removes it, as it does for searchable.
+        onChange={(checked) =>
           onChange(
             `${pointer}/${setting}`,
-            setting === 'exactLookup' && !event.target.checked ? undefined : event.target.checked,
+            (setting === 'exactLookup' || setting === 'searchable') && !checked ? undefined : checked,
           )
         }
       />
@@ -587,17 +685,6 @@ function Settings({
       case 'scale':
       case 'maxSize':
         return number(setting)
-      case 'creator':
-      case 'sensitive':
-      case 'exactLookup':
-        return flag(setting)
-      case 'searchable':
-        return (
-          <Switch
-            checked={field.searchable === true}
-            onChange={(checked) => onChange(`${pointer}/searchable`, checked ? true : undefined)}
-          />
-        )
       case 'min':
       case 'max':
         return (
@@ -669,14 +756,8 @@ function Settings({
             key={setting}
             pointer={pointer}
             field={field}
-            currencyFields={fields.flatMap((other, position) =>
-              position !== index &&
-              isContent(other) &&
-              (other.type === 'enum' || other.type === 'text') &&
-              typeof other.name === 'string' &&
-              other.name !== ''
-                ? [other.name]
-                : [],
+            currencyFields={(currencyNames ?? []).flatMap((name, position) =>
+              position !== index && name !== null ? [name] : [],
             )}
             onChange={onChange}
           />
@@ -692,7 +773,11 @@ function Settings({
           />
         ) : (
           <div key={setting} data-testid={`studio-field-${pointer}/${setting}`}>
-            {setting === 'valueLabels' ? input(setting) : labelled(setting)}
+            {setting === 'creator' || setting === 'sensitive' || setting === 'exactLookup' || setting === 'searchable'
+              ? flag(setting)
+              : setting === 'valueLabels'
+                ? input(setting)
+                : labelled(setting)}
           </div>
         ),
       )}
@@ -790,17 +875,15 @@ function CurrencySource({
 
   return (
     <Flex vertical gap="small">
-      <AxisField {...source}>
-        <Radio.Group
-          role="radiogroup"
-          aria-label={source.label}
-          value={fromField ? 'field' : 'code'}
-          onChange={(event) => switchTo(event.target.value)}
-        >
-          <Radio value="code">{t('shell.studio.entity.currencyFixed')}</Radio>
-          <Radio value="field">{t('shell.studio.entity.currencyFromField')}</Radio>
-        </Radio.Group>
-      </AxisField>
+      <AxisChoiceField
+        {...source}
+        value={fromField ? 'field' : 'code'}
+        onChange={(next) => switchTo(next === 'field' ? 'field' : 'code')}
+        options={[
+          { value: 'code', ...fieldTexts(t, 'fields.currencySource.code') },
+          { value: 'field', ...fieldTexts(t, 'fields.currencySource.field') },
+        ]}
+      />
       {fromField ? (
         <Picker
           pointer={`${pointer}/currencyField`}
@@ -893,7 +976,7 @@ function ValueLabels({ pointer, field, onChange }: { pointer: string; field: Con
  * column and writes the picked names in order. Every change writes the whole `indexes` array, and an empty list
  * removes the key.
  */
-function Indexes({
+const Indexes = memo(function Indexes({
   indexes,
   fields,
   readOnly,
@@ -938,74 +1021,76 @@ function Indexes({
 
   return (
     <div data-testid="studio-field-/indexes">
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.entity.indexes')}</Typography.Text>
-        {list.map((index, position) => {
-          const pointer = `/indexes/${position}`
-          const content = isContent(index) ? index : {}
-          return (
-            <Flex key={position} gap="small" align="flex-start" wrap data-testid={`studio-field-${pointer}`}>
-              <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
-                {text(content.name)}
-              </Typography.Text>
-              {layer && <LayerMarkTag layer={layer} list="/indexes" index={position} name={text(content.name)} />}
-              <div data-testid={`studio-field-${pointer}/fields`} style={{ flex: 1, minWidth: 240 }}>
-                <AxisField {...fieldTexts(t, 'indexes.fields')}>
-                  <Select
-                    mode="multiple"
-                    virtual={false}
-                    style={{ width: '100%' }}
-                    value={
-                      Array.isArray(content.fields) ? content.fields.filter((item) => typeof item === 'string') : []
-                    }
-                    options={choices.map((name) => ({ value: name, label: name }))}
-                    onChange={(next: string[]) => onChange(`${pointer}/fields`, next)}
-                  />
-                </AxisField>
-              </div>
-              <div data-testid={`studio-field-${pointer}/unique`}>
-                <AxisField {...fieldTexts(t, 'indexes.unique')}>
-                  <Checkbox
-                    checked={content.unique === true}
-                    onChange={(event) => onChange(`${pointer}/unique`, event.target.checked ? true : undefined)}
-                  />
-                </AxisField>
-              </div>
-              {readOnly ? null : (
-                <Flex gap="small">
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button disabled={position === 0} onClick={() => move(position, -1)}>
-                    {t('shell.studio.entity.moveUp')}
-                  </Button>
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button disabled={position === list.length - 1} onClick={() => move(position, 1)}>
-                    {t('shell.studio.entity.moveDown')}
-                  </Button>
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button danger onClick={() => write(list.filter((_, other) => other !== position))}>
-                    {t('shell.studio.entity.removeIndex')}
-                  </Button>
+      <AxisFieldGroup {...groupTexts(t, 'indexes')}>
+        <Flex vertical gap="small">
+          {list.map((index, position) => {
+            const pointer = `/indexes/${position}`
+            const content = isContent(index) ? index : {}
+            return (
+              <Flex key={position} vertical gap="small" data-testid={`studio-field-${pointer}`}>
+                <Flex gap="small" align="center">
+                  <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
+                    {text(content.name)}
+                  </Typography.Text>
+                  {layer && <LayerMarkTag layer={layer} list="/indexes" index={position} name={text(content.name)} />}
                 </Flex>
-              )}
-            </Flex>
-          )
-        })}
-        {readOnly ? null : (
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => write([...list, { name: uniqueStepName(list, 'index'), fields: [] }])}>
-              {t('shell.studio.entity.addIndex')}
-            </Button>
-          </div>
-        )}
-        <RemovedRows layer={layer} list="/indexes" />
-      </Flex>
+                <div data-testid={`studio-field-${pointer}/fields`} style={{ minWidth: 240 }}>
+                  <AxisField {...fieldTexts(t, 'indexes.fields')} required>
+                    <Select
+                      mode="multiple"
+                      virtual={false}
+                      style={{ width: '100%' }}
+                      value={
+                        Array.isArray(content.fields) ? content.fields.filter((item) => typeof item === 'string') : []
+                      }
+                      options={choices.map((name) => ({ value: name, label: name }))}
+                      onChange={(next: string[]) => onChange(`${pointer}/fields`, next)}
+                    />
+                  </AxisField>
+                </div>
+                <div data-testid={`studio-field-${pointer}/unique`}>
+                  <AxisCheckboxField
+                    {...fieldTexts(t, 'indexes.unique')}
+                    checked={content.unique === true}
+                    onChange={(checked) => onChange(`${pointer}/unique`, checked ? true : undefined)}
+                  />
+                </div>
+                {readOnly ? null : (
+                  <Flex gap="small">
+                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                    <Button disabled={position === 0} onClick={() => move(position, -1)}>
+                      {t('shell.studio.entity.moveUp')}
+                    </Button>
+                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                    <Button disabled={position === list.length - 1} onClick={() => move(position, 1)}>
+                      {t('shell.studio.entity.moveDown')}
+                    </Button>
+                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                    <Button danger onClick={() => write(list.filter((_, other) => other !== position))}>
+                      {t('shell.studio.entity.removeIndex')}
+                    </Button>
+                  </Flex>
+                )}
+              </Flex>
+            )
+          })}
+          {readOnly ? null : (
+            <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+              <Button onClick={() => write([...list, { name: uniqueStepName(list, 'index'), fields: [] }])}>
+                {t('shell.studio.entity.addIndex')}
+              </Button>
+            </div>
+          )}
+          <RemovedRows layer={layer} list="/indexes" />
+        </Flex>
+      </AxisFieldGroup>
     </div>
   )
-}
+})
 
 /** The validations of the entity as rows of a name, an expression, a message key and a field. */
-function Validations({
+const Validations = memo(function Validations({
   validations,
   fieldNames,
   readOnly,
@@ -1031,72 +1116,103 @@ function Validations({
 
   return (
     <div data-testid="studio-field-/validations">
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.entity.validations')}</Typography.Text>
-        {list.map((validation, index) => {
-          const pointer = `/validations/${index}`
-          const content = isContent(validation) ? validation : {}
-          const expression = fieldTexts(t, 'validations.expression')
-          return (
-            <Flex key={index} gap="small" align="flex-start" wrap data-testid={`studio-field-${pointer}`}>
-              <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
-                {text(content.name)}
-              </Typography.Text>
-              {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
-              <div data-testid={`studio-field-${pointer}/expression`} style={{ flex: 1, minWidth: 240 }}>
-                <AxisField {...expression}>
-                  <Expression
-                    pointer={`${pointer}/expression`}
-                    name={expression.label}
-                    value={text(content.expression)}
-                    required
-                    readOnly={readOnly}
-                    onChange={onChange}
-                  />
-                </AxisField>
-              </div>
-              <Picker
-                pointer={`${pointer}/message/textKey`}
-                {...fieldTexts(t, 'validations.message')}
-                kind="text"
-                value={isContent(content.message) ? content.message.textKey : undefined}
-                required
-                onPick={(next) => onChange(`${pointer}/message/textKey`, next ?? '')}
-              />
-              <Picker
-                pointer={`${pointer}/field`}
-                {...fieldTexts(t, 'validations.field')}
-                options={fieldNames}
-                value={content.field}
-                required
-                onPick={(next) => onChange(`${pointer}/field`, next ?? '')}
-              />
-              {readOnly ? null : (
-                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                <Button danger onClick={() => onChange(pointer, undefined)}>
-                  {t('shell.studio.entity.removeValidation')}
-                </Button>
-              )}
-            </Flex>
-          )
-        })}
-        {readOnly ? null : (
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button
-              onClick={() =>
-                onChange('/validations', [
-                  ...list,
-                  { name: uniqueStepName(list, 'validation'), expression: '', message: { textKey: '' }, field: '' },
-                ])
-              }
-            >
-              {t('shell.studio.entity.addValidation')}
-            </Button>
-          </div>
-        )}
-        <RemovedRows layer={layer} list="/validations" />
-      </Flex>
+      <AxisFieldGroup {...groupTexts(t, 'validations')}>
+        <Flex vertical gap="small">
+          {list.map((validation, index) => (
+            <ValidationRow
+              key={index}
+              index={index}
+              validation={validation}
+              fieldNames={fieldNames}
+              readOnly={readOnly}
+              layer={layer}
+              onChange={onChange}
+            />
+          ))}
+          {readOnly ? null : (
+            <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+              <Button
+                onClick={() =>
+                  onChange('/validations', [
+                    ...list,
+                    { name: uniqueStepName(list, 'validation'), expression: '', message: { textKey: '' }, field: '' },
+                  ])
+                }
+              >
+                {t('shell.studio.entity.addValidation')}
+              </Button>
+            </div>
+          )}
+          <RemovedRows layer={layer} list="/validations" />
+        </Flex>
+      </AxisFieldGroup>
     </div>
   )
-}
+})
+
+/** One validation of the entity, which draws again only when its own validation or the field names change. */
+const ValidationRow = memo(function ValidationRow({
+  index,
+  validation,
+  fieldNames,
+  readOnly,
+  layer,
+  onChange,
+}: {
+  index: number
+  validation: unknown
+  fieldNames: string[]
+  readOnly: boolean
+  layer: DesignerLayer | undefined
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const pointer = `/validations/${index}`
+  const content = isContent(validation) ? validation : {}
+  const expression = fieldTexts(t, 'validations.expression')
+  return (
+    <Flex vertical gap="small" data-testid={`studio-field-${pointer}`}>
+      <Flex gap="small" align="center">
+        <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
+          {text(content.name)}
+        </Typography.Text>
+        {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
+      </Flex>
+      <div data-testid={`studio-field-${pointer}/expression`} style={{ minWidth: 240 }}>
+        <AxisField {...expression} required>
+          <Expression
+            pointer={`${pointer}/expression`}
+            name={expression.label}
+            value={text(content.expression)}
+            required
+            readOnly={readOnly}
+            onChange={onChange}
+          />
+        </AxisField>
+      </div>
+      <Picker
+        pointer={`${pointer}/message/textKey`}
+        {...fieldTexts(t, 'validations.message')}
+        kind="text"
+        value={isContent(content.message) ? content.message.textKey : undefined}
+        required
+        onPick={(next) => onChange(`${pointer}/message/textKey`, next ?? '')}
+      />
+      <Picker
+        pointer={`${pointer}/field`}
+        {...fieldTexts(t, 'validations.field')}
+        options={fieldNames}
+        value={content.field}
+        required
+        onPick={(next) => onChange(`${pointer}/field`, next ?? '')}
+      />
+      {readOnly ? null : (
+        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
+        <Button danger onClick={() => onChange(pointer, undefined)}>
+          {t('shell.studio.entity.removeValidation')}
+        </Button>
+      )}
+    </Flex>
+  )
+})

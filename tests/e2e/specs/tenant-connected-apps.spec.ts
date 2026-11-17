@@ -105,7 +105,7 @@ test('an administrator allows one outside client in Connected apps and a reload 
   await adminPage.waitForURL(`https://${host}/`)
 
   const tab = await openConnectedApps(adminPage)
-  await tab.getByRole('radio', { name: 'Allow list', exact: true }).check()
+  await tab.getByRole('radio', { name: /^Allow list/ }).check()
   await tab.getByRole('combobox', { name: 'Allowed client IDs', exact: true }).fill('e2e-client')
   await adminPage.keyboard.press('Enter')
   await tab.getByRole('button', { name: 'Save', exact: true }).click()
@@ -113,7 +113,7 @@ test('an administrator allows one outside client in Connected apps and a reload 
 
   await adminPage.reload()
   await adminPage.getByRole('tab', { name: 'Connected apps', exact: true }).click()
-  await expect(tab.getByRole('radio', { name: 'Allow list', exact: true })).toBeChecked()
+  await expect(tab.getByRole('radio', { name: /^Allow list/ })).toBeChecked()
   await expect(tab.getByText('e2e-client', { exact: true })).toBeVisible()
 })
 
@@ -126,7 +126,7 @@ test('a person consents to an allowed client and calls /mcp, then the administra
 
   // The administrator adds the client to the allow list, which already holds e2e-client.
   const tab = await openConnectedApps(adminPage)
-  await tab.getByRole('radio', { name: 'Allow list', exact: true }).check()
+  await tab.getByRole('radio', { name: /^Allow list/ }).check()
   await tab.getByRole('combobox', { name: 'Allowed client IDs', exact: true }).fill(clientId)
   await adminPage.keyboard.press('Enter')
   await tab.getByRole('button', { name: 'Save', exact: true }).click()

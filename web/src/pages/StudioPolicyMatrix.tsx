@@ -2,6 +2,7 @@ import { Button, Checkbox, Flex, Select, Tag, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyState } from '../platform/EmptyState'
 import { diffPatch, setAt } from '../platform/jsonPatch'
@@ -491,34 +492,39 @@ function OwnGrants({
                   {grant.name}
                 </Typography.Text>
               )}
-              <Checkbox.Group
-                data-testid="studio-matrix-actions"
-                aria-describedby={missing ? missingId : undefined}
-                options={accepted}
-                value={actions.filter((action) => accepted.includes(action))}
-                onChange={(ticked) => setActions(index, ticked)}
-              />
-              {unaccepted.map((action) => (
-                // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
-                <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
-                  {t('shell.studio.matrix.unacceptedAction')} {action}
-                </Tag>
-              ))}
               {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button size="small" disabled={grants.length === 1} onClick={() => edit(`/grants/${index}`, undefined)}>
                 {t('shell.studio.matrix.removeGrant')}
               </Button>
             </Flex>
-            {missing && (
-              <Typography.Text type="danger" id={missingId} data-testid="studio-matrix-actions-required">
-                {t('shell.studio.matrix.actionsRequired')}
-              </Typography.Text>
-            )}
+            {/* The actions are one group with its help, see docs/reference/actions-and-controls.md#fields. */}
+            <AxisFieldGroup title={t('shell.studio.matrix.actions')} help={t('shell.studio.matrix.actions.help')}>
+              <Flex gap="small" align="center" wrap>
+                <Checkbox.Group
+                  data-testid="studio-matrix-actions"
+                  aria-describedby={missing ? missingId : undefined}
+                  options={accepted}
+                  value={actions.filter((action) => accepted.includes(action))}
+                  onChange={(ticked) => setActions(index, ticked)}
+                />
+                {unaccepted.map((action) => (
+                  // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
+                  <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
+                    {t('shell.studio.matrix.unacceptedAction')} {action}
+                  </Tag>
+                ))}
+              </Flex>
+              {missing && (
+                <Typography.Text type="danger" id={missingId} data-testid="studio-matrix-actions-required">
+                  {t('shell.studio.matrix.actionsRequired')}
+                </Typography.Text>
+              )}
+            </AxisFieldGroup>
             {target.kind === 'entity' && (
               <>
                 <AxisField label={t('shell.studio.matrix.filter')} help={t('shell.studio.matrix.filter.help')}>
                   <ExpressionField
-                    check={{ application, resourceId: String(draft.id), kind: 'policy', draft, names }}
+                    check={{ application, resourceId: String(draft.id), kind: 'policy', draft: () => draft, names }}
                     pointer={filterPath}
                     name={t('shell.studio.matrix.filter')}
                     value={filter}
@@ -526,16 +532,16 @@ function OwnGrants({
                     onChange={(path, next) => edit(path, next)}
                   />
                 </AxisField>
-                <Select
-                  mode="multiple"
-                  aria-label={t('shell.studio.matrix.fields')}
-                  placeholder={t('shell.studio.matrix.allFields')}
-                  style={{ minWidth: 240 }}
-                  virtual={false}
-                  value={stringsOf(grant.fields)}
-                  options={fields.map((field) => ({ value: field.name, label: field.name }))}
-                  onChange={(next: string[]) => edit(`/grants/${index}/fields`, next.length === 0 ? undefined : next)}
-                />
+                <AxisField label={t('shell.studio.matrix.fields')} help={t('shell.studio.matrix.fields.help')}>
+                  <Select
+                    mode="multiple"
+                    style={{ minWidth: 240 }}
+                    virtual={false}
+                    value={stringsOf(grant.fields)}
+                    options={fields.map((field) => ({ value: field.name, label: field.name }))}
+                    onChange={(next: string[]) => edit(`/grants/${index}/fields`, next.length === 0 ? undefined : next)}
+                  />
+                </AxisField>
               </>
             )}
           </Flex>

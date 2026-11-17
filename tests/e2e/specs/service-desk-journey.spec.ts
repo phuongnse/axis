@@ -602,7 +602,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         await page
           .getByTestId(recipient)
           .locator('label')
-          .filter({ has: page.getByRole('radio', { name: 'Role', exact: true }) })
+          .filter({ has: page.getByRole('radio', { name: /^Role/ }) })
           .click()
         await pickLabelled(page, `${recipient}/role`, 'roles', spec.to.role)
       } else {
@@ -1071,12 +1071,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     ) {
       await createResource(page, 'process', name)
       await openFormTab(page)
-      await page
-        .locator('label')
-        .filter({
-          has: page.getByRole('radio', { name: 'Parameters', exact: true }),
-        })
-        .click()
+      await page.getByRole('radio', { name: /^Parameters/ }).click()
       await expect(page.getByTestId('studio-field-/entity')).toHaveCount(0)
       for (const [index, [parameter, type]] of parameters.entries()) {
         await page.getByRole('button', { name: 'Add parameter', exact: true }).click()
@@ -1100,7 +1095,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       await page
         .getByTestId('studio-field-/steps/0/to/0')
         .locator('label')
-        .filter({ has: page.getByRole('radio', { name: 'Role', exact: true }) })
+        .filter({ has: page.getByRole('radio', { name: /^Role/ }) })
         .click()
       await pickLabelled(page, 'studio-field-/steps/0/to/0/role', 'roles', 'service-desk-lead')
       await page

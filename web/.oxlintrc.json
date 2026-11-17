@@ -100,6 +100,12 @@
       "rules": { "axis/no-prototype-write": "off" }
     },
     {
+      // A page's parts sit a rule apart, so a page or a console monitor draws no full-size card. A small card is an item
+      // in a list.
+      "files": ["src/pages/**", "src/platform/Console*.tsx"],
+      "rules": { "axis/no-card-panel": "error" }
+    },
+    {
       // Tests patch prototypes such as Element.prototype.scrollIntoView, call Object.assign and draw their own widgets
       // on purpose. They stay under the raw HTML rules.
       "files": ["**/*.test.ts", "**/*.test.tsx", "src/test/**"],
@@ -112,6 +118,7 @@
         "axis/no-antd-alert": "off",
         "axis/no-preset-tag-colour": "off",
         "axis/field-label-through-axis-field": "off",
+        "axis/no-card-panel": "off",
         "no-restricted-imports": "off",
         "no-restricted-properties": [
           "error",

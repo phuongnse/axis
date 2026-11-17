@@ -26,6 +26,7 @@ internal sealed class CellTestServer : IAsyncDisposable
     private readonly List<string> _jobStates = [];
     private WebApplication _app = null!;
     private int _tokenCount;
+    private int _tenantListReads;
     private int _refusals;
     private int _jobReads;
 
@@ -49,6 +50,9 @@ internal sealed class CellTestServer : IAsyncDisposable
     /// <summary>The tokens issued so far.</summary>
     public int TokenCount => Volatile.Read(ref _tokenCount);
 
+    /// <summary>How many requests the tenant list route has answered with a page.</summary>
+    public int TenantListReads => Volatile.Read(ref _tenantListReads);
+
     /// <summary>The <c>Authorization</c> header of each token request.</summary>
     public IReadOnlyCollection<string> TokenRequests => _tokenRequests;
 
@@ -65,6 +69,12 @@ internal sealed class CellTestServer : IAsyncDisposable
 
     /// <summary>The tenants that the tenant list route answers, in this order.</summary>
     public IReadOnlyList<(string Id, string[] Hosts)> Tenants { get; set; } = [];
+
+    /// <summary>
+    /// When set, gives the whole tenant list for the request with this number, counted from 1, so a test can change the list between
+    /// pages. It replaces <see cref="Tenants"/>.
+    /// </summary>
+    public Func<int, IReadOnlyList<(string Id, string[] Hosts)>>? TenantsForRead { get; set; }
 
     /// <summary>When set, the tenant list route answers this status and no list.</summary>
     public int? TenantListStatus { get; set; }
@@ -247,19 +257,29 @@ internal sealed class CellTestServer : IAsyncDisposable
                     statusCode: StatusCodes.Status202Accepted);
         });
 
-        app.MapGet("/api/cell/tenants", () =>
+        app.MapGet("/api/cell/tenants", (int? page, int? pageSize) =>
         {
             if (Refuse())
             {
                 return Results.StatusCode(StatusCodes.Status401Unauthorized);
             }
 
-            return TenantListStatus is { } status
-                ? Results.StatusCode(status)
-                : Results.Json(new
-                {
-                    items = Tenants.Select(tenant => new { id = tenant.Id, status = "active", application = (string?)null, hosts = tenant.Hosts, failedWork = (object?)null }),
-                });
+            if (TenantListStatus is { } status)
+            {
+                return Results.StatusCode(status);
+            }
+
+            var read = Interlocked.Increment(ref _tenantListReads);
+            var all = TenantsForRead?.Invoke(read) ?? Tenants;
+            var size = pageSize ?? 20;
+            return Results.Json(new
+            {
+                items = all.Skip(((page ?? 1) - 1) * size).Take(size)
+                    .Select(tenant => new { id = tenant.Id, status = "active", application = (string?)null, hosts = tenant.Hosts, failedWork = (object?)null }),
+                page = page ?? 1,
+                pageSize = size,
+                totalCount = all.Count,
+            });
         });
 
         app.MapGet("/api/cell/jobs/{id:guid}", (Guid id) =>

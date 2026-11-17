@@ -10,23 +10,29 @@ is in [Studio workspace](studio-workspace.md), and what each editor and designer
 ## Sections
 
 The form puts a resource's root properties in sections, so that an author reads them in groups that
-each say what they hold. Each section is a panel on `surface`, as the Overview's blocks are, with a
-heading and a line that says what it holds. An Overview block's heading has no line. The application's
+each say what they hold. Each section is a part with no panel, with its
+heading in `heading5` and a line that says what it holds. The sections sit one above another, with a `divider` rule
+before every one but the first, as [layout](shell.md#layout) says. An Overview block's heading has no line. The application's
 Settings, for example, has General (name, title, description and time zone), Modules, Packages and File
-storage, then the [auto-accept switch](ai-authoring-in-studio.md#auto-accept). A property that no section
-names goes to a last section with no heading.
+storage. Its [auto-accept switch](ai-authoring-in-studio.md#auto-accept) is the last part, after File storage,
+with no heading. A property that no section names goes to a last section with no heading.
 
 - **One field in a section.** A section that holds one field names it in its heading, so the field has
   no label of its own. A section that holds one object shows the object's fields itself.
-- **One list in a section.** A section that holds one list puts the list's Add… on the right of its
-  heading, and the table has no toolbar row.
-- **One rhythm.** The sections are `spacing-md` apart.
-- **One shared part.** The section is one shared part that the generic form draws and the typed editors can
-  draw too.
-- **Used by the generic form and most editors.** The generic form and the page, process, connector, identity
-  provider and scenario editors draw their sections through it.
-- **Every Studio form is built from it.** _(planned for M33)_ The entity designer and the seed editor draw their
-  sections through it too.
+- **One list in a section.** In the generic form's sections, a section that holds one list puts the list's Add…
+  on the right of its heading, and the table has no toolbar row.
+- **One rhythm.** There is `spacing-md` on each side of the rule.
+- **One shared part.** The section is `SectionPart`, in `SectionParts`, one shared part that the generic form
+  draws and the typed editors draw too.
+- **Blocks below the generic form.** A typed editor's block below the generic form is a part of the same list, with
+  a rule before it. A seed's records, an endpoint's values and event, a site's sign-in providers and a form's steps
+  are such parts. Each is headed with its field's title and help, and the auto-accept switch is a part with no heading.
+- **Used by the generic form, most editors and the Overview.** The generic form, the seed, page, process, connector,
+  identity provider and scenario editors and the Studio Overview draw their sections through it.
+  A module data source, rule, trigger, sequence, event or seed draws the same parts, under its Customized tag and Reset all.
+- **Add… in the heading of every list part** _(planned for M33)_. The records, values, sign-in providers and steps
+  parts put their Add… on the right of their heading.
+- **Every Studio form is built from it.** _(planned for M33)_ The entity designer draws its sections through it too.
 
 ## Fields
 
@@ -135,7 +141,8 @@ before a rename or a delete. A kind nothing can use, the application, has no suc
 is shown by its own editor, and deleting it breaks nothing it uses, so it has no list of its own, see
 [D141](../decisions/d141-the-reference-index-and-what-uses-a-resource.md).
 
-The tab is the [standard table](actions-and-controls.md#tables), flat, with search and the kind filter:
+The tab is the [standard table](actions-and-controls.md#tables), flat, with search and Filter on Kind, whose options
+are the kinds in the rows:
 
 1. Name: the other resource by its label, as the link that opens it at the path of the reference.
 2. Kind, as wide as its content.
@@ -150,7 +157,8 @@ says so.
 
 The save bar holds what acts on the whole draft. While there is something to save, it stays at the foot
 of the window across the content, drawn over the footer: "Unsaved changes" on the left, Undo and Redo as
-icons, then Discard and Save on the right. With nothing to save it is not drawn.
+icons, then Discard and Save on the right. With nothing to save it is not drawn. At narrow width Discard
+folds into the More actions menu, as an [action bar](actions-and-controls.md#buttons) does.
 
 - **While a step can be redone.** The bar stays, reading "No unsaved changes", with Redo on and no
   Discard, as nothing is left to discard. Save is off.
@@ -213,7 +221,7 @@ release routes are in [release page](studio-workspace.md#release-page).
 `GET .../resource-activity` answers `{ items }`, one for each resource of the folder and of the modules the
 application uses, each `{ id, module, status, titles, descriptions, modifiedBy, modifiedAt }`. It is a route of
 its own, so the resource list stays free of the database. Studio's [kind lists](studio.md#kind-lists-and-module-resources)
-read it. Like every Studio route it answers `401` without a session and `403` without the author role.
+build on the same read through the [kind list route](#kind-list). Like every Studio route it answers `401` without a session and `403` without the author role.
 
 - **`status`** is `new`, `changed` or `published`, against the live release, comparing each file as canonical
   JSON. A file the release does not hold is new, and with no live release every file is. A file it holds that
@@ -231,3 +239,45 @@ read it. Like every Studio route it answers `401` without a session and `403` wi
   git or by hand shows the dash rather than the wrong person. A module resource's writer is whoever last
   wrote its layer. `modifiedBy` is the user's current profile name, else the name stored with the write.
   A record that fails is logged and never fails the write.
+
+### Kind list
+
+`GET /api/studio/apps/{application}/kinds/{kind}/resources` answers one page of a kind's list in Studio, see
+[kind lists](studio.md#kind-lists-and-module-resources), as `{ items, page, pageSize, totalCount }`. Its rows are the
+folder's own resources of the kind and the resources of that kind in the module versions the application pins, read as
+the [resource activity](#resource-activity) is, so each has its status and its last write. Like every Studio route it
+answers `401` without a session and `403` without the author role, and `404` for an unknown application. A kind with no
+resources answers an empty page.
+
+Each item is `{ id, title, locale, description, module, moduleLabel, status, modifiedBy, modifiedAt }`.
+
+- **`locale`** is the UI locale, as the query parameter `locale`, and is `en` when it is missing. Titles and
+  descriptions are chosen as `textIn` of Studio does: the text in the locale, else in `en`, a blank one counting as
+  missing.
+- **`title`** is the text the row shows and sorts by. A text resource's title is its locale tag, such as `vi`, and its
+  item has `locale` set, so the browser shows the language's name, which the server cannot name. Any other title is the
+  resource's label in the locale, then in `en`, then its name, then its kind's singular name, as
+  `shell.studio.nav.kindOne.<kind>` says, in the locale and then in `en`. A module resource's name has no `<module>/` prefix.
+- **`description`** is the resource's description in the locale, else null.
+- **`module` and `moduleLabel`** are the module's id and the label of the module version the application pins, else the
+  id, for a module resource, and null for the folder's own.
+- **`status`, `modifiedBy` and `modifiedAt`** are as in the resource activity.
+
+The route takes the record API's `page`, `pageSize`, `sort`, `search` and `filter`, as
+[paging and sorting](record-api.md#paging-and-sorting) defines them, through the
+[shared list query](shared-widgets.md#which-widget). The columns are `name`, `description`, `module` and `modifiedBy`,
+which are text, `status`, which is an enum of `new`, `changed` and `published`, and `modifiedAt`, which is a date.
+
+- **`sort`.** One column. With none, the rows are in name order, ignoring letter case, then by id. A sort on `name`
+  ignores letter case, one on `status` orders New, Changed, Published and puts a scenario, which has none, last
+  ascending, and one on `modifiedAt` orders by the full time.
+- **`search`.** Keeps the rows whose `name`, `description` or `module` contains the text, ignoring letter case. The
+  `module` it compares is the label. Status is a filter and not a search term, because the search compares stored values.
+- **`filter`.** The same groups and operators as the record API. A condition on `modifiedAt` takes a day,
+  `YYYY-MM-DD`, and compares the day of the write in UTC.
+- **`totalCount`.** How many rows match, before the page is cut. A page past the end is `200` with empty `items` and
+  the real `totalCount`.
+
+A `page`, `pageSize`, `sort`, `search` or `filter` that is invalid, including a `sort` or a `filter` on a column the list
+does not hold, is `400` with a problem whose `errors` name the parameter. Each request compiles the folder and reads
+the tenant database for every kind before it keeps one, as the resource activity route does.

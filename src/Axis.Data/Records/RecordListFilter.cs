@@ -118,7 +118,32 @@ public sealed class RecordListFilter
     }
 
     /// <summary>The condition, wrapped in parentheses, that the row aliased <paramref name="rowAlias"/> matches. Its values are <c>@lf0</c>, <c>@lf1</c>, ….</summary>
-    internal string Sql(string rowAlias) => _root.Sql(rowAlias);
+    internal string Sql(string rowAlias) =>
+        Sql(field => $"{EntityNaming.Quote(rowAlias)}.{EntityNaming.Quote(EntityNaming.Column(field.Name))}");
+
+    /// <summary>
+    /// The condition, wrapped in parentheses, over the column expression that <paramref name="column"/> gives for each field, for
+    /// a list over a fixed table. The expressions are written in code and never come from a request. Its values are <c>@lf0</c>, <c>@lf1</c>, ….
+    /// </summary>
+    public string Sql(Func<FieldModel, string> column)
+    {
+        ArgumentNullException.ThrowIfNull(column);
+
+        return _root.Sql(column);
+    }
+
+    /// <summary>
+    /// Whether a row matches the filter, as the SQL of the filter would decide it for the same row. <paramref name="valueOf"/>
+    /// gives the row's value of a field: a string for text and enum, a number for integer, decimal and money, a
+    /// <see cref="DateOnly"/> for date and a <see cref="DateTimeOffset"/> for date-time, or null for none. The operators are
+    /// in the record API reference, under paging and sorting. A text match ignores letter case with ordinal rules.
+    /// </summary>
+    public bool Matches(Func<FieldModel, object?> valueOf)
+    {
+        ArgumentNullException.ThrowIfNull(valueOf);
+
+        return _root.Matches(valueOf);
+    }
 
     /// <summary>Adds the parameter of each condition that compares a value to <paramref name="command"/>.</summary>
     public void AddTo(NpgsqlCommand command)
@@ -146,13 +171,18 @@ public sealed class RecordListFilter
 
     private abstract record Node
     {
-        public abstract string Sql(string rowAlias);
+        public abstract string Sql(Func<FieldModel, string> column);
+
+        public abstract bool Matches(Func<FieldModel, object?> valueOf);
     }
 
     private sealed record Group(bool IsAll, List<Node> Children) : Node
     {
-        public override string Sql(string rowAlias) =>
-            $"({string.Join(IsAll ? " AND " : " OR ", Children.Select(child => child.Sql(rowAlias)))})";
+        public override string Sql(Func<FieldModel, string> column) =>
+            $"({string.Join(IsAll ? " AND " : " OR ", Children.Select(child => child.Sql(column)))})";
+
+        public override bool Matches(Func<FieldModel, object?> valueOf) =>
+            IsAll ? Children.All(child => child.Matches(valueOf)) : Children.Any(child => child.Matches(valueOf));
     }
 
     // Index is the position among the conditions that compare a value, or -1 for empty and notEmpty.
@@ -160,9 +190,9 @@ public sealed class RecordListFilter
     {
         public string ParameterName => $"lf{Index.ToString(CultureInfo.InvariantCulture)}";
 
-        public override string Sql(string rowAlias)
+        public override string Sql(Func<FieldModel, string> columnOf)
         {
-            var column = $"{EntityNaming.Quote(rowAlias)}.{EntityNaming.Quote(EntityNaming.Column(Field.Name))}";
+            var column = columnOf(Field);
             var placeholder = FieldTypes.HoldsDecimal(Field.Type) ? $"@{ParameterName}::numeric" : $"@{ParameterName}";
             var text = Field.Type == FieldType.Text;
             return Operator switch
@@ -178,6 +208,49 @@ public sealed class RecordListFilter
                 "notEmpty" => text ? $"({column} IS NOT NULL AND {column} <> '')" : $"{column} IS NOT NULL",
                 _ => throw new InvalidOperationException("Unknown operator."),
             };
+        }
+
+        // A comparison with null is never true, as in SQL, except ne, which is IS DISTINCT FROM.
+        public override bool Matches(Func<FieldModel, object?> valueOf)
+        {
+            var actual = valueOf(Field);
+            var text = Field.Type == FieldType.Text;
+            return Operator switch
+            {
+                "eq" => actual is not null && Compare(actual) == 0,
+                "ne" => actual is null || Compare(actual) != 0,
+                "contains" => actual is string held && held.Contains((string)Value!, StringComparison.OrdinalIgnoreCase),
+                "lt" => actual is not null && Compare(actual) < 0,
+                "lte" => actual is not null && Compare(actual) <= 0,
+                "gt" => actual is not null && Compare(actual) > 0,
+                "gte" => actual is not null && Compare(actual) >= 0,
+                "empty" => actual is null || (text && actual is ""),
+                "notEmpty" => actual is not null && !(text && actual is ""),
+                _ => throw new InvalidOperationException("Unknown operator."),
+            };
+        }
+
+        // Compares the row's value with the condition's. Numbers compare as decimal and text by ordinal rules.
+        private int Compare(object actual) => Field.Type switch
+        {
+            FieldType.Integer or FieldType.Decimal or FieldType.Money => ToDecimal(actual).CompareTo(ToDecimal(Value!)),
+            FieldType.Text or FieldType.Enum => string.CompareOrdinal((string)actual, (string)Value!),
+            _ => ((IComparable)actual).CompareTo(Value),
+        };
+
+        private static decimal ToDecimal(object value)
+        {
+            if (value is string text)
+            {
+                if (decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+                {
+                    return parsed;
+                }
+
+                return text.StartsWith('-') ? decimal.MinValue : decimal.MaxValue;
+            }
+
+            return Convert.ToDecimal(value, CultureInfo.InvariantCulture);
         }
     }
 

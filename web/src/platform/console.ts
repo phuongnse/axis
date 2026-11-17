@@ -103,7 +103,7 @@ export interface ConsoleWebhookDelivery {
   deliveredAt: string | null
 }
 
-/** A webhook of an active release, for the filter of the webhook deliveries. */
+/** A webhook of an active release, for the Webhook column's filter of the webhook deliveries. */
 export interface ConsoleWebhook {
   id: string
   name: string
@@ -123,7 +123,10 @@ export interface ConsoleWebhookDeliveryPage {
 /** The answer of the webhook deliveries route: a page, or the refusal that the page shows. */
 export type ConsoleWebhookDeliveriesResult = { kind: 'ok'; page: ConsoleWebhookDeliveryPage } | { kind: 'forbidden' }
 
-/** Loads one page of webhook deliveries. `query` holds the `page`, `application` and `webhook` parameters. */
+/**
+ * Loads one page of webhook deliveries. `query` is the record API's paging, sort, search and filter query string, which the
+ * view keeps under `webhookDeliveries.` in the address, and may hold the optional `application` and `webhook` ids.
+ */
 export async function fetchConsoleWebhookDeliveries(
   query: string,
   signal?: AbortSignal,
@@ -156,8 +159,8 @@ export interface ConsoleDeadLetterPage extends Omit<DeadLetterPage, 'items'> {
 }
 
 /**
- * Loads one page of the dead letters of the tenant, newest first. `query` holds the console API's `application`, `state`,
- * `page` and `pageSize`. A 403 returns {@link forbidden}. A 401 shows the sign-in prompt and throws, as any other failure does.
+ * Loads one page of the dead letters of the tenant, newest first until `query` sorts them. `query` holds the console API's
+ * `page`, `pageSize`, `sort`, `search` and `filter`, see docs/reference/operator-console.md#api. A 403 returns {@link forbidden}. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function fetchConsoleDeadLetters(
   query: string,
@@ -195,7 +198,7 @@ export interface ConsoleReleaseItem {
 /** One publish request of an application. It never holds the file snapshot, the diagnostics or the test results. */
 export interface ConsolePublishRequest {
   id: string
-  kind: 'publish' | 'activate' | 'test'
+  kind: 'validate' | 'publish' | 'activate' | 'test' | 'accept'
   target: string
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   label: string | null
@@ -208,7 +211,7 @@ export interface ConsolePublishRequest {
   releaseId: string | null
 }
 
-/** The publishing of one application: its release history and one page of its publish requests, newest first. */
+/** The publishing of one application: its release history and one page of its publish requests. */
 export interface ConsolePublishing {
   active: ConsoleActiveRelease | null
   releases: ConsoleReleaseItem[]
@@ -221,16 +224,18 @@ export interface ConsolePublishing {
 /** The answer of the publishing route: the publishing, or the refusal that the page shows. */
 export type ConsolePublishingResult = { kind: 'ok'; publishing: ConsolePublishing } | { kind: 'forbidden' }
 
-/** Loads the release history and one page of the publish requests of the application with the id `application`. */
+/**
+ * Loads the release history and one page of the publish requests of the application with the id `application`. `query` is the
+ * record API's paging, sort, search and filter query string, which the view keeps under `publishRequests.` in the address.
+ */
 export async function fetchConsolePublishing(
   application: string,
-  page: number,
+  query: string,
   signal?: AbortSignal,
 ): Promise<ConsolePublishingResult> {
-  const response = await apiFetch(
-    `/api/console/applications/${encodeURIComponent(application)}/publishing?page=${page}&pageSize=20`,
-    { signal },
-  )
+  const response = await apiFetch(`/api/console/applications/${encodeURIComponent(application)}/publishing?${query}`, {
+    signal,
+  })
   if (response.status === 403) {
     return { kind: 'forbidden' }
   }
@@ -256,26 +261,28 @@ export interface ConsoleScheduleItem {
   nextOccurrenceAt: string
 }
 
-/** The schedule triggers of the tenant, ordered by application and trigger name. They are not paged. */
-export interface ConsoleScheduleList {
+/**
+ * One page of the schedule triggers of the tenant, ordered by application and trigger name unless the query sorts them,
+ * with the number that matched before the page was cut.
+ */
+export interface ConsoleSchedulePage {
   items: ConsoleScheduleItem[]
+  page: number
+  pageSize: number
+  totalCount: number
 }
 
-/** The answer of the schedules route: the list, or the refusal that the view shows. */
-export type ConsoleSchedulesResult = { kind: 'ok'; schedules: ConsoleScheduleList } | { kind: 'forbidden' }
+/** The answer of the schedules route: the page, or the refusal that the view shows. */
+export type ConsoleSchedulesResult = { kind: 'ok'; schedules: ConsoleSchedulePage } | { kind: 'forbidden' }
 
-/** Loads the schedule triggers of the tenant, of one application when `application` is set. */
-export async function fetchConsoleSchedules(
-  application: string | undefined,
-  signal?: AbortSignal,
-): Promise<ConsoleSchedulesResult> {
-  const query = application ? `?${new URLSearchParams({ application })}` : ''
-  const response = await apiFetch(`/api/console/schedules${query}`, { signal })
+/** Loads one page of the schedule triggers of the tenant. `query` is the record API's paging, sort, search and filter query string. */
+export async function fetchConsoleSchedules(query: string, signal?: AbortSignal): Promise<ConsoleSchedulesResult> {
+  const response = await apiFetch(`/api/console/schedules${query ? `?${query}` : ''}`, { signal })
   if (response.status === 403) {
     return { kind: 'forbidden' }
   }
   if (!response.ok) {
     throw new Error(`Loading the console schedules failed with status ${response.status}.`)
   }
-  return { kind: 'ok', schedules: (await response.json()) as ConsoleScheduleList }
+  return { kind: 'ok', schedules: (await response.json()) as ConsoleSchedulePage }
 }

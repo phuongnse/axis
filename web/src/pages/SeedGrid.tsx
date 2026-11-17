@@ -2,6 +2,7 @@ import { Button, Flex, Input, Select, Typography } from 'antd'
 import type { HTMLAttributes } from 'react'
 import { useEffect, useState } from 'react'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { SectionPart } from '../platform/SectionParts'
 import { parseNumberText, seedColumns, seedValuePointer, type SeedField } from '../platform/seedValues'
 import { useText } from '../platform/texts'
 import { newUuid } from '../platform/uuid'
@@ -169,78 +170,82 @@ export function SeedGrid({
   }))
 
   return (
-    <div data-testid="studio-field-/records">
-      <Flex vertical gap="small" data-testid="studio-seed-grid">
-        <Typography.Text strong>{t('shell.studio.seed.records')}</Typography.Text>
-        <AxisTable<Row>
-          rowKey={(row) => String(row.index)}
-          dataSource={rows}
-          emptyText={t('shell.table.empty')}
-          rowAttributes={(row) =>
-            ({ 'data-testid': 'studio-seed-row', 'data-record-id': display(row.id) }) as HTMLAttributes<HTMLElement>
-          }
-          columns={[
-            {
-              key: 'id',
-              kind: 'fixed',
-              title: t('shell.studio.seed.recordId'),
-              render: (_, row) => <Typography.Text code>{display(row.id)}</Typography.Text>,
-            },
-            ...(layer === undefined
-              ? []
-              : [
-                  {
-                    key: 'layer',
-                    kind: 'fixed' as const,
-                    render: (_: unknown, row: Row) => (
-                      <LayerMarkTag layer={layer} list="/records" index={row.index} name={display(row.id)} />
-                    ),
-                  },
-                ]),
-            ...seedColumns(fields).map((field): AxisColumn<Row> => ({
-              key: field.name,
-              kind: isTextLike(field) ? 'freeText' : 'fixed',
-              title: field.name,
-              render: (_, row) => {
-                const pointer = seedValuePointer(row.index, field.name)
-                const problem = problems.get(pointer)
-                return (
-                  <div data-testid={`studio-field-${pointer}`}>
-                    <FieldCell
-                      field={field}
-                      value={Object.hasOwn(row.values, field.name) ? row.values[field.name] : undefined}
-                      problem={problem}
-                      onChange={(next) => onChange(pointer, next)}
-                    />
-                    {problem && (
-                      <Typography.Text type="danger" data-testid="studio-seed-problem">
-                        {t(problem)}
-                      </Typography.Text>
-                    )}
-                  </div>
-                )
+    <SectionPart
+      testName="records"
+      heading={{ title: t('shell.studio.field.seed.records'), line: t('shell.studio.field.seed.records.help') }}
+    >
+      <div data-testid="studio-field-/records">
+        <Flex vertical gap="small" data-testid="studio-seed-grid">
+          <AxisTable<Row>
+            rowKey={(row) => String(row.index)}
+            dataSource={rows}
+            emptyText={t('shell.table.empty')}
+            rowAttributes={(row) =>
+              ({ 'data-testid': 'studio-seed-row', 'data-record-id': display(row.id) }) as HTMLAttributes<HTMLElement>
+            }
+            columns={[
+              {
+                key: 'id',
+                kind: 'fixed',
+                title: t('shell.studio.seed.recordId'),
+                render: (_, row) => <Typography.Text code>{display(row.id)}</Typography.Text>,
               },
-            })),
-            {
-              key: 'remove',
-              kind: 'fixed',
-              render: (_, row) => (
-                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                <Button onClick={() => onChange(`/records/${row.index}`, undefined)}>
-                  {t('shell.studio.seed.removeRecord')}
-                </Button>
-              ),
-            },
-          ]}
-        />
-        <RemovedRows layer={layer} list="/records" />
-        <div>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button onClick={() => onChange('/records', [...list, { id: newUuid(), values: {} }])}>
-            {t('shell.studio.seed.addRecord')}
-          </Button>
-        </div>
-      </Flex>
-    </div>
+              ...(layer === undefined
+                ? []
+                : [
+                    {
+                      key: 'layer',
+                      kind: 'fixed' as const,
+                      render: (_: unknown, row: Row) => (
+                        <LayerMarkTag layer={layer} list="/records" index={row.index} name={display(row.id)} />
+                      ),
+                    },
+                  ]),
+              ...seedColumns(fields).map((field): AxisColumn<Row> => ({
+                key: field.name,
+                kind: isTextLike(field) ? 'freeText' : 'fixed',
+                title: field.name,
+                render: (_, row) => {
+                  const pointer = seedValuePointer(row.index, field.name)
+                  const problem = problems.get(pointer)
+                  return (
+                    <div data-testid={`studio-field-${pointer}`}>
+                      <FieldCell
+                        field={field}
+                        value={Object.hasOwn(row.values, field.name) ? row.values[field.name] : undefined}
+                        problem={problem}
+                        onChange={(next) => onChange(pointer, next)}
+                      />
+                      {problem && (
+                        <Typography.Text type="danger" data-testid="studio-seed-problem">
+                          {t(problem)}
+                        </Typography.Text>
+                      )}
+                    </div>
+                  )
+                },
+              })),
+              {
+                key: 'remove',
+                kind: 'fixed',
+                render: (_, row) => (
+                  // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
+                  <Button onClick={() => onChange(`/records/${row.index}`, undefined)}>
+                    {t('shell.studio.seed.removeRecord')}
+                  </Button>
+                ),
+              },
+            ]}
+          />
+          <RemovedRows layer={layer} list="/records" />
+          <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+            <Button onClick={() => onChange('/records', [...list, { id: newUuid(), values: {} }])}>
+              {t('shell.studio.seed.addRecord')}
+            </Button>
+          </div>
+        </Flex>
+      </div>
+    </SectionPart>
   )
 }

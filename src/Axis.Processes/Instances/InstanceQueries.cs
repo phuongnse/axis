@@ -27,44 +27,87 @@ public static class InstanceQueries
         "LEFT JOIN LATERAL (SELECT h.number FROM axis.release_activations AS h WHERE h.application_id = i.application_id AND h.release_id = i.release_id LIMIT 1) AS h ON true";
 
     /// <summary>
+    /// The SQL expression of an instance's release number, for a list's filter and sort. It is null when the release has
+    /// no history row. Every row of one release has the same number, so one row is enough.
+    /// </summary>
+    public const string ReleaseNumberSql =
+        "(SELECT rn.number FROM axis.release_activations AS rn WHERE rn.application_id = i.application_id AND rn.release_id = i.release_id LIMIT 1)";
+
+    /// <summary>
+    /// The SQL expression of an instance's subject label, the display field value of its subject record in
+    /// <paramref name="subjectEntity"/>, for a list's filter, search and sort. The caller declares it only when the reader
+    /// may see the label. <paramref name="subjectIdSql"/> is the outer column that holds the subject record id, the instance's
+    /// by default. Throws when the entity has no display field.
+    /// </summary>
+    public static string SubjectLabelSql(EntityModel subjectEntity, string? subjectIdSql = null)
+    {
+        ArgumentNullException.ThrowIfNull(subjectEntity);
+
+        var displayField = subjectEntity.DisplayField
+            ?? throw new InvalidOperationException($"The entity '{subjectEntity.Name}' has no display field.");
+        return $"(SELECT ls.{EntityNaming.Quote(EntityNaming.Column(displayField))} FROM {RecordQueries.Table(subjectEntity)} AS ls WHERE ls.{EntityNaming.Quote(EntityNaming.IdColumn)} = {subjectIdSql ?? $"{InstanceAlias}.subject_id"})";
+    }
+
+    /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> instances of the process,
-    /// whatever release they are pinned to, newest first, and counts them. <paramref name="state"/>
-    /// and <paramref name="subjectId"/> narrow the list when set. An instance is kept only when its
+    /// whatever release they are pinned to, newest first, and counts them. <paramref name="states"/>
+    /// keeps the instances in any of those states, and <paramref name="subjectId"/> narrows the list, when set. An instance is kept only when its
     /// subject record exists in <paramref name="subjectEntity"/> and matches
     /// <paramref name="condition"/>, or has no condition to match. Each item carries the subject
     /// record's display field value, whoever reads it, and the release's number. A page past the last one has no
     /// items. Returns <see langword="null"/> when the database rejects the condition for these
     /// records with a data exception (SQLSTATE class 22). Any other database error is thrown.
     /// </summary>
+    public static Task<InstanceListPage?> ListAsync(
+        NpgsqlConnection connection,
+        Guid applicationId,
+        Guid processId,
+        EntityModel subjectEntity,
+        IReadOnlyList<string>? states,
+        Guid? subjectId,
+        RecordCondition? condition,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default) =>
+        ListAsync(
+            connection, applicationId, processId, subjectEntity, states, subjectId, condition, new ListSql("TRUE", null, null, null), page, pageSize, cancellationToken);
+
+    /// <summary>
+    /// Reads the page as the overload without <paramref name="list"/> does, and keeps only the instances that match the
+    /// filter and the search of <paramref name="list"/>, which also narrow the count. The order is newest first when
+    /// <paramref name="list"/> has no sort, and a sort breaks its ties newest first.
+    /// </summary>
     public static async Task<InstanceListPage?> ListAsync(
         NpgsqlConnection connection,
         Guid applicationId,
         Guid processId,
         EntityModel subjectEntity,
-        string? state,
+        IReadOnlyList<string>? states,
         Guid? subjectId,
         RecordCondition? condition,
+        ListSql list,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(subjectEntity);
+        ArgumentNullException.ThrowIfNull(list);
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
-        var where = Where(subjectEntity, condition);
+        var where = Where(subjectEntity, condition, list);
         try
         {
             long totalCount;
             await using (var count = new NpgsqlCommand($"SELECT count(*) FROM axis.process_instances AS {InstanceAlias} {where}", connection))
             {
-                AddListParameters(count, applicationId, processId, subjectEntity.Id, state, subjectId, condition);
+                AddListParameters(count, applicationId, processId, subjectEntity.Id, states, subjectId, condition, list);
                 totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
             }
 
-            await using var command = new NpgsqlCommand(ListPageSql(subjectEntity, condition), connection);
-            AddListParameters(command, applicationId, processId, subjectEntity.Id, state, subjectId, condition);
+            await using var command = new NpgsqlCommand(ListPageSql(subjectEntity, condition, list), connection);
+            AddListParameters(command, applicationId, processId, subjectEntity.Id, states, subjectId, condition, list);
             command.Parameters.AddWithValue("limit", pageSize);
             command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
@@ -139,35 +182,40 @@ public static class InstanceQueries
 
     /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> instances of a process without
-    /// a subject, newest first, and counts them. Each item has no subject label. <paramref name="state"/> narrows the list when set.
+    /// a subject, and counts them. Each item has no subject label. <paramref name="states"/> keeps the instances in any of those states when set.
     /// <paramref name="subjectId"/> matches no instance when set, because these instances have no
-    /// subject record. There is no record to read, so no read filter applies.
+    /// subject record. There is no record to read, so no read filter applies. <paramref name="list"/> adds a filter, a
+    /// search and a sort as <see cref="ListAsync(NpgsqlConnection, Guid, Guid, EntityModel, IReadOnlyList{string}?, Guid?, RecordCondition?, ListSql, int, int, CancellationToken)"/>
+    /// does: the order is newest first when it has no sort, and a sort breaks its ties newest first.
     /// </summary>
     public static async Task<InstanceListPage> ListWithoutSubjectAsync(
         NpgsqlConnection connection,
         Guid applicationId,
         Guid processId,
-        string? state,
+        IReadOnlyList<string>? states,
         Guid? subjectId,
+        ListSql list,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(list);
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
-        const string where = """
+        var where = $"""
             WHERE i.application_id = @application AND i.process_id = @process AND i.subject_entity_id IS NULL
-              AND (@state::text IS NULL OR i.state = @state) AND (@subject::uuid IS NULL OR i.subject_id = @subject)
+              AND {StateCondition} AND (@subject::uuid IS NULL OR i.subject_id = @subject) AND {list.Condition}
             """;
 
         void AddParameters(NpgsqlCommand command)
         {
             command.Parameters.AddWithValue("application", applicationId);
             command.Parameters.AddWithValue("process", processId);
-            command.Parameters.Add(new NpgsqlParameter("state", NpgsqlDbType.Text) { Value = (object?)state ?? DBNull.Value });
+            AddStateParameters(command, states);
             command.Parameters.Add(new NpgsqlParameter("subject", NpgsqlDbType.Uuid) { Value = (object?)subjectId ?? DBNull.Value });
+            list.AddTo(command);
         }
 
         long totalCount;
@@ -178,7 +226,7 @@ public static class InstanceQueries
         }
 
         await using var command = new NpgsqlCommand(
-            $"SELECT {Columns}, NULL::text, h.number FROM axis.process_instances AS {InstanceAlias} {ReleaseNumberJoin} {where} ORDER BY i.created_at DESC, i.id DESC LIMIT @limit OFFSET @offset",
+            $"SELECT {Columns}, NULL::text, h.number FROM axis.process_instances AS {InstanceAlias} {ReleaseNumberJoin} {where} ORDER BY {Order(list)} LIMIT @limit OFFSET @offset",
             connection);
         AddParameters(command);
         command.Parameters.AddWithValue("limit", pageSize);
@@ -368,15 +416,35 @@ public static class InstanceQueries
         return rows;
     }
 
-    private static string Where(EntityModel subjectEntity, RecordCondition? condition)
+    // One state compares with `=`, so the state index still gives the order of the page. Several states need ANY, which
+    // that index cannot order. Each parameter is null when it does not apply, so the SQL has one shape.
+    private const string StateCondition =
+        "(@state::text IS NULL OR i.state = @state) AND (@states::text[] IS NULL OR i.state = ANY(@states))";
+
+    private static void AddStateParameters(NpgsqlCommand command, IReadOnlyList<string>? states)
+    {
+        command.Parameters.Add(new NpgsqlParameter("state", NpgsqlDbType.Text) { Value = states is [var only] ? only : DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("states", NpgsqlDbType.Array | NpgsqlDbType.Text)
+        {
+            Value = states is { Count: > 1 } ? states.ToArray() : DBNull.Value,
+        });
+    }
+
+    // A sort comes first and the list's own order, newest first, breaks its ties and orders an unsorted list.
+    private static string Order(ListSql list) =>
+        list.Order is null ? "i.created_at DESC, i.id DESC" : $"{list.Order}, i.created_at DESC, i.id DESC";
+
+    // The list's condition stands outside the EXISTS, because it reads the instance and not the record of the read filter.
+    private static string Where(EntityModel subjectEntity, RecordCondition? condition, ListSql list)
     {
         var row = EntityNaming.Quote(RecordQueries.RowAlias);
         var visible = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)} = {InstanceAlias}.subject_id"
             + (condition is null ? "" : $" AND {condition.Sql}");
         return $"""
             WHERE i.application_id = @application AND i.process_id = @process AND i.subject_entity_id = @entity
-              AND (@state::text IS NULL OR i.state = @state) AND (@subject::uuid IS NULL OR i.subject_id = @subject)
+              AND {StateCondition} AND (@subject::uuid IS NULL OR i.subject_id = @subject)
               AND EXISTS (SELECT 1 FROM {RecordQueries.Table(subjectEntity)} AS {row} WHERE {visible})
+              AND {list.Condition}
             """;
     }
 
@@ -384,8 +452,9 @@ public static class InstanceQueries
     /// The query that reads one page of the list. <c>@limit</c> and <c>@offset</c> are bound by the caller,
     /// next to the parameters of <see cref="AddListParameters"/>.
     /// </summary>
-    internal static string ListPageSql(EntityModel subjectEntity, RecordCondition? condition)
+    internal static string ListPageSql(EntityModel subjectEntity, RecordCondition? condition, ListSql? list = null)
     {
+        list ??= new ListSql("TRUE", null, null, null);
         // The subject record joins as s, because the condition refers to its record as r inside the EXISTS.
         var label = subjectEntity.DisplayField is { } displayField
             ? $"s.{EntityNaming.Quote(EntityNaming.Column(displayField))}"
@@ -394,7 +463,7 @@ public static class InstanceQueries
             SELECT {Columns}, {label}, h.number FROM axis.process_instances AS {InstanceAlias}
             LEFT JOIN {RecordQueries.Table(subjectEntity)} AS s ON s.{EntityNaming.Quote(EntityNaming.IdColumn)} = i.subject_id
             {ReleaseNumberJoin}
-            {Where(subjectEntity, condition)} ORDER BY i.created_at DESC, i.id DESC LIMIT @limit OFFSET @offset
+            {Where(subjectEntity, condition, list)} ORDER BY {Order(list)} LIMIT @limit OFFSET @offset
             """;
     }
 
@@ -403,16 +472,18 @@ public static class InstanceQueries
         Guid applicationId,
         Guid processId,
         Guid entityId,
-        string? state,
+        IReadOnlyList<string>? states,
         Guid? subjectId,
-        RecordCondition? condition)
+        RecordCondition? condition,
+        ListSql? list = null)
     {
         command.Parameters.AddWithValue("application", applicationId);
         command.Parameters.AddWithValue("process", processId);
         command.Parameters.AddWithValue("entity", entityId);
-        command.Parameters.Add(new NpgsqlParameter("state", NpgsqlDbType.Text) { Value = (object?)state ?? DBNull.Value });
+        AddStateParameters(command, states);
         command.Parameters.Add(new NpgsqlParameter("subject", NpgsqlDbType.Uuid) { Value = (object?)subjectId ?? DBNull.Value });
         condition?.AddTo(command);
+        list?.AddTo(command);
     }
 
     private static InstanceRelative ReadRelative(NpgsqlDataReader reader) =>

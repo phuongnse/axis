@@ -1,7 +1,7 @@
 import { Button, Descriptions, Flex, Tag, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { EmptyState } from './EmptyState'
@@ -28,10 +28,10 @@ import { PageActions, PageHeading } from './PageLayout'
 import { ProcessGraphCanvas, type ProcessGraphStep, type ProcessGraphTransitionView } from './ProcessGraph'
 import { RecordLink } from './RecordLink'
 import { RecordNotFound } from './RecordNotFound'
-import { PartRule, SectionPart } from './SectionParts'
 import { TermList, type Term } from './TermList'
 import { ReasonDialog } from './ReasonDialog'
 import { ResolveDialog } from './ResolveDialog'
+import { SectionPart, SectionParts } from './SectionParts'
 import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
@@ -375,12 +375,6 @@ export function InstanceDetailView({
     ...(due === null ? [] : [{ key: 'dueAt', term: t('shell.inspector.dueAt'), value: time('dueAt', due) }]),
     { key: 'release', term: t('shell.inspector.release'), value: instance.releaseNumber ?? instance.releaseId },
   ]
-  const part = (title: string, content: ReactNode) => (
-    <>
-      <PartRule />
-      <SectionPart title={title}>{content}</SectionPart>
-    </>
-  )
   const taken = new Set(instance.path.map((entry) => entry.step))
   // The transitions the instance took: from each step of its path to the next, and from the last to the step it is at.
   const walked = [...instance.path.map((entry) => entry.step), instance.step]
@@ -418,8 +412,9 @@ export function InstanceDetailView({
       }
     }),
   )
+
   return (
-    <Flex vertical gap="middle" data-testid="inspector-instance">
+    <div data-testid="inspector-instance">
       <PageHeading
         // Proposed: a process is named by its title in each language, see the review on #3650.
         title={instance.processTitleKey ? t(instance.processTitleKey) : instance.process}
@@ -432,68 +427,69 @@ export function InstanceDetailView({
       <PageActions>
         <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
       </PageActions>
-      <TermList terms={facts} />
-      {part(
-        t('shell.inspector.steps'),
-        // Proposed: the steps are the process's graph, drawn as the process designer draws it, with the steps the
-        // instance has run and the transitions it took in the success colour and the step it is at in the primary
-        // colour, see the review on #3650.
-        <ProcessGraphCanvas
-          steps={graphSteps}
-          transitions={graphTransitions}
-          ariaLabel={t('shell.inspector.steps')}
-          testId="inspector-graph"
-          height={400}
-        />,
-      )}
-      {part(
-        t('shell.inspector.history'),
-        <AxisTable<PathEntry>
-          rowKey={(row) => `${row.step}|${row.startedAt}|${row.finishedAt}`}
-          columns={historyColumns}
-          dataSource={instance.path}
-          emptyText={t('shell.inspector.noHistory')}
-        />,
-      )}
-      {part(
-        t('shell.inspector.tasks'),
-        <AxisTable<InstanceTask>
-          rowKey={(row) => row.id}
-          columns={taskColumns}
-          dataSource={instance.tasks}
-          emptyText={t('shell.inspector.noTasks')}
-        />,
-      )}
-      {part(
-        t('shell.inspector.calls'),
-        instance.calls.length === 0 ? (
-          <EmptyState text={t('shell.inspector.noCalls')} />
-        ) : (
-          <Flex vertical>
-            {instance.calls.map((call) => (
-              <CallItem
-                key={call.id}
-                call={call}
-                instanceId={instance.id}
-                instancesPath={instancesPath}
-                onChanged={onChanged}
-                stepLabel={stepLabel}
-                attemptColumns={attemptColumns}
-              />
-            ))}
-          </Flex>
-        ),
-      )}
-      {part(
-        t('shell.inspector.subProcesses'),
-        <AxisTable<SubProcess>
-          rowKey={(row) => row.id}
-          columns={subProcessColumns}
-          dataSource={instance.subProcesses}
-          emptyText={t('shell.inspector.noSubProcesses')}
-        />,
-      )}
-    </Flex>
+      <SectionParts>
+        {/* Proposed: what the platform keeps of the instance is its first part, with no heading, see the review on
+            #3650. */}
+        <SectionPart testName="inspector-details">
+          <TermList terms={facts} />
+        </SectionPart>
+        <SectionPart testName="inspector-steps" heading={{ title: t('shell.inspector.steps') }}>
+          {/* Proposed: the steps are the process's graph, drawn as the process designer draws it, with the steps the
+              instance has run and the transitions it took in the success colour and the step it is at in the
+              primary colour, see the review on #3650. */}
+          <ProcessGraphCanvas
+            steps={graphSteps}
+            transitions={graphTransitions}
+            ariaLabel={t('shell.inspector.steps')}
+            testId="inspector-graph"
+            height={400}
+          />
+        </SectionPart>
+        <SectionPart testName="inspector-history" heading={{ title: t('shell.inspector.history') }}>
+          <AxisTable<PathEntry>
+            rowKey={(row) => `${row.step}|${row.startedAt}|${row.finishedAt}`}
+            columns={historyColumns}
+            dataSource={instance.path}
+            emptyText={t('shell.inspector.noHistory')}
+          />
+        </SectionPart>
+        <SectionPart testName="inspector-tasks" heading={{ title: t('shell.inspector.tasks') }}>
+          <AxisTable<InstanceTask>
+            rowKey={(row) => row.id}
+            columns={taskColumns}
+            dataSource={instance.tasks}
+            emptyText={t('shell.inspector.noTasks')}
+          />
+        </SectionPart>
+        <SectionPart testName="inspector-calls" heading={{ title: t('shell.inspector.calls') }}>
+          {instance.calls.length === 0 ? (
+            <EmptyState text={t('shell.inspector.noCalls')} />
+          ) : (
+            <Flex vertical>
+              {instance.calls.map((call) => (
+                <CallItem
+                  key={call.id}
+                  call={call}
+                  instanceId={instance.id}
+                  instancesPath={instancesPath}
+                  onChanged={onChanged}
+                  stepLabel={stepLabel}
+                  attemptColumns={attemptColumns}
+                />
+              ))}
+            </Flex>
+          )}
+        </SectionPart>
+        <SectionPart testName="inspector-sub-processes" heading={{ title: t('shell.inspector.subProcesses') }}>
+          <AxisTable<SubProcess>
+            rowKey={(row) => row.id}
+            columns={subProcessColumns}
+            dataSource={instance.subProcesses}
+            emptyText={t('shell.inspector.noSubProcesses')}
+          />
+        </SectionPart>
+      </SectionParts>
+    </div>
   )
 }
 

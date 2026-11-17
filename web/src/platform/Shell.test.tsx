@@ -8,6 +8,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyDescription } from '../test/antd'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
+import { designTokensFor } from './designTokens'
 import { PreferencesMenu } from './PreferencesMenu'
 import { Shell } from './Shell'
 import { ShellNavigation } from './ShellNavigation'
@@ -131,6 +132,12 @@ describe.each(['light', 'dark'] as const)('Shell in %s mode', (mode) => {
       algorithm: mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm,
     }).colorBgContainer
     expect(screen.getByTestId('background')).toHaveTextContent(expected)
+  })
+
+  it('draws the page area on surface', () => {
+    renderShell('en')
+
+    expect(screen.getByRole('main')).toHaveStyle({ background: designTokensFor(mode).colour.surface })
   })
 })
 

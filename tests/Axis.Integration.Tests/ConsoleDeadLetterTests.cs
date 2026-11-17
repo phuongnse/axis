@@ -80,6 +80,50 @@ public sealed class ConsoleDeadLetterTests(RecordApiFixture fixture) : IClassFix
     }
 
     [Fact]
+    public async Task The_operator_searches_filters_sorts_and_pages_the_dead_letters_and_an_undeclared_field_is_a_400()
+    {
+        var (first, second) = await ApplicationsAsync();
+        var marker = Guid.NewGuid().ToString("N");
+        var few = await SeedAsync(first, "event.deliver", processId: Guid.NewGuid(), eventId: Guid.NewGuid(), attempts: 2, lastError: $"Failed {marker}");
+        var most = await SeedAsync(second, "event.deliver", processId: Guid.NewGuid(), eventId: Guid.NewGuid(), attempts: 7, lastError: $"Failed {marker}");
+        await SeedAsync(first, "event.deliver", processId: Guid.NewGuid(), eventId: Guid.NewGuid(), attempts: 9, lastError: $"Failed {marker}", state: "discarded");
+        await using var factory = OperatorRoleIsReader();
+        using var client = factory.CreateClient().SignedInAs("rita");
+        var open = Uri.EscapeDataString("""{"all":[{"field":"state","op":"eq","value":"open"}]}""");
+
+        using var top = await ListOkAsync(client, $"?search={marker}&filter={open}&sort=-attempts&pageSize=1");
+        Assert.Equal(most, Assert.Single(top.RootElement.GetProperty("items").EnumerateArray()).GetProperty("id").GetGuid());
+        Assert.Equal(1, top.RootElement.GetProperty("page").GetInt32());
+        Assert.Equal(1, top.RootElement.GetProperty("pageSize").GetInt32());
+        Assert.Equal(2, top.RootElement.GetProperty("totalCount").GetInt64());
+
+        using var next = await ListOkAsync(client, $"?search={marker}&filter={open}&sort=-attempts&pageSize=1&page=2");
+        Assert.Equal(few, Assert.Single(next.RootElement.GetProperty("items").EnumerateArray()).GetProperty("id").GetGuid());
+        Assert.Equal(2, next.RootElement.GetProperty("totalCount").GetInt64());
+
+        var ofFirst = Uri.EscapeDataString($$"""{"all":[{"field":"application","op":"eq","value":"{{first:D}}"}]}""");
+        using var inFirst = await ListOkAsync(client, $"?search={marker}&filter={ofFirst}&sort=attempts");
+        Assert.Equal(2, inFirst.RootElement.GetProperty("totalCount").GetInt64());
+        Assert.Equal(2, inFirst.RootElement.GetProperty("items")[0].GetProperty("attempts").GetInt32());
+
+        var today = Uri.EscapeDataString($$"""{"all":[{"field":"createdAt","op":"eq","value":"{{DateTime.UtcNow:yyyy-MM-dd}}"}]}""");
+        using var created = await ListOkAsync(client, $"?search={marker}&filter={today}&sort=-createdAt");
+        Assert.Equal(3, created.RootElement.GetProperty("totalCount").GetInt64());
+
+        using var none = await ListOkAsync(client, $"?search={Guid.NewGuid():N}");
+        Assert.Equal(0, none.RootElement.GetProperty("totalCount").GetInt64());
+
+        var undeclared = Uri.EscapeDataString("""{"all":[{"field":"processId","op":"eq","value":"x"}]}""");
+        foreach (var (query, key) in new[] { ($"?filter={undeclared}", "filter"), ("?sort=processId", "sort") })
+        {
+            using var refused = await client.SendAsync(Request($"{Path}{query}", HostA), CancellationToken);
+            Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+            using var problem = JsonDocument.Parse(await refused.Content.ReadAsStringAsync(CancellationToken));
+            Assert.Equal([key], problem.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
+        }
+    }
+
+    [Fact]
     public async Task The_console_routes_refuse_a_signed_out_user_with_401_and_a_user_without_the_operator_role_with_403()
     {
         var (first, _) = await ApplicationsAsync();
@@ -228,7 +272,10 @@ public sealed class ConsoleDeadLetterTests(RecordApiFixture fixture) : IClassFix
         Guid? triggerId = null,
         Guid? emailId = null,
         Guid? instanceId = null,
-        Guid? webhookId = null)
+        Guid? webhookId = null,
+        int attempts = 5,
+        string lastError = "Npgsql.PostgresException with SQLSTATE P0001",
+        string state = "open")
     {
         var id = Guid.CreateVersion7();
         await using var connection = await OpenConnectionAsync();
@@ -236,7 +283,7 @@ public sealed class ConsoleDeadLetterTests(RecordApiFixture fixture) : IClassFix
             """
             INSERT INTO axis.dead_letters
                 (id, kind, application_id, process_id, event_id, trigger_id, process_instance_id, email_id, webhook_id, attempts, last_error, state)
-            VALUES (@id, @kind, @application, @process, @event, @trigger, @instance, @email, @webhook, 5, 'Npgsql.PostgresException with SQLSTATE P0001', 'open')
+            VALUES (@id, @kind, @application, @process, @event, @trigger, @instance, @email, @webhook, @attempts, @lastError, @state)
             """,
             connection);
         command.Parameters.AddWithValue("id", id);
@@ -248,6 +295,9 @@ public sealed class ConsoleDeadLetterTests(RecordApiFixture fixture) : IClassFix
         command.Parameters.AddWithValue("instance", (object?)instanceId ?? DBNull.Value);
         command.Parameters.AddWithValue("email", (object?)emailId ?? DBNull.Value);
         command.Parameters.AddWithValue("webhook", (object?)webhookId ?? DBNull.Value);
+        command.Parameters.AddWithValue("attempts", attempts);
+        command.Parameters.AddWithValue("lastError", lastError);
+        command.Parameters.AddWithValue("state", state);
         await command.ExecuteNonQueryAsync(CancellationToken);
         return id;
     }

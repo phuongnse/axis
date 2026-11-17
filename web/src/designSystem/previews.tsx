@@ -17,7 +17,14 @@ import { IdentitySignIn } from './IdentitySignIn'
 import { SignUpPreview } from './SignUpPreview'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import { ClickOnMount, ShellPreview, TypedOnMount } from './ShellPreview'
-import { studioFixtures, typicalEntityId, typicalFormId, typicalPageId, typicalProcessId } from './studioFixtures'
+import {
+  studioFixtures,
+  typicalEntityId,
+  typicalFormId,
+  typicalPageId,
+  typicalProcessId,
+  typicalRevisionId,
+} from './studioFixtures'
 import {
   application,
   blankDetailWidget,
@@ -96,7 +103,7 @@ export interface PreviewState {
   fixtures?: Record<string, () => unknown>
   /** The address the state starts at. */
   entry?: InitialEntry
-  /** The height of the frame the state draws in, with its menus and dialogs inside it. */
+  /** The height of the screen the state draws in. A taller page scrolls inside it. */
   frameHeight?: number
 }
 
@@ -358,6 +365,18 @@ export const previews: Record<string, readonly PreviewState[]> = {
       entry: `/studio?app=${application}&resource=${typicalEntityId}`,
     },
     { caption: 'Policy matrix', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=policies` },
+    { caption: 'Releases', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=releases` },
+    { caption: 'History', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=history` },
+    {
+      caption: 'Revision',
+      fixtures: studioFixtures.typical,
+      entry: `/studio?app=${application}&view=history&revision=${typicalRevisionId}`,
+    },
+    {
+      caption: 'Release page',
+      fixtures: studioFixtures.releasePage,
+      entry: `/studio?app=${application}&view=release&release=2`,
+    },
   ].map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 })),
   studioPageDesign: studioDesignerStates(typicalPageId),
   studioFormDesign: studioDesignerStates(typicalFormId),

@@ -92,7 +92,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
     // on #3650.
     <Flex vertical gap={spacing.md} data-testid="record-history" aria-busy={loading}>
       <PartRule />
-      <SectionPart title={t('shell.history.title')}>
+      <SectionPart testId="record-history-part" heading={{ title: t('shell.history.title') }}>
         {failed ? (
           <AxisAlert data-testid="record-history-error" kind="error" message={t('shell.history.loadFailed')} />
         ) : (

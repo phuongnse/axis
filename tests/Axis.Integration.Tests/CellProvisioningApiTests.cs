@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -9,6 +10,7 @@ using Axis.Admin;
 using Axis.Administration;
 using Axis.Configuration.Tests;
 using Axis.Server.Tests;
+using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Logging;
@@ -132,6 +134,40 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task The_tenant_list_answers_a_searched_filtered_sorted_page_with_its_total_and_400_for_an_unknown_field()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var active = Uri.EscapeDataString("""{"all":[{"field":"status","op":"eq","value":"active"}]}""");
+        var undeclared = Uri.EscapeDataString("""{"all":[{"field":"nothing","op":"eq","value":"x"}]}""");
+
+        using var bare = await GetAsync(client, "/api/cell/tenants", token);
+        using var searched = await GetAsync(client, "/api/cell/tenants?search=example&sort=-id&pageSize=1", token);
+        using var filtered = await GetAsync(client, $"/api/cell/tenants?search=example&sort=-id&pageSize=1&filter={active}", token);
+        using var badFilter = await GetAsync(client, $"/api/cell/tenants?filter={undeclared}", token);
+        using var badSort = await GetAsync(client, "/api/cell/tenants?sort=nothing", token);
+        using var badPage = await GetAsync(client, "/api/cell/tenants?pageSize=0", token);
+
+        var all = await bare.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(3, all.GetProperty("totalCount").GetInt64());
+        Assert.Equal(20, all.GetProperty("pageSize").GetInt32());
+        Assert.Equal(1, all.GetProperty("page").GetInt32());
+        Assert.Equal(["a", "b", "c"], all.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetString()).ToArray());
+        var first = await searched.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(["c"], first.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetString()).ToArray());
+        Assert.Equal(1, first.GetProperty("page").GetInt32());
+        Assert.Equal(1, first.GetProperty("pageSize").GetInt32());
+        Assert.Equal(2, first.GetProperty("totalCount").GetInt64());
+        var narrowed = await filtered.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(["b"], narrowed.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetString()).ToArray());
+        Assert.Equal(1, narrowed.GetProperty("totalCount").GetInt64());
+        await AssertBadRequestAsync(badFilter, "filter");
+        await AssertBadRequestAsync(badSort, "sort");
+        await AssertBadRequestAsync(badPage, "pageSize");
+    }
+
+    [Fact]
     public async Task The_list_and_the_detail_answer_the_failed_work_counts_of_the_last_sample_and_null_for_a_tenant_without_one()
     {
         await using var factory = await StartAsync();
@@ -203,6 +239,27 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task The_detail_answers_the_users_and_applications_that_the_second_of_two_samples_of_the_day_wrote()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var store = new TenantUsageStore(NpgsqlDataSource.Create(PostgreSqlServer.RuntimeConnectionString(_platform)));
+        var now = DateTimeOffset.UtcNow;
+        await store.RecordCountsAsync("a", 3, 2, now, CancellationToken);
+        await store.RecordCountsAsync("a", 5, 4, now.AddMinutes(1), CancellationToken);
+
+        using var tenant = await GetAsync(client, "/api/cell/tenants/a", token);
+        using var anonymous = await GetAsync(client, "/api/cell/tenants/a", null);
+
+        Assert.Equal(HttpStatusCode.OK, tenant.StatusCode);
+        var body = await tenant.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(5, Use(body, "users").Used);
+        Assert.Equal(4, Use(body, "applications").Used);
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+    }
+
+    [Fact]
     public async Task The_tenant_read_answers_the_days_of_the_last_13_months_newest_first()
     {
         await using var factory = await StartAsync();
@@ -236,6 +293,50 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         Assert.Equal(0, (await other.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("days").GetArrayLength());
         var items = (await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
         Assert.All(items.EnumerateArray(), item => Assert.False(item.TryGetProperty("days", out _)));
+    }
+
+    [Fact]
+    public async Task The_usage_days_route_answers_a_filtered_sorted_page_with_its_total_400_for_an_unknown_field_and_404_for_an_unknown_tenant()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync(
+            """
+            INSERT INTO platform.tenant_usage (tenant_id, day, database_bytes, file_bytes, users, applications, emails_sent, connector_calls, work_items_run)
+            VALUES
+                ('a', ((now() AT TIME ZONE 'UTC')::date - interval '14 months')::date, 1, 1, 1, 1, 1, 1, 111),
+                ('a', ((now() AT TIME ZONE 'UTC')::date - interval '12 months')::date, 20, 21, NULL, NULL, 22, 23, 222),
+                ('a', (now() AT TIME ZONE 'UTC')::date - 1, 30, 31, 3, 2, 32, 33, 333),
+                ('a', (now() AT TIME ZONE 'UTC')::date - 2, 40, 41, 4, 3, 42, 43, 444)
+            """);
+        var large = Uri.EscapeDataString("""{"all":[{"field":"workItemsRun","op":"gte","value":300}]}""");
+        var undeclared = Uri.EscapeDataString("""{"all":[{"field":"nothing","op":"eq","value":"x"}]}""");
+
+        using var bare = await GetAsync(client, "/api/cell/tenants/a/usage-days", token);
+        using var filtered = await GetAsync(client, $"/api/cell/tenants/a/usage-days?filter={large}&sort=day&pageSize=1", token);
+        using var badFilter = await GetAsync(client, $"/api/cell/tenants/a/usage-days?filter={undeclared}", token);
+        using var badSort = await GetAsync(client, "/api/cell/tenants/a/usage-days?sort=nothing", token);
+        using var search = await GetAsync(client, "/api/cell/tenants/a/usage-days?search=1", token);
+        using var unknown = await GetAsync(client, "/api/cell/tenants/nobody/usage-days", token);
+        using var unknownBadSort = await GetAsync(client, "/api/cell/tenants/nobody/usage-days?sort=nothing", token);
+        using var preview = await GetAsync(client, "/api/cell/tenants/a-preview/usage-days", token);
+
+        var all = await bare.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(3, all.GetProperty("totalCount").GetInt64());
+        Assert.Equal(20, all.GetProperty("pageSize").GetInt32());
+        Assert.Equal([333L, 444L, 222L], all.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("workItemsRun").GetInt64()).ToArray());
+        var narrowed = await filtered.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal([444L], narrowed.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("workItemsRun").GetInt64()).ToArray());
+        Assert.Equal(1, narrowed.GetProperty("page").GetInt32());
+        Assert.Equal(1, narrowed.GetProperty("pageSize").GetInt32());
+        Assert.Equal(2, narrowed.GetProperty("totalCount").GetInt64());
+        await AssertBadRequestAsync(badFilter, "filter");
+        await AssertBadRequestAsync(badSort, "sort");
+        await AssertBadRequestAsync(search, "search");
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknownBadSort.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
     }
 
     [Fact]
@@ -311,10 +412,10 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             "usage.storage.limit", "usage.storage.used", "usage.users.limit", "usage.users.used",
             "usage.applications.limit", "usage.applications.used", "usage.emailsPerDay.limit", "usage.emailsPerDay.used",
         ];
-        string[] tenantFields = ["id", "status", "application", "hosts[]", .. failedWork, .. usage, "newestArchiveAt"];
+        string[] tenantFields = ["id", "status", "application", "hosts[]", .. failedWork, .. usage, "newestArchiveAt", "deleteAfter"];
         AssertFields(
             await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken),
-            [.. tenantFields.Select(field => $"items[].{field}")],
+            [.. tenantFields.Select(field => $"items[].{field}"), "page", "pageSize", "totalCount"],
             forbidden);
         string[] days = ["day", "databaseBytes", "fileBytes", "users", "applications", "emailsSent", "connectorCalls", "workItemsRun"];
         AssertFields(
@@ -391,6 +492,83 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task The_list_and_the_detail_answer_the_purge_time_of_a_deleting_tenant_and_null_for_any_other()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync("UPDATE platform.tenants SET delete_after = '2026-12-01T10:30:00Z' WHERE id = 'c'");
+
+        using var list = await GetAsync(client, "/api/cell/tenants", token);
+        using var deleting = await GetAsync(client, "/api/cell/tenants/c", token);
+        using var active = await GetAsync(client, "/api/cell/tenants/a", token);
+
+        var expected = DateTimeOffset.Parse("2026-12-01T10:30:00Z", CultureInfo.InvariantCulture);
+        var items = (await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
+        Assert.Equal(["a", "b", "c"], items.EnumerateArray().Select(item => item.GetProperty("id").GetString()).ToArray());
+        Assert.Equal(JsonValueKind.Null, items[0].GetProperty("deleteAfter").ValueKind);
+        Assert.Equal(JsonValueKind.Null, items[1].GetProperty("deleteAfter").ValueKind);
+        Assert.Equal("deleting", items[2].GetProperty("status").GetString());
+        Assert.Equal(expected, items[2].GetProperty("deleteAfter").GetDateTimeOffset());
+        var deletingTenant = await deleting.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(expected, deletingTenant.GetProperty("deleteAfter").GetDateTimeOffset());
+        Assert.Equal(JsonValueKind.Null, (await active.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("deleteAfter").ValueKind);
+    }
+
+    [Fact]
+    public async Task The_deleted_tenant_read_answers_the_purge_time_and_the_completion_7_days_later_and_nothing_of_the_actor_or_hosts()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync("INSERT INTO platform.deleted_tenants (id, deleted_at, actor, hosts) VALUES ('gone', '2026-11-01T00:00:00Z', 'operator-1', '{gone.vn.example.test}')");
+        await SeedJobAsync("purge", "gone", "succeeded", "[]");
+
+        using var response = await GetAsync(client, "/api/cell/deleted-tenants/gone", token);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(["id", "deletedAt", "completeAt"], body.EnumerateObject().Select(property => property.Name).ToArray());
+        Assert.Equal("gone", body.GetProperty("id").GetString());
+        Assert.Equal(DateTimeOffset.Parse("2026-11-01T00:00:00Z", CultureInfo.InvariantCulture), body.GetProperty("deletedAt").GetDateTimeOffset());
+        Assert.Equal(DateTimeOffset.Parse("2026-11-08T00:00:00Z", CultureInfo.InvariantCulture), body.GetProperty("completeAt").GetDateTimeOffset());
+    }
+
+    [Fact]
+    public async Task The_deleted_tenant_read_answers_404_for_a_preview_tombstone_that_no_purge_job_names_and_for_an_unknown_id()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync("INSERT INTO platform.deleted_tenants (id, deleted_at, actor, hosts) VALUES ('gone-preview', now(), 'operator-1', '{}')");
+
+        using var preview = await GetAsync(client, "/api/cell/deleted-tenants/gone-preview", token);
+        using var unknown = await GetAsync(client, "/api/cell/deleted-tenants/nobody", token);
+        using var live = await GetAsync(client, "/api/cell/deleted-tenants/a", token);
+
+        Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+        Assert.Equal("application/problem+json", preview.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, live.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_deleted_tenant_read_answers_401_without_a_token_and_403_without_the_role()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
+        await ExecuteAsync("INSERT INTO platform.deleted_tenants (id, deleted_at, actor, hosts) VALUES ('gone', now(), 'operator-1', '{}')");
+        await SeedJobAsync("purge", "gone", "succeeded", "[]");
+
+        using var none = await GetAsync(client, "/api/cell/deleted-tenants/gone", token: null);
+        using var noRole = await GetAsync(client, "/api/cell/deleted-tenants/gone", noRoleToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, noRole.StatusCode);
+    }
+
+    [Fact]
     public async Task A_request_without_a_token_or_with_a_tenant_realm_token_answers_401()
     {
         await using var factory = await StartAsync();
@@ -400,12 +578,16 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         using var none = await GetAsync(client, "/api/cell/tenants", token: null);
         using var tenantRealm = await GetAsync(client, "/api/cell/tenants", tenantRealmToken);
         using var tenantRealmOne = await GetAsync(client, "/api/cell/tenants/a", tenantRealmToken);
+        using var noTokenDays = await GetAsync(client, "/api/cell/tenants/a/usage-days", token: null);
         using var garbage = await GetAsync(client, "/api/cell/tenants", "not-a-token");
+        using var noTokenBadSort = await GetAsync(client, "/api/cell/tenants?sort=nothing", token: null);
 
         Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, tenantRealm.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, tenantRealmOne.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, noTokenDays.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, garbage.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, noTokenBadSort.StatusCode);
     }
 
     [Fact]
@@ -417,9 +599,13 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
 
         using var list = await GetAsync(client, "/api/cell/tenants", token);
         using var one = await GetAsync(client, "/api/cell/tenants/a", token);
+        using var days = await GetAsync(client, "/api/cell/tenants/a/usage-days", token);
+        using var badSort = await GetAsync(client, "/api/cell/tenants?sort=nothing", token);
 
         Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, one.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, days.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, badSort.StatusCode);
     }
 
     [Fact]
@@ -592,7 +778,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
-    public async Task An_operator_sets_and_clears_quotas_and_the_tenant_read_and_an_audit_record_show_them()
+    public async Task An_operator_sets_and_clears_quotas_and_the_tenant_read_and_an_audit_record_naming_the_caller_show_them()
     {
         await using var factory = await StartAsync();
         using var client = CreateClient(factory, _console);
@@ -624,6 +810,15 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         Assert.Equal(
             [("tenant quotas set", "b", "storage,users"), ("tenant quotas set", "b", "users")],
             records);
+        await using var connection = new NpgsqlConnection(_platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var actors = new NpgsqlCommand("SELECT actor FROM platform.audit_records ORDER BY occurred_at, id", connection);
+        await using var reader = await actors.ExecuteReaderAsync(CancellationToken);
+        var subject = new JsonWebToken(token).Subject;
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        Assert.Equal(subject, reader.GetString(0));
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        Assert.Equal(subject, reader.GetString(0));
     }
 
     [Fact]
@@ -1399,7 +1594,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
-    public async Task An_operator_lists_the_jobs_newest_first_filtered_by_tenant_and_limited_without_the_actor()
+    public async Task An_operator_lists_the_jobs_newest_first_filtered_by_tenant_and_paged_without_the_actor()
     {
         await using var factory = await StartAsync();
         using var client = CreateClient(factory, _console);
@@ -1430,10 +1625,14 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         using var all = await GetAsync(client, "/api/cell/jobs", token);
         using var ofB = await GetAsync(client, "/api/cell/jobs?tenant=b", token);
         using var ofNobody = await GetAsync(client, "/api/cell/jobs?tenant=nobody", token);
-        using var newest = await GetAsync(client, "/api/cell/jobs?limit=1", token);
+        using var newest = await GetAsync(client, "/api/cell/jobs?pageSize=1", token);
 
         Assert.Equal(HttpStatusCode.OK, all.StatusCode);
-        var items = (await all.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
+        var allPage = await all.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal(3, allPage.GetProperty("totalCount").GetInt64());
+        Assert.Equal(1, allPage.GetProperty("page").GetInt32());
+        Assert.Equal(20, allPage.GetProperty("pageSize").GetInt32());
+        var items = allPage.GetProperty("items");
         Assert.Equal(
             [ids[2], ids[1], ids[0]],
             items.EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray());
@@ -1456,16 +1655,77 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             ofBItems.EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray());
         Assert.Equal(HttpStatusCode.OK, ofNobody.StatusCode);
         Assert.Equal(0, (await ofNobody.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items").GetArrayLength());
-        var newestItems = (await newest.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
-        Assert.Equal([ids[2]], newestItems.EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray());
+        var newestPage = await newest.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal([ids[2]], newestPage.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid()).ToArray());
+        Assert.Equal(3, newestPage.GetProperty("totalCount").GetInt64());
+        Assert.Equal(1, newestPage.GetProperty("pageSize").GetInt32());
+    }
 
-        foreach (var limit in new[] { "0", "201", "-1", "abc", "" })
+    [Fact]
+    public async Task The_job_list_answers_a_searched_filtered_sorted_page_with_its_total_and_400_for_an_unknown_field()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        var ids = new List<Guid>();
+        foreach (var (path, key) in new[]
         {
-            using var bad = await GetAsync(client, $"/api/cell/jobs?limit={limit}", token);
-
-            Assert.Equal(HttpStatusCode.BadRequest, bad.StatusCode);
-            Assert.Equal("application/problem+json", bad.Content.Headers.ContentType?.MediaType);
+            ("/api/cell/tenants/b/suspend", "page-1"),
+            ("/api/cell/tenants/b/resume", "page-2"),
+            ("/api/cell/tenants/c/suspend", "page-3"),
+        })
+        {
+            using var queued = await PostJobAsync(client, path, token, key);
+            Assert.Equal(HttpStatusCode.Accepted, queued.StatusCode);
+            ids.Add((await queued.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetGuid());
         }
+
+        // The first job is created late on one UTC day, the other two on the next, so a day filter keeps two.
+        await ExecuteAsync($"UPDATE platform.jobs SET created_at = '2026-01-10 23:30:00+00' WHERE id = '{ids[0]:D}'");
+        await ExecuteAsync($"UPDATE platform.jobs SET created_at = '2026-01-11 00:30:00+00' WHERE id = '{ids[1]:D}'");
+        await ExecuteAsync($"UPDATE platform.jobs SET created_at = '2026-01-11 12:00:00+00' WHERE id = '{ids[2]:D}'");
+        await ExecuteAsync(
+            $$"""
+            UPDATE platform.jobs SET state = 'failed', error = 'The tenant is still provisioning.',
+                steps = '[{"name":"status","state":"failed","error":"The tenant is still provisioning."}]'::jsonb
+            WHERE id = '{{ids[1]:D}}'
+            """);
+        var suspends = Uri.EscapeDataString("""{"all":[{"field":"kind","op":"eq","value":"suspend"}]}""");
+        var day = Uri.EscapeDataString("""{"all":[{"field":"createdAt","op":"eq","value":"2026-01-11"}]}""");
+        var undeclared = Uri.EscapeDataString("""{"all":[{"field":"nothing","op":"eq","value":"x"}]}""");
+
+        using var searched = await GetAsync(client, "/api/cell/jobs?search=provisioning", token);
+        using var filtered = await GetAsync(client, $"/api/cell/jobs?filter={suspends}&sort=tenant&pageSize=1", token);
+        using var secondPage = await GetAsync(client, $"/api/cell/jobs?filter={suspends}&sort=tenant&pageSize=1&page=2", token);
+        using var ofDay = await GetAsync(client, $"/api/cell/jobs?filter={day}", token);
+        using var oldestFirst = await GetAsync(client, "/api/cell/jobs?sort=createdAt", token);
+        using var newestFirst = await GetAsync(client, "/api/cell/jobs?sort=-createdAt", token);
+        using var byState = await GetAsync(client, "/api/cell/jobs?sort=state", token);
+        using var ofC = await GetAsync(client, $"/api/cell/jobs?tenant=c&filter={suspends}", token);
+        using var badFilter = await GetAsync(client, $"/api/cell/jobs?filter={undeclared}", token);
+        using var badSort = await GetAsync(client, "/api/cell/jobs?sort=nothing", token);
+        using var badPage = await GetAsync(client, "/api/cell/jobs?pageSize=0", token);
+
+        // The page as the positions of its jobs in the order they were queued, then the total, the page and the page size.
+        async Task<string> ReadAsync(HttpResponseMessage response)
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+            var items = body.GetProperty("items").EnumerateArray().Select(item => ids.IndexOf(item.GetProperty("id").GetGuid()));
+            return $"{string.Join(',', items)} of {body.GetProperty("totalCount").GetInt64()}, page {body.GetProperty("page").GetInt32()}, size {body.GetProperty("pageSize").GetInt32()}";
+        }
+
+        Assert.Equal("1 of 1, page 1, size 20", await ReadAsync(searched));
+        Assert.Equal("0 of 2, page 1, size 1", await ReadAsync(filtered));
+        Assert.Equal("2 of 2, page 2, size 1", await ReadAsync(secondPage));
+        Assert.Equal("2,1 of 2, page 1, size 20", await ReadAsync(ofDay));
+        Assert.Equal("0,1,2 of 3, page 1, size 20", await ReadAsync(oldestFirst));
+        Assert.Equal("2,1,0 of 3, page 1, size 20", await ReadAsync(newestFirst));
+        Assert.Equal("1,2,0 of 3, page 1, size 20", await ReadAsync(byState));
+        Assert.Equal("2 of 1, page 1, size 20", await ReadAsync(ofC));
+        await AssertBadRequestAsync(badFilter, "filter");
+        await AssertBadRequestAsync(badSort, "sort");
+        await AssertBadRequestAsync(badPage, "pageSize");
     }
 
     [Fact]
@@ -1477,7 +1737,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         var operatorToken = await TokenAsync(_realm, CallerClientId, ClientSecret);
         var noRoleToken = await TokenAsync(_realm, NoRoleClientId, ClientSecret);
 
-        foreach (var path in new[] { "/api/cell", "/api/cell/jobs" })
+        foreach (var path in new[] { "/api/cell", "/api/cell/jobs", "/api/cell/jobs?sort=nothing" })
         {
             using var none = await GetAsync(client, path, token: null);
             using var noRole = await GetAsync(client, path, noRoleToken);
@@ -2199,6 +2459,13 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
 
     private static HttpClient CreateClient(WebApplicationFactory<Program> factory, Uri address) =>
         factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = address, AllowAutoRedirect = false });
+
+    private static async Task AssertBadRequestAsync(HttpResponseMessage response, string key)
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal([key], body.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
+    }
 
     private static async Task<HttpResponseMessage> GetAsync(HttpClient client, string path, string? token)
     {

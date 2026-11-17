@@ -167,7 +167,8 @@ allows in the authoring API, and the Studio fields of `GET /api/me` that follow 
   unset setting means no entries, and the [purge job](administration.md#purge-job), whose `studio`
   step deletes it when the tenant is [deleted](tenant-lifecycle.md#deleting-a-tenant). The folder
   also joins the tenant's [backup](tenant-backup-and-restore.md#backups-in-a-cell), and a restore
-  writes it under the new tenant.
+  writes it under the new tenant. The worker reads `Studio:ApplicationsPath` to count each tenant's
+  applications for its [usage](tenant-quotas.md#usage), and it never creates a folder.
 
 ## Console settings
 

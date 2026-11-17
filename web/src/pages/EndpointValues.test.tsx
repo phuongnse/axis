@@ -24,7 +24,7 @@ function renderValues(data: unknown = values, onChange = vi.fn(), known: string[
       <ThemeRoot>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <ExpressionCheckContext.Provider
-            value={{ application: 'Shop', resourceId: 'bc241668', kind: 'endpoint', draft: {}, names: null }}
+            value={{ application: 'Shop', resourceId: 'bc241668', kind: 'endpoint', draft: () => ({}), names: null }}
           >
             <EndpointValues fields={known ?? undefined} values={data} onChange={onChange} />
           </ExpressionCheckContext.Provider>
@@ -74,21 +74,20 @@ describe.each(['light', 'dark'])('EndpointValues in %s mode', (mode) => {
 })
 
 describe('EndpointValues', () => {
-  const group = {
-    name: platformEnglish['shell.studio.field.endpoint.values'],
-    description: platformEnglish['shell.studio.field.endpoint.values.help'],
-  }
+  const part = { name: platformEnglish['shell.studio.field.endpoint.values'] }
 
-  it('titles the rows as a group that its help describes', () => {
+  it('heads the rows with the title and the help that describes them', () => {
     renderValues()
 
-    expect(screen.getByTestId('studio-field-/values')).toContainElement(screen.getByRole('group', group))
+    const region = screen.getByRole('region', part)
+    expect(region).toContainElement(screen.getByTestId('studio-field-/values'))
+    expect(within(region).getByText(platformEnglish['shell.studio.field.endpoint.values.help'])).toBeVisible()
   })
 
   it('says there are no values above Add mapping when the endpoint has none', () => {
     renderValues({})
 
-    expect(screen.getByRole('group', group)).toContainElement(
+    expect(screen.getByRole('region', part)).toContainElement(
       screen.getByText(platformEnglish['shell.studio.endpoint.noValues']),
     )
     expect(screen.getByRole('combobox', { name: 'Add mapping' })).toBeVisible()
@@ -145,7 +144,7 @@ describe('EndpointValues', () => {
   it('points to the JSON view for a value that is not an object', () => {
     renderValues(['x'])
 
-    expect(screen.getByRole('group', group)).toContainElement(screen.getByTestId('studio-json-only'))
+    expect(screen.getByRole('region', part)).toContainElement(screen.getByTestId('studio-json-only'))
     expect(screen.getByTestId('studio-json-only')).toBeVisible()
   })
 })

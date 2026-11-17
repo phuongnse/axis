@@ -76,7 +76,7 @@ describe('TenantExportSection', () => {
     renderSection()
 
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/me', expect.anything()))
-    expect(screen.queryByTestId('tenant-export')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Export data' })).toBeNull()
     expect(screen.queryByText('Export data')).toBeNull()
   })
 
@@ -84,8 +84,8 @@ describe('TenantExportSection', () => {
     const fetchMock = stubServer(true)
     renderSection()
 
-    const section = await screen.findByTestId('tenant-export')
-    expect(within(section).getByRole('heading', { name: 'Export data' })).toBeVisible()
+    const section = await screen.findByRole('region', { name: 'Export data' })
+    expect(within(section).getByRole('heading', { name: 'Export data', level: 2 })).toBeVisible()
     expect(within(section).getByText(warning)).toBeVisible()
 
     await userEvent.click(within(section).getByRole('button', { name: 'Start export…' }))

@@ -29,6 +29,9 @@ const drawnPaths = [
   'startCondition',
   'startCondition.expression',
   'startCondition.message',
+  'subject',
+  'subject.entity',
+  'subject.parameters',
   'entity',
   'parameters',
   'parameters.name',
@@ -43,6 +46,9 @@ const drawnPaths = [
   'steps.branches.next',
   'steps.label',
   'steps.assignee',
+  'steps.assignee.mode',
+  'steps.assignee.mode.user',
+  'steps.assignee.mode.role',
   'steps.assignee.user',
   'steps.assignee.role',
   'steps.form',
@@ -55,10 +61,17 @@ const drawnPaths = [
   'steps.escalations.reassign',
   'steps.escalations.reassign.user',
   'steps.escalations.reassign.role',
+  'steps.escalations.reassign.mode',
+  'steps.escalations.reassign.mode.user',
+  'steps.escalations.reassign.mode.role',
   'steps.escalations.notify',
   'steps.escalations.notify.message.values',
   'steps.escalations.notify.open.parameters',
   'steps.escalations.notify.to',
+  'steps.escalations.notify.to.kind',
+  'steps.escalations.notify.to.kind.user',
+  'steps.escalations.notify.to.kind.role',
+  'steps.escalations.notify.to.kind.email',
   'steps.escalations.notify.to.user',
   'steps.escalations.notify.to.role',
   'steps.escalations.notify.to.email',
@@ -68,6 +81,9 @@ const drawnPaths = [
   'steps.escalations.notify.open',
   'steps.escalations.notify.open.page',
   'steps.timer',
+  'steps.timer.mode',
+  'steps.timer.mode.wait',
+  'steps.timer.mode.until',
   'steps.wait',
   'steps.until',
   'steps.event',
@@ -90,6 +106,12 @@ const drawnPaths = [
   'steps.fields',
   'steps.entity',
   'steps.input',
+  'steps.input.name',
+  'steps.input.kind',
+  'steps.input.kind.value',
+  'steps.input.kind.object',
+  'steps.input.kind.list',
+  'steps.input.value',
   'steps.input.fields',
   'steps.input.from',
   'steps.output',
@@ -100,6 +122,10 @@ const drawnPaths = [
   'steps.message.values',
   'steps.open.parameters',
   'steps.to',
+  'steps.to.kind',
+  'steps.to.kind.user',
+  'steps.to.kind.role',
+  'steps.to.kind.email',
   'steps.to.user',
   'steps.to.role',
   'steps.to.email',
@@ -112,8 +138,14 @@ const drawnPaths = [
 
 // The expression editor is CodeMirror. The mock shows the names it is offered, which is what these tests check.
 vi.mock('./ExpressionEditor', () => ({
-  default: ({ name, options }: { name: string; options: { label: string }[] }) => (
-    <div role="group" aria-label={name} data-options={options.map((option) => option.label).join(',')} />
+  default: ({ name, options }: { name: string; options: () => { label: string }[] }) => (
+    <div
+      role="group"
+      aria-label={name}
+      data-options={options()
+        .map((option) => option.label)
+        .join(',')}
+    />
   ),
 }))
 
@@ -224,7 +256,7 @@ function renderEditor(value: Record<string, unknown> = process, checked = false)
     )
     return checked ? (
       <ExpressionCheckContext.Provider
-        value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft, names }}
+        value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft: () => draft, names }}
       >
         {editor}
       </ExpressionCheckContext.Provider>
@@ -328,7 +360,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
       expect(within(card).getByTestId(`studio-field-${field}`)).toBeVisible()
     }
     expect(within(card).getByRole('textbox', { name: label('steps.dueIn') })).toHaveValue('P3D')
-    expect(within(card).getByRole('radio', { name: 'User' })).toBeChecked()
+    expect(within(card).getByRole('radio', { name: /^User/ })).toBeChecked()
     expect(within(card).getByRole('button', { name: 'Add outcome' })).toBeVisible()
   })
 
@@ -369,8 +401,8 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     const latest = renderEditor()
     const card = screen.getByTestId('studio-step-1')
 
-    // The radio input of a button group has no pointer events, so the click goes to its label.
-    const switchTo = (name: string) => userEvent.click(within(card).getByRole('radio', { name }).closest('label')!)
+    const switchTo = (name: string) =>
+      userEvent.click(within(card).getByRole('radio', { name: new RegExp(`^${name}`) }))
 
     await switchTo('Role')
     expect(stepOf(latest, 1).assignee).toEqual({ role: '' })
@@ -419,7 +451,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     const notify = '/steps/1/escalations/0/notify'
     await userEvent.click(field(`${notify}/to`).getByRole('button', { name: 'Add recipient' }))
     // The radio input of a button group has no pointer events, so the click goes to its label.
-    await userEvent.click(field(`${notify}/to/0`).getByRole('radio', { name: 'Role' }).closest('label')!)
+    await userEvent.click(field(`${notify}/to/0`).getByRole('radio', { name: /^Role/ }).closest('label')!)
     await chooseOption('finance-reviewer', screen.getByTestId(`studio-field-${notify}/to/0/role`))
     await userEvent.click(field(`${notify}/channels`).getByRole('checkbox', { name: 'In-app' }))
     await userEvent.type(field(`${notify}/message/subject`).getByRole('textbox', { name: 'Text key' }), 'task.approve')
@@ -456,7 +488,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
 
     // The task's own assignee stays a user while the escalation's group switches.
     const reassign = field('/steps/1/escalations/0/reassign')
-    await userEvent.click(reassign.getByRole('radio', { name: 'Role' }).closest('label')!)
+    await userEvent.click(reassign.getByRole('radio', { name: /^Role/ }))
     await chooseOption('finance-reviewer', screen.getByTestId('studio-field-/steps/1/escalations/0/reassign/role'))
     expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].reassign).toEqual({
       role: 'finance-reviewer',
@@ -526,10 +558,9 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
       (
         (await screen.findByRole('group', { name: label('steps.branches.when') })).getAttribute('data-options') ?? ''
       ).split(',')
-    // The radio input of a button group has no pointer events, so the click goes to its label.
-    const switchTo = (name: string) => userEvent.click(screen.getByRole('radio', { name }).closest('label')!)
+    const switchTo = (name: string) => userEvent.click(screen.getByRole('radio', { name: new RegExp(`^${name}`) }))
 
-    expect(screen.getByRole('radio', { name: 'Entity' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /^Entity/ })).toBeChecked()
     expect(await offered()).toContain('totalAmount')
 
     await switchTo('Parameters')
@@ -563,7 +594,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
   it('shows a process without a subject in parameters mode', () => {
     renderEditor({ ...process, entity: undefined, parameters: [{ name: 'daysOverdue', type: 'integer' }] })
 
-    expect(screen.getByRole('radio', { name: 'Parameters' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /^Parameters/ })).toBeChecked()
     expect(screen.getByRole('textbox', { name: label('parameters.name') })).toHaveValue('daysOverdue')
     expect(screen.getByTestId('studio-field-/parameters')).toBeVisible()
   })
@@ -842,6 +873,17 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
         escalation(`${path}.help`),
       )
     })
+
+    it('draws the recipient type of each recipient as a radio group, each option with its help', () => {
+      for (const row of ['to/0', 'to/1', 'to/2']) {
+        const group = at(row).getByRole('radiogroup', { name: escalation('to.kind') })
+        expect(group).toHaveAccessibleDescription(escalation('to.kind.help'))
+        for (const option of ['user', 'role', 'email']) {
+          const radio = within(group).getByRole('radio', { name: new RegExp(`^${escalation(`to.kind.${option}`)}`) })
+          expect(radio).toHaveAccessibleDescription(escalation(`to.kind.${option}.help`))
+        }
+      }
+    })
   })
 
   it('changes only the process of a sub-process whose child is not in the names list', async () => {
@@ -858,10 +900,10 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
   it('edits a timer through its own fields and switches between Wait and Until', async () => {
     const latest = renderEditor()
     const card = screen.getByTestId('studio-step-4')
-    // The radio input of a button group has no pointer events, so the click goes to its label.
-    const switchTo = (name: string) => userEvent.click(within(card).getByRole('radio', { name }).closest('label')!)
+    const switchTo = (name: string) =>
+      userEvent.click(within(card).getByRole('radio', { name: new RegExp(`^${name}`) }))
 
-    expect(within(card).getByRole('radio', { name: 'Wait' })).toBeChecked()
+    expect(within(card).getByRole('radio', { name: /^Wait/ })).toBeChecked()
     expect(within(card).getByRole('textbox', { name: label('steps.wait') })).toHaveValue('PT1H')
     await userEvent.type(within(card).getByRole('textbox', { name: label('steps.wait') }), '2')
     expect(stepOf(latest, 4).wait).toBe('PT1H2')
@@ -894,13 +936,11 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
       ],
     })
 
-    expect(within(screen.getByTestId('studio-step-0')).getByRole('radio', { name: 'Until' })).toBeChecked()
-    expect(within(screen.getByTestId('studio-step-1')).getByRole('radio', { name: 'Wait' })).toBeChecked()
-    expect(within(screen.getByTestId('studio-step-2')).getByRole('radio', { name: 'Wait' })).toBeChecked()
+    expect(within(screen.getByTestId('studio-step-0')).getByRole('radio', { name: /^Until/ })).toBeChecked()
+    expect(within(screen.getByTestId('studio-step-1')).getByRole('radio', { name: /^Wait/ })).toBeChecked()
+    expect(within(screen.getByTestId('studio-step-2')).getByRole('radio', { name: /^Wait/ })).toBeChecked()
 
-    await userEvent.click(
-      within(screen.getByTestId('studio-step-1')).getByRole('radio', { name: 'Until' }).closest('label')!,
-    )
+    await userEvent.click(within(screen.getByTestId('studio-step-1')).getByRole('radio', { name: /^Until/ }))
     expect(stepOf(latest, 1)).toEqual({ name: 'b', type: 'timer', until: 'x', next: 'a' })
   })
 
@@ -1065,7 +1105,7 @@ describe('ProcessEditor sections', () => {
     expect(within(sections[0]).getByTestId('studio-field-/name')).toBeVisible()
     expect(within(sections[0]).getByTestId('studio-field-/description')).toBeVisible()
     expect(within(sections[0]).getByTestId('studio-field-/startCondition')).toBeVisible()
-    expect(within(sections[1]).getByRole('radio', { name: 'Entity' })).toBeChecked()
+    expect(within(sections[1]).getByRole('radio', { name: /^Entity/ })).toBeChecked()
     expect(within(sections[1]).getByTestId('studio-field-/entity')).toBeVisible()
     expect(within(sections[2]).getByTestId('studio-field-/start')).toBeVisible()
     expect(within(sections[2]).getByTestId('studio-step-0')).toBeVisible()
@@ -1073,11 +1113,110 @@ describe('ProcessEditor sections', () => {
     expect(screen.queryByTestId('studio-section-rest')).toBeNull()
   })
 
-  it('names the subject choice by the heading of its section', () => {
+  it('names the subject choice by its label', () => {
     renderEditor()
 
     expect(
-      screen.getByRole('radiogroup', { name: english['shell.studio.section.process.subject'] }),
+      within(screen.getByTestId('studio-section-subject')).getByRole('radiogroup', { name: label('subject') }),
     ).toBeInTheDocument()
+  })
+})
+
+describe('ProcessEditor choices, rows and required fields', () => {
+  it.each([
+    ['subject', 'studio-section-subject', ['subject.entity', 'subject.parameters']],
+    ['steps.assignee.mode', 'studio-field-/steps/0/assignee', ['steps.assignee.mode.user', 'steps.assignee.mode.role']],
+    [
+      'steps.escalations.reassign.mode',
+      'studio-field-/steps/0/escalations/0/reassign',
+      ['steps.escalations.reassign.mode.user', 'steps.escalations.reassign.mode.role'],
+    ],
+    ['steps.timer.mode', 'studio-field-/steps/2/timer', ['steps.timer.mode.wait', 'steps.timer.mode.until']],
+  ])('names the %s choice by its label and describes each option by its own help', (path, container, options) => {
+    renderEditor(complete)
+
+    const group = within(screen.getByTestId(container)).getByRole('radiogroup', { name: label(path) })
+
+    expect(group).toHaveAccessibleDescription(help(path))
+    for (const option of options) {
+      const radio = within(group).getByRole('radio', { name: new RegExp(`^${label(option)}`) })
+      const text = within(group).getByText(help(option))
+      expect(radio).toHaveAttribute('aria-describedby', text.id)
+      expect(radio).toHaveAccessibleDescription(help(option))
+    }
+  })
+
+  it('puts each field of a parameter, deadline, branch and outcome row on its own line, with Remove below', () => {
+    renderEditor({ ...complete, entity: undefined, parameters: [{ name: 'daysOverdue', type: 'integer' }] })
+
+    const rows: [HTMLElement, string[], string][] = [
+      [
+        screen.getByTestId('studio-field-/parameters/0'),
+        ['/parameters/0/name', '/parameters/0/type'],
+        'Remove parameter',
+      ],
+      [
+        screen.getByTestId('studio-field-/steps/0/deadline/after').parentElement!,
+        ['/steps/0/deadline/after', '/steps/0/deadline/next'],
+        'Remove deadline',
+      ],
+      [
+        screen.getByTestId('studio-field-/steps/1/branches/0'),
+        ['/steps/1/branches/0/when', '/steps/1/branches/0/next'],
+        'Remove branch',
+      ],
+      [
+        screen.getByTestId('studio-field-/steps/0/outcomes/0'),
+        ['/steps/0/outcomes/0/name', '/steps/0/outcomes/0/label/textKey', '/steps/0/outcomes/0/next'],
+        'Remove outcome',
+      ],
+    ]
+    for (const [row, fields, remove] of rows) {
+      expect(row).toHaveClass('ant-flex-vertical')
+      for (const field of fields) {
+        expect(screen.getByTestId(`studio-field-${field}`).parentElement).toBe(row)
+      }
+      expect(row.lastElementChild).toContainElement(within(row).getByRole('button', { name: remove }))
+    }
+  })
+
+  it('marks the fields the schema requires with * and aria-required, and no optional field', () => {
+    renderEditor(complete)
+
+    const required: [string, 'textbox' | 'combobox'][] = [
+      ['studio-field-/start', 'combobox'],
+      ['studio-field-/steps/0/name', 'textbox'],
+      ['studio-field-/steps/0/type', 'combobox'],
+      ['studio-field-/steps/0/label/textKey', 'combobox'],
+      ['studio-field-/steps/0/form', 'combobox'],
+      ['studio-field-/steps/0/deadline/after', 'textbox'],
+      ['studio-field-/steps/0/deadline/next', 'combobox'],
+      ['studio-field-/steps/0/escalations/0/after', 'textbox'],
+      ['studio-field-/steps/0/outcomes/0/name', 'textbox'],
+      ['studio-field-/steps/0/outcomes/0/label/textKey', 'combobox'],
+      ['studio-field-/steps/1/branches/0/when', 'textbox'],
+      ['studio-field-/steps/2/next', 'combobox'],
+      ['studio-field-/steps/4/event', 'combobox'],
+      ['studio-field-/steps/4/timeout/after', 'textbox'],
+      ['studio-field-/steps/5/process', 'combobox'],
+    ]
+    const optional: [string, 'textbox' | 'combobox'][] = [
+      ['studio-field-/entity', 'combobox'],
+      ['studio-field-/steps/0/dueIn', 'textbox'],
+      ['studio-field-/steps/0/assignee/user', 'textbox'],
+      ['studio-field-/steps/2/wait', 'textbox'],
+      ['studio-field-/steps/4/when', 'textbox'],
+      ['studio-field-/steps/5/subject', 'textbox'],
+    ]
+    for (const [testId, role] of required) {
+      const field = within(screen.getByTestId(testId))
+      expect(field.getByRole(role)).toHaveAttribute('aria-required', 'true')
+      expect(field.getByText('*')).toBeInTheDocument()
+    }
+    for (const [testId, role] of optional) {
+      const field = within(screen.getByTestId(testId))
+      expect(field.getByRole(role)).not.toHaveAttribute('aria-required')
+      expect(field.queryByText('*')).toBeNull()
+    }
   })
 })

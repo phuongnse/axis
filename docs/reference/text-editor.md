@@ -1,7 +1,7 @@
 # Text editor
 
-A `text` resource opens as one table of keys, with a column for each locale and a search box, and the
-JSON view stays as the second view of the same draft.
+A `text` resource opens as one table of keys, with a column for each locale, and the JSON view stays as
+the second view of the same draft.
 
 - **Columns.** There is a row for each key, sorted by key, and a column for each locale in the order of
   the folder's `text` resources. Only the open resource's column is editable. The other locales show
@@ -10,8 +10,12 @@ JSON view stays as the second view of the same draft.
 - **Missing keys.** A key that the open locale lacks shows an empty cell marked missing, and typing in
   it adds the key to this locale. Another locale that lacks the key shows a missing mark in place of
   the text.
-- **Search.** The box keeps the rows whose key, or text in any locale, contains the search, ignoring
-  letter case.
+- **Search.** The search is the table's own, through its Search box. It keeps the rows whose key, or text
+  in any locale, contains the search, ignoring letter case. It starts on Enter or on the search button,
+  goes back to page 1, and lives in the address as `search`, so a reload or the Back button keeps it. See
+  [tables](actions-and-controls.md#tables).
+- **Paging.** The table pages 20 rows at a time, as every table with a view does. See
+  [tables](actions-and-controls.md#tables).
 - **Cells.** A cell edit goes into the draft, and Save sends one JSON Patch for the open resource only.
   Clearing a cell saves an empty string and keeps the key, because every locale holds the same keys
   (`AXC0027`).

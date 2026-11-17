@@ -255,7 +255,7 @@ test.describe('the author builds the asset management application with Studio on
     await page
       .getByTestId(`studio-field-/fields/${index}`)
       .getByRole('radiogroup', { name: 'Currency source', exact: true })
-      .getByText('Field', { exact: true })
+      .getByText('From a field', { exact: true })
       .click()
   }
 
@@ -1101,7 +1101,7 @@ test.describe('the author builds the asset management application with Studio on
     await page
       .getByTestId('studio-field-/steps/0/to/0')
       .locator('label')
-      .filter({ has: page.getByRole('radio', { name: 'Role', exact: true }) })
+      .filter({ has: page.getByRole('radio', { name: /^Role/ }) })
       .click()
     await pickLabelled(page, 'studio-field-/steps/0/to/0/role', 'roles', 'asset-manager')
     await page
@@ -1249,7 +1249,9 @@ test.describe('the author builds the asset management application with Studio on
     for (const name of software) {
       await page.getByRole('button', { name: 'Add Software', exact: true }).click()
       const dialog = await waitForDialog(page)
-      await dialog.getByTestId('reference-lookup-search').fill(name)
+      const search = dialog.getByRole('searchbox', { name: 'Search', exact: true })
+      await search.fill(name)
+      await search.press('Enter')
       await dialog.getByRole('row', { name: new RegExp(name) }).click()
       await expect(dialog).toBeHidden()
     }
@@ -1275,7 +1277,9 @@ test.describe('the author builds the asset management application with Studio on
     await expect(date).toHaveValue('10/01/2026')
     await page.getByRole('button', { name: 'Choose… Vendor 1', exact: true }).click()
     const lookup = await waitForDialog(page)
-    await lookup.getByTestId('reference-lookup-search').fill(vendor)
+    const search = lookup.getByRole('searchbox', { name: 'Search', exact: true })
+    await search.fill(vendor)
+    await search.press('Enter')
     await lookup.getByRole('row', { name: new RegExp(vendor) }).click()
     await expect(lookup).toBeHidden()
     await pickOption(page.getByRole('combobox', { name: 'Currency 1', exact: true }), 'USD')

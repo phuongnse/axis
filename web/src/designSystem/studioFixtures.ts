@@ -5,15 +5,19 @@ import type {
   StudioCatalog,
   StudioDiagnostic,
   StudioFormMetadataAnswer,
+  StudioKindListItem,
   StudioNameEntity,
   StudioNames,
   StudioPageMetadataAnswer,
   StudioPolicyMatrix,
+  StudioRelease,
+  StudioReleaseListRow,
   StudioReleases,
   StudioResource,
-  StudioResourceActivity,
   StudioResourceItem,
   StudioResourceReferences,
+  StudioRevision,
+  StudioRevisionDiff,
 } from '../platform/studio'
 import { application, entity as requestEntity, fields, formWidget, locale, tableWidget } from './fixtures'
 
@@ -97,19 +101,33 @@ function items(folder: Folder): StudioResourceItem[] {
   ]
 }
 
-/** Each resource's activity: a mix of statuses, and a writer and a time on the first resource. */
-function activity(folder: Folder): { items: StudioResourceActivity[] } {
+/**
+ * The first page of the entity list: 20 rows at most, with a mix of statuses and a writer and a time on the first row.
+ * The answer ignores the query, so a sort or a page change in the preview shows the same rows.
+ */
+function entityList(folder: Folder): {
+  items: StudioKindListItem[]
+  page: number
+  pageSize: number
+  totalCount: number
+} {
   const statuses = ['new', 'changed', 'published', null] as const
+  const pageSize = 20
   return {
-    items: items(folder).map((item, index) => ({
-      id: item.id,
+    items: folder.entities.slice(0, pageSize).map((entity, index) => ({
+      id: id(firstEntityId + index),
+      title: entity.title,
+      locale: null,
+      description: null,
       module: null,
+      moduleLabel: null,
       status: statuses[index % statuses.length],
-      titles: null,
-      descriptions: null,
       modifiedBy: index === 0 ? 'Linh Nguyen' : null,
       modifiedAt: index === 0 ? '2026-11-02T09:30:00Z' : null,
     })),
+    page: 1,
+    pageSize,
+    totalCount: folder.entities.length,
   }
 }
 
@@ -399,6 +417,129 @@ const typicalReleases = {
   partChanges: [],
 } satisfies StudioReleases
 
+/** The revisions of Typical, newest first: a person in Studio, a command-line client, and the server's own start of history. */
+const typicalRevisions = {
+  items: [
+    {
+      id: 'r3',
+      summary: 'Added the approval step',
+      author: 'Alex Morgan',
+      userId: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
+      client: 'studio',
+      request: null,
+      time: '2026-10-21T09:30:00Z',
+    },
+    {
+      id: 'r2',
+      summary: 'Added the supplier entity',
+      author: 'Alex Morgan',
+      userId: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
+      client: 'cli',
+      request: null,
+      time: '2026-10-18T14:05:00Z',
+    },
+    {
+      id: 'r1',
+      summary: 'Created the application',
+      author: '',
+      userId: null,
+      client: null,
+      request: null,
+      time: '2026-10-14T08:00:00Z',
+    },
+  ],
+  page: 1,
+  pageSize: 20,
+  totalCount: 3,
+  start: 'r1',
+} satisfies { items: StudioRevision[]; page: number; pageSize: number; totalCount: number; start: string }
+
+/** The newest revision of Typical with the three files it changed, which the Revision state opens. */
+const typicalRevisionDiff = {
+  revision: typicalRevisions.items[0],
+  resources: [
+    {
+      file: 'pages/request-list.json',
+      change: 'changed',
+      id: pageId,
+      kind: 'page',
+      name: 'RequestList',
+      before: JSON.stringify({
+        kind: 'page',
+        name: 'RequestList',
+        title: { textKey: 'requestList.title' },
+        widgets: [],
+      }),
+      after: JSON.stringify({
+        kind: 'page',
+        name: 'RequestList',
+        title: { textKey: 'requestList.title' },
+        widgets: [{ type: 'table', name: 'requests', entity: 'Request' }],
+      }),
+    },
+    {
+      file: 'roles/approver.json',
+      change: 'added',
+      id: approverRoleId,
+      kind: 'role',
+      name: 'Approver',
+      before: null,
+      after: JSON.stringify({ kind: 'role', name: 'Approver', label: { textKey: 'role.approver' } }),
+    },
+    {
+      file: 'forms/old-request.json',
+      change: 'removed',
+      id: null,
+      kind: 'form',
+      name: 'OldRequest',
+      before: JSON.stringify({ kind: 'form', name: 'OldRequest', entity: 'Request', sections: [] }),
+      after: null,
+    },
+  ],
+} satisfies StudioRevisionDiff
+
+/** Release 2 of Typical's history, which is live: it pins the Organization module and compares with release 1. */
+const typicalRelease: StudioRelease = {
+  number: 2,
+  previous: 1,
+  previousIsLive: false,
+  live: true,
+  changes: typicalReleases.changes,
+  partChanges: [],
+  modules: [{ id: 'organization', label: 'Organization', version: '1.2.0', previousVersion: '1.0.0' }],
+  packages: [],
+  blockers: [],
+}
+
+/**
+ * The release list of a state's releases: one row for each release, the highest number first, from its first activation,
+ * as the server builds it, with the whole list as one page.
+ */
+export function releasePage(releases: StudioReleases) {
+  const first = new Map<string, StudioReleases['items'][number]>()
+  for (const item of releases.items) {
+    const known = first.get(item.releaseId)
+    if (!known || Date.parse(item.activatedAt) < Date.parse(known.activatedAt)) {
+      first.set(item.releaseId, item)
+    }
+  }
+  const items: StudioReleaseListRow[] = [...first.values()]
+    .map((item) => ({
+      releaseId: item.releaseId,
+      number: item.number,
+      label: item.label,
+      note: item.note,
+      publishedAt: item.activatedAt,
+      actor: item.actor,
+      actorName: item.actorName,
+      live: item.releaseId === releases.active?.releaseId,
+      offStandard: item.offStandard,
+      relaxed: item.relaxed,
+    }))
+    .sort((left, right) => right.number - left.number)
+  return { items, page: 1, pageSize: 20, totalCount: items.length }
+}
+
 /** What a state's folder answers for its diagnostics and its releases. */
 interface StateAnswers {
   diagnostics: StudioDiagnostic[]
@@ -546,7 +687,7 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     [`${folderPath}/policy-matrix`]: () => policyMatrix(folder),
     [appsPath]: () => ({ items: folder.apps }) satisfies { items: StudioApplication[] },
     [`${folderPath}/resources`]: () => ({ items: items(folder) }) satisfies { items: StudioResourceItem[] },
-    [`${folderPath}/resource-activity`]: () => activity(folder),
+    [`${folderPath}/kinds/entity/resources`]: () => entityList(folder),
     [`${folderPath}/diagnostics`]: () =>
       ({ diagnostics: answers.diagnostics }) satisfies { diagnostics: StudioDiagnostic[] },
     // A field's default has no field in scope, and no state types an expression, so the scope is empty.
@@ -563,6 +704,9 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     [`${folderPath}/resources/${formId}/references`]: () => formReferences,
     [`${folderPath}/resources/${processId}`]: () => processResource,
     [`${folderPath}/releases`]: () => answers.releases,
+    [`${folderPath}/release-list`]: () => releasePage(answers.releases),
+    [`${folderPath}/revisions`]: () => typicalRevisions,
+    [`${folderPath}/revisions/${typicalRevisionId}`]: () => typicalRevisionDiff,
     [`${folderPath}/settings`]: () => settings,
   }
 }
@@ -633,6 +777,9 @@ const newFolder: Folder = {
   bare: true,
 }
 
+/** The id of the newest revision of Typical, which the Revision state opens at `&revision=<id>`. */
+export const typicalRevisionId = typicalRevisions.items[0].id
+
 /** The id of the Request entity of the Typical folder, which the Entity state opens at `&resource=<id>`. */
 export const typicalEntityId = id(firstEntityId)
 
@@ -655,5 +802,6 @@ export const studioFixtures = {
   longNames: workspaceRoutes(longFolder),
   withErrors: workspaceRoutes(typicalFolder, errorAnswers),
   newApplication: workspaceRoutes(newFolder, unpublishedAnswers),
+  releasePage: { ...workspaceRoutes(typicalFolder), [`${folderPath}/releases/2`]: () => typicalRelease },
   accessDenied: { [appsPath]: () => new Response(null, { status: 403 }) },
 } satisfies Record<string, Record<string, () => unknown>>

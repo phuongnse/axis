@@ -4,6 +4,12 @@ The entity designer is the Form tab of an `entity` resource in Studio, in place 
 It shows the entity's details, its fields as a table, its validations and its indexes, and the JSON tab
 edits the same draft. The rest of Studio is in [Studio](studio.md).
 
+## Typing
+
+A key redraws the box it went into and what shows its value, such as the save bar. The other field rows
+and validations stay as they are. A resource of a dozen fields stays quick to type in because of this.
+The expression editors read the draft when completion opens, not on each key.
+
 ## Sections
 
 _(planned for M33)_
@@ -109,7 +115,7 @@ These settings take a control of their own:
   [Validations](#validations) section keeps every one.
 - **A default has no record in scope,** so its editor offers rules and functions but no field names and
   no aggregate functions, and a field name in it is reported as unknown (`AXC0046`).
-- **A money field holds one currency.** Field writes an empty `currencyField` and removes `currency`, and
+- **A money field holds one currency.** From a field writes an empty `currencyField` and removes `currency`, and
   Fixed code removes `currencyField`. A typed code is turned into upper case.
 - **An enum keeps a removed value's label.** Removing a value keeps its label in `valueLabels`, and
   Validate reports it (`AXC0242`).
@@ -122,10 +128,19 @@ These settings take a control of their own:
   enum value or the last value label removes the key. Turning `searchable` off and unticking an index's
   Unique also remove the key, rather than write `false`.
 
+## Required keys
+
+The keys that `entity.schema.json` requires show the shared `*` and are announced as required: the entity
+name, an index's fields, and a validation's expression, message and field. So do the target of a reference
+field and the currency field of a money field, which cannot be emptied. The name of an index or a
+validation is read-only text and has no mark. The Name and Type cells of the fields table have none yet,
+as a table cell has no label for it.
+
 ## Indexes
 
 An Indexes list under the fields adds, moves and removes the entity's `indexes`. Each index shows its
-name as read-only text, picks the entity's fields in order and has a Unique checkbox. Add index writes
+name as read-only text, picks the entity's fields in order and has a Unique checkbox. A row shows its name
+and, with a customization layer, its mark on top, then one field to a line, then its buttons below. Add index writes
 the name `index1`, `index2` and so on, the first one that no index of the entity has, ignoring letter
 case. The picker offers only fields that have a column, so it leaves out `child-collection`,
 `references` and `file` fields (`AXC0276`). Each change writes the whole `indexes` array, and removing
@@ -134,7 +149,8 @@ the last index removes the key.
 ## Validations
 
 Each validation shows its name as read-only text, its expression in the expression editor, a message
-key picker and a field picker, and can be added and removed. Add validation writes the name
+key picker and a field picker, and can be added and removed. A row shows its name and mark on top, then
+one field to a line, then its buttons below. Add validation writes the name
 `validation1`, `validation2` and so on, the first one that no validation of the entity has, ignoring
 letter case.
 

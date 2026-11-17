@@ -49,8 +49,10 @@ leaves out a kind the application has no resource of, since the Overview introdu
 entry shows a count. An open entry shows its label alone and a collapsed one its icon alone, with the
 label as its tooltip; collapsed, a group's title becomes a thin rule.
 
-A kind's entry opens its list, at `&kind=<kind>`, under a heading with the kind's name; for a kind that
-modules hold, the module's resources follow. A resource open in an editor marks its kind's entry, and
+A kind's entry opens its list, at `&kind=<kind>`, under a heading with the kind's name. For a kind that
+modules hold, the list also has the module's resources, sorted with the application's own, each under a
+tag of its module, see [kind lists](studio.md#kind-lists-and-module-resources). A resource open in an
+editor marks its kind's entry, and
 the address keeps the view, as in `/studio?app=PurchaseRequests&resource=<id>`.
 
 ## Band
@@ -165,9 +167,8 @@ and the application's description it shows, in one column:
 While the release history loads, Live and Changes both say so, and when it fails both say that the releases did not
 load. Once it has loaded, Live is left out when there is no live release. Live also says so while its sites load.
 
-Each block is a panel on `surface`, as a [resource form's sections](studio-resource-form.md#sections) are,
-with its title as its heading and no line under it. The blocks are `spacing-md` apart. The page's
-`canvas` holds only the heading, the description and the gaps between the blocks.
+Each block is a part, as a [resource form's sections](studio-resource-form.md#sections) are,
+with its title as its heading and no line under it. The blocks sit a `divider` rule apart. Outside the blocks, the page holds only the heading, the description and the gaps between the blocks.
 
 ## Change list
 
@@ -189,9 +190,15 @@ The Overview's changes and a release's changes share one list.
 ## Releases
 
 The Releases entry lists the application's releases from
-[`GET .../releases`](authoring.md#release-history) on the
-[shared table](actions-and-controls.md#tables), one row per release, the highest number first: a publish
-gives a release its label and note, and activating goes to whichever release is wanted.
+[`GET .../release-list`](authoring.md#release-list) on the
+[shared table](actions-and-controls.md#tables), one row per release, the highest number first unless the
+view sorts them: a publish gives a release its label and note, and activating goes to whichever release is
+wanted. The table is paged on the server, [20 releases at a time](authoring.md#release-list), with Search,
+Filter, Columns, Refresh, a sort on Release, Label, Published and Published by, and a pager with a page size.
+Note does not sort, because it is long text. All of them live in the address, as
+[D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md)
+agrees. The page of releases loads again whenever the band's history does and when Refresh is pressed, so the
+Live tag is right after an activation.
 
 | Column       | Shows                                                                                                                                                       |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -225,7 +232,7 @@ the history lacks says so in one line, with a link to every release.
 The page shows, in order:
 
 1. **The heading** "Release N" with its tags, and Activate… as the page's action on the heading's right.
-2. **Facts:** Label; Status, live since or replaced on; Published; Published by; and Note, on a line of
+2. **Details:** Label; Status, live since or replaced on; Published; Published by; and Note, on a line of
    its own.
 3. **Relaxed points**, for a release that pins a module: the module's label, the point's label with a
    muted line that says what kind of point it is and on which entity, and the reason. With none, one
@@ -238,6 +245,10 @@ The page shows, in order:
    the release it compares with.
 5. **Modules and packages** that the release pins: name, type and version.
 6. **Activations:** when, by whom, the release it replaced and until when it was live.
+
+The parts from Details to Activations each have a `heading5` heading, with a `divider` rule between
+them and none before the first, through `SectionParts`. A part that the page leaves out, such as Relaxed
+points without a module, adds no rule.
 
 - **Cannot replace the live one.** An older release that lacks a module that the live
   release pins, or pins it at a version without some of its entities or fields, cannot replace the live

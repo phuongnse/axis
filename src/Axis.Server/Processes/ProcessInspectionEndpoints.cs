@@ -15,6 +15,7 @@ using Axis.Server.Http;
 using Axis.Server.Records;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 
 namespace Axis.Server.Processes;
@@ -22,8 +23,13 @@ namespace Axis.Server.Processes;
 /// <summary>
 /// The endpoints for a user who may inspect a process. The list at
 /// <c>GET /api/apps/{app}/processes/{process}/instances</c> shows the instances of the process,
-/// newest first and paged as the record API pages, whatever release each is pinned to. The
-/// <c>state</c> parameter keeps one state, and <c>subject</c> keeps the instances of one record. A
+/// newest first and paged as the record API pages, whatever release each is pinned to. It takes the record API's <c>sort</c>,
+/// <c>search</c> and <c>filter</c> through <see cref="ListQuery{T}"/>, which PostgreSQL applies, over <c>subjectLabel</c>,
+/// <c>state</c>, <c>step</c>, <c>releaseNumber</c>, <c>createdAt</c> and <c>endedAt</c>. <c>subjectLabel</c> is a field only for a
+/// process with a subject whose display field the user may read and the active release does not mark sensitive, so otherwise
+/// a sort or filter on it is a 400 and a search never matches it. A search looks in <c>subjectLabel</c> and <c>step</c>. A sorted list
+/// breaks ties newest first, and the total counts only the instances that match the filter and the search. The
+/// <c>state</c> parameter may repeat and keeps the instances in any of the given states, and <c>subject</c> keeps the instances of one record. A
 /// request is checked in order: session or service account bearer token (401), application and process (404), the user's
 /// <c>inspect</c> grant on the process (403), then the parameters (400), each keyed by its name.
 /// An instance is listed only when its subject record exists and matches one of the user's read
@@ -75,14 +81,13 @@ internal static class ProcessInspectionEndpoints
         endpoints.MapGet("/api/apps/{app}/processes/{process}/instances/{id}", GetAsync).WithMetadata(ServiceAccountRoute.Instance);
     }
 
-    // The query parameters are bound as strings so every invalid one is reported in one problem.
+    // The query parameters are bound as strings so every invalid one is reported in one problem. The repeated `state` needs
+    // [FromQuery], because the request delegate generator does not map the route without it.
     private static async Task<IResult> ListAsync(
         string app,
         string process,
-        string? state,
+        [FromQuery] string[]? state,
         string? subject,
-        string? page,
-        string? pageSize,
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
@@ -112,13 +117,23 @@ internal static class ProcessInspectionEndpoints
             return Grants.Forbidden();
         }
 
+        // The subject entity comes first, because it decides whether the label is a field of the list.
+        EntityModel? entity = null;
+        if (model.Entity is { } subjectEntity && !application.TryGetEntity(subjectEntity.Name, out entity))
+        {
+            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
+        }
+
+        var readable = entity is null ? null : PolicyEvaluator.Fields(application, user.RolesIn(application), entity, PolicyAction.Read);
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
-        if (state is not null && !_states.Contains(state, StringComparer.Ordinal))
+        var query = ListQuery<InstanceListItem>.Read(httpContext.Request, Columns(entity, readable), errors);
+        if (state is not null && state.Any(value => !_states.Contains(value, StringComparer.Ordinal)))
         {
             errors["state"] = [$"Must be one of {string.Join(", ", _states)}."];
         }
 
+        // A missing state is an empty array, which is no filter.
+        IReadOnlyList<string>? states = state is { Length: > 0 } ? state : null;
         Guid? subjectId = null;
         if (subject is not null)
         {
@@ -138,31 +153,27 @@ internal static class ProcessInspectionEndpoints
         }
 
         // An instance of a process without a subject has no record to read, so the inspect grant is enough.
-        if (model.Entity is not { } subjectEntity)
+        if (entity is null)
         {
             var withoutSubject = await InstanceQueries.ListWithoutSubjectAsync(
                 await database.GetConnectionAsync(cancellationToken),
                 application.Manifest.Id,
                 model.Id,
-                state,
+                states,
                 subjectId,
-                pageNumber,
-                size,
+                query.Sql(),
+                query.Page,
+                query.PageSize,
                 cancellationToken);
             return Results.Ok(new ProcessInstanceListResponse(
-                withoutSubject.Items.Select(item => ListItem(item, showsLabel: false)).ToList(), pageNumber, size, withoutSubject.TotalCount));
-        }
-
-        if (!application.TryGetEntity(subjectEntity.Name, out var entity))
-        {
-            throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
+                withoutSubject.Items.Select(item => ListItem(item, showsLabel: false)).ToList(), query.Page, query.PageSize, withoutSubject.TotalCount));
         }
 
         // An instance whose record the user may not read does not exist for them.
         var read = PolicyEvaluator.Access(application, user.RolesIn(application), entity, PolicyAction.Read);
         if (!read.Granted)
         {
-            return Results.Ok(new ProcessInstanceListResponse([], pageNumber, size, 0));
+            return Results.Ok(new ProcessInstanceListResponse([], query.Page, query.PageSize, 0));
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
@@ -176,7 +187,7 @@ internal static class ProcessInspectionEndpoints
             ? await RecordFilters.ConditionAsync(application, entity, RecordCommand.Expressions(filters), user.Id, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken)
             : null;
         if (await InstanceQueries.ListAsync(
-                connection, application.Manifest.Id, model.Id, entity, state, subjectId, condition, pageNumber, size, cancellationToken) is not { } result)
+                connection, application.Manifest.Id, model.Id, entity, states, subjectId, condition, query.Sql(), query.Page, query.PageSize, cancellationToken) is not { } result)
         {
             // PostgreSQL cannot fail one branch of an OR, so every filter of the list is named.
             var logger = loggerFactory.CreateLogger(typeof(ProcessInspectionEndpoints).FullName!);
@@ -190,7 +201,6 @@ internal static class ProcessInspectionEndpoints
 
         // The query reads the display field of every listed instance. The label shows only when the user may
         // read the field and neither the active nor the pinned release marks it sensitive.
-        var readable = PolicyEvaluator.Fields(application, user.RolesIn(application), entity, PolicyAction.Read);
         var pinnedEntities = new Dictionary<Guid, EntityModel?>();
         var items = new List<ProcessInstanceListItem>(result.Items.Count);
         foreach (var item in result.Items)
@@ -205,7 +215,38 @@ internal static class ProcessInspectionEndpoints
             items.Add(ListItem(item, ShowsSubjectLabel(entity, pinned, readable)));
         }
 
-        return Results.Ok(new ProcessInstanceListResponse(items, pageNumber, size, result.TotalCount));
+        return Results.Ok(new ProcessInstanceListResponse(items, query.Page, query.PageSize, result.TotalCount));
+    }
+
+    // The columns the list's search, filter and sort can name, over axis.process_instances. The Value functions only satisfy the
+    // column record, as in CellEndpoints, because PostgreSQL applies the list. The subject label is a column only when the
+    // user may see it. The time columns filter by their UTC day and sort by their instant.
+    private static List<ListColumn<InstanceListItem>> Columns(EntityModel? entity, IReadOnlySet<string>? readable)
+    {
+        var columns = new List<ListColumn<InstanceListItem>>();
+        if (entity is not null && ShowsSubjectLabel(entity, null, readable))
+        {
+            columns.Add(new("subjectLabel", ListColumnKind.Text, item => item.SubjectLabel, Searchable: true, Sql: InstanceQueries.SubjectLabelSql(entity)));
+        }
+
+        columns.Add(new("state", ListColumnKind.Enum, item => item.Instance.State, Values: _states, Sql: "i.state"));
+        columns.Add(new("step", ListColumnKind.Text, item => item.Instance.Step, Searchable: true, Sql: "i.step"));
+        columns.Add(new("releaseNumber", ListColumnKind.Number, item => item.ReleaseNumber, Sql: InstanceQueries.ReleaseNumberSql));
+        columns.Add(new(
+            "createdAt",
+            ListColumnKind.Date,
+            item => DateOnly.FromDateTime(item.Instance.CreatedAt.UtcDateTime),
+            Order: item => item.Instance.CreatedAt,
+            Sql: "(i.created_at AT TIME ZONE 'UTC')::date",
+            OrderSql: "i.created_at"));
+        columns.Add(new(
+            "endedAt",
+            ListColumnKind.Date,
+            item => item.Instance.EndedAt is { } endedAt ? DateOnly.FromDateTime(endedAt.UtcDateTime) : null,
+            Order: item => item.Instance.EndedAt,
+            Sql: "(i.ended_at AT TIME ZONE 'UTC')::date",
+            OrderSql: "i.ended_at"));
+        return columns;
     }
 
     private static ProcessInstanceListItem ListItem(InstanceListItem item, bool showsLabel) =>

@@ -1,6 +1,7 @@
-import { Button, Card, Checkbox, Flex, Input, Select, Typography } from 'antd'
+import { Button, Card, Flex, Input, Select, Typography } from 'antd'
 import { useContext, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
+import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { StudioBindingsContext } from '../platform/studioCatalog'
@@ -8,7 +9,7 @@ import { useText } from '../platform/texts'
 import { BindingSelect } from './CatalogControls'
 import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
-import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import type { ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -107,7 +108,7 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
   function textField(pointer: string, path: string, current: unknown, required: boolean) {
     return (
       <div data-testid={`studio-field-${pointer}`}>
-        <AxisField {...fieldTexts(t, path)}>
+        <AxisField {...fieldTexts(t, path)} required={required}>
           <Input
             value={text(current)}
             onChange={(event) =>
@@ -119,11 +120,11 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
     )
   }
 
-  function bindingField(pointer: string, path: string, current: unknown, kind: 'url' | 'secret') {
+  function bindingField(pointer: string, path: string, current: unknown, kind: 'url' | 'secret', required: boolean) {
     const texts = fieldTexts(t, path)
     return (
       <div data-testid={`studio-field-${pointer}`}>
-        <AxisField {...texts}>
+        <AxisField {...texts} required={required}>
           {bindings === undefined ? (
             <Input value={bindingName(current)} onChange={(event) => onChange(pointer, event.target.value)} />
           ) : (
@@ -142,17 +143,17 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
   function section(name: string, children: ReactNode, action?: ReactNode) {
     const prefix = `shell.studio.section.connector.${name}`
     return (
-      <ResourceFormSection testName={name} heading={{ title: t(prefix), line: t(`${prefix}.line`) }} action={action}>
+      <SectionPart testName={name} heading={{ title: t(prefix), line: t(`${prefix}.line`) }} action={action}>
         <Flex vertical gap="small">
           {children}
         </Flex>
-      </ResourceFormSection>
+      </SectionPart>
     )
   }
 
   return (
     <div data-testid="studio-connector-editor">
-      <ResourceFormSections>
+      <SectionParts>
         {section(
           'general',
           <>
@@ -167,7 +168,7 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
         {section(
           'service',
           <>
-            {bindingField('/baseUrl/binding', 'baseUrl', value.baseUrl, 'url')}
+            {bindingField('/baseUrl/binding', 'baseUrl', value.baseUrl, 'url', true)}
             {textField('/timeout', 'timeout', value.timeout, false)}
             {textField('/idempotency', 'idempotency', value.idempotency, false)}
           </>,
@@ -188,18 +189,18 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
                   />
                 </AxisField>
               </div>
-              {authType === 'bearer' && bindingField('/auth/token/binding', 'auth.token', auth?.token, 'secret')}
+              {authType === 'bearer' && bindingField('/auth/token/binding', 'auth.token', auth?.token, 'secret', true)}
               {authType === 'header' && (
                 <>
                   {textField('/auth/name', 'auth.name', auth?.name, true)}
-                  {bindingField('/auth/value/binding', 'auth.value', auth?.value, 'secret')}
+                  {bindingField('/auth/value/binding', 'auth.value', auth?.value, 'secret', true)}
                 </>
               )}
               {authType === 'oauth2' && (
                 <>
-                  {bindingField('/auth/tokenUrl/binding', 'auth.tokenUrl', auth?.tokenUrl, 'url')}
-                  {bindingField('/auth/clientId/binding', 'auth.clientId', auth?.clientId, 'secret')}
-                  {bindingField('/auth/clientSecret/binding', 'auth.clientSecret', auth?.clientSecret, 'secret')}
+                  {bindingField('/auth/tokenUrl/binding', 'auth.tokenUrl', auth?.tokenUrl, 'url', true)}
+                  {bindingField('/auth/clientId/binding', 'auth.clientId', auth?.clientId, 'secret', true)}
+                  {bindingField('/auth/clientSecret/binding', 'auth.clientSecret', auth?.clientSecret, 'secret', true)}
                   {textField('/auth/scope', 'auth.scope', auth?.scope, false)}
                   {textField('/auth/audience', 'auth.audience', auth?.audience, false)}
                 </>
@@ -233,7 +234,7 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
             {t('shell.studio.connector.addOperation')}
           </AxisButton>,
         )}
-      </ResourceFormSections>
+      </SectionParts>
     </div>
   )
 }
@@ -260,12 +261,12 @@ function Operation({
     <Card size="small" data-testid={`studio-operation-${index}`}>
       <Flex vertical gap="small">
         <div data-testid={`studio-field-${pointer}/name`}>
-          <AxisField {...fieldTexts(t, 'operations.name')}>
+          <AxisField {...fieldTexts(t, 'operations.name')} required>
             <Input value={text(operation.name)} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
           </AxisField>
         </div>
         <div data-testid={`studio-field-${pointer}/method`}>
-          <AxisField {...fieldTexts(t, 'operations.method')}>
+          <AxisField {...fieldTexts(t, 'operations.method')} required>
             <Select
               virtual={false}
               style={{ minWidth: 240 }}
@@ -276,7 +277,7 @@ function Operation({
           </AxisField>
         </div>
         <div data-testid={`studio-field-${pointer}/path`}>
-          <AxisField {...fieldTexts(t, 'operations.path')}>
+          <AxisField {...fieldTexts(t, 'operations.path')} required>
             <Input value={text(operation.path)} onChange={(event) => onChange(`${pointer}/path`, event.target.value)} />
           </AxisField>
         </div>
@@ -374,9 +375,9 @@ function FieldRows({
             const structured = kind === 'input' && isStructured(field.type)
             return (
               <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
-                <Flex gap="small" align="flex-end" wrap>
+                <Flex vertical gap="small">
                   <div data-testid={`studio-field-${rowPointer}/name`}>
-                    <AxisField {...fieldTexts(t, `${path}.name`)}>
+                    <AxisField {...fieldTexts(t, `${path}.name`)} required>
                       <Input
                         value={text(field.name)}
                         onChange={(event) => onChange(`${rowPointer}/name`, event.target.value)}
@@ -384,7 +385,7 @@ function FieldRows({
                     </AxisField>
                   </div>
                   <div data-testid={`studio-field-${rowPointer}/type`}>
-                    <AxisField {...fieldTexts(t, `${path}.type`)}>
+                    <AxisField {...fieldTexts(t, `${path}.type`)} required>
                       <Select
                         virtual={false}
                         style={{ minWidth: 140 }}
@@ -412,12 +413,11 @@ function FieldRows({
                     </div>
                   )}
                   <div data-testid={`studio-field-${rowPointer}/required`}>
-                    <AxisField {...fieldTexts(t, `${path}.required`)}>
-                      <Checkbox
-                        checked={field.required === true}
-                        onChange={(event) => onChange(`${rowPointer}/required`, event.target.checked)}
-                      />
-                    </AxisField>
+                    <AxisCheckboxField
+                      {...fieldTexts(t, `${path}.required`)}
+                      checked={field.required === true}
+                      onChange={(checked) => onChange(`${rowPointer}/required`, checked)}
+                    />
                   </div>
                   {kind === 'output' && (
                     <div data-testid={`studio-field-${rowPointer}/source`}>
@@ -431,10 +431,12 @@ function FieldRows({
                       </AxisField>
                     </div>
                   )}
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button onClick={() => onChange(rowPointer, undefined)}>
-                    {t('shell.studio.connector.removeField')}
-                  </Button>
+                  <div>
+                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                    <Button onClick={() => onChange(rowPointer, undefined)}>
+                      {t('shell.studio.connector.removeField')}
+                    </Button>
+                  </div>
                 </Flex>
                 {structured && (
                   <NestedFields pointer={`${rowPointer}/fields`} rows={field.fields} level={2} onChange={onChange} />
@@ -481,9 +483,9 @@ function NestedFields({
             const rowPointer = `${pointer}/${index}`
             return (
               <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
-                <Flex gap="small" align="flex-end" wrap>
+                <Flex vertical gap="small">
                   <div data-testid={`studio-field-${rowPointer}/name`}>
-                    <AxisField {...fieldTexts(t, `${path}.name`)}>
+                    <AxisField {...fieldTexts(t, `${path}.name`)} required>
                       <Input
                         value={text(field.name)}
                         onChange={(event) => onChange(`${rowPointer}/name`, event.target.value)}
@@ -491,7 +493,7 @@ function NestedFields({
                     </AxisField>
                   </div>
                   <div data-testid={`studio-field-${rowPointer}/type`}>
-                    <AxisField {...fieldTexts(t, `${path}.type`)}>
+                    <AxisField {...fieldTexts(t, `${path}.type`)} required>
                       <Select
                         virtual={false}
                         style={{ minWidth: 140 }}
@@ -502,17 +504,18 @@ function NestedFields({
                     </AxisField>
                   </div>
                   <div data-testid={`studio-field-${rowPointer}/required`}>
-                    <AxisField {...fieldTexts(t, `${path}.required`)}>
-                      <Checkbox
-                        checked={field.required === true}
-                        onChange={(event) => onChange(`${rowPointer}/required`, event.target.checked)}
-                      />
-                    </AxisField>
+                    <AxisCheckboxField
+                      {...fieldTexts(t, `${path}.required`)}
+                      checked={field.required === true}
+                      onChange={(checked) => onChange(`${rowPointer}/required`, checked)}
+                    />
                   </div>
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button onClick={() => onChange(rowPointer, undefined)}>
-                    {t('shell.studio.connector.removeField')}
-                  </Button>
+                  <div>
+                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                    <Button onClick={() => onChange(rowPointer, undefined)}>
+                      {t('shell.studio.connector.removeField')}
+                    </Button>
+                  </div>
                 </Flex>
                 {isStructured(field.type) && (
                   <NestedFields

@@ -77,8 +77,10 @@ over a private network with mutual TLS.
   job runner of the control plane retries the handler with the same key and finds the same cell job.
   These timings are code defaults and not `ControlPlane:` settings.
 - **The tenant list.** The client also reads `GET /api/cell/tenants` with the same token and
-  errors, and keeps each tenant's id and hosts. The directory's
-  [correction](region-directory.md#picking-a-cell) uses it.
+  errors, and keeps each tenant's id and hosts. It reads every page of 100 tenants, because the
+  directory's [correction](region-directory.md#picking-a-cell) removes any tenant that the list leaves
+  out. A total that changes between pages, or ids that do not add up to the total, fails the read like
+  any other failed call. The correction uses the list.
 - **One tenant.** The client also sends `DELETE /api/cell/tenants/{id}` with an `Idempotency-Key`
   and no body, and reads `GET /api/cell/tenants/{id}` for the tenant's `status`, which is empty when
   the cell answers `404`. The [subscription clock](subscriptions.md#one-clock) uses them.

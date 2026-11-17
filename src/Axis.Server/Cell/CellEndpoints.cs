@@ -21,6 +21,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace Axis.Server.CellApi;
 
@@ -42,14 +43,24 @@ namespace Axis.Server.CellApi;
 /// <c>GET /api/cell</c> answers <c>{ id, region, tenants, cap, restoreCheck }</c>: <c>tenants</c> is the count the tenant cap checks, previews
 /// and unfinished creates included, see docs/reference/cells.md#cell-size, <c>cap</c> is <see cref="CellOptions.TenantCap"/> or
 /// <see langword="null"/>, and <c>restoreCheck</c> is <c>{ ranAt, tenantId, passed }</c> of the newest row of <c>platform.restore_checks</c> or
-/// <see langword="null"/> when no check has run. <c>GET /api/cell/jobs?tenant&amp;limit</c> answers <c>{ "items": [...] }</c>, the jobs newest first, each as
-/// the job read answers it, and never with the job's <c>actor</c> or <c>input</c>. <c>tenant</c> keeps one tenant's jobs and an
-/// unknown tenant answers an empty list. <c>limit</c> is a whole number from 1 to 200, 50 when missing, and any other value
-/// answers <c>400</c>.
+/// <see langword="null"/> when no check has run. <c>GET /api/cell/jobs?tenant</c> answers one page as <c>{ items, page, pageSize, totalCount }</c>, 20 jobs by default, each as
+/// the job read answers it, and never with the job's <c>actor</c> or <c>input</c>. The <c>page</c>, <c>pageSize</c>, <c>sort</c>,
+/// <c>search</c> and <c>filter</c> are those of the shared <see cref="ListQuery{T}"/>, in the record API's format, and the database applies
+/// them, through its SQL form. The fields are <c>createdAt</c>, <c>kind</c>, <c>tenant</c>, <c>state</c>, <c>steps</c> and <c>error</c>,
+/// <c>createdAt</c> filters by its UTC day and sorts by its instant, and the search looks in the tenant and the error. An undeclared field,
+/// an invalid page or an invalid page size answers <c>400</c> keyed by the parameter, after the checks of the operator policy. The jobs stay
+/// newest first without <c>sort</c>, and a sorted list breaks ties newest first, see <c>docs/reference/tenant-lifecycle.md#routes</c>.
+/// <c>tenant</c> keeps one tenant's jobs and an unknown tenant answers an empty list.
 /// </para>
 /// <para>
-/// <c>GET /api/cell/tenants</c> answers <c>{ "items": [...] }</c>, ordered by id, with each tenant's <c>id</c>,
-/// <c>status</c>, <c>application</c>, <c>hosts</c>, <c>failedWork</c>, <c>usage</c> and <c>newestArchiveAt</c>. <c>GET /api/cell/tenants/{id}</c> answers one
+/// <c>GET /api/cell/tenants</c> answers one page as <c>{ items, page, pageSize, totalCount }</c>, 20 tenants by default, from the
+/// <c>page</c>, <c>pageSize</c>, <c>sort</c>, <c>search</c> and <c>filter</c> of the shared <see cref="ListQuery{T}"/>, in the record API's format.
+/// The fields are <c>id</c>, <c>status</c>, <c>application</c>, <c>hosts</c>, <c>instances</c>, <c>unknownCalls</c>, <c>deadLetters</c>,
+/// <c>storage</c>, <c>users</c>, <c>applications</c>, <c>emailsPerDay</c> and <c>newestArchiveAt</c>, and the search looks in the id and the hosts.
+/// An undeclared field, an invalid page or an invalid page size answers <c>400</c> keyed by the parameter, after the checks of the operator
+/// policy. Without <c>sort</c> the tenants stay ordered by id, see <c>docs/reference/tenant-lifecycle.md#routes</c>. Each tenant has its <c>id</c>,
+/// <c>status</c>, <c>application</c>, <c>hosts</c>, <c>failedWork</c>, <c>usage</c>, <c>newestArchiveAt</c> and <c>deleteAfter</c>, the scheduled purge time of a
+/// <c>deleting</c> tenant and <see langword="null"/> for every other. <c>GET /api/cell/tenants/{id}</c> answers one
 /// such tenant. Both read the platform tables over the reader role. The <c>failedWork</c> is <c>{ instances, unknownCalls, deadLetters }</c>, the counts of the worker's
 /// latest hourly sample in <c>platform.tenant_usage_latest</c>, and <see langword="null"/> until the worker has counted the tenant. The <c>status</c> is <c>deleting</c> while the tenant has a scheduled deletion, whatever
 /// its stored status, which stays <c>suspended</c>. A preview tenant belongs to its main tenant's Studio and is not a tenant of the
@@ -58,6 +69,13 @@ namespace Axis.Server.CellApi;
 /// whether the tenant <c>overridden</c> it, worked out from its <c>platform.tenant_quotas</c> rows and the cell's defaults. It also
 /// answers its <c>hostRequests</c>: the newest request of each host the operator asked for, as <c>{ host, state, expiresAt }</c>, ordered
 /// by host. A pending request past its expiry answers <c>expired</c>, and the token is never answered.
+/// </para>
+/// <para>
+/// <c>GET /api/cell/tenants/{id}/usage-days</c> answers the tenant's day rows of the kept 13 months as one page, <c>{ items, page, pageSize, totalCount }</c>,
+/// 20 days by default, from the same <c>page</c>, <c>pageSize</c>, <c>sort</c> and <c>filter</c> of the shared <see cref="ListQuery{T}"/>. The fields are
+/// <c>day</c>, <c>databaseBytes</c>, <c>fileBytes</c>, <c>users</c>, <c>applications</c>, <c>emailsSent</c>, <c>connectorCalls</c> and <c>workItemsRun</c>.
+/// A day holds no text, so the list has no search and a <c>search</c> answers <c>400</c>. Without <c>sort</c> the days come newest first.
+/// An unknown tenant or a preview tenant answers <c>404</c> before any <c>400</c> of the query, see <c>docs/reference/tenant-lifecycle.md#routes</c>.
 /// </para>
 /// <para>
 /// Both reads answer each tenant's <c>usage</c>: <c>storage</c>, <c>users</c>, <c>applications</c> and <c>emailsPerDay</c>, each as
@@ -81,8 +99,8 @@ namespace Axis.Server.CellApi;
 /// does not name stays as it is. It applies at once with no job and answers <c>200</c> with the tenant's quotas. An unknown key,
 /// a negative value, a key both set and removed, or a request that names no key answers <c>400</c> and writes nothing. It writes
 /// over the schema role, see <see cref="CellPlatformWriter"/>, and saves the rows with one platform audit record, command
-/// <c>tenant quotas set</c>, naming the keys of the request, or saves neither. The route passes no actor yet, so the record's
-/// <c>actor</c> column stays empty.
+/// <c>tenant quotas set</c>, naming the keys of the request, or saves neither. The record's <c>actor</c> is the operator's id, the
+/// subject of the bearer token or of the console session.
 /// </para>
 /// <para>
 /// <c>POST /api/cell/tenants/{id}/suspend</c>, <c>/resume</c> and <c>/read-only</c>, <c>DELETE /api/cell/tenants/{id}</c> and
@@ -114,6 +132,11 @@ namespace Axis.Server.CellApi;
 /// itself and never redirects to the storage. An unknown tenant, a preview tenant or an id that is no export of the tenant answers <c>404</c>,
 /// an export past its expiry or whose ZIP the storage no longer holds <c>410</c>, a download before the job succeeded <c>409</c> and a
 /// download on a server without the <c>Cell:ExportStorage</c> settings <c>503</c>. A refused call and a read of the JSON write no record.
+/// </para>
+/// <para>
+/// <c>GET /api/cell/deleted-tenants/{id}</c> answers <c>{ id, deletedAt, completeAt }</c> of a purged main tenant from its tombstone in
+/// <c>platform.deleted_tenants</c>, where <c>completeAt</c> is 7 days after <c>deletedAt</c>, see <c>docs/reference/tenant-lifecycle.md#deleting-a-tenant</c>.
+/// It never answers the tombstone's actor or hosts. An unknown id and a preview tenant's tombstone, which no <c>purge</c> job names, answer <c>404</c>.
 /// </para>
 /// <para>
 /// A call that an operator makes and a route refuses with a <c>4xx</c> writes the refused call warning of <see cref="RefusedRequests"/>
@@ -150,10 +173,6 @@ internal static partial class CellEndpoints
 
     private const string PurgeJobKind = "purge";
 
-    private const int DefaultJobListLimit = 50;
-
-    private const int MaxJobListLimit = 200;
-
     private static readonly TimeSpan _idempotencyWindow = TimeSpan.FromHours(24);
 
     // The steps of each kind, as the publisher's job runner defines them, see ProvisioningJobs.Builtin.
@@ -176,6 +195,10 @@ internal static partial class CellEndpoints
 
     private static readonly TimeSpan _hostRequestWindow = TimeSpan.FromDays(7);
 
+    // The managed PostgreSQL's point-in-time recovery retention, after which a deletion is complete,
+    // see docs/reference/tenant-lifecycle.md#deleting-a-tenant.
+    private static readonly TimeSpan _pointInTimeRecovery = TimeSpan.FromDays(7);
+
     private static readonly JsonSerializerOptions _createJobInputOptions =
         new(JsonSerializerOptions.Web) { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
 
@@ -188,7 +211,9 @@ internal static partial class CellEndpoints
         cell.MapGet("/session", GetSession);
         cell.MapGet("/tenants", ListTenantsAsync);
         cell.MapGet("/tenants/{id}", GetTenantAsync);
+        cell.MapGet("/tenants/{id}/usage-days", ListUsageDaysAsync);
         cell.MapGet("/tenants/{id}/administrators", ListAdministratorsAsync);
+        cell.MapGet("/deleted-tenants/{id}", GetDeletedTenantAsync);
         cell.MapPut("/tenants/{id}/quotas", SetQuotasAsync);
         cell.MapPost("/tenants", CreateTenantAsync);
         cell.MapPost("/tenants/{id}/suspend", (string id, HttpContext http, NpgsqlDataSource dataSource, CancellationToken cancellationToken) =>
@@ -263,16 +288,85 @@ internal static partial class CellEndpoints
         return Results.Ok(new CellResponse(cell.Id!, cell.Region!, tenants, cell.TenantCap, restoreCheck));
     }
 
+    // The fields of the tenant list, see docs/reference/tenant-lifecycle.md#routes. A usage field holds its used value.
+    private static readonly IReadOnlyList<ListColumn<CellTenantResponse>> _tenantColumns =
+    [
+        new("id", ListColumnKind.Text, tenant => tenant.Id, Searchable: true),
+        new(
+            "status",
+            ListColumnKind.Enum,
+            tenant => tenant.Status,
+            Values: ["active", "readOnly", "suspended", "provisioning", "deleting"]),
+        new("application", ListColumnKind.Text, tenant => tenant.Application),
+        new("hosts", ListColumnKind.Text, tenant => string.Join(' ', tenant.Hosts), Searchable: true),
+        new("instances", ListColumnKind.Number, tenant => tenant.FailedWork?.Instances),
+        new("unknownCalls", ListColumnKind.Number, tenant => tenant.FailedWork?.UnknownCalls),
+        new("deadLetters", ListColumnKind.Number, tenant => tenant.FailedWork?.DeadLetters),
+        new("storage", ListColumnKind.Number, tenant => tenant.Usage.Storage.Used),
+        new("users", ListColumnKind.Number, tenant => tenant.Usage.Users.Used),
+        new("applications", ListColumnKind.Number, tenant => tenant.Usage.Applications.Used),
+        new("emailsPerDay", ListColumnKind.Number, tenant => tenant.Usage.EmailsPerDay.Used),
+        new(
+            "newestArchiveAt",
+            ListColumnKind.Date,
+            tenant => tenant.NewestArchiveAt is { } at ? DateOnly.FromDateTime(at.UtcDateTime) : (DateOnly?)null,
+            Order: tenant => tenant.NewestArchiveAt),
+    ];
+
+    // The fields of the job list, over platform.jobs, see docs/reference/tenant-lifecycle.md#routes. createdAt filters by its UTC day and
+    // sorts by its instant. The Value lambdas only satisfy ListColumn, as this list never reads rows in memory.
+    private static readonly IReadOnlyList<ListColumn<JobRow>> _jobColumns =
+    [
+        new(
+            "createdAt",
+            ListColumnKind.Date,
+            job => DateOnly.FromDateTime(job.CreatedAt.UtcDateTime),
+            Order: job => job.CreatedAt,
+            Sql: "(created_at AT TIME ZONE 'UTC')::date",
+            OrderSql: "created_at"),
+        new(
+            "kind",
+            ListColumnKind.Enum,
+            job => job.Kind,
+            Values: ["suspend", "resume", "read-only", "create", "export", "delete", "cancel-deletion", "purge"],
+            Sql: "kind"),
+        new("tenant", ListColumnKind.Text, job => job.TenantId, Searchable: true, Sql: "tenant_id"),
+        new("state", ListColumnKind.Enum, job => job.State, Values: ["queued", "running", "succeeded", "failed"], Sql: "state"),
+        new("steps", ListColumnKind.Text, job => job.Steps, Sql: "steps::text"),
+        new("error", ListColumnKind.Text, job => job.Error, Searchable: true, Sql: "error"),
+    ];
+
+    // The fields of the usage days of a tenant, see docs/reference/tenant-lifecycle.md#routes. A day holds no text, so none is searchable.
+    private static readonly IReadOnlyList<ListColumn<TenantUsageDayResponse>> _usageDayColumns =
+    [
+        new("day", ListColumnKind.Date, day => day.Day),
+        new("databaseBytes", ListColumnKind.Number, day => day.DatabaseBytes),
+        new("fileBytes", ListColumnKind.Number, day => day.FileBytes),
+        new("users", ListColumnKind.Number, day => day.Users),
+        new("applications", ListColumnKind.Number, day => day.Applications),
+        new("emailsSent", ListColumnKind.Number, day => day.EmailsSent),
+        new("connectorCalls", ListColumnKind.Number, day => day.ConnectorCalls),
+        new("workItemsRun", ListColumnKind.Number, day => day.WorkItemsRun),
+    ];
+
     private static async Task<IResult> ListTenantsAsync(
+        HttpContext httpContext,
         NpgsqlDataSource dataSource,
         QuotaDefaults defaults,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var query = ListQuery<CellTenantResponse>.Read(httpContext.Request, _tenantColumns, errors);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
         await using var platform = Open(dataSource);
         var tenants = await platform.Tenants.AsNoTracking()
             .Where(tenant => tenant.PreviewOf == null)
-            .Select(tenant => new { tenant.Id, Status = tenant.DeleteAfter != null ? "deleting" : tenant.Status, tenant.Application })
+            .Select(tenant => new { tenant.Id, Status = tenant.DeleteAfter != null ? "deleting" : tenant.Status, tenant.Application, tenant.DeleteAfter })
             .ToListAsync(cancellationToken);
         var ids = tenants.Select(tenant => tenant.Id).ToList();
         var hosts = await ReadHostsAsync(platform, ids, cancellationToken);
@@ -281,7 +375,7 @@ internal static partial class CellEndpoints
         var usage = await ReadUsageAsync(platform, ids, quotas, latest, Today(time), cancellationToken);
         var archives = await ReadNewestArchivesAsync(platform, ids, cancellationToken);
 
-        return Results.Ok(new CellTenantListResponse(
+        IReadOnlyList<CellTenantResponse> rows =
             [.. tenants
                 .OrderBy(tenant => tenant.Id, StringComparer.Ordinal)
                 .Select(tenant => new CellTenantResponse(
@@ -291,7 +385,10 @@ internal static partial class CellEndpoints
                     HostsOf(hosts, tenant.Id),
                     latest.GetValueOrDefault(tenant.Id)?.FailedWork,
                     usage[tenant.Id],
-                    archives.TryGetValue(tenant.Id, out var archive) ? archive : null))]));
+                    archives.TryGetValue(tenant.Id, out var archive) ? archive : null,
+                    tenant.DeleteAfter))];
+        var page = query.Apply(rows);
+        return Results.Ok(new CellTenantListResponse(page.Items, page.Page, page.PageSize, page.TotalCount));
     }
 
     private static async Task<IResult> GetTenantAsync(
@@ -306,7 +403,7 @@ internal static partial class CellEndpoints
         await using var platform = Open(dataSource);
         var tenant = await platform.Tenants.AsNoTracking()
             .Where(row => row.Id == id && row.PreviewOf == null)
-            .Select(row => new { row.Id, Status = row.DeleteAfter != null ? "deleting" : row.Status, row.Application })
+            .Select(row => new { row.Id, Status = row.DeleteAfter != null ? "deleting" : row.Status, row.Application, row.DeleteAfter })
             .SingleOrDefaultAsync(cancellationToken);
         if (tenant is null)
         {
@@ -329,9 +426,61 @@ internal static partial class CellEndpoints
             quotas[tenant.Id],
             usage[tenant.Id],
             archives.TryGetValue(tenant.Id, out var archive) ? archive : null,
-            [.. days.Select(row => new TenantUsageDayResponse(
-                row.Day, row.DatabaseBytes, row.FileBytes, row.Users, row.Applications, row.EmailsSent, row.ConnectorCalls, row.WorkItemsRun))],
+            tenant.DeleteAfter,
+            UsageDaysOf(days),
             hostRequests));
+    }
+
+    // The tenant row is checked before the query, as the other tenant routes check the id before the rest of the request.
+    private static async Task<IResult> ListUsageDaysAsync(
+        string id,
+        HttpContext httpContext,
+        NpgsqlDataSource dataSource,
+        TenantUsageStore usageStore,
+        TimeProvider time,
+        CancellationToken cancellationToken)
+    {
+        await using var platform = Open(dataSource);
+        if (!await platform.Tenants.AsNoTracking().AnyAsync(row => row.Id == id && row.PreviewOf == null, cancellationToken))
+        {
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status404NotFound, "No tenant has this id.");
+        }
+
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var query = ListQuery<TenantUsageDayResponse>.Read(httpContext.Request, _usageDayColumns, errors);
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var days = await usageStore.ListDaysAsync(id, Today(time).AddMonths(-TenantUsageStore.RetentionMonths), cancellationToken);
+        var page = query.Apply(UsageDaysOf(days));
+        return Results.Ok(new CellTenantUsageDayListResponse(page.Items, page.Page, page.PageSize, page.TotalCount));
+    }
+
+    private static IReadOnlyList<TenantUsageDayResponse> UsageDaysOf(IReadOnlyList<TenantUsageRow> days) =>
+        [.. days.Select(row => new TenantUsageDayResponse(
+            row.Day, row.DatabaseBytes, row.FileBytes, row.Users, row.Applications, row.EmailsSent, row.ConnectorCalls, row.WorkItemsRun))];
+
+    // The tombstone of a preview tenant stays hidden: only a main tenant has a purge job that names it. The hosts step writes the tombstone,
+    // so a purge that is still running has one already. The actor and the hosts stay out of the select.
+    private static async Task<IResult> GetDeletedTenantAsync(
+        string id,
+        HttpContext httpContext,
+        NpgsqlDataSource dataSource,
+        CancellationToken cancellationToken)
+    {
+        await using var platform = Open(dataSource);
+        var deletedAt = await platform.DeletedTenants.AsNoTracking()
+            .Where(row => row.Id == id && platform.Jobs.Any(job => job.Kind == PurgeJobKind && job.TenantId == id))
+            .Select(row => (DateTimeOffset?)row.DeletedAt)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (deletedAt is null)
+        {
+            return RefusedRequests.Problem(httpContext, StatusCodes.Status404NotFound, "No deleted tenant has this id.");
+        }
+
+        return Results.Ok(new CellDeletedTenantResponse(id, deletedAt.Value, deletedAt.Value + _pointInTimeRecovery));
     }
 
     // The token stays out of the select. A request whose expiry has passed is not pending, as in RequestHostAsync, see docs/reference/tenant-lifecycle.md#hosts.
@@ -453,7 +602,12 @@ internal static partial class CellEndpoints
         }
 
         await PlatformAuditRecords.WriteAsync(
-            platform, "tenant quotas set", id, [.. QuotaKeys.All.Where(named.Contains)], cancellationToken);
+            platform,
+            "tenant quotas set",
+            id,
+            [.. QuotaKeys.All.Where(named.Contains)],
+            httpContext.User.FindFirst(CellOperator.IdClaim)!.Value,
+            cancellationToken);
         var quotas = await ReadQuotasAsync(platform, [id], defaults, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.Ok(new CellQuotasResponse(quotas[id]));
@@ -933,31 +1087,60 @@ internal static partial class CellEndpoints
     }
 
     // Job ids are time-ordered, so the id settles jobs created in the same instant.
-    private static async Task<IResult> ListJobsAsync(string? tenant, string? limit, HttpContext httpContext, NpgsqlDataSource dataSource, CancellationToken cancellationToken)
+    private static async Task<IResult> ListJobsAsync(string? tenant, HttpContext httpContext, NpgsqlDataSource dataSource, CancellationToken cancellationToken)
     {
-        var take = DefaultJobListLimit;
-        if (limit is not null
-            && (!int.TryParse(limit, NumberStyles.None, CultureInfo.InvariantCulture, out take) || take is < 1 or > MaxJobListLimit))
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var query = ListQuery<JobRow>.Read(httpContext.Request, _jobColumns, errors);
+        if (errors.Count > 0)
         {
-            return RefusedRequests.Problem(
-                httpContext,
-                StatusCodes.Status400BadRequest,
-                $"The limit must be a whole number from 1 to {MaxJobListLimit}.");
+            return Results.ValidationProblem(errors);
         }
 
-        await using var platform = Open(dataSource);
-        var jobs = platform.Jobs.AsNoTracking();
-        if (!string.IsNullOrEmpty(tenant))
+        var list = query.Sql();
+        var where = $"WHERE (@tenant::text IS NULL OR tenant_id = @tenant) AND {list.Condition}";
+        var order = list.Order is null ? "created_at DESC, id DESC" : $"{list.Order}, created_at DESC, id DESC";
+
+        void AddFilter(NpgsqlCommand command)
         {
-            jobs = jobs.Where(job => job.TenantId == tenant);
+            command.Parameters.Add(new NpgsqlParameter("tenant", NpgsqlDbType.Text)
+            {
+                Value = string.IsNullOrEmpty(tenant) ? DBNull.Value : tenant,
+            });
+            list.AddTo(command);
         }
 
-        var rows = await jobs
-            .OrderByDescending(job => job.CreatedAt)
-            .ThenByDescending(job => job.Id)
-            .Take(take)
-            .ToListAsync(cancellationToken);
-        return Results.Ok(new CellJobListResponse([.. rows.Select(JobDetail)]));
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        long totalCount;
+        await using (var count = new NpgsqlCommand($"SELECT count(*) FROM {PlatformDbContext.Schema}.jobs {where}", connection))
+        {
+            AddFilter(count);
+            totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
+        }
+
+        await using var command = new NpgsqlCommand(
+            $"SELECT id, kind, tenant_id, state, created_at, steps::text, error FROM {PlatformDbContext.Schema}.jobs {where} ORDER BY {order} LIMIT @limit OFFSET @offset",
+            connection);
+        AddFilter(command);
+        command.Parameters.AddWithValue("limit", query.PageSize);
+        command.Parameters.AddWithValue("offset", (long)(query.Page - 1) * query.PageSize);
+
+        var items = new List<CellJobDetailResponse>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(JobDetail(new JobRow
+            {
+                Id = reader.GetGuid(0),
+                Kind = reader.GetString(1),
+                TenantId = reader.GetString(2),
+                State = reader.GetString(3),
+                CreatedAt = reader.GetFieldValue<DateTimeOffset>(4),
+                Steps = reader.GetString(5),
+                Error = reader.IsDBNull(6) ? null : reader.GetString(6),
+            }));
+        }
+
+        return Results.Ok(new CellJobListResponse(items, query.Page, query.PageSize, totalCount));
     }
 
     private static CellJobDetailResponse JobDetail(JobRow job)
@@ -1132,7 +1315,8 @@ internal sealed record CellTenantUsageResponse(
 
 /// <summary>
 /// One tenant of the cell. <c>Application</c> is the one the create job recorded, and null for a tenant that no create job made. <c>FailedWork</c> is null until the
-/// worker has counted the tenant. <c>NewestArchiveAt</c> is null for a tenant that was never backed up.
+/// worker has counted the tenant. <c>NewestArchiveAt</c> is null for a tenant that was never backed up. <c>DeleteAfter</c> is the scheduled purge time of a
+/// <c>deleting</c> tenant and null for every other.
 /// </summary>
 internal sealed record CellTenantResponse(
     string Id,
@@ -1141,10 +1325,17 @@ internal sealed record CellTenantResponse(
     IReadOnlyList<string> Hosts,
     CellFailedWorkResponse? FailedWork,
     CellTenantUsageResponse Usage,
-    DateTimeOffset? NewestArchiveAt);
+    DateTimeOffset? NewestArchiveAt,
+    DateTimeOffset? DeleteAfter);
 
-/// <summary>The tenants of the cell, ordered by id.</summary>
-internal sealed record CellTenantListResponse(IReadOnlyList<CellTenantResponse> Items);
+/// <summary>A purged main tenant: when the purge removed its hosts and when its deletion is complete, 7 days later.</summary>
+internal sealed record CellDeletedTenantResponse(string Id, DateTimeOffset DeletedAt, DateTimeOffset CompleteAt);
+
+/// <summary>One page of the tenants of the cell, with the number of tenants that matched before the page was cut.</summary>
+internal sealed record CellTenantListResponse(IReadOnlyList<CellTenantResponse> Items, int Page, int PageSize, long TotalCount);
+
+/// <summary>One page of the day rows of a tenant's usage, with the number of days that matched before the page was cut.</summary>
+internal sealed record CellTenantUsageDayListResponse(IReadOnlyList<TenantUsageDayResponse> Items, int Page, int PageSize, long TotalCount);
 
 /// <summary>
 /// One tenant of the cell with its effective quotas, keyed by quota key, its day rows of the last 13 months, newest first, and the newest
@@ -1159,6 +1350,7 @@ internal sealed record CellTenantDetailResponse(
     IReadOnlyDictionary<string, CellQuotaResponse> Quotas,
     CellTenantUsageResponse Usage,
     DateTimeOffset? NewestArchiveAt,
+    DateTimeOffset? DeleteAfter,
     IReadOnlyList<TenantUsageDayResponse> Days,
     IReadOnlyList<CellHostRequestStateResponse> HostRequests);
 
@@ -1223,8 +1415,8 @@ internal sealed record CellJobDetailResponse(
     IReadOnlyList<CellJobStepResponse> Steps,
     string? Error);
 
-/// <summary>The jobs of the cell, newest first.</summary>
-internal sealed record CellJobListResponse(IReadOnlyList<CellJobDetailResponse> Items);
+/// <summary>One page of the jobs of the cell, with the number of jobs that matched before it was cut.</summary>
+internal sealed record CellJobListResponse(IReadOnlyList<CellJobDetailResponse> Items, int Page, int PageSize, long TotalCount);
 
 /// <summary>One step of a job. <c>Error</c> is the refusal of a failed step.</summary>
 internal sealed record CellJobStepResponse(string Name, string State, string? Error);

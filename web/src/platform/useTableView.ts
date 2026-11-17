@@ -8,6 +8,7 @@ import { parseTableQuery, recordPageSize, writeTableQuery, type TableQuery } fro
  * docs/reference/actions-and-controls.md#tables. An invalid, empty, repeated or out-of-order value, or a search the
  * table cannot make or a filter that is not valid for `fields`, is rewritten without a history entry. `setView` adds a history entry unless `replace` is set.
  * A view change keeps the scroll position, see docs/reference/frontend.md#routing.
+ * `prefix` goes before every address name, so a second table on a page keeps its view under names of its own.
  * `fields` and `parameterNames` must be stable between renders.
  */
 export function useTableView(
@@ -17,28 +18,38 @@ export function useTableView(
   searchable = false,
   filterable = false,
   columnsControl = false,
+  prefix = '',
 ): { view: TableQuery; setView: (next: TableQuery, options?: { replace?: boolean }) => void } {
   const [searchParams, setSearchParams] = useSearchParams()
   const view = useMemo(
     () =>
-      parseTableQuery(searchParams, fields, defaultPageSize, parameterNames, searchable, filterable, columnsControl),
-    [searchParams, fields, defaultPageSize, parameterNames, searchable, filterable, columnsControl],
+      parseTableQuery(
+        searchParams,
+        fields,
+        defaultPageSize,
+        parameterNames,
+        searchable,
+        filterable,
+        columnsControl,
+        prefix,
+      ),
+    [searchParams, fields, defaultPageSize, parameterNames, searchable, filterable, columnsControl, prefix],
   )
 
   useEffect(() => {
-    const canonical = writeTableQuery(searchParams, view, defaultPageSize, parameterNames)
+    const canonical = writeTableQuery(searchParams, view, defaultPageSize, parameterNames, prefix)
     if (canonical.toString() !== searchParams.toString()) {
       setSearchParams(canonical, { replace: true, preventScrollReset: true })
     }
-  }, [searchParams, view, defaultPageSize, parameterNames, setSearchParams])
+  }, [searchParams, view, defaultPageSize, parameterNames, prefix, setSearchParams])
 
   const setView = useCallback(
     (next: TableQuery, options?: { replace?: boolean }) =>
-      setSearchParams(writeTableQuery(searchParams, next, defaultPageSize, parameterNames), {
+      setSearchParams(writeTableQuery(searchParams, next, defaultPageSize, parameterNames, prefix), {
         ...options,
         preventScrollReset: true,
       }),
-    [searchParams, defaultPageSize, parameterNames, setSearchParams],
+    [searchParams, defaultPageSize, parameterNames, prefix, setSearchParams],
   )
   return { view, setView }
 }

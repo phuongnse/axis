@@ -12,10 +12,13 @@ namespace Axis.Server.Console;
 /// <summary>
 /// The dead letter routes of the operator console, in the group of <see cref="ConsoleEndpoints"/>, so the group's checks
 /// (signed-in user 401, operator role 403) come first. The list at <c>GET /api/console/dead-letters</c> shows the dead
-/// letters of every application of the tenant, newest first and paged as the instance list pages, including the ones that
-/// belong to no process. An optional <c>application</c> (an application id, a hyphenated UUID) keeps one application and an
+/// letters of every application of the tenant, including the ones that belong to no process. It takes the record API's <c>page</c>,
+/// <c>pageSize</c>, <c>sort</c>, <c>search</c> and <c>filter</c> over the fields <c>application</c>, <c>kind</c>, <c>event</c>,
+/// <c>target</c>, <c>attempts</c>, <c>lastError</c>, <c>state</c> and <c>createdAt</c>, which PostgreSQL applies, see
+/// <see cref="ListQuery{T}"/>. A search looks in <c>kind</c> and <c>lastError</c>, and a sort or filter on another field is a 400.
+/// With no sort the letters are newest first, and a sorted list breaks ties newest first. An optional <c>application</c> (an application id, a hyphenated UUID) keeps one application and an
 /// optional <c>state</c> of <c>open</c>, <c>redelivered</c> or <c>discarded</c> keeps one state. An invalid <c>application</c>,
-/// <c>state</c>, <c>page</c> or <c>pageSize</c> is a 400 that names each. Each item is a dead letter of the process route with
+/// <c>state</c>, <c>page</c>, <c>pageSize</c>, <c>sort</c>, <c>search</c> or <c>filter</c> is a 400 that names each. Each item is a dead letter of the process route with
 /// its <c>applicationId</c> and <c>processId</c>, and lists <c>redeliver</c> and <c>discard</c> as <c>commands</c> while it is
 /// <c>open</c>, because the operator role stands in for the <c>retry</c> grant.
 /// A redeliver at <c>POST /api/console/dead-letters/{id}/redeliver</c> and a discard at
@@ -40,17 +43,36 @@ internal static class ConsoleDeadLetterEndpoints
         console.MapPost("/dead-letters/{id}/discard", DiscardAsync);
     }
 
+    // The columns the list's search, filter and sort can name, over axis.dead_letters, see docs/reference/operator-console.md#api.
+    // The createdAt column filters by its UTC day and sorts by its instant.
+    private static readonly IReadOnlyList<ListColumn<DeadLetterRow>> _columns =
+    [
+        new("application", ListColumnKind.Text, row => row.ApplicationId.ToString("D"), Sql: "application_id::text"),
+        new("kind", ListColumnKind.Text, row => row.Kind, Searchable: true, Sql: "kind"),
+        new("event", ListColumnKind.Text, row => row.EventId?.ToString("D"), Sql: "event_id::text"),
+        new("target", ListColumnKind.Text, row => (row.TriggerId ?? row.WebhookId)?.ToString("D"), Sql: "coalesce(trigger_id, webhook_id)::text"),
+        new("attempts", ListColumnKind.Number, row => row.Attempts, Sql: "attempts"),
+        new("lastError", ListColumnKind.Text, row => row.LastError, Searchable: true, Sql: "last_error"),
+        new("state", ListColumnKind.Enum, row => row.State, Values: DeadLetters.States, Sql: "state"),
+        new(
+            "createdAt",
+            ListColumnKind.Date,
+            row => DateOnly.FromDateTime(row.CreatedAt.UtcDateTime),
+            Order: row => row.CreatedAt,
+            Sql: "(created_at AT TIME ZONE 'UTC')::date",
+            OrderSql: "created_at"),
+    ];
+
     // The query parameters are bound as strings so every invalid one is reported in one problem.
     private static async Task<IResult> ListAsync(
         string? application,
         string? state,
-        string? page,
-        string? pageSize,
+        HttpContext httpContext,
         TenantDatabase database,
         CancellationToken cancellationToken)
     {
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
+        var query = ListQuery<DeadLetterRow>.Read(httpContext.Request, _columns, errors);
         Guid? applicationId = null;
         if (application is not null)
         {
@@ -75,9 +97,10 @@ internal static class ConsoleDeadLetterEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await DeadLetters.ListTenantAsync(connection, applicationId, state, pageNumber, size, cancellationToken);
+        var result = await DeadLetters.ListTenantAsync(
+            connection, applicationId, state, query.Sql(), query.Page, query.PageSize, cancellationToken);
         var items = result.Items.Select(Item).ToList();
-        return Results.Ok(new ConsoleDeadLetterListResponse(items, pageNumber, size, result.TotalCount));
+        return Results.Ok(new ConsoleDeadLetterListResponse(items, query.Page, query.PageSize, result.TotalCount));
     }
 
     private static Task<IResult> RedeliverAsync(

@@ -1,9 +1,10 @@
 import { Flex, Modal, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { saveFile } from '../platform/exports'
+import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { downloadTenantExport, readTenantExport, startTenantExport, type TenantExport } from '../platform/tenantExports'
@@ -46,7 +47,6 @@ export function TenantExportSection() {
   const t = useText()
   const { size } = useDesignTokens()
   const { locale } = usePlatform().current
-  const headingId = useId()
   const [enabled, setEnabled] = useState(false)
   const [exported, setExported] = useState<TenantExport>()
   // The export to follow. Setting it again to the same id does not restart the check, so a start sets it once.
@@ -140,11 +140,8 @@ export function TenantExportSection() {
   const offerStart = !exported || exported.state === 'failed'
 
   return (
-    <section aria-labelledby={headingId} data-testid="tenant-export">
+    <SectionPart testName="tenant-export" heading={{ title: t('shell.users.export.title') }}>
       <Flex vertical gap="small">
-        <Typography.Title level={3} id={headingId}>
-          {t('shell.users.export.title')}
-        </Typography.Title>
         <AxisAlert kind="warning" message={t('shell.users.export.warning')} />
         {running && (
           <Typography.Text data-testid="tenant-export-running">{t('shell.users.export.running')}</Typography.Text>
@@ -196,6 +193,6 @@ export function TenantExportSection() {
       >
         <Typography.Text>{t('shell.users.export.warning')}</Typography.Text>
       </Modal>
-    </section>
+    </SectionPart>
   )
 }

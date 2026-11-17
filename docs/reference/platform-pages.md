@@ -59,14 +59,21 @@ tab shows only to an administrator of a tenant that has the setting.
 
 ### The list
 
-The page lists the tenant's users from `GET /api/users`, 20 to a page, and fetches each page from the
-server.
+The page lists the tenant's users from `GET /api/users`, 20 to a page. The server searches, filters,
+sorts and pages them, see [the list route](user-administration.md#read-routes).
 
 - **Columns.** Each row has the display name, which links to [the user's page](#a-users-roles), the email, how the person signs in (the provider's alias
   as the [list route](user-administration.md#read-routes) sends it, or "Account"), the status as a tag
-  (`invited`, `active` or `disabled`) and the last sign-in.
-- **Search.** A search box filters by name or email. A search starts on Enter or on the search button
-  and goes back to page 1.
+  (`invited`, `active` or `disabled`) and the last sign-in. A header sorts by its column. Columns, in the
+  toolbar, chooses which columns show.
+- **Search.** The table's own Search box, in the toolbar, looks in the name and the email. A search starts
+  on Enter or on the search button and goes back to page 1.
+- **Filter.** Filter, in the toolbar, filters by any column: the text of the name, the email and the
+  sign-in, the status (`invited`, `active` or `disabled`) and the day of the last sign-in. An account has no
+  provider, so the filter "is empty" on Sign-in finds the accounts.
+- **Paging.** The pager says "1–20 of N" and has a page size picker.
+- **The address.** The view lives in the address as `search`, `filter`, `sort`, `page`, `pageSize` and
+  `columns`, so a reload or the Back button keeps it. See [tables](actions-and-controls.md#tables).
 - **Refusals.** A `403` shows that the page is for administrators. A `404`, which a preview tenant and
   a tenant without a users client answer, shows the not-found page. Any other failure shows an error
   message.
@@ -74,7 +81,8 @@ server.
 ### Inviting and resending
 
 - **Invite.** The "Invite" button next to the search box opens a form with the email, the display name
-  and optional roles. The roles are in one section for each active application and one for the
+  and optional roles. The email and the display name are marked required. The roles sit in a "Roles" group
+  with its help, in one section for each active application and one for the
   platform, as on [a user's roles](#a-users-roles). The form gets them from the
   [roles route](user-administration.md#read-routes), called with the signed-in administrator's own id,
   and uses only `applications` and `platformRoles`. When they cannot be loaded, the form says so and
@@ -85,19 +93,19 @@ server.
   `409` as "An account already uses this email." Any other failure shows "The invitation could not be
   sent." and loads the list again, because an invitation whose email failed leaves the account as
   `invited`.
-- **Resend invitation.** A row that is `invited` and is an account, not a brokered user, has a "Resend
-  invitation" button. It asks for confirmation, names the person and the email, calls the resend route,
+- **Resend invitation.** A row that is `invited` and is an account, not a brokered user, has "Resend
+  invitation" in its "…" row-actions menu. It asks for confirmation, names the person and the email, calls the resend route,
   shows "The invitation was sent again." and loads the list again, because the resend gives the person
   a new id. It shows a `403` as "This page is for administrators." and a `409` as "This person has a
   password or signs in through a provider, so they cannot get a new invitation."
 
 ### Disabling, enabling and resetting an authenticator
 
-- **Which buttons.** A row that is `active` or `invited` has a "Disable" button, and a row that is
-  `disabled` has an "Enable" button instead. A row for an account, not a brokered user, has a "Reset
-  authenticator" button. The Disable button also shows on the administrator's own row, where the server
-  answers `409`.
-- **Confirmation.** Each button asks for confirmation, names the person and the email, calls its route
+- **Which commands.** A row's commands are entries of its "…" row-actions menu, not buttons. A row that is
+  `active` or `invited` has "Disable", and a row that is `disabled` has "Enable" instead. A row for an
+  account, not a brokered user, has "Reset authenticator". Disable also shows on the administrator's own
+  row, where the server answers `409`.
+- **Confirmation.** Each command asks for confirmation, names the person and the email, calls its route
   and loads the list again. The Disable and Reset confirmations add a line on the effect: the person's
   sessions end, and they cannot sign in until they are enabled, or their next sign-in asks them to add
   an authenticator again.
@@ -227,7 +235,7 @@ when the route answers `200`. That keeps it hidden from a user who is not an adm
 tenant with no directory row. A `403` or `404` is not logged, and any other failure is logged. Its texts are
 `shell.users.connectedApps.*`.
 
-- **Mode.** A choice of "All", "Allow list" or "None" shows the stored mode.
+- **Mode.** A choice of "All", "Allow list" or "None" shows the stored mode. Each option has its own help.
 - **Client IDs.** Under "Allow list", an editable list of client IDs shows. A typed ID is added with Enter. The tab keeps
   the list when another mode is chosen and sends it under every mode, because the server stores it under every mode.
 - **Save.** The "Save" button sends both values with `PUT /api/tenant/outside-clients`, then reads

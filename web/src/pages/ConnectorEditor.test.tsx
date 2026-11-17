@@ -252,6 +252,75 @@ describe('ConnectorEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/input/1/required', true)
   })
 
+  it('draws the Required box of a field by the shared checkbox field and ticks it through its path', async () => {
+    const onChange = renderEditor()
+    const input = within(screen.getByTestId('studio-field-/operations/0/input/0'))
+
+    const box = field('operations.input.required', 'checkbox', input)
+
+    expect(box).toBeChecked()
+    expect(box).toHaveAccessibleName(texts('operations.input.required').label)
+    await userEvent.click(box)
+    expect(onChange).toHaveBeenLastCalledWith('/operations/0/input/0/required', false)
+    await userEvent.click(
+      field('operations.input.required', 'checkbox', within(screen.getByTestId('studio-field-/operations/0/input/1'))),
+    )
+    expect(onChange).toHaveBeenLastCalledWith('/operations/0/input/1/required', true)
+  })
+
+  it('writes the first input Required box as true when it starts unticked', async () => {
+    const onChange = renderEditor({
+      ...connector,
+      operations: [{ name: 'a', method: 'POST', path: '/', input: [{ name: 'x', type: 'text' }] }],
+    })
+
+    await userEvent.click(
+      field('operations.input.required', 'checkbox', within(screen.getByTestId('studio-field-/operations/0/input/0'))),
+    )
+
+    expect(onChange).toHaveBeenLastCalledWith('/operations/0/input/0/required', true)
+  })
+
+  it('marks the keys the schema requires with * and aria-required', () => {
+    renderEditor()
+    const operation = within(screen.getByTestId('studio-operation-0'))
+    const row = within(screen.getByTestId('studio-field-/operations/0/input/0'))
+
+    for (const input of [
+      field('name'),
+      field('baseUrl'),
+      field('auth.token'),
+      field('operations.name', 'textbox', operation),
+      field('operations.method', 'combobox', operation),
+      field('operations.path', 'textbox', operation),
+      field('operations.input.name', 'textbox', row),
+      field('operations.input.type', 'combobox', row),
+    ]) {
+      expect(input).toHaveAttribute('aria-required', 'true')
+    }
+    expect(within(screen.getByTestId('studio-field-/name')).getByText('*')).toBeInTheDocument()
+    expect(within(screen.getByTestId('studio-field-/operations/0/name')).getByText('*')).toBeInTheDocument()
+  })
+
+  it('marks no optional key required, nor the Required box, nor the auth type', () => {
+    renderEditor()
+    const row = within(screen.getByTestId('studio-field-/operations/0/input/0'))
+
+    for (const input of [
+      field('timeout'),
+      field('idempotency'),
+      field('auth.type', 'combobox'),
+      field('operations.lookup', 'combobox', within(screen.getByTestId('studio-operation-0'))),
+      field('operations.input.required', 'checkbox', row),
+      field('operations.input.in', 'combobox', row),
+    ]) {
+      expect(input).not.toHaveAttribute('aria-required')
+    }
+    expect(within(screen.getByTestId('studio-field-/timeout')).queryByText('*')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('studio-field-/auth/type')).queryByText('*')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('studio-field-/operations/0/input/0/required')).queryByText('*')).toBeNull()
+  })
+
   it('offers only the other operations as a lookup', async () => {
     renderEditor()
 

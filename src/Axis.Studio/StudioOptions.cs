@@ -99,10 +99,11 @@ internal sealed record StudioOptions(
 
     /// <summary>
     /// The options of one request. Outside a cell they are these options. In a cell they name only the folder
-    /// <c>Studio:ApplicationsPath/&lt;tenantId&gt;</c>, created when missing, and its revisions in the <c>.revisions</c> folder inside it. With no applications path, no tenant, or a
+    /// <c>Studio:ApplicationsPath/&lt;tenantId&gt;</c>, created when missing unless <paramref name="create"/> is false, and its revisions in the <c>.revisions</c> folder inside it. With no applications path, no tenant, or a
     /// tenant id that is not a plain folder name, they name no applications folder, so Studio answers as if it were off.
+    /// The worker passes false: it only reads the folder, which it may mount read-only, and a missing folder holds no applications.
     /// </summary>
-    public StudioOptions ForTenant(string? tenantId)
+    public StudioOptions ForTenant(string? tenantId, bool create = true)
     {
         if (!PerTenant)
         {
@@ -116,13 +117,16 @@ internal sealed record StudioOptions(
         }
 
         var folder = Path.Combine(Path.TrimEndingDirectorySeparator(root), tenantId);
-        try
+        if (create)
         {
-            Directory.CreateDirectory(folder);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            throw new InvalidOperationException($"The folder '{folder}' of the tenant '{tenantId}' cannot be created.", exception);
+            try
+            {
+                Directory.CreateDirectory(folder);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                throw new InvalidOperationException($"The folder '{folder}' of the tenant '{tenantId}' cannot be created.", exception);
+            }
         }
 
         return this with { ApplicationsPath = folder, PerTenant = false, RevisionsPath = Path.Combine(folder, ".revisions") };

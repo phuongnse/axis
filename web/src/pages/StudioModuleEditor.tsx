@@ -16,6 +16,7 @@ import {
   type KeyedLists,
 } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
+import { SectionParts } from '../platform/SectionParts'
 import { seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
 import {
   deleteStudioResource,
@@ -82,7 +83,8 @@ interface Loaded {
  * the form designer's outline or the page designer marks the elements the layer added, changed or removed, each with
  * Reset to module, which undoes that one element on the server. The page designer draws the saved page on its canvas,
  * so the canvas changes after a save or a reset. A data source, a rule, a trigger, a sequence and an event open in the
- * schema form, and a seed in the seed grid with a form of its other properties. The data source's `fields`,
+ * schema form, and a seed in the seed grid with a form of its other properties. These kinds draw as the parts of
+ * docs/reference/studio-resource-form.md#sections, as a local resource's Form tab does. The data source's `fields`,
  * `parameters` and `aggregate.groupBy` and the seed's `records` are marked like the other keyed lists, and the other
  * kinds show only the Customized tag. `name` shows as text, because the save route refuses a renamed module
  * resource. There is no JSON view, no Delete and no migration questions. `onWritten` reports the folder's
@@ -460,7 +462,7 @@ export function StudioModuleEditor({
         </Suspense>
       ) : item.kind === 'seed' && schema ? (
         seedSchema ? (
-          <Flex vertical gap="middle">
+          <SectionParts>
             <SchemaForm schema={seedSchema} value={draft} onChange={change} readOnlyNames={moduleReadOnlyNames} />
             <SeedGrid
               fields={seedFields!}
@@ -469,7 +471,7 @@ export function StudioModuleEditor({
               onChange={update}
               layer={designerLayer(seedKeyedLists)}
             />
-          </Flex>
+          </SectionParts>
         ) : (
           <SchemaForm schema={schema} value={draft} onChange={change} readOnlyNames={moduleReadOnlyNames} />
         )

@@ -45,6 +45,17 @@ public sealed class RecordListFilterTests
     }
 
     [Fact]
+    public void A_column_function_gives_the_expression_of_each_field()
+    {
+        Assert.True(Parses(
+            """{"all":[{"field":"status","op":"eq","value":"open"},{"field":"quantity","op":"gte","value":5}]}""",
+            out var filter,
+            out _));
+
+        Assert.Equal("(status = @lf0 AND (attempts) >= @lf1)", filter!.Sql(field => field.Name == "status" ? "status" : "(attempts)"));
+    }
+
+    [Fact]
     public void Fields_are_each_named_once_in_declaration_order()
     {
         Assert.True(Parses(

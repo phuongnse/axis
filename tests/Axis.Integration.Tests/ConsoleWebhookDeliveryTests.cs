@@ -125,6 +125,50 @@ public sealed class ConsoleWebhookDeliveryTests(EndpointOutputFixture fixture) :
     }
 
     [Fact]
+    public async Task Deliveries_are_searched_filtered_sorted_and_paged_and_an_undeclared_field_is_a_400()
+    {
+        var staged = await StageAsync();
+        var (delivered, pending, deadLettered) = (staged[0], staged[1], staged[2]);
+        await using var factory = OperatorRoleIs("importer");
+        using var client = factory.CreateClient().SignedInAs("ivy");
+        var ofThree = Uri.EscapeDataString(
+            $$"""{"all":[{"any":[{"field":"event","op":"eq","value":"{{delivered.EventId:D}}"},{"field":"event","op":"eq","value":"{{pending.EventId:D}}"},{"field":"event","op":"eq","value":"{{deadLettered.EventId:D}}"}]},{"field":"state","op":"ne","value":"delivered"}]}""");
+
+        using var top = await SendAsync(client, $"{Path}?filter={ofThree}&sort=-attempts&pageSize=1");
+
+        Assert.Equal(HttpStatusCode.OK, top.StatusCode);
+        using var topAnswer = JsonDocument.Parse(await top.Content.ReadAsStringAsync(CancellationToken));
+        var first = Assert.Single(topAnswer.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal(deadLettered.Id, first.GetProperty("id").GetGuid());
+        Assert.Equal("deadLettered", first.GetProperty("state").GetString());
+        Assert.Equal(2, topAnswer.RootElement.GetProperty("totalCount").GetInt64());
+
+        using var next = await SendAsync(client, $"{Path}?filter={ofThree}&sort=-attempts&pageSize=1&page=2");
+        using var nextAnswer = JsonDocument.Parse(await next.Content.ReadAsStringAsync(CancellationToken));
+        var second = Assert.Single(nextAnswer.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal(pending.Id, second.GetProperty("id").GetGuid());
+        Assert.Equal(2, nextAnswer.RootElement.GetProperty("totalCount").GetInt64());
+
+        using var searched = await SendAsync(client, $"{Path}?search={deadLettered.EventId:D}&filter={ofThree}");
+        using var searchedAnswer = JsonDocument.Parse(await searched.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal(1, searchedAnswer.RootElement.GetProperty("totalCount").GetInt64());
+        Assert.Equal(deadLettered.Id, Assert.Single(searchedAnswer.RootElement.GetProperty("items").EnumerateArray()).GetProperty("id").GetGuid());
+
+        using var none = await SendAsync(client, $"{Path}?search={Guid.NewGuid():D}");
+        using var noneAnswer = JsonDocument.Parse(await none.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal(0, noneAnswer.RootElement.GetProperty("totalCount").GetInt64());
+
+        var undeclared = Uri.EscapeDataString("""{"all":[{"field":"releaseId","op":"eq","value":"x"}]}""");
+        foreach (var (query, key) in new[] { ($"?filter={undeclared}", "filter"), ("?sort=releaseId", "sort") })
+        {
+            using var refused = await SendAsync(client, $"{Path}{query}");
+            Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+            using var problem = JsonDocument.Parse(await refused.Content.ReadAsStringAsync(CancellationToken));
+            Assert.Equal([key], problem.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
+        }
+    }
+
+    [Fact]
     public async Task Deliveries_show_a_discarded_dead_letter_as_discarded()
     {
         var discarded = await StageDeliveryAsync("pending", 5, 503, NextCreatedAt(), deadLetter: "discarded");

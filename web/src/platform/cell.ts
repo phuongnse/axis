@@ -71,6 +71,8 @@ export interface CellTenant {
   failedWork: CellFailedWork | null
   usage: CellTenantUsage
   newestArchiveAt: string | null
+  /** The scheduled purge time of a `deleting` tenant, and `null` for every other. */
+  deleteAfter: string | null
 }
 
 /** One quota of a tenant. `value` is `null` for no limit, and `overridden` is true when the tenant overrides the cell's default. */
@@ -138,22 +140,79 @@ export function fetchCell(signal?: AbortSignal): Promise<CellResult<Cell>> {
   return fetchCellRoute('/api/cell', 'overview', signal)
 }
 
-/** Loads the newest jobs of the cell, newest first, or the jobs of one `tenant`. */
-export async function fetchCellJobs(signal?: AbortSignal, tenant?: string): Promise<CellResult<CellJob[]>> {
-  const query = tenant === undefined ? '' : `?tenant=${encodeURIComponent(tenant)}`
-  const result = await fetchCellRoute<{ items: CellJob[] }>(`/api/cell/jobs${query}`, 'jobs', signal)
-  return result.kind === 'ok' ? { kind: 'ok', value: result.value.items } : result
+/** One page of the jobs of the cell, as served by `GET /api/cell/jobs`. `totalCount` is the number of jobs that matched before the page was cut. */
+export interface CellJobPage {
+  items: CellJob[]
+  page: number
+  pageSize: number
+  totalCount: number
 }
 
-/** Loads every tenant of the cell, ordered by id. */
-export async function fetchCellTenants(signal?: AbortSignal): Promise<CellResult<CellTenant[]>> {
-  const result = await fetchCellRoute<{ items: CellTenant[] }>('/api/cell/tenants', 'tenants', signal)
-  return result.kind === 'ok' ? { kind: 'ok', value: result.value.items } : result
+/**
+ * Loads one page of the jobs of the cell, newest first unless the query sorts. `query` is the record API's paging, sort, search and
+ * filter query string, and may add `tenant` to keep one tenant's jobs.
+ */
+export function fetchCellJobs(query: string, signal?: AbortSignal): Promise<CellResult<CellJobPage>> {
+  return fetchCellRoute<CellJobPage>(`/api/cell/jobs${query ? `?${query}` : ''}`, 'jobs', signal)
+}
+
+/** One page of the tenants of the cell, as served by `GET /api/cell/tenants`. `totalCount` is the number of tenants that matched before the page was cut. */
+export interface CellTenantPage {
+  items: CellTenant[]
+  page: number
+  pageSize: number
+  totalCount: number
+}
+
+/** Loads one page of the tenants of the cell. `query` is the record API's paging, sort, search and filter query string. */
+export function fetchCellTenants(query: string, signal?: AbortSignal): Promise<CellResult<CellTenantPage>> {
+  return fetchCellRoute<CellTenantPage>(`/api/cell/tenants${query ? `?${query}` : ''}`, 'tenants', signal)
+}
+
+/** One page of a tenant's usage days, as served by `GET /api/cell/tenants/{id}/usage-days`. `totalCount` is the number of days that matched before the page was cut. */
+export interface CellTenantUsageDayPage {
+  items: TenantUsageDay[]
+  page: number
+  pageSize: number
+  totalCount: number
+}
+
+/** Loads one page of a tenant's usage days. `query` is the record API's paging, sort and filter query string. */
+export function fetchCellTenantUsageDays(
+  id: string,
+  query: string,
+  signal?: AbortSignal,
+): Promise<CellResult<CellTenantUsageDayPage>> {
+  return fetchCellRoute<CellTenantUsageDayPage>(
+    `/api/cell/tenants/${encodeURIComponent(id)}/usage-days${query ? `?${query}` : ''}`,
+    'tenant usage days',
+    signal,
+  )
 }
 
 /** Loads one tenant with its quotas. The value is `null` when the cell has no tenant with that id. */
 export function fetchCellTenant(id: string, signal?: AbortSignal): Promise<CellResult<CellTenantDetail | null>> {
   return fetchCellRoute<CellTenantDetail | null>(`/api/cell/tenants/${encodeURIComponent(id)}`, 'tenant', signal, true)
+}
+
+/** A purged main tenant: when the purge ran, and when its deletion is complete, as the point-in-time recovery no longer holds it. */
+export interface CellDeletedTenant {
+  id: string
+  deletedAt: string
+  completeAt: string
+}
+
+/** Loads a purged tenant. The value is `null` when the cell has no purged main tenant with that id. */
+export function fetchCellDeletedTenant(
+  id: string,
+  signal?: AbortSignal,
+): Promise<CellResult<CellDeletedTenant | null>> {
+  return fetchCellRoute<CellDeletedTenant | null>(
+    `/api/cell/deleted-tenants/${encodeURIComponent(id)}`,
+    'deleted tenant',
+    signal,
+    true,
+  )
 }
 
 /** Loads one job with its steps. */

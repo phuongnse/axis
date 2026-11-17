@@ -393,10 +393,13 @@ test.describe('Studio on a copy of its own', () => {
       await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-saved')).toBeVisible()
 
+      // The kind list is loaded from the server, so it is opened before the server stops.
+      await openKind(page, 'entity')
+      const lineItemLink = page.getByTestId(`studio-resource-${lineItem.id}`)
+      await expect(lineItemLink).toBeVisible()
       const { port } = restarted
       await restarted.stop()
-      await openKind(page, 'entity')
-      await page.getByTestId(`studio-resource-${lineItem.id}`).click()
+      await lineItemLink.click()
       await expect(page.getByTestId('studio-reconnecting')).toBeVisible()
 
       restarted = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Folders__0: copy }, port)
@@ -500,6 +503,10 @@ test.describe('Studio on a copy of its own', () => {
       await add.getByRole('textbox', { name: 'en', exact: true }).fill('E2E text')
       await add.getByRole('textbox', { name: 'vi', exact: true }).fill('Văn bản E2E')
       await add.getByRole('button', { name: 'Add key', exact: true }).click()
+      // A new key sorts past the first page, so the table is searched for it before its row is looked for.
+      const search = page.getByTestId('studio-text-table').getByRole('searchbox', { name: 'Search', exact: true })
+      await search.fill(key)
+      await search.press('Enter')
       await expect(page.locator(`[data-testid="studio-text-row"][data-key="${key}"]`)).toBeVisible()
 
       const [en, vi] = await Promise.all(

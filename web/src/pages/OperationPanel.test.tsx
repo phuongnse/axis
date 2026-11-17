@@ -166,7 +166,7 @@ function renderEditor(known = true, value: Record<string, unknown> = process, on
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           {known ? (
             <ExpressionCheckContext.Provider
-              value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft: value, names }}
+              value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft: () => value, names }}
             >
               {editor}
             </ExpressionCheckContext.Provider>
@@ -187,7 +187,7 @@ function renderStateful() {
     return (
       <>
         <ExpressionCheckContext.Provider
-          value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft, names }}
+          value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft: () => draft, names }}
         >
           <ProcessEditor
             schema={schema}
@@ -219,6 +219,13 @@ async function editExpression(fieldTestId: string, text: string) {
   view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } })
   // The editor reports an edit after a short pause.
   await waitFor(() => expect(screen.getByTestId('draft')).toHaveTextContent(`"${text}"`))
+}
+
+/** Whether the label of the field in `scope` that starts with `text` draws the required mark, the `*` that is hidden from a screen reader. */
+function isMarked(scope: HTMLElement, text: string): boolean {
+  const found = Array.from(scope.querySelectorAll('label')).find((item) => item.textContent?.startsWith(text))
+  expect(found, text).toBeDefined()
+  return found!.querySelector('[aria-hidden="true"]') !== null
 }
 
 function step(index: number) {
@@ -377,12 +384,12 @@ describe('A notify step', () => {
     await userEvent.type(field('/steps/0/to/0/user').getByRole('textbox', { name: 'User' }), 'X')
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/to/0/user', 'requesterX')
 
-    // The radio input of a button group has no pointer events, so the click goes to its label.
-    const switchTo = (name: string) =>
+    // The radio input is hidden, so the click goes to its label. A radio's name holds its help, so it is matched by its start.
+    const switchTo = (name: RegExp) =>
       userEvent.click(field('/steps/0/to/0').getByRole('radio', { name }).closest('label')!)
-    await switchTo('Role')
+    await switchTo(/^Role/)
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/to/0', { role: '' })
-    await switchTo('Email')
+    await switchTo(/^Email/)
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/to/0', { email: '' })
   })
 
@@ -502,6 +509,28 @@ describe('A notify step', () => {
       expect(field(`/steps/0/${pointer}`).getByRole('group', { name: text(path) })).toHaveAccessibleDescription(
         text(`${path}.help`),
       )
+    })
+
+    it('draws the recipient type of each row as a radio group, each option with its help', () => {
+      for (const row of ['0', '1', '2']) {
+        const group = field(`/steps/0/to/${row}`).getByRole('radiogroup', { name: text('to.kind') })
+        expect(group).toHaveAccessibleDescription(text('to.kind.help'))
+        for (const option of ['user', 'role', 'email']) {
+          const radio = within(group).getByRole('radio', { name: new RegExp(`^${text(`to.kind.${option}`)}`) })
+          expect(radio).toHaveAccessibleDescription(text(`to.kind.${option}.help`))
+        }
+      }
+    })
+
+    it('marks the recipient type, its value and the page required, and leaves Open a page unmarked', () => {
+      const element = (pointer: string) => screen.getByTestId(`studio-field-${pointer}`)
+
+      expect(isMarked(element('/steps/0/to/0'), text('to.kind'))).toBe(true)
+      expect(isMarked(element('/steps/0/to/0/user'), text('to.user'))).toBe(true)
+      expect(isMarked(element('/steps/0/to/1/role'), text('to.role'))).toBe(true)
+      expect(isMarked(element('/steps/0/to/2/email'), text('to.email'))).toBe(true)
+      expect(isMarked(element('/steps/0/open/page'), text('open.page'))).toBe(true)
+      expect(isMarked(element('/steps/0/open'), text('open'))).toBe(false)
     })
   })
 
@@ -625,13 +654,48 @@ describe('A callConnector step', () => {
       within(screen.getByTestId('studio-field-/steps/1/connector/operation')).getByText('createPurchaseOrder'),
     ).toBeVisible()
     const input = within(screen.getByTestId('studio-field-/steps/1/input/amount'))
-    expect(input.getByRole('textbox', { name: 'Input name' })).toHaveValue('amount')
+    expect(input.getByRole('textbox', { name: 'Name' })).toHaveValue('amount')
     expect(input.getByRole('textbox', { name: 'Expression' })).toBeVisible()
     const output = within(screen.getByTestId('studio-field-/steps/1/output/orderNumber'))
     expect(output.getByRole('textbox', { name: 'Connector output' })).toHaveValue('orderNumber')
     expect(output.getByRole('combobox', { name: 'Entity field' })).toBeVisible()
     expect(step(1).getByRole('spinbutton', { name: 'Attempts' })).toHaveValue('3')
     expect(step(1).getByRole('textbox', { name: 'Backoff' })).toHaveValue('PT30S')
+  })
+
+  it('draws an input row as a name, a kind and an expression, one to a line, each with its label and help', () => {
+    renderEditor(false)
+    const row = screen.getByTestId('studio-field-/steps/1/input/amount')
+    const [name, kind, expression] = Array.from(row.children) as HTMLElement[]
+    const texts = platformEnglish as Record<string, string>
+
+    expect(within(name).getByRole('textbox', { name: 'Name' })).toHaveAccessibleDescription(
+      texts['shell.studio.field.process.steps.input.name.help'],
+    )
+    expect(within(kind).getByRole('radiogroup', { name: 'Kind' })).toHaveAccessibleDescription(
+      texts['shell.studio.field.process.steps.input.kind.help'],
+    )
+    for (const option of ['value', 'object', 'list']) {
+      const key = `shell.studio.field.process.steps.input.kind.${option}`
+      expect(within(kind).getByRole('radio', { name: new RegExp(`^${texts[key]}`) })).toHaveAccessibleDescription(
+        texts[`${key}.help`],
+      )
+    }
+    expect(within(expression).getByRole('textbox', { name: 'Expression' })).toHaveAccessibleDescription(
+      texts['shell.studio.field.process.steps.input.value.help'],
+    )
+    expect(row.children).toHaveLength(4)
+  })
+
+  it('marks the name, the kind and the expression of an input row required, and says so to a screen reader', () => {
+    renderEditor(false)
+    const row = screen.getByTestId('studio-field-/steps/1/input/amount')
+
+    expect(isMarked(row, 'Name')).toBe(true)
+    expect(isMarked(row, 'Kind')).toBe(true)
+    expect(isMarked(row, 'Expression')).toBe(true)
+    expect(within(row).getByRole('textbox', { name: 'Name' })).toHaveAttribute('aria-required', 'true')
+    expect(within(row).getByRole('textbox', { name: 'Expression' })).toHaveAttribute('aria-required', 'true')
   })
 
   it('shows a list input as its From picker and nested rows, and no json-only text', async () => {
@@ -647,12 +711,13 @@ describe('A callConnector step', () => {
     expect(row.queryByTestId('studio-json-only')).toBeNull()
     expect(row.getByRole('combobox', { name: 'From' })).toBeVisible()
     expect(row.getByText('lines')).toBeVisible()
-    expect(row.getAllByRole('radio', { name: 'List' })[0]).toBeChecked()
+    expect(row.getAllByRole('radio', { name: /^List/ })[0]).toBeChecked()
     const nested = within(screen.getByTestId('studio-field-/steps/1/input/lines/fields/sku'))
-    expect(nested.getByRole('textbox', { name: 'Nested field' })).toHaveValue('sku')
+    expect(nested.getByRole('textbox', { name: 'Name' })).toHaveValue('sku')
+    expect(nested.getByRole('radiogroup', { name: 'Kind' })).toBeVisible()
     expect(nested.getByRole('textbox', { name: 'Expression' })).toBeVisible()
     const amount = within(screen.getByTestId('studio-field-/steps/1/input/amount'))
-    expect(amount.getByRole('radio', { name: 'Value' })).toBeChecked()
+    expect(amount.getByRole('radio', { name: /^Value/ })).toBeChecked()
     expect(amount.getByRole('textbox', { name: 'Expression' })).toBeVisible()
   })
 
@@ -671,13 +736,13 @@ describe('A callConnector step', () => {
     renderStateful()
     await screen.findAllByTestId('studio-expression-type')
     const input = () => within(screen.getByTestId('studio-field-/steps/1/input'))
-    // The radio input of a button group has no pointer events, so the click goes to its label.
-    const pick = (row: string, name: string) =>
+    // The radio input is hidden, so the click goes to its label.
+    const pick = (row: string, name: RegExp) =>
       userEvent.click(within(screen.getByTestId(row)).getAllByRole('radio', { name })[0].closest('label')!)
 
     await userEvent.click(input().getByRole('button', { name: 'Add mapping' }))
     await userEvent.type(screen.getByTestId('studio-field-/steps/1/input/').querySelector('input')!, 'lines')
-    await pick('studio-field-/steps/1/input/lines', 'List')
+    await pick('studio-field-/steps/1/input/lines', /^List/)
     await chooseOption('lines', screen.getByTestId('studio-field-/steps/1/input/lines/from'))
 
     const rows = () => within(screen.getByTestId('studio-field-/steps/1/input/lines/fields'))
@@ -692,7 +757,7 @@ describe('A callConnector step', () => {
 
     await userEvent.click(input().getAllByRole('button', { name: 'Add mapping' }).at(-1)!)
     await userEvent.type(screen.getByTestId('studio-field-/steps/1/input/').querySelector('input')!, 'address')
-    await pick('studio-field-/steps/1/input/address', 'Object')
+    await pick('studio-field-/steps/1/input/address', /^Object/)
     const address = () => within(screen.getByTestId('studio-field-/steps/1/input/address/fields'))
     await userEvent.click(address().getByRole('button', { name: 'Add mapping' }))
     await userEvent.type(
@@ -713,13 +778,13 @@ describe('A callConnector step', () => {
   it('switches an input row between a value, an object and a list', async () => {
     const onChange = renderEditor(false)
     const row = () => within(screen.getByTestId('studio-field-/steps/1/input/amount'))
-    const pick = (name: string) => userEvent.click(row().getByRole('radio', { name }).closest('label')!)
+    const pick = (name: RegExp) => userEvent.click(row().getByRole('radio', { name }).closest('label')!)
 
-    await pick('Value')
+    await pick(/^Value/)
     expect(onChange).not.toHaveBeenCalled()
-    await pick('Object')
+    await pick(/^Object/)
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/input/amount', { fields: {} })
-    await pick('List')
+    await pick(/^List/)
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/input/amount', { from: '', fields: {} })
   })
 
@@ -786,7 +851,7 @@ describe('A callConnector step', () => {
     await userEvent.type(step(1).getByRole('textbox', { name: 'Connector operation' }), 'X')
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/connector/operation', 'createPurchaseOrderX')
     const input = within(screen.getByTestId('studio-field-/steps/1/input/amount'))
-    await userEvent.type(input.getByRole('textbox', { name: 'Input name' }), 'X')
+    await userEvent.type(input.getByRole('textbox', { name: 'Name' }), 'X')
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/input', { amountX: 'totalAmount' })
     await userEvent.type(input.getByRole('textbox', { name: 'Expression' }), 'X')
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/input/amount', 'totalAmountX')

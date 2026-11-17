@@ -681,7 +681,9 @@ export function useRecordForm(
           !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) ? (
             // Proposed: a titled group is drawn by the shared part, so its heading keeps the part's spacing, see the
             // review on #3650.
-            <SectionPart title={t(section.titleKey)}>{grid}</SectionPart>
+            <SectionPart testId={`form-section-${index}`} heading={{ title: t(section.titleKey) }}>
+              {grid}
+            </SectionPart>
           ) : (
             grid
           )}

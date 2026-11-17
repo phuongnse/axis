@@ -259,6 +259,27 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     }
   })
 
+  it('draws the actions of an editable grant as a group named Actions and its fields picker as a Fields field, each with help', async () => {
+    stubFetch()
+    renderMatrix()
+
+    await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-entity-PurchaseRequest'))
+
+    for (const grant of screen.getAllByTestId('studio-matrix-own-grant')) {
+      const group = within(grant).getByRole('group', {
+        name: 'Actions',
+        description: platformEnglish['shell.studio.matrix.actions.help'],
+      })
+      expect(within(group).getByRole('checkbox', { name: 'read' })).toBeInTheDocument()
+      expect(
+        within(grant).getByRole('combobox', {
+          name: 'Fields',
+          description: platformEnglish['shell.studio.matrix.fields.help'],
+        }),
+      ).toBeInTheDocument()
+    }
+  })
+
   it('offers no checkbox and no Add grant on a read-only row', async () => {
     const fetchMock = stubFetch()
     renderMatrix()

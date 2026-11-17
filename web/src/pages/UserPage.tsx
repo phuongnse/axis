@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
 import { PageLayout } from '../platform/PageLayout'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { changeUserRole, fetchUserRoles, type RoleChange, type UserRoles } from '../platform/users'
@@ -131,33 +132,34 @@ export function UserPage() {
           {problem && (
             <AxisAlert data-testid="user-roles-problem" kind="error" message={t(`shell.users.roles.${problem}`)} />
           )}
-          {sections.map((section) => (
-            <section key={section.key} data-testid="user-roles-section" aria-label={section.title}>
-              <Typography.Title level={5}>{section.title}</Typography.Title>
-              <Flex vertical gap="small">
-                {section.rows.map((row) => (
-                  <Flex key={row.role} align="center" justify="space-between" gap="small" data-testid="user-role">
-                    <Flex align="center" gap="small">
-                      <Typography.Text>{row.role}</Typography.Text>
-                      {row.given && <Tag style={{ color: colour.successText }}>{t('shell.users.roles.given')}</Tag>}
-                      {!row.declared && (
-                        <Tag style={{ color: colour.warningText }}>{t('shell.users.roles.notDeclared')}</Tag>
+          <SectionParts>
+            {sections.map((section) => (
+              <SectionPart key={section.key} testName={`user-roles-${section.key}`} heading={{ title: section.title }}>
+                <Flex vertical gap="small">
+                  {section.rows.map((row) => (
+                    <Flex key={row.role} align="center" justify="space-between" gap="small" data-testid="user-role">
+                      <Flex align="center" gap="small">
+                        <Typography.Text>{row.role}</Typography.Text>
+                        {row.given && <Tag style={{ color: colour.successText }}>{t('shell.users.roles.given')}</Tag>}
+                        {!row.declared && (
+                          <Tag style={{ color: colour.warningText }}>{t('shell.users.roles.notDeclared')}</Tag>
+                        )}
+                      </Flex>
+                      {(row.given || row.declared) && (
+                        <AxisButton
+                          role={row.given ? 'destructive' : 'secondary'}
+                          disabled={busy}
+                          onClick={() => setPending({ give: !row.given, section, role: row.role })}
+                        >
+                          {t(row.given ? 'shell.users.roles.remove' : 'shell.users.roles.give')}
+                        </AxisButton>
                       )}
                     </Flex>
-                    {(row.given || row.declared) && (
-                      <AxisButton
-                        role={row.given ? 'destructive' : 'secondary'}
-                        disabled={busy}
-                        onClick={() => setPending({ give: !row.given, section, role: row.role })}
-                      >
-                        {t(row.given ? 'shell.users.roles.remove' : 'shell.users.roles.give')}
-                      </AxisButton>
-                    )}
-                  </Flex>
-                ))}
-              </Flex>
-            </section>
-          ))}
+                  ))}
+                </Flex>
+              </SectionPart>
+            ))}
+          </SectionParts>
         </Flex>
       )}
       <Modal

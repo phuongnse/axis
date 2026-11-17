@@ -78,8 +78,8 @@ becomes an issue.
 2. Make it in the real code under `web/src/platform/` and
    `web/src/designSystem/`, so the artifact shows the real widgets. Mark each
    new behaviour with a `Proposed:` comment, so its issue can find each one.
-3. When the change adds a state that changes how a widget looks, add it to the
-   widget's preview in the same step.
+3. Add each look-changing state, and each fixture the change needs, to the
+   widget's preview in this step. Open no issue for other missing fixtures.
 4. Run `scripts/design-system.sh`, which writes
    `artifacts/design-system/axis-design-system.js` and checks it.
 5. Check every changed card as [checking-a-card.md](checking-a-card.md) says.

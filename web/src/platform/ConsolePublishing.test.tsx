@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter, useLocation } from 'react-router'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { ConsoleApplication, ConsolePublishing as Publishing } from './console'
 import { ConsolePublishing } from './ConsolePublishing'
@@ -104,10 +105,15 @@ function answer(body: unknown) {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
 }
 
-function renderView() {
+const Location = () => <output data-testid="location">{useLocation().search}</output>
+
+function renderView(address = '/console') {
   render(
     <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-      <ConsolePublishing applications={applications} locale="en" />
+      <MemoryRouter initialEntries={[address]}>
+        <ConsolePublishing applications={applications} locale="en" />
+        <Location />
+      </MemoryRouter>
     </TextProvider>,
   )
 }
@@ -124,7 +130,7 @@ describe('ConsolePublishing', () => {
 
     const releases = await screen.findByTestId('console-publishing-releases')
     expect(await within(releases).findByText('#1')).toBeVisible()
-    expect(calls).toEqual([{ url: '/api/console/applications/a1/publishing?page=1&pageSize=20', method: 'GET' }])
+    expect(calls).toEqual([{ url: '/api/console/applications/a1/publishing?', method: 'GET' }])
     for (const title of ['Release', 'Label', 'Note', 'Activated by', 'Activated', 'Relaxed points']) {
       expect(within(releases).getByRole('columnheader', { name: title })).toBeVisible()
     }
@@ -230,46 +236,70 @@ describe('ConsolePublishing', () => {
     await userEvent.click(await screen.findByTitle('Purchasing'))
 
     expect(await within(view).findByText('Initial')).toBeVisible()
-    expect(calls.at(-1)).toEqual({ url: '/api/console/applications/a2/publishing?page=1&pageSize=20', method: 'GET' })
+    expect(calls.at(-1)).toEqual({ url: '/api/console/applications/a2/publishing?', method: 'GET' })
     expect(within(view).getByText('Pia Publisher')).toBeVisible()
     expect(within(view).getByText('Queued')).toBeVisible()
     expect(within(view).queryByText('Back again')).toBeNull()
     expect(within(view).getAllByText('Live')).toHaveLength(1)
   })
 
-  it('requests the next page of the publish requests', async () => {
+  it('keeps the search, filter and sort of the publish requests in the address and sends them', async () => {
+    const filter = JSON.stringify({ all: [{ field: 'status', op: 'eq', value: 'failed' }] })
+    const address = `/console?${new URLSearchParams({
+      'publishRequests.search': 'Undo',
+      'publishRequests.filter': filter,
+      'publishRequests.sort': '-requestedAt',
+    })}`
     const calls = stubServer(() => answer({ ...leave, totalCount: 45 }))
-    renderView()
-    const view = await screen.findByTestId('console-publishing')
-    await within(view).findByText('Back again')
+    const user = userEvent.setup()
+    renderView(address)
 
-    await userEvent.click(within(view).getByTitle('2'))
+    const requests = await screen.findByTestId('console-publishing-requests')
+    expect(await within(requests).findByText('1–20 of 45')).toBeVisible()
+    const first = new URL(calls.at(-1)!.url, 'http://localhost').searchParams
+    expect(first.get('search')).toBe('Undo')
+    expect(first.get('filter')).toBe(filter)
+    expect(first.get('sort')).toBe('-requestedAt')
 
-    await waitFor(() =>
-      expect(calls.at(-1)).toEqual({
-        url: '/api/console/applications/a1/publishing?page=2&pageSize=20',
-        method: 'GET',
-      }),
-    )
+    // The page size picker of the requests table, not the Application picker.
+    await user.click(within(requests).getByRole('combobox'))
+    await user.click(await screen.findByTitle('50 / page'))
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('publishRequests.pageSize=50'))
+    await waitFor(() => expect(calls.at(-1)?.url).toContain('pageSize=50'))
+    expect(screen.getByTestId('location')).toHaveTextContent('publishRequests.sort=-requestedAt')
+    expect(calls.at(-1)?.url).toContain('sort=-requestedAt')
   })
 
-  it('offers no command and sends nothing but GET requests', async () => {
+  it('offers no publish or activate command and sends nothing but GET requests', async () => {
     const calls = stubServer(() => answer(leave))
     renderView()
     const view = await screen.findByTestId('console-publishing')
     await within(view).findByText('Back again')
 
     expect(within(view).queryByRole('button', { name: /publish|activate|roll ?back|redeliver|discard/i })).toBeNull()
-    expect(within(view).queryAllByRole('button')).toHaveLength(0)
     expect(calls.every((call) => call.method === 'GET')).toBe(true)
   })
 
-  it('shows an error in the card when the publishing cannot be loaded', async () => {
+  it.each([
+    ['cannot be loaded', 500],
+    ['is forbidden', 403],
+  ])('shows the error in place of the rows of each table when the publishing %s', async (_, status) => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    stubServer(() => new Response(null, { status: 500 }))
+    stubServer(() => new Response(null, { status }))
     renderView()
 
-    const error = await screen.findByTestId('console-publishing-error')
-    expect(within(error).getByText('The publishing could not be loaded.')).toBeVisible()
+    const releases = await screen.findByTestId('console-publishing-releases')
+    const releasesError = await within(releases).findByTestId('console-publishing-releases-error')
+    expect(releasesError).toHaveTextContent('The publishing could not be loaded.')
+    expect(within(releases).queryByText('Nothing to show.')).toBeNull()
+
+    const requests = screen.getByTestId('console-publishing-requests')
+    const requestsError = within(requests).getByTestId('console-publishing-requests-error')
+    expect(requestsError).toHaveTextContent('The publishing could not be loaded.')
+    expect(within(requests).queryByText('Nothing to show.')).toBeNull()
+    // The toolbar stays, so the person can still search, filter and refresh.
+    expect(within(requests).getByRole('searchbox', { name: 'Search' })).toBeVisible()
+    expect(within(requests).getByRole('button', { name: 'Refresh' })).toBeVisible()
   })
 })

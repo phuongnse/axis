@@ -578,28 +578,48 @@ export async function fetchStudioNames(application: string, signal?: AbortSignal
   return (await response.json()) as StudioNames
 }
 
-/** One resource's status and last write, as `GET .../resource-activity` answers it, see docs/reference/studio-resource-form.md#resource-activity. */
-export interface StudioResourceActivity {
+/**
+ * One row of a kind's list, as `GET .../kinds/{kind}/resources` answers it, see docs/reference/studio-resource-form.md#kind-list.
+ * `title` is the text the row shows, and sorts by on the server. `locale` is set for a text resource, which shows the language's name.
+ * `module` and `moduleLabel` are set for a module resource.
+ */
+export interface StudioKindListItem {
   id: string
+  title: string
+  locale: string | null
+  description: string | null
   module: string | null
+  moduleLabel: string | null
   status: 'new' | 'changed' | 'published' | null
-  titles: Record<string, string> | null
-  descriptions: Record<string, string> | null
   modifiedBy: string | null
   modifiedAt: string | null
 }
 
-/** Loads the status and last write of every resource the application uses, as `GET .../resource-activity` answers them. */
-export async function fetchStudioResourceActivity(
+/** One page of a kind's list, with how many rows match in all. */
+export interface StudioKindList {
+  items: StudioKindListItem[]
+  totalCount: number
+}
+
+/**
+ * Loads one page of a kind's list with its titles in `locale`. `query` is the record API's `page`, `pageSize`, `sort`,
+ * `search` and `filter` as a query string, see docs/reference/studio-resource-form.md#kind-list. A 401 shows the
+ * sign-in prompt and throws, as any other failure does.
+ */
+export async function fetchStudioKindList(
   application: string,
+  kind: string,
+  locale: string,
+  query: string,
   signal?: AbortSignal,
-): Promise<StudioResourceActivity[]> {
-  const path = `/api/studio/apps/${encodeURIComponent(application)}/resource-activity`
+): Promise<StudioKindList> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/kinds/${encodeURIComponent(kind)}/resources?locale=${encodeURIComponent(locale)}${query ? `&${query}` : ''}`
   const response = await studioFetch(path, { signal })
   if (!response.ok) {
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
-  return ((await response.json()) as { items: StudioResourceActivity[] }).items
+  const { items, totalCount } = (await response.json()) as StudioKindList
+  return { items, totalCount }
 }
 
 /** A role or connector slot of an installed module, with its label in each locale that has one. */
@@ -1202,6 +1222,31 @@ export interface StudioReleaseListRow {
   relaxed: StudioRelaxedPoint[]
 }
 
+/** One page of the release list, with how many releases match in all. */
+export interface StudioReleasePage {
+  items: StudioReleaseListRow[]
+  totalCount: number
+}
+
+/**
+ * Loads one page of the releases of an application, the highest number first unless `query` sorts them. `query` is the
+ * record API's `page`, `pageSize`, `sort`, `search` and `filter` as a query string, see docs/reference/authoring.md#release-list.
+ * A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function fetchStudioReleaseList(
+  application: string,
+  query: string,
+  signal?: AbortSignal,
+): Promise<StudioReleasePage> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/release-list${query ? `?${query}` : ''}`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  const { items, totalCount } = (await response.json()) as StudioReleasePage
+  return { items, totalCount }
+}
+
 /** A module or package that a release pins: its id, label and version, and its version in the release it compares with. */
 export interface StudioReleasePart {
   id: string
@@ -1405,36 +1450,6 @@ export async function saveStudioSettings(application: string, autoAccept: boolea
 }
 
 /**
- * The rows of the release list: one for each release, the highest number first. A release that was activated more than
- * once has one row, which takes its details from its first activation, the earliest `activatedAt`. On equal times the
- * server's order decides.
- */
-export function releaseList(history: StudioReleases): StudioReleaseListRow[] {
-  const first = new Map<string, StudioReleaseItem>()
-  for (const item of history.items) {
-    const known = first.get(item.releaseId)
-    if (!known || Date.parse(item.activatedAt) < Date.parse(known.activatedAt)) {
-      first.set(item.releaseId, item)
-    }
-  }
-  const liveId = history.active?.releaseId
-  return [...first.values()]
-    .map((item) => ({
-      releaseId: item.releaseId,
-      number: item.number,
-      label: item.label,
-      note: item.note,
-      publishedAt: item.activatedAt,
-      actor: item.actor,
-      actorName: item.actorName,
-      live: item.releaseId === liveId,
-      offStandard: item.offStandard,
-      relaxed: item.relaxed,
-    }))
-    .sort((left, right) => right.number - left.number)
-}
-
-/**
  * Who activated a release, in words, in Studio and the operator console: the person's name, "System" for a startup
  * activation, "The platform operator" for an operator activation, and "Someone no longer known" for any other actor, so
  * a raw id is never shown.
@@ -1481,14 +1496,30 @@ export interface StudioRevisionDiff {
   resources: StudioRevisionChange[]
 }
 
-/** Loads the revisions of an application, newest first. A 401 shows the sign-in prompt and throws, as any other failure does. */
-export async function fetchStudioRevisions(application: string, signal?: AbortSignal): Promise<StudioRevision[]> {
-  const path = `/api/studio/apps/${encodeURIComponent(application)}/revisions`
+/** One page of an application's revisions, with how many match in all and the id of the start of history, null for none. */
+export interface StudioRevisionList {
+  items: StudioRevision[]
+  totalCount: number
+  start: string | null
+}
+
+/**
+ * Loads one page of the revisions of an application, newest first unless `query` sorts them. `query` is the record API's
+ * `page`, `pageSize`, `sort`, `search` and `filter` as a query string, see docs/reference/authoring-revisions.md#list.
+ * A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function fetchStudioRevisions(
+  application: string,
+  query: string,
+  signal?: AbortSignal,
+): Promise<StudioRevisionList> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/revisions${query ? `?${query}` : ''}`
   const response = await studioFetch(path, { signal })
   if (!response.ok) {
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
-  return ((await response.json()) as { items: StudioRevision[] }).items
+  const { items, totalCount, start } = (await response.json()) as StudioRevisionList
+  return { items, totalCount, start }
 }
 
 /** Loads one revision with its files. A 404 and any other failure throw, as does a 401 after it shows the sign-in prompt. */

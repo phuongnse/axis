@@ -535,14 +535,9 @@ describe('the Axis Helm chart', () => {
     assert.match(server, /- name: Studio__Folders__0\n\s+value: "\/studio\/purchase-requests"/)
     assert.match(server, /- name: Studio__AuthorRole\n\s+value: "author"/)
     assert.match(server, /- name: Studio__PublisherRole\n\s+value: "publisher"/)
-    for (const [kind, name] of [
-      ['Deployment', 'axis-worker'],
-      ['Job', 'axis-migrate'],
-    ]) {
-      const document = find(output, kind, name)
-      assert.doesNotMatch(document, /\/studio/)
-      assert.doesNotMatch(document, /Studio__/)
-    }
+    const migrate = find(output, 'Job', 'axis-migrate')
+    assert.doesNotMatch(migrate, /\/studio/)
+    assert.doesNotMatch(migrate, /Studio__/)
   })
 
   test('Studio folders without a volume fail and name studio.persistence', () => {
@@ -960,10 +955,27 @@ describe('the Axis Helm chart', () => {
     ]) {
       assert.doesNotMatch(
         find(output, kind, name),
-        /IdentityProvider__|Studio__ApplicationsPath|Templates__Path|mountPath: \/(studio|templates)|mountPath: \/cell-backup-key|axis-cell-backup-key|Admin__ConnectionString/,
+        /IdentityProvider__|Templates__Path|mountPath: \/templates|mountPath: \/cell-backup-key|axis-cell-backup-key|Admin__ConnectionString/,
         name,
       )
     }
+    assert.doesNotMatch(find(output, 'Job', 'axis-migrate'), /Studio__ApplicationsPath|mountPath: \/studio/)
+  })
+
+  test('in a cell the worker mounts the Studio volume read-only and counts the applications in it, outside a cell it does not', () => {
+    const worker = find(renderOk(), 'Deployment', 'axis-worker')
+    assert.match(worker, /- name: Studio__ApplicationsPath\n\s+value: \/studio\n/)
+    assert.match(worker, /- name: studio\n\s+mountPath: \/studio\n\s+readOnly: true\n/)
+    assert.match(worker, /- name: studio\n\s+persistentVolumeClaim:\n\s+claimName: axis-studio\n/)
+    assert.doesNotMatch(worker, /Studio__Folders__/)
+
+    const outside = find(
+      renderOk('--set', 'cell.id=', '--set', 'cell.certificate.enabled=false', '--set', 'cell.pgbouncer.enabled=false'),
+      'Deployment',
+      'axis-worker',
+    )
+    assert.doesNotMatch(outside, /\/studio/)
+    assert.doesNotMatch(outside, /Studio__/)
   })
 
   test('the server in a cell gets no templates volume', () => {

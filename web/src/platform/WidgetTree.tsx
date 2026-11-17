@@ -190,7 +190,12 @@ function TabsNode({ widget, renderLeaf }: { widget: TabsWidgetMetadata; renderLe
 function Section({ widget, renderLeaf }: { widget: SectionWidgetMetadata; renderLeaf: RenderLeaf }) {
   const t = useText()
   return (
-    <SectionPart title={t(widget.titleKey)} folds={widget.collapsed} startsClosed={widget.collapsed}>
+    <SectionPart
+      testId={`section-${widget.titleKey}`}
+      heading={{ title: t(widget.titleKey) }}
+      folds={widget.collapsed}
+      startsClosed={widget.collapsed}
+    >
       <WidgetList widgets={widget.widgets} renderLeaf={renderLeaf} pointer={listPointer(widget, 'widgets')} />
     </SectionPart>
   )

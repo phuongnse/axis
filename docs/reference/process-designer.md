@@ -114,8 +114,10 @@ field of the picked entity, as the `updateRecord` panel has for the subject enti
 
 ### Notify
 
-The operation picker offers `notify`. Its recipients are rows of a user expression, a role picker or an
-email expression, with Add recipient and Remove. Its `inApp` and `email` channels are two checkboxes, and
+The operation picker offers `notify`. Its recipients are rows, with Add recipient and Remove. Each row stacks
+a Recipient type choice of User, Role or Email, with a help line under each option, then the one field of that
+type: a user expression, a role picker or an email expression. Each field has its label and help, one field to
+a line, and the required fields are marked. Its `inApp` and `email` channels are two checkboxes, and
 its subject and body go through the label editor, so the author writes the texts in every locale.
 `values` are rows of a typed placeholder name and an expression. An Open a page checkbox adds `open` with
 a page picker and the page's parameters as rows, keyed by the parameters of the picked page.
@@ -128,12 +130,13 @@ adds no empty key. The editor takes the pointer of the object that holds these k
 
 ### Connector input
 
-The `input` of a `callConnector` step is rows of a typed input name, a Value, Object or List switch and an
-expression. The names route lists no input types, so the panel reads a row's kind from the draft: text
-is a Value, an object with `from` a List, and any other object an Object.
+The `input` of a `callConnector` step is rows. Each row stacks a Name, a Kind choice of Value, Object or List
+with a help line under each option, and an Expression for a value. Each field has its label and help, one
+field to a line, and the required fields are marked. The names route lists no input types, so the panel
+reads a row's kind from the draft: text is a Value, an object with `from` a List, and any other object an
+Object.
 
-- **Object.** An `object` shows nested field rows, each a typed field name and an expression over the
-  subject.
+- **Object.** An `object` shows nested rows, each with the same Name, Kind and Expression, over the subject.
 - **List.** A `list` shows a From picker of the subject's child collections, then nested field rows with
   an expression over a row of that collection. The expression editor offers that child entity's fields
   and `id`, not the subject's.

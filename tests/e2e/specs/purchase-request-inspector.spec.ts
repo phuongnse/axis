@@ -88,7 +88,8 @@ test('the operator opens an instance waiting for the manager and sees the path a
 }) => {
   const { title, instanceId } = await startWaitingInstance(page)
 
-  await page.goto('/purchasing/approvals?state=waiting&pageSize=100')
+  const waiting = encodeURIComponent(JSON.stringify({ all: [{ field: 'state', op: 'eq', value: 'waiting' }] }))
+  await page.goto(`/purchasing/approvals?filter=${waiting}&pageSize=100`)
   await expect(page.getByRole('banner').getByRole('button', { name: 'Operator User', exact: true })).toBeVisible()
   await page
     .locator(`tr[data-row-key="${instanceId}"]`)

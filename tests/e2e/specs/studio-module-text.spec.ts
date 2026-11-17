@@ -11,7 +11,7 @@ import {
   modulesPath,
 } from "../server-settings";
 import { useSession } from "../sessions";
-import { openKind } from "../studio-resources";
+import { openKind, openModuleResource } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -69,11 +69,15 @@ test.describe("Studio edits a module text as a layer", () => {
     await page.goto(`${server.url}/studio?app=ModuleApp`);
 
     await openKind(page, "text");
-    await page
-      .getByTestId("studio-group-module-texts")
-      .getByRole("button", { name: "checklists/TextsEn", exact: true })
-      .click();
+    // A text resource shows its language, as the application's own do.
+    await openModuleResource(page, "text", "Checklists", "English");
 
+    // The table pages, so the key is searched for before its row is looked for.
+    const search = page
+      .getByTestId("studio-text-table")
+      .getByRole("searchbox", { name: "Search", exact: true });
+    await search.fill(reviewerKey);
+    await search.press("Enter");
     const row = page.locator(
       `[data-testid="studio-text-row"][data-key="${reviewerKey}"]`,
     );

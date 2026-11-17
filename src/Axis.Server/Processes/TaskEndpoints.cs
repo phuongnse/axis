@@ -23,8 +23,10 @@ namespace Axis.Server.Processes;
 /// The task API endpoints that list the current user's open human tasks, read one task, complete
 /// one, claim or release one, and reassign one. The current user is the session user. A user may act on a task assigned to their
 /// id, or to a role they hold. A request is checked in order:
-/// signed-in user (401), application (404), then for a list the paging (400), and for a read or a
-/// completion the task id and the task's application (404) and who may act (403).
+/// signed-in user (401), application (404), then for a list the paging, <c>sort</c>, <c>search</c> and <c>filter</c> (400,
+/// each keyed by its name), and for a read or a completion the task id and the task's application (404) and who may act (403).
+/// A list takes <c>subject</c> and <c>dueAt</c> through <see cref="ListQuery{T}"/>, which PostgreSQL applies. A subject label the
+/// user may not read is NULL to the query, so no search, filter or sort reads it, and a sort breaks ties in the default order.
 /// A completion takes the application's start lock shared first. When the active release is no
 /// longer the one resolved, it runs again from resolution on the new release, and answers 503
 /// after three attempts. The completion's transaction runs under <c>Data:WriteTimeout</c>, set before the start lock.
@@ -92,11 +94,9 @@ internal static class TaskEndpoints
         tasks.MapPost("/{id}/reassign", ReassignAsync);
     }
 
-    // The query parameters are bound as strings so every invalid one is reported in one problem.
+    // The query parameters are read from the request so every invalid one is reported in one problem.
     private static async Task<IResult> ListAsync(
         string app,
-        string? page,
-        string? pageSize,
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
@@ -112,16 +112,63 @@ internal static class TaskEndpoints
             return ApplicationNotFound();
         }
 
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
+        var connection = await database.GetConnectionAsync(cancellationToken);
+
+        // The label's SQL reads the user's (release, entity) pairs, so a plain list does not pay for them.
+        var queried = httpContext.Request.Query.ContainsKey("sort")
+            || httpContext.Request.Query.ContainsKey("search")
+            || httpContext.Request.Query.ContainsKey("filter");
+        string? labelSql = null;
+        if (queried)
+        {
+            var labelled = new List<(Guid ReleaseId, EntityModel Entity)>();
+            var covered = new Dictionary<Guid, IReadOnlySet<string>?>();
+            foreach (var (releaseId, entityId) in await TaskQueries.ListOpenSubjectsAsync(connection, active.Model.Manifest.Id, user.Id, roles, cancellationToken))
+            {
+                var entity = (await resolver.GetReleaseModelAsync(releaseId, cancellationToken)).FindEntity(entityId);
+                if (entity is null)
+                {
+                    continue;
+                }
+
+                if (!covered.TryGetValue(entityId, out var readableFields))
+                {
+                    readableFields = TaskCompletionCommand.Readable(active.Model, roles, entityId);
+                    covered[entityId] = readableFields;
+                }
+
+                if (ShowsLabel(entity, readableFields))
+                {
+                    labelled.Add((releaseId, entity));
+                }
+            }
+
+            labelSql = TaskQueries.SubjectLabelSql(labelled);
+        }
+
+        // The Value functions only satisfy the column record, as in the instance list, because PostgreSQL applies the list.
+        // The due date filters by its UTC day and sorts by its instant. A label the user may not read is NULL in the SQL.
+        List<ListColumn<ProcessTaskRow>> columns =
+        [
+            new("subject", ListColumnKind.Text, _ => null, Searchable: true, Sql: labelSql),
+            new(
+                "dueAt",
+                ListColumnKind.Date,
+                task => task.DueAt is { } due ? DateOnly.FromDateTime(due.UtcDateTime) : null,
+                Order: task => task.DueAt,
+                Sql: "(process_tasks.due_at AT TIME ZONE 'UTC')::date",
+                OrderSql: "process_tasks.due_at"),
+        ];
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        if (!PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size))
+        var query = ListQuery<ProcessTaskRow>.Read(httpContext.Request, columns, errors);
+        if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
         }
 
-        var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
-        var connection = await database.GetConnectionAsync(cancellationToken);
         var result = await TaskQueries.ListOpenAsync(
-            connection, active.Model.Manifest.Id, user.Id, roles, pageNumber, size, cancellationToken);
+            connection, active.Model.Manifest.Id, user.Id, roles, query.Sql(), query.Page, query.PageSize, cancellationToken);
         var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
         var steps = new List<(ProcessTaskRow Task, ApplicationModel Release, ProcessModel Process, TaskStepModel Step)>(result.Items.Count);
         foreach (var task in result.Items)
@@ -154,7 +201,7 @@ internal static class TaskEndpoints
                 task.CreatedAt.UtcDateTime));
         }
 
-        return Results.Ok(new TaskListResponse(items, pageNumber, size, result.TotalCount));
+        return Results.Ok(new TaskListResponse(items, query.Page, query.PageSize, result.TotalCount));
     }
 
     private static async Task<IResult> GetAsync(
@@ -740,9 +787,12 @@ internal static class TaskEndpoints
     {
         var entity = release.FindEntity(task.SubjectEntityId)
             ?? throw new InvalidOperationException($"The subject entity of task '{task.Id}' is not in its release.");
-        var labelled = entity.DisplayField is { } displayField && (readable is null || readable.Contains(displayField));
-        return new TaskSubject(entity.Name, task.SubjectId, labelled ? labels.GetValueOrDefault((task.ReleaseId, task.SubjectId)) : null);
+        return new TaskSubject(entity.Name, task.SubjectId, ShowsLabel(entity, readable) ? labels.GetValueOrDefault((task.ReleaseId, task.SubjectId)) : null);
     }
+
+    // The one rule for a subject label: shown, and queried, only when the user's read grants cover the display field.
+    private static bool ShowsLabel(EntityModel entity, IReadOnlySet<string>? readable) =>
+        entity.DisplayField is { } displayField && (readable is null || readable.Contains(displayField));
 
     private static IResult ApplicationNotFound() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No application is active under this name.");

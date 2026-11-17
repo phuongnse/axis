@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { unusedStepName } from '../platform/formLayout'
+import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { LabelTexts } from './LabelTexts'
 import type { ChangeHandler } from './SchemaForm'
@@ -37,8 +38,8 @@ function sectionNames(sections: unknown): string[] {
 /**
  * The `steps` of a form as cards: a title, the sections the step shows, and buttons to move or remove it. The section
  * picker lists the named sections of the form, so the author picks names and does not type them. Removing the last step
- * removes `steps`, which turns the form back into one page. The cards edit the draft through `onChange`. A `steps`
- * that is not a list is left to the JSON view.
+ * removes `steps`, which turns the form back into one page. The cards sit in a part headed with the steps' title and
+ * help, and edit the draft through `onChange`. A `steps` that is not a list is left to the JSON view.
  */
 export function FormSteps({
   steps,
@@ -52,15 +53,17 @@ export function FormSteps({
   const t = useText()
   // A title editor keeps its texts in its state, so a move or a removal remounts the cards.
   const [generation, setGeneration] = useState(0)
+  const heading = { title: t('shell.studio.formSteps.title'), line: t('shell.studio.formSteps.help') }
 
   if (steps !== undefined && !Array.isArray(steps)) {
     return (
-      <div data-testid="studio-field-/steps">
-        <div>{t('shell.studio.formSteps.title')}</div>
-        <Typography.Text type="secondary" data-testid="studio-json-only">
-          {t('shell.studio.editInJson')}
-        </Typography.Text>
-      </div>
+      <SectionPart testName="steps" heading={heading}>
+        <div data-testid="studio-field-/steps">
+          <Typography.Text type="secondary" data-testid="studio-json-only">
+            {t('shell.studio.editInJson')}
+          </Typography.Text>
+        </div>
+      </SectionPart>
     )
   }
 
@@ -85,57 +88,58 @@ export function FormSteps({
   }
 
   return (
-    <div data-testid="studio-field-/steps">
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.formSteps.title')}</Typography.Text>
-        {list.map((step, index) => {
-          const pointer = `/steps/${index}`
-          const chosen = isContent(step) && Array.isArray(step.sections) ? step.sections : []
-          return (
-            <Card key={`${generation}-${index}`} size="small" data-testid={`studio-field-${pointer}`}>
-              <Flex vertical gap="small">
-                <div data-testid={`studio-field-${pointer}/title`}>
-                  <AxisFieldGroup {...groupTexts(t, 'steps.title')}>
-                    <LabelTexts
-                      pointer={`${pointer}/title`}
-                      value={isContent(step) ? step.title : undefined}
-                      onChange={onChange}
-                    />
-                  </AxisFieldGroup>
-                </div>
-                <div data-testid={`studio-field-${pointer}/sections`}>
-                  <AxisField {...fieldTexts(t, 'steps.sections')}>
-                    <Select
-                      mode="multiple"
-                      virtual={false}
-                      style={{ minWidth: 240 }}
-                      value={chosen}
-                      options={options}
-                      onChange={(next: string[]) => onChange(`${pointer}/sections`, next)}
-                    />
-                  </AxisField>
-                </div>
-                <Flex gap="small">
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button disabled={index === 0} onClick={() => move(index, index - 1)}>
-                    {t('shell.studio.formSteps.moveUp')}
-                  </Button>
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button disabled={index === list.length - 1} onClick={() => move(index, index + 1)}>
-                    {t('shell.studio.formSteps.moveDown')}
-                  </Button>
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button onClick={() => remove(index)}>{t('shell.studio.formSteps.removeStep')}</Button>
+    <SectionPart testName="steps" heading={heading}>
+      <div data-testid="studio-field-/steps">
+        <Flex vertical gap="small">
+          {list.map((step, index) => {
+            const pointer = `/steps/${index}`
+            const chosen = isContent(step) && Array.isArray(step.sections) ? step.sections : []
+            return (
+              <Card key={`${generation}-${index}`} size="small" data-testid={`studio-field-${pointer}`}>
+                <Flex vertical gap="small">
+                  <div data-testid={`studio-field-${pointer}/title`}>
+                    <AxisFieldGroup {...groupTexts(t, 'steps.title')}>
+                      <LabelTexts
+                        pointer={`${pointer}/title`}
+                        value={isContent(step) ? step.title : undefined}
+                        onChange={onChange}
+                      />
+                    </AxisFieldGroup>
+                  </div>
+                  <div data-testid={`studio-field-${pointer}/sections`}>
+                    <AxisField {...fieldTexts(t, 'steps.sections')}>
+                      <Select
+                        mode="multiple"
+                        virtual={false}
+                        style={{ minWidth: 240 }}
+                        value={chosen}
+                        options={options}
+                        onChange={(next: string[]) => onChange(`${pointer}/sections`, next)}
+                      />
+                    </AxisField>
+                  </div>
+                  <Flex gap="small">
+                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                    <Button disabled={index === 0} onClick={() => move(index, index - 1)}>
+                      {t('shell.studio.formSteps.moveUp')}
+                    </Button>
+                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                    <Button disabled={index === list.length - 1} onClick={() => move(index, index + 1)}>
+                      {t('shell.studio.formSteps.moveDown')}
+                    </Button>
+                    {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                    <Button onClick={() => remove(index)}>{t('shell.studio.formSteps.removeStep')}</Button>
+                  </Flex>
                 </Flex>
-              </Flex>
-            </Card>
-          )
-        })}
-        <div>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button onClick={add}>{t('shell.studio.formSteps.addStep')}</Button>
-        </div>
-      </Flex>
-    </div>
+              </Card>
+            )
+          })}
+          <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+            <Button onClick={add}>{t('shell.studio.formSteps.addStep')}</Button>
+          </div>
+        </Flex>
+      </div>
+    </SectionPart>
   )
 }

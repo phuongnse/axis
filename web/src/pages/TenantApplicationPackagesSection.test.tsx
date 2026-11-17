@@ -59,7 +59,7 @@ function renderSection() {
 async function expectHidden(fetchMock: ReturnType<typeof stubServer>) {
   await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith(path, expect.anything()))
   await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
-  expect(screen.queryByTestId('tenant-application-packages')).toBeNull()
+  expect(screen.queryByRole('region', { name: 'Application packages' })).toBeNull()
   expect(screen.queryByText('Application packages')).toBeNull()
 }
 
@@ -91,8 +91,8 @@ describe('TenantApplicationPackagesSection', () => {
     stubServer([json({ on: false })])
     renderSection()
 
-    const section = await screen.findByTestId('tenant-application-packages')
-    expect(within(section).getByRole('heading', { name: 'Application packages' })).toBeVisible()
+    const section = await screen.findByRole('region', { name: 'Application packages' })
+    expect(within(section).getByRole('heading', { name: 'Application packages', level: 2 })).toBeVisible()
     expect(within(section).getByText('Application packages are off.')).toBeVisible()
     expect(within(section).getByRole('button', { name: 'Turn on…' })).toBeVisible()
     expect(within(section).queryByRole('button', { name: 'Turn off…' })).toBeNull()

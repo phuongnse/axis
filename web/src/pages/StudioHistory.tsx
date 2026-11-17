@@ -4,10 +4,8 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { useContext, useEffect, useState, type HTMLAttributes } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
-import { EmptyDash } from '../platform/EmptyValue'
 import { QuotaRefusedError } from '../platform/quota'
 import {
-  changeRows,
   fetchStudioRevision,
   fetchStudioRevisions,
   revisionAuthor,
@@ -15,16 +13,17 @@ import {
   ServerUnreachableError,
   undoStudioRevision,
   type StudioDiagnostic,
-  type StudioReleaseChange,
   type StudioResourceItem,
   type StudioRevision,
   type StudioRevisionDiff,
+  type StudioRevisionList,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
-import { kindSingular } from '../platform/studioKinds'
+import { recordPageSize, recordQuery, tablePageSizes } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
-import { useDesignTokens } from '../platform/themeMode'
+import { useTableView } from '../platform/useTableView'
 import { PlatformContext } from './context'
+import { StudioChanges } from './StudioChanges'
 import { StudioPageHeading } from './StudioPageHeading'
 
 /** What an undo left on the page: the later revisions that block it, or why it failed. */
@@ -35,6 +34,16 @@ function historyAddress(application: string, revision?: string): string {
   return `/studio?${new URLSearchParams({ app: application, view: 'history', ...(revision ? { revision } : {}) })}`
 }
 
+/** The columns the view's search, filter and sort can name, see docs/reference/authoring-revisions.md#list. */
+const revisionFields = [
+  { name: 'summary', type: 'text' },
+  { name: 'author', type: 'text' },
+  { name: 'time', type: 'date' },
+  { name: 'client', type: 'text' },
+] as const
+// History has no parameters of its own. A stable empty array keeps useTableView from recomputing on each render.
+const noParameters: readonly string[] = []
+
 /** A time in the UI locale, to the second, as the release list shows its times. */
 function useRevisionTime(): (time: string) => string {
   const locale = useContext(PlatformContext)?.current.locale
@@ -43,11 +52,13 @@ function useRevisionTime(): (time: string) => string {
 }
 
 /**
- * The History of the open application: one row for each revision, newest first, on one page. A row shows the summary,
- * which opens the revision's page, who made it, when, and the client it came through. Every row but the oldest has an
- * Undo… icon button, off while an undo runs: the oldest is the start of history, which nothing undoes. An undo runs at
- * once. When it succeeds the list reloads and `onUndone` gets the folder's diagnostics. When later revisions changed the
- * same files, a warning names each of them and nothing is undone.
+ * The History of the open application: one row for each revision, newest first unless the view sorts them, paged on the
+ * server. A row shows the summary, which opens the revision's page, who made it, when, and the client it came through.
+ * The table has Search, Filter, Columns, Refresh, a sort on Who, When and Through and a pager with a page size, all kept
+ * in the address, see docs/reference/actions-and-controls.md#tables and docs/reference/authoring-revisions.md#list.
+ * Every row but the start of history, which the server names, has an Undo… icon button, off while an undo runs: nothing
+ * undoes the start of history. An undo runs at once. When it succeeds the list reloads and `onUndone` gets the folder's
+ * diagnostics. When later revisions changed the same files, a warning names each of them and nothing is undone.
  */
 export function StudioHistory({
   application,
@@ -61,14 +72,16 @@ export function StudioHistory({
   const t = useText()
   const time = useRevisionTime()
   const { generation, lost } = useStudioConnection()
-  const [revisions, setRevisions] = useState<StudioRevision[] | 'failed'>()
+  const { view, setView } = useTableView(revisionFields, recordPageSize, noParameters, true, true, true)
+  const query = recordQuery(view)
+  const [revisions, setRevisions] = useState<StudioRevisionList | 'failed'>()
   const [reload, setReload] = useState(0)
   const [busy, setBusy] = useState(false)
   const [outcome, setOutcome] = useState<UndoOutcome | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
-    fetchStudioRevisions(application, controller.signal).then(setRevisions, (error: unknown) => {
+    fetchStudioRevisions(application, query, controller.signal).then(setRevisions, (error: unknown) => {
       if (controller.signal.aborted) {
         return
       }
@@ -80,7 +93,7 @@ export function StudioHistory({
       setRevisions('failed')
     })
     return () => controller.abort()
-  }, [application, folderRevision, generation, reload, lost])
+  }, [application, query, folderRevision, generation, reload, lost])
 
   async function undo(revision: StudioRevision) {
     setBusy(true)
@@ -114,6 +127,7 @@ export function StudioHistory({
       key: 'summary',
       kind: 'freeText',
       title: t('shell.studio.history.summary'),
+      filter: { kind: 'text' },
       render: (_, row) => (
         <Link data-testid="studio-revision-link" to={historyAddress(application, row.id)}>
           {row.summary}
@@ -121,37 +135,49 @@ export function StudioHistory({
       ),
     },
     {
-      key: 'who',
+      key: 'author',
       kind: 'freeText',
       title: t('shell.studio.history.who'),
+      filter: { kind: 'text' },
+      sorter: true,
       render: (_, row) => revisionAuthor(row, t),
     },
     {
-      key: 'when',
+      key: 'time',
       kind: 'fixed',
       title: t('shell.studio.history.when'),
+      filter: { kind: 'date' },
+      sorter: true,
       render: (_, row) => time(row.time),
     },
     {
-      key: 'through',
+      key: 'client',
       kind: 'freeText',
       title: t('shell.studio.history.through'),
+      filter: { kind: 'text' },
+      sorter: true,
       render: (_, row) => revisionClient(row, t),
     },
   ]
-  const list = Array.isArray(revisions) ? revisions : []
-  const oldest = list.at(-1)?.id
+  const list = typeof revisions === 'object' ? revisions : undefined
 
   return (
     <section data-testid="studio-history">
       <AxisTable<StudioRevision>
         columns={columns}
         rowKey={(row) => row.id}
-        dataSource={list}
+        dataSource={list?.items ?? []}
         loading={revisions === undefined}
         emptyText={t('shell.studio.history.empty')}
-        pagination={false}
-        toolbar={{}}
+        view={{
+          query: view,
+          onChange: setView,
+          pageSizes: tablePageSizes(),
+          total: list?.totalCount ?? 0,
+          search: true,
+          columns: true,
+        }}
+        toolbar={{ onRefresh: () => setReload((value) => value + 1) }}
         failure={
           revisions === 'failed' ? (
             <AxisAlert data-testid="studio-history-error" kind="error" message={t('shell.studio.history.loadFailed')} />
@@ -185,7 +211,7 @@ export function StudioHistory({
         rowActions={{
           configured: 1,
           actions: (row) =>
-            row.id === oldest
+            row.id === list?.start
               ? null
               : [
                   {
@@ -203,20 +229,11 @@ export function StudioHistory({
   )
 }
 
-/** The JSON text of one side of a change, indented when it parses, and as it is when it does not. */
-function prettyJson(text: string): string {
-  try {
-    return JSON.stringify(JSON.parse(text), null, 2)
-  } catch {
-    return text
-  }
-}
-
 /**
  * The page of one revision: its summary as the heading, who made it, when and through which client under it, and then
- * every resource it added, changed or removed with its name, kind and change, and its JSON before and after side by
- * side. A side where the file does not exist shows the em dash. A revision that cannot be loaded shows one line with a
- * link back to History.
+ * every resource it added, changed or removed as `StudioChanges` draws it. A loaded revision has no
+ * link back, because the sidebar's marked History entry and the browser's Back lead back, see docs/reference/studio.md. A revision that
+ * cannot be loaded shows one line with a link to History.
  */
 export function StudioRevisionPage({
   application,
@@ -229,8 +246,6 @@ export function StudioRevisionPage({
 }) {
   const t = useText()
   const time = useRevisionTime()
-  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const { colour, radius, spacing, type } = useDesignTokens()
   const { generation, lost } = useStudioConnection()
   const [diff, setDiff] = useState<{ revisionId: string; value: StudioRevisionDiff | null }>()
 
@@ -268,62 +283,13 @@ export function StudioRevisionPage({
   }
 
   const { revision } = loaded
-  const changes = loaded.resources.map((resource): StudioReleaseChange => ({
-    path: resource.file,
-    change: resource.change,
-    kind: resource.kind,
-    name: resource.name,
-    titles: null,
-    locale: null,
-  }))
-  const byKey = new Map(loaded.resources.map((resource) => [`${resource.change}:${resource.file}`, resource]))
   const line = [revisionAuthor(revision, t), time(revision.time), revisionClient(revision, t)].filter(
     (part): part is string => part !== null,
   )
-  const block = (testId: string, title: string, text: string | null) => (
-    <Flex vertical gap={spacing.xs} style={{ minWidth: 0 }}>
-      <Typography.Text style={{ color: colour.textMuted }}>{title}</Typography.Text>
-      <pre
-        data-testid={testId}
-        style={{
-          margin: 0,
-          padding: spacing.sm,
-          overflow: 'auto',
-          fontFamily: type.codeFontFamily,
-          background: colour.surface,
-          border: `1px solid ${colour.borderSubtle}`,
-          borderRadius: radius.base,
-        }}
-      >
-        {text === null ? <EmptyDash /> : prettyJson(text)}
-      </pre>
-    </Flex>
-  )
-
   return (
     <Flex vertical gap="middle" data-testid="studio-revision">
       <StudioPageHeading title={revision.summary} line={line} />
-      {back}
-      {changeRows(changes, resources, locale, t).map((row) => {
-        const resource = byKey.get(row.key)
-        return (
-          <section key={row.key} data-testid="studio-revision-change" data-file={resource?.file}>
-            <Flex vertical gap="small">
-              <Flex wrap gap="small" align="baseline">
-                <Typography.Text strong>{row.name}</Typography.Text>
-                <Typography.Text style={{ color: colour.textMuted }}>
-                  {row.kind === null ? '—' : kindSingular(row.kind, t)}
-                </Typography.Text>
-                <Typography.Text>{t(`shell.studio.overview.change.${row.change}`)}</Typography.Text>
-              </Flex>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: spacing.md }}>
-                {block('studio-revision-before', t('shell.studio.history.before'), resource?.before ?? null)}
-                {block('studio-revision-after', t('shell.studio.history.after'), resource?.after ?? null)}
-              </div>
-            </Flex>
-          </section>
-        )
-      })}
+      <StudioChanges files={loaded.resources} resources={resources} />
     </Flex>
   )
 }

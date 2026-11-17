@@ -1,12 +1,12 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type {
   ConsoleDeadLetterPage,
   ConsoleFailedWorkPage,
-  ConsoleScheduleList,
+  ConsoleSchedulePage,
   ConsoleTenant,
   ConsoleWebhookDelivery,
   ConsoleWebhookDeliveryPage,
@@ -133,6 +133,8 @@ const failedWork: ConsoleFailedWorkPage = {
   totalCount: 45,
 }
 
+const deliveriesPath = '/api/console/webhook-deliveries'
+
 const deadLettersPath = '/api/console/dead-letters'
 
 const emptyDeadLetters: ConsoleDeadLetterPage = { items: [], page: 1, pageSize: 20, totalCount: 0 }
@@ -173,18 +175,18 @@ const allLetters: ConsoleDeadLetterPage = {
 
 const schedulesPath = '/api/console/schedules'
 
-const emptySchedules: ConsoleScheduleList = { items: [] }
+const emptySchedules: ConsoleSchedulePage = { items: [], page: 1, pageSize: 20, totalCount: 0 }
 
 /**
  * Answers the dead letter routes with `letters`, the schedules route with `schedules`, the webhook deliveries route with
- * `deliveries`, filtered by the `webhook` parameter, the publishing route with an empty answer, and every other route
- * with `answer`, and records every request.
+ * the two deliveries with the fields of `deliveries` over them, the publishing route with an empty answer, and every other
+ * route with `answer`, and records every request.
  */
 function stubServer(
   answer: (url: string) => Response,
-  letters: () => Response = () => json(emptyDeadLetters),
+  letters: (url: string) => Response = () => json(emptyDeadLetters),
   schedules: (url: string) => Response = () => json(emptySchedules),
-  deliveries = [leaveDelivery, orderDelivery],
+  deliveries: Partial<ConsoleWebhookDeliveryPage> = {},
 ) {
   const requests: string[] = []
   const bodies: (string | undefined)[] = []
@@ -194,14 +196,13 @@ function stubServer(
     if (input.startsWith(schedulesPath)) {
       return schedules(input)
     }
-    if (input.startsWith('/api/console/webhook-deliveries')) {
-      const webhook = new URL(input, 'http://localhost').searchParams.get('webhook')
-      return json(deliveryPage(deliveries.filter((row) => !webhook || row.webhookId === webhook)))
+    if (input.startsWith(deliveriesPath)) {
+      return json({ ...deliveryPage([leaveDelivery, orderDelivery]), ...deliveries })
     }
     if (input.startsWith('/api/console/applications/')) {
       return json({ active: null, releases: [], requests: [], page: 1, pageSize: 20, totalCount: 0 })
     }
-    return input.startsWith(deadLettersPath) ? letters() : answer(input)
+    return input.startsWith(deadLettersPath) ? letters(input) : answer(input)
   })
   vi.stubGlobal('fetch', fetchMock)
   return Object.assign(fetchMock, { requests, bodies })
@@ -211,12 +212,15 @@ function tenantAndFailedWork(url: string) {
   return json(url.startsWith('/api/console/tenant') ? tenant : failedWork)
 }
 
-function renderPage() {
+const Location = () => <output data-testid="location">{useLocation().search}</output>
+
+function renderPage(address = '/console') {
   render(
     <PlatformContext.Provider value={platform}>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[address]}>
           <ConsolePage />
+          <Location />
         </MemoryRouter>
       </TextProvider>
     </PlatformContext.Provider>,
@@ -265,6 +269,24 @@ describe('ConsolePage', () => {
     expect(within(view).queryByText('Active')).toBeNull()
   })
 
+  it('shows each monitor as a part named by its heading, and no card', async () => {
+    stubServer(tenantAndFailedWork)
+    renderPage()
+
+    const monitors = [
+      ['shell.console.tenant.title', 'console-tenant'],
+      ['shell.console.failedWork.title', 'console-failed-work'],
+      ['shell.console.webhooks.title', 'console-webhook-deliveries'],
+      ['shell.console.publishing.title', 'console-publishing'],
+      ['shell.console.deadLetters.title', 'console-dead-letters'],
+      ['shell.console.schedules.title', 'console-schedules'],
+    ] as const
+    for (const [title, testId] of monitors) {
+      expect(await screen.findByRole('region', { name: platformEnglish[title] })).toBe(screen.getByTestId(testId))
+    }
+    expect(document.querySelector('.ant-card')).toBeNull()
+  })
+
   it('shows the forbidden page on a 403', async () => {
     stubServer(() => new Response(null, { status: 403 }))
     renderPage()
@@ -272,6 +294,7 @@ describe('ConsolePage', () => {
     const forbidden = await screen.findByTestId('console-forbidden')
     expect(within(forbidden).getByText('This page is for operators.')).toBeVisible()
     expect(screen.queryByTestId('console-tenant')).toBeNull()
+    expect(screen.queryAllByRole('region')).toHaveLength(0)
   })
 
   it('shows an error when the tenant cannot be loaded', async () => {
@@ -343,8 +366,8 @@ describe('ConsolePage', () => {
     )
   })
 
-  it('lists the webhook deliveries and filters them by webhook', async () => {
-    const fetchMock = stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
+  it('lists the webhook deliveries', async () => {
+    stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
     renderPage()
 
     const view = await screen.findByTestId('console-webhook-deliveries')
@@ -359,17 +382,41 @@ describe('ConsolePage', () => {
     expect(within(order).getByText('5')).toBeVisible()
     expect(within(order).getByText('503')).toBeVisible()
     expect(within(order).getByText('—')).toBeVisible()
+  })
 
-    fireEvent.mouseDown(within(view).getByRole('combobox', { name: 'Webhook' }))
-    fireEvent.click(await screen.findByText('Purchasing / OrderHook'))
+  it('keeps the search, filter, sort and page size of the webhook deliveries in the address and the request', async () => {
+    const filter = JSON.stringify({ all: [{ field: 'state', op: 'eq', value: 'deadLettered' }] })
+    const address = `/console?${new URLSearchParams({
+      'webhookDeliveries.search': 'e-1',
+      'webhookDeliveries.filter': filter,
+      'webhookDeliveries.sort': '-attempts',
+    })}`
+    const server = stubServer(tenantAndFailedWork, undefined, undefined, { totalCount: 33 })
+    const user = userEvent.setup()
+    renderPage(address)
 
-    await waitFor(() =>
-      expect(fetchMock.requests.filter((request) => request.includes('webhook-deliveries')).at(-1)).toContain(
-        'webhook=w2',
-      ),
-    )
-    await waitFor(() => expect(within(view).queryByText('LeaveHook')).toBeNull())
-    expect(within(view).getByText('OrderHook')).toBeVisible()
+    const view = await screen.findByTestId('console-webhook-deliveries')
+    const requested = (path: string) => server.requests.filter((request) => request.startsWith(`GET ${path}`))
+    await waitFor(() => expect(requested(deliveriesPath)).toHaveLength(1))
+    const first = new URL(requested(deliveriesPath)[0].replace('GET ', ''), 'http://localhost').searchParams
+    expect(first.get('search')).toBe('e-1')
+    expect(first.get('filter')).toBe(filter)
+    expect(first.get('sort')).toBe('-attempts')
+    await waitFor(() => expect(requested(deadLettersPath)).toHaveLength(1))
+    const letters = new URL(requested(deadLettersPath)[0].replace('GET ', ''), 'http://localhost').searchParams
+    expect([...letters.keys()]).toEqual([])
+    await waitFor(() => expect(requested(schedulesPath)).toHaveLength(1))
+    const schedules = new URL(requested(schedulesPath)[0].replace('GET ', ''), 'http://localhost').searchParams
+    expect([...schedules.keys()]).toEqual([])
+    expect(await within(view).findByText('1–20 of 33')).toBeVisible()
+
+    await user.click(within(view).getByRole('combobox'))
+    await user.click(await screen.findByTitle('50 / page'))
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('webhookDeliveries.pageSize=50'))
+    await waitFor(() => expect(requested(deliveriesPath).some((request) => request.includes('pageSize=50'))).toBe(true))
+    expect(screen.getByTestId('location')).toHaveTextContent('webhookDeliveries.sort=-attempts')
+    expect(requested(schedulesPath)).toHaveLength(1)
   })
 
   it('lists the dead letters of every application, including one with no process', async () => {
@@ -392,17 +439,38 @@ describe('ConsolePage', () => {
     expect(within(discarded).queryByRole('button')).toBeNull()
   })
 
-  it('asks for the dead letters of the chosen application', async () => {
-    const server = stubServer(tenantAndFailedWork, () => json(allLetters))
+  it('keeps the search, filter, sort and page size of the dead letters in the address and the request', async () => {
+    const filter = JSON.stringify({ all: [{ field: 'state', op: 'eq', value: 'open' }] })
+    const address = `/console?${new URLSearchParams({
+      'deadLetters.search': 'timeout',
+      'deadLetters.filter': filter,
+      'deadLetters.sort': '-attempts',
+    })}`
+    const server = stubServer(tenantAndFailedWork, () => json({ ...allLetters, totalCount: 33 }))
     const user = userEvent.setup()
-    renderPage()
+    renderPage(address)
 
     const view = await screen.findByTestId('console-dead-letters')
-    await within(view).findByText('webhook.deliver')
-    await user.click(within(view).getByRole('combobox', { name: 'Application' }))
-    await user.click(await screen.findByTitle('Purchasing'))
+    const requested = (path: string) => server.requests.filter((request) => request.startsWith(`GET ${path}`))
+    await waitFor(() => expect(requested(deadLettersPath)).toHaveLength(1))
+    const first = new URL(requested(deadLettersPath)[0].replace('GET ', ''), 'http://localhost').searchParams
+    expect(first.get('search')).toBe('timeout')
+    expect(first.get('filter')).toBe(filter)
+    expect(first.get('sort')).toBe('-attempts')
+    await waitFor(() => expect(requested(schedulesPath)).toHaveLength(1))
+    const schedules = new URL(requested(schedulesPath)[0].replace('GET ', ''), 'http://localhost').searchParams
+    expect([...schedules.keys()]).toEqual([])
+    expect(await within(view).findByText('1–20 of 33')).toBeVisible()
 
-    await waitFor(() => expect(server.requests).toContain(`GET ${deadLettersPath}?application=a2`))
+    await user.click(within(view).getByRole('combobox'))
+    await user.click(await screen.findByTitle('50 / page'))
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('deadLetters.pageSize=50'))
+    await waitFor(() =>
+      expect(requested(deadLettersPath).some((request) => request.includes('pageSize=50'))).toBe(true),
+    )
+    expect(screen.getByTestId('location')).toHaveTextContent('deadLetters.sort=-attempts')
+    expect(requested(schedulesPath)).toHaveLength(1)
   })
 
   it.each([
@@ -442,7 +510,10 @@ describe('ConsolePage', () => {
   })
 
   it('lists the schedule triggers with their occurrences and a dash for one that never ran', async () => {
-    const schedules: ConsoleScheduleList = {
+    const schedules: ConsoleSchedulePage = {
+      page: 1,
+      pageSize: 20,
+      totalCount: 2,
       items: [
         {
           applicationId: 'a1',
@@ -487,17 +558,29 @@ describe('ConsolePage', () => {
     expect(within(second).getByText(new Date('2026-11-01T05:00:00Z').toLocaleString('en'))).toBeVisible()
   })
 
-  it('asks for the schedules of the chosen application', async () => {
-    const server = stubServer(tenantAndFailedWork)
+  it('keeps the search, filter, sort and page size of the schedules in the address and the request', async () => {
+    const filter = JSON.stringify({ all: [{ field: 'application', op: 'eq', value: 'Leave' }] })
+    const address = `/console?${new URLSearchParams({ search: 'Leave', filter, sort: '-nextOccurrenceAt' })}`
+    const server = stubServer(tenantAndFailedWork, undefined, () =>
+      json({ ...emptySchedules, totalCount: 33 } satisfies ConsoleSchedulePage),
+    )
     const user = userEvent.setup()
-    renderPage()
+    renderPage(address)
 
     const view = await screen.findByTestId('console-schedules')
-    await waitFor(() => expect(server.requests).toContain(`GET ${schedulesPath}`))
-    await user.click(within(view).getByRole('combobox', { name: 'Application' }))
-    await user.click(await screen.findByTitle('Purchasing'))
+    const requested = () => server.requests.filter((request) => request.startsWith(`GET ${schedulesPath}`))
+    await waitFor(() => expect(requested()).toHaveLength(1))
+    const first = new URL(requested()[0].replace('GET ', ''), 'http://localhost').searchParams
+    expect(first.get('search')).toBe('Leave')
+    expect(first.get('filter')).toBe(filter)
+    expect(first.get('sort')).toBe('-nextOccurrenceAt')
+    expect(await within(view).findByText('1–20 of 33')).toBeVisible()
 
-    await waitFor(() => expect(server.requests).toContain(`GET ${schedulesPath}?application=a2`))
+    await user.click(within(view).getByRole('combobox'))
+    await user.click(await screen.findByTitle('50 / page'))
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('pageSize=50'))
+    await waitFor(() => expect(requested().some((request) => request.includes('pageSize=50'))).toBe(true))
   })
 
   it('shows an error in the card when the schedules cannot be loaded', async () => {

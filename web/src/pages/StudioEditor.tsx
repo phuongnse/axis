@@ -8,6 +8,7 @@ import {
   useContext,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -29,6 +30,7 @@ import {
 } from '../platform/entityMigrations'
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { SectionParts } from '../platform/SectionParts'
 import { QuotaRefusedError } from '../platform/quota'
 import { seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
 import {
@@ -360,16 +362,99 @@ export function StudioEditor({
     messageApi.destroy('studio-removed')
   }
 
+  function change(pointer: string, next: unknown) {
+    if (jsonInvalid) {
+      return
+    }
+    const edited = /^\/fields\/(\d+)(\/|$)/.exec(pointer)
+    const origin = edited ? origins[Number(edited[1])] : null
+    if (origin) {
+      touch(origin)
+    }
+    // Unticking a box that the file never had leaves the key out, so the undo of a tick is no change.
+    // An array item always keeps its value, because a missing item would shift the others.
+    const parent = getAt(loaded!.content, pointer.slice(0, pointer.lastIndexOf('/')))
+    update(
+      pointer,
+      next === false && !Array.isArray(parent) && getAt(loaded!.content, pointer) === undefined ? undefined : next,
+    )
+  }
+
+  function touch(origin: string) {
+    setTouched((current) => (current.includes(origin) ? current : [...current, origin]))
+  }
+
+  /** Sets the draft's value at the pointer as it is. A seed cell that picks `false` must keep it. */
+  function update(pointer: string, value: unknown) {
+    if (jsonInvalid) {
+      return
+    }
+    const removed = removedItem(draft, pointer, value)
+    messageApi.destroy('studio-removed')
+    setHistory((h) => recordStep(h, { draft, jsonText, texts: labelTexts }, removed ? null : typingStep(pointer)))
+    setDraft((current) => setAt(current, pointer, value) as Content)
+    setJsonText(null)
+    setJsonInvalid(false)
+    setSaved(false)
+    setSaveError(null)
+    if (removed) {
+      const name = isContent(removed.item) && typeof removed.item.name === 'string' ? removed.item.name : null
+      void messageApi.open({
+        key: 'studio-removed',
+        duration: 10,
+        content: (
+          <>
+            {name === null ? t('shell.studio.removedRow') : t('shell.studio.removedNamed').replace('{name}', name)}{' '}
+            <AxisButton
+              role="plain"
+              aria-label={t('shell.studio.undoRemoval')}
+              onClick={() => {
+                messageApi.destroy('studio-removed')
+                latest.current.undo()
+              }}
+            >
+              {t('shell.studio.undo')}
+            </AxisButton>
+          </>
+        ),
+      })
+    }
+  }
+
+  /** Sets the texts of a label's key in the draft, as typing in the label's boxes does, so it joins the typing step. */
+  function changeTexts(pointer: string, key: string, texts: Record<string, string>) {
+    if (jsonInvalid) {
+      return
+    }
+    setHistory((h) => recordStep(h, { draft, jsonText, texts: labelTexts }, typingStep(pointer)))
+    setLabelTexts((current) => ({ ...current, [key]: texts }))
+    setSaved(false)
+    setSaveError(null)
+  }
+
   const undo = () => step(undoStep)
   const redo = () => step(redoStep)
-  const latest = useRef({ undo, redo, changeTexts })
+  const latest = useRef({ undo, redo, changeTexts, change, update })
+  // The draft as it is now, for the expression editors to read when they need it, so a key does not redraw them.
+  const draftRef = useRef(draft)
   const onTextsChange = useCallback(
     (pointer: string, key: string, texts: Record<string, string>) => latest.current.changeTexts(pointer, key, texts),
     [],
   )
+  // Handlers that stay the same between draws, so a key redraws only the boxes that show its value.
+  const onChange = useCallback((pointer: string, next: unknown) => latest.current.change(pointer, next), [])
+  const onUpdate = useCallback((pointer: string, next: unknown) => latest.current.update(pointer, next), [])
+  const onOriginsChange = useCallback((next: FieldOrigin[], removed?: string) => {
+    setOrigins(next)
+    if (removed) {
+      setTouched((current) => (current.includes(removed) ? current : [...current, removed]))
+    }
+  }, [])
 
-  useEffect(() => {
-    latest.current = { undo, redo, changeTexts }
+  // At layout time, so an event after a draw reads this draw's draft and not the one before it.
+  useLayoutEffect(() => {
+    latest.current = { undo, redo, changeTexts, change, update }
+    draftRef.current = draft
   })
 
   // The settings and a trigger's time zone choose from what the server has installed. Until it loads, or if it
@@ -598,8 +683,15 @@ export function StudioEditor({
     [application, item.file, item.name, loaded?.content, writtenTexts, labelTexts, onTextsChange],
   )
   const checkContext = useMemo(
-    () => ({ application, resourceId: item.id, kind: item.kind, draft, names: names ?? null }),
-    [application, item.id, item.kind, draft, names],
+    () => ({ application, resourceId: item.id, kind: item.kind, draft: () => draftRef.current, names: names ?? null }),
+    [application, item.id, item.kind, names],
+  )
+  // The warnings read only the fields, so a key outside them draws the table as it is.
+  const draftFields = draft.fields
+  const entityWarnings = useMemo(
+    () =>
+      item.kind === 'entity' && loaded ? fieldWarnings(loaded.content, { fields: draftFields }, origins) : undefined,
+    [item.kind, loaded, draftFields, origins],
   )
   // The form is final once the seed's entity has loaded, so a path into a record finds its cell.
   const formReady =
@@ -722,76 +814,6 @@ export function StudioEditor({
   }
   if (!loaded) {
     return null
-  }
-
-  function change(pointer: string, next: unknown) {
-    if (jsonInvalid) {
-      return
-    }
-    const edited = /^\/fields\/(\d+)(\/|$)/.exec(pointer)
-    const origin = edited ? origins[Number(edited[1])] : null
-    if (origin) {
-      touch(origin)
-    }
-    // Unticking a box that the file never had leaves the key out, so the undo of a tick is no change.
-    // An array item always keeps its value, because a missing item would shift the others.
-    const parent = getAt(loaded!.content, pointer.slice(0, pointer.lastIndexOf('/')))
-    update(
-      pointer,
-      next === false && !Array.isArray(parent) && getAt(loaded!.content, pointer) === undefined ? undefined : next,
-    )
-  }
-
-  function touch(origin: string) {
-    setTouched((current) => (current.includes(origin) ? current : [...current, origin]))
-  }
-
-  /** Sets the draft's value at the pointer as it is. A seed cell that picks `false` must keep it. */
-  function update(pointer: string, value: unknown) {
-    if (jsonInvalid) {
-      return
-    }
-    const removed = removedItem(draft, pointer, value)
-    messageApi.destroy('studio-removed')
-    setHistory((h) => recordStep(h, { draft, jsonText, texts: labelTexts }, removed ? null : typingStep(pointer)))
-    setDraft((current) => setAt(current, pointer, value) as Content)
-    setJsonText(null)
-    setJsonInvalid(false)
-    setSaved(false)
-    setSaveError(null)
-    if (removed) {
-      const name = isContent(removed.item) && typeof removed.item.name === 'string' ? removed.item.name : null
-      void messageApi.open({
-        key: 'studio-removed',
-        duration: 10,
-        content: (
-          <>
-            {name === null ? t('shell.studio.removedRow') : t('shell.studio.removedNamed').replace('{name}', name)}{' '}
-            <AxisButton
-              role="plain"
-              aria-label={t('shell.studio.undoRemoval')}
-              onClick={() => {
-                messageApi.destroy('studio-removed')
-                latest.current.undo()
-              }}
-            >
-              {t('shell.studio.undo')}
-            </AxisButton>
-          </>
-        ),
-      })
-    }
-  }
-
-  /** Sets the texts of a label's key in the draft, as typing in the label's boxes does, so it joins the typing step. */
-  function changeTexts(pointer: string, key: string, texts: Record<string, string>) {
-    if (jsonInvalid) {
-      return
-    }
-    setHistory((h) => recordStep(h, { draft, jsonText, texts: labelTexts }, typingStep(pointer)))
-    setLabelTexts((current) => ({ ...current, [key]: texts }))
-    setSaved(false)
-    setSaveError(null)
   }
 
   function changeJson(text: string) {
@@ -1040,6 +1062,82 @@ export function StudioEditor({
     )
   }
 
+  const form = seedSchema ? (
+    <SectionParts>
+      <SchemaForm schema={seedSchema} value={draft} onChange={onChange} />
+      <SeedGrid fields={seedFields!} records={draft.records} problems={problems} onChange={onUpdate} />
+    </SectionParts>
+  ) : item.kind === 'scenario' ? (
+    <ScenarioEditor value={draft} onChange={onUpdate} />
+  ) : item.kind === 'text' && schema && isContent(draft.texts) && otherTexts ? (
+    // The table reads the address for its search and page, so it is mounted only while its tab is open, as Used by is.
+    tab === 'form' ? (
+      <TextTable
+        columns={resources
+          .filter((resource) => resource.kind === 'text')
+          .map((resource) =>
+            resource.id === item.id
+              ? {
+                  id: item.id,
+                  locale: String(loaded.content.locale),
+                  texts: draft.texts as Record<string, unknown>,
+                  editable: true,
+                }
+              : otherTexts.find((column) => column.id === resource.id),
+          )
+          .filter((column): column is TextColumn => column !== undefined)}
+        onChange={onUpdate}
+        onAdd={addTextKey}
+      />
+    ) : null
+  ) : item.kind === 'entity' && schema ? (
+    <EntityDesigner
+      value={draft}
+      onChange={onChange}
+      origins={origins}
+      warnings={entityWarnings}
+      onOriginsChange={onOriginsChange}
+    />
+  ) : item.kind === 'connector' && schema ? (
+    <ConnectorEditor value={draft} onChange={onChange} />
+  ) : item.kind === 'identityProvider' && schema ? (
+    <IdentityProviderEditor value={draft} onChange={onChange} />
+  ) : processSchema ? (
+    <ProcessEditor schema={processSchema} value={draft} onChange={onChange} />
+  ) : item.kind === 'page' && schema ? (
+    <PageEditor value={draft} onChange={onChange} selected={widgetPath} onSelect={setWidgetPath} />
+  ) : endpointSchema ? (
+    <SectionParts>
+      <SchemaForm schema={endpointSchema} value={draft} onChange={onChange} />
+      <EndpointValues fields={endpointFields} values={draft.values} onChange={onChange} />
+      <EndpointEvent events={names?.events} value={draft.event} onChange={onChange} />
+    </SectionParts>
+  ) : siteSchema ? (
+    <SectionParts>
+      <SchemaForm schema={siteSchema} value={draft} onChange={onChange} />
+      <SiteSignIn
+        providers={resources
+          .filter((resource) => resource.kind === 'identityProvider' && resource.name)
+          .map((resource) => resource.name!)}
+        value={draft.signIn}
+        onChange={onChange}
+      />
+    </SectionParts>
+  ) : formSchema ? (
+    <SectionParts>
+      <SchemaForm schema={formSchema} value={draft} onChange={onChange} />
+      <FormSteps steps={draft.steps} sections={draft.sections} onChange={onChange} />
+    </SectionParts>
+  ) : schema ? (
+    <SchemaForm
+      schema={item.kind === 'trigger' ? triggerSchema(schema, draft) : schema}
+      value={draft}
+      onChange={onChange}
+    />
+  ) : (
+    <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
+  )
+
   return (
     <StudioCatalogContext.Provider value={catalog}>
       <StudioRelaxedContext.Provider value={relaxedContext}>
@@ -1106,7 +1204,7 @@ export function StudioEditor({
                                         version={loadedVersion}
                                         selected={widgetPath}
                                         onSelect={setWidgetPath}
-                                        onChange={change}
+                                        onChange={onChange}
                                       />
                                     </Suspense>,
                                   )
@@ -1129,7 +1227,7 @@ export function StudioEditor({
                                           version={loadedVersion}
                                           selected={formPath}
                                           onSelect={setFormPath}
-                                          onChange={change}
+                                          onChange={onChange}
                                           usedOn={usedOn}
                                           onOpen={onOpen}
                                         />
@@ -1153,7 +1251,7 @@ export function StudioEditor({
                                             diagnosticPaths={diagnosticPaths}
                                             selected={processStep}
                                             onSelect={setProcessStep}
-                                            onChange={change}
+                                            onChange={onChange}
                                           />
                                         </Suspense>,
                                       )
@@ -1166,94 +1264,13 @@ export function StudioEditor({
                       label: t('shell.studio.form'),
                       children: (
                         <Drawn onDrawn={setFormDrawn}>
-                          {editable(
-                            seedSchema ? (
-                              <Flex vertical gap="middle">
-                                <SchemaForm schema={seedSchema} value={draft} onChange={change} />
-                                <SeedGrid
-                                  fields={seedFields!}
-                                  records={draft.records}
-                                  problems={problems}
-                                  onChange={update}
-                                />
-                              </Flex>
-                            ) : item.kind === 'scenario' ? (
-                              <ScenarioEditor value={draft} onChange={update} />
-                            ) : item.kind === 'text' && schema && isContent(draft.texts) && otherTexts ? (
-                              <TextTable
-                                columns={resources
-                                  .filter((resource) => resource.kind === 'text')
-                                  .map((resource) =>
-                                    resource.id === item.id
-                                      ? {
-                                          id: item.id,
-                                          locale: String(loaded.content.locale),
-                                          texts: draft.texts as Record<string, unknown>,
-                                          editable: true,
-                                        }
-                                      : otherTexts.find((column) => column.id === resource.id),
-                                  )
-                                  .filter((column): column is TextColumn => column !== undefined)}
-                                onChange={update}
-                                onAdd={addTextKey}
-                              />
-                            ) : item.kind === 'entity' && schema ? (
-                              <EntityDesigner
-                                value={draft}
-                                onChange={change}
-                                origins={origins}
-                                warnings={fieldWarnings(loaded.content, draft, origins)}
-                                onOriginsChange={(next, removed) => {
-                                  setOrigins(next)
-                                  if (removed) {
-                                    touch(removed)
-                                  }
-                                }}
-                              />
-                            ) : item.kind === 'connector' && schema ? (
-                              <ConnectorEditor value={draft} onChange={change} />
-                            ) : item.kind === 'identityProvider' && schema ? (
-                              <IdentityProviderEditor value={draft} onChange={change} />
-                            ) : processSchema ? (
-                              <ProcessEditor schema={processSchema} value={draft} onChange={change} />
-                            ) : item.kind === 'page' && schema ? (
-                              <PageEditor
-                                value={draft}
-                                onChange={change}
-                                selected={widgetPath}
-                                onSelect={setWidgetPath}
-                              />
-                            ) : endpointSchema ? (
-                              <Flex vertical gap="middle">
-                                <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
-                                <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
-                                <EndpointEvent events={names?.events} value={draft.event} onChange={change} />
-                              </Flex>
-                            ) : siteSchema ? (
-                              <Flex vertical gap="middle">
-                                <SchemaForm schema={siteSchema} value={draft} onChange={change} />
-                                <SiteSignIn
-                                  providers={resources
-                                    .filter((resource) => resource.kind === 'identityProvider' && resource.name)
-                                    .map((resource) => resource.name!)}
-                                  value={draft.signIn}
-                                  onChange={change}
-                                />
-                              </Flex>
-                            ) : formSchema ? (
-                              <Flex vertical gap="middle">
-                                <SchemaForm schema={formSchema} value={draft} onChange={change} />
-                                <FormSteps steps={draft.steps} sections={draft.sections} onChange={change} />
-                              </Flex>
-                            ) : schema ? (
-                              <SchemaForm
-                                schema={item.kind === 'trigger' ? triggerSchema(schema, draft) : schema}
-                                value={draft}
-                                onChange={change}
-                              />
-                            ) : (
-                              <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
-                            ),
+                          {item.kind === 'application' ? (
+                            <SectionParts>
+                              {editable(form)}
+                              <StudioAutoAccept application={application} publisher={publisher} />
+                            </SectionParts>
+                          ) : (
+                            editable(form)
                           )}
                         </Drawn>
                       ),
@@ -1312,7 +1329,6 @@ export function StudioEditor({
             <AxisActionRow align="center">
               {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
             </AxisActionRow>
-            {item.kind === 'application' && <StudioAutoAccept application={application} publisher={publisher} />}
             {questions && (
               <EntityMigrationQuestions
                 questions={questions}

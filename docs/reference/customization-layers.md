@@ -250,8 +250,8 @@ the layer applied, its marks and its removed elements, its [save route](module-r
 writes the layer, and its [reset route](module-resource-saves.md#element-reset) takes one element out
 of it.
 
-The module groups list every resource of the modules that the application uses, by
-`<module id>/<name>`, and each opens in the editor of its kind:
+A kind's list holds every resource of the modules that the application uses, each under a tag of its
+module ([kind lists](studio.md#kind-lists-and-module-resources)), and each opens in the editor of its kind:
 
 | Kind                                   | Editor                                                                                          | Marks and Reset to module on                                                                     |
 | -------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |

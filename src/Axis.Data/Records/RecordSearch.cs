@@ -38,7 +38,18 @@ public sealed class RecordSearch(string text, IReadOnlyList<FieldModel> fields)
 
     /// <summary>The condition, wrapped in parentheses, that any field of the row aliased <paramref name="rowAlias"/> contains <c>@search</c>.</summary>
     internal string Sql(string rowAlias) =>
-        $"({string.Join(" OR ", Fields.Select(field => RecordQueries.SearchTerm($"{EntityNaming.Quote(rowAlias)}.{EntityNaming.Quote(EntityNaming.Column(field.Name))}")))})";
+        Sql(field => $"{EntityNaming.Quote(rowAlias)}.{EntityNaming.Quote(EntityNaming.Column(field.Name))}");
+
+    /// <summary>
+    /// The condition, wrapped in parentheses, that any field contains <c>@search</c>, over the column expression that
+    /// <paramref name="column"/> gives for each field, for a list over a fixed table. The expressions are written in code and never come from a request.
+    /// </summary>
+    public string Sql(Func<FieldModel, string> column)
+    {
+        ArgumentNullException.ThrowIfNull(column);
+
+        return $"({string.Join(" OR ", Fields.Select(field => RecordQueries.SearchTerm(column(field))))})";
+    }
 
     /// <summary>Adds the <c>@search</c> parameter to <paramref name="command"/>.</summary>
     public void AddTo(NpgsqlCommand command)

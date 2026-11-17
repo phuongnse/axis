@@ -261,7 +261,9 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
               heading, see the review on #3650. */}
           {index > 0 && section.titleKey !== null && <PartRule />}
           {section.titleKey !== null ? (
-            <SectionPart title={t(section.titleKey)}>{list(section)}</SectionPart>
+            <SectionPart testId={`detail-section-${index}`} heading={{ title: t(section.titleKey) }}>
+              {list(section)}
+            </SectionPart>
           ) : (
             list(section)
           )}

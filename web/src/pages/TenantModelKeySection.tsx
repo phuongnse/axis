@@ -1,9 +1,10 @@
 import { Flex, Form, Input, Modal, Typography } from 'antd'
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { requiredMark } from '../platform/requiredMark'
+import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import {
@@ -28,7 +29,6 @@ type Dialog = 'set' | 'remove'
 export function TenantModelKeySection() {
   const t = useText()
   const { size } = useDesignTokens()
-  const headingId = useId()
   const [modelKey, setModelKey] = useState<TenantModelKey | 'failed' | null>()
   const [dialog, setDialog] = useState<Dialog>()
   const [busy, setBusy] = useState(false)
@@ -57,7 +57,7 @@ export function TenantModelKeySection() {
   }
   if (modelKey === undefined || modelKey === 'failed') {
     return (
-      <ModelKeyShell headingId={headingId}>
+      <ModelKeyShell>
         {modelKey === undefined ? (
           <Typography.Text>{t('shell.users.modelKey.loading')}</Typography.Text>
         ) : (
@@ -100,7 +100,6 @@ export function TenantModelKeySection() {
 
   return (
     <ModelKeyShell
-      headingId={headingId}
       dialogs={
         <>
           {dialog === 'set' && (
@@ -148,27 +147,16 @@ export function TenantModelKeySection() {
   )
 }
 
-/** The section and its heading, which the loading, failed and loaded states share. */
-function ModelKeyShell({
-  headingId,
-  children,
-  dialogs,
-}: {
-  headingId: string
-  children: ReactNode
-  dialogs?: ReactNode
-}) {
+/** The part and its heading, which the loading, failed and loaded states share. */
+function ModelKeyShell({ children, dialogs }: { children: ReactNode; dialogs?: ReactNode }) {
   const t = useText()
   return (
-    <section aria-labelledby={headingId} data-testid="tenant-model-key">
+    <SectionPart testName="tenant-model-key" heading={{ title: t('shell.users.modelKey.title') }}>
       <Flex vertical gap="small">
-        <Typography.Title level={3} id={headingId}>
-          {t('shell.users.modelKey.title')}
-        </Typography.Title>
         {children}
       </Flex>
       {dialogs}
-    </section>
+    </SectionPart>
   )
 }
 

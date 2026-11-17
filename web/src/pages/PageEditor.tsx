@@ -1,6 +1,7 @@
-import { Button, Card, Flex, Input, InputNumber, Select, Switch, Typography } from 'antd'
+import { Button, Card, Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
+import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField, type AxisFieldProps } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { EmptyState } from '../platform/EmptyState'
@@ -39,7 +40,7 @@ import { stepLabels, usePartLabel } from './pagePaletteSupport'
 import { Expression } from './ProcessFields'
 import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
-import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import type { ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -118,8 +119,8 @@ export function PageEditor({
 
   return (
     <div data-testid="studio-page-editor">
-      <ResourceFormSections>
-        <ResourceFormSection testName="general" heading={heading('general')}>
+      <SectionParts>
+        <SectionPart testName="general" heading={heading('general')}>
           <Flex vertical gap="small">
             <div data-testid="studio-field-/name">
               <AxisField {...field('name')}>
@@ -137,9 +138,9 @@ export function PageEditor({
               </AxisFieldGroup>
             </div>
           </Flex>
-        </ResourceFormSection>
+        </SectionPart>
         <PageParameters value={value.parameters} onChange={onChange} />
-        <ResourceFormSection testName="widgets" heading={heading('widgets')}>
+        <SectionPart testName="widgets" heading={heading('widgets')}>
           <PageWidgets
             named
             value={value}
@@ -147,8 +148,8 @@ export function PageEditor({
             onSelect={onSelect ?? setPicked}
             onChange={onChange}
           />
-        </ResourceFormSection>
-      </ResourceFormSections>
+        </SectionPart>
+      </SectionParts>
     </div>
   )
 }
@@ -234,7 +235,7 @@ function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeH
   const editable = value === undefined || Array.isArray(value)
 
   return (
-    <ResourceFormSection
+    <SectionPart
       testName="parameters"
       heading={{
         title: t('shell.studio.section.page.parameters'),
@@ -272,7 +273,7 @@ function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeH
           </Flex>
         )}
       </div>
-    </ResourceFormSection>
+    </SectionPart>
   )
 }
 
@@ -284,40 +285,38 @@ function PageParameter({ base, parameter, onChange }: { base: string; parameter:
 
   return (
     <Flex vertical gap="small">
-      <Flex gap="small" align="flex-start" wrap>
-        <div data-testid={`studio-field-${base}/name`}>
-          <AxisField {...field('parameters.name')}>
-            <Input value={text(parameter.name)} onChange={(event) => onChange(`${base}/name`, event.target.value)} />
-          </AxisField>
-        </div>
-        <div data-testid={`studio-field-${base}/type`}>
-          <AxisField {...field('parameters.type')}>
-            <Select
-              virtual={false}
-              style={{ minWidth: 160 }}
-              value={type}
-              options={parameterTypes.map((option) => ({ value: option, label: option }))}
-              onChange={(next: string) => {
-                onChange(`${base}/type`, next)
-                if (next !== 'reference' && parameter.target !== undefined) {
-                  onChange(`${base}/target`, undefined)
-                }
-                if (next !== 'enum' && parameter.values !== undefined) {
-                  onChange(`${base}/values`, undefined)
-                }
-              }}
-            />
-          </AxisField>
-        </div>
-        <div data-testid={`studio-field-${base}/required`}>
-          <AxisField {...field('parameters.required')}>
-            <Switch
-              checked={parameter.required === true}
-              onChange={(checked) => onChange(`${base}/required`, checked ? true : undefined)}
-            />
-          </AxisField>
-        </div>
-      </Flex>
+      <div data-testid={`studio-field-${base}/name`}>
+        <AxisField {...field('parameters.name')}>
+          <Input value={text(parameter.name)} onChange={(event) => onChange(`${base}/name`, event.target.value)} />
+        </AxisField>
+      </div>
+      <div data-testid={`studio-field-${base}/type`}>
+        <AxisField {...field('parameters.type')}>
+          <Select
+            virtual={false}
+            style={{ minWidth: 160 }}
+            value={type}
+            options={parameterTypes.map((option) => ({ value: option, label: option }))}
+            onChange={(next: string) => {
+              onChange(`${base}/type`, next)
+              if (next !== 'reference' && parameter.target !== undefined) {
+                onChange(`${base}/target`, undefined)
+              }
+              if (next !== 'enum' && parameter.values !== undefined) {
+                onChange(`${base}/values`, undefined)
+              }
+            }}
+          />
+        </AxisField>
+      </div>
+      <div data-testid={`studio-field-${base}/required`}>
+        <AxisCheckboxField
+          kind="switch"
+          {...field('parameters.required')}
+          checked={parameter.required === true}
+          onChange={(checked) => onChange(`${base}/required`, checked ? true : undefined)}
+        />
+      </div>
       {type === 'reference' && (
         <NameField
           pointer={`${base}/target`}
@@ -1326,17 +1325,20 @@ function TabsPanel({
 
 /** The title of a section and its Collapsed switch. Switching it off removes the key, because a section starts expanded. */
 function SectionPanel({ base, widget, onChange }: { base: string; widget: Content; onChange: ChangeHandler }) {
+  const { field } = useFieldTexts('page')
   return (
     <Flex vertical gap="small">
       <PageFieldGroup pointer={`${base}/title`}>
         <LabelTexts pointer={`${base}/title`} value={widget.title} onChange={onChange} />
       </PageFieldGroup>
-      <PageField pointer={`${base}/collapsed`}>
-        <Switch
+      <div data-testid={`studio-field-${base}/collapsed`}>
+        <AxisCheckboxField
+          kind="switch"
+          {...field(pageFieldPath(`${base}/collapsed`))}
           checked={widget.collapsed === true}
           onChange={(checked) => onChange(`${base}/collapsed`, checked ? true : undefined)}
         />
-      </PageField>
+      </div>
     </Flex>
   )
 }

@@ -16,12 +16,14 @@ import { triggerSchema } from './triggerSchema'
 
 // The expression editor is CodeMirror. The mock shows the names it is offered, which is what these tests check.
 vi.mock('./ExpressionEditor', () => ({
-  default: ({ name, value, options }: { name: string; value: string; options: { label: string }[] }) => (
+  default: ({ name, value, options }: { name: string; value: string; options: () => { label: string }[] }) => (
     <div
       role="group"
       aria-label={name}
       data-value={value}
-      data-options={options.map((option) => option.label).join(',')}
+      data-options={options()
+        .map((option) => option.label)
+        .join(',')}
     />
   ),
 }))
@@ -80,7 +82,7 @@ function renderTrigger(value: Record<string, unknown>) {
     })
     return (
       <ExpressionCheckContext.Provider
-        value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'trigger', draft, names }}
+        value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'trigger', draft: () => draft, names }}
       >
         <SchemaForm
           schema={triggerSchema(schema, draft)}

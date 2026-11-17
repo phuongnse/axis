@@ -80,6 +80,24 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
     }
 
     [Fact]
+    public async Task A_repeated_state_keeps_the_instances_in_any_of_the_states()
+    {
+        var completed = await StartAsync();
+        var failed = await StartAsync();
+        var running = await StartAsync();
+        await fixture.SetInstanceStateAsync(completed.Id, "completed");
+        await fixture.SetInstanceStateAsync(failed.Id, "failed");
+
+        var items = await ListAsync("state=running&state=completed");
+        var ids = items.Select(item => item.GetProperty("id").GetGuid()).ToList();
+
+        Assert.Contains(running.Id, ids);
+        Assert.Contains(completed.Id, ids);
+        Assert.DoesNotContain(failed.Id, ids);
+        Assert.All(items, item => Assert.True(item.GetProperty("state").GetString() is "running" or "completed"));
+    }
+
+    [Fact]
     public async Task The_subject_filter_keeps_only_the_instances_of_that_record()
     {
         var wanted = await StartAsync();
@@ -114,6 +132,7 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
     [Theory]
     [InlineData("state=nope", "state")]
     [InlineData("state=Running", "state")]
+    [InlineData("state=running&state=nope", "state")]
     [InlineData("state=", "state")]
     [InlineData("subject=abc", "subject")]
     [InlineData("subject=", "subject")]
@@ -121,6 +140,10 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
     [InlineData("subject={00000000-0000-0000-0000-000000000001}", "subject")]
     [InlineData("page=0", "page")]
     [InlineData("pageSize=101", "pageSize")]
+    [InlineData("filter=%7B%22all%22%3A%5B%7B%22field%22%3A%22nope%22%2C%22op%22%3A%22eq%22%2C%22value%22%3A%22x%22%7D%5D%7D", "filter")]
+    [InlineData("sort=nope", "sort")]
+    [InlineData("sort=-nope", "sort")]
+    [InlineData("search=a&search=b", "search")]
     public async Task An_invalid_parameter_is_a_400_keyed_by_its_name(string query, string name)
     {
         using var response = await GetAsync($"{Instances}?{query}");
@@ -268,6 +291,115 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
         Assert.Equal(0, namedBody.RootElement.GetProperty("totalCount").GetInt64());
     }
 
+    [Fact]
+    public async Task A_sorted_filtered_and_searched_list_of_a_process_with_a_subject_holds_the_matching_instances_in_order()
+    {
+        var marker = Marker();
+        var alpha = await fixture.InsertInstanceAsync(await fixture.InsertRequestAsync(null, title: $"Request {marker} Alpha"));
+        var beta = await fixture.InsertInstanceAsync(await fixture.InsertRequestAsync(null, title: $"Request {marker} Beta"));
+        var gamma = await fixture.InsertInstanceAsync(await fixture.InsertRequestAsync(null, title: $"Request {marker} Gamma"));
+        await fixture.InsertInstanceAsync(await fixture.InsertRequestAsync(null, title: "Request Delta"));
+        await fixture.SetInstanceStateAsync(gamma, "completed");
+        var notCompleted = Uri.EscapeDataString("""{"all":[{"field":"state","op":"ne","value":"completed"}]}""");
+
+        var descending = await ListPageAsync($"{Instances}?search={marker}&sort=-subjectLabel&filter={notCompleted}");
+        var ascending = await ListPageAsync($"{Instances}?search={marker}&sort=subjectLabel");
+        var byLabel = await ListPageAsync($"{Instances}?filter={Uri.EscapeDataString($$"""{"all":[{"field":"subjectLabel","op":"contains","value":"{{marker}} Gamma"}]}""")}");
+        var byRelease = await ListPageAsync(
+            $"{Instances}?search={marker}&sort=releaseNumber&filter={Uri.EscapeDataString("""{"all":[{"field":"releaseNumber","op":"gte","value":1}]}""")}");
+        var paged = await ListPageAsync($"{Instances}?search={marker}&sort=subjectLabel&pageSize=1&page=2");
+        var unmatched = await ListPageAsync($"{Instances}?search={marker}&filter={Uri.EscapeDataString("""{"all":[{"field":"state","op":"eq","value":"failed"}]}""")}");
+
+        AssertPage([beta, alpha], 2, descending);
+        AssertPage([alpha, beta, gamma], 3, ascending);
+        AssertPage([gamma], 1, byLabel);
+        Assert.Equal(3, byRelease.TotalCount);
+        AssertPage([beta], 3, paged);
+        AssertPage([], 0, unmatched);
+    }
+
+    [Fact]
+    public async Task A_sorted_filtered_and_searched_list_of_a_process_without_a_subject_holds_the_matching_instances_in_order()
+    {
+        var marker = Marker();
+        var first = await StartJobAsync();
+        var second = await StartJobAsync();
+        var third = await StartJobAsync();
+        await using (var connection = await fixture.OpenConnectionAsync())
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                UPDATE axis.process_instances AS i SET step = v.step, created_at = now() - v.age,
+                    state = v.state, ended_at = CASE WHEN v.state = 'completed' THEN now() END
+                FROM (VALUES (@first, @a, interval '3 days', 'failed'),
+                             (@second, @b, interval '2 days', 'cancelled'),
+                             (@third, @c, interval '1 hour', 'completed')) AS v (id, step, age, state)
+                WHERE i.id = v.id
+                """;
+            command.Parameters.AddWithValue("first", first);
+            command.Parameters.AddWithValue("second", second);
+            command.Parameters.AddWithValue("third", third);
+            command.Parameters.AddWithValue("a", $"{marker}-a");
+            command.Parameters.AddWithValue("b", $"{marker}-b");
+            command.Parameters.AddWithValue("c", $"{marker}-c");
+            Assert.Equal(3, await command.ExecuteNonQueryAsync(CancellationToken));
+        }
+
+        var notCompleted = Uri.EscapeDataString("""{"all":[{"field":"state","op":"ne","value":"completed"}]}""");
+        var since = Uri.EscapeDataString($$"""{"all":[{"field":"createdAt","op":"gte","value":"{{DateTime.UtcNow.AddDays(-2):yyyy-MM-dd}}"}]}""");
+
+        var byStep = await ListPageAsync($"{JobInstances}?search={marker}&sort=-step&filter={notCompleted}");
+        var byDay = await ListPageAsync($"{JobInstances}?search={marker}&sort=step&filter={since}");
+        var byCreation = await ListPageAsync($"{JobInstances}?search={marker}&sort=-createdAt");
+        var unsorted = await ListPageAsync($"{JobInstances}?search={marker}");
+
+        AssertPage([second, first], 2, byStep);
+        AssertPage([second, third], 2, byDay);
+        AssertPage([third, second, first], 3, byCreation);
+        AssertPage([third, second, first], 3, unsorted);
+    }
+
+    [Fact]
+    public async Task A_sort_or_filter_on_the_subject_label_of_a_process_without_a_subject_is_a_400_and_a_search_matches_the_step()
+    {
+        using var sort = await GetAsync($"{JobInstances}?sort=subjectLabel");
+        using var filter = await GetAsync(
+            $"{JobInstances}?filter={Uri.EscapeDataString("""{"all":[{"field":"subjectLabel","op":"eq","value":"x"}]}""")}");
+
+        using var sortProblem = await ReadProblemAsync(sort, HttpStatusCode.BadRequest);
+        using var filterProblem = await ReadProblemAsync(filter, HttpStatusCode.BadRequest);
+        Assert.Equal(["sort"], sortProblem.RootElement.GetProperty("errors").EnumerateObject().Select(error => error.Name));
+        Assert.Equal(["filter"], filterProblem.RootElement.GetProperty("errors").EnumerateObject().Select(error => error.Name));
+    }
+
+    [Fact]
+    public async Task A_user_who_may_not_read_the_display_field_cannot_sort_filter_or_search_by_the_subject_label()
+    {
+        var marker = Marker();
+        var id = await fixture.InsertInstanceAsync(await fixture.InsertRequestAsync(null, title: $"Request {marker}"));
+        using var sam = fixture.CreateClient().SignedInAs("sam");
+
+        using var sort = await GetAsync($"{Instances}?sort=subjectLabel", sam);
+        using var filter = await GetAsync(
+            $"{Instances}?filter={Uri.EscapeDataString($$"""{"all":[{"field":"subjectLabel","op":"contains","value":"{{marker}}"}]}""")}", sam);
+        using var search = await GetAsync($"{Instances}?search={marker}&pageSize=100", sam);
+        using var unsearched = await GetAsync($"{Instances}?pageSize=100", sam);
+        using var allowed = await GetAsync($"{Instances}?search={marker}&sort=subjectLabel");
+
+        using var sortProblem = await ReadProblemAsync(sort, HttpStatusCode.BadRequest);
+        using var filterProblem = await ReadProblemAsync(filter, HttpStatusCode.BadRequest);
+        Assert.Equal(["sort"], sortProblem.RootElement.GetProperty("errors").EnumerateObject().Select(error => error.Name));
+        Assert.Equal(["filter"], filterProblem.RootElement.GetProperty("errors").EnumerateObject().Select(error => error.Name));
+        using var searchBody = await ReadJsonAsync(search);
+        Assert.Equal(HttpStatusCode.OK, search.StatusCode);
+        Assert.Equal(0, searchBody.RootElement.GetProperty("totalCount").GetInt64());
+        using var unsearchedBody = await ReadJsonAsync(unsearched);
+        Assert.Contains(id, unsearchedBody.RootElement.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid()));
+        using var allowedBody = await ReadJsonAsync(allowed);
+        Assert.Equal([id], allowedBody.RootElement.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid()));
+    }
+
     private async Task<long> CountReadableInstancesAsync()
     {
         Assert.True(fixture.Model.TryGetEntity("Request", out var request));
@@ -300,6 +432,25 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var body = await ReadJsonAsync(response);
         return body.RootElement.GetProperty("id").GetGuid();
+    }
+
+    // A marker of twelve digits separates the rows of one test from the others in the shared database.
+    private static string Marker() => Random.Shared.NextInt64(100_000_000_000, 1_000_000_000_000).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static void AssertPage(Guid[] expected, long totalCount, (List<Guid> Ids, long TotalCount) actual)
+    {
+        Assert.Equal(expected, actual.Ids);
+        Assert.Equal(totalCount, actual.TotalCount);
+    }
+
+    private async Task<(List<Guid> Ids, long TotalCount)> ListPageAsync(string path)
+    {
+        using var response = await GetAsync(path);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = await ReadJsonAsync(response);
+        return (
+            [.. body.RootElement.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid())],
+            body.RootElement.GetProperty("totalCount").GetInt64());
     }
 
     private async Task<List<JsonElement>> ListAsync(string query)
