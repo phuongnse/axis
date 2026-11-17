@@ -101,6 +101,9 @@ nothing:
 - **Package runners.** A tenant administrator's [create and revoke of a package runner](user-administration.md#package-runners)
   are never refused over the `storage` quota. A create writes one small row and one audit record, and a revoke is a
   security action that a billing limit must never stop.
+- **Table views and columns** _(planned for M33)_. A person's writes under `/api/me/tables/{key}` are never refused over
+  the `storage` quota. Each row is small and bounded by the route's limits, and a person can always tidy their views,
+  see [table views and columns](frontend.md#table-views-and-columns).
 - **`users`.** Inviting an account and enabling one on the [users page](user-administration.md) are
   refused when the count would pass the quota. A person who signs in through a brokered provider for
   the first time, and would pass the quota, is refused at the identity provider with a page that asks
