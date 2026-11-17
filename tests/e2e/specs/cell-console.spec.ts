@@ -77,16 +77,14 @@ test('a platform operator signs in with a password and a code, sees the tenants 
   await expectNoViolations(page)
 
   await navigate(page, 'Tenants')
-  // Wait for the Tenants page before typing, or the search lands on the Jobs page and aborts the tenants request.
-  await expect(page.getByTestId('cell-tenants')).toBeVisible()
-  const search = page.getByRole('searchbox', { name: 'Search', exact: true })
+  // Every view's table has a Search box, so the search is found in the Tenants table, which also waits for the view.
+  const tenants = page.getByTestId('cell-tenants')
+  const search = tenants.getByRole('searchbox', { name: 'Search', exact: true })
   await search.fill(tenant)
   await search.press('Enter')
-  const link = page.getByTestId('cell-tenants').getByRole('link', { name: tenant, exact: true })
+  const link = tenants.getByRole('link', { name: tenant, exact: true })
   await expect(link).toBeVisible()
-  await expect(
-    page.getByTestId('cell-tenants').getByRole('row').filter({ hasText: tenant }).getByTestId('cell-tenants-archive-stale'),
-  ).toBeVisible()
+  await expect(tenants.getByRole('row').filter({ hasText: tenant }).getByTestId('cell-tenants-archive-stale')).toBeVisible()
   await expectNoViolations(page)
 
   await link.click()
@@ -244,10 +242,11 @@ test('the platform operator creates a tenant, follows the create job and opens t
   await dialog.getByRole('button', { name: 'Close', exact: true }).last().click()
   await expect(dialog).toBeHidden()
 
-  const search = page.getByRole('searchbox', { name: 'Search', exact: true })
+  const tenants = page.getByTestId('cell-tenants')
+  const search = tenants.getByRole('searchbox', { name: 'Search', exact: true })
   await search.fill(created)
   await search.press('Enter')
-  await page.getByTestId('cell-tenants').getByRole('link', { name: created, exact: true }).click()
+  await tenants.getByRole('link', { name: created, exact: true }).click()
   await expect(page.getByTestId('cell-tenant')).toContainText(`${created}.localhost`)
 })
 
