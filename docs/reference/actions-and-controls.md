@@ -236,13 +236,19 @@ be kept right.
   filter never hides, such as a row added since the last save, so the author always sees what they just added. Only
   a table that holds all its rows reads `keep`, and only for the filter. A column whose header is not plain text
   names itself in the builder and its chips through `filter`'s `title`, and without one they show the header text.
-- **Filter on every table.** In every table, each column that shows a row's value can be filtered on.
-  This includes the columns of a data source table. A column of row actions has no value, so it has no filter.
-  A `table` widget leaves out boolean, reference, file and date-time columns, and a measure column of a grouped
-  data source. [Its filter](table-widget.md#filter) gives the reasons. A list column holds several values, such as
-  a cell job's Steps, so it has no filter. Some tables have no Filter at all. A child collection on a form or a
-  detail and a list of objects in a Studio form are part of one thing. The users page's Hosts and Usage tables have
-  none, and neither does the cell console's job table on a tenant's view or in Create a tenant.
+- **Filter on every table.** Each column that shows a row's value can be filtered on, in a table with a view and
+  in a data source table. Some columns and tables have no Filter, as the lines below name.
+  - **Kinds in a `table` widget.** The widget leaves out boolean, reference, file and date-time columns, and a
+    measure column of a grouped data source. [Its filter](table-widget.md#filter) gives the reasons.
+  - **A list column.** A list column can have no filter, such as the Steps column of a cell job table.
+  - **A column of a table with a view.** The Event column of the webhook deliveries and the Task column of the
+    task inbox have no Filter. [The task inbox](task-inbox-widget.md) names the columns it filters on.
+  - **A table with no Filter.** A child collection on a [form or detail](form-widget.md#child-collections) and a
+    list of objects in a [Studio form](studio-form-editors.md) have none. So do the publishing releases table of the
+    [operator console](operator-console.md#views), and the Hosts and Usage tables of the
+    [users page](platform-pages.md#export-data-and-usage). The DNS records of a host request dialog have none too.
+    A [reference lookup](form-widget.md#lookup) on a target with no display field has none. The cell console's job
+    table, on a tenant's view and in Create a tenant, has none, see [the cell console](cell-console.md).
 - **Columns control.** A table whose view turns it on has Columns, an icon button after Search and Filter. It
   opens a dialog that shows, hides and orders the columns, with Reset, Cancel and Apply. Reset sets the dialog
   back to every column in its first order, and nothing takes effect until Apply. The identifying column, the
