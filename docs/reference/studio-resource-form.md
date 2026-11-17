@@ -141,8 +141,8 @@ before a rename or a delete. A kind nothing can use, the application, has no suc
 is shown by its own editor, and deleting it breaks nothing it uses, so it has no list of its own, see
 [D141](../decisions/d141-the-reference-index-and-what-uses-a-resource.md).
 
-The tab is the [standard table](actions-and-controls.md#tables), flat, with search and Filter on Kind, whose options
-are the kinds in the rows:
+The tab is the [standard table](actions-and-controls.md#tables), flat, with search and Filter on each column: Name as
+text, and Kind and How it is used as choices of those in the rows:
 
 1. Name: the other resource by its label, as the link that opens it at the path of the reference.
 2. Kind, as wide as its content.
