@@ -251,6 +251,62 @@
       "vi": "nhật ký kiểm toán",
       "status": "proposed",
       "note": "The page where an administrator searches and exports every audit record of the tenant."
+    },
+    {
+      "concept": "Path (of an instance)",
+      "en": "path",
+      "vi": "luồng",
+      "status": "proposed",
+      "note": "One route of steps that an instance runs. It is not a URL path."
+    },
+    {
+      "concept": "Branch",
+      "en": "branch",
+      "vi": "nhánh",
+      "status": "proposed",
+      "note": "A decision's branch, as the screen already names it, or a parallel step's branch, which runs as a path of its own."
+    },
+    {
+      "concept": "Parallel (step)",
+      "en": "parallel",
+      "vi": "song song",
+      "status": "proposed",
+      "note": "A step that runs its branches at once."
+    },
+    {
+      "concept": "Repeat (step)",
+      "en": "repeat",
+      "vi": "lặp lại",
+      "status": "proposed",
+      "note": "A step that runs its body again and again. Each run of the body is a pass."
+    },
+    {
+      "concept": "Pass (of a repeat)",
+      "en": "pass",
+      "vi": "lượt lặp",
+      "status": "proposed",
+      "note": "One run of a repeat's body. \"lượt chạy quy trình\" names a process instance, so it never names a pass."
+    },
+    {
+      "concept": "Process variable",
+      "en": "variable",
+      "vi": "biến",
+      "status": "proposed",
+      "note": "A typed value that a process declares and that every path of its instance reads and sets."
+    },
+    {
+      "concept": "Error path",
+      "en": "error path",
+      "vi": "hướng xử lý lỗi",
+      "status": "proposed",
+      "note": "The route that a step takes when it fails for good, instead of ending its path."
+    },
+    {
+      "concept": "Completion (of a block or task)",
+      "en": "completion",
+      "vi": "điều kiện hoàn tất",
+      "status": "proposed",
+      "note": "The rule that says when a parallel step, or a task for several people, is done."
     }
   ]
 }

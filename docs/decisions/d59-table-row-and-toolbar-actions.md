@@ -11,7 +11,7 @@ remove data that should stay, and only the server can refuse a request
 ## Decision
 
 - **Two lists.** A `table` has `rowActions` and `toolbarActions`. A `navigate` action
-  ([D63](d63-navigate-actions-and-page-parameters.md)) may sit in either, and `startProcess` and
+  ([D159](d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md)) may sit in either, and `startProcess` and
   `delete` act on a row. A group row has no actions.
 - **Delete is confirmed, then checked.** The button shows only to a user with the `delete` grant, and
   the server checks the grant and its record filter again ([D24](d24-roles-and-policies.md)).

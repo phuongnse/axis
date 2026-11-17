@@ -167,6 +167,11 @@ in any state. The body has these parts:
     `null` for the `next` of an operation, a `subProcess` or a timer. An `end` step has none.
   - A `callConnector`, package, `raiseEvent` and `subProcess` step have type `operation`.
   - `labelKey` is set only for a `task` step.
+  - **Blocks.** _(planned for M38)_ The steps inside a block follow the block in list order, after it. Each step
+    has `block`, the name of its block step, and `branch`, the name of its branch, or `null` in a repeat. A block's
+    `type` is `parallel` or `repeat`, and its transition is `{ "next", "on": null }`. Each `onError` entry adds a
+    transition `{ "next", "on": "error:<kind>" }`, such as `error:call`. A top-level step has `block` and `branch`
+    set to `null`.
 - `path` is the history rows of the instance, ordered by `finished_at`, then
   by `id`. Each is
   `{ "step", "startedAt", "finishedAt", "decision", "output", "error", "traceId" }`.

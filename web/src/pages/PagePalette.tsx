@@ -21,8 +21,9 @@ type Content = Record<string, unknown>
  * selects it: after a leaf, at the end of a container's first list, or at the end of the page's list when the page has
  * no widgets. A pointer drag from a type to the canvas is handled by the page designer around it. A hidden live region
  * shows `announcement`, which names the list and position where a widget landed. A type the page cannot take under
- * the limits of D61 is disabled, with its reason beside it, and cannot be dragged. A pointer that names no widget
- * selects the first widget, as the tree does. A pointer to an action of a widget counts as that widget.
+ * the limits of docs/reference/resource-files.md#widget-trees is disabled, with its reason beside it, and cannot be
+ * dragged. A pointer that names no widget selects the first widget, as the tree does. A pointer to an action of a
+ * widget counts as that widget.
  */
 export function PagePalette({
   value,
