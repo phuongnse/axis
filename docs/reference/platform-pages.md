@@ -54,7 +54,7 @@ their roles. Who may open it, the rules of each command, its routes and its audi
 labels, and never shows a field marked `sensitive` or record data. Its texts are `shell.users.*`.
 
 The page has two tabs, and People is open by default. People holds [the list](#the-list) and the
-[Export data and usage](#export-data-and-usage) and [Model key](#model-key) sections. The [Connected apps](#connected-apps)
+[Export data and usage](#export-data-and-usage) (which includes Hosts) and [Model key](#model-key) sections. The [Connected apps](#connected-apps)
 tab shows only to an administrator of a tenant that has the setting.
 
 ### The list
@@ -137,10 +137,12 @@ one for the platform, where the administrator gives and removes them. Their text
 
 ### Export data and usage
 
-In a tenant of a cell, the People tab has two more sections for an administrator:
+In a tenant of a cell, the People tab has three more sections for an administrator:
 
 - **Export data.** Described below.
 - **Usage.** The tenant's quotas and its usage of the last 30 days, see [usage](tenant-quotas.md#usage).
+- **Hosts.** The hosts that the tenant asked for, and a way to add one, see
+  [hosts by a tenant administrator](tenant-lifecycle.md#hosts-by-a-tenant-administrator).
 
 The "Export data" section is a component of its own below the list. It loads `GET /api/me` and renders nothing unless
 `tenantExports` is true, see [the current user](security.md#roles-and-the-current-user). Its texts are `shell.users.export.*`.
@@ -170,9 +172,26 @@ are `shell.users.usage.*`.
 - **Days.** A table lists the tenant's rows of the last 30 days, newest first: the database and file sizes, users,
   applications, emails sent, connector calls and work items run. A count the server does not keep shows the em dash. The cell console's Tenant view shows the same table.
 
+The "Hosts" section is a component of its own, below "Usage". It loads `GET /api/tenant/hosts` and renders nothing unless
+the route answers `200`. That keeps it hidden outside a cell, in a preview tenant and from a user who is not an
+administrator. Its texts are `shell.users.hosts.*`, and none of them names the tenant, the cell or the customer.
+
+- **List.** A table lists each host that the tenant asked for, sorted by host, with its state: Pending with the date the
+  request expires, Verified or Expired. An empty list says that no host has been added yet. The cell console's Tenant
+  view draws the same table as `HostRequestTable`, see [which widget](shared-widgets.md#which-widget).
+- **Add.** The "Add a host…" button, the section's main action, opens the `HostRequestDialog` that the cell console also
+  uses. Its "Add" button sends `POST /api/tenant/hosts` with `{ host }`. A click with the host empty shows what to
+  enter under the field and sends nothing. The dialog then shows the TXT and CNAME records to add at the DNS provider and
+  when the request expires, with a "Close" button.
+- **A refusal.** The dialog stays open with a message in the person's language, chosen by the status: `400` is a bad
+  host name, `409` is a host in use and any other refusal, such as a read-only tenant, says that the host could not be
+  added. The page never shows the server's English title. The button also shows in a read-only tenant, where the
+  read-only banner explains the refusal.
+- **After adding.** The section reads `GET /api/tenant/hosts` again, so the new host shows as pending.
+
 ### Model key
 
-Where `Ai:AllowTenantKeys` is on, the People tab has a "Model key" section below Usage, where an administrator sets,
+Where `Ai:AllowTenantKeys` is on, the People tab has a "Model key" section below Hosts, where an administrator sets,
 changes and removes the tenant's own model key, see [the tenant's model key](user-administration.md#the-tenants-model-key).
 The section is a component of its own. It loads `GET /api/tenant/model-key`. While it loads, the section shows its heading
 and says so. A `403` or `404` leaves the section out and is not logged. That keeps it hidden from a user who is not an

@@ -12,8 +12,8 @@ import {
   fetchCellJobs,
   fetchCellTenant,
   queueCellTenantJob,
+  requestCellTenantHost,
   type CellDeletedTenant,
-  type CellHostRequestState,
   type CellJob,
   type CellQuota,
   type CellTenantAction,
@@ -21,6 +21,8 @@ import {
 } from '../platform/cell'
 import { EmptyDash } from '../platform/EmptyValue'
 import { saveFile } from '../platform/exports'
+import { HostRequestDialog } from '../platform/HostRequestDialog'
+import { HostRequestTable } from '../platform/HostRequestTable'
 import { PageLayout } from '../platform/PageLayout'
 import { newIdempotencyKey } from '../platform/processes'
 import { recordPageSize } from '../platform/tableQuery'
@@ -31,7 +33,6 @@ import { useFollowCellJob } from '../platform/useFollowCellJob'
 import { useTableView } from '../platform/useTableView'
 import { usePlatform } from './context'
 import { useCellConsole } from './cellConsoleContext'
-import { CellTenantHostDialog } from './CellTenantHostDialog'
 import { CellTenantQuotasDialog } from './CellTenantQuotasDialog'
 import { CellTenantUsage } from './CellTenantUsage'
 import { NotFoundPage } from './NotFoundPage'
@@ -315,42 +316,6 @@ export function CellTenantPage() {
     },
   ]
 
-  const hostRequestStates = ['pending', 'verified', 'expired'] as const
-  const hostRequestColumns: AxisColumn<CellHostRequestState>[] = [
-    {
-      key: 'host',
-      kind: 'freeText',
-      title: t('shell.cell.tenant.hostRequest.host'),
-      render: (_value, row) => row.host,
-      filter: { kind: 'text', value: (row) => row.host },
-    },
-    {
-      key: 'state',
-      kind: 'fixed',
-      title: t('shell.cell.tenant.hostRequest.state'),
-      render: (_value, row) => t(`shell.cell.tenant.hostRequest.state.${row.state}`),
-      filter: {
-        kind: 'enum',
-        value: (row) => row.state,
-        options: hostRequestStates.map((state) => ({
-          value: state,
-          label: t(`shell.cell.tenant.hostRequest.state.${state}`),
-        })),
-      },
-    },
-    {
-      key: 'expiresAt',
-      kind: 'fixed',
-      title: t('shell.cell.tenant.hostRequest.expiresAt'),
-      render: (_value, row) => (row.state === 'pending' ? when(row.expiresAt) : null),
-      // The date is the UTC day of the expiry, and a request that is not pending has no expiry to filter on.
-      filter: {
-        kind: 'date',
-        value: (row) => (row.state === 'pending' ? new Date(row.expiresAt).toISOString().slice(0, 10) : null),
-      },
-    },
-  ]
-
   return (
     <PageLayout title={id}>
       {tenantFailed && (
@@ -477,13 +442,12 @@ export function CellTenantPage() {
         )}
         {tenant && (
           <SectionPart testName="cell-tenant-host-requests" heading={{ title: t('shell.cell.tenant.hostRequests') }}>
-            <AxisTable<CellHostRequestState>
+            <HostRequestTable
+              requests={tenant.hostRequests}
+              texts="shell.cell.tenant"
+              locale={locale}
               testId="cell-tenant-host-requests"
-              rowKey={(row) => row.host}
-              dataSource={tenant.hostRequests}
-              columns={hostRequestColumns}
               view={{ query: hostRequestView.view, onChange: hostRequestView.setView }}
-              emptyText={t('shell.cell.tenant.noHostRequests')}
             />
           </SectionPart>
         )}
@@ -525,8 +489,13 @@ export function CellTenantPage() {
         />
       )}
       {openDialog === 'host' && (
-        <CellTenantHostDialog
-          tenant={id}
+        <HostRequestDialog
+          texts="shell.cell.tenant"
+          title={t('shell.cell.tenant.addHostTitle').replace('{tenant}', id)}
+          locale={locale}
+          testId="cell-tenant-host"
+          request={(host) => requestCellTenantHost(id, host)}
+          refusal={({ title }) => t('shell.cell.tenant.actionRefused').replace('{title}', title)}
           onRefused={onRefused}
           onAdded={() => setReload((count) => count + 1)}
           onClose={() => setOpenDialog(null)}
