@@ -24,9 +24,9 @@ const noParameters: readonly string[] = []
 /**
  * The Usage table of the cell console's Tenant view: the days of the tenant's last 13 months, newest first until the
  * view sorts them, paged on the server. The table has Filter and Columns, a sort on every column and a pager with a page
- * size, all kept in the address under their plain names because it is the only table of the view with a view of its
- * own, and no Search because a day holds no text, see docs/reference/cell-console.md#views and
- * docs/reference/actions-and-controls.md#tables. A failure shows an error in this part only.
+ * size, all kept in the address under their plain names, while the Host verification and Quotas tables of the view keep
+ * theirs under prefixes of their own, and no Search because a day holds no text, see docs/reference/cell-console.md#views
+ * and docs/reference/actions-and-controls.md#tables. A failure shows an error in this part only.
  */
 export function CellTenantUsage({ tenant, locale }: { tenant: string; locale: string }) {
   const t = useText()

@@ -25,10 +25,12 @@ import { HostRequestDialog } from '../platform/HostRequestDialog'
 import { HostRequestTable } from '../platform/HostRequestTable'
 import { PageLayout } from '../platform/PageLayout'
 import { newIdempotencyKey } from '../platform/processes'
+import { recordPageSize } from '../platform/tableQuery'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useFollowCellJob } from '../platform/useFollowCellJob'
+import { useTableView } from '../platform/useTableView'
 import { usePlatform } from './context'
 import { useCellConsole } from './cellConsoleContext'
 import { CellTenantQuotasDialog } from './CellTenantQuotasDialog'
@@ -38,6 +40,21 @@ import { NotFoundPage } from './NotFoundPage'
 interface QuotaRow extends CellQuota {
   key: string
 }
+
+/** The columns the Host verification view's filter can name, see docs/reference/cell-console.md#views. */
+const hostRequestFields = [
+  { name: 'host', type: 'text' },
+  { name: 'state', type: 'enum' },
+  { name: 'expiresAt', type: 'date' },
+] as const
+/** The columns the Quotas view's filter can name, see docs/reference/cell-console.md#views. */
+const quotaFields = [
+  { name: 'key', type: 'enum' },
+  { name: 'value', type: 'integer' },
+  { name: 'source', type: 'enum' },
+] as const
+// The two tables have no parameters of their own. A stable empty array keeps useTableView from recomputing on each render.
+const noParameters: readonly string[] = []
 
 /** The texts of each action, by their full keys. */
 const actionTexts = {
@@ -88,7 +105,8 @@ const actionTexts = {
  * succeeded `export` job among the jobs, Download opens a warning that the ZIP is restricted data, and only accepting it
  * fetches the ZIP. Set quotas and Add a host open their own dialogs, show for every status and queue no job: the quota
  * table shows the quotas that the cell answered. Once Add a host is answered, the page loads the tenant again, so the
- * new host shows as pending.
+ * new host shows as pending. Host verification and Quotas each filter their own rows on every column. Their filters are
+ * kept in the address under `hostRequests.` and `quotas.`, see docs/reference/cell-console.md#views.
  */
 export function CellTenantPage() {
   const t = useText()
@@ -117,6 +135,17 @@ export function CellTenantPage() {
   // The Idempotency-Key of each action's request that got no final answer, by tenant and action, so a retry cannot
   // queue a second job.
   const actionKeys = useRef(new Map<string, string>())
+  // The two tables keep their filters under prefixes of their own, so each link opens the same rows.
+  const hostRequestView = useTableView(
+    hostRequestFields,
+    recordPageSize,
+    noParameters,
+    false,
+    true,
+    false,
+    'hostRequests.',
+  )
+  const quotaView = useTableView(quotaFields, recordPageSize, noParameters, false, true, false, 'quotas.')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -249,12 +278,18 @@ export function CellTenantPage() {
 
   const when = (time: string) => new Date(time).toLocaleString(locale)
   const quotas: QuotaRow[] = tenant ? Object.entries(tenant.quotas).map(([key, quota]) => ({ key, ...quota })) : []
+  // A quota with no limit is empty for the number filter, as the table shows no number for it.
   const quotaColumns: AxisColumn<QuotaRow>[] = [
     {
       key: 'key',
       kind: 'fixed',
       title: t('shell.cell.tenant.quota.key'),
       render: (_value, row) => t(`shell.cell.tenant.quota.${row.key}`),
+      filter: {
+        kind: 'enum',
+        value: (row) => row.key,
+        options: quotas.map((row) => ({ value: row.key, label: t(`shell.cell.tenant.quota.${row.key}`) })),
+      },
     },
     {
       key: 'value',
@@ -262,6 +297,7 @@ export function CellTenantPage() {
       title: t('shell.cell.tenant.quota.value'),
       render: (_value, row) =>
         row.value === null ? t('shell.cell.tenant.quota.noLimit') : row.value.toLocaleString(locale),
+      filter: { kind: 'number', value: (row) => row.value },
     },
     {
       key: 'source',
@@ -269,6 +305,14 @@ export function CellTenantPage() {
       title: t('shell.cell.tenant.quota.source'),
       render: (_value, row) =>
         t(row.overridden ? 'shell.cell.tenant.quota.overridden' : 'shell.cell.tenant.quota.default'),
+      filter: {
+        kind: 'enum',
+        value: (row) => (row.overridden ? 'overridden' : 'default'),
+        options: [
+          { value: 'overridden', label: t('shell.cell.tenant.quota.overridden') },
+          { value: 'default', label: t('shell.cell.tenant.quota.default') },
+        ],
+      },
     },
   ]
 
@@ -403,6 +447,7 @@ export function CellTenantPage() {
               texts="shell.cell.tenant"
               locale={locale}
               testId="cell-tenant-host-requests"
+              view={{ query: hostRequestView.view, onChange: hostRequestView.setView }}
             />
           </SectionPart>
         )}
@@ -413,6 +458,7 @@ export function CellTenantPage() {
               rowKey={(row) => row.key}
               dataSource={quotas}
               columns={quotaColumns}
+              view={{ query: quotaView.view, onChange: quotaView.setView }}
               emptyText={t('shell.cell.tenant.noQuotas')}
             />
           </SectionPart>

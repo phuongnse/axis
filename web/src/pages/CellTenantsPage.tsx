@@ -49,7 +49,7 @@ const staleArchiveMs = 26 * 60 * 60 * 1000
 /**
  * The Tenants view of the cell console: one row per tenant of the cell, with its failed work, its usage against its
  * limits and the time of its newest archive, which carries a mark when it is more than 26 hours old. The server searches,
- * filters, sorts and pages the list. The table has Search, which looks in the id and the hosts, Filter on the status,
+ * filters, sorts and pages the list. The table has Search, which looks in the id and the hosts, Filter on every column,
  * Columns, a sort on every column but Hosts, and a pager with a page size, all kept in the address, see
  * `docs/reference/cell-console.md#views` and `docs/reference/actions-and-controls.md#tables`. Create tenant opens the
  * dialog that creates a tenant, and the list loads again when the create job ends.
@@ -131,6 +131,7 @@ export function CellTenantsPage() {
         title: t('shell.cell.tenants.id'),
         sorter: true,
         render: (_value, tenant) => <Link to={`/tenants/${encodeURIComponent(tenant.id)}`}>{tenant.id}</Link>,
+        filter: { kind: 'text' },
       },
       {
         key: 'status',
@@ -146,12 +147,14 @@ export function CellTenantsPage() {
         title: t('shell.cell.tenants.application'),
         sorter: true,
         render: (_value, tenant) => tenant.application ?? <EmptyDash />,
+        filter: { kind: 'text' },
       },
       {
         key: 'hosts',
         kind: 'freeText',
         title: t('shell.cell.tenants.hosts'),
         render: (_value, tenant) => tenant.hosts.join(', '),
+        filter: { kind: 'text' },
       },
       {
         key: 'instances',
@@ -159,6 +162,7 @@ export function CellTenantsPage() {
         title: t('shell.cell.tenants.failedInstances'),
         sorter: true,
         render: failedCount('instances'),
+        filter: { kind: 'number' },
       },
       {
         key: 'unknownCalls',
@@ -166,6 +170,7 @@ export function CellTenantsPage() {
         title: t('shell.cell.tenants.unknownCalls'),
         sorter: true,
         render: failedCount('unknownCalls'),
+        filter: { kind: 'number' },
       },
       {
         key: 'deadLetters',
@@ -173,6 +178,7 @@ export function CellTenantsPage() {
         title: t('shell.cell.tenants.deadLetters'),
         sorter: true,
         render: failedCount('deadLetters'),
+        filter: { kind: 'number' },
       },
       {
         key: 'storage',
@@ -180,14 +186,23 @@ export function CellTenantsPage() {
         title: t('shell.cell.tenants.storage'),
         sorter: true,
         render: usageCell('storage'),
+        filter: { kind: 'number' },
       },
-      { key: 'users', kind: 'fixed', title: t('shell.cell.tenants.users'), sorter: true, render: usageCell('users') },
+      {
+        key: 'users',
+        kind: 'fixed',
+        title: t('shell.cell.tenants.users'),
+        sorter: true,
+        render: usageCell('users'),
+        filter: { kind: 'number' },
+      },
       {
         key: 'applications',
         kind: 'fixed',
         title: t('shell.cell.tenants.applications'),
         sorter: true,
         render: usageCell('applications'),
+        filter: { kind: 'number' },
       },
       {
         key: 'emailsPerDay',
@@ -195,6 +210,7 @@ export function CellTenantsPage() {
         title: t('shell.cell.tenants.emailsToday'),
         sorter: true,
         render: usageCell('emailsPerDay'),
+        filter: { kind: 'number' },
       },
       {
         key: 'newestArchiveAt',
@@ -202,6 +218,7 @@ export function CellTenantsPage() {
         title: t('shell.cell.tenants.newestArchive'),
         sorter: true,
         render: archiveCell,
+        filter: { kind: 'date' },
       },
     ]
   }, [colour, locale, t])
