@@ -242,6 +242,34 @@ describe('StudioModuleContract', () => {
       expect(screen.getByTestId('studio-contract-state-review')).toHaveTextContent('Deletable')
     })
 
+    it('draws Initial and Deletable as fields with help, and saves the state with the ticked values', async () => {
+      const { puts } = renderLayered()
+
+      await userEvent.click(await screen.findByTestId('studio-contract-add-state'))
+      const dialog = await screen.findByRole('dialog')
+      const initial = within(dialog).getByRole('checkbox', {
+        name: 'Initial',
+        description: platformEnglish['shell.studio.contract.initial.help'],
+      })
+      const deletable = within(dialog).getByRole('checkbox', {
+        name: 'Deletable',
+        description: platformEnglish['shell.studio.contract.deletable.help'],
+      })
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'review')
+      await userEvent.click(initial)
+      await userEvent.click(deletable)
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Add' }))
+      await userEvent.click(await screen.findByTestId('studio-save'))
+
+      await waitFor(() => expect(puts()).toHaveLength(1))
+      const body = JSON.parse(String(puts()[0][1]?.body))
+      expect(body.lifecycle.states.find((state: { name: string }) => state.name === 'review')).toEqual({
+        name: 'review',
+        initial: true,
+        deletable: true,
+      })
+    })
+
     it('keeps Add transition on, and a click with nothing chosen shows what is missing and adds no row', async () => {
       renderLayered()
 

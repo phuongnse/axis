@@ -505,8 +505,8 @@ transitions through a layer, and relaxes and restores points.
   opens with a notice that only added states and transitions can be edited, and shows the lifecycle as
   a state diagram, then the core validations, the effects and the ceilings, each with its named point.
 - **Added states and transitions.** **Add state** and **Add transition** open a dialog. A state takes a
-  name, **Initial** and **Deletable**, and a transition a name, its from-states, its to-state and an
-  optional guard. The names, the from-states and the to-state are required fields with help. **Add**
+  name, **Initial** and **Deletable**, which are yes-or-no fields with help, and a transition a name,
+  its from-states, its to-state and an optional guard. The names, the from-states and the to-state are required fields with help. **Add**
   stays on, and a click [checks the fields](actions-and-controls.md#fields), including a name the
   contract already uses and a to-state that is also a from-state. A state or transition that the application added shows an **Added** tag and a
   **Remove** button, and has no named point, because a relax entry cannot name it. The module's own
