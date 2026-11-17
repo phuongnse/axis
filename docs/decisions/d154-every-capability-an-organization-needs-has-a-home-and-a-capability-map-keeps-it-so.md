@@ -48,8 +48,8 @@ such as documents made from templates, as utilities the platform owes its applic
   with the owner, as [the life of a milestone](../delivery.md#the-life-of-a-milestone) describes. Where
   a gap was kept out on purpose by an agreed decision, that milestone's decision replaces the part it
   changes, whole, as [decisions](../writing-docs.md#decisions) requires. These are reopened:
-  - one path per instance ([D19](d19-process-resource-and-worker-host.md)), and the waiting step every loop
-    needs ([D69](d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)), by M38;
+  - one path per instance and the waiting step every loop needed, which
+    [D155](d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md) replaced for M38;
   - fixed durations with no working time ([D71](d71-task-deadlines-escalation-claim-and-reassign.md),
     [D75](d75-the-application-time-zone.md)), by M39;
   - history that keeps no values ([D21](d21-development-test-users-audit-records-and-sequences.md),
