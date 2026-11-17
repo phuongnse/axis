@@ -54,6 +54,23 @@ form serves both a page and a task.
 - **Conditions and steps.** Fields may have `visibleWhen`, `requiredWhen` and `readOnlyWhen`, sections
   may have `visibleWhen`, and a form may have `steps`, which the widget shows as a wizard, see
   [form conditions and steps](form-conditions.md#form-conditions-and-steps).
+- **Tabs** _(planned for M42)_. `tabs` is an optional list of `{ "name", "title", "sections" }`, shaped like `steps`,
+  as in `"tabs": [{ "name": "main", "title": { "textKey": "order.tabs.main" }, "sections": ["request"] }]`. When it is
+  present, every section is in exactly one tab. Tabs show in list order, and a tab whose sections are all hidden is
+  left out. After a failed save the form opens the first tab with an error. The open tab stays out of the URL, as the
+  [current step](form-widget-conditions.md#steps) does. The tabs are drawn as a page's [tabs](container-widgets.md#tabs)
+  are. The compiler refuses a repeated tab name, an unknown or repeated section, a section in no tab, and `tabs` beside
+  `steps`. Each tab's `title` is a text key and joins the text key check. As [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) agrees.
+- **Folding** _(planned for M42)_. A section with `"collapsed": true` starts closed, as the `collapsed` property of a
+  page's [section](container-widgets.md#sections) does, and the person can open and close it. Its open state stays out
+  of the URL. A failed save opens a closed section that holds an error. As [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) agrees.
+- **Defaults from the context** _(planned for M42)_. A field entry may have `default`. `"user"` on a `text` field marked
+  `userId` gives the signed-in person's id, and `"today"` on a `date` field gives today in the
+  [application time zone](entity-logic-and-sequences.md#application-time-zone). It applies only to a new record, where
+  it replaces the entity's default. A value that the page gives, see
+  [first values of a new record](resource-files.md#first-values-of-a-new-record), wins over it. The compiler refuses
+  any other value, a `default` on the wrong field type, and one on a read-only, computed, sequence, creator or matched
+  field. As [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) agrees.
 
 ### Fields in columns
 
@@ -107,6 +124,8 @@ A required field's label is marked, but the mark blocks nothing: the server stil
 | Field type                                                                                                            | Input                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `text`                                                                                                                | A text input limited to `maxLength`. With `minLength` it also has the `minlength` attribute and shows the character count against the limits, such as `0 / 3–10`, or `0 / ≥3` with no `maxLength`                                                                                                                                                                                                                                     |
+| `text` with `multiline` _(planned for M42)_                                                                           | A text area that grows with its text. Enter adds a line and never sends the form                                                                                                                                                                                                                                                                                                                                                      |
+| `richText` _(planned for M42)_                                                                                        | An editor with a toolbar that offers only the allowed formats. A read-only value shows its formatting                                                                                                                                                                                                                                                                                                                                 |
 | A `text` field marked `userId`                                                                                        | A searchable select of people by display name, from `usersPath`, which searches again as the person types. It sends the picked user id, and a field that is not required can be cleared, which sends null. A stored id shows the person's name, read through the route's `id` parameter, or the id itself when no profile has it. A failed search leaves the list empty                                                               |
 | `integer`, `decimal`                                                                                                  | A plain text input with a numeric keyboard hint, which keeps the typed text as it is. With `min` or `max` its placeholder shows the range, such as `1 – 10`, `≥ 1` or `≤ 10`, and a typed number outside the range is marked invalid but never blocked, because the server decides                                                                                                                                                    |
 | `money`                                                                                                               | The input of a decimal with the currency code beside the box. The code is `currency`, or the current value of `currencyField` in the form, or in the row of a child collection. Without a code of three letters nothing shows beside the box. It sends the typed text as a plain JSON number                                                                                                                                          |
@@ -179,6 +198,10 @@ open one lookup dialog, which lists the records a person may pick.
 - **Reference label.** On edit, the label starts from the record's `labels`, and a picked record's
   display field value replaces it at once. A changed reference is sent as the record id, and a cleared
   one as `null`. Picking the record that was already set leaves the field unchanged.
+- **Filtered** _(planned for M42)_. For a field entry with `lookupFilter`, the lookup sends the form's current
+  values with each list request, and the server lists only the records the filter allows, on top of the read
+  filters. A pick that a later change makes disallowed stays in the field until the save refuses it. See
+  [lookup filters](form-conditions.md#lookup-filters).
 
 ## Set of references
 
@@ -223,7 +246,11 @@ A child collection field shows its rows as a table under the field's label.
   a tooltip on hover and on keyboard focus. Below 992px it folds into the row's "…" menu. Add row is the table
   toolbar's main action, above the table on the right, outlined at the main level of
   [buttons](actions-and-controls.md#buttons). It appends a row with every child field `null`, and
-  focus moves to the row's first input. Rows cannot be reordered.
+  focus moves to the row's first input.
+- **Order** _(planned for M42)_. Each editable row has a drag handle, and the keyboard moves a row with Move up and
+  Move down in the row's menu. The form sends the rows in the shown order, because a new order counts as a change.
+  The server keeps the order it is sent, see [child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations).
+  A read-only collection has no handle. As [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) agrees.
 - **Sending.** When rows were added, removed or edited, the form sends the whole row list, as
   [child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations) describes. Each row holds its
   non-null child fields in declaration order, without its computed fields. Rows are compared by value
@@ -242,9 +269,13 @@ The form sends only what changed, and shows the server's answer where it belongs
 
 - **Changed fields.** The form sends only the fields whose value differs from the value it started
   from. It never sends a computed, sequence, creator or read-only field, nor a field its form does not
-  show. A new record starts with every field `null` and every child collection and set of references
-  empty, so an untouched field stays out of a create and the server decides what is required. An edit
-  also sends the `version` it read. An emptied text or number input is sent as `null`.
+  show. A new record starts with every child collection and set of references empty, and with every field
+  `null` unless a start value below gives it one, so an untouched field stays out of a create and the server
+  decides what is required. An edit also sends the `version` it read. An emptied text or number input is
+  sent as `null`.
+- **Start values** _(planned for M42)_. On a new record, a field that starts with a first value or a context
+  default counts as changed. So the create sends it, and the server checks it against the person's
+  `createFields`, as it checks any value.
 - **Number text.** The body is written by hand, so an integer, decimal or money amount goes out as the
   typed text and no digit is lost. Text that is not a JSON number, such as `1,5`, goes out as a JSON
   string, and the server refuses it on its field. The form never turns number text into a JavaScript
@@ -359,6 +390,9 @@ each entity field has `helpKey`, the text key of its `help`, or `null`. It adds 
     is `[]` when the form has none.
   - A user who may not read any field of a section gets no such section, and its name is left out of
     the steps. A step left with no section is left out.
+- **Tabs, folding and lookups** _(planned for M42)_. `form` also holds `tabs`, as `[{ "name", "titleKey", "sections" }]`
+  or `[]`, each section's `collapsed` and each field's `lookupFilter`, as `true` or `false`. A tab left with no
+  readable section is left out.
 - **`actions`** is `[ { "type", "process", "labelKey", "instancesPath", "visibleWhen" } ]`, or `[]`,
   in file order.
   - `instancesPath` is the start endpoint, such as

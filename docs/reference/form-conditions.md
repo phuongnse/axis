@@ -1,10 +1,10 @@
 # Form conditions
 
-This page describes the conditions and wizard steps of a `form` resource: how a form shows, requires
-and locks fields depending on the record, and splits its sections into steps. The rest of the form
-resource is in [form widget](form-widget.md), how the SPA follows the conditions in
-[form widget conditions](form-widget-conditions.md), and the resource file shape and the entity fields
-in [resource files](resource-files.md).
+This page describes the conditions, wizard steps and lookup filters of a `form` resource: how a form shows,
+requires and locks fields depending on the record, splits its sections into steps, and narrows the records a
+lookup lists. The rest of the form resource is in [form widget](form-widget.md), how the SPA follows the
+conditions in [form widget conditions](form-widget-conditions.md), and the resource file shape and the entity
+fields in [resource files](resource-files.md).
 
 ## Form conditions and steps
 
@@ -55,6 +55,25 @@ server enforces `requiredWhen` on write, and on task completion it also refuses 
 - **Field widths.** A field entry may have `width`, a whole number from 1 to 12 in twelfths of its
   section, 12 when left out, so fields sit in columns, see
   [fields in columns](form-widget.md#fields-in-columns).
+
+### Lookup filters
+
+_(planned for M42)_
+
+A `reference` field entry may have `lookupFilter`, a boolean expression over the form's listed fields, which reads
+them as a condition does. Inside it, the field's own name stands for the candidate record. For example,
+`"lookupFilter": "contact.customer == customer"` lists only the contacts of the customer that the form names. The same
+expression narrows the lookup and checks the save, on the record that would be stored. As
+[D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md)
+agrees.
+
+- **On write.** The record API enforces it when the write names the form in `?form=`, as it enforces
+  `requiredWhen`. The task API enforces it on every completion. A record that the filter does not allow is a `400`
+  under `/values/<field>`.
+- **In the SQL subset.** The expression stays in the [SQL subset](expressions.md#sql-subset), so the lookup can run
+  it in the database. The compiler refuses it on another field type, and outside that subset.
+- **Not a security boundary.** As for conditions, a caller that does not name the form skips the check. A rule that
+  must always hold belongs in an entity [validation](entity-logic-and-sequences.md#entity-logic).
 
 ### Compile checks
 
