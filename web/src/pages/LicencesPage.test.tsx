@@ -64,11 +64,11 @@ function stubServer({
   return fetchMock
 }
 
-function renderPage() {
+function renderPage(address = '/licences') {
   render(
     <PlatformContext.Provider value={platform}>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[address]}>
           <LicencesPage />
         </MemoryRouter>
       </TextProvider>
@@ -135,6 +135,33 @@ describe('LicencesPage', () => {
 
     expect(within(screen.getByRole('region', { name: 'npm packages' })).getByText('react')).toBeInTheDocument()
     expect(screen.queryByText('Npgsql')).not.toBeInTheDocument()
+  })
+
+  it('narrows one list by its own filter in the address and leaves the other list whole', async () => {
+    stubServer({
+      licences: () =>
+        json({
+          npm: [
+            { name: 'react', licence: 'MIT' },
+            { name: 'vite', licence: 'MIT' },
+          ],
+          nuget: [
+            { name: 'Npgsql', licence: 'PostgreSQL' },
+            { name: 'Serilog', licence: 'Apache-2.0' },
+          ],
+        }),
+      about: unauthorized,
+    })
+    const filter = encodeURIComponent(JSON.stringify({ all: [{ field: 'name', op: 'eq', value: 'react' }] }))
+    renderPage(`/licences?npm.filter=${filter}`)
+
+    await screen.findByText('react')
+    const npm = screen.getByRole('region', { name: 'npm packages' })
+    const nuget = screen.getByRole('region', { name: 'NuGet packages' })
+    expect(within(npm).getByText('react')).toBeInTheDocument()
+    expect(within(npm).queryByText('vite')).not.toBeInTheDocument()
+    expect(within(nuget).getByText('Npgsql')).toBeInTheDocument()
+    expect(within(nuget).getByText('Serilog')).toBeInTheDocument()
   })
 
   it('shows the npm and NuGet lists as two parts, one above the other, with a rule between', async () => {

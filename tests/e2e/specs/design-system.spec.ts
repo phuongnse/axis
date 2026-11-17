@@ -41,7 +41,7 @@ const previews: Record<string, (page: Page | FrameLocator) => Locator> = {
   taskInbox: (page) =>
     page.getByRole("link", { name: "Review the request", exact: true }).first(),
   processInspector: (page) =>
-    page.getByRole("button", { name: "Filter", exact: true }),
+    page.getByRole("button", { name: "Filter", exact: true }).first(),
   detail: (page) =>
     page.getByText("Standing desks for the new office", { exact: true }),
   "chart-bar": (page) =>

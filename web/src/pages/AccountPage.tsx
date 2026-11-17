@@ -1,4 +1,5 @@
 import { Button, Flex, Tag } from 'antd'
+import dayjs from 'dayjs'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useCallback, useEffect, useState } from 'react'
 import { accountActionUrl, reauthenticateUrl } from '../platform/api'
@@ -14,9 +15,23 @@ import {
 } from '../platform/ownSessions'
 import { PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
+import { useTableView } from '../platform/useTableView'
 import { visuallyHidden } from '../platform/visuallyHidden'
 import { usePlatform } from './context'
+
+const noParameters: string[] = []
+
+const authenticatorFields = [
+  { name: 'label', type: 'text' },
+  { name: 'createdAt', type: 'date' },
+] as const
+
+const sessionFields = [
+  { name: 'signedInAt', type: 'date' },
+  { name: 'lastRequestAt', type: 'date' },
+] as const
 
 /**
  * The person's account page. For an account of the tenant's realm, Change password and the
@@ -25,6 +40,8 @@ import { usePlatform } from './context'
  * brokered user sees neither. Below come the person's live sessions, with an End button on every
  * session but the current one and a button to end all the others. When the last login is too old to
  * end sessions, the buttons are disabled and Sign in again starts a fresh login that returns here.
+ * Both tables have a Filter that narrows their own rows, kept in the address under `authenticators.`
+ * and `sessions.`, see docs/reference/actions-and-controls.md#tables.
  */
 export function AccountPage() {
   const t = useText()
@@ -36,6 +53,16 @@ export function AccountPage() {
   const [reload, setReload] = useState(0)
   const [authenticators, setAuthenticators] = useState<OwnAuthenticators>()
   const [authenticatorsFailed, setAuthenticatorsFailed] = useState(false)
+  const authenticatorsView = useTableView(
+    authenticatorFields,
+    recordPageSize,
+    noParameters,
+    false,
+    true,
+    false,
+    'authenticators.',
+  )
+  const sessionsView = useTableView(sessionFields, recordPageSize, noParameters, false, true, false, 'sessions.')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -117,7 +144,7 @@ export function AccountPage() {
               </Button>
               <AxisTable<OwnAuthenticator>
                 rowKey={(authenticator) => authenticator.id}
-                pagination={false}
+                view={{ query: authenticatorsView.view, onChange: authenticatorsView.setView, paging: false }}
                 dataSource={authenticators.authenticators}
                 emptyText={t('shell.account.authenticators.empty')}
                 columns={[
@@ -126,12 +153,18 @@ export function AccountPage() {
                     kind: 'freeText',
                     title: t('shell.account.authenticators.name'),
                     render: (_value, authenticator) => authenticator.label ?? t('shell.account.authenticators.unnamed'),
+                    filter: { kind: 'text', value: (authenticator) => authenticator.label },
                   },
                   {
                     key: 'createdAt',
                     kind: 'fixed',
                     title: t('shell.account.authenticators.addedAt'),
                     render: (_value, authenticator) => (authenticator.createdAt ? time(authenticator.createdAt) : null),
+                    filter: {
+                      kind: 'date',
+                      value: (authenticator) =>
+                        authenticator.createdAt ? dayjs(authenticator.createdAt).format('YYYY-MM-DD') : null,
+                    },
                   },
                   {
                     key: 'remove',
@@ -191,7 +224,7 @@ export function AccountPage() {
                 </Button>
                 <AxisTable<OwnSession>
                   rowKey={(session) => session.id}
-                  pagination={false}
+                  view={{ query: sessionsView.view, onChange: sessionsView.setView, paging: false }}
                   dataSource={sessions.sessions}
                   emptyText={t('shell.account.sessions.empty')}
                   columns={[
@@ -200,12 +233,14 @@ export function AccountPage() {
                       kind: 'fixed',
                       title: t('shell.account.sessions.signedInAt'),
                       render: (_value, session) => time(session.signedInAt),
+                      filter: { kind: 'date', value: (session) => dayjs(session.signedInAt).format('YYYY-MM-DD') },
                     },
                     {
                       key: 'lastRequestAt',
                       kind: 'fixed',
                       title: t('shell.account.sessions.lastRequestAt'),
                       render: (_value, session) => time(session.lastRequestAt),
+                      filter: { kind: 'date', value: (session) => dayjs(session.lastRequestAt).format('YYYY-MM-DD') },
                     },
                     {
                       key: 'end',

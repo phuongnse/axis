@@ -62,21 +62,24 @@ export interface ConsoleFailedWorkPage {
   page: number
   pageSize: number
   totalCount: number
+  /** The processes of every active release with their application, for the Process filter. */
+  processes: ConsoleProcess[]
+}
+
+/** One process of an active release with its application, as listed by `GET /api/console/failed-work`. */
+export interface ConsoleProcess {
+  id: string
+  name: string
+  applicationId: string
+  application: string
 }
 
 /** The answer of the failed work route: a page, or the refusal that the page shows. */
 export type ConsoleFailedWorkResult = { kind: 'ok'; page: ConsoleFailedWorkPage } | { kind: 'forbidden' }
 
-/** Loads a page of the tenant's failed work, of one application when `application` is set. */
-export async function fetchConsoleFailedWork(
-  query: { application?: string; page: number; pageSize: number },
-  signal?: AbortSignal,
-): Promise<ConsoleFailedWorkResult> {
-  const parameters = new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize) })
-  if (query.application) {
-    parameters.set('application', query.application)
-  }
-  const response = await apiFetch(`/api/console/failed-work?${parameters}`, { signal })
+/** Loads one page of the tenant's failed work. `query` is the record API's paging, sort, search and filter query string. */
+export async function fetchConsoleFailedWork(query: string, signal?: AbortSignal): Promise<ConsoleFailedWorkResult> {
+  const response = await apiFetch(`/api/console/failed-work${query ? `?${query}` : ''}`, { signal })
   if (response.status === 403) {
     return { kind: 'forbidden' }
   }

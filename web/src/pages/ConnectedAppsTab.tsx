@@ -1,4 +1,5 @@
 import { Flex, Modal, Select, Typography } from 'antd'
+import dayjs from 'dayjs'
 import { useEffect, useState } from 'react'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
@@ -6,6 +7,7 @@ import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisTable } from '../platform/AxisTable'
 import { FilledText } from '../platform/FilledText'
+import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import {
   fetchConnectedApps,
@@ -16,6 +18,7 @@ import {
   type TenantOutsideClients,
 } from '../platform/tenantOutsideClients'
 import { useDesignTokens } from '../platform/themeMode'
+import { useTableView } from '../platform/useTableView'
 import { usePlatform } from './context'
 
 type Notice = 'saved' | 'saveFailed' | 'notApplied'
@@ -24,6 +27,25 @@ type RevokeNotice = 'revokeNotFinished' | 'revokeFailed'
 
 const modes: TenantOutsideClients['outsideClients'][] = ['all', 'allowList', 'none']
 
+const noParameters: string[] = []
+
+const appFields = [
+  { name: 'name', type: 'text' },
+  { name: 'clientId', type: 'text' },
+  { name: 'people', type: 'text' },
+  { name: 'lastUsedAt', type: 'date' },
+] as const
+
+/** The names and email addresses of the people who consented, joined, or null when no person has either. */
+function peopleText(app: TenantConnectedApp): string | null {
+  return (
+    app.people
+      .flatMap((person) => [person.displayName, person.email])
+      .filter(Boolean)
+      .join(', ') || null
+  )
+}
+
 /**
  * The "Connected apps" tab of the users page, where an administrator chooses which outside MCP clients may connect:
  * All, Allow list or None, with the client ids of the list. The list shows only under Allow list, but Save sends it
@@ -31,8 +53,9 @@ const modes: TenantOutsideClients['outsideClients'][] = ['all', 'allowList', 'no
  * `PUT /api/tenant/outside-clients`, then reads them again, so the tab shows what the server stored, with the ids trimmed
  * and without repeats. A failed save keeps the edited values on screen, and a `502` says that the change is stored and
  * that saving again applies it. Each option has its own help. Below the choice, a table lists the apps that people consented to, read with
- * `GET /api/tenant/connected-apps`: the name, the client ID, the people who consented and the last use. Each row has a
- * Revoke button that asks for a confirmation naming the client, then sends
+ * `GET /api/tenant/connected-apps`: the name, the client ID, the people who consented and the last use. The table
+ * filters its own rows, kept in the address under `connectedApps.`, see docs/reference/actions-and-controls.md#tables.
+ * Each row has a Revoke button that asks for a confirmation naming the client, then sends
  * `POST /api/tenant/connected-apps/{clientId}/revoke` and reads the list again. A failed revoke keeps the row, and a
  * `502` says that revoking again finishes it. A list that does not load shows a message and leaves the choice working.
  * The users page shows the tab only when the outside clients route answers `200`.
@@ -53,6 +76,7 @@ export function ConnectedAppsTab({ initial }: { initial: TenantOutsideClients })
   const [pending, setPending] = useState<TenantConnectedApp | null>(null)
   const [revoking, setRevoking] = useState(false)
   const [revokeNotice, setRevokeNotice] = useState<RevokeNotice>()
+  const appsView = useTableView(appFields, recordPageSize, noParameters, false, true, false, 'connectedApps.')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -164,7 +188,7 @@ export function ConnectedAppsTab({ initial }: { initial: TenantOutsideClients })
       <AxisTable<TenantConnectedApp>
         testId="connected-apps-list"
         rowKey={(app) => app.clientId}
-        pagination={false}
+        view={{ query: appsView.view, onChange: appsView.setView, paging: false }}
         loading={apps === undefined && !appsFailed}
         dataSource={apps ?? []}
         emptyText={t('shell.users.connectedApps.empty')}
@@ -206,12 +230,14 @@ export function ConnectedAppsTab({ initial }: { initial: TenantOutsideClients })
             kind: 'freeText',
             title: t('shell.users.connectedApps.name'),
             render: (_value, app) => app.name,
+            filter: { kind: 'text', value: (app) => app.name },
           },
           {
             key: 'clientId',
             kind: 'freeText',
             title: t('shell.users.connectedApps.clientId'),
             render: (_value, app) => app.clientId,
+            filter: { kind: 'text', value: (app) => app.clientId },
           },
           {
             key: 'people',
@@ -227,12 +253,17 @@ export function ConnectedAppsTab({ initial }: { initial: TenantOutsideClients })
                 ))}
               </Flex>
             ),
+            filter: { kind: 'text', value: peopleText },
           },
           {
             key: 'lastUsedAt',
             kind: 'fixed',
             title: t('shell.users.connectedApps.lastUsedAt'),
             render: (_value, app) => (app.lastUsedAt ? new Date(app.lastUsedAt).toLocaleString(locale) : null),
+            filter: {
+              kind: 'date',
+              value: (app) => (app.lastUsedAt ? dayjs(app.lastUsedAt).format('YYYY-MM-DD') : null),
+            },
           },
         ]}
       />

@@ -314,7 +314,6 @@
   "shell.console.schedules.empty": "No schedule triggers.",
   "shell.console.schedules.loadFailed": "The schedules could not be loaded.",
   "shell.console.failedWork.title": "Failed work",
-  "shell.console.failedWork.applicationFilter": "All applications",
   "shell.console.failedWork.application": "Application",
   "shell.console.failedWork.process": "Process",
   "shell.console.failedWork.instance": "Instance",

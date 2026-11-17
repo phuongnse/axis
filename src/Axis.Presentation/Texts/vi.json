@@ -314,7 +314,6 @@
   "shell.console.schedules.empty": "Không có bộ kích hoạt theo lịch nào.",
   "shell.console.schedules.loadFailed": "Không tải được lịch chạy.",
   "shell.console.failedWork.title": "Lượt chạy lỗi",
-  "shell.console.failedWork.applicationFilter": "Tất cả ứng dụng",
   "shell.console.failedWork.application": "Ứng dụng",
   "shell.console.failedWork.process": "Quy trình",
   "shell.console.failedWork.instance": "Lượt chạy",
