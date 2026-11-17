@@ -80,6 +80,7 @@ Read by people who change how records, files, processes, tasks and notifications
 | [Process events and triggers](reference/process-events.md) | Events, triggers, delivery, schedules, scheduled jobs, delete triggers, dead letters     | You change events, triggers, schedules or dead letters                 |
 | [Process flow](reference/process-flow.md)                  | Timer, wait for event and sub-process steps, loops, create record, no-subject processes  | You add or change a timer, wait, sub-process or loop step              |
 | [Task deadlines and claims](reference/task-deadlines.md)   | Task escalations and deadlines, overdue tasks, claim, release and reassign               | You change escalations, deadlines, claims or reassignment              |
+| [Working time and SLAs](reference/working-time.md)         | Calendars, days off and make-up days, durations in working time, SLAs                    | You change calendars, working-time durations or SLAs                   |
 | [Notifications](reference/notifications.md)                | The `notify` operation, in-app and email notifications, user profiles, mail settings     | You change the notify operation or notification settings               |
 | [Process inspection](reference/process-inspection.md)      | Inspecting instances and the operator commands retry, cancel and resolve                 | You change how instances are inspected, retried, cancelled or resolved |
 

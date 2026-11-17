@@ -69,6 +69,38 @@ flowchart LR
 | P100 | Crafted input to a parser, in a record body, an import file or an expression, crashes the parser or reaches SQL. | Browser and server | Tampering | High | **Mitigated** | `RecordBodyFuzzTests` (a body is accepted or refused with a 400 problem), `RecordImportFuzzTests` (any bytes give rows or refusals), `ExpressionFuzzTests` (no SQL the translator emits holds input text outside a parameter). |
 | P113 | The public `/licences` page tells an attacker which package versions Axis runs, and so which known weaknesses to try. | Browser and server | Information disclosure | Low | **Mitigated** | `LicenceEndpointTests` (an anonymous caller gets a 401 problem, and only a signed-in caller gets the versions). The public `/licences.json` holds names and licences only. |
 
+**Administrator and calendar days** _(planned for M39)_
+
+An administrator keeps a calendar's days off and make-up days through the server, and the worker moves due
+times that have not passed when they change, see [days off and make-up days](working-time.md#days-off-and-make-up-days).
+
+```mermaid
+flowchart LR
+    subgraph browser [Browser]
+        Admin[Administrator in the SPA]
+    end
+    subgraph server [Server]
+        Routes[Calendar days routes]
+    end
+    subgraph tenantdb [Tenant database]
+        Days[(axis.calendar_days)]
+    end
+    subgraph worker [Worker]
+        Mover[Moves due times]
+    end
+    Admin -->|sets and removes days| Routes
+    Routes -->|writes| Days
+    Mover -->|reads days and counts again| Days
+```
+
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
+
+- (Elevation of privilege, High) a user without the `calendar` grant's `update` action changes days off and
+  moves every due time of the application.
+- (Repudiation, Medium) a change to days off leaves no audit record.
+- (Denial of service, Medium) one change makes the worker count a very large number of due times again.
+- (Tampering, Medium) a change to the days of one application moves due times of another application.
+
 ### Server and databases
 
 The server finds each tenant from the host. It then reads and writes that tenant's database as the runtime role.

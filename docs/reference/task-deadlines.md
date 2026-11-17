@@ -39,8 +39,11 @@ A task step may add `escalations`, which reassign the task or notify people afte
   (`AXC0084`, at `/steps/{i}/deadline/after` for the deadline and at
   `/steps/{i}/escalations/{j}/after` for an escalation). It counts from the time of the task step's
   transaction, the same time `dueIn` counts from and the task's `created_at`. In a
-  [test scenario](test-scenarios.md) that time follows the scenario's `now`. There are no business
-  hours or calendars.
+  [test scenario](test-scenarios.md) that time follows the scenario's `now`.
+- **Working time** _(planned for M39)_. `dueIn`, an escalation's `after` and the deadline's `after` may
+  count working time on a calendar, and a due time that has not passed moves when the calendar changes,
+  see [durations in working time](working-time.md#durations-in-working-time) and
+  [when a calendar changes](working-time.md#when-a-calendar-changes).
 - **Escalation.** Each has a `name`, `after` and at least one of `reassign` and `notify`, otherwise
   `AXC0280` at `/steps/{i}/escalations/{j}`. A missing `name` is `AXC0004`, and a later escalation
   with a name already used in the task, ignoring letter case, is `AXC0359` at
@@ -118,6 +121,10 @@ return `expired_at`.
 **Overdue.** A task is overdue when it is `open` and its `due_at` is before the database's current
 time. The task API's list and read add `"overdue": true|false`, worked out when read with database
 time, and nothing is stored. A completed, cancelled or expired task is never overdue.
+
+**At risk** _(planned for M39)_. An open task that is not overdue, and whose instance has an
+[SLA](working-time.md#slas) that is `atRisk` or `breached`, reads with `"atRisk": true`. It is worked
+out when read, and nothing is stored.
 
 ## Claim and release
 
@@ -227,6 +234,8 @@ The [task inbox widget](task-inbox-widget.md) and the task page use these fields
 
 - The inbox shows an "Overdue" tag beside the due date of an `overdue` task, and a "Claimed by you"
   tag on a row whose `claimedBy` is set.
+- **At risk** _(planned for M39)_. The inbox and the task page show an "At risk" tag for an `atRisk` task,
+  see [task inbox widget](task-inbox-widget.md#task-inbox-widget).
 - The task page shows the "Overdue" tag. It shows Claim and Release when `commands` lists them, and
   shows the task the route returns. A `403` or `409` shows a message and loads the task again.
 - An `expired` task shows that its deadline passed, with no form or buttons.

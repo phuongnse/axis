@@ -3,8 +3,8 @@
 An application is a folder of JSON resource files. This page describes the shape of those files: the
 properties every resource shares, the resource kinds that pages, seeds, rules and migrations use, the
 JSON Schema keywords that guide Studio, the entity field types and their constraints, entity logic,
-sequences and the application time zone. How the pipeline loads and checks the files, and the code
-of each problem, are in [the configuration pipeline](configuration.md).
+sequences, the application time zone and the fiscal year. How the pipeline loads and checks the files,
+and the code of each problem, are in [the configuration pipeline](configuration.md).
 
 ## Resource file shape
 
@@ -834,5 +834,30 @@ an instant wherever Axis needs one:
   [`{yyyy}`](#sequences) and its yearly restart, the dates in
   [notifications](notifications.md#placeholders) and the date buckets of data sources.
 - **What does not.** `now()` stays an instant. A schedule trigger keeps its own `timeZone`. The SPA
-  shows a `date-time` in the browser's time zone. Durations keep a fixed length, so calendar
-  durations such as `P1M` stay `AXC0084`.
+  shows a `date-time` in the browser's time zone. Calendar durations such as `P1M` stay `AXC0084`.
+- **Due times** _(planned for M39)_. A due time counted on a calendar shows in that calendar's time zone,
+  see [durations in working time](working-time.md#durations-in-working-time).
+
+## Fiscal year
+
+_(planned for M39)_
+
+The `application` manifest may name the month in which the application's fiscal year starts, so that a
+[data source](data-sources.md#aggregates) can total by fiscal period:
+
+```json
+{
+  "id": "6ec71db1-5b21-43d9-95d2-dcc45055eb0e",
+  "kind": "application",
+  "name": "ServiceDesk",
+  "formatVersion": 1,
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "fiscalYearStart": 4
+}
+```
+
+- **`fiscalYearStart`.** It is optional. It is a month from 1 to 12, and without it the fiscal year starts
+  in January. A value that is not a whole number from 1 to 12 is refused by the compiler.
+- **Part of the release.** A change applies to work that runs on the new release.
+- **What uses it.** The `fiscalQuarter` and `fiscalYear` buckets of
+  [aggregates](data-sources.md#aggregates).

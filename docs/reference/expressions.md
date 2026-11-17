@@ -355,6 +355,9 @@ signatures, `n` is an integer or a decimal. Unless the table says otherwise, a f
 | `day(date)`                 | integer               | date    | 1 to 31.                                                                                                                                                                                                                                                                      | Yes |
 | `addDays(date, integer)`    | date                  | date    | A result outside 0001 to 9999 is a [run-time error](#run-time-errors).                                                                                                                                                                                                        | Yes |
 | `daysBetween(date, date)`   | integer               | date    | Second minus first.                                                                                                                                                                                                                                                           | Yes |
+| `addWorkingTime(date-time, text, text)` | date-time             | date    | Adds working time to an instant. The second argument is an ISO 8601 duration of hours, minutes and seconds, written as a text literal, otherwise the compiler refuses it. The third is a calendar name. See [working time](working-time.md#durations-in-working-time). _(planned for M39)_ | No |
+| `workingTimeBetween(date-time, date-time, text)` | integer               | date    | The minutes of working time on the calendar named by the text, second minus first. See [working time](working-time.md#durations-in-working-time). _(planned for M39)_ | No |
+| `isWorkingDay(date, text)`  | boolean               | date    | Tells whether the date is a working day of the calendar named by the text. See [working time](working-time.md#days-off-and-make-up-days). _(planned for M39)_ | No |
 | `coalesce(a, b, …)`         | type of the arguments | logic   | First argument that is not `null`. The arguments after it are not evaluated. All arguments fit each other under the rules of `==`. An integer and a decimal mix to a decimal, so a picked integer comes back as a decimal. A listed text literal and an enum mix to the enum. | Yes |
 | `if(condition, then, else)` | type of the branches  | logic   | A `null` condition picks `else`. Only the picked branch is evaluated. The branches fit each other under the rules of `==`. An integer and a decimal mix to a decimal, so a picked integer comes back as a decimal.                                                            | Yes |
 | `date(text literal)`        | date                  | date    | See [Literals](#literals).                                                                                                                                                                                                                                                    | Yes |
@@ -369,6 +372,10 @@ signatures, `n` is an integer or a decimal. Unless the table says otherwise, a f
 
 - **Dates.** The date functions work on `date` only, not on `date-time`. Taking a calendar day from
   an instant needs a time zone, so `toDate` does it.
+- **Working time** _(planned for M39)_. The calendar name is any text expression, and an unknown name is a
+  [run-time error](#run-time-errors). These functions read days off that change without a publish, so a
+  computed field, whose value is stored, cannot call them, and the SQL subset has none of them. See
+  [working time and SLAs](working-time.md).
 - **Text.** The text functions take `text` only. An enum value is not text to them, because no
   conversion is implicit except integer to decimal.
 - **The application time zone.** `today()` and `toDate(date-time)` use the

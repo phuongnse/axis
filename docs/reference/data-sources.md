@@ -123,6 +123,11 @@ group.
     tie-break order and a sort by that group field.
   - A measure over the same field reads the raw values, so `max` of a date-time stays a date-time.
   - Page metadata, export and Studio's names give a bucketed group the type `date`.
+- **Quarter and fiscal buckets** _(planned for M39)_. `bucket` also takes `quarter`, `fiscalQuarter` and
+  `fiscalYear`. The group value is the first date of the bucket. A quarter starts in January, April, July
+  or October. A fiscal year starts on day 1 of the application's
+  [`fiscalYearStart`](resource-files.md#fiscal-year) month, so with April a record of 2026-06-15 is in the
+  fiscal year that starts on 2026-04-01. Fiscal quarters run every three months from that start.
 - **`measures`.** Each has a `name` and a `function`: `count`, `sum`, `min`, `max`, `avg` or
   `countDistinct`. It may also have a `filter`.
 - **`count`.** It takes no `field` and counts rows.

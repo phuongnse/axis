@@ -154,7 +154,9 @@ outcomes. Operators inspect the approvals and change nothing:
   - a `dataSource` takes `read` and `export`;
   - a `process` takes `start`, `inspect`, `cancel`, `retry`, `resolve` and
     `reassign`, see [Reassign](task-deadlines.md#reassign);
-  - an `endpoint` takes `invoke`.
+  - an `endpoint` takes `invoke`;
+  - **a `calendar`** _(planned for M39)_ takes `read` and `update`, see
+    [days off and make-up days](working-time.md#days-off-and-make-up-days).
   - `export` stays within the user's `read` grants and `import` within their
     `create` and `update` grants, as [import and export](import-export.md#grants)
     says.
