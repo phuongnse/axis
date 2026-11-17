@@ -25,25 +25,15 @@ export function formatTimeAgo(at: string | Date, locale: string, now: Date = new
   return format.format(0, 'second')
 }
 
-/** How long an event stays told as a time ago before its date tells it: a week, as Slack and Jira do. */
+/** How long an event stays told as a time ago before its date and time tell it: a week, as Slack and Jira do. */
 const agoFor = 7 * 24 * 60 * 60 * 1000
 
 /**
- * Proposed, see the review on #3650: when an event of a record in time happened, as the reader best tells events
- * apart: how long ago, from `formatTimeAgo`, within a week, and its date after that, "4 Mar" in the same year and
- * "4 Mar 2025" in another, in the locale's words, so a list of old events still reads in order.
+ * Proposed, see the review on #3650: whether an event is recent enough to be told as how long ago it was. After a
+ * week, its date and time in the system's own format tell it, as every other date and time does.
  */
-export function formatEventTime(at: string | Date, locale: string, now: Date = new Date()): string {
-  const when = new Date(at)
-  if (now.getTime() - when.getTime() < agoFor) {
-    return formatTimeAgo(when, locale, now)
-  }
-  const sameYear = when.getFullYear() === now.getFullYear()
-  return new Intl.DateTimeFormat(locale, {
-    day: 'numeric',
-    month: 'short',
-    ...(sameYear ? {} : { year: 'numeric' }),
-  }).format(when)
+export function isRecent(at: string | Date, now: Date = new Date()): boolean {
+  return now.getTime() - new Date(at).getTime() < agoFor
 }
 
 /**
