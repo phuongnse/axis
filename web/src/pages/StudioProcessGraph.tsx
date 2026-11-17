@@ -1,5 +1,5 @@
 import { useDroppable } from '@dnd-kit/core'
-import { BaseEdge, EdgeLabelRenderer, type EdgeProps, getBezierPath, type OnConnectEnd } from '@xyflow/react'
+import { EdgeLabelRenderer, type OnConnectEnd } from '@xyflow/react'
 import { type KeyboardEvent, useMemo, useRef } from 'react'
 import { ProcessGraphCanvas, type ProcessGraphStep, type ProcessGraphTransitionView } from '../platform/ProcessGraph'
 import { useText } from '../platform/texts'
@@ -7,64 +7,32 @@ import { useDesignTokens } from '../platform/themeMode'
 import { type ProcessGraph, type ProcessGraphTransition, transitionName } from './processGraph'
 
 /**
- * An edge drawn as the default edge is, with a drop target at its midpoint: a transition that a palette entry can be
- * dropped on. The target takes no pointer events, so a click still reaches the edge, and the drag library measures it
- * all the same. The drop target has no transform of its own, because the drag library measures an element without it.
+ * The drop target at the middle of a transition, which a palette entry can be dropped on, drawn by the shared graph at
+ * the middle of the transition's route. It takes no pointer events, so a click still reaches the transition, and the
+ * drag library measures it all the same. It has no transform of its own, because the drag library measures an element
+ * without it.
  */
-function TransitionEdge({
-  id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  label,
-  labelStyle,
-  labelBgStyle,
-  markerEnd,
-  style,
-}: EdgeProps) {
-  const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
+function TransitionDrop({ id, x, y }: { id: string; x: number; y: number }) {
   const { colour } = useDesignTokens()
   const { setNodeRef, isOver } = useDroppable({ id: `edge:${id}`, data: { pointer: id } })
   return (
-    <>
-      <BaseEdge
-        id={id}
-        path={path}
-        label={label}
-        labelX={labelX}
-        labelY={labelY}
-        labelStyle={labelStyle}
-        labelBgStyle={labelBgStyle}
-        markerEnd={markerEnd}
-        style={style}
-      />
-      <EdgeLabelRenderer>
+    <EdgeLabelRenderer>
+      <div style={{ position: 'absolute', transform: `translate(${x}px, ${y}px)`, pointerEvents: 'none' }}>
         <div
+          ref={setNodeRef}
+          data-testid={`studio-process-edge-drop-${id}`}
           style={{
             position: 'absolute',
-            transform: `translate(${labelX}px, ${labelY}px)`,
+            left: -dropWidth / 2,
+            top: -dropHeight / 2,
+            width: dropWidth,
+            height: dropHeight,
             pointerEvents: 'none',
+            outline: isOver ? `2px solid ${colour.primary}` : undefined,
           }}
-        >
-          <div
-            ref={setNodeRef}
-            data-testid={`studio-process-edge-drop-${id}`}
-            style={{
-              position: 'absolute',
-              left: -dropWidth / 2,
-              top: -dropHeight / 2,
-              width: dropWidth,
-              height: dropHeight,
-              pointerEvents: 'none',
-              outline: isOver ? `2px solid ${colour.primary}` : undefined,
-            }}
-          />
-        </div>
-      </EdgeLabelRenderer>
-    </>
+        />
+      </div>
+    </EdgeLabelRenderer>
   )
 }
 
@@ -200,7 +168,7 @@ export default function StudioProcessGraph({
       transitions={transitions}
       ariaLabel={t('shell.studio.processGraph')}
       testId="studio-process-graph"
-      edgeType={TransitionEdge}
+      Adornment={TransitionDrop}
       sectionRef={(element: HTMLElement | null) => {
         section.current = element
         setNodeRef(element)
