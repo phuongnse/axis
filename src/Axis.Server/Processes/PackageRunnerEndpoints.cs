@@ -1,7 +1,9 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Packages;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
+using Axis.Server.Applications;
 using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
@@ -19,11 +21,21 @@ namespace Axis.Server.Processes;
 /// package and the version, and no release or application. A runner that is revoked while the request runs answers <c>401</c> and stores
 /// nothing.
 /// </para>
+/// <para>
+/// <c>POST /api/package-runner/calls/take</c> reads <c>{ "packages": [{ "id", "version" }] }</c>, the packages the runner instance holds. In one
+/// transaction, <see cref="PackageCallTakes"/> takes the oldest waiting call to one of them that the runner also registered, and the runner's last
+/// call time is set. The answer is <c>200</c> with the lease, the package, the version, the operation, the operation identity, the input and the end of
+/// the lease, and <c>204</c> when no call waits. A runner that is revoked while the request runs answers <c>401</c> and takes nothing. Like a
+/// registration, a take is never refused over the <c>storage</c> quota, because it is running work.
+/// </para>
 /// </summary>
 internal static class PackageRunnerEndpoints
 {
-    public static void MapPackageRunnerEndpoints(this IEndpointRouteBuilder endpoints) =>
+    public static void MapPackageRunnerEndpoints(this IEndpointRouteBuilder endpoints)
+    {
         endpoints.MapPost("/api/package-runner/packages", RegisterAsync);
+        endpoints.MapPost("/api/package-runner/calls/take", TakeAsync);
+    }
 
     private static async Task<IResult> RegisterAsync(
         HttpContext context, TenantDatabase database, PackageCatalog packages, CancellationToken cancellationToken)
@@ -59,6 +71,44 @@ internal static class PackageRunnerEndpoints
         return await PackageRunners.AddPackagesAsync(connection, runnerId, added, cancellationToken)
             ? Results.NoContent()
             : Grants.PackageRunnerTokenRequired(context);
+    }
+
+    private static async Task<IResult> TakeAsync(
+        HttpContext context,
+        TenantDatabase database,
+        PackageCatalog packages,
+        ActiveApplicationResolver resolver,
+        CancellationToken cancellationToken)
+    {
+        using var body = await ReadBodyAsync(context.Request, cancellationToken);
+        if (body is null || ReadPackages(body.RootElement) is not { } held)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "The body needs a list of packages, each with an id and a version.");
+        }
+
+        var runnerId = Guid.Parse(EndpointCaller.Read(context.User)!.Id);
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // The write limit comes first, so it also bounds the wait for a row that another take has locked.
+        await database.LimitWriteAsync(transaction, cancellationToken);
+        var take = await PackageCallTakes.TakeAsync(transaction, runnerId, held, packages, resolver.GetReleaseModelAsync, cancellationToken);
+        if (take is null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return Results.NoContent();
+        }
+
+        if (!await PackageRunners.MarkCalledAsync(transaction, runnerId, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return Grants.PackageRunnerTokenRequired(context);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return Results.Ok(new TakeResponse(take.LeaseId, take.Package, take.Version, take.Operation, take.OperationId, take.Input, take.LeaseUntil));
     }
 
     /// <summary>The parsed body, or null when it is not JSON.</summary>
@@ -110,6 +160,34 @@ internal static class PackageRunnerEndpoints
         return manifests;
     }
 
+    /// <summary>
+    /// The packages of <c>{ "packages": [{ "id", "version" }] }</c>, or null when the shape is wrong: the list must not be empty, and each item
+    /// must be an object with a non-empty <c>id</c> and <c>version</c>, which are strings.
+    /// </summary>
+    private static List<PackageRunnerPackage>? ReadPackages(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("packages", out var list)
+            || list.ValueKind != JsonValueKind.Array
+            || list.GetArrayLength() == 0)
+        {
+            return null;
+        }
+
+        var packages = new List<PackageRunnerPackage>();
+        foreach (var item in list.EnumerateArray())
+        {
+            if (!TryReadText(item, "id", out var id) || !TryReadText(item, "version", out var version))
+            {
+                return null;
+            }
+
+            packages.Add(new PackageRunnerPackage(id, version));
+        }
+
+        return packages;
+    }
+
     private static bool TryReadText(JsonElement manifest, string property, out string value)
     {
         value = string.Empty;
@@ -125,3 +203,13 @@ internal static class PackageRunnerEndpoints
         return false;
     }
 }
+
+/// <summary>The answer to a take: the lease and the call, with no binding value in the input.</summary>
+internal sealed record TakeResponse(
+    Guid LeaseId,
+    string Package,
+    string Version,
+    string Operation,
+    Guid OperationId,
+    JsonObject Input,
+    DateTimeOffset LeaseUntil);

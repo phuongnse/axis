@@ -116,6 +116,10 @@ public sealed class StorageQuotaRouteTests
         // docs/reference/tenant-quotas.md#refusals.
         "POST /api/package-runner/packages",
 
+        // A runner's take marks a call as a step's Mark does, and a billing limit must never stop running work, see
+        // docs/reference/tenant-quotas.md#refusals.
+        "POST /api/package-runner/calls/take",
+
         "POST /api/apps/{app}/forms/{form}/state",
         "POST /api/apps/{app}/tasks/{id}/form-state",
 

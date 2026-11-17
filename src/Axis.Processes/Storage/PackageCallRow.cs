@@ -67,4 +67,16 @@ public sealed class PackageCallRow
 
     /// <summary>When the call became <c>succeeded</c> or <c>failed</c>, or <see langword="null"/> before.</summary>
     public DateTimeOffset? SettledAt { get; init; }
+
+    /// <summary>
+    /// The customer-hosted runner that holds the lease, or <see langword="null"/> when no runner took the call. It has no foreign
+    /// key, because <c>axis.package_runners</c> belongs to another context.
+    /// </summary>
+    public Guid? RunnerId { get; init; }
+
+    /// <summary>The lease of the current attempt, a version 7 UUID, or <see langword="null"/> when no runner took the call.</summary>
+    public Guid? LeaseId { get; init; }
+
+    /// <summary>When the lease ends, by the database clock, or <see langword="null"/> when no runner took the call.</summary>
+    public DateTimeOffset? LeaseUntil { get; init; }
 }

@@ -431,7 +431,7 @@ internal sealed partial class PackageCallHandler(
     /// not at all, is <see langword="null"/>. Returns <see langword="null"/> when the input is not
     /// stored or a value has the wrong type.
     /// </summary>
-    private static Dictionary<string, object?>? ReadInput(string? stored, PackageOperation operation)
+    internal static Dictionary<string, object?>? ReadInput(string? stored, PackageOperation operation)
     {
         if (stored is null)
         {

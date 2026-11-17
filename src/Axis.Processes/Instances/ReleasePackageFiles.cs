@@ -56,6 +56,29 @@ internal static class ReleasePackageFiles
     }
 
     /// <summary>
+    /// Reads the manifest of the package <paramref name="packageId"/> from the source of <paramref name="releaseId"/>, which is the only place a
+    /// customer-hosted package keeps it, because such a package has no built files. Returns <see langword="null"/> when the release has no
+    /// manifest for the package or the manifest has a problem.
+    /// </summary>
+    public static async Task<PackageManifest?> LoadSourceManifestAsync(
+        NpgsqlTransaction transaction,
+        Guid releaseId,
+        string packageId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT content FROM axis.release_resources WHERE release_id = @release AND path = @manifest",
+            transaction.Connection,
+            transaction);
+        command.Parameters.AddWithValue("release", releaseId);
+        command.Parameters.Add(new NpgsqlParameter("manifest", NpgsqlDbType.Text)
+        {
+            Value = $"{ApplicationLoader.PackagesFolderPrefix}{packageId}/{PackageCatalog.ManifestFileName}",
+        });
+        return await command.ExecuteScalarAsync(cancellationToken) is string content ? PackageCatalog.ReadManifestText(content) : null;
+    }
+
+    /// <summary>
     /// The SHA-256 of <paramref name="files"/> as lower-case hex: every file in ordinal path order, each written as its path, a newline, its
     /// length in bytes, a newline, its bytes and a newline. The length keeps a path from being confused with content, as the raw-text
     /// rule of <see cref="Axis.Configuration.Releases.ContentHash"/> does for source files. Two releases that hold the same built files give the same digest.
