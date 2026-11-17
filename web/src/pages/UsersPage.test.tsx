@@ -6,6 +6,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import type { UserList, UserRoles } from '../platform/users'
 import { TextProvider } from '../platform/TextProvider'
+import { isRequiredLabel } from '../test/antd'
 import { PlatformContext, type Platform } from './context'
 import { UsersPage } from './UsersPage'
 
@@ -130,8 +131,8 @@ async function fillInvitation() {
   renderPage()
   await userEvent.click(await screen.findByRole('button', { name: 'Invite…' }))
   const form = await confirmation('Invite a person')
-  await userEvent.type(within(form).getByLabelText('Email'), 'new@axis.local')
-  await userEvent.type(within(form).getByLabelText('Display name'), 'New Person')
+  await userEvent.type(within(form).getByLabelText(/^Email\*?$/), 'new@axis.local')
+  await userEvent.type(within(form).getByLabelText(/^Display name\*?$/), 'New Person')
   return form
 }
 
@@ -205,7 +206,7 @@ describe('UsersPage', () => {
     expect(screen.getByText('Ann Invited')).toBeVisible()
     await userEvent.click(screen.getByRole('tab', { name: 'Connected apps' }))
     expect(await screen.findByTestId('connected-apps')).toBeVisible()
-    expect(screen.getByRole('radio', { name: 'Allow list' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /^Allow list/ })).toBeChecked()
     expect(screen.getByText('claude')).toBeVisible()
   })
 
@@ -450,10 +451,25 @@ describe('UsersPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Invite…' }))
     const form = await confirmation('Invite a person')
 
-    expect(within(form).getByLabelText('Email')).toHaveAccessibleDescription('The invitation goes to this address.')
-    expect(within(form).getByLabelText('Display name')).toHaveAccessibleDescription(
+    expect(within(form).getByLabelText(/^Email\*?$/)).toHaveAccessibleDescription(
+      'The invitation goes to this address.',
+    )
+    expect(within(form).getByLabelText(/^Display name\*?$/)).toHaveAccessibleDescription(
       'The name that shows for the person in the users list.',
     )
+  })
+
+  it('marks the email and the display name of the invite form required, and groups the roles with their help', async () => {
+    stubInvitations()
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Invite…' }))
+    const form = await confirmation('Invite a person')
+
+    expect(isRequiredLabel(within(form).getByText('Email'))).toBe(true)
+    expect(isRequiredLabel(within(form).getByText('Display name'))).toBe(true)
+    const group = await within(form).findByRole('group', { name: 'Roles' })
+    expect(group).toHaveAccessibleDescription('Tick the roles to give the person. You can change them later.')
+    expect(within(group).getByRole('checkbox', { name: 'approver' })).toBeInTheDocument()
   })
 
   it('asks for the fields of the form before it asks to invite', async () => {
@@ -461,7 +477,7 @@ describe('UsersPage', () => {
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: 'Invite…' }))
     const form = await confirmation('Invite a person')
-    await userEvent.type(within(form).getByLabelText('Email'), 'not-an-email')
+    await userEvent.type(within(form).getByLabelText(/^Email\*?$/), 'not-an-email')
     await userEvent.click(within(form).getByRole('button', { name: 'Invite' }))
 
     await vi.waitFor(() => expect(form.querySelectorAll('.ant-form-item-explain-error').length).toBe(2))
@@ -482,7 +498,7 @@ describe('UsersPage', () => {
 
     expect(await screen.findByTestId('users-invite-problem')).toHaveTextContent(text)
     expect(screen.queryByTestId('users-done')).toBeNull()
-    expect(within(form).getByLabelText('Email')).toHaveValue('new@axis.local')
+    expect(within(form).getByLabelText(/^Email\*?$/)).toHaveValue('new@axis.local')
   })
 
   it('shows a generic text and loads the list again when the invite fails', async () => {

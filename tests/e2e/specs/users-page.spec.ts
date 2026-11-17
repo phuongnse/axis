@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "../test";
 import { csrfHeaders } from "../csrf";
 import { waitForDialog } from "../dialogs";
+import { fieldLabel } from "../fields";
 import { logInAtKeycloak } from "../keycloak";
 import { useSession } from "../sessions";
 
@@ -232,9 +233,9 @@ test.describe("invitations", () => {
       .click();
 
     const form = await waitForDialog(page, "Invite a person");
-    await form.getByLabel("Email", { exact: true }).fill(email);
+    await form.getByLabel(fieldLabel("Email")).fill(email);
     await form
-      .getByLabel("Display name", { exact: true })
+      .getByLabel(fieldLabel("Display name"))
       .fill("Invited Person");
     await form.getByRole("button", { name: "Invite", exact: true }).click();
     const confirmation = await waitForDialog(page, "Invite this person?");
