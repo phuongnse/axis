@@ -8,6 +8,7 @@ import { StudioConnectionContext } from '../platform/studioConnection'
 import type { ModuleResourceItem, StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
+import { openEntityField } from '../test/entityFields'
 import { followLink, renderGuarded } from '../test/leaveGuard'
 import { StudioModuleEditor } from './StudioModuleEditor'
 
@@ -89,7 +90,8 @@ function calls(fetchMock: ReturnType<typeof vi.fn>, method: string) {
 }
 
 async function rename() {
-  const input = within(await screen.findByTestId('studio-field-/fields/0/name')).getByRole('textbox')
+  const name = within(await openEntityField(0)).getByTestId('studio-field-/fields/0/name')
+  const input = within(name).getByRole('textbox')
   await userEvent.clear(input)
   await userEvent.type(input, 'heading')
 }
@@ -117,7 +119,8 @@ describe('StudioModuleEditor', () => {
     expect(screen.queryByTestId('studio-module-read-only')).toBeNull()
     expect(screen.queryByTestId('studio-module-layer')).toBeNull()
     expect(screen.getByTestId('studio-save')).toBeDisabled()
-    expect(within(screen.getByTestId('studio-field-/fields/0/name')).getByRole('textbox')).toBeEnabled()
+    const name = within(await openEntityField(0)).getByTestId('studio-field-/fields/0/name')
+    expect(within(name).getByRole('textbox')).toBeEnabled()
   })
 
   it('saves with If-None-Match: * and no If-Match when the entity has no layer', async () => {

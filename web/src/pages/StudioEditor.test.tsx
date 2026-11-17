@@ -15,6 +15,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { loadKindSchema } from '../platform/studioSchemas'
 import { chooseOption, selectRoot } from '../test/antd'
+import { addEntityField, entityFieldAction, openEntityField } from '../test/entityFields'
 import { editJson, jsonText, jsonView } from '../test/jsonView'
 import { buildProcessGraph } from './processGraph'
 import { StudioEditor } from './StudioEditor'
@@ -2223,7 +2224,8 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    await chooseOption('enum', await screen.findByTestId('studio-field-/fields/0/type', {}, slow))
+    await openEntityField(0)
+    await chooseOption('enum', screen.getByTestId('studio-field-/fields/0/type'))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -2238,7 +2240,7 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Add field' }, slow))
+    await addEntityField()
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -2249,8 +2251,7 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    const row = await screen.findByTestId('studio-field-/fields/1', {}, slow)
-    await userEvent.click(within(row).getByRole('button', { name: 'Remove field' }))
+    await entityFieldAction(1, 'Remove')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('code')
     await userEvent.click(screen.getByRole('button', { name: 'Drop data' }))
@@ -2279,8 +2280,7 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    const row = await screen.findByTestId('studio-field-/fields/2', {}, slow)
-    await userEvent.click(within(row).getByRole('button', { name: 'Remove field' }))
+    await entityFieldAction(2, 'Remove')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await userEvent.click(screen.getByRole('button', { name: 'Keep field' }))
 
@@ -2296,7 +2296,7 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Add field' }, slow))
+    await addEntityField()
     await userEvent.type(within(screen.getByTestId('studio-field-/fields/3/name')).getByRole('textbox'), 'ab')
     await userEvent.clear(within(screen.getByTestId('studio-field-/fields/3/name')).getByRole('textbox'))
     await userEvent.type(within(screen.getByTestId('studio-field-/fields/3/name')).getByRole('textbox'), 'memo')
@@ -2318,7 +2318,8 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    const name = within(await screen.findByTestId('studio-field-/fields/1/name', {}, slow)).getByRole('textbox')
+    await openEntityField(1)
+    const name = within(screen.getByTestId('studio-field-/fields/1/name')).getByRole('textbox')
     await userEvent.clear(name)
     await userEvent.type(name, 'abc')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -2341,7 +2342,8 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    await chooseOption('integer', await screen.findByTestId('studio-field-/fields/2/type', {}, slow))
+    await openEntityField(2)
+    await chooseOption('integer', screen.getByTestId('studio-field-/fields/2/type'))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('note')
     expect(screen.getByRole('button', { name: 'Add convert' })).toBeEnabled()
@@ -2359,7 +2361,7 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    const row = await screen.findByTestId('studio-field-/fields/2', {}, slow)
+    const row = await openEntityField(2)
     await userEvent.click(within(row).getByRole('checkbox', { name: 'Required' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await userEvent.type(screen.getByRole('textbox', { name: 'Fill expression' }), "'none'")
@@ -2373,7 +2375,8 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    await chooseOption('integer', await screen.findByTestId('studio-field-/fields/2/type', {}, slow))
+    await openEntityField(2)
+    await chooseOption('integer', screen.getByTestId('studio-field-/fields/2/type'))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => expect(screen.queryByTestId('studio-migration-question')).not.toBeInTheDocument())
@@ -2391,7 +2394,8 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    await chooseOption('enum', await screen.findByTestId('studio-field-/fields/2/type', {}, slow))
+    await openEntityField(2)
+    await chooseOption('enum', screen.getByTestId('studio-field-/fields/2/type'))
     expect(screen.getByTestId('studio-migration-warning-/fields/2')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-migration-warning-/fields/1')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -2406,7 +2410,8 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    const name = within(await screen.findByTestId('studio-field-/fields/2/name', {}, slow)).getByRole('textbox')
+    await openEntityField(2)
+    const name = within(screen.getByTestId('studio-field-/fields/2/name')).getByRole('textbox')
     await userEvent.clear(name)
     await userEvent.type(name, 'remark')
     await chooseOption('integer', screen.getByTestId('studio-field-/fields/2/type'))
@@ -2432,8 +2437,7 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, withCollection)
     renderResource(designedItem)
 
-    const row = await screen.findByTestId('studio-field-/fields/3', {}, slow)
-    await userEvent.click(within(row).getByRole('button', { name: 'Remove field' }))
+    await entityFieldAction(3, 'Remove')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -2445,7 +2449,8 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    const name = within(await screen.findByTestId('studio-field-/fields/2/name', {}, slow)).getByRole('textbox')
+    await openEntityField(2)
+    const name = within(screen.getByTestId('studio-field-/fields/2/name')).getByRole('textbox')
     await userEvent.type(name, 's')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -2460,12 +2465,9 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    const row = await screen.findByTestId('studio-field-/fields/1', {}, slow)
-    expect(within(screen.getByTestId('studio-field-/fields/0')).getByRole('button', { name: 'Move up' })).toBeDisabled()
-    await userEvent.click(within(row).getByRole('button', { name: 'Move up' }))
-    await userEvent.click(
-      within(screen.getByTestId('studio-field-/fields/1')).getByRole('button', { name: 'Move down' }),
-    )
+    expect(within(await openEntityField(0)).getByRole('button', { name: 'Move up' })).toBeDisabled()
+    await entityFieldAction(1, 'Move up')
+    await entityFieldAction(1, 'Move down')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')

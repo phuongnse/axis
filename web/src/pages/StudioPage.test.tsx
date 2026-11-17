@@ -25,6 +25,7 @@ import { PlatformContext, type Platform } from './context'
 import { StudioPage } from './StudioPage'
 import { editJson, jsonText } from '../test/jsonView'
 import { isRequiredLabel } from '../test/antd'
+import { openEntityField } from '../test/entityFields'
 
 vi.mock('../platform/navigation', () => ({ assignLocation: vi.fn() }))
 
@@ -497,7 +498,8 @@ describe('StudioPage', () => {
     stubServer()
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
 
-    const name = await screen.findByTestId('studio-field-/fields/0/name')
+    await openEntityField(0)
+    const name = screen.getByTestId('studio-field-/fields/0/name')
     expect(within(name).getByRole('textbox')).toHaveValue('number')
     expect(within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')).toHaveValue('200')
     const label = screen.getByTestId('studio-field-/label')
@@ -509,7 +511,8 @@ describe('StudioPage', () => {
   it('sends only the changed value, with the loaded version', async () => {
     const fetchMock = stubServer()
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
-    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await openEntityField(1)
+    const maxLength = within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
     expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
     await userEvent.clear(maxLength)
     await userEvent.type(maxLength, '250')
@@ -533,7 +536,8 @@ describe('StudioPage', () => {
     const panel = await openProblems()
     expect(within(panel).getByText('AXC0101')).toBeInTheDocument()
 
-    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await openEntityField(1)
+    const maxLength = within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
     await userEvent.clear(maxLength)
     await userEvent.type(maxLength, '250')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -546,7 +550,8 @@ describe('StudioPage', () => {
   it('keeps the draft on a conflict until the author reloads', async () => {
     const fetchMock = stubServer(undefined, { status: 409, body: { title: 'Conflict.' } })
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
-    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await openEntityField(1)
+    const maxLength = within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
     await userEvent.clear(maxLength)
     await userEvent.type(maxLength, '250')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -568,7 +573,7 @@ describe('StudioPage', () => {
   it('shows an edit in the JSON view in the form, and keeps Save on for invalid JSON but sends nothing on a click', async () => {
     const fetchMock = stubServer()
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
-    await screen.findByTestId('studio-field-/fields/0/name')
+    await openEntityField(0)
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
 
     await editJson(JSON.stringify({ ...entityContent(), name: 'Renamed' }))
@@ -1251,7 +1256,8 @@ describe('StudioPage', () => {
   it('loads the names again after a save and after a delete', async () => {
     const fetchMock = stubServer()
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
-    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await openEntityField(1)
+    const maxLength = within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
     const loads = () => fetchMock.mock.calls.filter(([input]) => input === namesPath).length
     await waitFor(() => expect(loads()).toBe(1))
 
@@ -1322,7 +1328,7 @@ describe('StudioPage', () => {
 
     outage.down = null
 
-    expect(await screen.findByTestId('studio-field-/fields/0/name', {}, { timeout: 3000 })).toBeInTheDocument()
+    expect(await openEntityField(0)).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByTestId('studio-reconnecting')).not.toBeInTheDocument())
     const reads = (path: string) => fetchMock.mock.calls.filter(([input, init]) => input === path && !init?.method)
     expect(reads(`/api/studio/apps/PurchaseRequests/resources/${entityId}`)).toHaveLength(2)
@@ -1333,7 +1339,8 @@ describe('StudioPage', () => {
     const outage: Outage = { down: null }
     const fetchMock = stubServer(undefined, undefined, outage)
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
-    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await openEntityField(1)
+    const maxLength = within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
     await userEvent.clear(maxLength)
     await userEvent.type(maxLength, '250')
 
@@ -1360,7 +1367,8 @@ describe('StudioPage', () => {
     const outage: Outage = { down: null }
     stubServer(undefined, undefined, outage)
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
-    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await openEntityField(1)
+    const maxLength = within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
     await userEvent.clear(maxLength)
     await userEvent.type(maxLength, '250')
 
@@ -1379,7 +1387,8 @@ describe('StudioPage leaving unsaved changes', () => {
   const entityAddress = `${overview}&resource=${entityId}`
 
   async function editMaxLength() {
-    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await openEntityField(1)
+    const maxLength = within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
     await userEvent.clear(maxLength)
     await userEvent.type(maxLength, '250')
     return maxLength
@@ -1445,7 +1454,7 @@ describe('StudioPage leaving unsaved changes', () => {
   it('does not ask before a link while nothing is unsaved', async () => {
     stubServer()
     const router = renderGuardedPage([entityAddress])
-    await screen.findByTestId('studio-field-/fields/1/maxLength')
+    await openEntityField(1)
 
     await userEvent.click(screen.getByRole('link', { name: 'Home' }))
 
