@@ -496,7 +496,7 @@ The publisher and the server also write records for the operator's work in a cel
   such as `tenant suspend` or `tenant purge`, its `changed` holds `job:<id>` and its actor is the job's.
 - **Host verification.** When the publisher verifies a [host request](tenant-lifecycle.md#hosts) and the
   host joins the tenant, it writes `tenant host verify` as `tenant host add` writes its record, with the
-  operator who asked for the host as actor.
+  operator or the tenant administrator who asked for the host as actor.
 - **Quotas.** The quotas route of the provisioning API, `PUT /api/cell/tenants/{id}/quotas`, writes
   `tenant quotas set` in one transaction with the quota rows, with the quota keys it was given in
   `changed` and the operator or the machine caller as actor.

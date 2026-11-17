@@ -91,6 +91,10 @@ public sealed class StorageQuotaRouteTests
         // quota must still be able to take its data.
         "POST /api/tenant/exports",
 
+        // A tenant administrator's host request writes one platform row and no tenant data, see
+        // docs/reference/tenant-quotas.md#refusals.
+        "POST /api/tenant/hosts",
+
         // The tenant's model key is a platform row and no tenant data, so the storage quota does not count it.
         "DELETE /api/tenant/model-key",
         "PUT /api/tenant/model-key",

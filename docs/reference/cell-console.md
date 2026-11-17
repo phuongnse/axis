@@ -118,7 +118,7 @@ tenant button of the Tenants view and the actions of the Tenant view.
     default. The `filter`, `columns`, `sort`, `page` and `pageSize` live in the address under their plain names, see
     [tables](actions-and-controls.md#tables). It has no Search, because a day holds no text. If the days fail to load,
     this part shows its own error and the rest of the view still works.
-  - **Host verification.** Each host that the operator asked for, from the [tenant read](tenant-lifecycle.md#routes)'s
+  - **Host verification.** Each host that the operator or a tenant administrator asked for, from the [tenant read](tenant-lifecycle.md#routes)'s
     `hostRequests`: pending with the date its request expires, verified or expired.
   - **Dates of a deletion.** A `deleting` tenant shows its purge date, `deleteAfter` of the
     [tenant read](tenant-lifecycle.md#routes), after its status. An id that was a tenant and is purged shows the status

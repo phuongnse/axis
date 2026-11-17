@@ -3,7 +3,9 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Admin;
+using Axis.Server.Tests;
 using Axis.Tenancy.Realms;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Npgsql;
 
@@ -15,7 +17,9 @@ namespace Axis.Integration.Tests;
 /// <c>verified</c>. A request past its seven days becomes <c>expired</c>. A wrong token leaves the request <c>pending</c>. A host
 /// that the tenant already holds is not added twice, and a host that another tenant holds stays pending. The certificate of a verified
 /// host is written, here by a fake writer, then its route, here by a fake writer too, before the request is marked. A failed write leaves
-/// the request pending. A blank route service writes no route, and a route service that the pod cannot reach stops the publisher.
+/// the request pending. A blank route service writes no route, and a route service that the pod cannot reach stops the publisher. A
+/// request that a tenant administrator made through <c>POST /api/tenant/hosts</c> is verified the same way, and its <c>tenant host verify</c>
+/// record names the administrator, see <c>docs/reference/tenant-lifecycle.md#hosts-by-a-tenant-administrator</c>.
 /// </summary>
 public sealed class TenantHostVerificationTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
@@ -91,6 +95,49 @@ public sealed class TenantHostVerificationTests(KeycloakFixture keycloak, Postgr
         Assert.Equal("operator-1", await TextAsync(scenario, "SELECT actor FROM platform.audit_records WHERE command = 'tenant host verify'"));
         await using var server = AdminScenario.CreateServer(scenario.Platform);
         Assert.NotEqual(HttpStatusCode.NotFound, await StatusAsync(server, host));
+    }
+
+    [Fact]
+    public async Task A_request_made_through_the_administrators_route_is_verified_with_the_administrator_as_the_records_actor()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = await CreateTenantAsync(scenario);
+        var host = $"shop-{id}.example.test";
+        const string role = "tenant-administrator";
+        await using var server = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Testing");
+            builder.UseTestPlatform(scenario.Platform);
+            builder.UseSetting("Tenancy:Source", "directory");
+            builder.UseSetting("Cell:Id", "test-1");
+            builder.UseSetting("Cell:Region", "test");
+            builder.UseSetting("Cell:TenantDomain", "example.test");
+            builder.UseSetting("Users:AdministratorRole", role);
+            builder.UseTestAuthentication(new TestIdentity("admin-1", "Admin", role));
+        });
+        using var client = server.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri($"http://{id}.example.test") })
+            .SignedInAs("admin-1");
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("/api/tenant/hosts", UriKind.Relative))
+        {
+            Content = JsonContent.Create(new { host }),
+        };
+        request.Headers.Add("X-Axis-Csrf", "1");
+
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var token = (await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("token").GetString()!;
+        var resolver = new FakeDnsResolver { [$"_axis-verify.{host}"] = [token] };
+        var result = await RunPublisherUntilAsync(
+            scenario, resolver, new FakeCertificateWriter(), async () => await StateAsync(scenario, id, host) == "verified");
+
+        Assert.Equal(0, result.Exit);
+        Assert.Contains(host, await scenario.HostsAsync(id));
+        Assert.Equal("admin-1", await TextAsync(scenario, $"SELECT actor FROM platform.tenant_host_requests WHERE tenant_id = '{id}' AND host = '{host}'"));
+        var record = Assert.Single(await scenario.AuditRecordsAsync(), record => record.Command == "tenant host verify");
+        Assert.Equal(id, record.TenantId);
+        Assert.Equal([$"host:{host}"], record.Changed);
+        Assert.Equal("admin-1", await TextAsync(scenario, "SELECT actor FROM platform.audit_records WHERE command = 'tenant host verify'"));
     }
 
     [Fact]

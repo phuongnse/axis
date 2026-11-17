@@ -2,7 +2,8 @@
 
 The tenants of a [cell](cells.md) are created, changed, exported and deleted through the cell's
 provisioning API. This page covers that API, then creating a tenant, its hosts, exporting it and
-deleting it. A self-hosted installation has no provisioning API and keeps the `Axis.Admin` commands
+deleting it. A tenant administrator asks for a host and exports the tenant's data from the tenant's
+own host. A self-hosted installation has no provisioning API and keeps the `Axis.Admin` commands
 of [administration](administration.md).
 
 ## Provisioning API
@@ -193,7 +194,8 @@ The publisher runs the job's steps in order, see the [create job](administration
 ## Hosts
 
 `POST /api/cell/tenants/{id}/hosts` takes `{ "host" }` and answers the host's verification token and
-the DNS records to add. The checks, the certificate, the route and the rule that a host is never
+the DNS records to add. A tenant administrator asks the same way through
+[`POST /api/tenant/hosts`](#hosts-by-a-tenant-administrator), which runs the same code. The checks, the certificate, the route and the rule that a host is never
 served before it is verified are in [hosts and certificates](cells.md#hosts-and-certificates).
 
 - **The host.** The server trims the host and keeps it in lower case. It must be a DNS name of at
@@ -215,7 +217,7 @@ served before it is verified are in [hosts and certificates](cells.md#hosts-and-
   [storage](storage.md#platform-database), and another tenant may request the same host. The host is
   not in `platform.tenant_hosts`, so it still answers `404` for every path. The server stores the
   request over the platform reader role, which may insert into that table and nothing else there. The
-  row's `actor` is the operator's id. The route queues no job and takes no `Idempotency-Key`.
+  row's `actor` is the id of the operator, or of the tenant administrator who asked. The route queues no job and takes no `Idempotency-Key`.
 
 The [publisher](administration.md#publisher) checks the customer's DNS records, under
 `Tenancy:Source=directory`, every `Cell:HostCheckInterval` (10 minutes by default):
@@ -230,7 +232,7 @@ The [publisher](administration.md#publisher) checks the customer's DNS records, 
   `Certificate` and its Ingress route when the cell has certificates on, and the request becomes
   `verified`. The
   [platform audit record](tenant-setting-commands.md#platform-audit-records) is named
-  `tenant host verify` and names the operator who asked for the host as its actor. The request is
+  `tenant host verify` and names whoever asked for the host, an operator or a tenant administrator, as its actor. The request is
   marked last, so a stop, a failed realm update, a failed certificate write or a failed route write is
   retried in the next round (a `Certificate` or an Ingress that exists counts as written), and a host that the tenant already holds is
   not added or audited twice. A host is never verified without a matching record.
@@ -294,6 +296,37 @@ letters, digits, `.`, `_` and `-`, so the module entity `organization/Department
 `organization_Department`. When two names become the same file name in one application, the later one
 gets `_2`, `_3` and so on. Two file names that clash in one folder get `_2`, `_3` and so on before the
 extension, such as `scan_2.pdf`. The paths under `applications/` are copied as they are.
+
+## Hosts by a tenant administrator
+
+A tenant administrator asks for a host of the tenant's own, with the same request code as the
+[operator's route](#hosts), so that a business can add its host without asking the operator.
+
+| Route                    | What it does                                                                 |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| `POST /api/tenant/hosts` | Asks for a host with `{ "host" }`, as the [hosts route](#hosts) does         |
+| `GET /api/tenant/hosts`  | Lists the newest request of each host as `{ host, state, expiresAt }`        |
+
+- **Who.** A person who holds the [administrator role](user-administration.md#the-administrator-role).
+  The routes serve API callers, and no screen draws them.
+- **Routes.** Both are platform routes on the tenant's host, in the session partition, with the CSRF
+  header on the `POST`.
+- **Checks.** In this order: no session answers `401`, no administrator role `403`, and a tenant that
+  is not a cell tenant, or is a preview tenant, `404`. Then the checks of [hosts](#hosts) follow: a
+  bad host answers `400`, and a held host or one held back after a deletion `409`, with no tenant named.
+- **Answer.** As the operator route answers, with the same `201` for a new request and `200` with the
+  same token for a repeat, and the same token, `txt` and `cname` records and `expiresAt`. The request
+  row's `actor` is the administrator.
+- **List.** `{ items }`, sorted by host, with the newest request of each host as
+  `{ host, state, expiresAt }` and no token. A pending request past `expiresAt` shows as `expired`, as
+  in the [cell console](cell-console.md).
+- **When.** While the tenant is `active`, the `POST` and the `GET` work. While it is `readOnly`, the
+  `POST` is refused with the read-only `403` and the `GET` still answers.
+- **Audit.** Asking for a host writes no platform audit record, as the operator route writes none. The
+  row's `actor` keeps who asked. When the [publisher](administration.md#publisher) verifies the host,
+  the `tenant host verify` record names the administrator as its actor.
+- **Storage quota.** A request writes one platform row and no tenant data, so it is never refused
+  over the `storage` quota, see [tenant quotas](tenant-quotas.md#refusals).
 
 ## Exports by a tenant administrator
 
@@ -374,7 +407,7 @@ A deletion can be undone during its grace window, and not after.
    the tombstone's `deleted_at` on the database clock, so a new tenant does not receive the old
    tenant's links and emails. The check ignores letter case. `tenant create` refuses the id and the
    hosts with exit code 2, `tenant host add` and `move` refuse the hosts with exit code 2, and
-   `POST /api/cell/tenants` and `POST /api/cell/tenants/{id}/hosts` answer `409`. No message names
+   `POST /api/cell/tenants`, `POST /api/cell/tenants/{id}/hosts` and `POST /api/tenant/hosts` answer `409`. No message names
    the deleted tenant. A host request whose DNS check passed stays pending for the same reason. The
    platform audit records stay.
 
