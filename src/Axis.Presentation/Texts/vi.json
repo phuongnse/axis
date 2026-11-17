@@ -677,6 +677,7 @@
   "shell.graph.fit": "Xem toàn bộ quy trình",
   "shell.graph.fullScreen": "Toàn màn hình",
   "shell.graph.exitFullScreen": "Thoát toàn màn hình",
+  "shell.graph.overview": "Toàn cảnh quy trình",
   "shell.inspector.status.failed": "Dừng ở bước {step}: {error}",
   "shell.inspector.status.noError": "không ghi nhận lỗi.",
   "shell.inspector.status.waiting": "Đang chờ ở bước {step} đã {since}.",

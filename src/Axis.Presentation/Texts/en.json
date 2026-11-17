@@ -677,6 +677,7 @@
   "shell.graph.fit": "Show the whole process",
   "shell.graph.fullScreen": "Full screen",
   "shell.graph.exitFullScreen": "Exit full screen",
+  "shell.graph.overview": "Overview of the process",
   "shell.inspector.status.failed": "Stopped at {step}: {error}",
   "shell.inspector.status.noError": "no error was recorded.",
   "shell.inspector.status.waiting": "Waiting at the step {step} for {since}.",
