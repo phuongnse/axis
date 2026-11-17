@@ -74,10 +74,14 @@ function json(body: unknown, status = 200) {
 
 const outsideClientsPath = '/api/tenant/outside-clients'
 const applicationPackagesPath = '/api/tenant/application-packages'
+const hostsPath = '/api/tenant/hosts'
 
 function stubServer(answer: (input: string, init?: RequestInit) => Response) {
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
-    input === '/api/tenant/usage' || input === outsideClientsPath || input === applicationPackagesPath
+    input === '/api/tenant/usage' ||
+    input === hostsPath ||
+    input === outsideClientsPath ||
+    input === applicationPackagesPath
       ? new Response(null, { status: 404 })
       : answer(input, init),
   )
@@ -197,7 +201,7 @@ describe('UsersPage', () => {
         if (input === '/api/tenant/connected-apps') {
           return json({ items: [] })
         }
-        return input === '/api/tenant/usage' ? new Response(null, { status: 404 }) : json(users)
+        return input === '/api/tenant/usage' || input === hostsPath ? new Response(null, { status: 404 }) : json(users)
       }),
     )
     renderPage()
@@ -216,7 +220,7 @@ describe('UsersPage', () => {
       vi.fn(async (input: string) =>
         input === outsideClientsPath
           ? new Response(null, { status: 403 })
-          : input === '/api/tenant/usage'
+          : input === '/api/tenant/usage' || input === hostsPath
             ? new Response(null, { status: 404 })
             : json(users),
       ),
@@ -228,7 +232,7 @@ describe('UsersPage', () => {
     expect(screen.queryByRole('tab', { name: 'Connected apps' })).toBeNull()
   })
 
-  it('shows Export data, Usage, Model key and Application packages as parts under the table, each with a rule above', async () => {
+  it('shows Export data, Usage, Hosts, Model key and Application packages as parts under the table, each with a rule above', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: string) => {
@@ -237,6 +241,8 @@ describe('UsersPage', () => {
             return json({ ...administrator, tenantExports: true })
           case '/api/tenant/usage':
             return json({ quotas: { users: { limit: 5, used: 2 } }, days: [] })
+          case hostsPath:
+            return json({ items: [] })
           case '/api/tenant/model-key':
             return json({ set: false })
           case applicationPackagesPath:
@@ -251,19 +257,20 @@ describe('UsersPage', () => {
     renderPage()
 
     expect(await screen.findByText('Ann Invited')).toBeVisible()
-    for (const name of ['Export data', 'Usage', 'Model key', 'Application packages']) {
+    for (const name of ['Export data', 'Usage', 'Hosts', 'Model key', 'Application packages']) {
       const region = await screen.findByRole('region', { name })
       expect(within(region).getByRole('heading', { level: 2, name })).toBeVisible()
     }
-    expect(screen.getAllByRole('separator')).toHaveLength(4)
+    expect(screen.getAllByRole('separator')).toHaveLength(5)
   })
 
-  it('shows none of the four parts and no rule when their routes refuse', async () => {
+  it('shows none of the five parts and no rule when their routes refuse', async () => {
     const fetchMock = vi.fn(async (input: string) => {
       switch (input) {
         case '/api/me':
           return json({ ...administrator, tenantExports: false })
         case '/api/tenant/usage':
+        case hostsPath:
         case '/api/tenant/model-key':
         case applicationPackagesPath:
           return new Response(null, { status: 403 })
@@ -278,7 +285,13 @@ describe('UsersPage', () => {
 
     expect(await screen.findByText('Ann Invited')).toBeVisible()
     await vi.waitFor(() => {
-      for (const path of ['/api/me', '/api/tenant/usage', '/api/tenant/model-key', applicationPackagesPath]) {
+      for (const path of [
+        '/api/me',
+        '/api/tenant/usage',
+        hostsPath,
+        '/api/tenant/model-key',
+        applicationPackagesPath,
+      ]) {
         expect(fetchMock).toHaveBeenCalledWith(path, expect.anything())
       }
     })

@@ -51,11 +51,12 @@ An administrator gives and removes a person's roles, see [roles](#roles), in the
 
 ### Export data and usage
 
-In a tenant of a cell, the users page also shows two sections, see
+In a tenant of a cell, the users page also shows three sections, see
 [export data and usage](platform-pages.md#export-data-and-usage):
 
 - **Export data.** An administrator starts, follows and downloads the tenant's export.
 - **Usage.** The tenant's quotas and usage.
+- **Hosts.** The hosts that the tenant asked for. An administrator adds a host and sees its verification state.
 
 ### Read routes
 
