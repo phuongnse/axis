@@ -17,7 +17,8 @@ user needs.
   gets a `pg_trgm` index, and a data source opts in with `"search": true`.
 - **Data sources get more aggregates.** Measures add `avg` and `countDistinct`, each measure takes an
   optional `filter`, and a `groupBy` entry on a date or date-time field takes a `day`, `week`,
-  `month` or `year` bucket in the [application time zone](d75-the-application-time-zone.md).
+  `month` or `year` bucket in the
+  [application time zone](d156-working-time-calendars-durations-in-working-hours-and-slas.md).
   Expressions add `avg(list, item)`.
 - **Heavy statements run under a timeout.** Interactive reads, exports, writes, worker items and
   activation each run with `SET LOCAL statement_timeout` from a setting of their own. Each default

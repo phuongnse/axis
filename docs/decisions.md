@@ -82,11 +82,11 @@ the files agree, title and status included.
 | [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) | Issues of several milestones run at once | **Agreed** |
 | D69 | Timer, wait for event and sub-process steps, loops and create record | Superseded by [D155](decisions/d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md), [last text](https://github.com/phuongnse/axis/blob/b7af8e40c52f8d650fa4f6d0a1a4b6e099aa96a0/docs/decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md) |
 | [D70](decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md) | Processes without a subject, scheduled jobs and delete triggers | **Agreed** |
-| [D71](decisions/d71-task-deadlines-escalation-claim-and-reassign.md) | Task deadlines, escalation, claim and reassign | **Agreed** |
+| D71 | Task deadlines, escalation, claim and reassign | Superseded by [D156](decisions/d156-working-time-calendars-durations-in-working-hours-and-slas.md), [last text](https://github.com/phuongnse/axis/blob/27b802cb21dc1a322b24a4456b4ecd3b5c89a473/docs/decisions/d71-task-deadlines-escalation-claim-and-reassign.md) |
 | [D72](decisions/d72-a-delivery-limit-and-dead-letters.md) | A delivery limit and dead letters | **Agreed** |
 | [D73](decisions/d73-in-app-and-email-notifications.md) | In-app and email notifications | **Agreed** |
 | [D74](decisions/d74-a-visual-process-designer.md) | A visual process designer | **Agreed** |
-| [D75](decisions/d75-the-application-time-zone.md) | The application time zone | **Agreed** |
+| D75 | The application time zone | Superseded by [D156](decisions/d156-working-time-calendars-durations-in-working-hours-and-slas.md), [last text](https://github.com/phuongnse/axis/blob/27b802cb21dc1a322b24a4456b4ecd3b5c89a473/docs/decisions/d75-the-application-time-zone.md) |
 | [D76](decisions/d76-file-money-and-enum-label-field-types.md) | File, money and enum label field types | **Agreed** |
 | [D77](decisions/d77-indexes-defaults-and-ranges.md) | Indexes, defaults and ranges | **Agreed** |
 | [D78](decisions/d78-references-from-child-rows-and-many-to-many.md) | References from child rows and many-to-many | **Agreed** |
@@ -167,3 +167,4 @@ the files agree, title and status included.
 | [D153](decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md) | A person's table views and columns are kept on the server, and the address still wins | **Agreed** |
 | [D154](decisions/d154-every-capability-an-organization-needs-has-a-home-and-a-capability-map-keeps-it-so.md) | Every capability an organization needs has a home, and a capability map keeps it so | **Agreed** |
 | [D155](decisions/d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md) | Processes run paths at once, repeat steps, give tasks to many people and take error paths | **Agreed** |
+| [D156](decisions/d156-working-time-calendars-durations-in-working-hours-and-slas.md) | Working time: calendars, durations in working hours, and SLAs | **Agreed** |

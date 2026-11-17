@@ -50,8 +50,8 @@ such as documents made from templates, as utilities the platform owes its applic
   changes, whole, as [decisions](../writing-docs.md#decisions) requires. These are reopened:
   - one path per instance and the waiting step every loop needed, which
     [D155](d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md) replaced for M38;
-  - fixed durations with no working time ([D71](d71-task-deadlines-escalation-claim-and-reassign.md),
-    [D75](d75-the-application-time-zone.md)), by M39;
+  - fixed durations with no working time, which
+    [D156](d156-working-time-calendars-durations-in-working-hours-and-slas.md) replaced for M39;
   - history that keeps no values ([D21](d21-development-test-users-audit-records-and-sequences.md),
     [D109](d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md)), by M41;
   - no email to a role ([D73](d73-in-app-and-email-notifications.md)), by M46;
