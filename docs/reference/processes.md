@@ -13,6 +13,7 @@ The rest of the process reference is on these pages:
 | [Process states](process-states.md)           | The states of an instance and of a task                                                          |
 | [Task API](task-api.md)                       | Listing, reading and completing tasks                                                            |
 | [Task deadlines and claims](task-deadlines.md) | Escalations, deadlines, overdue tasks, claim, release and reassign                               |
+| [Working time and SLAs](working-time.md)      | Calendars, days off and make-up days, durations in working time, SLAs                            |
 | [Process flow](process-flow.md)               | Timer, wait for event and sub-process steps, loops, `createRecord`, processes without a subject |
 | [Process blocks](process-blocks.md)           | _(planned for M38)_ Parallel and repeat steps, their structure, limits and compile checks        |
 | [Notifications](notifications.md)             | The `notify` operation, in-app notifications and email                                           |
@@ -394,6 +395,10 @@ Each code is in the [diagnostic code table](diagnostic-codes.md).
   `P2W`, or days with an optional time part of hours, minutes and seconds, such as `P3D`, `PT4H` or
   `P1DT12H` (`AXC0084` at `/steps/{i}/dueIn`). Years and months are refused, because they have no
   fixed length. Every other duration of a process follows the same rule.
+- **Working time** _(planned for M39)_. Any duration may be written `{ "working": … }`, and a `task`,
+  `timer` or `waitEvent` step or the process may name a `calendar`, see
+  [durations in working time](working-time.md#durations-in-working-time).
+- **SLAs** _(planned for M39)_. A process may declare `slas`, see [SLAs](working-time.md#slas).
 - Outcome names are unique within the step, ignoring letter case (`AXC0085` at
   `/steps/{i}/outcomes/{j}/name`).
 - The `startCondition` message's text key, each task `label`'s and each outcome `label`'s exist,

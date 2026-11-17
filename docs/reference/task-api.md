@@ -97,6 +97,12 @@ are ordered by `dueAt` ascending with no due date last, then by `createdAt`, the
 - `dueAt` is `null` when the step has no `dueIn`.
 - `overdue` is `true` when `dueAt` has passed, worked out when read, see
   [Task states](task-deadlines.md#task-states).
+- **`dueTimeZone`** _(planned for M39)_. The IANA time zone of the calendar that counted `dueAt`, or
+  `null` for a fixed-time due date, see [durations in working time](working-time.md#durations-in-working-time).
+- **`workingTimeLeft`** _(planned for M39)_. An ISO 8601 duration of the working time from now to `dueAt`,
+  worked out when read. It is `null` for a fixed-time due date and for an overdue task.
+- **`atRisk`** _(planned for M39)_. `true` when the task is at risk, see
+  [Task states](task-deadlines.md#task-states).
 
 The list answers within 300 ms for a holder of a role with 1,000 open role tasks, 300 of them claimed
 by others, and its count reads through the task index. This is the Reads objective of

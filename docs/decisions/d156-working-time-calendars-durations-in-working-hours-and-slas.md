@@ -53,7 +53,8 @@ them that still holds.
 - **A due time reads in its calendar's time zone,** with the working time left, and a task that is at
   risk or past due is marked with a status tag.
 
-The detail is in [task deadlines and claims](../reference/task-deadlines.md),
+The detail is in [working time and SLAs](../reference/working-time.md),
+[task deadlines and claims](../reference/task-deadlines.md),
 [application time zone](../reference/resource-files.md#application-time-zone) and the
 [expression functions](../reference/expressions.md#functions).
 

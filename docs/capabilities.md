@@ -50,7 +50,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Keep an event that comes before the case waits for it | [Wait for event step](reference/process-flow.md#wait-for-event-step) |
 | Wait for the first of several events | [Wait for event step](reference/process-flow.md#wait-for-event-step) _(planned for M38)_ |
 | Match an event to a case by a key other than its record | _(planned for M45)_ |
-| Count due dates, deadlines, escalations and timers in working hours, skipping holidays | _(planned for M39)_ |
+| Count due dates, deadlines, escalations and timers in working hours, skipping holidays | [Durations in working time](reference/working-time.md#durations-in-working-time) _(planned for M39)_ |
 | Wait for a calendar month or year | [D156](decisions/d156-working-time-calendars-durations-in-working-hours-and-slas.md) |
 
 ### Errors and cancelling
@@ -96,6 +96,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Attach a file to the record a task decides | [Field and value](reference/file-fields.md#field-and-value) |
 | Set a due date and show overdue tasks | [Task states](reference/task-deadlines.md#task-states) |
 | Remind or escalate a task after a time | [Escalations and deadline](reference/task-deadlines.md#escalations-and-deadline) |
+| Promise a response or resolution time with an SLA that pauses, warns and escalates | [SLAs](reference/working-time.md#slas) _(planned for M39)_ |
 | Move the case on when a task's deadline passes | [Escalations and deadline](reference/task-deadlines.md#escalations-and-deadline) |
 | List my open tasks | [Task inbox widget](reference/task-inbox-widget.md#task-inbox-widget) |
 | List the tasks I completed | _(planned for M43)_ |
@@ -228,7 +229,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Queries over a record and the records it points to | [Resource shape](reference/data-sources.md#resource-shape) |
 | Computed columns and joins to records that point here | _(planned for M54)_ |
 | Totals, averages and counts by group, by day, week, month or year | [Aggregates](reference/data-sources.md#aggregates) |
-| Totals by quarter or fiscal period | _(planned for M39)_ |
+| Totals by quarter or fiscal period | [Aggregates](reference/data-sources.md#aggregates) _(planned for M39)_ |
 | Bar, line and pie charts | [Chart widget](reference/detail-chart-kpi-widgets.md#chart-widget) |
 | Stacked and multi-series charts | _(planned for M54)_ |
 | Open the records behind a chart | _(planned for M54)_ |
@@ -251,7 +252,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Amounts in several currencies with exchange rates | _(planned for M53)_ |
 | Record values in several languages | _(planned for M53)_ |
 | Units of measure | _(planned for M53)_ |
-| Working days, holidays and fiscal years | _(planned for M39)_ |
+| Working days, holidays and fiscal years | [Calendar resource](reference/working-time.md#calendar-resource) _(planned for M39)_ |
 
 ## Pages, forms and sites
 
