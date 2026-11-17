@@ -69,6 +69,7 @@ export function InstanceTimeline({
   const stepsByName = Object.fromEntries(instance.graph.steps.map((step) => [step.name, step]))
   const lasted = (row: TimelineRow) =>
     row.startedAt === null ? null : Date.parse(row.finishedAt ?? now) - Date.parse(row.startedAt)
+  const stateRank = { failed: 0, waiting: 1, running: 2, retried: 3, done: 4 }
   const stateOptions = (['done', 'failed', 'waiting', 'running'] as const).map((value) => ({
     value,
     label: t(`shell.inspector.timeline.state${value[0].toUpperCase()}${value.slice(1)}`),
@@ -369,7 +370,7 @@ export function InstanceTimeline({
       // Proposed: the timeline has the standard controls its growth asks for, see the review on #3650: search finds a
       // run by its words and those of the rows inside it, and a step filters and sorts by its label.
       searchText: (row) => row.words,
-      sortValue: (row) => row.stepText,
+      // A step has no order a person sorts by: the process gives its order, and Filter shows one step's runs.
       filter: {
         kind: 'enum',
         value: (row) => row.step,
@@ -382,7 +383,8 @@ export function InstanceTimeline({
       kind: 'fixed',
       title: t('shell.inspector.state'),
       render: (_v, row) => row.state,
-      sortValue: (row) => row.stateKey,
+      // States sort by what they ask of the reader, a failure first and done last.
+      sortValue: (row) => stateRank[row.stateKey],
       filter: { kind: 'enum', value: (row) => row.stateKey, options: stateOptions },
     },
     {
