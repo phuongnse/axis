@@ -72,10 +72,10 @@ the files agree, title and status included.
 | [D58](decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md) | Ant Design is a detail of the SPA, without ProComponents | **Agreed** |
 | [D59](decisions/d59-table-row-and-toolbar-actions.md) | Table row and toolbar actions | **Agreed** |
 | [D60](decisions/d60-the-service-desk-dashboard-ticket-detail-page-and-guided-form.md) | The service desk dashboard, ticket detail page and guided form | **Agreed** |
-| [D61](decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md) | Widget trees in columns, tabs and sections, and pages at phone width | **Agreed** |
+| D61 | Widget trees in columns, tabs and sections, and pages at phone width | Superseded by [D159](decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md), [last text](https://github.com/phuongnse/axis/blob/40b46c2ab7011e6d68dcd5364a4d122c9384b8e9/docs/decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md) |
 | [D62](decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md) | Conditional form states, validation as you type and wizard steps | **Agreed** |
-| [D63](decisions/d63-navigate-actions-and-page-parameters.md) | Navigate actions and page parameters | **Agreed** |
-| [D64](decisions/d64-detail-chart-and-kpi-widgets.md) | Detail, chart and KPI widgets | **Agreed** |
+| D63 | Navigate actions and page parameters | Superseded by [D159](decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md), [last text](https://github.com/phuongnse/axis/blob/40b46c2ab7011e6d68dcd5364a4d122c9384b8e9/docs/decisions/d63-navigate-actions-and-page-parameters.md) |
+| D64 | Detail, chart and KPI widgets | Superseded by [D159](decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md), [last text](https://github.com/phuongnse/axis/blob/40b46c2ab7011e6d68dcd5364a4d122c9384b8e9/docs/decisions/d64-detail-chart-and-kpi-widgets.md) |
 | [D65](decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md) | A visual page designer on a canvas drawn by the site's widgets | **Agreed** |
 | [D66](decisions/d66-a-visual-form-designer-for-form-resources.md) | A visual form designer for form resources | **Agreed** |
 | [D67](decisions/d67-live-widget-previews-in-the-design-system.md) | Live widget previews in the design system | **Agreed** |
@@ -170,3 +170,4 @@ the files agree, title and status included.
 | [D156](decisions/d156-working-time-calendars-durations-in-working-hours-and-slas.md) | Working time: calendars, durations in working hours, and SLAs | **Agreed** |
 | [D157](decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md) | Files reach calls and emails, show in the page, keep their versions, and documents come from Word templates | **Agreed** |
 | [D158](decisions/d158-history-keeps-old-and-new-values-a-deleted-record-waits-in-a-recycle-bin-and-every-record-has-system-fields.md) | History keeps old and new values, a deleted record waits in a recycle bin, and every record has system fields | **Agreed** |
+| [D159](decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) | Pages show related lists, boards and calendars, forms take context and drafts, and each site has its brand | **Agreed** |

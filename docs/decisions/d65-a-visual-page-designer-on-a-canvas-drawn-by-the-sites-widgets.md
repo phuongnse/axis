@@ -20,12 +20,13 @@ page is a file in git, so the designer must write the same format as the Form an
   no compiler of its own.
 - **The designer writes only the format.** It writes the order of the widget tree and the properties
   the format has, never a position or a size in pixels, and the page limits of
-  [D61](d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md) hold.
+  [D159](d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) hold.
 - **Everything is bound by drag and drop, and by keyboard.** A palette adds widgets, a data panel binds
-  one to an entity or a data source as [D64](d64-detail-chart-and-kpi-widgets.md) allows, and each
-  action opens in the property panel, which maps a navigate action's parameters as
-  [D63](d63-navigate-actions-and-page-parameters.md) sets out. Every insert and move has a keyboard
-  way that a screen reader announces.
+  one to an entity or a data source as
+  [D159](d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md)
+  allows, and each action opens in the property panel, which maps a navigate action's parameters as
+  [D159](d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md)
+  sets out. Every insert and move has a keyboard way that a screen reader announces.
 - **Undo covers the draft** in the three tabs, from a history in memory that a save keeps and a reload
   clears.
 - **Drag and drop comes from the stable `@dnd-kit` packages,** in a lazy chunk that the designers share.
