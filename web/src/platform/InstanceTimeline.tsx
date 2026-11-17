@@ -80,7 +80,7 @@ export function InstanceTimeline({
   }))
   // A run not yet finished lasts until now.
   const now = useMinuteClock().toISOString()
-  const { typeOf, typeText, assigneeText, targetOf, callSummary, summary, stateWords } = useRunWords({
+  const { typeOf, typeText, assigneeText, taskSentence, targetOf, callSummary, summary, stateWords } = useRunWords({
     instance,
     stepLabel,
     outcomeLabel,
@@ -202,12 +202,7 @@ export function InstanceTimeline({
       task.outcome === null ? '' : outcomeLabel(task.step, task.outcome),
     ].join(' '),
     name: named(assigneeText(task), t('shell.inspector.stepType.task')),
-    what:
-      task.outcome === null
-        ? t('shell.inspector.timeline.taskOpen').replace('{assignee}', assigneeText(task))
-        : t('shell.inspector.timeline.taskDone')
-            .replace('{person}', task.completedBy ?? assigneeText(task))
-            .replace('{outcome}', outcomeLabel(task.step, task.outcome)),
+    what: taskSentence(task, task.step),
     state: stateWords(task.completedAt === null ? 'waiting' : 'done', true),
     startedAt: task.createdAt,
     finishedAt: task.completedAt,

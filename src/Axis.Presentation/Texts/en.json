@@ -2783,5 +2783,6 @@
   "shell.table.hideDetails": "Hide the details",
   "shell.stepRun.thenGoesTo": "Then goes to",
   "shell.stepRun.ended": "Ended",
-  "shell.inspector.openInStudio": "Open in Studio"
+  "shell.inspector.openInStudio": "Open in Studio",
+  "shell.person.you": "(you)"
 }

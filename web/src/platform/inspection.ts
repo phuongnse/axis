@@ -148,6 +148,10 @@ export interface InstanceTask {
   state: string
   outcome: string | null
   completedBy: string | null
+  /** Proposed, see the review on #3650: the user id of a `user` assignee, so the page names them as a person. */
+  assigneeId?: string | null
+  /** Proposed, see the review on #3650: the user id of who completed the task, so the page names them as a person. */
+  completedById?: string | null
   createdAt: string
   completedAt: string | null
   /** Proposed, see the review on #3650: when the task is due, from its step's `dueIn`, or `null` without one. */
@@ -272,7 +276,13 @@ export interface InstanceDetail {
    * Proposed, see the review on #3650: who or what started the instance: a person, with the action they took, a
    * trigger, an endpoint, a schedule, or the instance of a parent process.
    */
-  startedBy?: { kind: 'user' | 'trigger' | 'endpoint' | 'schedule' | 'parent'; name: string; via?: string | null }
+  startedBy?: {
+    kind: 'user' | 'trigger' | 'endpoint' | 'schedule' | 'parent'
+    name: string
+    /** A person's user id, so the page names them as a person. */
+    id?: string | null
+    via?: string | null
+  }
   /** Proposed, see the review on #3650: the parameters the instance started with, under the masking rule. */
   input?: Record<string, unknown> | null
   /** Proposed, see the review on #3650: the end step an ended instance reached, and the values it ended with. */

@@ -2783,5 +2783,6 @@
   "shell.table.hideDetails": "Ẩn chi tiết",
   "shell.stepRun.thenGoesTo": "Sau đó đi tới",
   "shell.stepRun.ended": "Kết thúc",
-  "shell.inspector.openInStudio": "Mở trong Studio"
+  "shell.inspector.openInStudio": "Mở trong Studio",
+  "shell.person.you": "(bạn)"
 }

@@ -1,6 +1,7 @@
 import { Flex, Tabs, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
+import { PersonName } from './PersonName'
 import { studioResourceAddress } from './studioAddress'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
@@ -321,7 +322,11 @@ export function InstanceDetailView({
           <NotSet />
         ) : (
           <span>
-            {startedBy.name}
+            {startedBy.kind === 'user' ? (
+              <PersonName person={{ id: startedBy.id, name: startedBy.name }} />
+            ) : (
+              startedBy.name
+            )}
             {(startedBy.kind === 'user' ? startedBy.via : t(`shell.inspector.startedVia.${startedBy.kind}`)) && (
               <Typography.Text type="secondary">
                 {' · '}
@@ -338,12 +343,7 @@ export function InstanceDetailView({
     {
       key: 'endedAt',
       term: t('shell.inspector.endedAt'),
-      value:
-        instance.endedAt === null ? (
-          <Typography.Text type="secondary">{t('shell.value.notSet')}</Typography.Text>
-        ) : (
-          time('endedAt', instance.endedAt)
-        ),
+      value: instance.endedAt === null ? <NotSet /> : time('endedAt', instance.endedAt),
       width: 2,
     },
     {

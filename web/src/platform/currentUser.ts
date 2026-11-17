@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { apiFetch } from './api'
 
 /** The signed-in user, as served by `GET /api/me`. */
@@ -50,4 +51,25 @@ export async function signOutSession(): Promise<string> {
   }
   const body = (await response.json()) as { signOutUrl: string }
   return body.signOutUrl
+}
+
+let sharedUser: Promise<CurrentUser | null> | null = null
+
+/**
+ * Proposed, see the review on #3650: the signed-in user for a widget that draws something by who reads it, such as a
+ * person's name, loaded once for the page and shared by every such widget; `undefined` while it loads.
+ */
+export function useCurrentUser(): CurrentUser | null | undefined {
+  const [user, setUser] = useState<CurrentUser | null | undefined>(undefined)
+  useEffect(() => {
+    let live = true
+    sharedUser ??= fetchCurrentUser().catch(() => null)
+    void sharedUser.then((loaded) => {
+      if (live) setUser(loaded)
+    })
+    return () => {
+      live = false
+    }
+  }, [])
+  return user
 }

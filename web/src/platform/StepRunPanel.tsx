@@ -6,7 +6,7 @@ import { AxisButton } from './AxisButton'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { BodyView, ValueTable } from './ValueTable'
 import { jsonRows, textRows } from './valueRows'
-import { EmptyDash } from './EmptyValue'
+import { EmptyDash, NotSet } from './EmptyValue'
 import { EventTime } from './EventTime'
 import { formatValue } from './formatValue'
 import { inspectorPath } from './inspectorPages'
@@ -108,7 +108,7 @@ export function StepRunPanel({
   const t = useText()
   const now = useMinuteClock()
   const { spacing } = useDesignTokens()
-  const { typeText, stateWords, targetOf, assigneeText } = useRunWords({
+  const { typeText, stateWords, targetOf, assigneeName, completedName } = useRunWords({
     instance,
     stepLabel,
     outcomeLabel,
@@ -155,7 +155,7 @@ export function StepRunPanel({
       <EmptyDash />
     )
   const muted = (text: ReactNode) => <Typography.Text type="secondary">{text}</Typography.Text>
-  const notSet = muted(t('shell.value.notSet'))
+  const notSet = <NotSet />
   // A time set ahead, such as a due time, is data, not an event that happened, so it keeps the system's date and time
   // alone and never takes a time ago or ahead, as `EventTime` says.
   const dueTime = (at: string) => formatValue({ name: 'due', type: 'date-time' }, at, {}, { locale, text: t }) as string
@@ -251,7 +251,7 @@ export function StepRunPanel({
         value: durationText(shown.startedAt, shown.finishedAt ?? now.toISOString(), locale),
       },
       ...shown.tasks.flatMap((task): Term[] => [
-        { key: `assignee-${task.id}`, term: t('shell.stepRun.assignedTo'), value: assigneeText(task) },
+        { key: `assignee-${task.id}`, term: t('shell.stepRun.assignedTo'), value: assigneeName(task) },
         {
           key: `due-${task.id}`,
           term: t('shell.stepRun.due'),
@@ -267,7 +267,11 @@ export function StepRunPanel({
               </Flex>
             ),
         },
-        { key: `completedBy-${task.id}`, term: t('shell.stepRun.completedBy'), value: task.completedBy ?? notSet },
+        {
+          key: `completedBy-${task.id}`,
+          term: t('shell.stepRun.completedBy'),
+          value: task.completedBy === null ? notSet : completedName(task),
+        },
         {
           key: `outcome-${task.id}`,
           term: t('shell.stepRun.outcomeChosen'),

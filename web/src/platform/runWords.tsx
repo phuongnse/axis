@@ -7,6 +7,9 @@ import type { StepRun } from './instanceRuns'
 import { filled } from './instanceStatus'
 import { StatusTag } from './StatusTag'
 import { problemText } from './stepProblems'
+import { PersonName } from './PersonName'
+import { usePersonText } from './personText'
+import { textNodes } from './textNodes'
 import { useText } from './texts'
 
 /**
@@ -34,8 +37,32 @@ export function useRunWords({
     const text = t(key)
     return text === key ? type : text
   }
+  const personText = usePersonText()
+  // Proposed, see the review on #3650: a person a run names is a `PersonName`, and words only where words are needed.
   const assigneeText = (task: InstanceTask) =>
-    task.assigneeKind === 'role' ? t('shell.inspector.timeline.role').replace('{role}', task.assignee) : task.assignee
+    task.assigneeKind === 'role'
+      ? t('shell.inspector.timeline.role').replace('{role}', task.assignee)
+      : personText({ id: task.assigneeId, name: task.assignee })
+  const assigneeName = (task: InstanceTask): ReactNode =>
+    task.assigneeKind === 'role' ? (
+      assigneeText(task)
+    ) : (
+      <PersonName person={{ id: task.assigneeId, name: task.assignee }} />
+    )
+  const completedName = (task: InstanceTask): ReactNode =>
+    task.completedBy === null ? (
+      assigneeName(task)
+    ) : (
+      <PersonName person={{ id: task.completedById, name: task.completedBy }} />
+    )
+  /** What a task's run did, in a sentence that names its people. */
+  const taskSentence = (task: InstanceTask, step: string): ReactNode =>
+    task.outcome === null
+      ? textNodes(t('shell.inspector.timeline.taskOpen'), { assignee: assigneeName(task) })
+      : textNodes(t('shell.inspector.timeline.taskDone'), {
+          person: completedName(task),
+          outcome: outcomeLabel(step, task.outcome),
+        })
   const targetOf = (call: InstanceCall) => `${call.connector ?? `${call.package}@${call.version}`} · ${call.operation}`
 
   const callSummary = (call: InstanceCall) => {
@@ -55,13 +82,7 @@ export function useRunWords({
   const summary = (run: StepRun): ReactNode => {
     const lines: ReactNode[] = []
     for (const task of run.tasks) {
-      lines.push(
-        task.outcome === null
-          ? t('shell.inspector.timeline.taskOpen').replace('{assignee}', assigneeText(task))
-          : t('shell.inspector.timeline.taskDone')
-              .replace('{person}', task.completedBy ?? assigneeText(task))
-              .replace('{outcome}', outcomeLabel(run.step, task.outcome)),
-      )
+      lines.push(taskSentence(task, run.step))
     }
     for (const call of run.calls) {
       lines.push(callSummary(call))
@@ -127,5 +148,16 @@ export function useRunWords({
       {t(`shell.inspector.timeline.state${value[0].toUpperCase()}${value.slice(1)}`)}
     </StatusTag>
   )
-  return { typeOf, typeText, assigneeText, targetOf, callSummary, summary, stateWords }
+  return {
+    typeOf,
+    typeText,
+    assigneeText,
+    assigneeName,
+    completedName,
+    taskSentence,
+    targetOf,
+    callSummary,
+    summary,
+    stateWords,
+  }
 }
