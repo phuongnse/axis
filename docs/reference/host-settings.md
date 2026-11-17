@@ -90,8 +90,8 @@ a seed record.
 - **Parsing.** Each record goes through the record input parser as a create body, so the rules of
   the record API apply. Every record is parsed before any write. An invalid value is `AXC0033` at
   `/records/{i}/values/<field>`, and so is a value for a
-  [computed field](resource-files.md#entity-logic) or a [sequence](resource-files.md#sequences)
-  field. The entity's [validations](resource-files.md#entity-logic) do not run on seed records.
+  [computed field](entity-logic-and-sequences.md#entity-logic) or a [sequence](entity-logic-and-sequences.md#sequences)
+  field. The entity's [validations](entity-logic-and-sequences.md#entity-logic) do not run on seed records.
 - **One transaction.** All inserts and updates of the folder run in one transaction, seed files in
   path order and records in file order, so a reference value must name an existing record or one
   inserted earlier in the same run. Each write computes the record's computed fields, an update from

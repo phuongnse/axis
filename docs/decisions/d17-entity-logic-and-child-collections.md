@@ -23,9 +23,9 @@ expressions without side effects, as [D16](d16-expression-language.md) defines t
   in the child entity's table with a foreign key to the owner, are deleted with the owner, and are
   read and written only through the owner record, in one request and under the owner's version.
 
-The resource shapes are in [entity logic](../reference/resource-files.md#entity-logic), the storage
+The resource shapes are in [entity logic](../reference/entity-logic-and-sequences.md#entity-logic), the storage
 in [child tables and computed columns](../reference/child-tables-and-computed-columns.md#child-tables-and-computed-columns),
-and the API in [child rows, computed fields and validations](../reference/record-api.md#child-rows-computed-fields-and-validations).
+and the API in [child rows, computed fields and validations](../reference/record-child-rows-and-validations.md#child-rows-computed-fields-and-validations).
 
 ## Consequences
 

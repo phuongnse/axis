@@ -384,9 +384,9 @@ columns, one holding a table and the other a section with a task inbox:
   `null` for a field of a module's entity, which has no upload route, so the input shows no upload button.
   `downloadPath` is `/api/apps/{app}/files`, and the SPA appends a file's id to it. The SPA never builds a file URL
   itself.
-- **Values the server sets.** `computed` is `true` for a [computed field](resource-files.md#entity-logic), whose value
+- **Values the server sets.** `computed` is `true` for a [computed field](entity-logic-and-sequences.md#entity-logic), whose value
   the server sets on every write. `sequence` is `true` for a text field that names a
-  [sequence](resource-files.md#sequences), which the server numbers on create. `creator` is `true` for a text field
+  [sequence](entity-logic-and-sequences.md#sequences), which the server numbers on create. `creator` is `true` for a text field
   that declares [`creator`](roles-and-policies.md#record-creator), which the server sets to the creating user's id on
   create. A form shows each of them read-only and never sends it.
 - **`target`** names the referenced entity, its display field and the path of its record API, so the SPA never builds
