@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Packages;
 using Axis.Extensions;
@@ -27,6 +28,21 @@ public sealed class PackageCatalogTests
         Assert.Equal(PackageLanguage.CSharp, package.Manifest.Language);
         Assert.Equal("packages.lock.json", package.Manifest.Lock);
         Assert.Equal("test-package/1.0.0", package.LoadContext?.Name);
+    }
+
+    [Fact]
+    public void A_loaded_version_gives_the_json_of_its_manifest_file_and_another_version_or_the_empty_catalog_gives_null()
+    {
+        using var root = new TemporaryFolder().Install("1.0.0");
+        var catalog = PackageCatalog.Load(root.Path);
+        using var file = JsonDocument.Parse(File.ReadAllText(Path.Combine(root.Path, ManifestFile)));
+
+        var manifest = catalog.ReadManifestJson(TestPackages.Id, "1.0.0");
+
+        Assert.NotNull(manifest);
+        Assert.True(JsonElement.DeepEquals(file.RootElement, manifest.Value));
+        Assert.Null(catalog.ReadManifestJson(TestPackages.Id, "9.9.9"));
+        Assert.Null(PackageCatalog.Empty.ReadManifestJson(TestPackages.Id, "1.0.0"));
     }
 
     [Fact]

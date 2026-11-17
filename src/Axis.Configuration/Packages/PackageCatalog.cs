@@ -31,14 +31,17 @@ public sealed class PackageCatalog
 
     private static readonly JsonSchema _schema = LoadSchema();
 
-    private PackageCatalog(IReadOnlyList<InstalledPackage> packages, IReadOnlyList<Diagnostic> diagnostics)
+    private readonly string? _root;
+
+    private PackageCatalog(IReadOnlyList<InstalledPackage> packages, IReadOnlyList<Diagnostic> diagnostics, string? root)
     {
+        _root = root;
         Packages = packages;
         Diagnostics = diagnostics;
         Versions = [.. packages.Select(package => new PackageVersion(package.Manifest.Id, package.Manifest.Version) { Operations = package.Manifest.Operations })];
     }
 
-    public static PackageCatalog Empty { get; } = new([], []);
+    public static PackageCatalog Empty { get; } = new([], [], null);
 
     /// <summary>The loaded packages, by id and then by version.</summary>
     public IReadOnlyList<InstalledPackage> Packages { get; }
@@ -53,6 +56,31 @@ public sealed class PackageCatalog
         Packages.FirstOrDefault(package =>
             string.Equals(package.Manifest.Id, id, StringComparison.Ordinal)
             && string.Equals(package.Manifest.Version, version, StringComparison.Ordinal));
+
+    /// <summary>
+    /// The manifest file of the loaded version as JSON, for a comparison of JSON values with a manifest that a customer-hosted
+    /// runner registers, see docs/reference/extension-packages.md#customer-hosted-runners. Null when this catalog did not
+    /// load the version, when the catalog has no root folder, or when the file cannot be read or parsed.
+    /// </summary>
+    public JsonElement? ReadManifestJson(string id, string version)
+    {
+        if (_root is null || Find(id, version) is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            using var stream = File.OpenRead(Path.Combine(_root, id, version, ManifestFileName));
+            using var document = JsonDocument.Parse(stream, _documentOptions);
+            return document.RootElement.Clone();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // The exception message names the absolute path, so it is never passed on.
+            return null;
+        }
+    }
 
     /// <summary>
     /// Finds and loads the packages under <paramref name="root"/>. A null or empty root gives an
@@ -103,7 +131,7 @@ public sealed class PackageCatalog
             string.CompareOrdinal(left.Manifest.Id, right.Manifest.Id) is var byId and not 0
                 ? byId
                 : PackageVersions.Compare(left.Manifest.Version, right.Manifest.Version));
-        return new PackageCatalog(packages, DiagnosticOrder.Sort(diagnostics));
+        return new PackageCatalog(packages, DiagnosticOrder.Sort(diagnostics), root);
     }
 
     /// <summary>
