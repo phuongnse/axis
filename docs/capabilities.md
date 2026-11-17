@@ -331,10 +331,10 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Capability | Where |
 | --- | --- |
 | Show a site's menu with icons | [Navigation icons](reference/shell.md#navigation-icons) |
-| Group menu entries under a parent | _(planned for M42)_ |
+| Group menu entries under a parent | [Sites and pages](reference/resource-files.md#sites-and-pages) _(planned for M42)_ |
 | Hide pages and widgets a person may not open | [Policies](reference/frontend.md#policies) |
-| Open a home page that fits the person's role | _(planned for M42)_ |
-| Keep favourites and recent items | _(planned for M42)_ |
+| Open a home page that fits the person's role | [Layout](reference/shell.md#layout) _(planned for M42)_ |
+| Keep favourites and recent items | [Favourites and recent items](reference/shell.md#favourites-and-recent-items) _(planned for M42)_ |
 | Search across all records of an application | _(planned for M53)_ |
 | Move between applications and tools | [App switcher and preferences](reference/shell.md#app-switcher-and-preferences) |
 | See every application on one home page | [Platform home page](reference/shell.md#platform-home-page) |
@@ -367,7 +367,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Open pages and forms without signing in | _(planned for M49)_ |
 | Let outside people register on a portal site | _(planned for M49)_ |
 | Embed a page in another site | _(planned for M49)_ |
-| Give each site its own logo and colours | _(planned for M42)_ |
+| Give each site its own logo and colours | [Design tokens and previews](reference/frontend.md#design-tokens-and-previews) _(planned for M42)_ |
 | Offer several languages on a site | [Text resolution](reference/frontend.md#text-resolution) |
 | Show dates and numbers in locales beyond English and Vietnamese, and right-to-left languages | _(planned for M58)_ |
 | Meet contrast, keyboard and screen reader rules | [Design tokens and previews](reference/frontend.md#design-tokens-and-previews) |

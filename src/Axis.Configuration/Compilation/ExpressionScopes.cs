@@ -60,7 +60,8 @@ public static class ExpressionScopes
             referenceFields: null,
             modules,
             undeclaredModuleIsUnknown,
-            labelKeys: LabelKeysOf(all.Select(field => (field.Name, field.Label))));
+            labelKeys: LabelKeysOf(all.Select(field => (field.Name, field.Label))),
+            valueLabelKeys: ValueLabelKeysOf(all));
     }
 
     internal static ExpressionScope ForEntity(
@@ -84,7 +85,8 @@ public static class ExpressionScopes
             referenceFields: null,
             modules,
             undeclaredModuleIsUnknown,
-            labelKeys: LabelKeysOf(all));
+            labelKeys: LabelKeysOf(all),
+            valueLabelKeys: ValueLabelKeysOf(all));
     }
 
     /// <summary>
@@ -117,6 +119,10 @@ public static class ExpressionScopes
         var all = fields.ToList();
         ReferenceFieldResolver resolver =
             (target, name) => findEntity(target) is { } entity && entity.TryGetField(name, out var field) ? TypeOf(field) : null;
+        ReferenceLabelResolver labels = (target, name) =>
+            findEntity(target) is { } entity && entity.TryGetField(name, out var field) && TypeOf(field) is { } type
+                ? new ExpressionScopeField(field.Name, type, field.Label?.TextKey, ValueLabelKeysOf(new[] { field }).GetValueOrDefault(field.Name))
+                : null;
         return Build(
             [
                 .. all.Select(field => (field.Name, TypeOf(field))),
@@ -136,14 +142,22 @@ public static class ExpressionScopes
                                 rules: null,
                                 collections: null,
                                 resolver,
-                                labelKeys: LabelKeysOf(item.Fields.Select(itemField => (itemField.Name, itemField.Label)))))
+                                labelKeys: LabelKeysOf(item.Fields.Select(itemField => (itemField.Name, itemField.Label))),
+                                valueLabelKeys: ValueLabelKeysOf(item.Fields),
+                                referenceLabels: labels))
                         : null)
                     .OfType<ExpressionCollection>(),
             ],
             resolver,
             modules,
             undeclaredModuleIsUnknown,
-            labelKeys: LabelKeysOf(all.Select(field => (field.Name, field.Label))));
+            labelKeys: LabelKeysOf(all.Select(field => (field.Name, field.Label))),
+            valueLabelKeys: ValueLabelKeysOf(
+                [
+                    .. all.Select(field => (field.Name, field.ValueLabels)),
+                    .. parameters.Select(parameter => (parameter.Name, parameter.ValueLabels)),
+                ]),
+            referenceLabels: labels);
     }
 
     /// <summary>
@@ -174,7 +188,13 @@ public static class ExpressionScopes
             modules,
             undeclaredModuleIsUnknown,
             ReferenceCollectionsOf(findEntity),
-            LabelKeysOf(all));
+            LabelKeysOf(all),
+            ValueLabelKeysOf(
+            [
+                .. all.Select(field => (field.Name, field.ValueLabels)),
+                .. parameters.Select(parameter => (parameter.Name, parameter.ValueLabels)),
+            ]),
+            ReferenceLabelsOf(findEntity));
     }
 
     /// <summary>
@@ -202,7 +222,9 @@ public static class ExpressionScopes
             ReferenceFieldsOf(findEntity),
             modules,
             referenceCollections: ReferenceCollectionsOf(findEntity),
-            labelKeys: LabelKeysOf(all));
+            labelKeys: LabelKeysOf(all),
+            valueLabelKeys: ValueLabelKeysOf(all),
+            referenceLabels: ReferenceLabelsOf(findEntity));
     }
 
     /// <summary>
@@ -229,7 +251,8 @@ public static class ExpressionScopes
             referenceFields: null,
             modules,
             undeclaredModuleIsUnknown: true,
-            labelKeys: LabelKeysOf(all));
+            labelKeys: LabelKeysOf(all),
+            valueLabelKeys: ValueLabelKeysOf(all));
     }
 
     /// <summary>
@@ -287,7 +310,8 @@ public static class ExpressionScopes
             rules: null,
             collections: null,
             referenceFields: null,
-            labelKeys: LabelKeysOf(all.Select(pair => (pair.Name, pair.Field.Label))));
+            labelKeys: LabelKeysOf(all.Select(pair => (pair.Name, pair.Field.Label))),
+            valueLabelKeys: ValueLabelKeysOf(all.Select(pair => (pair.Name, pair.Field.ValueLabels))));
     }
 
     /// <summary>
@@ -304,7 +328,8 @@ public static class ExpressionScopes
             [.. rootEntity is null ? [] : new[] { ("id", (ExpressionType?)ExpressionType.ReferenceParameter(rootEntity)) }, .. names],
             rules: null,
             collections: null,
-            referenceFields: findEntity is null ? null : ReferenceFieldsOf(findEntity));
+            referenceFields: findEntity is null ? null : ReferenceFieldsOf(findEntity),
+            referenceLabels: findEntity is null ? null : ReferenceLabelsOf(findEntity));
 
     /// <summary>The expression type of a field's value, or null for a child collection or a references field.</summary>
     public static ExpressionType? TypeOf(FieldModel field)
@@ -346,7 +371,9 @@ public static class ExpressionScopes
                                 rules: null,
                                 collections: null,
                                 ReferenceFieldsOf(findEntity),
-                                labelKeys: LabelKeysOf(child.Fields))
+                                labelKeys: LabelKeysOf(child.Fields),
+                                valueLabelKeys: ValueLabelKeysOf(child.Fields),
+                                referenceLabels: ReferenceLabelsOf(findEntity))
                             : ForEntity(child.Fields))
                     : null)
                 .OfType<ExpressionCollection>(),
@@ -384,7 +411,9 @@ public static class ExpressionScopes
         IEnumerable<string>? modules = null,
         bool undeclaredModuleIsUnknown = false,
         ReferenceCollectionResolver? referenceCollections = null,
-        IReadOnlyDictionary<string, string>? labelKeys = null)
+        IReadOnlyDictionary<string, string>? labelKeys = null,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? valueLabelKeys = null,
+        ReferenceLabelResolver? referenceLabels = null)
     {
         var types = new Dictionary<string, ExpressionType>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, type) in fields)
@@ -395,7 +424,8 @@ public static class ExpressionScopes
             }
         }
 
-        return new ExpressionScope(types, rules, collections, referenceFields, modules, undeclaredModuleIsUnknown, referenceCollections, labelKeys);
+        return new ExpressionScope(
+            types, rules, collections, referenceFields, modules, undeclaredModuleIsUnknown, referenceCollections, labelKeys, valueLabelKeys, referenceLabels);
     }
 
     /// <summary>The text key of each field's label by name, for the fields that have a label. A repeated name keeps its first.</summary>
@@ -415,6 +445,46 @@ public static class ExpressionScopes
 
     private static Dictionary<string, string> LabelKeysOf(IEnumerable<FieldDefinition> fields) =>
         LabelKeysOf(fields.Select(field => (field.Name, field.Label)));
+
+    /// <summary>
+    /// The text key of each enum value's label by value, for each field by name that has value labels. A repeated name
+    /// keeps its first.
+    /// </summary>
+    private static Dictionary<string, IReadOnlyDictionary<string, string>> ValueLabelKeysOf(
+        IEnumerable<(string Name, IReadOnlyDictionary<string, TextReference>? ValueLabels)> fields)
+    {
+        var keys = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, labels) in fields)
+        {
+            if (labels is { Count: > 0 })
+            {
+                keys.TryAdd(name, labels.ToDictionary(pair => pair.Key, pair => pair.Value.TextKey, StringComparer.Ordinal));
+            }
+        }
+
+        return keys;
+    }
+
+    private static Dictionary<string, IReadOnlyDictionary<string, string>> ValueLabelKeysOf(IEnumerable<FieldDefinition> fields) =>
+        ValueLabelKeysOf(fields.Select(field => (field.Name, field.ValueLabels)));
+
+    private static Dictionary<string, IReadOnlyDictionary<string, string>> ValueLabelKeysOf(IEnumerable<FieldModel> fields) =>
+        ValueLabelKeysOf(fields.Select(field => (field.Name, field.ValueLabels)));
+
+    /// <summary>
+    /// Finds a field of the entity <paramref name="findEntity"/> returns for a reference's target, ignoring letter case, with
+    /// its label key and value label keys, so a path step is named by the field it resolves to.
+    /// </summary>
+    private static ReferenceLabelResolver ReferenceLabelsOf(Func<string, EntityResource?> findEntity) =>
+        (target, name) => findEntity(target)?.Fields
+            .FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)) is { } field
+            && TypeOf(field) is { } type
+                ? new ExpressionScopeField(
+                    field.Name,
+                    type,
+                    field.Label?.TextKey,
+                    ValueLabelKeysOf(new[] { field }).GetValueOrDefault(field.Name))
+                : null;
 
     /// <summary>
     /// A parameter's type is a field's, except that an enum parameter declares its own values and a

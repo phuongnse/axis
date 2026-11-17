@@ -47,6 +47,8 @@ Core migrations shipped with Axis.
 | `axis.table_views`                     | `Axis.Data`          | A view that a person saved for one table, see [table views and columns](frontend.md#table-views-and-columns)                                                                                                                                                                          |
 | `axis.table_columns`                   | `Axis.Data`          | A person's columns of one table, see [table views and columns](frontend.md#table-views-and-columns)                                                                                                                                                                                   |
 | `axis.form_drafts` _(planned for M42)_ | `Axis.Data`          | A person's draft of a new record on one form, see [form drafts](record-form-state.md#form-drafts)                                                                                                                                                                                     |
+| `axis.favourites` _(planned for M42)_  | `Axis.Data`          | A page or record that a person keeps as a favourite on a site, see [favourites and recent items](shell.md#favourites-and-recent-items)                                                                                                                                                 |
+| `axis.recent_items` _(planned for M42)_ | `Axis.Data`         | A page and record that a person opened on a site, the latest 20 kept, see [favourites and recent items](shell.md#favourites-and-recent-items)                                                                                                                                          |
 | `axis.process_*` and the others        | `Axis.Processes`     | Process instances, steps, tasks, staged calls, events, notifications, emails, webhook deliveries, receipts and work items, see [process tables](process-tables.md#tables)                                                                                                             |
 
 The tables of `Axis.Processes` include `axis.process_instances`, `axis.process_step_history`,
@@ -136,6 +138,14 @@ erDiagram
   `?form=`. The worker deletes the rows whose `saved_at` is over 30 days old, by its own clock, when the tenant
   becomes ready and then every 24 hours. The runtime database role writes the table, so the grant step adds it
   to the list of `axis` tables that runtime writes, in [database roles](#database-roles), when M42 builds it.
+- **Favourites and recent items** _(planned for M42)_. A row of `axis.favourites` holds `id` (`uuid`, the primary key),
+  `user_id`, `application_id`, `site_path`, `page`, `record_id` (`uuid`, `null` for a page alone) and `created_at`
+  (`timestamptz`). Favourites are unique on user, application, site, page and record, with nulls counted as equal. A row
+  of `axis.recent_items` holds `user_id`, `application_id`, `site_path`, `page`, `record_id` (`uuid`) and `opened_at`
+  (`timestamptz`), unique on the same key. The server keeps the latest 20 rows per person and site. The server reads
+  and writes both through the routes of [favourites and recent items](shell.md#favourites-and-recent-items). The runtime
+  database role writes both tables, so the grant step adds them to the list of `axis` tables that runtime writes, in
+  [database roles](#database-roles), when M42 builds them.
 
 ## Entity tables
 
