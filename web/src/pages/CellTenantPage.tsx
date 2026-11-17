@@ -74,7 +74,7 @@ const actionTexts = {
 
 /**
  * The Tenant view of the cell console, in parts a rule apart, see docs/reference/shell.md#layout: Details with one tenant's
- * status, application, hosts and actions, then Host verification with the state of each host the operator asked for,
+ * status, application, hosts and actions, then Host verification with the state of each host that was asked for,
  * Quotas with the ones it overrides, Usage of the last 13 months by day in the table of the users page's "Usage" section, paged on the server from the tenant's own usage days route,
  * and Jobs in the shared job table. A `deleting` tenant shows its purge date after its status. An id that is no tenant
  * but a purged one shows only Deleted, the date of the purge, the date its deletion is complete and its jobs, with no

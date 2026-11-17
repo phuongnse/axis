@@ -308,7 +308,7 @@ A tenant administrator asks for a host of the tenant's own, with the same reques
 | `GET /api/tenant/hosts`  | Lists the newest request of each host as `{ host, state, expiresAt }`        |
 
 - **Who.** A person who holds the [administrator role](user-administration.md#the-administrator-role).
-  No screen draws the routes yet.
+  The routes serve API callers, and no screen draws them.
 - **Routes.** Both are platform routes on the tenant's host, in the session partition, with the CSRF
   header on the `POST`.
 - **Checks.** In this order: no session answers `401`, no administrator role `403`, and a tenant that

@@ -67,7 +67,7 @@ namespace Axis.Server.CellApi;
 /// cell, so the list leaves it out and its id is a <c>404</c>. The <c>application</c> is the one the create job
 /// recorded on the tenant's row: the template id, or the name of the blank application, and <see langword="null"/> for a tenant that no create job made. The one tenant also answers its <c>quotas</c>: each quota key with its effective <c>value</c> and
 /// whether the tenant <c>overridden</c> it, worked out from its <c>platform.tenant_quotas</c> rows and the cell's defaults. It also
-/// answers its <c>hostRequests</c>: the newest request of each host the operator asked for, as <c>{ host, state, expiresAt }</c>, ordered
+/// answers its <c>hostRequests</c>: the newest request of each host that was asked for, as <c>{ host, state, expiresAt }</c>, ordered
 /// by host. A pending request past its expiry answers <c>expired</c>, and the token is never answered.
 /// </para>
 /// <para>
@@ -1222,7 +1222,7 @@ internal sealed record CellTenantUsageDayListResponse(IReadOnlyList<TenantUsageD
 
 /// <summary>
 /// One tenant of the cell with its effective quotas, keyed by quota key, its day rows of the last 13 months, newest first, and the newest
-/// request of each host the operator asked for.
+/// request of each host that was asked for.
 /// </summary>
 internal sealed record CellTenantDetailResponse(
     string Id,
