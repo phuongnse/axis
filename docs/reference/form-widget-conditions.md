@@ -41,6 +41,9 @@ person edits, and shows its answer.
   the `defaults` of an answer, as the form's starting value. A value that the user typed or cleared is
   kept. The widget does not send an unchanged default, so the save applies it, and clearing a default
   sends `null`. A saved record and the task page ignore `defaults`.
+- **Context defaults** _(planned for M42)_. A context default, see [defaults from the context](form-widget.md#form-resource),
+  is the exception to the rule above. It counts as changed, so the create sends it. The server then stores the person's
+  id or today's date, not the entity's default.
 - **Save.** The widget always sends `?form=` with the form's name on create, on update and on the save
   before a `startProcess` action, so the server enforces `requiredWhen`. A widget that names an
   `entity` sends no `?form=`.

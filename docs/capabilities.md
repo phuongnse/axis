@@ -132,7 +132,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | One date for "today" in the application's time zone | [Application time zone](reference/entity-logic-and-sequences.md#application-time-zone) |
 | A fixed list of values with a label for each | [More field types](reference/resource-files.md#more-field-types-and-properties) |
 | A file on a record, and several files through child rows | [File fields](reference/file-fields.md#field-and-value) |
-| Multi-line and rich text | _(planned for M42)_ |
+| Multi-line and rich text | [More field types](reference/resource-files.md#more-field-types-and-properties) and [Inputs](reference/form-widget.md#inputs) _(planned for M42)_ |
 | Duration, location, JSON and multi-select fields | _(planned for M53)_ |
 | A record that points to another record | [Entity field types](reference/resource-files.md#entity-field-types-and-constraints) |
 | Rows owned by a record, such as line items | [Entity logic](reference/entity-logic-and-sequences.md#entity-logic) |
@@ -157,7 +157,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Business numbers that restart each year | [Sequences](reference/entity-logic-and-sequences.md#sequences) |
 | Business numbers per month or per prefix | _(planned for M53)_ |
 | Default values from a fixed value, a rule or the current time | [More field types](reference/resource-files.md#more-field-types-and-properties) |
-| Default values from the user or the page | _(planned for M42)_ |
+| Default values from the user or the page | [Form resource](reference/form-widget.md#form-resource) _(planned for M42)_ |
 | Who created a record, for "my records" | [Record creator](reference/roles-and-policies.md#record-creator) |
 | Who may read or change which records and which fields | [Policies](reference/roles-and-policies.md#policies) |
 | Sensitive values stored encrypted | [Sensitive field values](reference/data-encryption.md#sensitive-field-values) |
@@ -264,21 +264,21 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | --- | --- |
 | Lay out a form in titled sections | [Form resource](reference/form-widget.md#form-resource) |
 | Place fields side by side in columns | [Fields in columns](reference/form-widget.md#fields-in-columns) |
-| Put a form's sections in tabs | _(planned for M42)_ |
-| Collapse a form section | _(planned for M42)_ |
+| Put a form's sections in tabs | [Form resource](reference/form-widget.md#form-resource) _(planned for M42)_ |
+| Collapse a form section | [Form resource](reference/form-widget.md#form-resource) _(planned for M42)_ |
 | Show, require or lock a field by condition | [Conditions](reference/form-conditions.md#conditions) |
 | Show validation messages as the person types | [Conditions](reference/form-widget-conditions.md#conditions) |
 | Split a form into wizard steps | [Steps](reference/form-conditions.md#steps) |
-| Default a field from the context, such as the current person or the page | _(planned for M42)_ |
+| Default a field from the context, such as the current person or the page | [Form resource](reference/form-widget.md#form-resource) _(planned for M42)_ |
 | Open a new record already filled in from its parent | [First values of a new record](reference/resource-files.md#first-values-of-a-new-record) _(planned for M42)_ |
 | Enter line items in a grid inside the form | [Child collections](reference/form-widget.md#child-collections) |
-| Reorder line items | _(planned for M42)_ |
+| Reorder line items | [Child collections](reference/form-widget.md#child-collections) _(planned for M42)_ |
 | Pick a record through a lookup with search | [Lookup](reference/form-widget.md#lookup) |
 | Pick several records | [Set of references](reference/form-widget.md#set-of-references) |
-| Narrow a lookup by another field's value | _(planned for M42)_ |
+| Narrow a lookup by another field's value | [Lookup filters](reference/form-conditions.md#lookup-filters) _(planned for M42)_ |
 | Pick a person | [Inputs](reference/form-widget.md#inputs) |
-| Type text on several lines | _(planned for M42)_ |
-| Format text with rich text | _(planned for M42)_ |
+| Type text on several lines | [Inputs](reference/form-widget.md#inputs) _(planned for M42)_ |
+| Format text with rich text | [Inputs](reference/form-widget.md#inputs) _(planned for M42)_ |
 | Upload a file | [In the SPA](reference/file-fields.md#in-the-spa) |
 | Attach several files to a record | [Field and value](reference/file-fields.md#field-and-value) |
 | Preview an image or a PDF without downloading it | [Preview](reference/file-fields.md#download) _(planned for M40)_ |
@@ -305,10 +305,10 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Act on several selected rows at once | [Bulk actions](reference/table-widget.md#bulk-actions) _(planned for M42)_ |
 | Edit values in the table | [Inline edit](reference/table-widget.md#inline-edit) _(planned for M42)_ |
 | Import records from CSV or Excel into a table | [Import](reference/table-widget.md#import) |
-| Show records on a calendar | _(planned for M42)_ |
-| Show records on a kanban board | _(planned for M42)_ |
-| Show records as cards | _(planned for M42)_ |
-| Show records as a tree | _(planned for M42)_ |
+| Show records on a calendar | [Calendar](reference/calendar-board-card-tree-widgets.md#calendar) _(planned for M42)_ |
+| Show records on a kanban board | [Board](reference/calendar-board-card-tree-widgets.md#board) _(planned for M42)_ |
+| Show records as cards | [Cards](reference/calendar-board-card-tree-widgets.md#cards) _(planned for M42)_ |
+| Show records as a tree | [Tree](reference/calendar-board-card-tree-widgets.md#tree) _(planned for M42)_ |
 | Show records on a Gantt chart or timeline | _(planned for M58)_ |
 | Show records on a map | _(planned for M58)_ |
 | Show one record read-only | [Detail widget](reference/detail-chart-kpi-widgets.md#detail-widget) |

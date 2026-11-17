@@ -250,6 +250,9 @@ A list takes a page, a page size, a sort, a filter and a search text in its quer
   does not speed it up. A search over 100,000 records with two searched fields
   answers a page within 2 s, and `SearchPerformanceTests` fails when it takes
   2 s or more.
+- **Rich text** _(planned for M42)_. `search` reads a `searchable` `richText` field as its plain words: tags are
+  removed and character references are decoded. So a tag name never matches, and `a &amp; b` matches `a & b`.
+  See [more field types](resource-files.md#more-field-types-and-properties).
 - **System fields** _(planned for M41)_. `sort` and `filter` may name `createdAt`, `createdBy`, `updatedAt`
   and `updatedBy`, which are not entries of `values`, see [system fields](#system-fields). `createdAt` and
   `updatedAt` are `date` fields for the operators below, and `createdBy` and `updatedBy` are `text`. They
