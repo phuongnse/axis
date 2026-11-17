@@ -401,7 +401,7 @@ internal static class PresentationChecker
 
         ApplicationCompiler.CheckTextKey(page.Title, page, "/title", references, diagnostics);
 
-        var parameterNames = new HashSet<string>(["page", "pageSize", "sort", "search"], StringComparer.OrdinalIgnoreCase);
+        var parameterNames = new HashSet<string>(["page", "pageSize", "sort", "search", "filter"], StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < page.Parameters.Count; index++)
         {
             var parameter = page.Parameters[index];
@@ -410,7 +410,7 @@ internal static class PresentationChecker
             {
                 Report(
                     DiagnosticCodes.InvalidPageParameterName,
-                    $"The parameter name '{parameter.Name}' is reserved or already used by an earlier parameter. 'page', 'pageSize', 'sort' and 'search' are reserved, ignoring letter case, because they share the URL query with the table.",
+                    $"The parameter name '{parameter.Name}' is reserved or already used by an earlier parameter. 'page', 'pageSize', 'sort', 'search' and 'filter' are reserved, ignoring letter case, because they share the URL query with the table.",
                     $"{path}/name");
             }
 

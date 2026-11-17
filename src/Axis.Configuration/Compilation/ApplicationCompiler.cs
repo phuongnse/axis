@@ -2723,7 +2723,7 @@ public static partial class ApplicationCompiler
             }
 
             var countBeforeParameters = diagnostics.Count;
-            var parameterNames = new HashSet<string>(["page", "pageSize", "sort", "search"], StringComparer.OrdinalIgnoreCase);
+            var parameterNames = new HashSet<string>(["page", "pageSize", "sort", "search", "filter"], StringComparer.OrdinalIgnoreCase);
             for (var index = 0; index < dataSource.Parameters.Count; index++)
             {
                 var parameter = dataSource.Parameters[index];
@@ -2739,7 +2739,7 @@ public static partial class ApplicationCompiler
                 {
                     Report(
                         DiagnosticCodes.InvalidDataSourceParameterName,
-                        $"The parameter name '{parameter.Name}' is reserved or already used by an earlier parameter. 'page', 'pageSize', 'sort' and 'search' are reserved, ignoring letter case.",
+                        $"The parameter name '{parameter.Name}' is reserved or already used by an earlier parameter. 'page', 'pageSize', 'sort', 'search' and 'filter' are reserved, ignoring letter case.",
                         $"{path}/name");
                 }
 

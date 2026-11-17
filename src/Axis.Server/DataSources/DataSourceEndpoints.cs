@@ -41,7 +41,9 @@ namespace Axis.Server.DataSources;
 /// source parameters are read by <see cref="DataSourceParameterReader"/>. A database error while evaluating the filter or the
 /// read filters is a 400 problem with a fixed title, and each read filter is logged by its policy
 /// and grant. The problem titles never contain text from the request, SQL or storage names.
-/// The export route takes the same <c>search</c> and checks it the same way. A data source of a module is written <c>{module id}/{data source name}</c>, as two path segments,
+/// <c>filter</c> is the record API's filter over the projected columns, or over the group fields of a grouped data source. It narrows the rows
+/// on top of the data source's filter and the read filters, and a column that is being recomputed is a 409 keyed <c>filter</c>.
+/// The export route takes the same <c>search</c> and <c>filter</c> and checks them the same way. A data source of a module is written <c>{module id}/{data source name}</c>, as two path segments,
 /// for example <c>data-sources/departments/Departments/rows</c>. It has the same checks as any
 /// other data source, and only that form reaches it.
 /// </summary>
@@ -148,6 +150,7 @@ internal static class DataSourceEndpoints
         }
 
         var searching = ReadSearch(context, model, search, errors);
+        var listFilter = ReadFilter(context, model, errors);
         var parameters = DataSourceParameterReader.Read(context.Request.QueryString, model, errors);
 
         if (errors.Count > 0)
@@ -155,8 +158,8 @@ internal static class DataSourceEndpoints
             return Results.ValidationProblem(errors);
         }
 
-        // A sort, a group field, a measure, a filter or a search on a field that is being recomputed would decide from a stale stored value.
-        var pending = await DataSourcePendingFields.ReadAsync(connection, database.ReadTransaction, application, model, order, searching, cancellationToken);
+        // A sort, a group field, a measure, a filter, a request filter or a search on a field that is being recomputed would decide from a stale stored value.
+        var pending = await DataSourcePendingFields.ReadAsync(connection, database.ReadTransaction, application, model, order, searching, listFilter, cancellationToken);
         if (pending.Count > 0)
         {
             return Results.ValidationProblem(pending.ToDictionary(), statusCode: StatusCodes.Status409Conflict, title: "A field is being recomputed.");
@@ -166,7 +169,7 @@ internal static class DataSourceEndpoints
             ? await RecordFilters.ConditionAsync(application, root, [.. filters.Select(filter => filter.Expression)], user.Id, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken)
             : null;
         var result = await DataSourceQueries.ListAsync(
-            connection, database.ReadTransaction, application, model, pageNumber, size, order, parameters, condition, search, RecordEndpoints.Cipher(sensitive, tenants), user.Id, cancellationToken);
+            connection, database.ReadTransaction, application, model, pageNumber, size, order, parameters, condition, search, RecordEndpoints.Cipher(sensitive, tenants), user.Id, listFilter, cancellationToken);
         if (result is null)
         {
             // PostgreSQL cannot say which part of the WHERE clause failed, so every read filter is named.
@@ -187,7 +190,7 @@ internal static class DataSourceEndpoints
         return Results.Ok(new DataSourceRowsResponse([.. result.Items.Select(fields.Visible)], pageNumber, size, result.TotalCount));
     }
 
-    // An export takes the query of the rows route, its search included, without its paging. The grants, the filters and the
+    // An export takes the query of the rows route, its search and filter included, without its paging. The grants, the filters and the
     // field checks are the rows route's, and the export grant is checked in place of the read grant.
     // The rows are written to a temporary file, so the file is complete before the audit record and
     // before any byte is sent. A grouped data source writes its group fields, then its measures.
@@ -255,6 +258,7 @@ internal static class DataSourceEndpoints
         }
 
         var searching = ReadSearch(context, model, search, errors);
+        var listFilter = ReadFilter(context, model, errors);
         var parameters = DataSourceParameterReader.Read(context.Request.QueryString, model, errors);
         ExportFile.TryParseFormat(format, errors, out var exportFormat);
         if (errors.Count > 0)
@@ -262,8 +266,8 @@ internal static class DataSourceEndpoints
             return Results.ValidationProblem(errors);
         }
 
-        // A sort, a group field, a measure, a filter or a search on a field that is being recomputed would decide from a stale stored value.
-        var pending = await DataSourcePendingFields.ReadAsync(connection, database.ReadTransaction, application, model, order, searching, cancellationToken);
+        // A sort, a group field, a measure, a filter, a request filter or a search on a field that is being recomputed would decide from a stale stored value.
+        var pending = await DataSourcePendingFields.ReadAsync(connection, database.ReadTransaction, application, model, order, searching, listFilter, cancellationToken);
         if (pending.Count > 0)
         {
             return Results.ValidationProblem(pending.ToDictionary(), statusCode: StatusCodes.Status409Conflict, title: "A field is being recomputed.");
@@ -291,7 +295,7 @@ internal static class DataSourceEndpoints
                 exportFormat,
                 model.Name,
                 columns,
-                DataSourceQueries.ReadAllAsync(connection, application, model, order, parameters, condition, search, export.MaxRows + 1, RecordEndpoints.Cipher(sensitive, tenants), user.Id, cancellationToken),
+                DataSourceQueries.ReadAllAsync(connection, application, model, order, parameters, condition, search, export.MaxRows + 1, RecordEndpoints.Cipher(sensitive, tenants), user.Id, listFilter, cancellationToken),
                 Cells,
                 export.MaxRows,
                 (rows, truncated) => new AuditEntry(
@@ -326,6 +330,30 @@ internal static class DataSourceEndpoints
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "The data source filter could not be evaluated for these rows.");
         }
+    }
+
+    // The request filter is the record list's, over the columns of the data source. A repeated filter or one that does not
+    // parse is a 400 keyed filter, and an empty one means none. Returns the parsed filter, or null when there is none.
+    private static RecordListFilter? ReadFilter(HttpContext context, DataSourceModel model, SortedDictionary<string, string[]> errors)
+    {
+        var values = context.Request.Query["filter"];
+        if (values.Count > 1)
+        {
+            errors["filter"] = SearchQuery.RepeatedError;
+            return null;
+        }
+
+        if (values.ToString() is not { Length: > 0 } json)
+        {
+            return null;
+        }
+
+        if (!DataSourceListFilter.TryParse(json, model, out var parsed, out var message))
+        {
+            errors["filter"] = [message];
+        }
+
+        return parsed;
     }
 
     // Without the option, only a given search is refused, and an empty one is no search. Returns
