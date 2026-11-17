@@ -4,6 +4,7 @@ import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { CellJob, CellTenant } from '../platform/cell'
+import { formItem } from '../test/antd'
 import { clickInDialog, pick } from '../test/tableFilter'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
@@ -162,12 +163,12 @@ async function openDialog(user: ReturnType<typeof userEvent.setup>) {
 }
 
 async function fillDialog(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, id = 'delta') {
-  await user.clear(within(dialog).getByLabelText('Tenant ID'))
-  await user.type(within(dialog).getByLabelText('Tenant ID'), id)
-  await user.clear(within(dialog).getByLabelText('Application'))
-  await user.type(within(dialog).getByLabelText('Application'), ' approvals ')
-  await user.clear(within(dialog).getByLabelText("Administrator's email"))
-  await user.type(within(dialog).getByLabelText("Administrator's email"), 'admin@delta.test')
+  await user.clear(within(dialog).getByLabelText(/^Tenant ID\*?$/))
+  await user.type(within(dialog).getByLabelText(/^Tenant ID\*?$/), id)
+  await user.clear(within(dialog).getByLabelText(/^Application\*?$/))
+  await user.type(within(dialog).getByLabelText(/^Application\*?$/), ' approvals ')
+  await user.clear(within(dialog).getByLabelText(/^Administrator's email\*?$/))
+  await user.type(within(dialog).getByLabelText(/^Administrator's email\*?$/), 'admin@delta.test')
 }
 
 // The dialog's corner icon has the same name, so the footer button is the last.
@@ -369,7 +370,7 @@ describe('CellTenantsPage', () => {
     renderPage()
 
     const dialog = await openDialog(user)
-    await user.type(within(dialog).getByLabelText('Tenant ID'), 'Not Valid')
+    await user.type(within(dialog).getByLabelText(/^Tenant ID\*?$/), 'Not Valid')
     await user.click(createButton(dialog))
 
     expect(await within(dialog).findAllByText(/required|not match|valid/i)).not.toHaveLength(0)
@@ -383,15 +384,30 @@ describe('CellTenantsPage', () => {
 
     const dialog = await openDialog(user)
 
-    expect(within(dialog).getByLabelText('Tenant ID')).toHaveAccessibleDescription(
+    expect(within(dialog).getByLabelText(/^Tenant ID\*?$/)).toHaveAccessibleDescription(
       '1 to 50 lower-case letters, digits and hyphens, such as acme.',
     )
-    expect(within(dialog).getByLabelText('Application')).toHaveAccessibleDescription(
+    expect(within(dialog).getByLabelText(/^Application\*?$/)).toHaveAccessibleDescription(
       'The ID of an installed application template, such as approvals.',
     )
-    expect(within(dialog).getByLabelText("Administrator's email")).toHaveAccessibleDescription(
+    expect(within(dialog).getByLabelText(/^Administrator's email\*?$/)).toHaveAccessibleDescription(
       "The tenant's first administrator, who gets an invitation at this address.",
     )
+  })
+
+  it('marks the tenant id, the application and the administrator as required', async () => {
+    stubCreate([])
+    const user = userEvent.setup()
+    renderPage()
+
+    const dialog = await openDialog(user)
+
+    for (const label of ['Tenant ID', 'Application', "Administrator's email"]) {
+      const field = within(dialog).getByLabelText(new RegExp(`^${label}\\*?$`))
+      const labelText = formItem(field).querySelector('label')
+      expect(labelText?.textContent).toBe(`${label}*`)
+      expect(labelText?.querySelector('[aria-hidden="true"]')?.textContent).toBe('*')
+    }
   })
 
   it('says what to enter in each empty field and sends nothing', async () => {
@@ -457,7 +473,7 @@ describe('CellTenantsPage', () => {
     await fillDialog(user, dialog)
     await user.click(createButton(dialog))
     await within(dialog).findByTestId('cell-create-error')
-    await user.type(within(dialog).getByLabelText('Tenant ID'), '2')
+    await user.type(within(dialog).getByLabelText(/^Tenant ID\*?$/), '2')
     await user.click(createButton(dialog))
 
     await within(dialog).findByTestId('cell-jobs')

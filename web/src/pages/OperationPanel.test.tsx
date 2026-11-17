@@ -11,7 +11,7 @@ import { setAt } from '../platform/jsonPatch'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, optionTexts, selectRoot } from '../test/antd'
+import { chooseOption, flexOf, optionTexts, selectRoot } from '../test/antd'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { forbiddenOperationKeys, operationJsonOnlyKeys, withOperation } from './operationKeys'
 import { ProcessEditor } from './ProcessEditor'
@@ -1175,5 +1175,27 @@ describe('withOperation', () => {
     expect(operationJsonOnlyKeys({ operation: 'updateRecord', set: {} })).toEqual([])
     expect(operationJsonOnlyKeys({ operation: 'updateRecord', set: {}, to: [] })).toEqual(['to'])
     expect(operationJsonOnlyKeys({ operation: 'notify', to: [], open: {} })).toEqual([])
+  })
+})
+
+describe('The fields of a step, one to a row', () => {
+  it('stacks an operation and its package operation', () => {
+    renderEditor()
+
+    const operation = step(3).getByRole('combobox', { name: 'Operation' })
+    const row = flexOf(operation)
+    expect(row).toHaveClass('ant-flex-vertical')
+    expect(row.children[0]).toContainElement(operation)
+    expect(row.children[1]).toContainElement(step(3).getByRole('textbox', { name: 'Package operation' }))
+  })
+
+  it('stacks the attempts and the backoff of a retry', () => {
+    renderEditor()
+
+    const attempts = step(1).getByRole('spinbutton', { name: 'Attempts' })
+    const row = flexOf(attempts)
+    expect(row).toHaveClass('ant-flex-vertical')
+    expect(row.children[0]).toContainElement(attempts)
+    expect(row.children[1]).toContainElement(step(1).getByRole('textbox', { name: 'Backoff' }))
   })
 })

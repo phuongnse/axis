@@ -2,6 +2,7 @@ import { Button, Flex, Form, Input, Select, Space } from 'antd'
 import { useEffect, useState } from 'react'
 import { FieldInput } from './FieldInput'
 import { fetchRecord, type RecordItem, type RecordValue } from './records'
+import { requiredMark } from './requiredMark'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { DataSourceParameter, FieldMetadata } from './site'
 import { useText } from './texts'
@@ -65,7 +66,7 @@ export function FilterBar({ parameters, values, errors, onChange, locale }: Filt
   const t = useText()
   const { spacing } = useDesignTokens()
   return (
-    <Form layout="vertical" data-testid="filter-bar">
+    <Form layout="vertical" requiredMark={requiredMark} data-testid="filter-bar">
       <Flex wrap gap={spacing.lg}>
         {parameters.map((parameter) => {
           const { name } = parameter

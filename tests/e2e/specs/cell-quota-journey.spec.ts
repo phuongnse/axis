@@ -2,6 +2,7 @@ import type { Browser, Page } from '@playwright/test'
 import { expect, test } from '../test'
 import { startCell } from '../cell'
 import { confirmDialog, waitForDialog } from '../dialogs'
+import { fieldLabel } from '../fields'
 import { addAuthenticator, submitCode, submitPassword } from '../keycloak'
 import { psql } from '../postgres'
 import { addRealmAccount, clearRequiredActions, giveRealmRole, setRealmPassword } from '../tenant-realm'
@@ -43,9 +44,9 @@ async function createTenant(page: Page, tenant: string) {
   await page.goto(`${consoleUrl}tenants`)
   await page.getByTestId('cell-tenants-create').click()
   const dialog = await waitForDialog(page)
-  await dialog.getByLabel('Tenant ID', { exact: true }).fill(tenant)
-  await dialog.getByLabel('Application', { exact: true }).fill('approvals')
-  await dialog.getByLabel("Administrator's email", { exact: true }).fill(`first-admin@${tenant}.test`)
+  await dialog.getByLabel(fieldLabel('Tenant ID')).fill(tenant)
+  await dialog.getByLabel(fieldLabel('Application')).fill('approvals')
+  await dialog.getByLabel(fieldLabel("Administrator's email")).fill(`first-admin@${tenant}.test`)
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
 
   const jobs = dialog.getByTestId('cell-jobs')

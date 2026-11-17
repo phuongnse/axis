@@ -1028,7 +1028,7 @@
   "shell.studio.section.entity.validations": "Quy tắc kiểm tra",
   "shell.studio.section.entity.validations.line": "Các quy tắc mà bản ghi phải thỏa trước khi lưu. Bản ghi vi phạm sẽ bị từ chối kèm thông báo của quy tắc.",
   "shell.studio.section.entity.indexes": "Chỉ mục",
-  "shell.studio.section.entity.indexes.line": "Chỉ mục giúp lọc và sắp xếp danh sách nhanh hơn. Chỉ mục duy nhất còn từ chối giá trị bị lặp lại.",
+  "shell.studio.section.entity.indexes.line": "Chỉ mục giúp lọc và sắp xếp danh sách nhanh hơn. Chỉ mục không trùng còn từ chối giá trị bị lặp lại.",
   "shell.studio.section.identityProvider.general": "Chung",
   "shell.studio.section.identityProvider.general.line": "Tên của nhà cung cấp, loại của nó và nó dùng để làm gì.",
   "shell.studio.section.identityProvider.signIn": "Đăng nhập",
