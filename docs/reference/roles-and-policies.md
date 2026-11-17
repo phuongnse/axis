@@ -321,7 +321,7 @@ A field declares it with `"creator": true`, and policies test it, for example
   session, in the create's transaction. A create by the system or by seed
   data leaves it `null`.
 - **Not writable.** Clients cannot write it, as for a
-  [sequence](resource-files.md#sequences) field. A body that sets it on create or update, even
+  [sequence](entity-logic-and-sequences.md#sequences) field. A body that sets it on create or update, even
   to `null`, is a `400` at its pointer with the message "Cannot be set.". A
   seed value for it is `AXC0033`.
 - **Allowed fields.** `creator` is allowed only on a `text` field. It cannot

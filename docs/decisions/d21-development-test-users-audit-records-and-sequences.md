@@ -24,7 +24,7 @@ and never skip.
 
 The detail is in [audit records](../reference/storage.md#audit-records-and-sequence-counters),
 [history](../reference/record-audit.md#audit-records-and-history) and
-[sequences](../reference/resource-files.md#sequences).
+[sequences](../reference/entity-logic-and-sequences.md#sequences).
 
 ## Consequences
 

@@ -121,7 +121,7 @@ A required field's label is marked, but the mark blocks nothing: the server stil
 | Any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | The value the server returned, formatted as a table cell shows it, as plain text, see [field look](#field-look). An empty value shows "Not set" in muted italics. It changes only when the record is saved and loaded again                                                                                                                                                                                                           |
 
 - **Sequence fields.** Page metadata marks a field that names a
-  [sequence](resource-files.md#sequences), so the form shows it read-only. It is empty on a new record,
+  [sequence](entity-logic-and-sequences.md#sequences), so the form shows it read-only. It is empty on a new record,
   and the form never sends it.
 - **Creator fields.** Page metadata marks a field that declares
   [`creator`](roles-and-policies.md#record-creator), so the form shows it read-only. It is empty on a

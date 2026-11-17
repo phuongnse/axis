@@ -184,31 +184,31 @@ A tool with an optional draft reads the working folder without it and the person
 describe the kind. Both are embedded in the server at build time, so an agent reads the rules of the
 version it talks to. An unknown topic answers a tool error with a fixed title.
 
-| Topic              | Pages                                                                                  |
-| ------------------ | -------------------------------------------------------------------------------------- |
-| `application`      | [Resource files](resource-files.md)                                                    |
-| `entity`           | [Resource files](resource-files.md)                                                    |
-| `site`             | [Resource files](resource-files.md)                                                    |
-| `page`             | [Resource files](resource-files.md), [Frontend](frontend.md)                           |
-| `text`             | [Resource files](resource-files.md)                                                    |
-| `seed`             | [Resource files](resource-files.md)                                                    |
-| `dataSource`       | [Data sources](data-sources.md)                                                        |
-| `rule`             | [Resource files](resource-files.md)                                                    |
-| `sequence`         | [Resource files](resource-files.md)                                                    |
-| `process`          | [Processes](processes.md), [Process flow](process-flow.md)                             |
-| `form`             | [Form resource and form widget](form-widget.md), [Form conditions](form-conditions.md) |
-| `role`             | [Roles and policies](roles-and-policies.md)                                            |
-| `policy`           | [Roles and policies](roles-and-policies.md)                                            |
-| `connector`        | [Connectors, events and endpoints](integration-resources.md)                           |
-| `identityProvider` | [Axis's identity provider](identity-provider.md)                                       |
-| `event`            | [Connectors, events and endpoints](integration-resources.md)                           |
-| `endpoint`         | [Connectors, events and endpoints](integration-resources.md)                           |
-| `trigger`          | [Connectors, events and endpoints](integration-resources.md)                           |
-| `webhook`          | [Outbound webhooks](outbound-webhooks.md)                                              |
-| `migration`        | [Migrations and recomputing](migrations.md), [Resource files](resource-files.md)       |
-| `scenario`         | [Test scenarios](test-scenarios.md)                                                    |
-| `contract`         | [Module contracts](module-contracts.md)                                                |
-| `layer`            | [Customization layers](customization-layers.md)                                        |
+| Topic              | Pages                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------ |
+| `application`      | [Resource files](resource-files.md), [Entity logic and sequences](entity-logic-and-sequences.md) |
+| `entity`           | [Resource files](resource-files.md), [Entity logic and sequences](entity-logic-and-sequences.md) |
+| `site`             | [Resource files](resource-files.md)                                                              |
+| `page`             | [Resource files](resource-files.md), [Frontend](frontend.md)                                     |
+| `text`             | [Resource files](resource-files.md)                                                              |
+| `seed`             | [Resource files](resource-files.md)                                                              |
+| `dataSource`       | [Data sources](data-sources.md)                                                                  |
+| `rule`             | [Resource files](resource-files.md)                                                              |
+| `sequence`         | [Resource files](resource-files.md), [Entity logic and sequences](entity-logic-and-sequences.md) |
+| `process`          | [Processes](processes.md), [Process flow](process-flow.md)                                       |
+| `form`             | [Form resource and form widget](form-widget.md), [Form conditions](form-conditions.md)           |
+| `role`             | [Roles and policies](roles-and-policies.md)                                                      |
+| `policy`           | [Roles and policies](roles-and-policies.md)                                                      |
+| `connector`        | [Connectors, events and endpoints](integration-resources.md)                                     |
+| `identityProvider` | [Axis's identity provider](identity-provider.md)                                                 |
+| `event`            | [Connectors, events and endpoints](integration-resources.md)                                     |
+| `endpoint`         | [Connectors, events and endpoints](integration-resources.md)                                     |
+| `trigger`          | [Connectors, events and endpoints](integration-resources.md)                                     |
+| `webhook`          | [Outbound webhooks](outbound-webhooks.md)                                                        |
+| `migration`        | [Migrations and recomputing](migrations.md), [Resource files](resource-files.md)                 |
+| `scenario`         | [Test scenarios](test-scenarios.md)                                                              |
+| `contract`         | [Module contracts](module-contracts.md)                                                          |
+| `layer`            | [Customization layers](customization-layers.md)                                                  |
 
 `McpReferenceTopicsDocumentationTests` compares this table with the server's map and with the resource
 kinds.

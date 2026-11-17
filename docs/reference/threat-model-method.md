@@ -19,7 +19,7 @@ rated by a short form of a standard rating.
 - **One row per threat.** The table has these columns: id, threat, boundary, category, rating,
   status and evidence. A scope letter and a number make an id, such as `P1`, `I1` or `B1`. An id is
   unique across every threat model file, so a later row or issue can name a threat by its id alone.
-  The model is split by scope, one file for each, see [threat model](threat-model.md).
+  The model is split by scope, and each scope has its own file or files, see [threat model](threat-model.md).
 - **Rating.** The rating is Low, Medium, High or Critical. It comes from likelihood and impact, a
   short form of the OWASP Risk Rating Methodology.
   - A **Gap** has time to close, as a vulnerable dependency does, see

@@ -27,7 +27,7 @@ interpreters.
 
 The rules are in [form conditions](../reference/form-conditions.md#form-conditions-and-steps) and
 [form widget conditions](../reference/form-widget-conditions.md), and the endpoints in
-[form state](../reference/record-api.md#form-state) and
+[form state](../reference/record-form-state.md#form-state) and
 [form state of a task](../reference/task-api.md#form-state-of-a-task).
 
 ## Consequences

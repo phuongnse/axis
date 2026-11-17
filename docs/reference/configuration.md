@@ -5,8 +5,9 @@ release active. This page describes its five steps, the checks each step runs wi
 code that each problem gets, and the reference index that the compile builds on the way. The
 resources it reads are described on their own pages:
 
-- [Resource files](resource-files.md): the file shape, the schema keywords, entity field types,
-  entity logic and sequences.
+- [Resource files](resource-files.md): the file shape, the schema keywords and entity field types.
+- [Entity logic and sequences](entity-logic-and-sequences.md): an entity's logic and sequences, the
+  application time zone and the fiscal year.
 - [Roles and policies](roles-and-policies.md), [integration resources](integration-resources.md),
   [identity providers](identity-provider.md#identity-provider-resource),
   [modules and templates](modules-and-templates.md), [module contracts](module-contracts.md),
@@ -136,7 +137,7 @@ including a reference to itself, must have a `displayField`, otherwise the refer
 ### Child collections
 
 A `child-collection` field's `target` is a child entity, owned by that field. The limits below exist
-for the reasons in [entity logic](resource-files.md#entity-logic).
+for the reasons in [entity logic](entity-logic-and-sequences.md#entity-logic).
 
 - **Target.** A `child-collection` field without `target` is `AXC0014` at the field, and a `target`
   that names no loaded entity is `AXC0012` at `/fields/{i}/target`.
@@ -333,7 +334,7 @@ time, because the startup step checks them before it inserts any record, see
 
 ### Sequences
 
-A field's [`sequence`](resource-files.md#sequences) must name a loaded `sequence` resource, ignoring
+A field's [`sequence`](entity-logic-and-sequences.md#sequences) must name a loaded `sequence` resource, ignoring
 letter case, otherwise it is `AXC0066` at `/fields/{i}/sequence`. A `sequence` is `AXC0013` at
 `/fields/{i}/sequence` when the field is not `text`, is `required`, has an `expression`, or belongs
 to a child entity. The field gets one diagnostic, for the first of these reasons in that order, and a
@@ -580,13 +581,13 @@ The Check step type-checks the expressions of entity logic and of rules. A valid
 field with an error produces no model. [Data source](data-sources.md#compile-checks) filters are
 checked in the [Resolve](#data-sources) step, with the data sources.
 
-- **Validations.** Each entity's [validations](resource-files.md#entity-logic) are parsed and
+- **Validations.** Each entity's [validations](entity-logic-and-sequences.md#entity-logic) are parsed and
   type-checked against the entity's own fields and its child collections, which only
   [aggregates](expressions.md#aggregates) accept, and must be boolean. A problem in the expression
   is reported with its [expression diagnostic](expressions.md#diagnostics) code at
   `/validations/{i}/expression`. A `field` that names no field of the entity, ignoring letter case,
   is `AXC0052` at `/validations/{i}/field`, and the `message` joins the `AXC0028` check.
-- **Computed fields.** The expression of each [computed field](resource-files.md#entity-logic) is
+- **Computed fields.** The expression of each [computed field](entity-logic-and-sequences.md#entity-logic) is
   parsed and type-checked against the entity's fields that are not computed and its child
   collections, and must give the field's type. A call to `now()`, `today()` or `toDate` in it,
   including inside an aggregate's item expression, is `AXC0086`. A problem in it is reported the same

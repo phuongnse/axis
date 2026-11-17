@@ -824,7 +824,7 @@ Besides the record and process actions, these actions write audit records. A `pu
 
 ### Sequence counters
 
-`axis.sequence_counters` holds one row per [sequence](resource-files.md#sequences) and period, which
+`axis.sequence_counters` holds one row per [sequence](entity-logic-and-sequences.md#sequences) and period, which
 the first number of the period creates.
 
 | Column           | Type      | Meaning                                              |

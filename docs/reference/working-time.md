@@ -40,7 +40,7 @@ application may hold several, such as one for each branch or team.
   span is a `from` and a `to`, written `HH:mm`. The spans of a day ascend and do not overlap. The
   compiler refuses a span that is badly written, is empty or backwards, or overlaps another.
 - **`timeZone`.** It is optional. Without it the calendar uses the
-  [application time zone](resource-files.md#application-time-zone), and the compiler checks an id as it
+  [application time zone](entity-logic-and-sequences.md#application-time-zone), and the compiler checks an id as it
   checks that one. The spans are local times in this zone, so a branch in another city keeps its own hours.
 - **`publicHolidays`.** It is optional. `"VN"` takes the public holidays of Vietnam, the solar ones and
   the lunar ones, with lunar new year and the Hùng Kings' day included. They are days off of the
