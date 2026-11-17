@@ -1,12 +1,16 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { setAt } from '../platform/jsonPatch'
 import { TextProvider } from '../platform/TextProvider'
 import { seedProblems, type SeedField } from '../platform/seedValues'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
+import { chooseOption, optionTexts } from '../test/antd'
+import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { SeedGrid } from './SeedGrid'
 
 const fields: SeedField[] = [
@@ -35,20 +39,68 @@ function ThemeRoot({ children }: { children: ReactNode }) {
   return <div data-theme-mode={useThemeMode().mode}>{children}</div>
 }
 
+const columns = fields.filter(
+  (field) => !field.expression && !field.sequence && !field.creator && field.type !== 'child-collection',
+)
+
+/** The ids of the records as last saved. */
+const savedIds = records.map((record) => record.id)
+
 function renderGrid(onChange = vi.fn(), data: unknown = records) {
-  const columns = fields.filter(
-    (field) => !field.expression && !field.sequence && !field.creator && field.type !== 'child-collection',
-  )
   render(
-    <ThemeModeProvider>
-      <ThemeRoot>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <SeedGrid fields={fields} records={data} problems={seedProblems(data, columns)} onChange={onChange} />
-        </TextProvider>
-      </ThemeRoot>
-    </ThemeModeProvider>,
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <ThemeRoot>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <SeedGrid
+              fields={fields}
+              records={data}
+              savedIds={savedIds}
+              problems={seedProblems(data, columns)}
+              onChange={onChange}
+            />
+          </TextProvider>
+        </ThemeRoot>
+      </ThemeModeProvider>
+    </MemoryRouter>,
   )
   return onChange
+}
+
+/** The grid over a draft that it edits, as the editor does: each change is applied with `setAt`. */
+function renderEditing(address = '/') {
+  function Harness() {
+    const [draft, setDraft] = useState<unknown>({ records })
+    return (
+      <>
+        <SeedGrid
+          fields={fields}
+          records={(draft as { records: unknown }).records}
+          savedIds={savedIds}
+          problems={seedProblems((draft as { records: unknown }).records, columns)}
+          onChange={(pointer, next) => setDraft((current: unknown) => setAt(current, pointer, next))}
+        />
+        <output data-testid="seed-records">{JSON.stringify(draft)}</output>
+      </>
+    )
+  }
+  render(
+    <MemoryRouter initialEntries={[address]}>
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <Harness />
+      </TextProvider>
+    </MemoryRouter>,
+  )
+  return () => (JSON.parse(screen.getByTestId('seed-records').textContent ?? '') as { records: typeof records }).records
+}
+
+/** Filters the grid on a text column that is `value`. */
+async function filterOn(column: string, operator: string, value: string) {
+  await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+  await pick('Column', 0, column)
+  await pick('Operator', 0, operator)
+  await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Value' }), value)
+  await clickInDialog('Apply')
 }
 
 afterEach(() => localStorage.clear())
@@ -136,5 +188,65 @@ describe('SeedGrid', () => {
 
     await userEvent.click(within(screen.getAllByTestId('studio-seed-row')[1]).getByRole('button', { name: 'Remove' }))
     expect(onChange).toHaveBeenLastCalledWith('/records/1', undefined)
+  })
+
+  describe('filter', () => {
+    const shownCodes = () =>
+      screen.getAllByTestId('studio-seed-row').map((row) => within(row).getByRole('textbox', { name: 'code' }))
+
+    it('offers the Id and every column that a seed may set, each by its kind of value', async () => {
+      renderEditing()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+      await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+      const offered = optionTexts()
+      expect(offered).toEqual(['Id', 'code', 'size', 'price', 'cost', 'active', 'status', 'due', 'closedAt', 'manager'])
+      await chooseOption('status')
+      await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Value' }))
+      expect(optionTexts()).toContain('Closed')
+    })
+
+    it('hides a record that does not match and shows every row on one page with no pager', async () => {
+      renderEditing()
+
+      await filterOn('code', 'is', 'ENG')
+
+      expect(shownCodes()).toHaveLength(1)
+      expect(shownCodes()[0]).toHaveValue('ENG')
+      expect(screen.queryByRole('list')).not.toBeInTheDocument()
+    })
+
+    it('keeps an edit to a record that the filter then hides, and shows the record again after Clear all', async () => {
+      const draft = renderEditing()
+      await userEvent.type(
+        within(screen.getAllByTestId('studio-seed-row')[0]).getByRole('textbox', { name: 'code' }),
+        'X',
+      )
+
+      await filterOn('code', 'is', 'ENG')
+      expect(shownCodes().map((input) => (input as HTMLInputElement).value)).toEqual(['ENG'])
+      expect(draft()[0].values.code).toBe('FINX')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Clear all' }))
+      expect(shownCodes().map((input) => (input as HTMLInputElement).value)).toEqual(['FINX', 'ENG'])
+    })
+
+    it('shows a record added while a filter is in force', async () => {
+      const draft = renderEditing()
+      await filterOn('code', 'is', 'ENG')
+      expect(shownCodes()).toHaveLength(1)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Add record' }))
+
+      expect(draft()).toHaveLength(3)
+      expect(screen.getAllByTestId('studio-seed-row')).toHaveLength(2)
+    })
+
+    it('reads the filter from the address, so a shared link shows the same rows', () => {
+      const filter = encodeURIComponent(JSON.stringify({ all: [{ field: 'code', op: 'eq', value: 'FIN' }] }))
+      renderEditing(`/?records.filter=${filter}`)
+
+      expect(shownCodes().map((input) => (input as HTMLInputElement).value)).toEqual(['FIN'])
+    })
   })
 })

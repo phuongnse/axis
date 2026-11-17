@@ -9,6 +9,7 @@ import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { fetchTasks, type TaskListItem, type TaskPage } from './tasks'
 import { resolveText, useText, useTextCatalogs } from './texts'
 import { useReleaseTexts } from './useReleaseTexts'
+import { useSiteTableKey } from './tableChoices'
 import { useTableView } from './useTableView'
 import { siteAddress } from './siteLinks'
 import { RecordLink } from './RecordLink'
@@ -69,7 +70,11 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
   // The server sets the path on every task inbox.
   const tasksPath = widget.tasksPath!
   const taskPath = siteAddress(sitePath, pageName.toLowerCase())
-  const { view: query, setView } = useTableView(taskFields, recordPageSize, noParameters, true, true, true)
+  const {
+    view: query,
+    setView,
+    saved,
+  } = useTableView(taskFields, recordPageSize, noParameters, true, true, true, '', useSiteTableKey(sitePath, pageName))
   const requestQuery = recordQuery(query)
   const requestUrl = `${tasksPath}${requestQuery ? `?${requestQuery}` : ''}`
   // Refresh counts up, so the same URL loads again.
@@ -174,6 +179,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
       view={{
         query,
         onChange: setView,
+        saved,
         total: state.page?.totalCount ?? 0,
         pageSizes,
         search: true,

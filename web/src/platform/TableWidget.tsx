@@ -33,6 +33,7 @@ import type {
   StartProcessAction,
   WidgetMetadata,
 } from './site'
+import { useSiteTableKey } from './tableChoices'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -42,6 +43,8 @@ import { setOwn } from './ownProperty'
 
 interface TableWidgetProps {
   sitePath: string
+  /** The page's name, which gives the table its key. */
+  pageName: string
   widget: WidgetMetadata
   /** The UI locale, for formatting values. */
   locale: string
@@ -141,15 +144,15 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * cell. Text, reference and file columns are free text: they share the width left in equal parts and wrap at 320 px.
  * Every other column, an enum too, fits its content.
  * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
- * and the back button keep them. An entity table has a Filter button, and its filter lives in the URL as
- * `filter` and goes to the rows and export routes as it is. A data source table has no Filter button, but a
- * filter bar, whose values live in the
- * URL under the parameter names. A data source parameter that the widget binds to a page parameter has
- * no filter input: the table sends the page parameter's value under the data source parameter's name,
+ * and the back button keep them. A table with a column the builder offers has a Filter button, and its filter
+ * lives in the URL as `filter` and goes to the rows and export routes as it is. A measure column of a grouped data
+ * source has no filter. A data source table also has a filter bar, whose values live in the URL under the parameter
+ * names. A data source parameter that the widget binds to a page parameter has no filter input: the table sends the
+ * page parameter's value under the data source parameter's name,
  * and leaves that page parameter in the URL as it is. A table whose rows can be searched has a search
  * box, which AxisTable draws and whose text lives in the URL as `search`. The text is sent as typed.
  */
-export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidgetProps) {
+export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: TableWidgetProps) {
   const t = useText()
   const { size } = useDesignTokens()
   const navigate = useNavigate()
@@ -174,9 +177,20 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   )
   const parameterNames = useMemo(() => parameters.map((parameter) => parameter.name), [parameters])
   const sizes = useMemo(() => tablePageSizes(defaultPageSize), [defaultPageSize])
-  // The record API filters an entity's records. A data source's rows route takes no `filter`.
-  const filterable = widget.entity !== null
-  const { view: query, setView } = useTableView(fields, defaultPageSize, parameterNames, searchable, filterable)
+  const {
+    view: query,
+    setView,
+    saved,
+  } = useTableView(
+    fields,
+    defaultPageSize,
+    parameterNames,
+    searchable,
+    true,
+    false,
+    '',
+    useSiteTableKey(sitePath, pageName),
+  )
   // The bound values and the filter values, in declaration order.
   const parameterValues = useMemo(() => {
     const values: Record<string, string> = {}
@@ -398,7 +412,8 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   const columns = useMemo<AxisColumn<TableRow>[]>(() => {
     // The types the record API filters, see docs/reference/record-api.md#paging-and-sorting.
     const filterOf = (field: FieldMetadata | DataSourceColumn): AxisColumn<TableRow>['filter'] => {
-      if (!filterable) {
+      // The rows route filters group fields only, see docs/reference/data-sources.md#query-parameters.
+      if ('measure' in field && field.measure) {
         return undefined
       }
       switch (field.type) {
@@ -491,7 +506,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         return column === 0 ? openLink(text, text, record) : text
       },
     }))
-  }, [fields, filterable, locale, rowActions, openIndex, runNavigate, sitePath, from, t, canvas, widget.priorities])
+  }, [fields, locale, rowActions, openIndex, runNavigate, sitePath, from, t, canvas, widget.priorities])
 
   // The row's actions other than the one its identifying cell opens. A start action runs for the row, a delete asks
   // first, a navigate action opens its page or is dropped when its path is unknown, and an action whose visibleWhen
@@ -582,6 +597,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       view={{
         query,
         onChange: setView,
+        saved,
         pageSizes: sizes,
         total: parameterErrors ? 0 : (state.page?.totalCount ?? 0),
         search: searchable,

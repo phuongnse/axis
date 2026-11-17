@@ -23,8 +23,9 @@ export function leavesWithoutAsking(state: unknown): boolean {
 const viewParameters = ['search', 'filter', 'sort', 'page', 'pageSize']
 
 /**
- * Whether two addresses differ only in a table's view, its `search`, `filter`, `sort`, `page` and `pageSize`, see
- * docs/reference/actions-and-controls.md#tables. Such a move keeps the editor on screen, so the guard does not ask.
+ * Whether two addresses differ only in a table's view, its `search`, `filter`, `sort`, `page` and `pageSize`, also under
+ * the table's prefix such as `fields.filter`, see docs/reference/actions-and-controls.md#tables. Such a move keeps the
+ * editor on screen, so the guard does not ask.
  */
 export function onlyTableViewChanged(
   current: { pathname: string; search: string },
@@ -32,7 +33,10 @@ export function onlyTableViewChanged(
 ): boolean {
   const withoutView = (search: string) => {
     const params = new URLSearchParams(search)
-    viewParameters.forEach((name) => params.delete(name))
+    const views = [...params.keys()].filter((key) =>
+      viewParameters.some((name) => key === name || key.endsWith(`.${name}`)),
+    )
+    views.forEach((key) => params.delete(key))
     return params.toString()
   }
   return current.pathname === next.pathname && withoutView(current.search) === withoutView(next.search)

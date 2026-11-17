@@ -161,7 +161,7 @@ open one lookup dialog, which lists the records a person may pick.
 
 - **List.** The dialog is titled with the field's label. It lists the target entity's records through
   their record API, sorted ascending by the target's display field, in one column for that field. The
-  shared table draws it, with the search in its toolbar, and the pager hides when one page holds every
+  shared table draws it, with search and filter in its toolbar, and the pager hides when one page holds every
   record. The record API lists only the target records that match the user's read filters. It pages 20
   records at a time and keeps nothing in the URL. Loading, empty and error states use the table's
   texts.
@@ -172,6 +172,10 @@ open one lookup dialog, which lists the records a person may pick.
   it as the record API's `search` parameter, and leaves `search` out when the text is empty. A new search
   starts again at page 1. Like paging, the search stays in the dialog, out of the URL, and is empty each
   time the dialog opens.
+- **Filter.** The display column has the table's Filter, with text conditions such as is, contains and is
+  empty. The SPA sends the filter as the record API's `filter`, together with the search and the sort. A new
+  filter starts again at page 1. Like paging and search, the filter stays in the dialog, out of the URL, and is
+  empty each time the dialog opens. A target with no display field has no Filter.
 - **Reference label.** On edit, the label starts from the record's `labels`, and a picked record's
   display field value replaces it at once. A changed reference is sent as the record id, and a cleared
   one as `null`. Picking the record that was already set leaves the field unchanged.
@@ -183,7 +187,7 @@ field's label. A label that is missing or null shows the record id instead, beca
 returns no label when the user may not read the target's display field.
 
 - **Adding and removing.** Each item has a remove button, named `Remove` and the item's label. The add
-  button, named `Add` and the field's label, opens the [lookup](#lookup), with its paging and search.
+  button, named `Add` and the field's label, opens the [lookup](#lookup), with its paging, search and filter.
   Picking a row appends that record and closes the dialog, and picking a record that is in the set
   already leaves the set unchanged. A set is reordered by removing records and adding them again.
 - **Keyboard and screen readers.** A polite live region announces `Added <label>` or

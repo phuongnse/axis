@@ -33,7 +33,8 @@ function stubRevisions(reply: (url: string) => Response) {
     input.startsWith(path) ? reply(input) : new Response(null, { status: 404 }),
   )
   vi.stubGlobal('fetch', fetchMock)
-  return () => fetchMock.mock.calls.map(([input]) => input)
+  // The table's own choices of columns are not a request for its rows.
+  return () => fetchMock.mock.calls.map(([input]) => input).filter((input) => !input.startsWith('/api/me/tables/'))
 }
 
 const Location = () => <output data-testid="location">{useLocation().search}</output>

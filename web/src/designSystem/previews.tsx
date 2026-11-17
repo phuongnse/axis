@@ -88,7 +88,7 @@ const fieldTypes: readonly PreviewFieldType[] = [
 /** Draws the table or the task inbox of a container preview, with the same fixtures as their own previews. */
 function renderLeaf(widget: WidgetMetadata): ReactNode {
   return widget.type === 'table' ? (
-    <TableWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={{}} />
+    <TableWidget sitePath={sitePath} pageName="Requests" widget={widget} locale={locale} pageValues={{}} />
   ) : (
     <TaskInboxWidget sitePath={sitePath} pageName="Tasks" widget={widget} locale={locale} fallbackLocale={locale} />
   )
@@ -127,7 +127,7 @@ function withAndWithoutData(data: () => ReactNode, empty: () => ReactNode): read
 
 /** The request table over the given metadata, with the same props as the table preview. */
 function requestTable(widget: WidgetMetadata): ReactNode {
-  return <TableWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={{}} />
+  return <TableWidget sitePath={sitePath} pageName="Requests" widget={widget} locale={locale} pageValues={{}} />
 }
 
 function inbox(widget: WidgetMetadata): ReactNode {

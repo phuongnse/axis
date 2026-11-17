@@ -36,8 +36,8 @@ import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
 import { useAddressTab } from './addressTab'
 import { recordPageSize, writeTableQuery } from './tableQuery'
-import { useTableView } from './useTableView'
 import { useReleaseTexts } from './useReleaseTexts'
+import { useTableView } from './useTableView'
 
 interface ProcessInstancePageProps {
   sitePath: string
@@ -83,6 +83,11 @@ const noParameters: readonly string[] = []
  * and each sub-process link to their instance on the first navigation page whose process inspector
  * names their process, and show without a link when there is none. A step the path holds is marked as taken, and the step the instance is at is marked as
  * current. A call whose input is hidden shows the fixed "hidden" text and no value.
+ *
+ * The History, Tasks and Sub-processes tables and each call's Attempts table hold all their rows, show them with no
+ * pager and have Filter on every column but the Open link. Each keeps its filter in the address under a prefix of its
+ * own: `history.`, `tasks.`, `subProcesses.` and `attempts.{callId}.`, and a date filters on the local day of its time,
+ * see docs/reference/process-inspector-widget.md#instance-page.
  *
  * Step labels come from the texts of the instance's release, then the site texts and the platform
  * texts. A step without a label shows its name. If the release texts fail to load, the page shows

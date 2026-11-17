@@ -579,6 +579,33 @@ export async function fetchStudioNames(application: string, signal?: AbortSignal
 }
 
 /**
+ * One resource of the folder or of a module the application uses, as `GET .../resource-activity` answers it. `titles` and
+ * `descriptions` are set for a module resource only, see docs/reference/studio-resource-form.md#resource-activity.
+ */
+export interface StudioResourceActivityItem {
+  id: string
+  module: string | null
+  status: 'new' | 'changed' | 'published' | null
+  titles: Record<string, string> | null
+  descriptions: Record<string, string> | null
+  modifiedBy: string | null
+  modifiedAt: string | null
+}
+
+/** Loads the activity of each resource of the application's folder and of its modules, see docs/reference/studio-resource-form.md#resource-activity. */
+export async function fetchStudioResourceActivity(
+  application: string,
+  signal?: AbortSignal,
+): Promise<StudioResourceActivityItem[]> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/resource-activity`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return ((await response.json()) as { items: StudioResourceActivityItem[] }).items
+}
+
+/**
  * One row of a kind's list, as `GET .../kinds/{kind}/resources` answers it, see docs/reference/studio-resource-form.md#kind-list.
  * `title` is the text the row shows, and sorts by on the server. `locale` is set for a text resource, which shows the language's name.
  * `module` and `moduleLabel` are set for a module resource.
@@ -1673,6 +1700,20 @@ export function resourceTitle(item: StudioResourceItem, locale: string, t: (key:
     return languageName(item.locale, locale)
   }
   return textIn(item.titles, locale) ?? item.name ?? kindSingular(item.kind, t)
+}
+
+/**
+ * The heading of a module resource: its label in `locale`, else in `en`, from the resource activity's `titles`. Without a
+ * label it is the name without the `<module>/` prefix, as the kind list shows the row, so `organization/Department` reads
+ * `Department`.
+ */
+export function moduleResourceTitle(
+  item: ModuleResourceItem,
+  titles: Readonly<Record<string, string>> | null | undefined,
+  locale: string,
+): string {
+  const prefix = `${item.module}/`
+  return textIn(titles, locale) ?? (item.name.startsWith(prefix) ? item.name.slice(prefix.length) : item.name)
 }
 
 /**

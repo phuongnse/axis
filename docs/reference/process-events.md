@@ -620,15 +620,20 @@ Content-Type: application/json
   `/api/console/dead-letters`. They list the dead letters of every application, including the ones
   with no process, and run the same redeliver and discard with the operator as actor.
 
-The list shows the dead letters of the process, newest first, paged as the instance list is, with
-`page`, `pageSize`, `totalCount` and `items`. The optional `state` is `open`, `redelivered` or
-`discarded`. Any other value is a `400` keyed `state`, and without it every state is listed. A request
-is checked in this order: session (`401`), application and process (`404`), the `inspect` grant
-(`403`), then the query (`400`). Each item has `id`, `kind`, `eventId`, `triggerId`,
-`processInstanceId`, `emailId`, `webhookId`, `occurrenceAt`, `attempts`, `lastError`, `state`,
-`reason`, `settledBy`, `createdAt`, `settledAt` and `commands`, with times in UTC and null for what its
-kind lacks. `commands` is `["redeliver", "discard"]` for an `open` dead letter when the user holds the
-`retry` grant, and empty otherwise.
+The list shows one page of the dead letters of the process, with `page`, `pageSize`, `totalCount` and
+`items`. PostgreSQL filters, searches, sorts and pages them. The route takes `page`, `pageSize`, `sort`,
+`search` and `filter` in the [record API's format](record-api.md#paging-and-sorting) over the fields
+`kind`, `attempts`, `lastError` and `createdAt`. `createdAt` filters by its UTC day and sorts by its
+instant. A search looks in `kind` and `lastError`. A sort or filter on another field is a `400` that
+names the parameter, and so is an invalid `page`, `pageSize` or `search`. Without `sort` the letters
+are newest first, and a sorted list breaks ties newest first. `totalCount` counts only the letters that
+match. The optional `state` is `open`, `redelivered` or `discarded`. Any other value is a `400` keyed
+`state`, and without it every state is listed. A request is checked in this order: session (`401`),
+application and process (`404`), the `inspect` grant (`403`), then the query (`400`). Each item has `id`,
+`kind`, `eventId`, `triggerId`, `processInstanceId`, `emailId`, `webhookId`, `occurrenceAt`, `attempts`,
+`lastError`, `state`, `reason`, `settledBy`, `createdAt`, `settledAt` and `commands`, with times in UTC
+and null for what its kind lacks. `commands` is `["redeliver", "discard"]` for an `open` dead letter
+when the user holds the `retry` grant, and empty otherwise.
 
 A command is checked in this order: session (`401`), application and process (`404`), the `retry`
 grant (`403`), content type (`415`), then the body (`400`), which is exactly

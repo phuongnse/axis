@@ -504,6 +504,11 @@ transitions through a layer, and relaxes and restores points.
   tag of its module, as other kinds' lists do. A contract
   opens with a notice that only added states and transitions can be edited, and shows the lifecycle as
   a state diagram, then the core validations, the effects and the ceilings, each with its named point.
+- **Filter.** Each of these tables has a [Filter](actions-and-controls.md#tables) on every column, the named point
+  included, and shows every row on one page with no pager. A filter is kept in the address under the table's own
+  prefix: `states.filter`, `transitions.filter`, `validations.filter`, `effects.filter` or `ceiling.filter`. A state or
+  transition that the saved contract does not have stays shown under any filter, so an author sees what they just
+  added. A change to a filter does not ask to leave without saving.
 - **Added states and transitions.** **Add state** and **Add transition** open a dialog. A state takes a
   name, **Initial** and **Deletable**, which are yes-or-no fields with help, and a transition a name,
   its from-states, its to-state and an optional guard. The names, the from-states and the to-state are required fields with help. **Add**

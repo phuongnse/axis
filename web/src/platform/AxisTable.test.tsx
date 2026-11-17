@@ -1,10 +1,11 @@
 import { DeleteOutlined } from '@ant-design/icons'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Button } from 'antd'
 import { useState, type HTMLAttributes } from 'react'
+import { MemoryRouter, useLocation, useNavigationType } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { chooseOption, tabTo } from '../test/antd'
+import { chooseOption, optionTexts, tabTo } from '../test/antd'
 import { withAntdStyles } from '../test/antdStyles'
 import { dialog, filterTexts } from '../test/tableFilter'
 import { AxisTable, type AxisColumn, type AxisRowAction, type AxisTableProps, type AxisTableToolbar } from './AxisTable'
@@ -12,6 +13,7 @@ import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
 import type { TableQuery } from './tableQuery'
 import { narrowWidthQuery } from './useNarrowWidth'
+import { useTableView } from './useTableView'
 
 interface Row {
   id: string
@@ -33,6 +35,20 @@ const texts = {
   'shell.table.columnsMoveUp': 'Move up',
   'shell.table.columnsMoveDown': 'Move down',
   'shell.form.cancel': 'Cancel',
+  'shell.form.save': 'Save',
+  'shell.table.views': 'Views',
+  'shell.table.viewsEmpty': 'No views yet.',
+  'shell.table.viewsName': 'Name',
+  'shell.table.viewsName.help': 'The name the view is listed under.',
+  'shell.table.viewsNameRequired': 'Enter a name.',
+  'shell.table.viewsNameTaken': 'Another view has this name.',
+  'shell.table.viewsSave': 'Save view',
+  'shell.table.viewsSaveFailed': 'The view could not be saved.',
+  'shell.table.viewsRename': 'Rename',
+  'shell.table.viewsRenameFailed': 'The view could not be renamed.',
+  'shell.table.viewsDelete': 'Delete',
+  'shell.table.viewsDeleteConfirm': 'Delete the view {name}?',
+  'shell.table.viewsDeleteFailed': 'The view could not be deleted.',
   'shell.table.selectRow': 'Select row',
   'row.archive': 'Archive',
   'row.delete': 'Delete',
@@ -460,6 +476,31 @@ describe('AxisTable', () => {
       expect(filter.compareDocumentPosition(refresh) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
+    describe('search box width', () => {
+      withAntdStyles()
+
+      it('keeps the search box at its own width so Filter and Columns follow it on one line, and wrap when there is no room', () => {
+        const searchable: AxisColumn<Row> = {
+          ...nameColumn,
+          searchText: (row) => row.name ?? '',
+          filter: { kind: 'text' },
+        }
+        renderTable({
+          columns: [searchable, amountColumn],
+          view: { query: { page: 1, pageSize: 20, sort: null }, onChange: vi.fn(), columns: true },
+          pagination: undefined,
+        })
+
+        const search = screen.getByRole('searchbox', { name: 'Search' }).closest('.ant-input-search') as HTMLElement
+        expect(search).toHaveStyle({ width: '320px', maxWidth: '100%' })
+        // Filter and Columns sit in the same wrapping container as the search box, so they wrap with it.
+        const controls = search.parentElement as HTMLElement
+        expect(within(controls).getByRole('button', { name: 'Filter' })).toBeInTheDocument()
+        expect(within(controls).getByRole('button', { name: 'Columns' })).toBeInTheDocument()
+        expect(controls).toHaveStyle({ flexWrap: 'wrap', minWidth: '0px' })
+      })
+    })
+
     it('has no slot for a control of its own', () => {
       // @ts-expect-error A table has no control of its own for a view, see docs/reference/actions-and-controls.md#tables.
       const toolbar: AxisTableToolbar = { view: <input aria-label="Search" /> }
@@ -521,6 +562,72 @@ describe('AxisTable', () => {
     })
     expect(screen.getByRole('row', { name: /Buy paper/ })).toBeInTheDocument()
     expect(screen.getAllByRole('row').filter((row) => within(row).queryAllByRole('cell').length > 0)).toHaveLength(2)
+  })
+
+  it('offers a column whose header is not plain text under its filter title', async () => {
+    renderTable({
+      columns: [
+        {
+          ...nameColumn,
+          title: (
+            <div>
+              <span>Name</span>
+              <small>text</small>
+            </div>
+          ),
+          filter: { kind: 'text', title: 'Due', value: (row) => row.name },
+        },
+        amountColumn,
+      ],
+      view: { query: { page: 1, pageSize: 20, sort: null }, onChange: vi.fn() },
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+
+    expect(optionTexts()).toEqual(['Due'])
+  })
+
+  describe('a view with paging off', () => {
+    const many = Array.from({ length: 25 }, (_, index) => ({ id: String(index), name: `Row ${index}`, amount: index }))
+    const bodyRows = () => screen.getAllByRole('row').filter((row) => within(row).queryAllByRole('cell').length > 0)
+    const filterable: AxisColumn<Row> = {
+      ...nameColumn,
+      filter: { kind: 'text', value: (row) => row.name },
+    }
+
+    it('shows every row with no pager even when the rows run past the page size', () => {
+      renderTable({
+        columns: [filterable, amountColumn],
+        dataSource: many,
+        view: { query: { page: 1, pageSize: 20, sort: null }, onChange: vi.fn(), paging: false },
+      })
+
+      expect(bodyRows()).toHaveLength(25)
+      expect(screen.queryByRole('list')).not.toBeInTheDocument()
+      expect(screen.queryByText(/of 25/)).not.toBeInTheDocument()
+    })
+
+    it('shows a kept row that the filter would hide, and still hides the others', () => {
+      renderTable({
+        columns: [filterable, amountColumn],
+        dataSource: many,
+        view: {
+          query: {
+            page: 1,
+            pageSize: 20,
+            sort: null,
+            filter: { all: [{ field: 'name', op: 'eq', value: 'no such row' }] },
+          },
+          onChange: vi.fn(),
+          paging: false,
+        },
+        keep: (row) => row.id === '24',
+      })
+
+      expect(bodyRows()).toHaveLength(1)
+      expect(screen.getByRole('row', { name: /Row 24/ })).toBeInTheDocument()
+    })
   })
 
   describe('columns control', () => {
@@ -679,6 +786,359 @@ describe('AxisTable', () => {
       renderTable({ view: { query: first, onChange: () => {} } })
 
       expect(screen.queryByRole('button', { name: 'Columns' })).not.toBeInTheDocument()
+    })
+
+    describe('kept columns', () => {
+      const keptFields = [
+        { name: 'name', type: 'text' },
+        { name: 'amount', type: 'integer' },
+        { name: 'note', type: 'text' },
+      ] as const
+      const tableUrl = '/api/me/tables/test.table'
+
+      /** A server that keeps the columns of one table. `read` is called when the answer to a read is taken. */
+      function serveChoices(kept: string[] | null, readStatus = 200) {
+        const server = { kept, read: vi.fn() }
+        const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+          const method = init?.method ?? 'GET'
+          if (url === tableUrl && method === 'GET') {
+            const response = new Response(null, { status: readStatus })
+            vi.spyOn(response, 'json').mockImplementation(async () => {
+              server.read()
+              return { columns: server.kept, views: [] }
+            })
+            return response
+          }
+          if (url === `${tableUrl}/columns` && method === 'PUT') {
+            server.kept = (JSON.parse(String(init?.body)) as { columns: string[] }).columns
+          } else if (url === `${tableUrl}/columns` && method === 'DELETE') {
+            server.kept = null
+          }
+          return new Response(null, { status: 204 })
+        })
+        vi.stubGlobal('fetch', fetchMock)
+        return { server, fetchMock }
+      }
+
+      function KeptHarness() {
+        const { view, setView } = useTableView(keptFields, 20, [], true, true, true, '', 'test.table')
+        return (
+          <TextProvider catalogs={catalogs} development={false}>
+            <AxisTable<Row>
+              columns={arranged}
+              rowKey={(row) => row.id}
+              dataSource={noted}
+              view={{ query: view, onChange: setView, columns: true }}
+            />
+          </TextProvider>
+        )
+      }
+
+      function Probe() {
+        return (
+          <>
+            <output data-testid="address">{useLocation().search}</output>
+            <output data-testid="navigation">{useNavigationType()}</output>
+          </>
+        )
+      }
+
+      const open = (address = '/') =>
+        render(
+          <MemoryRouter initialEntries={[address]}>
+            <KeptHarness />
+            <Probe />
+          </MemoryRouter>,
+        )
+
+      const applyColumns = async (change: () => Promise<void>) => {
+        await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+        await change()
+        await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Apply' }))
+      }
+
+      const mutations = (fetchMock: ReturnType<typeof serveChoices>['fetchMock']) =>
+        fetchMock.mock.calls.filter(([, init]) => init?.method !== undefined)
+
+      it('keeps the columns that Apply sets, and shows them again when the table opens with no columns', async () => {
+        const { server, fetchMock } = serveChoices(null)
+        const first = open()
+        await waitFor(() => expect(server.read).toHaveBeenCalled())
+
+        await applyColumns(() => userEvent.click(within(columnsDialog()).getByRole('checkbox', { name: 'Amount' })))
+
+        await waitFor(() => expect(server.kept).toEqual(['name', 'note']))
+        const [url, init] = mutations(fetchMock)[0]
+        expect(url).toBe(`${tableUrl}/columns`)
+        expect(init?.method).toBe('PUT')
+        expect(init?.body).toBe('{"columns":["name","note"]}')
+        expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
+        first.unmount()
+
+        open()
+
+        await waitFor(() => expect(headers()).toEqual(['Name', 'Note']))
+        expect(screen.getByTestId('address')).toHaveTextContent('columns=name%2Cnote')
+        expect(screen.getByTestId('navigation')).toHaveTextContent('REPLACE')
+      })
+
+      it('shows the columns of the address, not the kept ones, and forgets the choice on Reset and Apply', async () => {
+        const { server, fetchMock } = serveChoices(['name', 'note'])
+        open('/?columns=name,amount')
+        await waitFor(() => expect(server.read).toHaveBeenCalled())
+        await act(async () => {})
+
+        expect(headers()).toEqual(['Name', 'Amount'])
+        expect(mutations(fetchMock)).toHaveLength(0)
+
+        await applyColumns(() => userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Reset' })))
+
+        await waitFor(() => expect(server.kept).toBeNull())
+        const [url, init] = mutations(fetchMock)[0]
+        expect(url).toBe(`${tableUrl}/columns`)
+        expect(init?.method).toBe('DELETE')
+        expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
+        expect(headers()).toEqual(['Name', 'Amount', 'Note'])
+      })
+
+      it('shows every column and leaves the address alone when the choices are refused', async () => {
+        const { fetchMock } = serveChoices(['name', 'note'], 401)
+        open()
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(tableUrl, expect.anything()))
+        await act(async () => {})
+
+        expect(headers()).toEqual(['Name', 'Amount', 'Note'])
+        expect(screen.getByTestId('address')).toBeEmptyDOMElement()
+        expect(screen.getByTestId('navigation')).toHaveTextContent('POP')
+      })
+    })
+
+    describe('saved views', () => {
+      const keptFields = [
+        { name: 'name', type: 'text' },
+        { name: 'amount', type: 'integer' },
+        { name: 'note', type: 'text' },
+      ] as const
+      const tableUrl = '/api/me/tables/test.table'
+      const filter = JSON.stringify({ all: [{ field: 'note', op: 'contains', value: 'urgent' }] })
+
+      interface Stored {
+        id: string
+        name: string
+        search: string | null
+        filter: string | null
+        sort: string | null
+      }
+
+      /** A server that keeps the views of one table. `saveStatus` is what a POST answers. */
+      function serveViews(views: Stored[], saveStatus = 201) {
+        const server = { views, saveStatus }
+        const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+          const method = init?.method ?? 'GET'
+          if (url === tableUrl && method === 'GET') {
+            return Response.json({ columns: null, views: server.views })
+          }
+          if (url === `${tableUrl}/views` && method === 'POST') {
+            if (server.saveStatus !== 201) {
+              return new Response(null, { status: server.saveStatus })
+            }
+            const saved = { id: 'new', ...(JSON.parse(String(init?.body)) as Omit<Stored, 'id'>) }
+            server.views = [...server.views, saved]
+            return Response.json(saved, { status: 201 })
+          }
+          return new Response(null, { status: 204 })
+        })
+        vi.stubGlobal('fetch', fetchMock)
+        return { server, fetchMock }
+      }
+
+      function ViewsHarness() {
+        const { view, setView, saved } = useTableView(keptFields, 20, [], true, true, false, '', 'test.table')
+        return (
+          <TextProvider catalogs={catalogs} development={false}>
+            <AxisTable<Row>
+              columns={arranged}
+              rowKey={(row) => row.id}
+              dataSource={noted}
+              view={{ query: view, onChange: setView, saved }}
+            />
+          </TextProvider>
+        )
+      }
+
+      function Probe() {
+        return (
+          <>
+            <output data-testid="address">{useLocation().search}</output>
+            <output data-testid="navigation">{useNavigationType()}</output>
+          </>
+        )
+      }
+
+      const open = (address = '/') =>
+        render(
+          <MemoryRouter initialEntries={[address]}>
+            <ViewsHarness />
+            <Probe />
+          </MemoryRouter>,
+        )
+
+      const viewsDialog = () => screen.getByRole('dialog', { name: 'Views' })
+      const openViews = async () => {
+        await userEvent.click(await screen.findByRole('button', { name: 'Views' }))
+        return viewsDialog()
+      }
+      const mutations = (fetchMock: ReturnType<typeof serveViews>['fetchMock']) =>
+        fetchMock.mock.calls.filter(([, init]) => init?.method !== undefined)
+      const address = () => new URLSearchParams(screen.getByTestId('address').textContent ?? '')
+
+      it('saves the address as a view, and opens it again at page 1 with a history entry', async () => {
+        const { fetchMock } = serveViews([])
+        const first = open(`/?search=pen&filter=${encodeURIComponent(filter)}&sort=-amount&page=2`)
+
+        const dialog = await openViews()
+        await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Mine')
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Save view' }))
+
+        await waitFor(() => expect(mutations(fetchMock)).toHaveLength(1))
+        const [url, init] = mutations(fetchMock)[0]
+        expect(url).toBe(`${tableUrl}/views`)
+        expect(init?.method).toBe('POST')
+        expect(JSON.parse(String(init?.body))).toEqual({ name: 'Mine', search: 'pen', filter, sort: '-amount' })
+        expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
+        first.unmount()
+
+        open('/?page=3&pageSize=50')
+        await userEvent.click(within(await openViews()).getByRole('button', { name: 'Mine' }))
+
+        await waitFor(() => expect(address().get('search')).toBe('pen'))
+        expect(address().get('filter')).toBe(filter)
+        expect(address().get('sort')).toBe('-amount')
+        expect(address().has('page')).toBe(false)
+        expect(address().get('pageSize')).toBe('50')
+        expect(screen.getByTestId('navigation')).toHaveTextContent('PUSH')
+      })
+
+      it('clears the parts that a view leaves empty', async () => {
+        serveViews([{ id: 'a', name: 'Plain', search: null, filter: null, sort: null }])
+        open(`/?search=pen&filter=${encodeURIComponent(filter)}&sort=amount`)
+
+        await userEvent.click(within(await openViews()).getByRole('button', { name: 'Plain' }))
+
+        await waitFor(() => expect(screen.getByTestId('address')).toBeEmptyDOMElement())
+      })
+
+      it('drops the filter of a view that names a field the table no longer has', async () => {
+        const lost = JSON.stringify({ all: [{ field: 'gone', op: 'eq', value: 'x' }] })
+        serveViews([{ id: 'a', name: 'Old', search: 'pen', filter: lost, sort: null }])
+        open()
+
+        await userEvent.click(within(await openViews()).getByRole('button', { name: 'Old' }))
+
+        await waitFor(() => expect(address().get('search')).toBe('pen'))
+        expect(address().has('filter')).toBe(false)
+      })
+
+      it('shows no Views button before the views have loaded', async () => {
+        vi.stubGlobal(
+          'fetch',
+          vi.fn(async () => new Response(null, { status: 401 })),
+        )
+        open()
+        await act(async () => {})
+
+        expect(screen.queryByRole('button', { name: 'Views' })).not.toBeInTheDocument()
+      })
+
+      it('keeps the dialog open and the table as it was when the server refuses a save', async () => {
+        const { server } = serveViews([{ id: 'a', name: 'Old', search: null, filter: null, sort: null }], 409)
+        open('/?search=pen')
+
+        const dialog = await openViews()
+        await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Mine')
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Save view' }))
+
+        expect(await within(dialog).findByText('The view could not be saved.')).toBeInTheDocument()
+        expect(viewsDialog()).toBe(dialog)
+        expect(screen.getByTestId('address')).toHaveTextContent('?search=pen')
+        expect(screen.getByTestId('navigation')).toHaveTextContent('POP')
+        expect(within(dialog).getAllByRole('button', { name: /^(Rename|Delete) / })).toHaveLength(2)
+        expect(server.views).toHaveLength(1)
+      })
+
+      it('refuses an empty name and a name another view has, without sending anything', async () => {
+        const { fetchMock } = serveViews([{ id: 'a', name: 'Old', search: null, filter: null, sort: null }])
+        open()
+
+        const dialog = await openViews()
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Save view' }))
+        expect(await within(dialog).findByText('Enter a name.')).toBeInTheDocument()
+
+        await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), ' old ')
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Save view' }))
+        expect(await within(dialog).findByText('Another view has this name.')).toBeInTheDocument()
+        expect(mutations(fetchMock)).toHaveLength(0)
+      })
+
+      it('renames a view in its own line', async () => {
+        const { fetchMock } = serveViews([{ id: 'a b', name: 'Old', search: 'pen', filter: null, sort: '-amount' }])
+        open()
+
+        const dialog = await openViews()
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Rename Old' }))
+        const input = within(dialog).getByRole('textbox', { name: 'Name', description: '' })
+        await userEvent.clear(input)
+        await userEvent.type(input, 'New{Enter}')
+
+        expect(await within(dialog).findByRole('button', { name: 'New' })).toBeInTheDocument()
+        const [url, init] = mutations(fetchMock)[0]
+        expect(url).toBe(`${tableUrl}/views/a%20b`)
+        expect(init?.method).toBe('PUT')
+        expect(JSON.parse(String(init?.body))).toEqual({ name: 'New', search: 'pen', filter: null, sort: '-amount' })
+        expect(within(dialog).queryByRole('button', { name: 'Old' })).not.toBeInTheDocument()
+      })
+
+      it('deletes a view in its own line after the question, and keeps it when Cancel answers', async () => {
+        const { fetchMock } = serveViews([
+          { id: 'a', name: 'Old', search: null, filter: null, sort: null },
+          { id: 'b', name: 'Keep', search: null, filter: null, sort: null },
+        ])
+        open()
+
+        const dialog = await openViews()
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Delete Old' }))
+        expect(within(dialog).getByText('Delete the view Old?')).toBeInTheDocument()
+        expect(mutations(fetchMock)).toHaveLength(0)
+        // The line's Cancel comes before the dialog's own.
+        await userEvent.click(within(dialog).getAllByRole('button', { name: 'Cancel' })[0])
+        expect(within(dialog).getByRole('button', { name: 'Old' })).toBeInTheDocument()
+
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Delete Old' }))
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+        await waitFor(() => expect(within(dialog).queryByRole('button', { name: 'Old' })).not.toBeInTheDocument())
+        const [url, init] = mutations(fetchMock)[0]
+        expect(url).toBe(`${tableUrl}/views/a`)
+        expect(init?.method).toBe('DELETE')
+        expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
+        expect(within(dialog).getByRole('button', { name: 'Keep' })).toBeInTheDocument()
+      })
+
+      it('lists the views by name', async () => {
+        serveViews([
+          { id: 'a', name: 'Zed', search: null, filter: null, sort: null },
+          { id: 'b', name: 'Abe', search: null, filter: null, sort: null },
+        ])
+        open()
+
+        const dialog = await openViews()
+
+        const names = within(dialog)
+          .getAllByRole('button')
+          .map((button) => button.textContent)
+          .filter((name) => name === 'Abe' || name === 'Zed')
+        expect(names).toEqual(['Abe', 'Zed'])
+      })
     })
   })
 

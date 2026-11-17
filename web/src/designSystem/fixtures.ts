@@ -2235,6 +2235,9 @@ export const fixtureScopes = [
   '/api/notifications',
 ] as const
 
+/** A person's table choices when nothing is kept. */
+export const noTableChoices = { columns: null, views: [] }
+
 /**
  * The answers of the fixture application's APIs, by path or by path and query. The page's own
  * queries (paging, sorting) are answered by the path alone.
@@ -2261,6 +2264,9 @@ export const routes: Record<string, () => unknown> = {
   [`${blankRequestsPath}/${requestId}`]: () => blankRecord,
   [emptyTasksPath]: () => emptyTaskPage,
   [noRowsPath]: () => emptyRecordPage,
+  [`/api/me/tables/site.${sitePath}.requests`]: () => noTableChoices,
+  [`/api/me/tables/site.${sitePath}.tasks`]: () => noTableChoices,
+  [`/api/me/tables/site.${sitePath}.instances`]: () => noTableChoices,
   [`/api/sites/${sitePath}/texts/${locale}`]: () => ({ texts: siteTexts }),
   [`/api/sites/${sitePath}`]: () => applicationSite,
   [`/api/sites/${sitePath}/pages/requests`]: () => requestsPage,

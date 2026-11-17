@@ -36,4 +36,20 @@ describe('the New resource dialog', () => {
     expect(getComputedStyle(kind).getPropertyValue('--ant-form-item-margin-bottom')).toBe('0px')
     expect(getComputedStyle(name).getPropertyValue('--ant-form-item-margin-bottom')).toBe('0px')
   })
+
+  it('marks its kind and name fields required, and the mark is hidden from screen readers', async () => {
+    renderButton()
+    await userEvent.click(screen.getByRole('button', { name: 'New resource…' }))
+    await screen.findByRole('dialog')
+
+    for (const [input, label] of [
+      [screen.getByRole('combobox', { name: 'Kind' }), 'Kind'],
+      [screen.getByRole('textbox', { name: 'Name' }), 'Name'],
+    ] as const) {
+      const text = formItem(input).querySelector('label')
+      expect(text?.textContent).toBe(`${label}*`)
+      expect(text?.querySelector('[aria-hidden="true"]')?.textContent).toBe('*')
+      expect(input).toHaveAttribute('aria-required', 'true')
+    }
+  })
 })

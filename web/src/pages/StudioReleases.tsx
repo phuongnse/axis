@@ -214,7 +214,16 @@ export function StudioReleasesList({
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale
   const { generation, lost } = useStudioConnection()
-  const { view, setView } = useTableView(releaseFields, recordPageSize, noParameters, true, true, true)
+  const { view, setView, saved } = useTableView(
+    releaseFields,
+    recordPageSize,
+    noParameters,
+    true,
+    true,
+    true,
+    '',
+    `studio.${application}.releases`,
+  )
   const query = recordQuery(view)
   const [releases, setReleases] = useState<StudioReleasePage | 'failed'>()
   const [reload, setReload] = useState(0)
@@ -312,6 +321,7 @@ export function StudioReleasesList({
           view={{
             query: view,
             onChange: setView,
+            saved,
             pageSizes: tablePageSizes(),
             total: list?.totalCount ?? 0,
             search: true,

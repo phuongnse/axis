@@ -3,6 +3,7 @@ import { EditorView } from '@codemirror/view'
 import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
@@ -21,6 +22,8 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
 import { chooseOption, clearPicker, clearSelect, openDropdown, optionTexts, removeTag } from '../test/antd'
+import { addEntityField, entityFieldAction, openEntityField } from '../test/entityFields'
+import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { EntityDesigner } from './EntityDesigner'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { LabelTextsContext } from './labelTextsContext'
@@ -46,6 +49,8 @@ const english: Record<string, string> = platformEnglish
 
 const labelOf = (path: string) => english[`shell.studio.field.entity.${path}`]
 const helpOf = (path: string) => english[`shell.studio.field.entity.${path}.help`]
+/** The title of a section, or its line when the path ends in `.line`, from `shell.studio.section.entity.`. */
+const sectionOf = (path: string) => english[`shell.studio.section.entity.${path}`]
 
 /** The paths under `shell.studio.field.entity.` that the designer draws, each with a label and a help. */
 const drawnPaths = [
@@ -63,9 +68,6 @@ const drawnPaths = [
   'fields.maxSize',
   'fields.accept',
   'fields.target',
-  'fields',
-  'indexes',
-  'validations',
   'fields.currencySource',
   'fields.currencySource.code',
   'fields.currencySource.field',
@@ -213,15 +215,17 @@ function renderDesigner(
 
 function Providers({ loaded, children }: { loaded: StudioNames | null; children: ReactNode }) {
   return (
-    <ThemeModeProvider>
-      <ThemeRoot>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioNamesContext.Provider value={loaded ?? undefined}>
-            <LabelTextsContext.Provider value={labelContext}>{children}</LabelTextsContext.Provider>
-          </StudioNamesContext.Provider>
-        </TextProvider>
-      </ThemeRoot>
-    </ThemeModeProvider>
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <ThemeRoot>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioNamesContext.Provider value={loaded ?? undefined}>
+              <LabelTextsContext.Provider value={labelContext}>{children}</LabelTextsContext.Provider>
+            </StudioNamesContext.Provider>
+          </TextProvider>
+        </ThemeRoot>
+      </ThemeModeProvider>
+    </MemoryRouter>
   )
 }
 
@@ -267,14 +271,14 @@ describe.each(['light', 'dark'])('EntityDesigner in %s mode', (mode) => {
   it.each([
     ['with a computed field of each type', typed],
     ['with no computed field', plain],
-  ])('shows, for each type, inputs only for the settings the type takes, %s', (_, fields) => {
+  ])('shows, for each type, inputs only for the settings the type takes, %s', async (_, fields) => {
     renderDesigner(entity({ fields, displayField: undefined }))
 
     const designer = screen.getByTestId('studio-entity-designer')
     expect(designer.closest(`[data-theme-mode=${mode}]`)).not.toBeNull()
     expect(designer).toBeVisible()
-    fields.forEach((field, index) => {
-      const row = screen.getByTestId(`studio-field-/fields/${index}`)
+    for (const [index, field] of fields.entries()) {
+      const row = await openEntityField(index)
       expect(row).toBeVisible()
       for (const setting of fieldSettingNames) {
         const present = screen.queryByTestId(`studio-field-/fields/${index}/${setting}`) !== null
@@ -288,16 +292,18 @@ describe.each(['light', 'dark'])('EntityDesigner in %s mode', (mode) => {
           expect(row.contains(screen.getByTestId(`studio-field-/fields/${index}/${setting}`))).toBe(true)
         }
       }
-    })
+    }
   })
 
-  it('shows default, min, max and minLength on every type that takes them when the field computes nothing', () => {
+  it('shows default, min, max and minLength on every type that takes them when the field computes nothing', async () => {
     renderDesigner(entity({ fields: plain, displayField: undefined }))
 
     for (const setting of ['default', 'min', 'max', 'minLength'] as const) {
-      const types = plain.flatMap((field, index) =>
-        screen.queryByTestId(`studio-field-/fields/${index}/${setting}`) === null ? [] : [field.type],
-      )
+      const types: string[] = []
+      for (const [index, field] of plain.entries()) {
+        await openEntityField(index)
+        if (screen.queryByTestId(`studio-field-/fields/${index}/${setting}`) !== null) types.push(field.type)
+      }
       expect(types, setting).toEqual(
         plain.filter((field) => fieldSettings(field.type).includes(setting)).map((f) => f.type),
       )
@@ -305,21 +311,27 @@ describe.each(['light', 'dark'])('EntityDesigner in %s mode', (mode) => {
     }
   })
 
-  it('offers no sensitive setting on reference, references and file fields, and still offers it on text', () => {
+  it('offers no sensitive setting on reference, references and file fields, and still offers it on text', async () => {
     renderDesigner(entity({ fields: plain, displayField: undefined }))
 
-    const offered = (type: string) =>
-      plain.flatMap((field, index) =>
-        field.type === type && screen.queryByTestId(`studio-field-/fields/${index}/sensitive`) !== null ? [index] : [],
-      )
+    const offered = async (type: string) => {
+      const indexes: number[] = []
+      for (const [index, field] of plain.entries()) {
+        await openEntityField(index)
+        if (field.type === type && screen.queryByTestId(`studio-field-/fields/${index}/sensitive`) !== null) {
+          indexes.push(index)
+        }
+      }
+      return indexes
+    }
     for (const type of ['reference', 'references', 'file']) {
       expect(
         plain.some((field) => field.type === type),
         type,
       ).toBe(true)
-      expect(offered(type), type).toEqual([])
+      expect(await offered(type), type).toEqual([])
     }
-    expect(offered('text').length).toBeGreaterThan(0)
+    expect((await offered('text')).length).toBeGreaterThan(0)
   })
 })
 
@@ -327,7 +339,7 @@ const follows = (first: HTMLElement, second: HTMLElement) =>
   (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
 
 describe('EntityDesigner', () => {
-  it('shows the header and the fields of the entity', () => {
+  it('shows the header and the fields of the entity', async () => {
     renderDesigner(entity())
 
     expect(screen.getByRole('textbox', { name: 'Entity name' })).toHaveValue('Invoice')
@@ -335,11 +347,15 @@ describe('EntityDesigner', () => {
       'Invoice',
     )
     expect(within(screen.getByTestId('studio-field-/displayField')).getByText('code')).toBeInTheDocument()
-    expect(within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')).toHaveValue('20')
-    expect(within(screen.getByTestId('studio-field-/fields/0/name')).getByRole('textbox')).toHaveValue('total')
+    expect(
+      within(within(await openEntityField(1)).getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton'),
+    ).toHaveValue('20')
+    expect(
+      within(within(await openEntityField(0)).getByTestId('studio-field-/fields/0/name')).getByRole('textbox'),
+    ).toHaveValue('total')
   })
 
-  it('names each entity input by its label and describes it by its help', () => {
+  it('names each entity input by its label and describes it by its help', async () => {
     renderDesigner(entity({ description: { textKey: 'entity.invoice.description' } }))
 
     expect(screen.getByRole('textbox', { name: labelOf('name') })).toHaveAccessibleDescription(helpOf('name'))
@@ -353,13 +369,13 @@ describe('EntityDesigner', () => {
       }),
     ).toHaveAccessibleDescription(helpOf('displayField'))
     expect(
-      within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton', {
+      within(within(await openEntityField(1)).getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton', {
         name: labelOf('fields.maxLength'),
       }),
     ).toHaveAccessibleDescription(helpOf('fields.maxLength'))
   })
 
-  it('names the currency inputs by their labels and describes them by their help', () => {
+  it('names the currency inputs by their labels and describes them by their help', async () => {
     renderDesigner(
       entity({
         fields: [
@@ -370,7 +386,7 @@ describe('EntityDesigner', () => {
       }),
     )
 
-    const fixed = within(screen.getByTestId('studio-field-/fields/1'))
+    const fixed = within(await openEntityField(1))
     expect(fixed.getByRole('radiogroup', { name: labelOf('fields.currencySource') })).toHaveAccessibleDescription(
       helpOf('fields.currencySource'),
     )
@@ -378,7 +394,7 @@ describe('EntityDesigner', () => {
       helpOf('fields.currency'),
     )
     expect(
-      within(screen.getByTestId('studio-field-/fields/2')).getByRole('combobox', {
+      within(await openEntityField(2)).getByRole('combobox', {
         name: labelOf('fields.currencyField'),
       }),
     ).toHaveAccessibleDescription(helpOf('fields.currencyField'))
@@ -386,7 +402,7 @@ describe('EntityDesigner', () => {
 
   it('describes each option of the currency source by its help', async () => {
     const fields = renderEditing(entity({ fields: [{ name: 'amount', type: 'money', currency: 'USD' }] }))
-    const amount = within(screen.getByTestId('studio-field-/fields/0'))
+    const amount = within(await openEntityField(0))
 
     for (const [option, label] of [
       ['code', /^Fixed code/],
@@ -415,7 +431,7 @@ describe('EntityDesigner', () => {
     'draws %s as a field with its help and writes its pointer when it is toggled',
     async (setting, role, label, off) => {
       const fields = renderEditing(entity({ fields: [{ name: 'code', type: 'text' }] }))
-      const code = within(screen.getByTestId('studio-field-/fields/0'))
+      const code = within(await openEntityField(0))
 
       const input = code.getByRole(role, { name: label })
       expect(label).toBe(labelOf(`fields.${setting}`))
@@ -431,15 +447,55 @@ describe('EntityDesigner', () => {
     },
   )
 
-  it('shows Fields, Indexes and Validations as groups named by their title and described by their help', () => {
+  it('shows General, Fields, Validations and Indexes as sections in that order, each with its line and a rule before all but the first', () => {
     renderDesigner(entity())
 
-    for (const path of ['fields', 'indexes', 'validations']) {
-      const group = screen.getByRole('group', { name: labelOf(path) })
-      expect(group).toHaveAccessibleDescription(helpOf(path))
-      expect(within(group).getByText(helpOf(path))).toBeVisible()
-      expect(screen.getByTestId(`studio-field-/${path}`).contains(group)).toBe(true)
+    const names = ['general', 'fields', 'validations', 'indexes'] as const
+    const regions = screen.getAllByRole('region')
+    expect(regions.map((region) => region.dataset.testid)).toEqual(names.map((name) => `studio-section-${name}`))
+    names.forEach((name, position) => {
+      const region = screen.getByRole('region', { name: sectionOf(name) })
+      expect(region).toBe(regions[position])
+      expect(within(region).getByText(sectionOf(`${name}.line`))).toBeVisible()
+      const previous = region.previousElementSibling
+      if (position === 0) {
+        expect(previous).toBeNull()
+      } else {
+        expect(previous).toHaveAttribute('role', 'separator')
+      }
+    })
+  })
+
+  it('shows the name, label, description and display field in General, and no id, kind or formatVersion', () => {
+    renderDesigner(entity({ description: { textKey: 'entity.invoice.description' } }))
+
+    const general = within(screen.getByTestId('studio-section-general'))
+    expect(general.getByRole('textbox', { name: labelOf('name') })).toHaveAccessibleDescription(helpOf('name'))
+    expect(general.getByRole('group', { name: labelOf('label') })).toHaveAccessibleDescription(helpOf('label'))
+    expect(general.getByRole('group', { name: labelOf('description') })).toHaveAccessibleDescription(
+      helpOf('description'),
+    )
+    expect(general.getByRole('combobox', { name: labelOf('displayField') })).toHaveAccessibleDescription(
+      helpOf('displayField'),
+    )
+    for (const key of ['id', 'kind', 'formatVersion']) {
+      expect(screen.queryByTestId(`studio-field-/${key}`), key).toBeNull()
     }
+  })
+
+  it('puts Add field on the right of the Fields heading, and a click appends an empty text field', async () => {
+    const fields = renderEditing(entity({ fields: [{ name: 'a', type: 'text' }] }))
+    const section = screen.getByTestId('studio-section-fields')
+    const heading = within(section).getByRole('heading', { name: sectionOf('fields') })
+    const add = within(section).getByRole('button', { name: 'Add field' })
+
+    expect(follows(heading, add)).toBe(true)
+    expect(follows(add, screen.getByTestId('studio-field-/fields'))).toBe(true)
+    await userEvent.click(add)
+    expect(fields()).toEqual([
+      { name: 'a', type: 'text' },
+      { name: '', type: 'text' },
+    ])
   })
 
   it('marks the keys that the entity schema requires and no others, and announces them as required', () => {
@@ -471,7 +527,7 @@ describe('EntityDesigner', () => {
     unmarked('studio-field-/indexes/0/unique', 'checkbox', labelOf('indexes.unique'))
   })
 
-  it('marks the target of a reference field and the currency field of a money field as required', () => {
+  it('marks the target of a reference field and the currency field of a money field as required', async () => {
     renderDesigner(
       entity({
         fields: [
@@ -482,10 +538,10 @@ describe('EntityDesigner', () => {
       }),
     )
 
-    const target = within(screen.getByTestId('studio-field-/fields/1/target'))
+    const target = within(within(await openEntityField(1)).getByTestId('studio-field-/fields/1/target'))
     expect(target.getByText('*')).toBeInTheDocument()
     expect(target.getByRole('combobox', { name: labelOf('fields.target') })).toHaveAttribute('aria-required', 'true')
-    const currency = within(screen.getByTestId('studio-field-/fields/2/currencyField'))
+    const currency = within(within(await openEntityField(2)).getByTestId('studio-field-/fields/2/currencyField'))
     expect(currency.getByText('*')).toBeInTheDocument()
     expect(currency.getByRole('combobox', { name: labelOf('fields.currencyField') })).toHaveAttribute(
       'aria-required',
@@ -569,7 +625,7 @@ describe('EntityDesigner', () => {
     expect(row.getByText(helpOf('validations.expression'))).toBeVisible()
   })
 
-  it('shows the help of a computed field expression', () => {
+  it('shows the help of a computed field expression', async () => {
     renderDesigner(
       entity({
         fields: [
@@ -579,7 +635,7 @@ describe('EntityDesigner', () => {
       }),
     )
 
-    expect(within(screen.getByTestId('studio-field-/fields/1')).getByText(helpOf('fields.expression'))).toBeVisible()
+    expect(within(await openEntityField(1)).getByText(helpOf('fields.expression'))).toBeVisible()
   })
 
   it('shows the description after the name and the label and writes its texts', async () => {
@@ -614,7 +670,7 @@ describe('EntityDesigner', () => {
   it('changes the type of a field without precision and scale and keeps unique', async () => {
     const onChange = renderDesigner(entity())
 
-    await chooseOption('enum', screen.getByTestId('studio-field-/fields/0/type'))
+    await chooseOption('enum', within(await openEntityField(0)).getByTestId('studio-field-/fields/0/type'))
 
     expect(onChange).toHaveBeenCalledWith('/fields/0', {
       name: 'total',
@@ -626,29 +682,29 @@ describe('EntityDesigner', () => {
 
   it('removes a field label with undefined and writes a picked key under textKey', async () => {
     const onChange = renderDesigner(entity())
-    const label = screen.getByTestId('studio-field-/fields/0/label')
+    const label = within(await openEntityField(0)).getByTestId('studio-field-/fields/0/label')
 
     await clearSelect(label)
     expect(onChange).toHaveBeenCalledWith('/fields/0/label', undefined)
 
-    await chooseOption('field.total', screen.getByTestId('studio-field-/fields/1/label'))
+    await chooseOption('field.total', within(await openEntityField(1)).getByTestId('studio-field-/fields/1/label'))
     expect(onChange).toHaveBeenCalledWith('/fields/1/label/textKey', 'field.total')
   })
 
   it('removes a field help with undefined and writes a picked key under textKey', async () => {
     const onChange = renderDesigner(entity())
 
-    await chooseOption('field.total', screen.getByTestId('studio-field-/fields/1/help'))
+    await chooseOption('field.total', within(await openEntityField(1)).getByTestId('studio-field-/fields/1/help'))
     expect(onChange).toHaveBeenCalledWith('/fields/1/help/textKey', 'field.total')
 
-    await clearSelect(screen.getByTestId('studio-field-/fields/2/help'))
+    await clearSelect(within(await openEntityField(2)).getByTestId('studio-field-/fields/2/help'))
     expect(onChange).toHaveBeenCalledWith('/fields/2/help', undefined)
   })
 
   it('keeps the help of a field when its type changes', async () => {
     const onChange = renderDesigner(entity())
 
-    await chooseOption('integer', screen.getByTestId('studio-field-/fields/2/type'))
+    await chooseOption('integer', within(await openEntityField(2)).getByTestId('studio-field-/fields/2/type'))
 
     expect(onChange).toHaveBeenCalledWith('/fields/2', {
       name: 'note',
@@ -659,7 +715,9 @@ describe('EntityDesigner', () => {
 
   it('sends undefined for a cleared maxLength and the number for a typed one', async () => {
     const onChange = renderDesigner(entity())
-    const maxLength = within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    const maxLength = within(
+      within(await openEntityField(1)).getByTestId('studio-field-/fields/1/maxLength'),
+    ).getByRole('spinbutton')
 
     await userEvent.clear(maxLength)
     expect(onChange).toHaveBeenLastCalledWith('/fields/1/maxLength', undefined)
@@ -669,7 +727,7 @@ describe('EntityDesigner', () => {
 
   it('sends undefined when every enum value is cleared', async () => {
     const onChange = renderDesigner(entity({ fields: [{ name: 'state', type: 'enum', values: ['open'] }] }))
-    const values = screen.getByTestId('studio-field-/fields/0/values')
+    const values = within(await openEntityField(0)).getByTestId('studio-field-/fields/0/values')
 
     await removeTag(values)
 
@@ -686,7 +744,7 @@ describe('EntityDesigner', () => {
         ],
       }),
     )
-    const amount = within(screen.getByTestId('studio-field-/fields/2'))
+    const amount = within(await openEntityField(2))
 
     await userEvent.click(amount.getByRole('radio', { name: /^From a field/ }))
     expect(fields()[2]).toEqual({ name: 'amount', type: 'money', currencyField: '' })
@@ -706,7 +764,7 @@ describe('EntityDesigner', () => {
 
   it('sets and clears the max size and the accepted media types of a file field', async () => {
     const fields = renderEditing(entity({ fields: [{ name: 'receipt', type: 'file' }] }))
-    const receipt = within(screen.getByTestId('studio-field-/fields/0'))
+    const receipt = within(await openEntityField(0))
 
     await userEvent.type(receipt.getByRole('spinbutton', { name: 'Max size (bytes)' }), '1048576')
     expect(fields()[0]).toEqual({ name: 'receipt', type: 'file', maxSize: 1048576 })
@@ -729,7 +787,7 @@ describe('EntityDesigner', () => {
 
   it('sets the label of each enum value and removes valueLabels with the last one', async () => {
     const fields = renderEditing(entity({ fields: [{ name: 'status', type: 'enum', values: ['open', 'closed'] }] }))
-    const status = within(screen.getByTestId('studio-field-/fields/0'))
+    const status = within(await openEntityField(0))
     const picker = (value: string) => status.getByTestId(`studio-field-/fields/0/valueLabels/${value}`)
 
     expect(status.getByRole('combobox', { name: 'Label of open' })).toBeInTheDocument()
@@ -747,7 +805,7 @@ describe('EntityDesigner', () => {
 
   it('sets and clears the default of a field, with no key left after it is cleared', async () => {
     const fields = renderEditing(entity({ fields: [{ name: 'state', type: 'enum', values: ['open'] }] }))
-    const state = within(screen.getByTestId('studio-field-/fields/0'))
+    const state = within(await openEntityField(0))
 
     await userEvent.type(state.getByRole('textbox', { name: 'Default' }), "'open'")
     expect(fields()[0]).toEqual({ name: 'state', type: 'enum', values: ['open'], default: "'open'" })
@@ -766,21 +824,23 @@ describe('EntityDesigner', () => {
         ],
       }),
     )
-    const row = (index: number) => within(screen.getByTestId(`studio-field-/fields/${index}`))
+    const count = within(await openEntityField(0))
+    const total = within(await openEntityField(1))
+    const price = within(await openEntityField(2))
 
-    await userEvent.type(row(0).getByRole('spinbutton', { name: 'Min' }), '0')
-    await userEvent.type(row(0).getByRole('spinbutton', { name: 'Max' }), '10')
+    await userEvent.type(count.getByRole('spinbutton', { name: 'Min' }), '0')
+    await userEvent.type(count.getByRole('spinbutton', { name: 'Max' }), '10')
     expect(fields()[0]).toEqual({ name: 'count', type: 'integer', min: 0, max: 10 })
-    await userEvent.clear(row(0).getByRole('spinbutton', { name: 'Min' }))
+    await userEvent.clear(count.getByRole('spinbutton', { name: 'Min' }))
     expect(fields()[0]).toEqual({ name: 'count', type: 'integer', max: 10 })
-    await userEvent.clear(row(0).getByRole('spinbutton', { name: 'Max' }))
+    await userEvent.clear(count.getByRole('spinbutton', { name: 'Max' }))
     expect(fields()[0]).toEqual({ name: 'count', type: 'integer' })
 
-    await userEvent.type(row(1).getByRole('spinbutton', { name: 'Min' }), '-1.5')
+    await userEvent.type(total.getByRole('spinbutton', { name: 'Min' }), '-1.5')
     expect(fields()[1]).toEqual({ name: 'total', type: 'decimal', min: -1.5 })
-    await userEvent.type(row(2).getByRole('spinbutton', { name: 'Max' }), '99.25')
+    await userEvent.type(price.getByRole('spinbutton', { name: 'Max' }), '99.25')
     expect(fields()[2]).toEqual({ name: 'price', type: 'money', currency: 'VND', max: 99.25 })
-    await userEvent.clear(row(2).getByRole('spinbutton', { name: 'Max' }))
+    await userEvent.clear(price.getByRole('spinbutton', { name: 'Max' }))
     expect(fields()[2]).toEqual({ name: 'price', type: 'money', currency: 'VND' })
   })
 
@@ -793,12 +853,12 @@ describe('EntityDesigner', () => {
         ],
       }),
     )
-    const day = within(screen.getByTestId('studio-field-/fields/0')).getByRole('textbox', { name: 'Min' })
-    const at = within(screen.getByTestId('studio-field-/fields/1')).getByRole('textbox', { name: 'Min' })
+    const day = within(await openEntityField(0)).getByRole('textbox', { name: 'Min' })
+    const at = within(await openEntityField(1)).getByRole('textbox', { name: 'Min' })
 
     await userEvent.type(day, '2026-01-05{Enter}')
     expect(fields()[0]).toEqual({ name: 'day', type: 'date', min: '2026-01-05' })
-    await clearPicker(screen.getByTestId('studio-field-/fields/0/min'))
+    await clearPicker(within(await openEntityField(0)).getByTestId('studio-field-/fields/0/min'))
     expect(fields()[0]).toEqual({ name: 'day', type: 'date' })
 
     await userEvent.type(at, '2026-01-05 10:30:00{Enter}')
@@ -807,7 +867,7 @@ describe('EntityDesigner', () => {
     expect(new Date(written).getTime()).toBe(new Date(2026, 0, 5, 10, 30, 0).getTime())
   })
 
-  it('shows the date and date-time limits of the file in their pickers', () => {
+  it('shows the date and date-time limits of the file in their pickers', async () => {
     renderDesigner(
       entity({
         fields: [
@@ -817,20 +877,26 @@ describe('EntityDesigner', () => {
       }),
     )
 
-    expect(within(screen.getByTestId('studio-field-/fields/0/min')).getByRole('textbox', { name: 'Min' })).toHaveValue(
-      '2026-01-05',
-    )
-    expect(within(screen.getByTestId('studio-field-/fields/0/max')).getByRole('textbox', { name: 'Max' })).toHaveValue(
-      '2026-02-01',
-    )
-    expect(within(screen.getByTestId('studio-field-/fields/1/min')).getByRole('textbox', { name: 'Min' })).toHaveValue(
-      dayjs('2026-01-05T10:30:00Z').format('YYYY-MM-DD HH:mm:ss'),
-    )
+    expect(
+      within(within(await openEntityField(0)).getByTestId('studio-field-/fields/0/min')).getByRole('textbox', {
+        name: 'Min',
+      }),
+    ).toHaveValue('2026-01-05')
+    expect(
+      within(within(await openEntityField(0)).getByTestId('studio-field-/fields/0/max')).getByRole('textbox', {
+        name: 'Max',
+      }),
+    ).toHaveValue('2026-02-01')
+    expect(
+      within(within(await openEntityField(1)).getByTestId('studio-field-/fields/1/min')).getByRole('textbox', {
+        name: 'Min',
+      }),
+    ).toHaveValue(dayjs('2026-01-05T10:30:00Z').format('YYYY-MM-DD HH:mm:ss'))
   })
 
   it('sets and clears minLength and searchable of a text field, and removes the key for a switch turned off', async () => {
     const fields = renderEditing(entity({ fields: [{ name: 'code', type: 'text' }] }))
-    const code = within(screen.getByTestId('studio-field-/fields/0'))
+    const code = within(await openEntityField(0))
 
     await userEvent.type(code.getByRole('spinbutton', { name: 'Min length' }), '2')
     expect(fields()[0]).toEqual({ name: 'code', type: 'text', minLength: 2 })
@@ -853,19 +919,79 @@ describe('EntityDesigner', () => {
     expect(fields()[0]).toEqual({ name: 'code', type: 'text', searchable: true })
   })
 
-  it('hides default, min, max and minLength next to an expression, and keeps a key that is already there', () => {
+  it('hides default, min, max and minLength next to an expression, and keeps a key that is already there', async () => {
     renderDesigner(
       entity({
         fields: [{ name: 'code', type: 'text', sequence: 'InvoiceNumbers', minLength: 2, default: "'x'" }],
       }),
     )
-    const code = within(screen.getByTestId('studio-field-/fields/0'))
+    const code = within(await openEntityField(0))
 
     for (const name of ['Default', 'Min length']) {
       expect(code.queryByRole('textbox', { name })).toBeNull()
       expect(code.queryByRole('spinbutton', { name })).toBeNull()
     }
     expect(code.getByRole('switch', { name: 'Searchable' })).toBeInTheDocument()
+  })
+
+  describe('filter', () => {
+    const fields = [
+      { name: 'count', type: 'integer', required: true },
+      { name: 'code', type: 'text', label: { textKey: 'field.total' } },
+      { name: 'size', type: 'integer' },
+      { name: 'total', type: 'decimal', unique: true },
+    ]
+    const rows = () => screen.getAllByTestId(/^studio-field-\/fields\/\d+$/)
+    const rowNames = () =>
+      rows()
+        .map((row) => within(row).getByRole('textbox', { name: 'Field name' }))
+        .map((box) => (box as HTMLInputElement).value)
+
+    function renderFiltered(origins: (string | null)[]) {
+      render(
+        <Providers loaded={names}>
+          <EntityDesigner value={entity({ fields })} onChange={vi.fn()} origins={origins} />
+        </Providers>,
+      )
+    }
+
+    it('offers the name, label, type, Required and Unique columns, and applying Type is integer leaves only the integer fields', async () => {
+      renderFiltered(['count', 'code', 'size', 'total'])
+      expect(rows()).toHaveLength(4)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+      await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+      expect(optionTexts()).toEqual(['Field name', 'Field label', 'Field type', 'Required', 'Unique'])
+      await chooseOption('Field type')
+      await pick('Value', 0, 'integer')
+      await clickInDialog('Apply')
+
+      expect(rowNames()).toEqual(['count', 'size'])
+      expect(screen.queryByRole('list')).not.toBeInTheDocument()
+    })
+
+    it('filters Required as Yes or No, and leaves out a field whose type has no Required', async () => {
+      renderFiltered(['count', 'code', 'size', 'total'])
+
+      await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+      await pick('Column', 0, 'Required')
+      await pick('Value', 0, 'Yes')
+      await clickInDialog('Apply')
+
+      expect(rowNames()).toEqual(['count'])
+    })
+
+    it('keeps a field added since the last save shown, and hides a saved field that does not match', async () => {
+      renderFiltered(['count', 'code', 'size', null])
+
+      await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+      await pick('Column', 0, 'Field type')
+      await pick('Value', 0, 'integer')
+      await clickInDialog('Apply')
+
+      // The decimal field `total` has no origin, so it is new and stays.
+      expect(rowNames()).toEqual(['count', 'size', 'total'])
+    })
   })
 
   it('keeps the other keys of the entity when it sets a setting', async () => {
@@ -982,7 +1108,7 @@ describe('EntityDesigner', () => {
         </ExpressionCheckContext.Provider>
       </Providers>,
     )
-    const row = within(screen.getByTestId('studio-field-/fields/1/default'))
+    const row = within(within(await openEntityField(1)).getByTestId('studio-field-/fields/1/default'))
 
     // The editor loads lazily, and a plain read-only box stands in until it has.
     await waitFor(() =>
@@ -1023,13 +1149,13 @@ describe('EntityDesigner', () => {
     expect(row(0).getByRole('button', { name: 'Move up' })).toBeDisabled()
     expect(row(2).getByRole('button', { name: 'Move down' })).toBeDisabled()
 
-    await userEvent.click(row(1).getByRole('button', { name: 'Move up' }))
+    await entityFieldAction(1, 'Move up')
     expect(onChange).toHaveBeenLastCalledWith('/fields', [fields[1], fields[0], fields[2]])
-    await userEvent.click(row(1).getByRole('button', { name: 'Move down' }))
+    await entityFieldAction(1, 'Move down')
     expect(onChange).toHaveBeenLastCalledWith('/fields', [fields[0], fields[2], fields[1]])
-    await userEvent.click(row(0).getByRole('button', { name: 'Remove field' }))
+    await entityFieldAction(0, 'Remove')
     expect(onChange).toHaveBeenLastCalledWith('/fields', [fields[1], fields[2]])
-    await userEvent.click(screen.getByRole('button', { name: 'Add field' }))
+    await addEntityField()
     expect(onChange).toHaveBeenLastCalledWith('/fields', [...fields, { name: '', type: 'text' }])
   })
 
@@ -1139,11 +1265,14 @@ describe('EntityDesigner', () => {
       expect(screen.queryByRole('button', { name })).toBeNull()
     }
 
-    await userEvent.type(within(screen.getByTestId('studio-field-/fields/0/name')).getByRole('textbox'), 'x')
+    await userEvent.type(
+      within(within(await openEntityField(0)).getByTestId('studio-field-/fields/0/name')).getByRole('textbox'),
+      'x',
+    )
     expect(onChange).not.toHaveBeenCalled()
   })
 
-  it('shows a disabled label box and plain boxes for the rest until the names have loaded', () => {
+  it('shows a disabled label box and plain boxes for the rest until the names have loaded', async () => {
     renderDesigner(
       entity({
         validations: [{ name: 'totalPositive', expression: 'total > 0', message: { textKey: 'v' }, field: 'total' }],
@@ -1154,7 +1283,9 @@ describe('EntityDesigner', () => {
 
     expect(within(screen.getByTestId('studio-field-/label')).getByRole('textbox')).toBeDisabled()
     expect(screen.queryByRole('textbox', { name: 'Text key' })).toBeNull()
-    expect(within(screen.getByTestId('studio-field-/fields/0/label')).getByRole('textbox')).toHaveValue('field.total')
+    expect(
+      within(within(await openEntityField(0)).getByTestId('studio-field-/fields/0/label')).getByRole('textbox'),
+    ).toHaveValue('field.total')
     expect(within(screen.getByTestId('studio-field-/validations/0/message/textKey')).getByRole('textbox')).toHaveValue(
       'v',
     )
@@ -1168,6 +1299,16 @@ describe('the texts of the entity designer', () => {
       expect(catalogue[`shell.studio.field.entity.${path}.help`]).toBeTruthy()
     }
   })
+
+  it.each(['general', 'fields', 'validations', 'indexes'])(
+    'has a title and a line for the %s section in English and Vietnamese',
+    (name) => {
+      for (const catalogue of [platformEnglish, platformVietnamese] as Record<string, string>[]) {
+        expect(catalogue[`shell.studio.section.entity.${name}`]).toBeTruthy()
+        expect(catalogue[`shell.studio.section.entity.${name}.line`]).toBeTruthy()
+      }
+    },
+  )
 })
 
 describe('EntityDesigner with a customization layer', () => {
@@ -1314,7 +1455,10 @@ describe('typing in the entity designer', () => {
     renderStable()
     await settled()
 
-    await userEvent.type(within(screen.getByTestId('studio-field-/fields/1/label')).getByRole('textbox'), 'x')
+    await userEvent.type(
+      within(within(await openEntityField(1)).getByTestId('studio-field-/fields/1/label')).getByRole('textbox'),
+      'x',
+    )
 
     expect(saved().fields[1].label).toEqual({ textKey: 'x' })
     expect(draws.filter((pointer) => !pointer.startsWith('/fields/1/'))).toEqual([])

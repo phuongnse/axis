@@ -27,7 +27,7 @@ public sealed class ConsoleFailedWorkTests(ProcessStartFixture fixture) : IClass
         Assert.Equal(HttpStatusCode.OK, status);
         using var _ = body;
         var root = body.RootElement;
-        Assert.Equal(["items", "page", "pageSize", "totalCount"], root.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["items", "page", "pageSize", "totalCount", "processes"], root.EnumerateObject().Select(property => property.Name));
         Assert.Equal((1, 20, 4L), (root.GetProperty("page").GetInt32(), root.GetProperty("pageSize").GetInt32(), root.GetProperty("totalCount").GetInt64()));
         var items = root.GetProperty("items").EnumerateArray().ToList();
         Assert.Equal(["connector", "instance", "package", "instance"], items.Select(item => item.GetProperty("kind").GetString()));
@@ -75,6 +75,19 @@ public sealed class ConsoleFailedWorkTests(ProcessStartFixture fixture) : IClass
         Assert.Equal(Hour(1), failedFirst.GetProperty("failedAt").GetDateTimeOffset());
         Assert.Equal(JsonValueKind.Null, failedFirst.GetProperty("error").ValueKind);
 
+        var processes = root.GetProperty("processes").EnumerateArray().ToList();
+        Assert.All(processes, process => Assert.Equal(
+            ["id", "name", "applicationId", "application"],
+            process.EnumerateObject().Select(property => property.Name)));
+        Assert.Contains(processes, process =>
+            process.GetProperty("name").GetString() == "Submit"
+            && process.GetProperty("applicationId").GetGuid() == seed.FirstApplicationId
+            && process.GetProperty("application").GetString() == seed.FirstName);
+        Assert.Contains(processes, process =>
+            process.GetProperty("name").GetString() == "NightlyJob"
+            && process.GetProperty("applicationId").GetGuid() == seed.SecondApplicationId
+            && process.GetProperty("application").GetString() == seed.SecondName);
+
         Assert.All(items, item => Assert.Equal(
             ["kind", "applicationId", "application", "process", "instanceId", "step", "callId", "connector", "package", "operation", "failedAt", "error"],
             item.EnumerateObject().Select(property => property.Name)));
@@ -93,6 +106,44 @@ public sealed class ConsoleFailedWorkTests(ProcessStartFixture fixture) : IClass
         var items = body.RootElement.GetProperty("items").EnumerateArray().ToList();
         Assert.Equal([seed.SecondFailedInstanceId, seed.SecondPackageInstanceId], items.Select(item => item.GetProperty("instanceId").GetGuid()));
         Assert.All(items, item => Assert.Equal(seed.SecondApplicationId, item.GetProperty("applicationId").GetGuid()));
+    }
+
+    [Fact]
+    public async Task A_filter_on_application_keeps_only_that_application_with_its_total()
+    {
+        var seed = await SeedAsync();
+        var application = Uri.EscapeDataString($$"""{"all":[{"field":"application","op":"eq","value":"{{seed.SecondApplicationId:D}}"}]}""");
+        var withError = Uri.EscapeDataString(
+            $$"""{"all":[{"field":"application","op":"eq","value":"{{seed.SecondApplicationId:D}}"},{"field":"error","op":"contains","value":"package"}]}""");
+
+        var (status, body) = await GetAsync("olga", $"?filter={application}");
+        var (withErrorStatus, withErrorBody) = await GetAsync("olga", $"?filter={withError}");
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        using var _ = body;
+        Assert.Equal(2, body.RootElement.GetProperty("totalCount").GetInt64());
+        var items = body.RootElement.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal([seed.SecondFailedInstanceId, seed.SecondPackageInstanceId], items.Select(item => item.GetProperty("instanceId").GetGuid()));
+        Assert.Equal(HttpStatusCode.OK, withErrorStatus);
+        using var __ = withErrorBody;
+        Assert.Equal(1, withErrorBody.RootElement.GetProperty("totalCount").GetInt64());
+        Assert.Equal(seed.SecondPackageInstanceId, Assert.Single(withErrorBody.RootElement.GetProperty("items").EnumerateArray()).GetProperty("instanceId").GetGuid());
+    }
+
+    [Fact]
+    public async Task A_filter_or_sort_on_an_undeclared_field_is_a_400_keyed_by_its_parameter()
+    {
+        await SeedAsync();
+        var undeclared = Uri.EscapeDataString("""{"all":[{"field":"releaseId","op":"eq","value":"x"}]}""");
+
+        foreach (var (query, key) in new[] { ($"?filter={undeclared}", "filter"), ("?sort=releaseId", "sort") })
+        {
+            var (status, body) = await GetAsync("olga", query);
+
+            Assert.Equal(HttpStatusCode.BadRequest, status);
+            using var _ = body;
+            Assert.Equal([key], body.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
+        }
     }
 
     [Fact]

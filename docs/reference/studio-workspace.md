@@ -243,8 +243,15 @@ The page shows, in order:
    adds and Removed what it takes away. The live release lists what it brought, under "Changes from
    release 3", and the first live release says there is nothing to compare with. The title always names
    the release it compares with.
-5. **Modules and packages** that the release pins: name, type and version.
-6. **Activations:** when, by whom, the release it replaced and until when it was live.
+5. **Modules and packages** that the release pins: name, type and version. The table has Filter on each
+   column: Name and Version as text, Type as a choice of Module or Package.
+6. **Activations:** when, by whom, the release it replaced and until when it was live. The table has Filter on each
+   column: When and Until as dates, By as text and Replaced as a number. A date filters on the local day that
+   the row shows, and the live release's Until, which reads "now", is empty.
+
+Each table holds its rows, so it filters them itself and keeps its filter in the address, see
+[tables](actions-and-controls.md#tables). The Modules and packages table uses the plain name `filter`, and
+Activations the `activations.` prefix, so a link opens the same rows in both.
 
 The parts from Details to Activations each have a `heading5` heading, with a `divider` rule between
 them and none before the first, through `SectionParts`. A part that the page leaves out, such as Relaxed

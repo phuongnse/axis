@@ -95,8 +95,8 @@ tenant button of the Tenants view and the actions of the Tenant view.
   A row shows the time, the kind, the tenant and the state, each
   step with its state, or one line when no step has run yet, and the error of a failed job or step. A failed job other than a `purge` job has a Run
   again button, with a confirmation that names the job and the tenant, see [actions](#actions).
-- **Tenants.** One row per tenant, with AxisTable's Search, which looks in the id and the hosts, its Filter on the
-  status, its Columns, a sort on the header of every column but Hosts, a pager with a page size, and a Create tenant
+- **Tenants.** One row per tenant, with AxisTable's Search, which looks in the id and the hosts, its Filter on every
+  column, its Columns, a sort on the header of every column but Hosts, a pager with a page size, and a Create tenant
   button that opens the dialog of [creating a tenant](#actions). The server searches, filters, sorts and pages the
   list, 20 tenants to a page by default, see [the tenant list](tenant-lifecycle.md#routes). The search, the filter,
   the columns, the sort, the page and the page size live in the address, see [tables](actions-and-controls.md#tables).
@@ -118,8 +118,13 @@ tenant button of the Tenants view and the actions of the Tenant view.
     default. The `filter`, `columns`, `sort`, `page` and `pageSize` live in the address under their plain names, see
     [tables](actions-and-controls.md#tables). It has no Search, because a day holds no text. If the days fail to load,
     this part shows its own error and the rest of the view still works.
-  - **Host verification.** Each host that the operator asked for, from the [tenant read](tenant-lifecycle.md#routes)'s
-    `hostRequests`: pending with the date its request expires, verified or expired.
+  - **Host verification.** Each host that the operator or a tenant administrator asked for, from the
+    [tenant read](tenant-lifecycle.md#routes)'s `hostRequests`: pending with the date its request expires, verified or
+    expired. The table has Filter on every column, which filters its own rows. The filter lives in the address under
+    `hostRequests.`, see [tables](actions-and-controls.md#tables).
+  - **Quotas.** The quotas of the tenant read, with the rows that override the cell's defaults. The table has Filter on
+    every column, which filters its own rows. The filter lives in the address under `quotas.`, see
+    [tables](actions-and-controls.md#tables).
   - **Dates of a deletion.** A `deleting` tenant shows its purge date, `deleteAfter` of the
     [tenant read](tenant-lifecycle.md#routes), after its status. An id that was a tenant and is purged shows the status
     Deleted, the date it was purged, the date its deletion is complete and its jobs, read from

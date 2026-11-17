@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using Axis.Data.Naming;
+using Axis.Data.Records;
 using Axis.Processes.Instances;
 using Axis.Server.Tests;
 using static Axis.Integration.Tests.EndpointOutputFixture;
@@ -143,7 +144,7 @@ public sealed class EndpointAnnounceCallTests(EndpointOutputFixture fixture) : I
         await using var connection = await fixture.OpenConnectionAsync();
         foreach (var process in fixture.Model.Processes)
         {
-            var page = await DeadLetters.ListAsync(connection, fixture.Model.Manifest.Id, process.Id, null, 1, 100, CancellationToken);
+            var page = await DeadLetters.ListAsync(connection, fixture.Model.Manifest.Id, process.Id, null, new ListSql("TRUE", null, null, null), 1, 100, CancellationToken);
             Assert.DoesNotContain(page.Items, letter => letter.EventId == eventId);
         }
     }

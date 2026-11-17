@@ -26,14 +26,16 @@ interface UsedByRow {
   id: string
   kind: string
   label: string
+  relation: string
   how: string
   path: string
 }
 
-/** The columns the view's sort can name, see docs/reference/studio-resource-form.md#used-by. */
+/** The columns the view's search, filter and sort can name, see docs/reference/studio-resource-form.md#used-by. */
 const usedByFields = [
   { name: 'label', type: 'text' },
   { name: 'kind', type: 'text' },
+  { name: 'how', type: 'enum' },
 ] as const
 
 /**
@@ -61,6 +63,7 @@ function usedByRows(
       id: node.id,
       kind: node.kind,
       label: item ? resourceTitle(item, locale, t) : (node.name ?? kindSingular(node.kind, t)),
+      relation,
       how: t(relationTextKey(relation)),
       path,
     })
@@ -75,7 +78,7 @@ function usedByRows(
 
 /**
  * The Used by tab of a resource: the resources that use it, each by its label as a link that opens it at the path of
- * the reference, with search and Filter on Kind. It loads when the tab mounts.
+ * the reference, with search and Filter on each column. It loads when the tab mounts.
  */
 export function StudioUsedBy({
   application,
@@ -119,7 +122,28 @@ export function StudioUsedBy({
     () => [...new Set(rows.map((row) => row.kind))].sort((left, right) => sidebarRank(left) - sidebarRank(right)),
     [rows],
   )
-  const { view, setView } = useTableView(usedByFields, recordPageSize, [], true, true)
+  const hows = useMemo(
+    () =>
+      sortByName(
+        [...new Set(rows.map((row) => row.relation))].map((relation) => ({
+          value: relation,
+          label: t(relationTextKey(relation)),
+        })),
+        (option) => option.label,
+        locale,
+      ),
+    [rows, locale, t],
+  )
+  const { view, setView, saved } = useTableView(
+    usedByFields,
+    recordPageSize,
+    [],
+    true,
+    true,
+    false,
+    '',
+    `studio.${application}.usedBy`,
+  )
 
   const columns: AxisColumn<UsedByRow>[] = [
     {
@@ -128,6 +152,7 @@ export function StudioUsedBy({
       title: t('shell.studio.usedBy.name'),
       searchText: (row) => row.label,
       sortValue: (row) => row.label,
+      filter: { kind: 'text', value: (row) => row.label },
       render: (_value, row) => <Link to={studioResourceAddress(application, row.id, row.path)}>{row.label}</Link>,
     },
     {
@@ -147,6 +172,7 @@ export function StudioUsedBy({
       kind: 'freeText',
       title: t('shell.studio.usedBy.how'),
       render: (_value, row) => row.how,
+      filter: { kind: 'enum', value: (row) => row.relation, options: hows },
     },
   ]
 
@@ -156,7 +182,7 @@ export function StudioUsedBy({
       columns={columns}
       rowKey={(row) => row.key}
       dataSource={rows}
-      view={{ query: view, onChange: setView }}
+      view={{ query: view, onChange: setView, saved }}
       loading={usedBy === undefined && !failed}
       emptyText={t('shell.studio.usedBy.none')}
       failure={failed ? <AxisAlert kind="error" message={t('shell.studio.referencesFailed')} /> : undefined}

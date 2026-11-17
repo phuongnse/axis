@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
@@ -77,11 +78,13 @@ async function openRevoke(user: ReturnType<typeof userEvent.setup>, clientId: st
 
 const none: TenantOutsideClients = { outsideClients: 'none', allowedClients: [] }
 
-function renderTab(initial: TenantOutsideClients) {
+function renderTab(initial: TenantOutsideClients, address = '/users') {
   return render(
     <PlatformContext.Provider value={platform}>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <ConnectedAppsTab initial={initial} />
+        <MemoryRouter initialEntries={[address]}>
+          <ConnectedAppsTab initial={initial} />
+        </MemoryRouter>
       </TextProvider>
     </PlatformContext.Provider>,
   )
@@ -222,6 +225,16 @@ describe('ConnectedAppsTab', () => {
     expect(within(row).getByText(new Date('2026-03-04T10:15:00Z').toLocaleString('en'))).toBeVisible()
     const unnamed = screen.getByText('unnamed').closest('tr')!
     expect(within(unnamed).getAllByText('—')).toHaveLength(2)
+  })
+
+  it('narrows the apps by a filter on Name in the address, and hides the other apps', async () => {
+    const other: TenantConnectedApp = { clientId: 'claude/cli', name: 'Terminal helper', lastUsedAt: null, people: [] }
+    stubServer({ apps: [() => json({ items: [draftHelper, other] })] })
+    const filter = encodeURIComponent(JSON.stringify({ all: [{ field: 'name', op: 'eq', value: 'Draft helper' }] }))
+    renderTab(none, `/users?connectedApps.filter=${filter}`)
+
+    expect(await screen.findByText('claude/desktop')).toBeVisible()
+    expect(screen.queryByText('claude/cli')).not.toBeInTheDocument()
   })
 
   it('says that no app has consent when the list is empty', async () => {

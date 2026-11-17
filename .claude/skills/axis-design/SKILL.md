@@ -106,8 +106,8 @@ Use this after a merged change to the tokens or a widget, or when the owner
 asks. The rule is "A sync follows the repository" in
 [Design changes](../../../docs/delivery.md#design-changes).
 
-1. Run `scripts/build.sh` if the build output is missing or old. Then run
-   `scripts/design-system.sh`, which writes `artifacts/design-system/`.
+1. Run `scripts/design-system.sh`, which builds the bundle from source. If
+   `web/node_modules` is missing, run `scripts/setup.sh` first.
 2. Read the tokens from `web/src/platform/designTokens.ts`.
 3. For each issue the artifact's change notes name, run
    `gh issue view <number> --json state,title`. The changes of open issues are

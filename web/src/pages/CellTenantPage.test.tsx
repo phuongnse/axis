@@ -9,6 +9,7 @@ import { ThemeModeProvider } from '../platform/theme'
 import { CellTenantPage } from './CellTenantPage'
 import { PlatformContext, type Platform } from './context'
 import { hasFieldError, isRequiredLabel } from '../test/antd'
+import { clickInDialog, pick } from '../test/tableFilter'
 
 const platform: Platform = {
   site: {
@@ -276,6 +277,106 @@ describe('CellTenantPage', () => {
       ['portal.acme.test', 'Pending', new Date('2026-11-12T10:00:00Z').toLocaleString('en')],
       ['shop.acme.test', 'Verified', '—'],
     ])
+  })
+
+  it('filters the host verification on its state, kept in its own address name', async () => {
+    stubRoutes(
+      ok({
+        ...acme,
+        hostRequests: [
+          { host: 'old.acme.test', state: 'expired', expiresAt: '2026-11-01T10:00:00Z' },
+          { host: 'portal.acme.test', state: 'pending', expiresAt: '2026-11-12T10:00:00Z' },
+          { host: 'shop.acme.test', state: 'verified', expiresAt: '2026-11-05T10:00:00Z' },
+        ],
+      }),
+    )
+    renderPage('/tenants/acme')
+
+    const hosts = await screen.findByTestId('cell-tenant-host-requests')
+    await userEvent.click(within(hosts).getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'State')
+    await pick('Value', 0, 'Pending')
+    await clickInDialog('Apply')
+
+    const filter = { all: [{ field: 'state', op: 'eq', value: 'pending' }] }
+    await waitFor(() =>
+      expect(within(hosts).getAllByRole('row').slice(1).map(cellTexts)).toEqual([
+        ['portal.acme.test', 'Pending', new Date('2026-11-12T10:00:00Z').toLocaleString('en')],
+      ]),
+    )
+    expect(
+      JSON.parse(new URLSearchParams(screen.getByTestId('address').textContent!).get('hostRequests.filter')!),
+    ).toEqual(filter)
+  })
+
+  it('filters the quotas on their source, kept in its own address name and never sent to the tenant read', async () => {
+    const fetchMock = stubRoutes(ok(acme))
+    renderPage('/tenants/acme')
+
+    const quotas = await screen.findByTestId('cell-tenant-quotas')
+    await userEvent.click(within(quotas).getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'Source')
+    await pick('Value', 0, 'Cell default')
+    await clickInDialog('Apply')
+
+    await waitFor(() =>
+      expect(within(quotas).getAllByRole('row').slice(1).map(cellTexts)).toEqual([
+        ['Applications', '10', 'Cell default'],
+      ]),
+    )
+    const filter = { all: [{ field: 'source', op: 'eq', value: 'default' }] }
+    expect(JSON.parse(new URLSearchParams(screen.getByTestId('address').textContent!).get('quotas.filter')!)).toEqual(
+      filter,
+    )
+    const tenantUrls = fetchMock.mock.calls
+      .map(([input]) => String(input))
+      .filter((url) => url.startsWith('/api/cell/tenants/acme'))
+    expect(tenantUrls.length).toBeGreaterThan(0)
+    expect(tenantUrls.some((url) => new URL(url, 'http://localhost').searchParams.has('filter'))).toBe(false)
+  })
+
+  it('filters the host verification on the day its request expires, and no other state has one', async () => {
+    stubRoutes(
+      ok({
+        ...acme,
+        hostRequests: [
+          { host: 'portal.acme.test', state: 'pending', expiresAt: '2026-11-12T10:00:00Z' },
+          { host: 'shop.acme.test', state: 'pending', expiresAt: '2026-11-20T10:00:00Z' },
+          { host: 'old.acme.test', state: 'verified', expiresAt: '2026-11-12T10:00:00Z' },
+        ],
+      }),
+    )
+    renderPage('/tenants/acme')
+
+    const hosts = await screen.findByTestId('cell-tenant-host-requests')
+    await userEvent.click(within(hosts).getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'Expires')
+    await userEvent.type(
+      within(screen.getByRole('dialog')).getByRole('textbox', { name: 'Value' }),
+      '2026-11-12{Enter}',
+    )
+    await clickInDialog('Apply')
+
+    await waitFor(() => expect(within(hosts).getAllByRole('row').slice(1).map(cellTexts)).toHaveLength(1))
+    expect(within(hosts).getAllByRole('row')[1]).toHaveTextContent('portal.acme.test')
+  })
+
+  it('filters the quotas on their value, and a quota with no limit is empty', async () => {
+    stubRoutes(ok(acme))
+    renderPage('/tenants/acme')
+
+    const quotas = await screen.findByTestId('cell-tenant-quotas')
+    await userEvent.click(within(quotas).getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'Value')
+    await pick('Operator', 0, 'is more than')
+    await userEvent.type(within(screen.getByRole('dialog')).getByRole('spinbutton', { name: 'Value' }), '50')
+    await clickInDialog('Apply')
+
+    await waitFor(() =>
+      expect(within(quotas).getAllByRole('row').slice(1).map(cellTexts)).toEqual([
+        ['Users', '100', 'Set for this tenant'],
+      ]),
+    )
   })
 
   it('says that no host has been requested', async () => {

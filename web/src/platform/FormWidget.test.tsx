@@ -6,7 +6,8 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
-import { formItem, hasFieldError, isRequiredLabel, tabTo } from '../test/antd'
+import { chooseOption, formItem, hasFieldError, isRequiredLabel, tabTo } from '../test/antd'
+import { filterTexts } from '../test/tableFilter'
 import { designTokensFor } from './designTokens'
 import { FormWidget } from './FormWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
@@ -354,6 +355,7 @@ const texts = {
   'shell.form.added': 'Added',
   'shell.form.removed': 'Removed',
   'shell.table.search': 'Search',
+  ...filterTexts,
   'shell.table.empty': 'No records yet.',
   'shell.value.notSet': 'Not set',
   'shell.table.yes': 'Yes',
@@ -981,6 +983,50 @@ describe('FormWidget', () => {
 
     await waitFor(() => expect(requests()).toHaveLength(3))
     expect(requests()[2].url).toBe('/api/apps/E2eApp/entities/Category/records?search=off&page=2&sort=name')
+  })
+
+  it('filters the lookup by its display column and sends it with the search, keeping the address', async () => {
+    const requests = stubFetch({ status: 200, body: categoryPageJson }, { status: 200, body: categoryPageJson })
+    renderForm()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
+    const lookup = await screen.findByRole('dialog')
+    await within(lookup).findByText('Office')
+    await userEvent.click(within(lookup).getByRole('button', { name: 'Filter' }))
+    // The builder opens over the lookup, after it in the document, so its steps use the newest dialog.
+    const builder = screen.getAllByRole('dialog').at(-1)!
+    await userEvent.click(within(builder).getAllByRole('combobox', { name: 'Operator' })[0])
+    await chooseOption('contains')
+    await userEvent.type(within(builder).getByRole('textbox', { name: 'Value' }), 'off')
+    await userEvent.click(within(builder).getByRole('button', { name: 'Apply' }))
+
+    const filter = JSON.stringify({ all: [{ field: 'name', op: 'contains', value: 'off' }] })
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1].url).toBe(
+      `/api/apps/E2eApp/entities/Category/records?${new URLSearchParams({ filter, sort: 'name' })}`,
+    )
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/e2e\/noteform\/new$/)
+  })
+
+  it('gives a lookup whose target has no display field no Filter', async () => {
+    const widget: EntityWidgetMetadata = {
+      ...noteWidget,
+      entity: {
+        ...noteWidget.entity,
+        fields: noteWidget.entity.fields.map((f) =>
+          f.name === 'category' ? { ...f, target: { ...f.target!, displayField: null } } : f,
+        ),
+      },
+    }
+    stubFetch({ status: 200, body: categoryPageJson })
+    renderForm(null, widget)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
+    const lookup = await screen.findByRole('dialog')
+    // With no display field the column shows the record id, so the row is there once the id shows.
+    await within(lookup).findByText(categoryId)
+
+    expect(within(lookup).queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
   })
 
   it('does not search the lookup until Enter is pressed', async () => {

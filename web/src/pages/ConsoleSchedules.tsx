@@ -34,7 +34,16 @@ const noParameters: readonly string[] = []
  */
 export function ConsoleSchedules({ locale }: ConsoleSchedulesProps) {
   const t = useText()
-  const { view, setView } = useTableView(scheduleFields, recordPageSize, noParameters, true, true, true)
+  const { view, setView, saved } = useTableView(
+    scheduleFields,
+    recordPageSize,
+    noParameters,
+    true,
+    true,
+    true,
+    '',
+    'console.schedules',
+  )
   const query = recordQuery(view)
   const [schedules, setSchedules] = useState<ConsoleSchedulePage | 'failed'>()
   const [reload, setReload] = useState(0)
@@ -119,6 +128,7 @@ export function ConsoleSchedules({ locale }: ConsoleSchedulesProps) {
         view={{
           query: view,
           onChange: setView,
+          saved,
           pageSizes: tablePageSizes(),
           total: page?.totalCount ?? 0,
           search: true,

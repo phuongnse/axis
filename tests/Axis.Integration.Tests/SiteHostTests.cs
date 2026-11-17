@@ -35,6 +35,10 @@ public sealed class SiteHostTests(PostgreSqlFixture database) : IClassFixture<Po
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/api/studio/apps", site));
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/api/apps/LeaveRequests/tasks", site));
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/api/me/sessions", site));
+        Assert.Equal(HttpStatusCode.OK, await StatusAsync(client, "/api/me/tables/site.purchasing.requests", site));
+        Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/api/me/tables/site.leave.requests", site));
+        Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/api/me/tables/console.deadLetters", site));
+        Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/api/me/tables/site.purchasing", site));
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/studio", site));
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/account", site));
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/users", site));

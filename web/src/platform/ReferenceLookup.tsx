@@ -33,8 +33,9 @@ const pageSize = 20
  * A dialog that lists the records of a reference field's target entity, sorted by its display
  * field, to pick one. Its Search box is AxisTable's, so the search applies on Enter, on the search
  * button or when the box is cleared, as every table's search does. The trimmed text filters the
- * records to those whose display field contains it, ignoring case. Paging and search are the
- * dialog's own state, not the page's address, see docs/reference/form-widget.md#lookup.
+ * records to those whose display field contains it, ignoring case. The display column's Filter is text
+ * conditions, sent as the record API's `filter`. Paging, search and the filter are the dialog's own
+ * state, not the page's address, see docs/reference/form-widget.md#lookup.
  */
 export function ReferenceLookup({ field, title, open, onPick, onClose }: ReferenceLookupProps) {
   const { size } = useDesignTokens()
@@ -86,6 +87,9 @@ function LookupList({ field, onPick }: Pick<ReferenceLookupProps, 'field' | 'onP
         title: field.labelKey ? t(field.labelKey) : field.name,
         render: (value) =>
           value === null || value === undefined || value === '' ? null : String(value as RecordValue),
+        // The display field is required text, so it filters as text. A target with none has no Filter, see
+        // docs/reference/form-widget.md#lookup.
+        ...(displayField ? { filter: { kind: 'text' as const } } : {}),
       },
     ],
     [displayField, field.labelKey, field.name, t],

@@ -56,7 +56,7 @@ function StubCard({
             </AxisField>
           </div>
           {connector && (
-            <Flex gap="small">
+            <Flex vertical gap="small">
               <div data-testid={`studio-field-${pointer}/connector/name`}>
                 <AxisField {...fieldText('connector.name')}>
                   <ReferencePicker
@@ -202,7 +202,7 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
             const roles = Array.isArray(users[user]) ? (users[user] as string[]) : []
             return (
               <div key={user} data-testid={`studio-field-${pointer}`}>
-                <Flex gap="small" align="flex-end">
+                <Flex vertical gap="small">
                   <AxisField {...texts.field('users.id')}>
                     <KeyInput value={user} onRename={(next) => renameUser(user, next)} />
                   </AxisField>

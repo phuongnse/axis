@@ -30,7 +30,7 @@ header, as the other session routes do. They are checked on the server whatever 
 | Route                                                     | What it does                                                              |
 | --------------------------------------------------------- | ------------------------------------------------------------------------- |
 | `GET /api/console/tenant`                                 | Answers the tenant of the host and its active applications                |
-| `GET /api/console/failed-work`                            | Lists one page of the failed work of the tenant, newest first             |
+| `GET /api/console/failed-work`                            | Lists one page of the failed work of the tenant, searched, filtered and sorted in PostgreSQL |
 | `GET /api/console/webhook-deliveries`                     | Lists one page of the tenant's webhook deliveries, searched, filtered and sorted in PostgreSQL |
 | `GET /api/console/instances/{id}`                         | Answers one instance of the tenant, in the process inspection shape       |
 | `POST /api/console/instances/{id}/retry`                  | Runs the retry command of an instance on its active release               |
@@ -48,19 +48,28 @@ header, as the other session routes do. They are checked on the server whatever 
   release history, as Studio shows them) and `activatedAt`. The applications are the ones with an
   active release, in name order. The `status` is `active` or `readOnly`, because a host serves
   only those tenants: the hosts of a suspended tenant answer `503`.
-- **`GET /api/console/failed-work`.** Lists the failed work of the tenant, newest first, in the
-  paging shape of the record API (`items`, `page`, `pageSize`, `totalCount`). The parameters are
-  `application` (an application id), `page` and `pageSize`, all optional. An invalid one is a
-  `400` keyed by its name, and an `application` that is not a hyphenated UUID is keyed
-  `application`. Each item has `kind` (`instance`, `connector` or `package`), `applicationId`,
-  `application`, `process`, `instanceId`, `step`, `callId`, `connector`, `package`, `operation`,
-  `failedAt` and `error`. The keys that do not apply are `null`: an instance has no `callId`,
-  `connector`, `package` or `operation`. The `application` and `process` names come from the
-  active release, and from the release the instance is pinned to when the application is not
-  active. An item never holds a call input, a history input or output, or a record value. The
-  time of a failed instance is its `ended_at`, and its error is the newest history error of the
-  instance. The time of a call with an unknown outcome is the finish of its newest attempt, or its
-  `created_at` when it has no attempt row, and its error is the call's `last_error`.
+- **`GET /api/console/failed-work`.** Answers one page of the failed work of the tenant.
+  PostgreSQL filters, searches, sorts and pages it. The route takes `page`, `pageSize`, `sort`,
+  `search` and `filter` in the [record API's format](record-api.md#paging-and-sorting) over the
+  fields `application` (the application id), `process` (the process id), `instance` (the instance
+  id), `stepOrCall`, `failedAt` and `error`. The `stepOrCall` field is the text the view shows: the
+  step, or for a call `step: connector-or-package operation`. `failedAt` filters by its UTC day and
+  sorts by its instant. A search looks in `stepOrCall` and `error`. A sort or filter on another
+  field, and an invalid `page` or `pageSize`, is a `400` that names the parameter. Without `sort`
+  the list is newest first, and a sorted list breaks ties newest first. The optional `application`
+  id, a hyphenated UUID, keeps one application, and a malformed one is a `400` keyed
+  `application`. The answer has the paging shape of the record API (`items`, `page`, `pageSize`,
+  `totalCount`) and `processes`. Each item has `kind` (`instance`, `connector` or `package`),
+  `applicationId`, `application`, `process`, `instanceId`, `step`, `callId`, `connector`,
+  `package`, `operation`, `failedAt` and `error`. The keys that do not apply are `null`: an
+  instance has no `callId`, `connector`, `package` or `operation`. The `application` and `process`
+  names come from the active release, and from the release the instance is pinned to when the
+  application is not active. An item never holds a call input, a history input or output, or a
+  record value. The time of a failed instance is its `ended_at`, and its error is the newest
+  history error of the instance. The time of a call with an unknown outcome is the finish of its
+  newest attempt, or its `created_at` when it has no attempt row, and its error is the call's
+  `last_error`. `processes` lists the processes of every active release, each with its `id`,
+  `name`, `applicationId` and `application`, for the view's Process filter.
 - **`GET /api/console/webhook-deliveries`.** Answers one page of the webhook deliveries of the
   tenant. PostgreSQL filters, searches, sorts and pages them. The route takes `page`, `pageSize`,
   `sort`, `search` and `filter` in the [record API's format](record-api.md#paging-and-sorting) over
@@ -179,8 +188,14 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   outcome is `unknown`, across every process of every application. An entry opens the
   [instance detail](process-inspection.md#instance-detail) at `/console/instances/{id}`, with the
   graph, the history, the tasks and the calls. The page is outside every site, so it has no
-  release texts and shows step names, not their labels. It offers the commands that the detail
-  lists.
+  release texts and shows step names, not their labels. Its tables filter as the
+  [instance page's](process-inspector-widget.md#instance-page) do. It offers the commands that the detail
+  lists. The view is paged on the server. Its table has the toolbar of
+  [tables](actions-and-controls.md#tables) with Filter, and a pager. Each column filters, and the
+  Application and Process columns filter by name, so the view has no Application picker. The
+  Process filter offers the processes of the active releases. The address keeps the view as
+  `failedWork.filter`, `failedWork.page` and `failedWork.pageSize`, because the page has other
+  tables.
 - **Dead letters.** Event deliveries that reached the event delivery limit,
   including [webhook deliveries](outbound-webhooks.md#outbound-webhooks) and those that belong to
   no process. The view lists them in every state, newest first until it is sorted, and is paged on
@@ -204,7 +219,7 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   filter, and search finds the event occurrence id. The address keeps the view as
   `webhookDeliveries.search`, `webhookDeliveries.filter`, `webhookDeliveries.sort`,
   `webhookDeliveries.page`, `webhookDeliveries.pageSize` and `webhookDeliveries.columns`, because
-  Schedules keeps the plain names and Dead letters and Publishing their own prefixes.
+  Schedules keeps the plain names and Failed work, Dead letters and Publishing their own prefixes.
 - **Schedules.** Each schedule trigger of each active release, with its process, its schedule and
   time zone, and its last and next occurrence, see [schedules](process-events.md#schedules). The
   view is ordered by application and trigger name until it is sorted and is paged on the server.
@@ -231,7 +246,9 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   of the view. A failed load shows the error in each table in place of its rows, and the requests
   table keeps its toolbar. It offers no publish or activate button.
 - **Tenant.** The tenant's status and each application's active release, as a table with the
-  application, the release number and label, and the activation time.
+  application, the release number and label, and the activation time. The table has Filter on
+  Application, Release and Activated (the day), kept in the address as `applications.filter`. It
+  shows every row with no pager.
 
 ## Commands
 

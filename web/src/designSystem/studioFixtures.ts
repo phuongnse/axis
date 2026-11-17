@@ -19,7 +19,15 @@ import type {
   StudioRevision,
   StudioRevisionDiff,
 } from '../platform/studio'
-import { application, entity as requestEntity, fields, formWidget, locale, tableWidget } from './fixtures'
+import {
+  application,
+  entity as requestEntity,
+  fields,
+  formWidget,
+  locale,
+  noTableChoices,
+  tableWidget,
+} from './fixtures'
 
 // The answers of the `studio` preview. Its states answer the same `/api/studio/apps` path, so each state brings its own
 // routes, and the preview shows one state at a time, see docs/reference/widget-previews.md#the-bundle.
@@ -708,6 +716,13 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     [`${folderPath}/revisions`]: () => typicalRevisions,
     [`${folderPath}/revisions/${typicalRevisionId}`]: () => typicalRevisionDiff,
     [`${folderPath}/settings`]: () => settings,
+    // A table of the open application asks for the person's kept choices, and no state keeps any.
+    ...Object.fromEntries(
+      ['entity', 'history', 'releases', 'usedBy', 'texts', 'moduleTexts'].map((table) => [
+        `/api/me/tables/studio.${application}.${table}`,
+        () => noTableChoices,
+      ]),
+    ),
   }
 }
 

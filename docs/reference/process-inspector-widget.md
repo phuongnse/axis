@@ -76,6 +76,13 @@ wrong form show the not-found page, and the instance is not requested.
   yet." in place of its table, see [Attempts](process-inspection.md#attempts). A call whose
   `inputHidden` is `true` shows "hidden" in place of its input. A shown input is a list of its
   top-level properties, where a number keeps its source digits.
+- **Filter.** The History, Tasks and Sub-processes tables and each call's Attempts table have Filter on
+  each column that holds a value, of the column's kind, as [tables](actions-and-controls.md#tables)
+  say. The Open link has none. Each table holds its rows and filters them itself, with no pager. Its
+  filter is in the address under its own prefix: `history.`, `tasks.`, `subProcesses.` and
+  `attempts.{callId}.`. A date filters on the local day of its time. A step and an assignee filter on
+  the text the cell shows. A task state, an attempt kind, an attempt outcome and a sub-process state
+  filter as a choice.
 - **Subject, timer and parent.** An instance without a subject shows "No subject" in place of the
   subject id. An instance that is `waiting` at a `timer` step shows a Due row with the `dueAt` of that
   step's latest history row, and the row is left out in any other case. An instance that a sub-process
@@ -133,9 +140,16 @@ Under the instance list, a Dead letters section lists the process's open dead le
 `{deadLettersPath}?state=open`, newest first, with the kind, the attempts, the last error and the time
 it was dead-lettered.
 
+- **Toolbar.** The table has Filter, see [tables](actions-and-controls.md#tables). Filter has every
+  column: Kind and Last error as text, Attempts as a number, and Created as a date. It has no search
+  box, no sort, no Columns and no saved views.
+- **Server.** The widget sends `filter` with `state=open` to the dead letters path, and the server
+  applies it, see [process events](process-events.md#routes). The column keys are the route's field
+  names: `kind`, `attempts`, `lastError` and `createdAt`. Created filters by its UTC day.
 - **Rows.** The kind shows as the API sends it. With none open, the section shows an empty text.
-- **Paging.** The list has its own page number, which the URL does not hold, because the URL's `page`
-  and `pageSize` belong to the instance list.
+- **Paging.** The filter and the page live in the URL as `deadLetters.filter` and `deadLetters.page`,
+  because the URL's plain `filter` and `page` belong to the instance list. A new filter goes back to
+  page 1. A `state` in the address is not read.
 - **Buttons.** A row has a Redeliver and a Discard button for each of those commands that the item's
   `commands` lists, which it does for an open dead letter and a user with the `retry` grant. A user
   with only `inspect` sees no button, and a command name the SPA does not know is left out. Redeliver,

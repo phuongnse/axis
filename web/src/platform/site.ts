@@ -197,6 +197,8 @@ export interface DataSourceColumn {
   currency?: string | null
   /** The name of the column that holds the currency code of a money column or measure, or missing or `null` otherwise. */
   currencyColumn?: string | null
+  /** True on a measure of a grouped data source, missing otherwise. */
+  measure?: boolean
 }
 
 /**

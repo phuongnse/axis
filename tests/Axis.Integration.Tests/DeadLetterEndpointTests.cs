@@ -319,6 +319,59 @@ public sealed class DeadLetterEndpointTests(TaskApiFixture fixture) : IClassFixt
             await fixture.AdminCountAsync(Tenant, $"SELECT count(*) FROM axis.process_work_items WHERE kind = 'webhook.deliver' AND event_id = '{eventId:D}'"));
     }
 
+    [Fact]
+    public async Task The_list_keeps_only_the_dead_letters_that_match_the_filter_and_counts_only_them()
+    {
+        Assert.True(fixture.Model.TryGetProcess("Decide", out var decide));
+        var marker = Guid.NewGuid().ToString("N");
+        foreach (var (attempts, error) in new[] { (2, marker), (5, marker), (5, "other") })
+        {
+            await fixture.ExecuteAsync(
+                Tenant,
+                """
+                INSERT INTO axis.dead_letters (id, kind, application_id, process_id, process_instance_id, event_id, webhook_id, attempts, last_error, state, created_at)
+                VALUES (@id, 'webhook.deliver', @application, @process, @instance, @event, @webhook, @attempts, @error, 'open', now())
+                """,
+                ("id", Guid.CreateVersion7()),
+                ("application", fixture.Model.Manifest.Id),
+                ("process", decide.Id),
+                ("instance", Guid.NewGuid()),
+                ("event", Guid.NewGuid()),
+                ("webhook", Guid.NewGuid()),
+                ("attempts", attempts),
+                ("error", error));
+        }
+
+        var both = Uri.EscapeDataString($$"""{"all":[{"field":"lastError","op":"eq","value":"{{marker}}"},{"field":"attempts","op":"gte","value":3}]}""");
+        using var matching = await ListOkAsync("maria", $"?state=open&filter={both}");
+        var item = Assert.Single(matching.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal(5, item.GetProperty("attempts").GetInt32());
+        Assert.Equal(marker, item.GetProperty("lastError").GetString());
+        Assert.Equal(1, matching.RootElement.GetProperty("totalCount").GetInt64());
+
+        var byError = Uri.EscapeDataString($$"""{"all":[{"field":"lastError","op":"eq","value":"{{marker}}"}]}""");
+        using var sameError = await ListOkAsync("maria", $"?state=open&filter={byError}&sort=attempts&pageSize=1");
+        Assert.Equal(2, sameError.RootElement.GetProperty("items")[0].GetProperty("attempts").GetInt32());
+        Assert.Equal(1, sameError.RootElement.GetProperty("pageSize").GetInt32());
+        Assert.Equal(2, sameError.RootElement.GetProperty("totalCount").GetInt64());
+    }
+
+    [Fact]
+    public async Task A_filter_or_sort_on_an_undeclared_field_is_a_400_and_a_user_without_inspect_still_gets_403()
+    {
+        var undeclared = Uri.EscapeDataString("""{"all":[{"field":"processId","op":"eq","value":"x"}]}""");
+        foreach (var (query, key) in new[] { ($"?filter={undeclared}", "filter"), ("?sort=processId", "sort") })
+        {
+            using var refused = await SendAsync("maria", HttpMethod.Get, $"dead-letters{query}", body: null);
+            Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+            using var problem = JsonDocument.Parse(await refused.Content.ReadAsStringAsync(CancellationToken));
+            Assert.Equal([key], problem.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
+
+            using var denied = await SendAsync("otto", HttpMethod.Get, $"dead-letters{query}", body: null);
+            Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+        }
+    }
+
     private static string ReasonBody => JsonSerializer.Serialize(new { reason = Reason });
 
     /// <summary>

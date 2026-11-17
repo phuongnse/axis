@@ -10,11 +10,14 @@ namespace Axis.Server.Processes;
 
 /// <summary>
 /// The endpoints for the dead letters of a process, see the dead letters of the event delivery reference.
-/// The list at <c>GET /api/apps/{app}/processes/{process}/dead-letters</c> shows them newest first and
-/// paged as the instance list pages, and an optional <c>state</c> of <c>open</c>, <c>redelivered</c> or
-/// <c>discarded</c> keeps one state. It is checked in order: session (401), application and process
-/// (404), the user's <c>inspect</c> grant on the process (403), then <c>page</c>, <c>pageSize</c> and
-/// <c>state</c> (400). Each item lists the <c>commands</c> the user may take: <c>redeliver</c> and
+/// The list at <c>GET /api/apps/{app}/processes/{process}/dead-letters</c> takes the record API's <c>page</c>,
+/// <c>pageSize</c>, <c>sort</c>, <c>search</c> and <c>filter</c> over the fields <c>kind</c>, <c>attempts</c>,
+/// <c>lastError</c> and <c>createdAt</c>, which PostgreSQL applies, see <see cref="ListQuery{T}"/> and the routes of
+/// the event delivery reference. A search looks in <c>kind</c> and <c>lastError</c>, and a sort or filter on another
+/// field is a 400. With no sort the letters are newest first, and a sorted list breaks ties newest first. An optional
+/// <c>state</c> of <c>open</c>, <c>redelivered</c> or <c>discarded</c> keeps one state. It is checked in order:
+/// session (401), application and process (404), the user's <c>inspect</c> grant on the process (403), then
+/// <c>page</c>, <c>pageSize</c>, <c>sort</c>, <c>search</c>, <c>filter</c> and <c>state</c> (400). Each item lists the <c>commands</c> the user may take: <c>redeliver</c> and
 /// <c>discard</c> for an <c>open</c> dead letter when the user holds the <c>retry</c> grant, none
 /// otherwise. An item holds ids, a count and a fixed error text, never a record value.
 /// A redeliver at <c>POST …/dead-letters/{id}/redeliver</c> and a discard at <c>POST …/dead-letters/{id}/discard</c>
@@ -40,13 +43,35 @@ internal static class DeadLetterEndpoints
         endpoints.MapPost("/api/apps/{app}/processes/{process}/dead-letters/{id}/discard", DiscardAsync);
     }
 
+    // The columns that the list's search, filter and sort can name, over axis.dead_letters, see docs/reference/process-events.md#routes.
+    // The console list declares the same four, so a field filters and sorts one way. The createdAt column filters by its UTC day
+    // and sorts by its instant.
+    internal static readonly ListColumn<DeadLetterRow> KindColumn =
+        new("kind", ListColumnKind.Text, row => row.Kind, Searchable: true, Sql: "kind");
+
+    internal static readonly ListColumn<DeadLetterRow> AttemptsColumn =
+        new("attempts", ListColumnKind.Number, row => row.Attempts, Sql: "attempts");
+
+    internal static readonly ListColumn<DeadLetterRow> LastErrorColumn =
+        new("lastError", ListColumnKind.Text, row => row.LastError, Searchable: true, Sql: "last_error");
+
+    internal static readonly ListColumn<DeadLetterRow> CreatedAtColumn =
+        new(
+            "createdAt",
+            ListColumnKind.Date,
+            row => DateOnly.FromDateTime(row.CreatedAt.UtcDateTime),
+            Order: row => row.CreatedAt,
+            Sql: "(created_at AT TIME ZONE 'UTC')::date",
+            OrderSql: "created_at");
+
+    private static readonly IReadOnlyList<ListColumn<DeadLetterRow>> _columns =
+        [KindColumn, AttemptsColumn, LastErrorColumn, CreatedAtColumn];
+
     // The query parameters are bound as strings so every invalid one is reported in one problem.
     private static async Task<IResult> ListAsync(
         string app,
         string process,
         string? state,
-        string? page,
-        string? pageSize,
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
@@ -74,7 +99,7 @@ internal static class DeadLetterEndpoints
         }
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
+        var query = ListQuery<DeadLetterRow>.Read(httpContext.Request, _columns, errors);
         if (state is not null && !DeadLetters.States.Contains(state, StringComparer.Ordinal))
         {
             errors["state"] = [$"Must be one of {string.Join(", ", DeadLetters.States)}."];
@@ -86,10 +111,10 @@ internal static class DeadLetterEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var result = await DeadLetters.ListAsync(connection, application.Manifest.Id, model.Id, state, pageNumber, size, cancellationToken);
+        var result = await DeadLetters.ListAsync(connection, application.Manifest.Id, model.Id, state, query.Sql(), query.Page, query.PageSize, cancellationToken);
         var mayRetry = PolicyEvaluator.AllowsRetry(application, user.RolesIn(application), model);
         var items = result.Items.Select(row => Item(row, mayRetry)).ToList();
-        return Results.Ok(new DeadLetterListResponse(items, pageNumber, size, result.TotalCount));
+        return Results.Ok(new DeadLetterListResponse(items, query.Page, query.PageSize, result.TotalCount));
     }
 
     private static Task<IResult> RedeliverAsync(

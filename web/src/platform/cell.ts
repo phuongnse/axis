@@ -90,7 +90,7 @@ export interface CellHostRequestState {
 
 /**
  * One tenant with its quotas, its usage of the last 13 months by day, newest first, and the newest request of each
- * host that the operator asked for, ordered by host, as served by `GET /api/cell/tenants/{id}`.
+ * host that was asked for, ordered by host, as served by `GET /api/cell/tenants/{id}`.
  */
 export interface CellTenantDetail extends CellTenant {
   quotas: Record<string, CellQuota>
@@ -236,7 +236,7 @@ export type CellActionResult = CellWriteResult<CellJob>
  * Reads the answer of a console route that writes. A 401 or 403 is a refusal. Any other 4xx is a final answer and comes
  * back as the problem. A 5xx throws, so the caller may retry. A 2xx answers its JSON body.
  */
-async function cellWriteAnswer<T>(response: Response, name: string): Promise<CellWriteResult<T>> {
+export async function cellWriteAnswer<T>(response: Response, name: string): Promise<CellWriteResult<T>> {
   if (response.status === 401) {
     return { kind: 'unauthorized' }
   }

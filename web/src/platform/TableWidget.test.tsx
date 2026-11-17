@@ -237,18 +237,21 @@ const texts = {
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
-/** Stubs `fetch` with the record API and returns the requested URLs. */
+/** The route of a person's kept choices, which every table with a key asks for when it opens. The tests below do not read it. */
+const choicesRoute = '/api/me/tables/'
+
+/** Stubs `fetch` with the record API and returns the requested URLs, except the table's choices. */
 function stubRecords(body = notePage, status = 200) {
   const fetchMock = vi.fn(async (_input: string) => new Response(body, { status }))
   vi.stubGlobal('fetch', fetchMock)
-  return () => fetchMock.mock.calls.map(([url]) => url)
+  return () => fetchMock.mock.calls.map(([url]) => url).filter((url) => !url.startsWith(choicesRoute))
 }
 
-/** Stubs `fetch` with a handler per URL and returns the requested URLs. */
+/** Stubs `fetch` with a handler per URL and returns the requested URLs, except the table's choices. */
 function stubFetch(handler: (url: string) => Response) {
   const fetchMock = vi.fn(async (input: string) => handler(input))
   vi.stubGlobal('fetch', fetchMock)
-  return () => fetchMock.mock.calls.map(([url]) => url)
+  return () => fetchMock.mock.calls.map(([url]) => url).filter((url) => !url.startsWith(choicesRoute))
 }
 
 const emptyRows = '{"items":[],"page":1,"pageSize":10,"totalCount":0}'
@@ -277,7 +280,7 @@ function renderWidget(search = '', widget: WidgetMetadata = noteWidget, pageValu
   return render(
     <MemoryRouter initialEntries={[`/e2e/notes${search}`]}>
       <TextProvider catalogs={catalogs} development={false}>
-        <TableWidget sitePath="e2e" widget={widget} locale="en" pageValues={pageValues} />
+        <TableWidget sitePath="e2e" pageName="Requests" widget={widget} locale="en" pageValues={pageValues} />
       </TextProvider>
       <CurrentLocation />
     </MemoryRouter>,
@@ -289,7 +292,7 @@ function renderWidgetInDark(widget: WidgetMetadata) {
     <ThemeModeProvider initialMode="dark">
       <MemoryRouter initialEntries={['/e2e/notes']}>
         <TextProvider catalogs={catalogs} development={false}>
-          <TableWidget sitePath="e2e" widget={widget} locale="en" />
+          <TableWidget sitePath="e2e" pageName="Requests" widget={widget} locale="en" />
         </TextProvider>
       </MemoryRouter>
     </ThemeModeProvider>,
@@ -1392,7 +1395,7 @@ describe('TableWidget', () => {
     }
     const closableWidget = { ...noteWidget, rowActions: [closeNote] }
 
-    /** Stubs `fetch`: GET answers the notes, POST answers `startStatus`. Returns the calls made. */
+    /** Stubs `fetch`: GET answers the notes, POST answers `startStatus`. Returns the calls made, except the table's choices. */
     function stubStart(startStatus: number, startBody = '') {
       const fetchMock = vi.fn(
         async (_input: string, init?: RequestInit) =>
@@ -1401,7 +1404,7 @@ describe('TableWidget', () => {
           }),
       )
       vi.stubGlobal('fetch', fetchMock)
-      return fetchMock.mock.calls
+      return () => fetchMock.mock.calls.filter(([url]) => !url.startsWith(choicesRoute))
     }
 
     it('posts the row id with an idempotency key, then requests the rows again', async () => {
@@ -1411,10 +1414,10 @@ describe('TableWidget', () => {
 
       await userEvent.click(within(row).getByRole('button', { name: 'Close note' }))
 
-      await waitFor(() => expect(calls.filter(([, init]) => init?.method !== 'POST')).toHaveLength(2))
-      const [first, second] = calls.filter(([, init]) => init?.method !== 'POST')
+      await waitFor(() => expect(calls().filter(([, init]) => init?.method !== 'POST')).toHaveLength(2))
+      const [first, second] = calls().filter(([, init]) => init?.method !== 'POST')
       expect(second[0]).toBe(first[0])
-      const posts = calls.filter(([, init]) => init?.method === 'POST')
+      const posts = calls().filter(([, init]) => init?.method === 'POST')
       expect(posts).toHaveLength(1)
       const [url, init] = posts[0]
       expect(url).toBe(closeNote.instancesPath)
@@ -1433,7 +1436,7 @@ describe('TableWidget', () => {
       expect(await screen.findByTestId('table-action-error')).toHaveTextContent(
         'This record is already in a running process.',
       )
-      expect(calls.filter(([, init]) => init?.method !== 'POST')).toHaveLength(1)
+      expect(calls().filter(([, init]) => init?.method !== 'POST')).toHaveLength(1)
     })
 
     it('shows a start condition message as text', async () => {
@@ -1456,8 +1459,8 @@ describe('TableWidget', () => {
       expect(await screen.findByTestId('table-action-error')).toHaveTextContent('The process could not be started.')
       await userEvent.click(within(row).getByRole('button', { name: 'Close note' }))
 
-      await waitFor(() => expect(calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(2))
-      const keys = calls
+      await waitFor(() => expect(calls().filter(([, init]) => init?.method === 'POST')).toHaveLength(2))
+      const keys = calls()
         .filter(([, init]) => init?.method === 'POST')
         .map(([, init]) => new Headers(init?.headers).get('Idempotency-Key'))
       expect(keys[0]).toBe(keys[1])
@@ -1483,7 +1486,8 @@ describe('TableWidget', () => {
       )
       vi.stubGlobal('fetch', fetchMock)
       return {
-        gets: () => fetchMock.mock.calls.filter(([, init]) => init?.method !== 'DELETE'),
+        gets: () =>
+          fetchMock.mock.calls.filter(([url, init]) => !url.startsWith(choicesRoute) && init?.method !== 'DELETE'),
         deletes: () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'DELETE'),
       }
     }
@@ -1642,16 +1646,69 @@ describe('TableWidget filter', () => {
     expect(optionTexts(shownDropdown()!)).toEqual(['Open', 'Done'])
   })
 
-  it('has no Filter button on a data source table, with or without parameters', async () => {
+  it('shows a Filter button on a data source table, with or without parameters', async () => {
     stubRecords()
     const { unmount } = renderWidget('', noteListWidget)
     await screen.findByRole('row', { name: /Buy paper/ })
-    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
     unmount()
 
     renderWidget('', filteredWidget)
     await screen.findByRole('row', { name: /Buy paper/ })
-    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Title contains')).toHaveRole('textbox')
+  })
+
+  it('sends the filter of a data source table to its rows route, keeps it in the address and starts at page 1', async () => {
+    const urls = stubRecords()
+    renderWidget('?page=3', noteListWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Operator', 0, 'contains')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Value' }), 'paper')
+    await clickInDialog('Apply')
+
+    const filter = JSON.stringify({ all: [{ field: 'title', op: 'contains', value: 'paper' }] })
+    await waitFor(() => expect(filterOfLastRequest(urls)).toBe(filter))
+    expect(urls().at(-1)!.startsWith(`${rowsPath}?`)).toBe(true)
+    expect(new URLSearchParams(search()!).get('filter')).toBe(filter)
+    expect(new URLSearchParams(search()!).has('page')).toBe(false)
+  })
+
+  it('offers the group columns of a grouped data source in the Filter builder, and no measure', async () => {
+    const groupedWidget: WidgetMetadata = {
+      ...noteListWidget,
+      dataSource: {
+        name: 'NotesByStatus',
+        rowsPath,
+        entity: 'Note',
+        parameters: [],
+        pageSize: 10,
+        search: false,
+        columns: [
+          {
+            name: 'status',
+            type: 'enum',
+            labelKey: 'note.status',
+            values: ['open', 'done'],
+            valueLabelKeys: { open: 'note.statusOpen', done: 'note.statusDone' },
+            target: null,
+          },
+          { name: 'requests', type: 'integer', labelKey: null, values: null, target: null, measure: true },
+          { name: 'total', type: 'decimal', labelKey: null, values: null, target: null, measure: true },
+        ],
+      },
+    }
+    stubRecords(
+      `{"items":[{"id":null,"values":{"status":"open","requests":2,"total":10.5},"labels":{}}],"page":1,"pageSize":10,"totalCount":1}`,
+    )
+    renderWidget('', groupedWidget)
+    await screen.findByRole('columnheader', { name: /Status/ })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+    expect(optionTexts(shownDropdown()!)).toEqual(['Status'])
   })
 })
 
@@ -2034,6 +2091,22 @@ describe('TableWidget export', () => {
       ['sort', '-title'],
       ['format', 'csv'],
     ])
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1))
+    click.mockRestore()
+  })
+
+  it('exports a data source table to its export route with the filter it is sent with', async () => {
+    const exported = stubExport(() => file())
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const filter = JSON.stringify({ all: [{ field: 'title', op: 'contains', value: 'paper' }] })
+    renderWidget(`?${new URLSearchParams({ filter })}`, { ...noteListWidget, access: withExport })
+
+    await chooseExport('CSV')
+
+    await waitFor(() => expect(exported()).toHaveLength(1))
+    const dataSourceExportPath = rowsPath.replace(/\/rows$/, '/export')
+    expect(exported()[0].startsWith(`${dataSourceExportPath}?`)).toBe(true)
+    expect([...new URLSearchParams(exported()[0].split('?')[1])]).toContainEqual(['filter', filter])
     await waitFor(() => expect(click).toHaveBeenCalledTimes(1))
     click.mockRestore()
   })

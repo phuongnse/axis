@@ -1,11 +1,13 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioMatrixCell, StudioMatrixRole, StudioNames, StudioPolicyMatrix } from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
-import { emptyDescription, removeTag } from '../test/antd'
+import { chooseOption, emptyDescription, optionTexts, removeTag } from '../test/antd'
+import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { StudioPolicyMatrixTable } from './StudioPolicyMatrix'
 
 const sharedPolicyId = '3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f'
@@ -147,17 +149,19 @@ function renderMatrix(overrides: Partial<StudioPolicyMatrix> = {}) {
   const onOpenPolicy = vi.fn()
   const onWritten = vi.fn()
   render(
-    <ThemeModeProvider>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioPolicyMatrixTable
-          application={application}
-          matrix={{ ...matrix, ...overrides }}
-          names={names}
-          onOpenPolicy={onOpenPolicy}
-          onWritten={onWritten}
-        />
-      </TextProvider>
-    </ThemeModeProvider>,
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioPolicyMatrixTable
+            application={application}
+            matrix={{ ...matrix, ...overrides }}
+            names={names}
+            onOpenPolicy={onOpenPolicy}
+            onWritten={onWritten}
+          />
+        </TextProvider>
+      </ThemeModeProvider>
+    </MemoryRouter>,
   )
   return Object.assign(onOpenPolicy, { onWritten })
 }
@@ -176,6 +180,23 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     const actions = within(screen.getByTestId('studio-matrix-cell-employee-entity-PurchaseRequest'))
     expect(actions.getByText('read')).toBeInTheDocument()
     expect(actions.getByText('update')).toBeInTheDocument()
+  })
+
+  it('offers the Role and each target by its name and kind, and filters the roles', async () => {
+    renderMatrix()
+    expect(screen.getByTestId('studio-matrix-cell-manager-entity-PurchaseRequest')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+    expect(optionTexts()).toContain('Role')
+    expect(optionTexts()).toContain('PurchaseRequest, entity')
+    await chooseOption('Role')
+    await pick('Operator', 0, 'is')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Value' }), 'employee')
+    await clickInDialog('Apply')
+
+    expect(screen.getByTestId('studio-matrix-cell-employee-entity-PurchaseRequest')).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-matrix-cell-manager-entity-PurchaseRequest')).not.toBeInTheDocument()
   })
 
   it('marks a shared grant and opens its policy', async () => {
@@ -620,17 +641,19 @@ describe('StudioPolicyMatrixTable reasons', () => {
   it('shows the raw code of a reason it has no text for', () => {
     const roles: StudioMatrixRole[] = [{ ...matrix.roles[1], readOnlyReason: 'somethingNew' }]
     render(
-      <ThemeModeProvider>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioPolicyMatrixTable
-            application={application}
-            matrix={{ ...matrix, roles }}
-            names={null}
-            onOpenPolicy={vi.fn()}
-            onWritten={vi.fn()}
-          />
-        </TextProvider>
-      </ThemeModeProvider>,
+      <MemoryRouter>
+        <ThemeModeProvider>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioPolicyMatrixTable
+              application={application}
+              matrix={{ ...matrix, roles }}
+              names={null}
+              onOpenPolicy={vi.fn()}
+              onWritten={vi.fn()}
+            />
+          </TextProvider>
+        </ThemeModeProvider>
+      </MemoryRouter>,
     )
 
     expect(screen.getByTestId('studio-matrix-readonly-manager')).toHaveTextContent('somethingNew')

@@ -670,6 +670,7 @@ public sealed class DataSourceCompilerTests
     [InlineData("""[{ "name": "SORT", "type": "text" }]""", 0, "'SORT'")]
     [InlineData("""[{ "name": "pagesize", "type": "integer" }]""", 0, "'pagesize'")]
     [InlineData("""[{ "name": "Search", "type": "text" }]""", 0, "'Search'")]
+    [InlineData("""[{ "name": "Filter", "type": "text" }]""", 0, "'Filter'")]
     [InlineData("""[{ "name": "Amount", "type": "decimal" }]""", 0, "field of the entity 'Order'")]
     public void Parameter_name_that_repeats_another_is_reserved_or_is_a_field_is_reported_at_that_name(
         string parameters, int index, string messagePart)

@@ -25,6 +25,7 @@ import { InviteUserModal } from './InviteUserModal'
 import { NotFoundPage } from './NotFoundPage'
 import { TenantApplicationPackagesSection } from './TenantApplicationPackagesSection'
 import { TenantExportSection } from './TenantExportSection'
+import { TenantHostsSection } from './TenantHostsSection'
 import { TenantModelKeySection } from './TenantModelKeySection'
 import { TenantUsageSection } from './TenantUsageSection'
 
@@ -86,7 +87,7 @@ export function UsersPage() {
   const { size } = useDesignTokens()
   const platform = usePlatform()
   const { locale } = platform.current
-  const { view, setView } = useTableView(userFields, recordPageSize, noParameters, true, true, true)
+  const { view, setView, saved } = useTableView(userFields, recordPageSize, noParameters, true, true, true, '', 'users')
   const query = recordQuery(view)
   const [list, setList] = useState<UserList>()
   const [refusal, setRefusal] = useState<Exclude<UserListResult['kind'], 'ok'>>()
@@ -261,6 +262,7 @@ export function UsersPage() {
                     view={{
                       query: view,
                       onChange: setView,
+                      saved,
                       pageSizes: tablePageSizes(),
                       total: list.totalCount,
                       search: true,
@@ -294,6 +296,7 @@ export function UsersPage() {
                   />
                   <TenantExportSection />
                   <TenantUsageSection />
+                  <TenantHostsSection />
                   <TenantModelKeySection />
                   <TenantApplicationPackagesSection />
                 </SectionParts>

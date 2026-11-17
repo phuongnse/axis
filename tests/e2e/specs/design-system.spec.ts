@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { waitForDialog } from "../dialogs";
 import { cellValue, expectShown, fieldLabel, fieldValue } from "../fields";
+import { closeEntityField, openEntityField } from "../studio-resources";
 import { cardGroups, cardName } from "../../../web/src/designSystem/cardOrder";
 import {
   bundleFile,
@@ -41,7 +42,7 @@ const previews: Record<string, (page: Page | FrameLocator) => Locator> = {
   taskInbox: (page) =>
     page.getByRole("link", { name: "Review the request", exact: true }).first(),
   processInspector: (page) =>
-    page.getByRole("button", { name: "Filter", exact: true }),
+    page.getByRole("button", { name: "Filter", exact: true }).first(),
   detail: (page) =>
     page.getByText("Standing desks for the new office", { exact: true }),
   "chart-bar": (page) =>
@@ -1190,9 +1191,11 @@ test("the studio preview's entity state loads each field's default editor with n
     "?preview=studio&mode=light&state=entity",
   );
 
+  await openEntityField(page, 0);
   await expect(
     page.getByTestId("studio-field-/fields/0/default").locator(".cm-editor"),
   ).toBeVisible();
+  await closeEntityField(page);
   expect(recording.errors).toEqual([]);
 });
 

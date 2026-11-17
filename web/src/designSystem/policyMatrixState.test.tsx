@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { StudioPolicyMatrixTable } from '../pages/StudioPolicyMatrix'
@@ -16,17 +17,19 @@ describe('the design-system Policy matrix state', () => {
   it('shows the Requester grant from RequesterPolicy as shared, with its Open policy link', async () => {
     const onOpenPolicy = vi.fn()
     render(
-      <ThemeModeProvider>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioPolicyMatrixTable
-            application={application}
-            matrix={matrix}
-            names={null}
-            onOpenPolicy={onOpenPolicy}
-            onWritten={vi.fn()}
-          />
-        </TextProvider>
-      </ThemeModeProvider>,
+      <MemoryRouter>
+        <ThemeModeProvider>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioPolicyMatrixTable
+              application={application}
+              matrix={matrix}
+              names={null}
+              onOpenPolicy={onOpenPolicy}
+              onWritten={vi.fn()}
+            />
+          </TextProvider>
+        </ThemeModeProvider>
+      </MemoryRouter>,
     )
 
     await userEvent.click(screen.getByTestId('studio-matrix-cell-Requester-entity-Request'))

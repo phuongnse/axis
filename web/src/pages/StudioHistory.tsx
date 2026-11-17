@@ -72,7 +72,16 @@ export function StudioHistory({
   const t = useText()
   const time = useRevisionTime()
   const { generation, lost } = useStudioConnection()
-  const { view, setView } = useTableView(revisionFields, recordPageSize, noParameters, true, true, true)
+  const { view, setView, saved } = useTableView(
+    revisionFields,
+    recordPageSize,
+    noParameters,
+    true,
+    true,
+    true,
+    '',
+    `studio.${application}.history`,
+  )
   const query = recordQuery(view)
   const [revisions, setRevisions] = useState<StudioRevisionList | 'failed'>()
   const [reload, setReload] = useState(0)
@@ -172,6 +181,7 @@ export function StudioHistory({
         view={{
           query: view,
           onChange: setView,
+          saved,
           pageSizes: tablePageSizes(),
           total: list?.totalCount ?? 0,
           search: true,

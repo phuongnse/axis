@@ -51,7 +51,7 @@ const deliveryStates = ['delivered', 'pending', 'deadLettered', 'discarded']
  */
 export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhookDeliveriesProps) {
   const t = useText()
-  const { view, setView } = useTableView(
+  const { view, setView, saved } = useTableView(
     deliveryFields,
     recordPageSize,
     noParameters,
@@ -59,6 +59,7 @@ export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhoo
     true,
     true,
     'webhookDeliveries.',
+    'console.webhookDeliveries',
   )
   const query = recordQuery(view)
   const [reload, setReload] = useState(0)
@@ -158,6 +159,7 @@ export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhoo
         view={{
           query: view,
           onChange: setView,
+          saved,
           pageSizes: tablePageSizes(),
           total: page?.totalCount ?? 0,
           search: true,

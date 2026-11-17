@@ -245,8 +245,8 @@ is reported at the widget's own pointer, such as `/widgets/0/columns/1/widgets/0
 
 A page's `parameters` are checked in file order, at `/parameters/{i}`.
 
-- **Names.** A name that an earlier parameter already uses, or one of `page`, `pageSize`, `sort` and
-  `search`, ignoring letter case, is `AXC0231` at `/name`. So is a name that an unbound parameter of
+- **Names.** A name that an earlier parameter already uses, or one of `page`, `pageSize`, `sort`,
+  `search` and `filter`, ignoring letter case, is `AXC0231` at `/name`. So is a name that an unbound parameter of
   the page's table data source also has, ignoring letter case, because both live in the URL query.
 - **Types.** The type is checked by the entity field rules, as a data source parameter is. An
   unknown type is `AXC0004`, a missing `values` or `target` is `AXC0014`, an unknown `reference`

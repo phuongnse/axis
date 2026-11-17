@@ -15,6 +15,7 @@ import {
 } from './inspection'
 import type { WidgetMetadata } from './site'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
+import { useSiteTableKey } from './tableChoices'
 import { useTableView } from './useTableView'
 import { useText } from './texts'
 import { siteAddress } from './siteLinks'
@@ -64,14 +65,27 @@ const endedAtField = { name: 'endedAt', type: 'date-time' } as const
  * inspection API's 401 shows the sign-in prompt.
  *
  * The step column shows the step's name, because a list row carries no label key. Under the list, the
- * process's open dead letters have their own list, which has its own page number.
+ * process's open dead letters have their own list, which keeps its view in the address under the `deadLetters.` prefix.
  */
 export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: ProcessInspectorWidgetProps) {
   const t = useText()
   // The server sets the path on every process inspector.
   const instancesPath = widget.instancesPath!
   const instancePath = siteAddress(sitePath, pageName.toLowerCase())
-  const { view: query, setView } = useTableView(instanceFields, recordPageSize, noParameters, true, true, true)
+  const {
+    view: query,
+    setView,
+    saved,
+  } = useTableView(
+    instanceFields,
+    recordPageSize,
+    noParameters,
+    true,
+    true,
+    true,
+    '',
+    useSiteTableKey(sitePath, pageName),
+  )
   const requestQuery = recordQuery(query)
   const requestUrl = `${instancesPath}${requestQuery ? `?${requestQuery}` : ''}`
   // Refresh counts up, so the same URL loads again.
@@ -191,6 +205,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
         view={{
           query,
           onChange: setView,
+          saved,
           total: load.page?.totalCount ?? 0,
           pageSizes,
           search: true,

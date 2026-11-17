@@ -12,8 +12,6 @@ The expression editors read the draft when completion opens, not on each key.
 
 ## Sections
 
-_(planned for M33)_
-
 The Form tab is sections, as [the resource form](studio-resource-form.md#sections) has them: General,
 Fields, Validations and Indexes. Sections suit an entity because its parts are small, and tabs are for
 parts that are large and apart. The details are inputs on the page, with no step to edit them.
@@ -32,6 +30,12 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
   Properties. It has a search, and Add field sits in the section's heading. Each row's menu has Move up,
   Move down and Remove, and each of these replaces the `fields` array. A field's name opens the
   [field drawer](#field-drawer), beside the table, so every field stays in sight however many settings it has.
+- **Filter.** The table has a Filter on Name, Label, Type, Required and Unique, and none on the settings or the
+  row's buttons. Name and Label filter as text, Label on its text key, which is what the file holds. Type filters as a
+  choice of the field types. Required and Unique filter as a choice of Yes or No, and a field whose type does not take
+  the setting counts as empty, as its cell shows nothing. The filter lives in the address as `fields.filter`. It only
+  hides rows: every row shows on one page with no pager, and an edit to a hidden row stays in the draft. A field whose
+  origin is new, one added since the last save, stays shown. The table has no search, sort or Columns.
 - **Type in words** _(planned for M33)_. The cell reads the type's name, and for a reference, references or child
   collection the entity it points to, by its label, as "Reference to Department" or "Child collection
   of Line item". The name shows only where that entity has no label. Enum and every other type read as
@@ -138,7 +142,7 @@ as a table cell has no label for it.
 
 ## Indexes
 
-An Indexes list under the fields adds, moves and removes the entity's `indexes`. Each index shows its
+The Indexes section, after Validations, adds, moves and removes the entity's `indexes`. Each index shows its
 name as read-only text, picks the entity's fields in order and has a Unique checkbox. A row shows its name
 and, with a customization layer, its mark on top, then one field to a line, then its buttons below. Add index writes
 the name `index1`, `index2` and so on, the first one that no index of the entity has, ignoring letter
@@ -220,8 +224,8 @@ A module entity, such as `organization/Department`, opens in the designer with t
 plain text inputs, because the module resource is not one of the folder's. There is no JSON tab, no
 Delete, no migration questions and no Used by tab.
 
-- **Its heading** _(planned for M33)_. The page heading shows the entity's label, not
-  `organization/Department`.
+- **Its heading.** The page heading shows the entity's label in the author's language, with English as the fallback.
+  Without a label it shows the name without the `<module>/` prefix, never `organization/Department`.
 - **Save writes the layer.** Save sends the whole entity to the
   [module save route](module-resource-saves.md), which writes only the difference as the layer. It is
   off until the draft differs from what was loaded. A save that the server refuses shows the server's

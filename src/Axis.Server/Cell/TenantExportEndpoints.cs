@@ -101,7 +101,7 @@ internal static class TenantExportEndpoints
             return (null, Grants.Forbidden());
         }
 
-        var tenantId = ExportTenant(
+        var tenantId = CellTenant(
             services.GetRequiredService<CellOptions>(), services.GetRequiredService<ITenantCatalog>(), services.GetRequiredService<ITenantContextAccessor>());
         if (tenantId is null)
         {
@@ -112,10 +112,11 @@ internal static class TenantExportEndpoints
     }
 
     /// <summary>
-    /// The id of the current tenant when it has exports: a cell with a tenant in the catalog that is not a preview tenant.
-    /// Otherwise <c>null</c>. The routes answer <c>404</c> for <c>null</c> and <c>GET /api/me</c> answers <c>tenantExports</c> false.
+    /// The id of the current tenant when it has exports and hosts: a cell with a tenant in the catalog that is not a preview tenant.
+    /// Otherwise <c>null</c>. The export routes and the hosts routes answer <c>404</c> for <c>null</c> and <c>GET /api/me</c> answers
+    /// <c>tenantExports</c> false.
     /// </summary>
-    internal static string? ExportTenant(CellOptions cell, ITenantCatalog catalog, ITenantContextAccessor tenants) =>
+    internal static string? CellTenant(CellOptions cell, ITenantCatalog catalog, ITenantContextAccessor tenants) =>
         cell.IsCell && tenants.Current is { } tenant && catalog.Find(tenant.TenantId) is { PreviewOf: null }
             ? tenant.TenantId
             : null;

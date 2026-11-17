@@ -22,7 +22,9 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
+import { useTableView } from '../platform/useTableView'
 import { ExpressionField } from './ExpressionField'
 import { newGrant, newPolicy, ownGrantIndexes, targetActions } from './policyMatrixDraft'
 
@@ -41,6 +43,9 @@ function matrixId(matrix: object): number {
   return id
 }
 
+/** The matrix keeps no data source parameter in the address, only its view. */
+const noParameters: string[] = []
+
 /** The cell a person selected: the role's row and the target's column, by index. */
 interface Selection {
   role: string
@@ -53,7 +58,9 @@ interface Selection {
  * the fields. A shared grant is tagged Shared and its Open policy link calls `onOpenPolicy` with the policy's id. A
  * data source cell that lacks the root entity's `read` warns and names that entity. A row that cannot be edited shows
  * why. In an editable row the cell's own grants, the ones in the role's `<Role>Access` policy, can be edited and
- * saved, which calls `onWritten` with the folder's diagnostics and, when the save created the policy, its item.
+ * saved, which calls `onWritten` with the folder's diagnostics and, when the save created the policy, its item. The
+ * table has a Filter on the Role and on every target, kept in the address as `matrix.filter`, and shows every role on
+ * one page, see [the policy matrix](docs/reference/studio.md#policy-matrix).
  */
 export function StudioPolicyMatrixTable({
   application,
@@ -75,6 +82,15 @@ export function StudioPolicyMatrixTable({
   const target = selection === undefined ? undefined : matrix.targets[selection.index]
   const cell = selection === undefined ? undefined : role?.cells[selection.index]
 
+  const fields = useMemo(
+    () => [
+      { name: 'role', type: 'text' as const },
+      ...matrix.targets.map((item) => ({ name: `${item.kind}-${item.name}`, type: 'text' as const })),
+    ],
+    [matrix.targets],
+  )
+  const { view, setView } = useTableView(fields, recordPageSize, noParameters, false, true, false, 'matrix.')
+
   const columns: AxisColumn<StudioMatrixRole>[] = [
     {
       key: 'role',
@@ -82,6 +98,7 @@ export function StudioPolicyMatrixTable({
       title: t('shell.studio.matrix.role'),
       fixed: 'left',
       render: (_, row) => <RoleHeader role={row} />,
+      filter: { kind: 'text', value: (row) => row.name },
     },
     ...matrix.targets.map((item, index) => ({
       key: `${item.kind}-${item.name}`,
@@ -92,6 +109,11 @@ export function StudioPolicyMatrixTable({
           <Typography.Text type="secondary">{item.module ? `${item.kind}, ${item.module}` : item.kind}</Typography.Text>
         </Flex>
       ),
+      filter: {
+        kind: 'text' as const,
+        title: item.module ? `${item.name}, ${item.kind}, ${item.module}` : `${item.name}, ${item.kind}`,
+        value: (row: StudioMatrixRole) => row.cells[index]?.actions.join(', ') || null,
+      },
       render: (_: unknown, row: StudioMatrixRole) => (
         <MatrixCell
           role={row}
@@ -112,6 +134,7 @@ export function StudioPolicyMatrixTable({
         rowKey={(row) => row.id}
         dataSource={matrix.roles}
         columns={columns}
+        view={{ query: view, onChange: setView, paging: false }}
         emptyText={t('shell.table.empty')}
       />
       {role && target && cell && (

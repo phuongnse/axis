@@ -32,7 +32,7 @@ import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonP
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { SectionParts } from '../platform/SectionParts'
 import { QuotaRefusedError } from '../platform/quota'
-import { seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
+import { savedRecordIds, seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
 import {
   deleteStudioResource,
   fetchResourceReferences,
@@ -700,6 +700,7 @@ export function StudioEditor({
     () => (seedFields ? seedProblems(draft.records, seedColumns(seedFields)) : noProblems),
     [seedFields, draft.records],
   )
+  const savedSeedIds = useMemo(() => savedRecordIds(loaded?.content), [loaded?.content])
   const seedSchema = useMemo(() => {
     if (!schema || !seedFields) {
       return undefined
@@ -1065,7 +1066,13 @@ export function StudioEditor({
   const form = seedSchema ? (
     <SectionParts>
       <SchemaForm schema={seedSchema} value={draft} onChange={onChange} />
-      <SeedGrid fields={seedFields!} records={draft.records} problems={problems} onChange={onUpdate} />
+      <SeedGrid
+        fields={seedFields!}
+        records={draft.records}
+        savedIds={savedSeedIds}
+        problems={problems}
+        onChange={onUpdate}
+      />
     </SectionParts>
   ) : item.kind === 'scenario' ? (
     <ScenarioEditor value={draft} onChange={onUpdate} />
@@ -1073,6 +1080,7 @@ export function StudioEditor({
     // The table reads the address for its search and page, so it is mounted only while its tab is open, as Used by is.
     tab === 'form' ? (
       <TextTable
+        tableKey={`studio.${application}.texts`}
         columns={resources
           .filter((resource) => resource.kind === 'text')
           .map((resource) =>

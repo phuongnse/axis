@@ -121,18 +121,20 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   status is `idle`, which shows nothing, so the input stays in place as the status changes and keeps its
   focus. A field outside a form takes no status, because the form item is what draws the message, the
   border and the spinner.
-- **Every Studio and console field is drawn through them** _(planned for M33)_, with `AxisCheckboxField` as
+- **Every Studio and console field is drawn through them**, with `AxisCheckboxField` as
   a yes-or-no field with its help under its label and `AxisChoiceField` as a choice among a few ways, each
   with its help.
-- **Every field has help** _(planned for M33)_, as [platform field help](frontend.md#platform-field-help) says.
-- **Nothing between help and input** _(planned for M33)_. Guidance goes into the help, never on a line of
+- **Every field has help**, as [platform field help](frontend.md#platform-field-help) says.
+- **Nothing between help and input**. Guidance goes into the help, never on a line of
   its own.
-- **One field to a row** _(planned for M33)_. Two fields share a row only when they truly belong together,
-  such as a range's minimum and maximum, through `AxisFieldRow`, and they stack at narrow width.
-- **Every required field is marked** _(planned for M33)_. A platform field follows the form widget's
+- **One field to a row**. Two fields share a row only when they truly belong together,
+  such as a range's minimum and maximum, through `AxisFieldRow`, and they stack at narrow width. A key and its
+  value in one row of a titled list are one entry, so they share a row too.
+- **Every required field is marked**. A platform field follows the form widget's
   [required mark](form-widget.md#field-look), in every form and dialog, even where every field is
-  required, such as New resource. Only the sign-in page marks none, as everyone knows both its fields are
-  needed. A field never says "(optional)".
+  required, such as New resource. The sign-in pages mark none, since everyone knows their fields are needed.
+  A field never says "(optional)". Each form names the shared `requiredMark`, and a Vitest check refuses a form
+  outside the sign-in pages that does not.
 - **A field is checked on click**. A finish button is never disabled because the
   input is not valid: that says nothing of what is missing, has low contrast and cannot be focused. A
   click checks the fields, shows under each one that is wrong what to do, such as "Enter a name.", and
@@ -207,7 +209,8 @@ be kept right.
   [page heading](studio-workspace.md#page-heading), not the toolbar. A `table` widget keeps the toolbar
   actions its author configures.
 - **Every control in one table.** `AxisTable` has every control below, and each view
-  turns on what it needs. Search, filter, sort, page and columns live in the address. A view is only a
+  turns on what it needs. Search, filter, sort, page and columns live in the address, except in a dialog's
+  table, which keeps them in the dialog. A view is only a
   filter kept there, so a link opens the same rows for anyone who follows it. A second table on a page puts a
   prefix of its own before each address name, as the console's Dead letters view does with `deadLetters.filter`.
 - **Sort.** A column sorts from its header when its values have an order a person uses: names, people,
@@ -218,7 +221,7 @@ be kept right.
   in the record API, and search looks in all of them. `AxisTable` draws the box, which says Search, and a
   table that holds all its rows searches them by itself, while a table paged on the server sends the text to
   the server. The text applies on Enter, on the search button and when the box is cleared, never on each
-  key, and a new search starts at page 1. Search, sort, page and page size live in the address. A table in a
+  key, and a new search starts at page 1. Search, filter, sort, page and page size live in the address. A table in a
   dialog, such as the [lookup](form-widget.md#lookup), keeps them in the dialog instead.
 - **Filter.** Filter is an icon button that carries the count of conditions in force, and
   opens a builder of conditions in groups of All or Any, with no limit on depth. A column can be filtered
@@ -226,7 +229,13 @@ be kept right.
   or date, each with empty and not empty. Apply puts it in force, and a condition with no value is left
   out. A chip stands for each condition and group, with Clear all. A table that holds all its rows filters
   them itself. A table paged on the server sends its filter to the server as the record API's `filter`. The
-  filter lives in the address as `filter`, in the shape of [the record API's filter](record-api.md#paging-and-sorting).
+  filter lives in the address as `filter` except in a dialog's table, in the shape of
+  [the record API's filter](record-api.md#paging-and-sorting).
+  A second table on a page keeps its view under a prefix, as `fields.filter`. In a table that edits a draft, a filter
+  only hides rows, and an edit to a hidden row stays in the draft. The table's `keep` option names the rows the
+  filter never hides, such as a row added since the last save, so the author always sees what they just added. Only
+  a table that holds all its rows reads `keep`, and only for the filter. A column whose header is not plain text
+  names itself in the builder and its chips through `filter`'s `title`, and without one they show the header text.
 - **Filter on every table** _(planned for M33)_. Every column of every table can be filtered on, a data source
   table's included.
 - **Columns control.** A table whose view turns it on has Columns, an icon button after Search and Filter. It
@@ -235,8 +244,28 @@ be kept right.
   first, stays first and always shows. A hidden column is still searched and filtered on. The choice lives in
   the address as `columns`, the keys of the shown columns in order, and is left out when every column shows in
   its first order. A change of columns keeps the page.
-- **Each person's columns** _(planned for M33)_. The platform keeps each person's choice of columns.
-- **Saved views** _(planned for M33)_. A person saves a table's search, filter and sort as a view.
+- **Each person's columns.** The choice of columns is kept on the server for the person and the
+  table. Apply keeps it, and Reset followed by Apply forgets it. A table opened with no `columns` in its address puts
+  the kept choice into the address, without a history entry. An address with `columns` always wins, and a kept key
+  of a column the table no longer has is dropped.
+- **Saved views.** A person saves a table's search, filter and sort under a name, and the view is kept on the server
+  for that person and table. Views is an icon button after Columns, and it shows once the person's views have
+  loaded. It opens a dialog that lists the person's views of the table by name, in the page language's collation,
+  with a Name field and Save view. A view's name opens it. A view is renamed in its own line, and deleted in its own
+  line after a question, so the dialog opens no dialog of its own.
+- **Opening a view.** It writes the view's search, filter and sort into the address at page 1, with a history entry,
+  so Back returns. The columns, the page size and the data source values stay. An empty part of the view clears that
+  part. The values are checked as the address's are, so a filter that names a field the table no longer has is
+  dropped. No view applies by itself, and there is no default view.
+- **A refused save.** A name that is empty or that another of the person's views has, ignoring letter case, is
+  refused before anything is sent. Any other save the server refuses leaves the dialog open with "The view could not
+  be saved.", and the address and the list stay as they were.
+- **Overwrite a view** _(planned for M33)_. A person replaces a view's search, filter and sort with the current ones.
+- **Which tables keep a choice.** A table whose view `useTableView` keeps in the address, and that
+  has a key, keeps its columns and views on the server. A table in a dialog keeps its view in the dialog and keeps
+  nothing. The cell console's tables pass no key, because its host has no tenant database. Studio's page canvas
+  passes no key either. The key format and the
+  routes are in [table views and columns](frontend.md#table-views-and-columns).
 - **Columns.** A column whose values have a fixed form, such as a number, a date, a date and time, a
   status tag or the row's icon actions, is as wide as its content and never wraps. The columns of free
   text share the width left in equal parts, and their text wraps. A table with no free text gives the
@@ -252,7 +281,12 @@ be kept right.
   has no Edit icon, see [opening things](#opening-things).
 - **An empty table keeps its header**, with the
   [empty state](#showing-what-is-empty) in its body.
-- **Paging.** A long table pages.
+- **Paging.** A long table pages. A table that edits a draft, such as Studio's seed grid and the entity designer's
+  Fields, turns paging off with the view's `paging` option and shows every row with no pager, because a pager would
+  move the row an author is editing. Studio's policy matrix, the tables of a module contract, the operator console's Tenant
+  table, the two licences lists, the account page's Authenticators and Sessions, the users page's Connected
+  apps and the tables of a process instance's page also show every row with no pager. Only a table that holds all its
+  rows reads it.
 - **How many.** A paged table says what it shows of how many, as "1–20 of 143", with the numbers in the
   language's format.
 - **Too little room.** A table measures its own width, as it changes. Its text columns
@@ -278,7 +312,8 @@ be kept right.
 - **Group rows.** A row that heads a group shows its heading and leaves its other cells blank, with no dash,
   as `AxisTable`'s `blankRow` draws them.
 
-The reasons for the table standard are in [D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md).
+The reasons for the table standard are in [D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md),
+and the reasons for each person's columns and saved views are in [D153](../decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md).
 
 ## Opening things
 

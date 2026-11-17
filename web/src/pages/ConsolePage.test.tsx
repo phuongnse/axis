@@ -13,6 +13,8 @@ import type {
 } from '../platform/console'
 import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
+import { optionTexts } from '../test/antd'
+import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { PlatformContext, type Platform } from './context'
 import { ConsolePage } from './ConsolePage'
 
@@ -131,6 +133,10 @@ const failedWork: ConsoleFailedWorkPage = {
   page: 1,
   pageSize: 20,
   totalCount: 45,
+  processes: [
+    { id: 'p1', name: 'Approve', applicationId: 'a1', application: 'Leave' },
+    { id: 'p2', name: 'Review', applicationId: 'a2', application: 'Purchasing' },
+  ],
 }
 
 const deliveriesPath = '/api/console/webhook-deliveries'
@@ -161,6 +167,9 @@ function deadLetter(id: string, applicationId: string, kind: string, processId: 
     commands: state === 'open' ? ['redeliver', 'discard'] : [],
   }
 }
+
+// A console view waits for its fetch and the table, which is slow while other test files run.
+const slow = { timeout: 5000 }
 
 const allLetters: ConsoleDeadLetterPage = {
   items: [
@@ -257,6 +266,16 @@ describe('ConsolePage', () => {
     expect(screen.queryByTestId('console-forbidden')).toBeNull()
   })
 
+  it('narrows the tenant applications by a filter in the address, and hides the others', async () => {
+    const filter = encodeURIComponent(JSON.stringify({ all: [{ field: 'application', op: 'eq', value: 'Leave' }] }))
+    stubServer(tenantAndFailedWork)
+    renderPage(`/console?applications.filter=${filter}`)
+
+    const view = await screen.findByTestId('console-tenant')
+    expect(await within(view).findByText('Leave')).toBeVisible()
+    expect(within(view).queryByText('Purchasing')).not.toBeInTheDocument()
+  })
+
   it('labels a read-only tenant', async () => {
     stubServer((url) => json(url.startsWith('/api/console/tenant') ? { ...tenant, status: 'readOnly' } : failedWork))
     renderPage()
@@ -311,7 +330,7 @@ describe('ConsolePage', () => {
 
     const view = await screen.findByTestId('console-failed-work')
     expect(await within(view).findByText('Timed out.')).toBeVisible()
-    expect(failedWorkRequests(fetchMock)).toEqual(['/api/console/failed-work?page=1&pageSize=20'])
+    expect(failedWorkRequests(fetchMock)).toEqual(['/api/console/failed-work'])
     for (const title of ['Application', 'Process', 'Instance', 'Step or call', 'Failed', 'Error']) {
       expect(within(view).getByRole('columnheader', { name: title })).toBeVisible()
     }
@@ -347,23 +366,46 @@ describe('ConsolePage', () => {
 
     await userEvent.click(within(view).getByTitle('2'))
 
-    await waitFor(() => expect(failedWorkRequests(fetchMock)).toContain('/api/console/failed-work?page=2&pageSize=20'))
+    await waitFor(() => expect(failedWorkRequests(fetchMock)).toContain('/api/console/failed-work?page=2'))
+    expect(screen.getByTestId('location')).toHaveTextContent('failedWork.page=2')
   })
 
-  it('filters the failed work by application and returns to the first page', async () => {
+  it('offers a filter on each column of the failed work', async () => {
+    stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
+    renderPage()
+    const view = await screen.findByTestId('console-failed-work')
+    expect(await within(view).findByText('Timed out.')).toBeVisible()
+
+    await userEvent.click(within(view).getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+
+    expect(optionTexts()).toEqual(['Application', 'Process', 'Instance', 'Step or call', 'Failed', 'Error'])
+  })
+
+  it('requests the failed work with the filter and keeps it in the address', async () => {
     const fetchMock = stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
     renderPage()
     const view = await screen.findByTestId('console-failed-work')
     expect(await within(view).findByText('Timed out.')).toBeVisible()
     await userEvent.click(within(view).getByTitle('2'))
-    await waitFor(() => expect(failedWorkRequests(fetchMock)).toContain('/api/console/failed-work?page=2&pageSize=20'))
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('failedWork.page=2'))
 
-    await userEvent.click(within(view).getByRole('combobox'))
-    await userEvent.click(await screen.findByTitle('Purchasing'))
+    await userEvent.click(within(view).getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'Application')
+    await pick('Value', 0, 'Purchasing')
+    await clickInDialog('Apply')
 
+    const filter = JSON.stringify({ all: [{ field: 'application', op: 'eq', value: 'a2' }] })
     await waitFor(() =>
-      expect(failedWorkRequests(fetchMock).at(-1)).toBe('/api/console/failed-work?page=1&pageSize=20&application=a2'),
+      expect(
+        failedWorkRequests(fetchMock)
+          .map((url) => new URL(url, 'http://localhost').searchParams.get('filter'))
+          .at(-1),
+      ).toBe(filter),
     )
+    const location = screen.getByTestId('location')
+    expect(new URLSearchParams(location.textContent ?? '').get('failedWork.filter')).toBe(filter)
+    expect(location).not.toHaveTextContent('failedWork.page')
   })
 
   it('lists the webhook deliveries', async () => {
@@ -481,7 +523,7 @@ describe('ConsolePage', () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(await screen.findByTestId(`console-dead-letter-${command}-d2`))
+    await user.click(await screen.findByTestId(`console-dead-letter-${command}-d2`, {}, slow))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText(title, { selector: '.ant-modal-title' })).toBeInTheDocument()
     expect(server.requests.filter((request) => request.startsWith('POST'))).toEqual([])
@@ -505,7 +547,7 @@ describe('ConsolePage', () => {
     stubServer(tenantAndFailedWork, () => new Response(null, { status: 500 }))
     renderPage()
 
-    expect(await screen.findByTestId('console-dead-letters-error')).toBeVisible()
+    expect(await screen.findByTestId('console-dead-letters-error', {}, slow)).toBeVisible()
     expect(screen.getByTestId('console-tenant')).toBeVisible()
   })
 
@@ -588,7 +630,7 @@ describe('ConsolePage', () => {
     stubServer(tenantAndFailedWork, undefined, () => new Response(null, { status: 500 }))
     renderPage()
 
-    expect(await screen.findByTestId('console-schedules-error')).toBeVisible()
+    expect(await screen.findByTestId('console-schedules-error', {}, slow)).toBeVisible()
     expect(screen.getByTestId('console-tenant')).toBeVisible()
   })
 })

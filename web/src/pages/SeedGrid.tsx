@@ -1,10 +1,13 @@
 import { Button, Flex, Input, Select, Typography } from 'antd'
 import type { HTMLAttributes } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { SectionPart } from '../platform/SectionParts'
 import { parseNumberText, seedColumns, seedValuePointer, type SeedField } from '../platform/seedValues'
+import type { FieldMetadata } from '../platform/site'
+import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
+import { useTableView } from '../platform/useTableView'
 import { newUuid } from '../platform/uuid'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import type { ChangeHandler } from './SchemaForm'
@@ -73,6 +76,76 @@ function NumberCell({ field, value, problem, onChange, id, 'aria-describedby': d
       }}
     />
   )
+}
+
+/** The seed grid keeps no data source parameter in the address, only its view. */
+const noParameters: string[] = []
+
+/** Joins the columns of the view into one text that tells whether they changed. A name never holds these. */
+const nameSeparator = '\u0000'
+const typeSeparator = '\u0001'
+
+/**
+ * The fields of the view: the Id, then the columns that `signature` lists as a name and a type each. A signature keeps
+ * the list the same between draws, as `useTableView` needs.
+ */
+function viewFieldsOf(signature: string): Pick<FieldMetadata, 'name' | 'type'>[] {
+  const columns = signature === '' ? [] : signature.split(nameSeparator)
+  return [
+    { name: 'id', type: 'text' },
+    ...columns.map((column) => {
+      const [name, type] = column.split(typeSeparator)
+      return { name, type: type as FieldMetadata['type'] }
+    }),
+  ]
+}
+
+/** The value of a seed cell as a number, or null when it holds none. */
+function numberOf(value: unknown): number | null {
+  return typeof value === 'number' ? value : null
+}
+
+/** The value of a seed cell as text, or null when it holds none. A value of the wrong type is null. */
+function textOf(value: unknown): string | null {
+  return typeof value === 'string' ? value : null
+}
+
+/**
+ * What a seed column filters on, by the field's type, see docs/reference/studio-form-editors.md#seed-editor. A value of the wrong
+ * type is empty. A date-time filters as a date, on its first ten characters, as a timestamp does elsewhere.
+ */
+function seedFilter(field: SeedField, yes: string, no: string): NonNullable<AxisColumn<Row>['filter']> {
+  const read = (row: Row) => (Object.hasOwn(row.values, field.name) ? row.values[field.name] : undefined)
+  switch (field.type) {
+    case 'integer':
+    case 'decimal':
+    case 'money':
+      return { kind: 'number', value: (row) => numberOf(read(row)) }
+    case 'boolean':
+      return {
+        kind: 'enum',
+        value: (row) => {
+          const value = read(row)
+          return typeof value === 'boolean' ? String(value) : null
+        },
+        options: [
+          { value: 'true', label: yes },
+          { value: 'false', label: no },
+        ],
+      }
+    case 'enum':
+      return {
+        kind: 'enum',
+        value: (row) => textOf(read(row)),
+        options: (field.values ?? []).map((value) => ({ value, label: value })),
+      }
+    case 'date':
+      return { kind: 'date', value: (row) => textOf(read(row)) }
+    case 'date-time':
+      return { kind: 'date', value: (row) => textOf(read(row))?.slice(0, 10) ?? null }
+    default:
+      return { kind: 'text', value: (row) => textOf(read(row)) }
+  }
 }
 
 /** Whether the cell of the field is the plain text input, which `FieldCell` draws for every type it has no input for. */
@@ -146,7 +219,10 @@ export function FieldCell(props: CellProps) {
  * `problems` holds the text key of each value that would fail seeding, by the pointer of the value. The grid edits
  * the draft through `onChange`. An empty cell removes the key from the record's `values`, and a value it does not
  * show, such as a child collection, is not touched. With a `layer`, a record that the layer added or changed shows its
- * tag with Reset to module, and the records it removed show as muted rows below the grid.
+ * tag with Reset to module, and the records it removed show as muted rows below the grid. The grid has a Filter on the
+ * Id and every field column, kept in the address under `records.`. A filter only hides rows: every row shows on one page,
+ * an edit to a hidden row stays in the draft, and a record whose id is not among `savedIds`, the ids as last saved, stays
+ * shown, see docs/reference/studio-form-editors.md#seed-editor.
  */
 export function SeedGrid({
   fields,
@@ -154,14 +230,22 @@ export function SeedGrid({
   problems,
   onChange,
   layer,
+  savedIds,
 }: {
   fields: SeedField[]
   records: unknown
+  /** The ids of the records as last saved. */
+  savedIds: readonly unknown[]
   problems: Map<string, string>
   onChange: ChangeHandler
   layer?: DesignerLayer
 }) {
   const t = useText()
+  const signature = seedColumns(fields)
+    .map((field) => `${field.name}${typeSeparator}${field.type}`)
+    .join(nameSeparator)
+  const viewFields = useMemo(() => viewFieldsOf(signature), [signature])
+  const { view, setView } = useTableView(viewFields, recordPageSize, noParameters, false, true, false, 'records.')
   const list = Array.isArray(records) ? records : []
   const rows: Row[] = list.map((record, index) => ({
     index,
@@ -179,6 +263,8 @@ export function SeedGrid({
           <AxisTable<Row>
             rowKey={(row) => String(row.index)}
             dataSource={rows}
+            view={{ query: view, onChange: setView, paging: false }}
+            keep={(row) => !savedIds.includes(row.id)}
             emptyText={t('shell.table.empty')}
             rowAttributes={(row) =>
               ({ 'data-testid': 'studio-seed-row', 'data-record-id': display(row.id) }) as HTMLAttributes<HTMLElement>
@@ -188,6 +274,7 @@ export function SeedGrid({
                 key: 'id',
                 kind: 'fixed',
                 title: t('shell.studio.seed.recordId'),
+                filter: { kind: 'text', value: (row) => display(row.id) || null },
                 render: (_, row) => <Typography.Text code>{display(row.id)}</Typography.Text>,
               },
               ...(layer === undefined
@@ -205,6 +292,7 @@ export function SeedGrid({
                 key: field.name,
                 kind: isTextLike(field) ? 'freeText' : 'fixed',
                 title: field.name,
+                filter: seedFilter(field, t('shell.table.yes'), t('shell.table.no')),
                 render: (_, row) => {
                   const pointer = seedValuePointer(row.index, field.name)
                   const problem = problems.get(pointer)

@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { parseNumberText, seedColumns, seedProblems, seedValueProblem, type SeedField } from './seedValues'
+import {
+  parseNumberText,
+  savedRecordIds,
+  seedColumns,
+  seedProblems,
+  seedValueProblem,
+  type SeedField,
+} from './seedValues'
 
 const required = 'shell.studio.seed.required'
 const wrongType = 'shell.studio.seed.wrongType'
@@ -147,5 +154,13 @@ describe('parseNumberText', () => {
     expect(parseNumberText('1.50', 'decimal')).toBe(1.5)
     expect(parseNumberText('1.', 'decimal')).toBe('1.')
     expect(parseNumberText('1e3', 'decimal')).toBe('1e3')
+  })
+})
+
+describe('savedRecordIds', () => {
+  it('lists the id of each record, and nothing when the content has no list of records', () => {
+    expect(savedRecordIds({ records: [{ id: 'a' }, 'text', { values: {} }] })).toEqual(['a', undefined, undefined])
+    expect(savedRecordIds({ records: 'text' })).toEqual([])
+    expect(savedRecordIds(undefined)).toEqual([])
   })
 })

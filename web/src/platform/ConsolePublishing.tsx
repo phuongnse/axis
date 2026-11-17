@@ -71,7 +71,7 @@ function formatTime(value: string | null, locale: string) {
 export function ConsolePublishing({ applications, locale }: ConsolePublishingProps) {
   const t = useText()
   const [application, setApplication] = useState<string | undefined>(applications[0]?.id)
-  const { view, setView } = useTableView(
+  const { view, setView, saved } = useTableView(
     requestFields,
     recordPageSize,
     noParameters,
@@ -79,6 +79,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
     true,
     true,
     'publishRequests.',
+    'console.publishRequests',
   )
   const query = recordQuery(view)
   const [reload, setReload] = useState(0)
@@ -279,6 +280,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
             view={{
               query: view,
               onChange: setView,
+              saved,
               pageSizes: tablePageSizes(),
               total: load.publishing?.totalCount ?? 0,
               search: true,

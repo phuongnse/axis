@@ -161,6 +161,30 @@ public sealed class PendingComputedDataSourceTests(TaskApiFixture fixture) : ICl
     }
 
     [Fact]
+    public async Task A_request_filter_on_a_pending_field_is_409_with_an_error_at_filter_and_a_filter_on_another_column_is_200()
+    {
+        await fixture.InsertRequestAsync(TenantA, null, divisor: 7);
+        await ActivateAsync(TenantA, DoubledRequest("divisor * 2"), DoubledRequest("divisor * 3"));
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        var onDoubled = $"?filter={Uri.EscapeDataString("""{"all":[{"field":"doubled","op":"gt","value":1}]}""")}";
+        var onTitle = $"?filter={Uri.EscapeDataString("""{"all":[{"field":"title","op":"notEmpty"}]}""")}";
+
+        using var refused = await SendAsync(maria, "DoubledRequests", TenantA, onDoubled);
+
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        using var problem = await ReadAsync(refused);
+        Assert.Equal("A field is being recomputed.", problem.RootElement.GetProperty("title").GetString());
+        var errors = problem.RootElement.GetProperty("errors");
+        Assert.Equal(["filter"], errors.EnumerateObject().Select(error => error.Name));
+        Assert.Contains("doubled", errors.GetProperty("filter")[0].GetString(), StringComparison.Ordinal);
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(maria, "DoubledRequests", TenantA, onTitle)).StatusCode);
+
+        await BackfillAsync(TenantA);
+
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(maria, "DoubledRequests", TenantA, onDoubled)).StatusCode);
+    }
+
+    [Fact]
     public async Task A_data_source_filter_that_reads_a_pending_field_through_a_reference_is_409_with_an_error_at_filter_and_succeeds_after_the_backfill()
     {
         var department = await fixture.InsertDepartmentAsync(TenantB, "Lan");

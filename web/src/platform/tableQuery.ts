@@ -136,6 +136,19 @@ export function writeTableQuery(
 }
 
 /**
+ * The entries of `current` that a table owns, as text in address order: its data source parameters and its `search`,
+ * `filter`, `columns`, `page`, `pageSize` and `sort`, each with the `prefix`. A table compares these, not the whole
+ * address, to see whether its view is written in canonical form, so two tables on one page never rewrite each other's
+ * order of the other names.
+ */
+export function ownEntries(current: URLSearchParams, parameterNames: readonly string[] = [], prefix = ''): string {
+  const own = new Set(
+    [...parameterNames, 'search', 'filter', 'columns', 'page', 'pageSize', 'sort'].map((name) => prefix + name),
+  )
+  return new URLSearchParams([...current].filter(([name]) => own.has(name))).toString()
+}
+
+/**
  * The record API query for a table query: the data source parameter values, the search text, the filter as compact
  * JSON, then only the paging and sorting parameters that differ from the defaults.
  */

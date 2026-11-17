@@ -22,11 +22,13 @@ import { markCurrentPage } from './pagination'
 import { matchesFilter, type FilterGroup, type FilterKind } from './tableFilter'
 import { TableFilterButton, TableFilterChips, type FilterColumn } from './TableFilter'
 import { TableColumnsButton } from './TableColumns'
+import { TableViewsButton } from './TableViews'
 import { shownColumns, type TableQuery, type TableSort } from './tableQuery'
 import { makeRoom, type ColumnPriority } from './tableRoom'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
+import type { TableSavedViews } from './useTableView'
 import { visuallyHidden } from './visuallyHidden'
 
 /**
@@ -56,10 +58,12 @@ export type AxisColumn<T> = Omit<TableColumnType<T>, 'width' | 'render'> & {
    * What the column filters on, see docs/reference/actions-and-controls.md#tables: its kind of value and, for an enum,
    * its options. A column that gives it has a filter in the builder of any table with a view. Only a table that holds
    * its rows reads `value`, how a row gives the value (null is empty), so a table paged on the server may leave it out.
-   * A column without `filter` has no filter. Dates compare as ISO text.
+   * A column without `filter` has no filter. Dates compare as ISO text. A column whose header is not plain text gives a
+   * `title`, the name the builder and its chips show. Without it they show the header text, or the key.
    */
   filter?: {
     kind: FilterKind
+    title?: string
     value?: (row: T) => string | number | null
     options?: { value: string; label: string }[]
   }
@@ -81,6 +85,13 @@ export interface AxisTableView {
   search?: boolean
   /** Whether the table has the Columns button. */
   columns?: boolean
+  /** The person's saved views of a table with a key, which `useTableView` gives. The Views button shows when it is set. */
+  saved?: TableSavedViews
+  /**
+   * Whether the table pages its rows. With `false`, every row shows and there is no pager. Only a table that holds its
+   * rows reads it, see docs/reference/actions-and-controls.md#tables.
+   */
+  paging?: boolean
 }
 
 /**
@@ -112,7 +123,7 @@ export interface AxisBulkAction<T> {
 
 /**
  * The toolbar of every table, see docs/reference/actions-and-controls.md#tables. AxisTable draws the view's Search, Filter
- * and Columns on the left. The toolbar gives the right side: Refresh, the secondary actions such as Import and Export, and
+ * Columns and Views on the left. The toolbar gives the right side: Refresh, the secondary actions such as Import and Export, and
  * the main action last. Each is there only when the table has it.
  */
 export interface AxisTableToolbar {
@@ -141,6 +152,11 @@ export interface AxisTableProps<T> {
   onChange?: TableProps<T>['onChange']
   /** The search, sort and paging, kept by the caller, for example in the address with `useTableView`. */
   view?: AxisTableView
+  /**
+   * Whether a row is one the filter never hides, such as a row added since the last save. Only a table that holds its
+   * rows reads it, and only for the filter, see docs/reference/actions-and-controls.md#tables.
+   */
+  keep?: (row: T) => boolean
   toolbar?: AxisTableToolbar
   /** What sits between the toolbar and the rows, such as a filter bar, messages and dialogs. */
   below?: ReactNode
@@ -201,7 +217,7 @@ const foldFrom = 3
 
 /**
  * The one table of the platform, see docs/reference/actions-and-controls.md#tables. It draws the toolbar in its fixed
- * order, with the Columns button after Search and Filter for a view that turns it on, the columns by their kind, rows and a header of the `tableRow` size, the row actions, folded into one "…" menu
+ * order, with the Columns button after Search and Filter for a view that turns it on, then the Views button for a view with `saved`, the columns by their kind, rows and a header of the `tableRow` size, the row actions, folded into one "…" menu
  * from three on or below 992 px, the row checkboxes and the selection bar of the bulk actions, the paging, the columns that move under their row and then the sideways scrolling when the page is narrower than the columns, and the em
  * dash for an empty cell.
  */
@@ -214,6 +230,7 @@ export function AxisTable<T extends object>({
   pagination,
   onChange,
   view,
+  keep,
   toolbar = {},
   below,
   failure,
@@ -347,7 +364,7 @@ export function AxisTable<T extends object>({
             ? [
                 {
                   key: column.key,
-                  title: typeof column.title === 'string' ? column.title : column.key,
+                  title: column.filter.title ?? (typeof column.title === 'string' ? column.title : column.key),
                   kind: column.filter.kind,
                   options: column.filter.options,
                 },
@@ -361,10 +378,14 @@ export function AxisTable<T extends object>({
   let current = 1
   if (view && query) {
     if (local) {
-      const rows = held(dataSource ?? [], columns, query, locale)
+      const rows = held(dataSource ?? [], columns, query, locale, keep)
       total = rows.length
-      current = Math.min(query.page, Math.max(1, Math.ceil(total / query.pageSize)))
-      pageRows = rows.slice((current - 1) * query.pageSize, current * query.pageSize)
+      if (view.paging === false) {
+        pageRows = rows
+      } else {
+        current = Math.min(query.page, Math.max(1, Math.ceil(total / query.pageSize)))
+        pageRows = rows.slice((current - 1) * query.pageSize, current * query.pageSize)
+      }
     } else {
       total = view.total ?? 0
       current = query.page
@@ -481,12 +502,15 @@ export function AxisTable<T extends object>({
     filterable ||
     arrangeable ||
     toolbar.title !== undefined ||
+    view?.saved !== undefined ||
     toolbar.onRefresh !== undefined ||
     toolbar.secondary !== undefined ||
     toolbar.main !== undefined
   const row: CSSProperties = { height: tokens.size.tableRow }
   const paging = view
-    ? { current, pageSize: query!.pageSize, total, pageSizeOptions: view.pageSizes ?? [] }
+    ? view.paging === false && local
+      ? undefined
+      : { current, pageSize: query!.pageSize, total, pageSizeOptions: view.pageSizes ?? [] }
     : pagination || undefined
   const sizes = paging?.pageSizeOptions ?? []
   const picker = sizes.length > 0
@@ -526,13 +550,15 @@ export function AxisTable<T extends object>({
       {hasToolbar && (
         <Flex justify="space-between" align="center" gap="small" wrap>
           {toolbar.title}
-          {(searchable || filterable || arrangeable) && (
-            <Flex gap="small" wrap>
+          {/* The search box keeps its own width, so Filter, Columns and Views follow it on one line, see
+              docs/reference/actions-and-controls.md#tables. */}
+          {(searchable || filterable || arrangeable || view?.saved !== undefined) && (
+            <Flex gap="small" wrap style={{ minWidth: 0 }}>
               {searchable && (
                 <Input.Search
                   allowClear
                   maxLength={200}
-                  style={{ maxWidth: 320 }}
+                  style={{ width: 320, maxWidth: '100%' }}
                   aria-label={t('shell.table.search')}
                   placeholder={t('shell.table.search')}
                   value={draft}
@@ -553,6 +579,7 @@ export function AxisTable<T extends object>({
                   onApply={onColumns}
                 />
               )}
+              {view?.saved && <TableViewsButton saved={view.saved} />}
             </Flex>
           )}
           <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
@@ -681,23 +708,31 @@ export function AxisTable<T extends object>({
 }
 
 /**
- * The rows of a table that holds them, filtered by the columns that give `filter`, searched by the columns that give
+ * The rows of a table that holds them, filtered by the columns that give `filter` (a row `keep` names stays), searched by the columns that give
  * `searchText`, then sorted by the sorted column's `sortValue`. The search is case-insensitive and ignores the spaces
  * around it. An empty value comes last.
  */
-function held<T>(rows: readonly T[], columns: readonly AxisColumn<T>[], query: TableQuery, locale: string): T[] {
+function held<T>(
+  rows: readonly T[],
+  columns: readonly AxisColumn<T>[],
+  query: TableQuery,
+  locale: string,
+  keep?: (row: T) => boolean,
+): T[] {
   const { filter } = query
   const filtered = filter
-    ? rows.filter((row) =>
-        matchesFilter(
-          row,
-          filter,
-          (field) => {
-            const column = columns.find((candidate) => candidate.key === field)?.filter
-            return column?.value ? { kind: column.kind, value: column.value } : undefined
-          },
-          locale,
-        ),
+    ? rows.filter(
+        (row) =>
+          keep?.(row) === true ||
+          matchesFilter(
+            row,
+            filter,
+            (field) => {
+              const column = columns.find((candidate) => candidate.key === field)?.filter
+              return column?.value ? { kind: column.kind, value: column.value } : undefined
+            },
+            locale,
+          ),
       )
     : rows
   const needle = query.search?.trim().toLocaleLowerCase(locale)

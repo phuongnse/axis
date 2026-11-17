@@ -15,7 +15,7 @@ import { fieldLabel } from '../fields'
 import { journeyURL } from '../server-settings'
 import { pickOption } from '../select'
 import { useJourneySession } from '../sessions'
-import { openKind, openModuleResource, openProblems } from '../studio-resources'
+import { addEntityField, closeEntityField, openKind, openModuleResource, openProblems } from '../studio-resources'
 
 // Publishing waits behind the other journeys on the shared publisher, so the two tests each get their own budget.
 test.setTimeout(420_000)
@@ -38,8 +38,9 @@ test.describe('the second business changes the module', () => {
     await openModuleResource(page, 'entity', 'Approvals', 'Request')
     await expect(page.getByTestId('studio-entity-designer')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Add field', exact: true }).click()
+    await addEntityField(page, 16)
     await page.getByTestId('studio-field-/fields/16/name').getByRole('textbox').fill('costCenter')
+    await closeEntityField(page)
     await page.getByTestId('studio-save').click()
 
     await expect(page.getByTestId('studio-saved')).toBeVisible()

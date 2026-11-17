@@ -1,9 +1,8 @@
 import { Button, Flex, Input, Tag, Typography } from 'antd'
 import type { HTMLAttributes } from 'react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { escapePointerSegment } from '../platform/jsonPatch'
-import type { FieldMetadata } from '../platform/site'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
@@ -22,9 +21,6 @@ interface Row {
   key: string
 }
 
-// The text table has no fields or parameters of its own. Stable empty arrays keep useTableView from recomputing on each render.
-const noFields: readonly Pick<FieldMetadata, 'name' | 'type'>[] = []
-
 function textOf(column: TextColumn, key: string): string {
   const value = column.texts[key]
   return typeof value === 'string' ? value : ''
@@ -35,7 +31,8 @@ function textOf(column: TextColumn, key: string): string {
  * an editable column takes input, and it edits the draft through `onChange`. A key that a column lacks shows as
  * missing, and typing in an editable cell adds it. The search is AxisTable's own, see
  * docs/reference/actions-and-controls.md#tables: it keeps the rows whose key or text in any locale contains the
- * search, ignoring letter case, and lives in the address as `search`. The table pages, so a key past page 1 needs a
+ * search, ignoring letter case, and lives in the address as `search`. Filter is there too, on the key and on each
+ * locale's text, where a missing or empty text is empty, and lives in the address as `filter`. The table pages, so a key past page 1 needs a
  * search. `onAdd` writes a new key in every locale and answers how that went. With a `layer`, each key that the
  * layer changed or added shows its mark and Reset to module after the key.
  */
@@ -44,11 +41,14 @@ export function TextTable({
   onChange,
   onAdd,
   layer,
+  tableKey,
 }: {
   columns: TextColumn[]
   onChange: ChangeHandler
   onAdd: (key: string, texts: Record<string, string>) => Promise<'added' | 'invalid' | 'failed'>
   layer?: DesignerLayer
+  /** The table's key, see docs/reference/frontend.md#table-views-and-columns. */
+  tableKey: string
 }) {
   const t = useText()
   const [newKey, setNewKey] = useState('')
@@ -57,7 +57,16 @@ export function TextTable({
   const [problem, setProblem] = useState<string>()
 
   const keys = [...new Set(columns.flatMap((column) => Object.keys(column.texts)))].sort()
-  const { view, setView } = useTableView(noFields, recordPageSize, [], true)
+  // One text field for the key and one for each locale's column. The ids are joined so that the fields stay stable between renders.
+  const ids = columns.map((column) => column.id).join('\n')
+  const fields = useMemo(
+    () => [
+      { name: 'key', type: 'text' as const },
+      ...(ids === '' ? [] : ids.split('\n')).map((name) => ({ name, type: 'text' as const })),
+    ],
+    [ids],
+  )
+  const { view, setView, saved } = useTableView(fields, recordPageSize, [], true, true, false, '', tableKey)
 
   async function add() {
     const key = newKey.trim()
@@ -93,7 +102,7 @@ export function TextTable({
         testId="studio-text-table"
         rowKey={(row) => row.key}
         dataSource={keys.map((key) => ({ key }))}
-        view={{ query: view, onChange: setView }}
+        view={{ query: view, onChange: setView, saved }}
         emptyText={t('shell.table.empty')}
         rowAttributes={(row) =>
           ({ 'data-testid': 'studio-text-row', 'data-key': row.key }) as HTMLAttributes<HTMLElement>
@@ -104,6 +113,7 @@ export function TextTable({
             kind: 'fixed',
             title: t('shell.studio.texts.key'),
             searchText: (row) => row.key,
+            filter: { kind: 'text', value: (row) => row.key },
             render: (_, row) => <Typography.Text code>{row.key}</Typography.Text>,
           },
           ...(layer
@@ -122,6 +132,7 @@ export function TextTable({
             kind: 'freeText',
             title: column.locale,
             searchText: (row) => textOf(column, row.key),
+            filter: { kind: 'text', value: (row) => textOf(column, row.key) || null },
             render: (_, row) => {
               const missing = !Object.hasOwn(column.texts, row.key)
               if (!column.editable) {
