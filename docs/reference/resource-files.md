@@ -131,6 +131,9 @@ A page holds one or more widgets. A leaf widget's `type` is `table`, `form`, `ta
   `title`, see [detail, chart and KPI widgets](detail-chart-kpi-widgets.md).
 - **Content** _(planned for M42)_. A `content` widget shows fixed text, an image, a link or a note, see
   [content widget](content-widget.md#content-widget).
+- **Calendar, board, cards and tree** _(planned for M42)_. A `calendar`, a `board`, `cards` and a `tree` show an entity's
+  records by a date, in groups, as tiles and under their parent, see
+  [calendar, board, cards and tree widgets](calendar-board-card-tree-widgets.md).
 - **Form and detail actions.** A `form` or `detail` widget may list `actions`. Each is
   `{ "type": "startProcess", "name": "submit", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
   a button that starts the process for the form's record, or a `navigate` action, see

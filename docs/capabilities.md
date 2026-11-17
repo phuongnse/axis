@@ -305,10 +305,10 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Act on several selected rows at once | _(planned for M42)_ |
 | Edit values in the table | _(planned for M42)_ |
 | Import records from CSV or Excel into a table | [Import](reference/table-widget.md#import) |
-| Show records on a calendar | _(planned for M42)_ |
-| Show records on a kanban board | _(planned for M42)_ |
-| Show records as cards | _(planned for M42)_ |
-| Show records as a tree | _(planned for M42)_ |
+| Show records on a calendar | [Calendar](reference/calendar-board-card-tree-widgets.md#calendar) _(planned for M42)_ |
+| Show records on a kanban board | [Board](reference/calendar-board-card-tree-widgets.md#board) _(planned for M42)_ |
+| Show records as cards | [Cards](reference/calendar-board-card-tree-widgets.md#cards) _(planned for M42)_ |
+| Show records as a tree | [Tree](reference/calendar-board-card-tree-widgets.md#tree) _(planned for M42)_ |
 | Show records on a Gantt chart or timeline | _(planned for M58)_ |
 | Show records on a map | _(planned for M58)_ |
 | Show one record read-only | [Detail widget](reference/detail-chart-kpi-widgets.md#detail-widget) |

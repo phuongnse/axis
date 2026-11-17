@@ -92,7 +92,8 @@ A table may set `prefix`, such as `"prefix": "orders"`, so that a page can hold 
 `search`, `filter`, `page`, `pageSize` and `sort`, and its unbound data source parameters, then live in the URL
 as `orders.search`, `orders.filter`, `orders.page`, `orders.pageSize`, `orders.sort` and `orders.{parameter}`.
 They keep the order and the rules of [paging and sorting](#paging-and-sorting). A table without a `prefix` keeps
-the plain keys, and a page has at most one such table.
+the plain keys, and a page has at most one table, calendar, board or cards widget without a `prefix`, see
+[calendar, board, cards and tree widgets](calendar-board-card-tree-widgets.md).
 
 A page parameter never takes a prefix. So a table bound to a page parameter reads its value from the URL under
 the plain name, and every table bound to it follows the same value. A customer page with its orders and tickets
