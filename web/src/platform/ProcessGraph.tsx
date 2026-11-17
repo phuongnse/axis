@@ -36,12 +36,35 @@ import {
 import { ProcessGraphControls } from './ProcessGraphControls'
 import { StatusTag, type StatusTone } from './StatusTag'
 import { Tooltip } from 'antd'
+import { typeTokens } from './designTokens'
 import { useDesignTokens, useThemeMode } from './themeMode'
 
-// Room for a label on two lines and the line under it, a status tag's 22 px: 8 + 4 + 2 × 20 + 2 + 22 + 8 px and the
-// borders, so nothing is cut.
 const nodeWidth = 272
-const nodeHeight = 88
+/**
+ * A card's height by the lines its label takes: one line, or two, with the line under it and a status tag's 22 px:
+ * 8 + 4 + 20 or 40 + 2 + 22 + 8 px and the borders. Only a step whose label needs two lines is the taller.
+ */
+const cardHeight = { one: 68, two: 88 }
+/** The room a label has on a card: its width less the padding, the icon's tile, the gap and the borders. */
+const labelRoom = nodeWidth - 2 * 12 - 28 - 12 - 2
+
+let measure: CanvasRenderingContext2D | null | undefined
+/** How wide a label is in the card's bold 14 px, from a canvas, else from its letters where there is none. */
+function labelWidthOf(label: string): number {
+  if (measure === undefined) {
+    measure = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d')
+  }
+  if (measure === null) {
+    return label.length * 8
+  }
+  measure.font = `600 14px ${typeTokens.fontFamily}`
+  return measure.measureText(label).width
+}
+
+/** A step's card height: the taller one only when its label does not fit on one line. */
+function heightOf(step: ProcessGraphStep): number {
+  return labelWidthOf(step.name) > labelRoom ? cardHeight.two : cardHeight.one
+}
 const handleSize = 10
 
 /**
@@ -142,7 +165,7 @@ async function layOut(
       'elk.spacing.edgeLabel': '4',
       'elk.edgeLabels.inline': 'false',
     },
-    children: steps.map((step) => ({ id: step.id, width: nodeWidth, height: nodeHeight })),
+    children: steps.map((step) => ({ id: step.id, width: nodeWidth, height: heightOf(step) })),
     edges: transitions
       .filter(
         (transition) =>
@@ -162,7 +185,10 @@ async function layOut(
       const section = edge.sections?.[0]
       const rectOf = (id: string | undefined) => {
         const place = id === undefined ? undefined : places.get(id)
-        return place === undefined ? undefined : { ...place, width: nodeWidth, height: nodeHeight }
+        const step = steps.find((candidate) => candidate.id === id)
+        return place === undefined || step === undefined
+          ? undefined
+          : { ...place, width: nodeWidth, height: heightOf(step) }
       }
       const points = section
         ? straighten(
@@ -553,14 +579,14 @@ export function ProcessGraphCanvas({
         type: 'step',
         position: layout.places.get(step.id) ?? { x: 0, y: 0 },
         width: nodeWidth,
-        height: nodeHeight,
+        height: heightOf(step),
         handles: [
-          { type: 'target', position: Position.Left, x: 0, y: nodeHeight / 2, width: 1, height: 1 },
+          { type: 'target', position: Position.Left, x: 0, y: heightOf(step) / 2, width: 1, height: 1 },
           {
             type: 'source',
             position: Position.Right,
             x: nodeWidth - handleSize / 2,
-            y: nodeHeight / 2 - handleSize / 2,
+            y: heightOf(step) / 2 - handleSize / 2,
             width: handleSize,
             height: handleSize,
           },
