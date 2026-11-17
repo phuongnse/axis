@@ -1642,16 +1642,69 @@ describe('TableWidget filter', () => {
     expect(optionTexts(shownDropdown()!)).toEqual(['Open', 'Done'])
   })
 
-  it('has no Filter button on a data source table, with or without parameters', async () => {
+  it('shows a Filter button on a data source table, with or without parameters', async () => {
     stubRecords()
     const { unmount } = renderWidget('', noteListWidget)
     await screen.findByRole('row', { name: /Buy paper/ })
-    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
     unmount()
 
     renderWidget('', filteredWidget)
     await screen.findByRole('row', { name: /Buy paper/ })
-    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Title contains')).toHaveRole('textbox')
+  })
+
+  it('sends the filter of a data source table to its rows route, keeps it in the address and starts at page 1', async () => {
+    const urls = stubRecords()
+    renderWidget('?page=3', noteListWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Operator', 0, 'contains')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Value' }), 'paper')
+    await clickInDialog('Apply')
+
+    const filter = JSON.stringify({ all: [{ field: 'title', op: 'contains', value: 'paper' }] })
+    await waitFor(() => expect(filterOfLastRequest(urls)).toBe(filter))
+    expect(urls().at(-1)!.startsWith(`${rowsPath}?`)).toBe(true)
+    expect(new URLSearchParams(search()!).get('filter')).toBe(filter)
+    expect(new URLSearchParams(search()!).has('page')).toBe(false)
+  })
+
+  it('offers the group columns of a grouped data source in the Filter builder, and no measure', async () => {
+    const groupedWidget: WidgetMetadata = {
+      ...noteListWidget,
+      dataSource: {
+        name: 'NotesByStatus',
+        rowsPath,
+        entity: 'Note',
+        parameters: [],
+        pageSize: 10,
+        search: false,
+        columns: [
+          {
+            name: 'status',
+            type: 'enum',
+            labelKey: 'note.status',
+            values: ['open', 'done'],
+            valueLabelKeys: { open: 'note.statusOpen', done: 'note.statusDone' },
+            target: null,
+          },
+          { name: 'requests', type: 'integer', labelKey: null, values: null, target: null, measure: true },
+          { name: 'total', type: 'decimal', labelKey: null, values: null, target: null, measure: true },
+        ],
+      },
+    }
+    stubRecords(
+      `{"items":[{"id":null,"values":{"status":"open","requests":2,"total":10.5},"labels":{}}],"page":1,"pageSize":10,"totalCount":1}`,
+    )
+    renderWidget('', groupedWidget)
+    await screen.findByRole('columnheader', { name: /Status/ })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+    expect(optionTexts(shownDropdown()!)).toEqual(['Status'])
   })
 })
 
@@ -2034,6 +2087,22 @@ describe('TableWidget export', () => {
       ['sort', '-title'],
       ['format', 'csv'],
     ])
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1))
+    click.mockRestore()
+  })
+
+  it('exports a data source table to its export route with the filter it is sent with', async () => {
+    const exported = stubExport(() => file())
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const filter = JSON.stringify({ all: [{ field: 'title', op: 'contains', value: 'paper' }] })
+    renderWidget(`?${new URLSearchParams({ filter })}`, { ...noteListWidget, access: withExport })
+
+    await chooseExport('CSV')
+
+    await waitFor(() => expect(exported()).toHaveLength(1))
+    const dataSourceExportPath = rowsPath.replace(/\/rows$/, '/export')
+    expect(exported()[0].startsWith(`${dataSourceExportPath}?`)).toBe(true)
+    expect([...new URLSearchParams(exported()[0].split('?')[1])]).toContainEqual(['filter', filter])
     await waitFor(() => expect(click).toHaveBeenCalledTimes(1))
     click.mockRestore()
   })

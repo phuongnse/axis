@@ -25,7 +25,7 @@ label. A child collection and a `references` field have no column.
 ### Toolbar
 
 The toolbar always shows, also when the table has no search and no toolbar action. What changes the view sits on the
-left: the search box, the Filter button of an entity table and the filter inputs of a data source table. On the right
+left: the search box, the Filter button and, on a data source table, its filter inputs. On the right
 is a Refresh icon button, named by the platform text `shell.table.refresh` ("Refresh", in `vi` "Làm mới"), which loads
 the current page of rows again. Then come the secondary actions, Import, Export and the toolbar actions after the first,
 and last the first shown toolbar action, as the table's main action, see [buttons](actions-and-controls.md#buttons).
@@ -50,25 +50,26 @@ right.
 
 ### Filter
 
-An entity table has a Filter button in the toolbar, after the search box, which opens the builder of
-[tables](actions-and-controls.md#tables).
+A table with a column the builder offers has a Filter button in the toolbar, after the search box, which opens the
+builder of [tables](actions-and-controls.md#tables).
 
 - **Columns.** The builder offers the text, enum, integer, decimal, money and date columns. It leaves out boolean,
   reference, file and date-time columns, as the record API refuses the first three and the builder's date picker gives
   no time for the fourth. An enum column offers its values by their labels. The builder cannot tell which fields are
-  `sensitive`, so it may offer one, and the record API then answers `400`.
+  `sensitive`, so it may offer one, and the record API then answers `400`. A measure column of a grouped data source
+  has no filter, so the builder leaves it out. A bucketed group column is a date.
 - **Operators.** Each column takes the operators the record API takes for its type, see
   [record API paging and sorting](record-api.md#paging-and-sorting).
-- **Sending.** The filter lives in the URL as `filter`, and the rows request and the export send it to the record API
-  as `filter`. A data source table has no Filter button, because its rows route takes no `filter`, and a `filter` in its
-  URL is ignored and removed.
+- **Sending.** The filter lives in the URL as `filter`. The rows request and the export send it as `filter`, to the
+  record API of an entity or to the rows and export routes of a data source. The data source routes take it as
+  [query parameters](data-sources.md#query-parameters) describes.
 
 ### Paging and sorting
 
 Paging, sorting and search live in the URL, so reload, sharing and the back button keep them.
 
 - **URL state.** They are the record API's own `page`, `pageSize`, `sort` (`-` and the field name for descending),
-  `search` and, on an entity table, `filter`. The widget writes them after every other parameter, always in the order
+  `search` and `filter`. The widget writes them after every other parameter, always in the order
   `search`, `filter`, `page`, `pageSize`, `sort`, and leaves out defaults: no search, no filter, page 1, 20 a page or
   the data source's page size, and no sort. It changes only its own parameters and, for a data source, its
   [parameter values](#data-source-binding). Any other parameter, such as `x=1`, stays as it is.
@@ -149,7 +150,7 @@ metadata then gives the widget `"entity": null` and a `dataSource` object, and a
   projected name. A measure has no `labelKey`, so its header is its name. A `count` is an `integer` column, a `sum` is
   a `decimal` column, and a `min` or `max` has its field's type. A column over a labelled enum field has the same
   `valueLabelKeys` as the field, and `null` otherwise. Sorting, values and labels follow the column's type, as for an
-  entity table.
+  entity table. A measure column has `"measure": true`, and every other column leaves the property out.
 - **Page size.** The data source's `pageSize` is the table's default page size. It is offered with 10, 20, 50 and 100
   when it is not one of them, and the URL leaves it out.
 - **Search.** `search` is `true` when the data source declares `"search": true`, and the table then shows the
@@ -315,7 +316,7 @@ exports nothing.
 - **The choice.** The dropdown offers CSV and Excel, and it opens and selects with the keyboard.
 - **The request.** A choice sends `GET` to the export route: the entity's `recordsPath` with `/export` added, or the
   data source's `rowsPath` with its last `/rows` swapped for `/export`. The address holds the table's data source
-  parameter values, bound and filter, its `search`, its `sort` and, on an entity table, its `filter`, as the rows
+  parameter values, bound and filter, its `search`, its `filter` and its `sort`, as the rows
   request has them, and `format` as `csv` or `xlsx`. It holds no `page` or `pageSize`, so the file has every matching
   row.
 - **The file.** The SPA saves the file under the name in the response's `Content-Disposition`, through a temporary

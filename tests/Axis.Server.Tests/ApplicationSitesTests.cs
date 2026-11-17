@@ -26,6 +26,26 @@ public sealed class ApplicationSitesTests
     }
 
     [Fact]
+    public void Measure_column_says_it_is_a_measure_and_a_group_column_leaves_the_mark_out()
+    {
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions, SampleModules.Modules);
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+
+        var page = ApplicationSites.FindPage(result.Model, "RequestsByDepartment");
+
+        Assert.NotNull(page);
+        var widget = Assert.IsType<WidgetMetadata>(Assert.Single(page.Widgets));
+        Assert.NotNull(widget.DataSource);
+        var columns = widget.DataSource.Columns;
+        Assert.Equal([false, true, true], columns.Select(column => column.Measure));
+        var group = System.Text.Json.JsonSerializer.Serialize(columns[0], System.Text.Json.JsonSerializerOptions.Web);
+        Assert.DoesNotContain("measure", group, StringComparison.Ordinal);
+        var measure = System.Text.Json.JsonSerializer.Serialize(columns[1], System.Text.Json.JsonSerializerOptions.Web);
+        Assert.Contains("\"measure\":true", measure, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Bucketed_group_column_is_a_date_whatever_its_field_is()
     {
         var root = Path.Combine(Path.GetTempPath(), $"axis-sites-{Guid.NewGuid():N}");
