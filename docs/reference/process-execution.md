@@ -25,6 +25,8 @@ never leaves an instance half moved.
   under its retry policy, see [Connector calls](#connector-calls), and so does a package operation
   step, see [Package operations](#package-operations). An operator can retry a `failed` instance, see
   [Retry](process-inspection.md#retry).
+- **Error paths.** _(planned for M38)_ A step that names an error path for its kind of failure takes
+  it instead of failing its path, see [Paths](#paths).
 - **Work item errors.** When a work item's handler throws, its writes roll back. A following
   transaction, still checked against the claim token, deletes the item and calls the handler's
   failure callback with the error, and the item is not retried. A worker that crashes or stops before
@@ -219,6 +221,84 @@ is one of these:
 See [Step errors](process-inspection.md#step-errors-in-inspection). The failure is also logged at
 Warning level with the step name, the instance id and the same fixed text as the history row. A failed
 work item is logged with its exception type only.
+
+**Error path.** _(planned for M38)_ A step with an `onError` entry for its kind of failure does not fail
+its path in this transaction. It takes the error path, see [Paths](#paths).
+
+## Paths
+
+_(planned for M38)_
+
+An instance is at one step, or at several when a [block](process-blocks.md) starts paths. A path is one
+line of steps that runs on its own. A process without blocks has one path, and every rule above holds
+for it as written. This section says what changes when paths run at once.
+
+- **Root path.** The instance is its own root path. Its `step`, `revision` and state are that path's,
+  and `axis.process_paths` holds a row only for a path that a block starts, see
+  [Paths](process-tables.md#paths).
+- **Starting paths.** The transaction of a `parallel` step inserts one path row for each branch that
+  runs, and queues a `process.step` item for each. The path that reached the block waits on the block
+  step, as a parent waits on a [sub-process](process-flow.md#sub-process-step), so the instance is
+  `waiting` while its root path waits, and a second start for the same record stays blocked. Each path
+  has its own state, see [path states](process-states.md#path-states).
+- **Own position, revision and history.** Each path keeps its own `step`, `revision` and state. A step
+  history row, a work item, a task and a call each name their path, so inspection and the worker tell
+  the paths apart. A step of a path that a block started writes that path's row and never the
+  instance's, so two paths never fight over one revision.
+- **First resume.** A resume counts only at the path's revision. The second of two concurrent resumes
+  of a path, such as a task completion and a deadline, finds the revision moved and writes nothing
+  else, as step 4 of [Running a step](#running-a-step) says for an instance.
+- **One transaction per step.** A step commits its business writes, its path's state and revision, its
+  history, its audit records and the next work item together. The path's state and revision take the
+  place of the instance's in the list of [Running a step](#running-a-step). A `process.step` item names
+  its path, and it is skipped when that path is missing or not `running`.
+- **Going on.** The transaction that ends a path checks the rule of the block it belongs to. When the
+  rule holds, it resumes the path that waits on the block, on the block's `next`, with the next
+  revision. A path that ends does not start a path outside its block.
+- **Cancelling.** The transaction that finds the rule holding also cancels the paths of the block that
+  still run. Each live sibling path and its descendants become `cancelled`, their open tasks become
+  `closed`, their `pending` calls become `cancelled`, their work items are deleted, and one history row
+  with the output `{ "state": "cancelled", "block" }` is written for each cancelled path. A call that
+  is `sending` or `unknown` settles on its call row and in the audit as it does for a cancelled
+  instance, but it writes no output and moves no path. Lock order follows
+  [Cancel](process-inspection.md#cancel): the open tasks, then the instance, then the paths, parents
+  before children. A path that ends locks the same way, so two paths that end at once queue and exactly
+  one of them sees the rule hold.
+- **Passes.** A `repeat` step's transaction reads its items once and inserts one path row for each item
+  of a `forEach` or each pass of `times`, and one pass at a time for `while` and `until`. In order, the
+  first pass runs, and the end of a pass starts the next one after the repeat's checks of `stopWhen`,
+  `while`, `until` and `maxPasses`. With `waitBetween`, the transaction that ends a pass queues a
+  `process.timer` item for the path that waits on the repeat, and its resume starts the next pass. With
+  `atOnce`, the first `atOnce` passes start together, the others wait for their turn, and each pass that
+  ends starts the next waiting one. When the repeat ends, the transaction cancels the passes still
+  running, as under Cancelling.
+- **Gathering.** A pass that ends without a skip stores the value of `gather` in the `gathered` column
+  of its path row. When the repeat ends, its transaction writes the values to the variable in the order
+  of the passes, so the list follows the items, see [variables](processes.md#variables).
+- **Calls.** A call is known by its step, its path and its pass. Its row has `path_id` and `pass`, and
+  the unique index is on instance, path, step and `staged_revision`, which is the path's revision. So a
+  step that runs on every pass of a repeat, or on each of two branches, stages one call for each.
+- **Error path.** A step that still fails takes the `onError` entry that names its kind of failure:
+  `call` for a failed call, `record` for a refused write, `expression` for an expression that failed,
+  `limit` for a reached limit and otherwise `any`. The step's failure transaction, or the outcome
+  transaction of a failed call, sets the path `running` on the entry's `next`, writes the history row
+  with the error and the output `{ "error", "next" }`, writes the audit record `process.errorPathTaken`
+  with details `{ "step", "error", "next" }` and the actor `system`, and queues the next step. A call
+  left `unknown` takes no error path, because it has not failed. The transaction is the one that would
+  otherwise fail the path.
+- **No error path.** A path whose step names no entry for its kind becomes `failed`. Its block then
+  cancels the paths that still run, as under Cancelling, and takes its own `onError` for the same kind
+  of failure. When the block has none, the path that waits on the block fails in turn. The root path
+  fails the instance, as [When a step fails](#when-a-step-fails) says.
+- **Limits.** Four limits keep an instance bounded, as [limits](process-blocks.md#limits) say. A limit
+  at run time fails the step that would pass it with the error kind `limit`, so an `onError` entry can
+  take it, and each has its [worker setting](#worker-settings):
+  - `Worker:MaxPathsAtOnce` bounds the paths that an instance runs at once, across all its blocks.
+  - `Worker:MaxRepeatItems` bounds the items of a `forEach` and the `times` of a repeat.
+  - `Worker:MaxRepeatPasses` bounds the passes of one repeat.
+  - Depth has no worker setting. It is a compile check, `AXC0379` in
+    [compile checks](process-blocks.md#compile-checks), because the publisher cannot read a worker's
+    settings.
 
 ## Connector calls
 
@@ -718,6 +798,9 @@ does not hold back the tenant's work items.
 | `Worker:Quantum`              | `10`                    | The work items a tenant of weight 1 runs in one turn, see [fair share](worker-scheduling.md#fair-share). It must be at least 1.                                                                                                                                                               |
 | `Worker:DeliveryAttempts`     | `5`                     | Failures of a delivery before it becomes a [dead letter](process-events.md#dead-letters). It must be at least 1.                                                                                                                                                                              |
 | `Worker:StatementTimeout`     | `00:01:00`              | The `statement_timeout` of every transaction a work item runs. A statement past it fails the attempt, so the item is retried like any other failure of its kind, and a delivery counts it toward its dead letter. A value that is not a duration of at least one millisecond stops the start. |
+| `Worker:MaxPathsAtOnce` _(planned for M38)_ | `100` | The paths one instance runs at once, across all its blocks, see [limits](#paths). It must be at least 1. |
+| `Worker:MaxRepeatItems` _(planned for M38)_ | `1000` | The items of a `forEach` repeat, and the `times` of a repeat, see [limits](#paths). It must be at least 1. |
+| `Worker:MaxRepeatPasses` _(planned for M38)_ | `1000` | The passes of one repeat, see [limits](#paths). It must be at least 1. |
 | `Notifications:RetentionDays` | `90`                    | How many days the worker keeps [in-app notifications](notifications.md#in-app-notifications). A value that is not a whole number of at least 1 stops the worker at start.                                                                                                                    |
 | `Health:Urls`                 | `http://127.0.0.1:5208` | The address of the worker's health endpoints, `/health/live` and `/health/ready`. It serves nothing else.                                                                                                                                                                                     |
 
@@ -726,6 +809,9 @@ As environment variables they are `Worker__LeaseDuration`, `Worker__PollInterval
 `Worker__DeliveryAttempts`, `Worker__StatementTimeout`, `Notifications__RetentionDays` and
 `Health__Urls`. What the health endpoints answer is in
 [health checks](../architecture.md#health-checks).
+
+**Limits.** _(planned for M38)_ As environment variables the three limits are `Worker__MaxPathsAtOnce`,
+`Worker__MaxRepeatItems` and `Worker__MaxRepeatPasses`.
 
 ### Worker metrics
 

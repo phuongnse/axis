@@ -76,8 +76,8 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Give a task to a line manager or a department head | [The organization module](reference/built-in-modules.md#the-organization-module) |
 | Give a task to a list of people | _(planned for M43)_ |
 | Give a task to a role within one department | _(planned for M43)_ |
-| Ask several people and decide by all, any, a majority or a set number | _(planned for M38)_ |
-| Add an approver while a request is in progress | _(planned for M38)_ |
+| Ask several people and decide by all, any, a majority or a set number | [A task for several people](reference/task-api.md#a-task-for-several-people) _(planned for M38)_ |
+| Add an approver while a request is in progress | [Add a person](reference/task-deadlines.md#add-a-person) _(planned for M38)_ |
 | Give a task to someone else, with a reason | [Reassign](reference/task-deadlines.md#reassign) |
 | Share tasks by workload or in turn | _(planned for M43)_ |
 | Give an absent approver's approvals to a delegate | [The approval process](reference/built-in-modules.md#the-approval-process) |

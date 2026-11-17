@@ -328,6 +328,11 @@ promise that each step is decided once.
   value a step stores with the one it held before: `stepDecision == decisionTask() and stepDecision
   != previous(stepDecision)`. A layer that adds a second write after one decision then cannot move
   the counter twice.
+- **A task for several people.** _(planned for M38)_ Only the answer that decides the task replaces the
+  instance's deciding task and accountable user. An answer that does not decide it changes neither, and
+  the tasks that are `closed` afterwards never do. So a contract counts a task for several people as
+  decided once, whatever the number of people. See
+  [a task for several people](task-api.md#a-task-for-several-people).
 - **Allowed where.** Where `accountableUser()` is allowed, and `AXC0341` elsewhere.
 - **Why not `currentUser()`.** `currentUser()` is the session's user and binds a SQL parameter.
   A process step has no session, and its write must still be judged by who decided it. So a step

@@ -177,6 +177,7 @@ three calls takes 300 ms or more.
 - `completedAt`, `completedBy` and `outcome` are `null` while the task is `open`.
 - `overdue` is `true` only for an open task whose `dueAt` has passed. A completed, cancelled or
   expired task reads `false`.
+- **Closed tasks.** _(planned for M38)_ A `closed` task reads `overdue` as `false` too.
 - `commands` lists what the user may do with the task now, and `reassignRoles` the roles they may
   reassign it to. The claim, release, reassign and complete responses carry both too, see
   [Inbox and task page](task-deadlines.md#inbox-and-task-page).
@@ -243,6 +244,39 @@ One transaction records the decision:
 The form, the outcomes and the record write all use the release the instance is pinned to. When any
 part fails, nothing is written. The worker then runs the next step as usual.
 
+## A task for several people
+
+_(planned for M38)_
+
+A `task` step may give its task to several people, see [several assignees](processes.md#steps). Each
+person has a task of their own, and the step's rule of completion says when enough of them have
+answered. Everything else on this page holds for each of these tasks, as for any other.
+
+- **Creating.** The step's transaction evaluates `users.from` and `user`, and inserts one `open` task
+  for each distinct user id, all with one `group_id`, see [process tables](process-tables.md#tasks). A
+  `null` or blank id, and an empty list, fail the step.
+- **Each answer is kept.** Every answer completes its person's task as
+  [Completing a task](#completing-a-task) says, values included, and the person's outcome stays on
+  their task. The transaction first locks every task of the group in id order, then the instance, then
+  the path. Two answers at once therefore queue one after the other, and exactly one of them decides the
+  task.
+- **Decided.** The task is decided as soon as no answer still to come can change its outcome, under
+  the rule of [processes](processes.md#steps), which may take `otherwise`. Under `majority` of three,
+  two answers that agree decide it. Under `all`, two answers that differ decide it, because no outcome
+  can still win, and `otherwise` is taken. An answer that does not decide it leaves the instance and
+  its path as they are. It runs steps 1 to 3 and 6 of [Completing a task](#completing-a-task) and
+  writes its history row, see [History output](process-tables.md#history-output).
+- **The deciding answer.** Only the answer that decides the task also runs steps 4, 5, 7 and 8 of
+  [Completing a task](#completing-a-task), for the path of the task step and on the decided outcome's
+  `next`. It deletes the pending `task.escalate` and `task.deadline` items of the group, and sets
+  the group's other `open` tasks to `closed`, writing the audit record `task.closed` with details
+  `{ "taskId", "decidingTaskId" }` and the actor `system` for each. A `closed` task has no outcome and
+  leaves every inbox.
+- **Decided once.** A module contract counts the task as decided once, whatever the number of people,
+  see [the deciding task](module-contracts.md#the-deciding-task).
+- **Adding a person.** A person may be added to an open task, see
+  [add a person](task-deadlines.md#add-a-person).
+
 ## Task API errors
 
 Every task route answers a failure with a problem detail, as the [record API](record-api.md#errors)
@@ -295,6 +329,9 @@ is a `403` before any of these checks, and so is one in a
 - **`409` for a decided task.** The task is not `open`. Another completion came first, which covers a
   later completion and the loser of two concurrent ones, or the task is `cancelled` or `expired`, see
   [Task states](task-deadlines.md#task-states). A task that is not `open` is not listed.
+
+  **Closed.** _(planned for M38)_ A task that is `closed` gets this `409` too, see
+  [a task for several people](#a-task-for-several-people).
 
   ```json
   {
