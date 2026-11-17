@@ -664,8 +664,6 @@
   "shell.inspector.timeline.packageCall": "Package call",
   "shell.inspector.timeline.connectorCall": "Connector call",
   "shell.inspector.timeline.inputHidden": "The input is hidden.",
-  "shell.inspector.timeline.only": "Only the runs of {step}.",
-  "shell.inspector.timeline.showAll": "Show all",
   "shell.inspector.stepType.decision": "Decision",
   "shell.inspector.stepType.task": "Task",
   "shell.inspector.stepType.operation": "Operation",

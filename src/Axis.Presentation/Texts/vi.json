@@ -664,8 +664,6 @@
   "shell.inspector.timeline.packageCall": "Gọi gói mở rộng",
   "shell.inspector.timeline.connectorCall": "Gọi connector",
   "shell.inspector.timeline.inputHidden": "Dữ liệu gửi đi được ẩn.",
-  "shell.inspector.timeline.only": "Chỉ các lần chạy của {step}.",
-  "shell.inspector.timeline.showAll": "Hiện tất cả",
   "shell.inspector.stepType.decision": "Rẽ nhánh",
   "shell.inspector.stepType.task": "Công việc",
   "shell.inspector.stepType.operation": "Thao tác",

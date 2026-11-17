@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AxisButton } from './AxisButton'
 import { AxisTable, type AxisColumn } from './AxisTable'
+import { tablePageSizes, type TableQuery } from './tableQuery'
 import { inspectorPath } from './inspectorPages'
 import type { CallAttempt, InstanceCall, InstanceDetail, InstanceTask, SubProcess } from './inspection'
 import { durationText, stepRuns, type StepRun } from './instanceRuns'
@@ -15,6 +16,11 @@ import { EventTime } from './EventTime'
 /** One row of the timeline, with the rows inside it, which the table folds. */
 interface TimelineRow {
   key: string
+  /** The step's name, its label and the words of the row and the rows inside it, for filter, sort and search. */
+  step: string
+  stepText: string
+  stateKey: 'done' | 'failed' | 'waiting' | 'running' | 'retried'
+  words: string
   name: ReactNode
   what: ReactNode
   state: ReactNode
@@ -32,9 +38,9 @@ interface InstanceTimelineProps {
   stepLabel: (name: string) => string
   /** The label of a transition out of a step, such as a task's outcome, from the process's texts, else its name. */
   outcomeLabel: (step: string, name: string) => string
-  /** Shows only the runs of this step, until Show all clears it. */
-  only: string | null
-  onShowAll: () => void
+  /** The table's search, filter, sort and page, kept in the address by the page. */
+  view: TableQuery
+  onViewChange: (next: TableQuery) => void
   onChanged: () => void
 }
 
@@ -53,13 +59,20 @@ export function InstanceTimeline({
   locale,
   stepLabel,
   outcomeLabel,
-  only,
-  onShowAll,
+  view,
+  onViewChange,
   onChanged,
 }: InstanceTimelineProps) {
   const t = useText()
   const [resolving, setResolving] = useState<InstanceCall | null>(null)
-  const runs = stepRuns(instance).filter((run) => only === null || run.step === only)
+  const runs = stepRuns(instance)
+  const stepsByName = Object.fromEntries(instance.graph.steps.map((step) => [step.name, step]))
+  const lasted = (row: TimelineRow) =>
+    row.startedAt === null ? null : Date.parse(row.finishedAt ?? now) - Date.parse(row.startedAt)
+  const stateOptions = (['done', 'failed', 'waiting', 'running'] as const).map((value) => ({
+    value,
+    label: t(`shell.inspector.timeline.state${value[0].toUpperCase()}${value.slice(1)}`),
+  }))
   // A run not yet finished lasts until the page was drawn.
   const [now] = useState(() => new Date().toISOString())
   const typeOf = (step: string) => instance.graph.steps.find((candidate) => candidate.name === step)?.type ?? ''
@@ -181,6 +194,10 @@ export function InstanceTimeline({
   // A row of the timeline: a run of a step, or, inside it, a task, a call, an attempt of a call or a sub-process.
   const attemptRow = (call: InstanceCall, attempt: CallAttempt): TimelineRow => ({
     key: `${call.id}/${attempt.number}`,
+    step: call.step,
+    stepText: stepLabel(call.step),
+    stateKey: attempt.outcome === 'succeeded' ? 'done' : attempt.outcome === 'retryable' ? 'retried' : 'failed',
+    words: [attempt.error ?? '', attempt.httpStatus ?? '', attempt.traceId ?? ''].join(' '),
     name: named(t('shell.inspector.timeline.attempt').replace('{number}', String(attempt.number)), ''),
     what: (
       <Flex vertical>
@@ -211,6 +228,17 @@ export function InstanceTimeline({
         : Object.entries(call.input as Record<string, unknown>)
     return {
       key: call.id,
+      step: call.step,
+      stepText: stepLabel(call.step),
+      stateKey: callState(call),
+      words: [
+        targetOf(call),
+        callSummary(call),
+        ...input.map(([name, value]) => `${name} ${String(value)}`),
+        ...call.attempts.map(
+          (attempt) => `${attempt.error ?? ''} ${attempt.httpStatus ?? ''} ${attempt.traceId ?? ''}`,
+        ),
+      ].join(' '),
       name: named(
         targetOf(call),
         t(call.kind === 'package' ? 'shell.inspector.timeline.packageCall' : 'shell.inspector.timeline.connectorCall'),
@@ -248,6 +276,14 @@ export function InstanceTimeline({
   }
   const taskRow = (task: InstanceTask): TimelineRow => ({
     key: task.id,
+    step: task.step,
+    stepText: stepLabel(task.step),
+    stateKey: task.completedAt === null ? 'waiting' : 'done',
+    words: [
+      assigneeText(task),
+      task.completedBy ?? '',
+      task.outcome === null ? '' : outcomeLabel(task.step, task.outcome),
+    ].join(' '),
     name: named(assigneeText(task), t('shell.inspector.stepType.task')),
     what:
       task.outcome === null
@@ -264,6 +300,10 @@ export function InstanceTimeline({
     const key = `shell.inspector.states.${child.state}`
     return {
       key: child.id,
+      step: child.step,
+      stepText: stepLabel(child.step),
+      stateKey: child.endedAt === null ? 'running' : child.state === 'failed' ? 'failed' : 'done',
+      words: `${child.process} ${child.state}`,
       name: named(
         page === undefined ? (
           child.process
@@ -286,6 +326,21 @@ export function InstanceTimeline({
     )
     return {
       key: run.key,
+      step: run.step,
+      stepText: stepLabel(run.step),
+      stateKey: run.state,
+      // A run is found by its own words and by those of the rows inside it.
+      words: [
+        stepLabel(run.step),
+        typeText(typeOf(run.step)),
+        run.error ?? '',
+        run.decision === null
+          ? ''
+          : run.decision in stepsByName
+            ? stepLabel(run.decision)
+            : outcomeLabel(run.step, run.decision),
+        ...children.map((child) => `${child.stepText} ${child.words}`),
+      ].join(' '),
       name: named(
         stepLabel(run.step),
         run.number > 1
@@ -306,13 +361,36 @@ export function InstanceTimeline({
   }
 
   const columns: AxisColumn<TimelineRow>[] = [
-    { key: 'step', kind: 'freeText', title: t('shell.inspector.step'), render: (_v, row) => row.name },
+    {
+      key: 'step',
+      kind: 'freeText',
+      title: t('shell.inspector.step'),
+      render: (_v, row) => row.name,
+      // Proposed: the timeline has the standard controls its growth asks for, see the review on #3650: search finds a
+      // run by its words and those of the rows inside it, and a step filters and sorts by its label.
+      searchText: (row) => row.words,
+      sortValue: (row) => row.stepText,
+      filter: {
+        kind: 'enum',
+        value: (row) => row.step,
+        options: instance.graph.steps.map((step) => ({ value: step.name, label: stepLabel(step.name) })),
+      },
+    },
     { key: 'what', kind: 'freeText', title: t('shell.inspector.timeline.what'), render: (_v, row) => row.what },
-    { key: 'state', kind: 'fixed', title: t('shell.inspector.state'), render: (_v, row) => row.state },
+    {
+      key: 'state',
+      kind: 'fixed',
+      title: t('shell.inspector.state'),
+      render: (_v, row) => row.state,
+      sortValue: (row) => row.stateKey,
+      filter: { kind: 'enum', value: (row) => row.stateKey, options: stateOptions },
+    },
     {
       key: 'startedAt',
       kind: 'fixed',
       title: t('shell.inspector.startedAt'),
+      sortValue: (row) => row.startedAt,
+      filter: { kind: 'date', value: (row) => row.startedAt?.slice(0, 10) ?? null },
       // Proposed: a run's start is how long ago it was, the exact time its tooltip, see the review on #3650.
       render: (_v, row) => (row.startedAt === null ? null : <EventTime at={row.startedAt} locale={locale} />),
     },
@@ -322,26 +400,21 @@ export function InstanceTimeline({
       key: 'duration',
       kind: 'fixed',
       title: t('shell.inspector.timeline.duration'),
+      sortValue: lasted,
       render: (_v, row) => (row.startedAt === null ? null : durationText(row.startedAt, row.finishedAt ?? now, locale)),
     },
   ]
 
   return (
     <Flex vertical gap="middle" data-testid="inspector-timeline">
-      {only !== null && (
-        <Flex align="center" gap="small">
-          <span>{t('shell.inspector.timeline.only').replace('{step}', stepLabel(only))}</span>
-          <AxisButton role="link" onClick={onShowAll}>
-            {t('shell.inspector.timeline.showAll')}
-          </AxisButton>
-        </Flex>
-      )}
       <AxisTable<TimelineRow>
         rowKey={(row) => row.key}
         columns={columns}
         // Records in time are newest first, as docs/reference/actions-and-controls.md#list-order says.
         dataSource={runs.map(runRow).reverse()}
         emptyText={t('shell.inspector.noHistory')}
+        view={{ query: view, onChange: onViewChange, pageSizes: tablePageSizes(), search: true }}
+        toolbar={{ onRefresh: onChanged }}
       />
       {resolving && resolving.outputs && (
         <ResolveDialog

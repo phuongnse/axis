@@ -2,7 +2,7 @@ import { Flex, Tabs } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { NotSet } from './EmptyValue'
 import { formatValue } from './formatValue'
 import {
@@ -32,6 +32,8 @@ import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
 import { useAddressTab } from './addressTab'
+import { recordPageSize, writeTableQuery } from './tableQuery'
+import { useTableView } from './useTableView'
 import { useReleaseTexts } from './useReleaseTexts'
 
 interface ProcessInstancePageProps {
@@ -57,6 +59,16 @@ const dateTime = (name: string) => ({ name, type: 'date-time' }) as const
  * sub-processes.
  */
 const instanceTabs = ['general', 'timeline', 'steps']
+
+/** The timeline's columns that its filter and sort may name, kept in the address by `useTableView`. */
+const timelineFields = [
+  { name: 'step', type: 'enum' },
+  { name: 'state', type: 'enum' },
+  { name: 'startedAt', type: 'date' },
+  { name: 'duration', type: 'integer' },
+] as const
+// The timeline has no parameter of its own. A stable empty array keeps useTableView from recomputing on each render.
+const noParameters: readonly string[] = []
 
 /**
  * Shows one instance under the page of its process inspector: its state and step, the steps of
@@ -200,7 +212,25 @@ export function InstanceDetailView({
     return labelKey ? t(labelKey) : name
   }
   const status = useInstanceStatus(instance, stepLabel, locale)
-  const [only, setOnly] = useState<string | null>(null)
+  // Proposed: the timeline's search, filter, sort and page live in the address, and a click on a step in the graph
+  // opens the timeline filtered to that step through the same filter, see the review on #3650.
+  const { view: timelineView, setView: setTimelineView } = useTableView(
+    timelineFields,
+    recordPageSize,
+    noParameters,
+    true,
+    true,
+  )
+  const [searchParams, setSearchParams] = useSearchParams()
+  const showStep = (step: string) => {
+    const next = writeTableQuery(
+      searchParams,
+      { ...timelineView, page: 1, filter: { all: [{ field: 'step', op: 'eq', value: step }] } },
+      recordPageSize,
+    )
+    next.set('tab', 'timeline')
+    setSearchParams(next, { preventScrollReset: true })
+  }
 
   // Proposed, see the review on #3650: the instance is headed by its process, its state a tag beside it and its kind the
   // line; what the platform keeps of it is the first part, each fact on a row of its own, and each part after it is a
@@ -347,8 +377,8 @@ export function InstanceDetailView({
                     locale={locale}
                     stepLabel={stepLabel}
                     outcomeLabel={outcomeLabel}
-                    only={only}
-                    onShowAll={() => setOnly(null)}
+                    view={timelineView}
+                    onViewChange={setTimelineView}
                     onChanged={onChanged}
                   />
                 ),
@@ -368,10 +398,7 @@ export function InstanceDetailView({
                     height={560}
                     focus={instance.step}
                     controls
-                    onStepClick={(step) => {
-                      setOnly(step)
-                      selectTab('timeline')
-                    }}
+                    onStepClick={showStep}
                   />
                 ),
               },
