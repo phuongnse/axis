@@ -80,6 +80,11 @@ export interface AxisTableView {
   search?: boolean
   /** Whether the table has the Columns button. */
   columns?: boolean
+  /**
+   * Whether the table pages its rows. With `false`, every row shows and there is no pager. Only a table that holds its
+   * rows reads it, see docs/reference/actions-and-controls.md#tables.
+   */
+  paging?: boolean
 }
 
 /**
@@ -135,6 +140,11 @@ export interface AxisTableProps<T> {
   onChange?: TableProps<T>['onChange']
   /** The search, sort and paging, kept by the caller, for example in the address with `useTableView`. */
   view?: AxisTableView
+  /**
+   * Whether a row is one the filter never hides, such as a row added since the last save. Only a table that holds its
+   * rows reads it, and only for the filter, see docs/reference/actions-and-controls.md#tables.
+   */
+  keep?: (row: T) => boolean
   toolbar?: AxisTableToolbar
   /** What sits between the toolbar and the rows, such as a filter bar, messages and dialogs. */
   below?: ReactNode
@@ -204,6 +214,7 @@ export function AxisTable<T extends object>({
   pagination,
   onChange,
   view,
+  keep,
   toolbar = {},
   below,
   failure,
@@ -348,10 +359,14 @@ export function AxisTable<T extends object>({
   let current = 1
   if (view && query) {
     if (local) {
-      const rows = held(dataSource ?? [], columns, query, locale)
+      const rows = held(dataSource ?? [], columns, query, locale, keep)
       total = rows.length
-      current = Math.min(query.page, Math.max(1, Math.ceil(total / query.pageSize)))
-      pageRows = rows.slice((current - 1) * query.pageSize, current * query.pageSize)
+      if (view.paging === false) {
+        pageRows = rows
+      } else {
+        current = Math.min(query.page, Math.max(1, Math.ceil(total / query.pageSize)))
+        pageRows = rows.slice((current - 1) * query.pageSize, current * query.pageSize)
+      }
     } else {
       total = view.total ?? 0
       current = query.page
@@ -460,7 +475,9 @@ export function AxisTable<T extends object>({
     toolbar.main !== undefined
   const row: CSSProperties = { height: tokens.size.tableRow }
   const paging = view
-    ? { current, pageSize: query!.pageSize, total, pageSizeOptions: view.pageSizes ?? [] }
+    ? view.paging === false && local
+      ? undefined
+      : { current, pageSize: query!.pageSize, total, pageSizeOptions: view.pageSizes ?? [] }
     : pagination || undefined
   const sizes = paging?.pageSizeOptions ?? []
   const picker = sizes.length > 0
@@ -629,23 +646,31 @@ export function AxisTable<T extends object>({
 }
 
 /**
- * The rows of a table that holds them, filtered by the columns that give `filter`, searched by the columns that give
+ * The rows of a table that holds them, filtered by the columns that give `filter` (a row `keep` names stays), searched by the columns that give
  * `searchText`, then sorted by the sorted column's `sortValue`. The search is case-insensitive and ignores the spaces
  * around it. An empty value comes last.
  */
-function held<T>(rows: readonly T[], columns: readonly AxisColumn<T>[], query: TableQuery, locale: string): T[] {
+function held<T>(
+  rows: readonly T[],
+  columns: readonly AxisColumn<T>[],
+  query: TableQuery,
+  locale: string,
+  keep?: (row: T) => boolean,
+): T[] {
   const { filter } = query
   const filtered = filter
-    ? rows.filter((row) =>
-        matchesFilter(
-          row,
-          filter,
-          (field) => {
-            const column = columns.find((candidate) => candidate.key === field)?.filter
-            return column?.value ? { kind: column.kind, value: column.value } : undefined
-          },
-          locale,
-        ),
+    ? rows.filter(
+        (row) =>
+          keep?.(row) === true ||
+          matchesFilter(
+            row,
+            filter,
+            (field) => {
+              const column = columns.find((candidate) => candidate.key === field)?.filter
+              return column?.value ? { kind: column.kind, value: column.value } : undefined
+            },
+            locale,
+          ),
       )
     : rows
   const needle = query.search?.trim().toLocaleLowerCase(locale)

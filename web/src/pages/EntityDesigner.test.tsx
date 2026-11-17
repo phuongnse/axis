@@ -3,6 +3,7 @@ import { EditorView } from '@codemirror/view'
 import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
@@ -21,6 +22,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
 import { chooseOption, clearPicker, clearSelect, openDropdown, optionTexts, removeTag } from '../test/antd'
+import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { EntityDesigner } from './EntityDesigner'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { LabelTextsContext } from './labelTextsContext'
@@ -212,15 +214,17 @@ function renderDesigner(
 
 function Providers({ loaded, children }: { loaded: StudioNames | null; children: ReactNode }) {
   return (
-    <ThemeModeProvider>
-      <ThemeRoot>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioNamesContext.Provider value={loaded ?? undefined}>
-            <LabelTextsContext.Provider value={labelContext}>{children}</LabelTextsContext.Provider>
-          </StudioNamesContext.Provider>
-        </TextProvider>
-      </ThemeRoot>
-    </ThemeModeProvider>
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <ThemeRoot>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioNamesContext.Provider value={loaded ?? undefined}>
+              <LabelTextsContext.Provider value={labelContext}>{children}</LabelTextsContext.Provider>
+            </StudioNamesContext.Provider>
+          </TextProvider>
+        </ThemeRoot>
+      </ThemeModeProvider>
+    </MemoryRouter>
   )
 }
 
@@ -905,6 +909,66 @@ describe('EntityDesigner', () => {
       expect(code.queryByRole('spinbutton', { name })).toBeNull()
     }
     expect(code.getByRole('switch', { name: 'Searchable' })).toBeInTheDocument()
+  })
+
+  describe('filter', () => {
+    const fields = [
+      { name: 'count', type: 'integer', required: true },
+      { name: 'code', type: 'text', label: { textKey: 'field.total' } },
+      { name: 'size', type: 'integer' },
+      { name: 'total', type: 'decimal', unique: true },
+    ]
+    const rows = () => screen.getAllByTestId(/^studio-field-\/fields\/\d+$/)
+    const rowNames = () =>
+      rows()
+        .map((row) => within(row).getByRole('textbox', { name: 'Field name' }))
+        .map((box) => (box as HTMLInputElement).value)
+
+    function renderFiltered(origins: (string | null)[]) {
+      render(
+        <Providers loaded={names}>
+          <EntityDesigner value={entity({ fields })} onChange={vi.fn()} origins={origins} />
+        </Providers>,
+      )
+    }
+
+    it('offers the name, label, type, Required and Unique columns, and applying Type is integer leaves only the integer fields', async () => {
+      renderFiltered(['count', 'code', 'size', 'total'])
+      expect(rows()).toHaveLength(4)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+      await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+      expect(optionTexts()).toEqual(['Field name', 'Field label', 'Field type', 'Required', 'Unique'])
+      await chooseOption('Field type')
+      await pick('Value', 0, 'integer')
+      await clickInDialog('Apply')
+
+      expect(rowNames()).toEqual(['count', 'size'])
+      expect(screen.queryByRole('list')).not.toBeInTheDocument()
+    })
+
+    it('filters Required as Yes or No, and leaves out a field whose type has no Required', async () => {
+      renderFiltered(['count', 'code', 'size', 'total'])
+
+      await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+      await pick('Column', 0, 'Required')
+      await pick('Value', 0, 'Yes')
+      await clickInDialog('Apply')
+
+      expect(rowNames()).toEqual(['count'])
+    })
+
+    it('keeps a field added since the last save shown, and hides a saved field that does not match', async () => {
+      renderFiltered(['count', 'code', 'size', null])
+
+      await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+      await pick('Column', 0, 'Field type')
+      await pick('Value', 0, 'integer')
+      await clickInDialog('Apply')
+
+      // The decimal field `total` has no origin, so it is new and stays.
+      expect(rowNames()).toEqual(['count', 'size', 'total'])
+    })
   })
 
   it('keeps the other keys of the entity when it sets a setting', async () => {

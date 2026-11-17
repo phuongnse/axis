@@ -163,6 +163,27 @@ describe('onlyTableViewChanged', () => {
     ).toBe(true)
   })
 
+  it('treats a change of only a prefixed table view parameter as a change of the table view', () => {
+    expect(
+      onlyTableViewChanged(
+        { pathname: '/studio', search: '?app=A' },
+        { pathname: '/studio', search: `?app=A&fields.filter=${filter}` },
+      ),
+    ).toBe(true)
+    expect(
+      onlyTableViewChanged(
+        { pathname: '/studio', search: '?app=A&records.page=2' },
+        { pathname: '/studio', search: `?app=A&records.pageSize=50&fields.sort=name` },
+      ),
+    ).toBe(true)
+    expect(
+      onlyTableViewChanged(
+        { pathname: '/studio', search: '?app=A' },
+        { pathname: '/studio', search: `?app=B&fields.filter=${filter}` },
+      ),
+    ).toBe(false)
+  })
+
   it('does not treat a change of another parameter as a change of the table view', () => {
     expect(
       onlyTableViewChanged(

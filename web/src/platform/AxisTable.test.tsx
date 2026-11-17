@@ -548,6 +548,48 @@ describe('AxisTable', () => {
     expect(screen.getAllByRole('row').filter((row) => within(row).queryAllByRole('cell').length > 0)).toHaveLength(2)
   })
 
+  describe('a view with paging off', () => {
+    const many = Array.from({ length: 25 }, (_, index) => ({ id: String(index), name: `Row ${index}`, amount: index }))
+    const bodyRows = () => screen.getAllByRole('row').filter((row) => within(row).queryAllByRole('cell').length > 0)
+    const filterable: AxisColumn<Row> = {
+      ...nameColumn,
+      filter: { kind: 'text', value: (row) => row.name },
+    }
+
+    it('shows every row with no pager even when the rows run past the page size', () => {
+      renderTable({
+        columns: [filterable, amountColumn],
+        dataSource: many,
+        view: { query: { page: 1, pageSize: 20, sort: null }, onChange: vi.fn(), paging: false },
+      })
+
+      expect(bodyRows()).toHaveLength(25)
+      expect(screen.queryByRole('list')).not.toBeInTheDocument()
+      expect(screen.queryByText(/of 25/)).not.toBeInTheDocument()
+    })
+
+    it('shows a kept row that the filter would hide, and still hides the others', () => {
+      renderTable({
+        columns: [filterable, amountColumn],
+        dataSource: many,
+        view: {
+          query: {
+            page: 1,
+            pageSize: 20,
+            sort: null,
+            filter: { all: [{ field: 'name', op: 'eq', value: 'no such row' }] },
+          },
+          onChange: vi.fn(),
+          paging: false,
+        },
+        keep: (row) => row.id === '24',
+      })
+
+      expect(bodyRows()).toHaveLength(1)
+      expect(screen.getByRole('row', { name: /Row 24/ })).toBeInTheDocument()
+    })
+  })
+
   describe('columns control', () => {
     const idColumn: AxisColumn<Row> = {
       key: 'name',
