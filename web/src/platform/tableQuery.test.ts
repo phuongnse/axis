@@ -3,6 +3,7 @@ import type { FieldMetadata } from './site'
 import type { FilterGroup } from './tableFilter'
 import {
   columnsChoice,
+  ownEntries,
   parseTableQuery,
   recordQuery,
   shownColumns,
@@ -122,6 +123,15 @@ describe('writeTableQuery', () => {
 
     expect(writeTableQuery(current, query).toString()).toBe('x=1&y=2&page=2&pageSize=10&sort=title')
     expect(writeTableQuery(current, { page: 1, pageSize: 20, sort: null }).toString()).toBe('x=1&y=2')
+  })
+})
+
+describe('ownEntries', () => {
+  it('keeps only the names of the table with its prefix, in address order', () => {
+    const current = new URLSearchParams('filter=a&deadLetters.page=2&x=1&deadLetters.filter=b&page=3&p=v')
+
+    expect(ownEntries(current, [], 'deadLetters.')).toBe('deadLetters.page=2&deadLetters.filter=b')
+    expect(ownEntries(current, ['p'])).toBe('filter=a&page=3&p=v')
   })
 })
 

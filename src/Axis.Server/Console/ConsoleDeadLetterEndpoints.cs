@@ -44,23 +44,17 @@ internal static class ConsoleDeadLetterEndpoints
     }
 
     // The columns the list's search, filter and sort can name, over axis.dead_letters, see docs/reference/operator-console.md#api.
-    // The createdAt column filters by its UTC day and sorts by its instant.
+    // The kind, attempts, lastError and createdAt columns are the process route's, see docs/reference/process-events.md#routes.
     private static readonly IReadOnlyList<ListColumn<DeadLetterRow>> _columns =
     [
         new("application", ListColumnKind.Text, row => row.ApplicationId.ToString("D"), Sql: "application_id::text"),
-        new("kind", ListColumnKind.Text, row => row.Kind, Searchable: true, Sql: "kind"),
+        DeadLetterEndpoints.KindColumn,
         new("event", ListColumnKind.Text, row => row.EventId?.ToString("D"), Sql: "event_id::text"),
         new("target", ListColumnKind.Text, row => (row.TriggerId ?? row.WebhookId)?.ToString("D"), Sql: "coalesce(trigger_id, webhook_id)::text"),
-        new("attempts", ListColumnKind.Number, row => row.Attempts, Sql: "attempts"),
-        new("lastError", ListColumnKind.Text, row => row.LastError, Searchable: true, Sql: "last_error"),
+        DeadLetterEndpoints.AttemptsColumn,
+        DeadLetterEndpoints.LastErrorColumn,
         new("state", ListColumnKind.Enum, row => row.State, Values: DeadLetters.States, Sql: "state"),
-        new(
-            "createdAt",
-            ListColumnKind.Date,
-            row => DateOnly.FromDateTime(row.CreatedAt.UtcDateTime),
-            Order: row => row.CreatedAt,
-            Sql: "(created_at AT TIME ZONE 'UTC')::date",
-            OrderSql: "created_at"),
+        DeadLetterEndpoints.CreatedAtColumn,
     ];
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.

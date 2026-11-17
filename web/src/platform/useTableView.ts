@@ -4,6 +4,7 @@ import type { FieldMetadata } from './site'
 import { useTableChoices, type SavedTableView } from './tableChoices'
 import {
   columnsChoice,
+  ownEntries,
   parseTableQuery,
   recordPageSize,
   shownColumns,
@@ -72,7 +73,9 @@ export function useTableView(
 
   useEffect(() => {
     const canonical = writeTableQuery(searchParams, view, defaultPageSize, parameterNames, prefix)
-    if (canonical.toString() !== searchParams.toString()) {
+    // Only the table's own names are compared, so a second table on the page, which writes its names last, is not
+    // rewritten back and forth with this one.
+    if (ownEntries(canonical, parameterNames, prefix) !== ownEntries(searchParams, parameterNames, prefix)) {
       setSearchParams(canonical, { replace: true, preventScrollReset: true })
     }
   }, [searchParams, view, defaultPageSize, parameterNames, prefix, setSearchParams])

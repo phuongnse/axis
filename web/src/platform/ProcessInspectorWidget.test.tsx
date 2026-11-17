@@ -245,7 +245,8 @@ describe('ProcessInspectorWidget', () => {
     renderWidget('?page=2&pageSize=10')
 
     await screen.findByRole('row', { name: /managerApproval/ })
-    await user.click(screen.getByRole('button', { name: 'Filter' }))
+    // The instance list's Filter comes first, the Dead letters section has its own below it.
+    await user.click(screen.getAllByRole('button', { name: 'Filter' })[0])
     await pick('Column', 0, 'State')
     await pick('Value', 0, 'Failed')
     await clickInDialog('Apply')
@@ -268,7 +269,7 @@ describe('ProcessInspectorWidget', () => {
 
     await screen.findByRole('row', { name: /managerApproval/ })
     await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'carpet{Enter}')
-    await user.click(screen.getByRole('button', { name: 'Filter' }))
+    await user.click(screen.getAllByRole('button', { name: 'Filter' })[0])
     await pick('Column', 0, 'Step')
     await pick('Operator', 0, 'contains')
     await user.type(within(screen.getByRole('dialog')).getByRole('textbox', { name: 'Value' }), 'manager')
@@ -344,7 +345,7 @@ describe('ProcessInspectorWidget', () => {
 
     expect(await screen.findByTestId('inspector-error')).toHaveTextContent('The instances could not be loaded.')
     expect(screen.queryByRole('row', { name: /managerApproval/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Filter' })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Filter' })).toHaveLength(2)
   })
 
   it('asks to sign in when nobody is signed in', async () => {
@@ -458,6 +459,23 @@ describe('ProcessInspectorWidget', () => {
     expect(requests.deadLetterRequests()[1].body).toBe('{"reason":"The trigger is back"}')
   })
 
+  it('sends the dead letters filter and page from the address under their own names, apart from the instance list', async () => {
+    const requests = stubInstances()
+    const filter = JSON.stringify({ all: [{ field: 'lastError', op: 'contains', value: 'Npgsql' }] })
+
+    renderWidget(
+      `?deadLetters.filter=${encodeURIComponent(filter)}&filter=${encodeURIComponent('{"all":[{"field":"step","op":"eq","value":"x"}]}')}`,
+    )
+
+    await screen.findByRole('row', { name: /event\.deliver/ })
+    const params = new URL(requests.deadLetterRequests()[0].url, 'http://localhost').searchParams
+    expect(params.get('state')).toBe('open')
+    expect(params.get('filter')).toBe(filter)
+    expect(params.has('page')).toBe(false)
+    const instanceParams = new URL(requests()[0], 'http://localhost').searchParams
+    expect(JSON.parse(instanceParams.get('filter')!)).toEqual({ all: [{ field: 'step', op: 'eq', value: 'x' }] })
+  })
+
   it('goes back to the last page with rows when settling empties the current page', async () => {
     const item = (id: string, kind: string) => ({
       ...JSON.parse(deadLetterPage).items[0],
@@ -482,16 +500,19 @@ describe('ProcessInspectorWidget', () => {
         const onSecondPage = input.includes('page=2')
         const items = settled ? (onSecondPage ? [] : [first]) : onSecondPage ? [second] : [first]
         return new Response(
-          JSON.stringify({ items, page: onSecondPage ? 2 : 1, pageSize: 1, totalCount: settled ? 1 : 2 }),
+          JSON.stringify({ items, page: onSecondPage ? 2 : 1, pageSize: 10, totalCount: settled ? 10 : 11 }),
         )
       }),
     )
     const user = userEvent.setup()
 
-    renderWidget()
+    renderWidget('?deadLetters.pageSize=10')
 
     await screen.findByRole('row', { name: /event\.deliver/ })
     await user.click(screen.getByTitle('2'))
+    await waitFor(() =>
+      expect(new URLSearchParams(screen.getByTestId('search').textContent ?? '').get('deadLetters.page')).toBe('2'),
+    )
     await user.click(await screen.findByTestId(`inspector-dead-letter-discard-${settledId}`))
     const dialog = await screen.findByRole('dialog')
     await user.type(within(dialog).getByRole('textbox', { name: 'Reason' }), 'Not needed')
@@ -501,10 +522,10 @@ describe('ProcessInspectorWidget', () => {
     expect(await screen.findByRole('row', { name: /event\.deliver/ })).toBeInTheDocument()
     expect(screen.queryByText('No open dead letters.')).not.toBeInTheDocument()
     expect(deadLetterGets).toEqual([
-      `${deadLettersPath}?state=open`,
-      `${deadLettersPath}?state=open&page=2`,
-      `${deadLettersPath}?state=open&page=2`,
-      `${deadLettersPath}?state=open`,
+      `${deadLettersPath}?state=open&pageSize=10`,
+      `${deadLettersPath}?state=open&page=2&pageSize=10`,
+      `${deadLettersPath}?state=open&page=2&pageSize=10`,
+      `${deadLettersPath}?state=open&pageSize=10`,
     ])
   })
 
