@@ -14,10 +14,17 @@ import { jsonRows, parseJsonText, type ValueRow } from './valueRows'
  * toolbar, compact, every row shown; a nested value is a row of its own named by its path, see `jsonRows`. A
  * value is shown as it was written, a number with its source digits; `null` and empty text read in muted
  * words, so neither passes for text. It has no header row, as the developer tools' headers have none: each name, in
- * `textMuted` as a term's, says what its row is. Its name and its value each take half its width, a longer name
- * wrapping, so the tables one view stacks line up from top to bottom at any width, as the developer tools' header
+ * `textMuted` as a term's, says what its row is. Its name takes 5 of 12 columns and its value 7, as values run longer
+ * and a name wraps between its words where an address or an id would break in the middle; a longer name wraps, so the tables one view stacks line up from top to bottom at any width, as the developer tools' header
  * sections do.
  */
+/**
+ * Proposed, see the review on #3650: the shares of a name and its value, 5 and 7 of the 12 columns of the grid, so at
+ * the side panel's least width most names fit and a date and time does not wrap.
+ */
+const nameShare = `${(5 / 12) * 100}%`
+const valueShare = `${(7 / 12) * 100}%`
+
 export function ValueTable({ rows, label }: { rows: readonly ValueRow[]; label: string }) {
   const t = useText()
   const muted = (text: string) => <Typography.Text type="secondary">{text}</Typography.Text>
@@ -26,15 +33,15 @@ export function ValueTable({ rows, label }: { rows: readonly ValueRow[]; label: 
       key: 'name',
       kind: 'fixed',
       title: t('shell.valueTable.name'),
-      // The name and the value each take half the table, so the tables a view stacks line up at any width.
-      onCell: () => ({ style: { width: '50%', whiteSpace: 'normal', overflowWrap: 'anywhere' } }),
+      // The name takes 5 of 12 columns and the value 7, so the tables a view stacks line up at any width.
+      onCell: () => ({ style: { width: nameShare, whiteSpace: 'normal', overflowWrap: 'anywhere' } }),
       render: (_value, row) => <Typography.Text type="secondary">{row.name}</Typography.Text>,
     },
     {
       key: 'value',
       kind: 'freeText',
       title: t('shell.valueTable.value'),
-      onCell: () => ({ style: { width: '50%' } }),
+      onCell: () => ({ style: { width: valueShare } }),
       render: (_value, row) => {
         const value = row.value
         switch (value.kind) {
