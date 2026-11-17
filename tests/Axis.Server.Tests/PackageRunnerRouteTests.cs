@@ -30,7 +30,13 @@ public sealed class PackageRunnerRouteTests
             .Order(StringComparer.Ordinal)
             .ToList();
 
-        Assert.Equal(["POST /api/package-runner/calls/take", "POST /api/package-runner/packages"], marked);
+        Assert.Equal(
+            [
+                "POST /api/package-runner/calls/take",
+                "POST /api/package-runner/leases/{leaseId}/result",
+                "POST /api/package-runner/packages",
+            ],
+            marked);
     }
 
     private static WebApplicationFactory<Program> CreateFactory() =>

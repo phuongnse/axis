@@ -23,7 +23,8 @@ namespace Axis.Processes.Instances;
 /// operation runs. A short transaction first marks the call <c>sending</c>, counts the attempt and
 /// extends the item's lease by the operation's timeout. The operation then runs from the package
 /// version the release pins, with the stored input and the operation identity in its context, under
-/// a token that is cancelled at the timeout. An outcome transaction records the result. An output
+/// a token that is cancelled at the timeout. An outcome transaction records the result with the writes of <see cref="PackageCallRecords"/>,
+/// which a customer-hosted runner's result shares. An output
 /// that fits the manifest writes the output fields, starts the data change triggers of the update
 /// from the active release, settles the call <c>succeeded</c> and resumes
 /// the instance on <c>next</c>. A <see cref="RetryableException"/>, and a pinned version that the
@@ -117,7 +118,7 @@ internal sealed partial class PackageCallHandler(
         ArgumentNullException.ThrowIfNull(item);
         ArgumentNullException.ThrowIfNull(connection);
 
-        Attempt attempt;
+        PackageCallAttempt attempt;
         Target? target = null;
         string? error = null;
         var errorClass = ErrorClass.Failed;
@@ -145,7 +146,7 @@ internal sealed partial class PackageCallHandler(
                 return WorkItemOutcome.Completed;
             }
 
-            attempt = new Attempt(call, instance.Revision, call.Attempts, instance.Now);
+            attempt = new PackageCallAttempt(call, instance.Revision, call.Attempts, instance.Now);
             var package = call.State == PackageCalls.Sending ? null : packages.Find(call.Package, call.Version);
             if (call.State == PackageCalls.Sending)
             {
@@ -272,7 +273,7 @@ internal sealed partial class PackageCallHandler(
         if (ReadInput(attempt.Call.Input, target.Operation) is not { } input)
         {
             var misfit = $"The stored input of the call did not fit the operation '{target.Operation.Name}' of the package '{target.Manifest.Id}'.";
-            return await FailAsync(item, connection, attempt, misfit, AttemptRow(attempt, CallAttempts.Failed, misfit), cancellationToken);
+            return await FailAsync(item, connection, attempt, misfit, PackageCallRecords.AttemptRow(attempt, CallAttempts.Failed, misfit), cancellationToken);
         }
 
         using var span = AxisTelemetry.Source.StartActivity(
@@ -300,7 +301,7 @@ internal sealed partial class PackageCallHandler(
     private async Task<WorkItemOutcome> RunCallAsync(
         ClaimedWorkItem item,
         NpgsqlConnection connection,
-        Attempt attempt,
+        PackageCallAttempt attempt,
         Target target,
         Dictionary<string, object?> input,
         CancellationToken cancellationToken)
@@ -332,7 +333,7 @@ internal sealed partial class PackageCallHandler(
         {
             // The operation asked for more than it declares. A retry cannot fix that, and the
             // operation may have swallowed the exception, so this holds whatever it returned.
-            return await FailAsync(item, connection, attempt, violation, AttemptRow(attempt, CallAttempts.Failed, violation), cancellationToken);
+            return await FailAsync(item, connection, attempt, violation, PackageCallRecords.AttemptRow(attempt, CallAttempts.Failed, violation), cancellationToken);
         }
 
         if (run.Timeout)
@@ -352,10 +353,10 @@ internal sealed partial class PackageCallHandler(
             return await SettleAttemptAsync(item, connection, attempt, run.Retryable ? ErrorClass.Retryable : ErrorClass.Failed, runError, true, cancellationToken);
         }
 
-        if (Fit(run.Output, target) is not { } values)
+        if (PackageCallRecords.Fit(run.Output, target.Operation, target.Step, target.Entity) is not { } values)
         {
-            var misfit = $"The output of the operation '{target.Operation.Name}' of the package '{target.Manifest.Id}' {target.Manifest.Version} did not fit its manifest.";
-            return await FailAsync(item, connection, attempt, misfit, AttemptRow(attempt, CallAttempts.Failed, misfit), cancellationToken);
+            var misfit = PackageCallRecords.Misfit(target.Manifest, target.Operation);
+            return await FailAsync(item, connection, attempt, misfit, PackageCallRecords.AttemptRow(attempt, CallAttempts.Failed, misfit), cancellationToken);
         }
 
         return await SucceedAsync(item, connection, attempt, target, values, cancellationToken);
@@ -377,19 +378,8 @@ internal sealed partial class PackageCallHandler(
         CancellationToken cancellationToken)
     {
         var model = await models.GetAsync(context, call.ReleaseId, cancellationToken);
-        var process = model.Processes.FirstOrDefault(candidate => candidate.Id == instance.ProcessId)
-            ?? throw new InvalidOperationException($"The release has no process '{instance.ProcessId}'.");
-        var entity = instance.SubjectEntityId is { } entityId
-            ? model.FindEntity(entityId) ?? throw new InvalidOperationException($"The release has no entity '{entityId}'.")
-            : null;
-        if (!process.TryGetStep(call.Step, out var step) || step is not PackageOperationStepModel packageStep)
-        {
-            throw new InvalidOperationException($"The process '{process.Name}' has no package operation step '{call.Step}'.");
-        }
-
-        var operation = manifest.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, call.Operation, StringComparison.OrdinalIgnoreCase))
-            ?? throw new InvalidOperationException($"The package '{call.Package}' {call.Version} has no operation '{call.Operation}'.");
-        return new Target(model, entity, packageStep, manifest, operation, installed, files);
+        var found = PackageCallRecords.FindTarget(model, instance, call, manifest);
+        return new Target(model, found.Entity, found.Step, manifest, found.Operation, installed, files);
     }
 
     /// <summary>
@@ -534,7 +524,7 @@ internal sealed partial class PackageCallHandler(
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             // The message can hold input values or secrets, so only the type is kept.
-            return new Run(null, context.Violation, Error: ErrorOf(exception), Retryable: exception is RetryableException);
+            return new Run(null, context.Violation, Error: PackageCallRecords.ErrorOf(exception), Retryable: exception is RetryableException);
         }
     }
 
@@ -576,7 +566,7 @@ internal sealed partial class PackageCallHandler(
         }
         catch (InvalidCastException exception)
         {
-            return new Run(null, null, Error: ErrorOf(exception));
+            return new Run(null, null, Error: PackageCallRecords.ErrorOf(exception));
         }
 
         RunnerConnection runner;
@@ -658,21 +648,7 @@ internal sealed partial class PackageCallHandler(
         switch (answer)
         {
             case ResultMessage result:
-                try
-                {
-                    // Decode gives null for an output the result lacks, which Fit would write as an explicit null.
-                    var output = RunnerValues.Decode(target.Operation.Output, result.Output);
-                    foreach (var field in target.Operation.Output.Where(field => !result.Output.ContainsKey(field.Name)))
-                    {
-                        output.Remove(field.Name);
-                    }
-
-                    return new Run(output, null);
-                }
-                catch (FormatException)
-                {
-                    return new Run(null, null);
-                }
+                return new Run(PackageCallRecords.DecodeRunnerOutput(target.Operation, result.Output), null);
 
             case RetryableMessage retryable:
                 return new Run(null, null, Error: retryable.Error, Retryable: true);
@@ -687,66 +663,6 @@ internal sealed partial class PackageCallHandler(
         }
     }
 
-    /// <summary>The full type name of <paramref name="exception"/>, the only part of it that is recorded.</summary>
-    private static string ErrorOf(Exception exception) => exception.GetType().FullName ?? exception.GetType().Name;
-
-    /// <summary>
-    /// Reads the outputs from the operation's result. The result fits when it holds a value of the
-    /// exact .NET type for each output it holds, and a value for each required output. Returns the
-    /// subject fields to write with their values, or <see langword="null"/> when it does not fit.
-    /// An optional output the result leaves out writes nothing, and an explicit <c>null</c> writes
-    /// <c>null</c>.
-    /// </summary>
-    private static List<KeyValuePair<FieldModel, object?>>? Fit(IReadOnlyDictionary<string, object?>? result, Target target)
-    {
-        if (result is null)
-        {
-            return null;
-        }
-
-        var values = new List<KeyValuePair<FieldModel, object?>>();
-        foreach (var output in target.Operation.Output)
-        {
-            var present = result.TryGetValue(output.Name, out var value);
-            if (value is null)
-            {
-                if (output.Required)
-                {
-                    return null;
-                }
-            }
-            else if (!HasType(value, output.Type))
-            {
-                return null;
-            }
-
-            var mapping = target.Step.Output.FirstOrDefault(candidate => string.Equals(candidate.Output, output.Name, StringComparison.OrdinalIgnoreCase));
-            if (present && mapping is not null)
-            {
-                if (target.Entity is not { } entity || !entity.TryGetField(mapping.Field, out var field))
-                {
-                    return null;
-                }
-
-                values.Add(KeyValuePair.Create(field, value is DateTimeOffset time ? time.ToUniversalTime() : value));
-            }
-        }
-
-        return values;
-    }
-
-    private static bool HasType(object value, FieldType type) =>
-        type switch
-        {
-            FieldType.Text => value is string,
-            FieldType.Integer => value is long,
-            FieldType.Decimal => value is decimal,
-            FieldType.Boolean => value is bool,
-            FieldType.Date => value is DateOnly,
-            FieldType.DateTime => value is DateTimeOffset,
-            _ => false,
-        };
-
     /// <summary>
     /// Records a fitting output in one transaction: the output fields with the record update rules,
     /// the call <c>succeeded</c>, the instance <c>running</c> on <c>next</c>, the history row, the
@@ -756,7 +672,7 @@ internal sealed partial class PackageCallHandler(
     private async Task<WorkItemOutcome> SucceedAsync(
         ClaimedWorkItem item,
         NpgsqlConnection connection,
-        Attempt attempt,
+        PackageCallAttempt attempt,
         Target target,
         List<KeyValuePair<FieldModel, object?>> values,
         CancellationToken cancellationToken)
@@ -782,12 +698,25 @@ internal sealed partial class PackageCallHandler(
 
             try
             {
-                failure = await WriteSuccessAsync(item, transaction, instance!, attempt, target, values, cancellationToken);
+                var cipher = sensitive is null ? null : new RecordCipher(sensitive, item.TenantId);
+                failure = await PackageCallRecords.WriteSuccessAsync(
+                    transaction,
+                    item.TenantId,
+                    instance!,
+                    attempt,
+                    target.Model,
+                    target.Entity,
+                    target.Step,
+                    values,
+                    cipher,
+                    (applicationId, token) => models.FindActiveAsync(new WorkItemContext(item, connection, transaction), applicationId, token),
+                    logger,
+                    cancellationToken);
             }
             catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 // The message can hold record values, so only the type is kept.
-                failure = ErrorOf(exception);
+                failure = PackageCallRecords.ErrorOf(exception);
             }
 
             if (failure is null)
@@ -800,144 +729,7 @@ internal sealed partial class PackageCallHandler(
             await transaction.RollbackAsync(cancellationToken);
         }
 
-        return await FailAsync(item, connection, attempt, failure, AttemptRow(attempt, CallAttempts.Failed, failure), cancellationToken);
-    }
-
-    /// <summary>Writes the success in the transaction. Returns the error when the record write is refused, or <see langword="null"/>.</summary>
-    private async Task<string?> WriteSuccessAsync(
-        ClaimedWorkItem item,
-        NpgsqlTransaction transaction,
-        LoadedInstance instance,
-        Attempt attempt,
-        Target target,
-        List<KeyValuePair<FieldModel, object?>> values,
-        CancellationToken cancellationToken)
-    {
-        var call = attempt.Call;
-        var connection = transaction.Connection!;
-        var entity = target.Entity;
-        var cipher = sensitive is null ? null : new RecordCipher(sensitive, item.TenantId);
-        Record? record = null;
-
-        // A process without a subject has no record to lock, read or write, and no outputs to write.
-        if (instance.SubjectId is { } subjectId && entity is not null)
-        {
-            if (values.Count > 0)
-            {
-                // The write can start instances through data change triggers. The start lock comes before any
-                // entity table is read, so a migrating activation cannot deadlock with this transaction.
-                await StartLock.TakeSharedAsync(transaction, instance.ApplicationId, cancellationToken);
-
-                // The lock makes the read below see the latest version, and a concurrent write of the
-                // record waits until this transaction ends.
-                await RecordCommands.LockAsync(connection, entity, subjectId, cancellationToken);
-            }
-
-            record = await RecordQueries.GetAsync(connection, target.Model, entity, subjectId, cipher, cancellationToken);
-            if (record is null && values.Count > 0)
-            {
-                return $"No record of '{entity.Name}' has the id '{subjectId}'.";
-            }
-        }
-        else if (values.Count > 0)
-        {
-            return "The step has outputs, but the process has no subject to write them to.";
-        }
-
-        if (!await ProcessSteps.TryResumeCallAsync(transaction, instance.Id, call.Step, attempt.Revision, target.Step.Next, cancellationToken))
-        {
-            throw new InvalidOperationException($"The process instance '{instance.Id}' is no longer waiting on the step '{call.Step}'.");
-        }
-
-        var input = new JsonObject { ["subjectId"] = instance.SubjectId, ["subjectVersion"] = record?.Version };
-        var output = new JsonObject { ["operationId"] = call.Id, ["outcome"] = PackageCalls.Succeeded, ["next"] = target.Step.Next };
-        AuditEntry? recordAudit = null;
-        Record? updated = null;
-        IReadOnlyList<EffectRecord> effects = [];
-        var write = new RecordWriteContext(instance.AccountableUser, instance.DecisionTask);
-        if (values.Count > 0)
-        {
-            var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var result = await RecordCommands.SetAsync(connection, target.Model, entity!, call.ReleaseId, write, record!, values, now, cipher: cipher, cancellationToken: cancellationToken);
-            if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
-            {
-                return $"The record update was rejected: {ProcessStepHandler.Describe(result)}";
-            }
-
-            await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, item.TenantId, target.Model, entity!, call.ReleaseId, cancellationToken);
-            updated = written;
-            effects = result.Effects;
-            output["subjectVersion"] = written.Version;
-            recordAudit = new AuditEntry(
-                AuditActors.System,
-                AuditActions.RecordUpdated,
-                instance.ApplicationId,
-                instance.SubjectEntityId,
-                instance.SubjectId,
-                instance.Id,
-                new JsonObject
-                {
-                    ["version"] = written.Version,
-                    ["fields"] = new JsonArray([.. values.Select(value => JsonValue.Create(value.Key.Name))]),
-                });
-        }
-
-        await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Succeeded, null, cancellationToken);
-        await CallAttempts.InsertAsync(transaction, CallAttempts.Package, call.Id, AttemptRow(attempt, CallAttempts.Succeeded, null), Tags(item, attempt), cancellationToken);
-        await ProcessSteps.InsertHistoryAsync(
-            transaction,
-            new StepOccurrence(instance.Id, call.Step, attempt.Revision, input, output, null, null, attempt.StartedAt),
-            cancellationToken);
-        if (recordAudit is not null)
-        {
-            await AuditRecords.AppendAsync(transaction, recordAudit, cancellationToken);
-        }
-
-        if (updated is not null)
-        {
-            var active = await models.FindActiveAsync(new WorkItemContext(item, connection, transaction), instance.ApplicationId, cancellationToken);
-            if (active is { } activeNow)
-            {
-                await DataChangeTriggerStarts.StartAfterUpdateAsync(
-                    transaction,
-                    item.TenantId,
-                    activeNow.Model,
-                    activeNow.ReleaseId,
-                    call.ReleaseId,
-                    entity!,
-                    record!,
-                    updated,
-                    [],
-                    write,
-                    logger,
-                    cancellationToken);
-            }
-
-            await EffectRecordWrites.AppendAsync(
-                transaction,
-                item.TenantId,
-                active?.Model,
-                active?.ReleaseId ?? call.ReleaseId,
-                call.ReleaseId,
-                instance.ApplicationId,
-                instance.Id,
-                AuditActors.System,
-                effects,
-                write,
-                logger,
-                cancellationToken);
-        }
-
-        await AuditRecords.AppendAsync(transaction, Called(instance, attempt, PackageCalls.Succeeded), cancellationToken);
-        await WorkItemQueue.EnqueueAsync(
-            connection,
-            transaction,
-            item.TenantId,
-            ProcessStarts.StepWorkItemKind,
-            DateTimeOffset.UtcNow,
-            cancellationToken,
-            processInstanceId: instance.Id);
-        return null;
+        return await FailAsync(item, connection, attempt, failure, PackageCallRecords.AttemptRow(attempt, CallAttempts.Failed, failure), cancellationToken);
     }
 
     /// <summary>
@@ -951,7 +743,7 @@ internal sealed partial class PackageCallHandler(
     private Task<WorkItemOutcome> SettleAttemptAsync(
         ClaimedWorkItem item,
         NpgsqlConnection connection,
-        Attempt attempt,
+        PackageCallAttempt attempt,
         ErrorClass errorClass,
         string error,
         bool counted,
@@ -960,7 +752,7 @@ internal sealed partial class PackageCallHandler(
         var call = attempt.Call;
         var attemptsLeft = attempt.Attempts < call.Retry.Attempts;
         var row = counted
-            ? AttemptRow(
+            ? PackageCallRecords.AttemptRow(
                 attempt,
                 errorClass switch
                 {
@@ -989,7 +781,7 @@ internal sealed partial class PackageCallHandler(
     private async Task<WorkItemOutcome> RetryAsync(
         ClaimedWorkItem item,
         NpgsqlConnection connection,
-        Attempt attempt,
+        PackageCallAttempt attempt,
         string error,
         TimeSpan delay,
         CallAttempt? row,
@@ -1013,7 +805,7 @@ internal sealed partial class PackageCallHandler(
         }
 
         await PackageCalls.RetryAsync(transaction, call.Id, error, cancellationToken);
-        await InsertAttemptAsync(transaction, Tags(item, attempt), call, row, cancellationToken);
+        await PackageCallRecords.InsertAttemptAsync(transaction, Tags(item, attempt), call, row, cancellationToken);
         if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -1035,7 +827,7 @@ internal sealed partial class PackageCallHandler(
     private async Task<WorkItemOutcome> LeaveUnknownAsync(
         ClaimedWorkItem item,
         NpgsqlConnection connection,
-        Attempt attempt,
+        PackageCallAttempt attempt,
         string error,
         CallAttempt? row,
         CancellationToken cancellationToken)
@@ -1059,7 +851,7 @@ internal sealed partial class PackageCallHandler(
         }
 
         await PackageCalls.MarkUnknownAsync(transaction, call.Id, error, cancellationToken);
-        await InsertAttemptAsync(transaction, Tags(item, attempt), call, row, cancellationToken);
+        await PackageCallRecords.InsertAttemptAsync(transaction, Tags(item, attempt), call, row, cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
             new StepOccurrence(
@@ -1085,7 +877,7 @@ internal sealed partial class PackageCallHandler(
     private async Task<WorkItemOutcome> FailAsync(
         ClaimedWorkItem item,
         NpgsqlConnection connection,
-        Attempt attempt,
+        PackageCallAttempt attempt,
         string error,
         CallAttempt? row,
         CancellationToken cancellationToken)
@@ -1100,8 +892,9 @@ internal sealed partial class PackageCallHandler(
         }
 
         var instance = await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
-        if (!IsWaitingAt(instance, call, attempt)
-            || !await ProcessSteps.TryFailWaitingAsync(transaction, instance!.Id, call.Step, attempt.Revision, cancellationToken))
+        if (instance is null
+            || !IsWaitingAt(instance, call, attempt)
+            || !await PackageCallRecords.WriteFailureAsync(transaction, item.TenantId, instance, attempt, error, row, cancellationToken))
         {
             LogStale(call.Id, call.ProcessInstanceId, call.Step, attempt.Revision);
             await transaction.CommitAsync(cancellationToken);
@@ -1109,70 +902,15 @@ internal sealed partial class PackageCallHandler(
         }
 
         await InstanceMetrics.RecordEndedAsync(models, new WorkItemContext(item, connection, transaction), instance, ProcessStarts.Failed, cancellationToken);
-        await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Failed, error, cancellationToken);
-        await InsertAttemptAsync(transaction, Tags(item, attempt), call, row, cancellationToken);
-        await ProcessSteps.InsertHistoryAsync(
-            transaction,
-            new StepOccurrence(
-                instance.Id,
-                call.Step,
-                attempt.Revision,
-                new JsonObject { ["subjectId"] = instance.SubjectId, ["subjectVersion"] = null },
-                new JsonObject { ["operationId"] = call.Id, ["outcome"] = PackageCalls.Failed },
-                null,
-                error,
-                attempt.StartedAt),
-            cancellationToken);
-        await AuditRecords.AppendAsync(transaction, Called(instance, attempt, PackageCalls.Failed), cancellationToken);
-        await AuditRecords.AppendAsync(
-            transaction,
-            new AuditEntry(
-                AuditActors.System,
-                AuditActions.ProcessFailed,
-                instance.ApplicationId,
-                instance.SubjectEntityId,
-                instance.SubjectId,
-                instance.Id,
-                new JsonObject { ["step"] = call.Step }),
-            cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         LogFailed(call.Id, instance.Id, error);
         return WorkItemOutcome.Failed;
     }
 
-    /// <summary>
-    /// The row of the attempt the worker makes. Its number is the next attempt number of the call, which
-    /// carries on after an operator retry. A package call has no HTTP status.
-    /// </summary>
-    private static CallAttempt AttemptRow(Attempt attempt, string outcome, string? error) =>
-        new(CallAttempts.Attempt, null, attempt.StartedAt, outcome, null, error);
+    private static CallTags Tags(ClaimedWorkItem item, PackageCallAttempt attempt) => PackageCallRecords.Tags(item.TenantId, attempt);
 
-    private static CallTags Tags(ClaimedWorkItem item, Attempt attempt) =>
-        new(item.TenantId, attempt.Application, AxisTelemetry.PackageTag, attempt.Call.Package, attempt.Call.Operation);
-
-    private static Task InsertAttemptAsync(NpgsqlTransaction transaction, CallTags tags, LoadedPackageCall call, CallAttempt? row, CancellationToken cancellationToken) =>
-        row is null ? Task.CompletedTask : CallAttempts.InsertAsync(transaction, CallAttempts.Package, call.Id, row, tags, cancellationToken);
-
-    private static bool IsWaitingAt(LoadedInstance? instance, LoadedPackageCall call, Attempt attempt) =>
+    private static bool IsWaitingAt(LoadedInstance? instance, LoadedPackageCall call, PackageCallAttempt attempt) =>
         instance is { State: ProcessStarts.Waiting } && instance.Step == call.Step && instance.Revision == attempt.Revision;
-
-    private static AuditEntry Called(LoadedInstance instance, Attempt attempt, string outcome) =>
-        new(
-            AuditActors.System,
-            AuditActions.OperationCalled,
-            instance.ApplicationId,
-            instance.SubjectEntityId,
-            instance.SubjectId,
-            instance.Id,
-            new JsonObject
-            {
-                ["package"] = attempt.Call.Package,
-                ["version"] = attempt.Call.Version,
-                ["operation"] = attempt.Call.Operation,
-                ["operationId"] = attempt.Call.Id,
-                ["attempts"] = attempt.Attempts,
-                ["outcome"] = outcome,
-            });
 
     /// <summary>
     /// Adds the CPU seconds of one call to the tenant's package run time. The seconds are <paramref name="cpuMilliseconds"/> rounded up, or without
@@ -1241,12 +979,6 @@ internal sealed partial class PackageCallHandler(
 
     [LoggerMessage(LogLevel.Warning, "Package call {CallId} of process instance {InstanceId} has an unknown outcome after {Attempts} attempts and is not run again: {Error}")]
     private partial void LogUnknown(Guid callId, Guid instanceId, int attempts, string error);
-
-    /// <summary>
-    /// The attempt a worker makes: the call, the instance revision it waits at, the attempts made
-    /// with this one, and the time of the mark transaction, which starts the step's history row.
-    /// </summary>
-    private sealed record Attempt(LoadedPackageCall Call, long Revision, int Attempts, DateTimeOffset StartedAt, string? Application = null);
 
     /// <summary>
     /// What the call's release and the host declare for it: the manifest of its package, and either the installed package, or for an

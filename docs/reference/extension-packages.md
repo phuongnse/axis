@@ -707,7 +707,8 @@ The `connect` command reads these settings, as environment variables with the na
 | --- | --- | --- |
 | `POST /api/package-runner/packages` | `{ "packages": [{ "manifest": {...} }] }` | `204`. It adds to the registered list, or `409` |
 | `POST /api/package-runner/calls/take` | `{ "packages": [{ "id": "purchasing-tools", "version": "1.0.0" }] }`, the registered packages that this instance holds | `200` with `{ "leaseId", "package", "version", "operation", "operationId", "input", "leaseUntil" }`, or `204` when no call waits |
-| `POST /api/package-runner/leases/{leaseId}/result` _(planned for M37)_ | `{ "outcome": "succeeded", "output": {...} }`, `{ "outcome": "retryable" }` or `{ "outcome": "failed", "error": "<exception type>" }` | `204` |
+| `POST /api/package-runner/leases/{leaseId}/result` | `{ "outcome": "succeeded", "output": {...} }` | `204`, also when the output does not fit and the call fails, or `404` or `409` |
+| `POST /api/package-runner/leases/{leaseId}/result` _(planned for M37)_ | `{ "outcome": "retryable" }` or `{ "outcome": "failed", "error": "<exception type>" }` | `204` |
 
 - **The order of the checks.** A request is checked in this order: the tenant of the host, then the token
   (`401` for the signature, the issuer, the expiry, the audience, or a runner row that is missing or
