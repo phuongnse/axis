@@ -6,6 +6,7 @@ import type { InstanceCall, InstanceDetail, InstanceTask } from './inspection'
 import type { StepRun } from './instanceRuns'
 import { filled } from './instanceStatus'
 import { StatusTag } from './StatusTag'
+import { problemText } from './stepProblems'
 import { useText } from './texts'
 
 /**
@@ -83,8 +84,9 @@ export function useRunWords({
         }),
       )
     }
-    if (run.error !== null) {
-      lines.push(run.error)
+    const error = problemText(t, run.problem, run.error)
+    if (error !== null) {
+      lines.push(error)
     } else if (run.decision !== null && run.tasks.length === 0) {
       const target = instance.graph.steps.some((step) => step.name === run.decision)
       lines.push(

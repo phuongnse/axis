@@ -1,4 +1,5 @@
 import type { InstanceCall, InstanceDetail, InstanceTask, SubProcess } from './inspection'
+import type { StepProblem } from './stepProblems'
 
 /**
  * Proposed, see the review on #3650: one run of a step, as the instance's timeline shows it. A step run again, such as
@@ -13,6 +14,7 @@ export interface StepRun {
   finishedAt: string | null
   decision: string | null
   error: string | null
+  problem: StepProblem | null
   traceId: string | null
   state: 'done' | 'failed' | 'waiting' | 'running'
   tasks: InstanceTask[]
@@ -39,6 +41,7 @@ export function stepRuns(instance: InstanceDetail): StepRun[] {
       finishedAt: entry.finishedAt,
       decision: entry.decision,
       error: entry.error,
+      problem: entry.problem ?? null,
       traceId: entry.traceId,
       state: entry.error === null ? 'done' : 'failed',
       tasks: [],
@@ -56,6 +59,7 @@ export function stepRuns(instance: InstanceDetail): StepRun[] {
       finishedAt: null,
       decision: null,
       error: null,
+      problem: null,
       traceId: null,
       state: instance.state === 'failed' ? 'failed' : instance.state === 'running' ? 'running' : 'waiting',
       tasks: [],

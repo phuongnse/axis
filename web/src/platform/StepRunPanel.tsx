@@ -1,10 +1,12 @@
 import { Flex, Select, Tabs, Typography } from 'antd'
 import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { CodeBlock } from './CodeBlock'
 import { EmptyDash } from './EmptyValue'
 import { EventTime } from './EventTime'
+import { inspectorPath } from './inspectorPages'
 import type { CallAttempt, InstanceCall, InstanceDetail, StepDefinition } from './inspection'
 import { durationText, stepRuns, type StepRun } from './instanceRuns'
 import { RecordLink } from './RecordLink'
@@ -12,6 +14,7 @@ import { useMinuteClock } from './relativeTime'
 import { useRunWords } from './runWords'
 import { SidePanel } from './SidePanel'
 import { StatusTag, type StatusTone } from './StatusTag'
+import { problemText } from './stepProblems'
 import type { StepRunTab } from './stepRunTabs'
 import { TermList, type Term } from './TermList'
 import { useText } from './texts'
@@ -34,6 +37,15 @@ const list = (value: unknown): Record<string, unknown>[] => (Array.isArray(value
 const words = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value))
 
 /** The tone of an attempt's outcome: it ended well, it will be tried again, it failed, or nobody knows yet. */
+/** The tone of a sub-process's state, as an instance's own state takes. */
+const childTones: Record<string, StatusTone> = {
+  completed: 'success',
+  failed: 'danger',
+  waiting: 'neutral',
+  running: 'neutral',
+  cancelled: 'muted',
+}
+
 const attemptTones: Record<string, StatusTone> = {
   succeeded: 'success',
   found: 'success',
@@ -47,7 +59,7 @@ const attemptTones: Record<string, StatusTone> = {
  * Proposed, see the review on #3650: the side panel of one run of a process instance's step, which a click on the step
  * in the graph or on its run in the timeline opens, as AWS Step Functions and Camunda Operate show a state's details
  * beside its diagram. A step run more than once chooses its run on top. Its tabs show what the step needs, and only
- * those: Overview, the run's state, times, where it came from and went to and why, and what it did; Input, what a call
+ * those: Overview, the run's state, times, where it came from and went to and why, and what it did as facts; Input, what a call
  * sent, its request with its headers and body; Output, what the external system answered and the fields the step
  * wrote; Attempts, each attempt of a call with its status, error, trace ID and answer; Error, why a failed run failed;
  * and Definition, the step as the instance's release defines it. A value the reader may not read is hidden as the
@@ -90,7 +102,7 @@ export function StepRunPanel({
   const t = useText()
   const now = useMinuteClock()
   const { spacing } = useDesignTokens()
-  const { typeText, summary, stateWords, targetOf, assigneeText } = useRunWords({
+  const { typeText, stateWords, targetOf, assigneeText } = useRunWords({
     instance,
     stepLabel,
     outcomeLabel,
@@ -144,6 +156,7 @@ export function StepRunPanel({
       <Typography.Text code>{words(value)}</Typography.Text>
     )
   const muted = (text: ReactNode) => <Typography.Text type="secondary">{text}</Typography.Text>
+  const notSet = muted(t('shell.value.notSet'))
   const heading = (text: ReactNode) => (
     <Typography.Title level={5} style={{ margin: `${spacing.md}px 0 ${spacing.xs}px`, fontSize: 14 }}>
       {text}
@@ -211,12 +224,55 @@ export function StepRunPanel({
             </Flex>
           ),
       },
-      ...shown.tasks.map((task) => ({
-        key: `task-${task.id}`,
-        term: t('shell.stepRun.assignedTo'),
-        value: assigneeText(task),
+      // Proposed, see the review on #3650: what the run did, as facts by what it holds, in place of the timeline's
+      // sentence: a task's assignee, who completed it and with which outcome; a call's target, state and attempts,
+      // whose detail is the Attempts tab; a sub-process's instance and state. A decision's Went to says it all.
+      ...shown.tasks.flatMap((task): Term[] => [
+        { key: `assignee-${task.id}`, term: t('shell.stepRun.assignedTo'), value: assigneeText(task) },
+        {
+          key: `completedBy-${task.id}`,
+          term: t('shell.stepRun.completedBy'),
+          value: task.completedBy ?? notSet,
+          width: 6,
+        },
+        {
+          key: `outcome-${task.id}`,
+          term: t('shell.stepRun.outcomeChosen'),
+          value: task.outcome === null ? notSet : outcomeLabel(step, task.outcome),
+          width: 6,
+        },
+      ]),
+      ...shown.calls.flatMap((call): Term[] => [
+        { key: `called-${call.id}`, term: t('shell.stepRun.called'), value: targetOf(call) },
+        {
+          key: `callState-${call.id}`,
+          term: t('shell.stepRun.callState'),
+          value: stateWords(call.state === 'succeeded' ? 'done' : call.state === 'failed' ? 'failed' : 'running'),
+          width: 6,
+        },
+        {
+          key: `attempts-${call.id}`,
+          term: t('shell.stepRun.attemptCount'),
+          value: String(call.attempts.filter((attempt) => attempt.kind === 'attempt').length),
+          width: 6,
+        },
+      ]),
+      ...shown.subProcesses.map((child): Term => ({
+        key: `child-${child.id}`,
+        term: t('shell.stepRun.subProcess'),
+        value: (
+          <Flex align="center" gap="small" wrap>
+            {inspectors?.get(child.process) === undefined ? (
+              child.process
+            ) : (
+              <Link to={inspectorPath(sitePath, inspectors.get(child.process) ?? '', child.id)}>{child.process}</Link>
+            )}
+            <StatusTag tone={childTones[child.state] ?? 'neutral'}>
+              {t(`shell.inspector.states.${child.state}`)}
+            </StatusTag>
+          </Flex>
+        ),
       })),
-      { key: 'happened', term: t('shell.stepRun.happened'), value: summary(shown) },
       {
         key: 'trace',
         term: t('shell.stepRun.traceId'),
@@ -390,7 +446,9 @@ export function StepRunPanel({
 
   const error = () => (
     <Flex vertical gap={spacing.sm}>
-      {chosen?.error != null && <AxisAlert kind="error" message={chosen.error} />}
+      {chosen !== undefined && problemText(t, chosen.problem, chosen.error) !== null && (
+        <AxisAlert kind="error" message={problemText(t, chosen.problem, chosen.error)} />
+      )}
       {calls
         .filter((call) => call.state === 'failed')
         .map((call) => {
@@ -400,7 +458,9 @@ export function StepRunPanel({
               key={call.id}
               kind="error"
               message={targetOf(call)}
-              description={[last?.httpStatus, last?.error].filter((part) => part != null).join(' · ')}
+              description={[last?.httpStatus, last ? problemText(t, last.problem, last.error) : null]
+                .filter((part) => part != null)
+                .join(' · ')}
             />
           )
         })}
@@ -616,7 +676,12 @@ function AttemptView({ attempt, locale, children }: { attempt: CallAttempt; loca
               value: attempt.httpStatus === null ? <EmptyDash /> : String(attempt.httpStatus),
               width: 4,
             },
-            { key: 'error', term: t('shell.stepRun.error'), value: attempt.error ?? <EmptyDash />, width: 8 },
+            {
+              key: 'error',
+              term: t('shell.stepRun.error'),
+              value: problemText(t, attempt.problem, attempt.error) ?? <EmptyDash />,
+              width: 8,
+            },
             {
               key: 'trace',
               term: t('shell.stepRun.traceId'),

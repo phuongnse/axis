@@ -2711,5 +2711,19 @@
   "shell.stepRun.definition.after": "Sau {duration}: {step}",
   "shell.stepRun.definition.next": "Bước tiếp",
   "shell.stepRun.definition.end": "Kết thúc",
-  "shell.stepRun.definition.ends": "Kết thúc lượt chạy."
+  "shell.stepRun.definition.ends": "Kết thúc lượt chạy.",
+  "shell.stepRun.completedBy": "Người hoàn thành",
+  "shell.stepRun.outcomeChosen": "Kết quả",
+  "shell.stepRun.called": "Gọi tới",
+  "shell.stepRun.callState": "Trạng thái lời gọi",
+  "shell.stepRun.attemptCount": "Số lần thử",
+  "shell.stepRun.subProcess": "Quy trình con",
+  "shell.stepProblem.unavailable": "Hệ thống bên kia tạm thời không phục vụ.",
+  "shell.stepProblem.serverError": "Hệ thống bên kia không xử lý được request.",
+  "shell.stepProblem.refused": "Hệ thống bên kia từ chối request.",
+  "shell.stepProblem.timeout": "Không có phản hồi trong {seconds} giây.",
+  "shell.stepProblem.notSent": "Không gửi được lời gọi ({type}).",
+  "shell.stepProblem.exception": "Bước bị lỗi {type}.",
+  "shell.stepProblem.expressionFailed": "Phần {part} của bước bị lỗi: {kind}.",
+  "shell.stepProblem.writeRefused": "Không lưu được {field}: {reason}."
 }

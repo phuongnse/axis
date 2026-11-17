@@ -2711,5 +2711,19 @@
   "shell.stepRun.definition.after": "After {duration}, {step}",
   "shell.stepRun.definition.next": "Next",
   "shell.stepRun.definition.end": "End",
-  "shell.stepRun.definition.ends": "Ends the instance."
+  "shell.stepRun.definition.ends": "Ends the instance.",
+  "shell.stepRun.completedBy": "Completed by",
+  "shell.stepRun.outcomeChosen": "Outcome",
+  "shell.stepRun.called": "Called",
+  "shell.stepRun.callState": "Call state",
+  "shell.stepRun.attemptCount": "Attempts",
+  "shell.stepRun.subProcess": "Sub-process",
+  "shell.stepProblem.unavailable": "The system was not available.",
+  "shell.stepProblem.serverError": "The system could not handle the request.",
+  "shell.stepProblem.refused": "The system refused the request.",
+  "shell.stepProblem.timeout": "No answer within {seconds} sec.",
+  "shell.stepProblem.notSent": "The call could not be sent ({type}).",
+  "shell.stepProblem.exception": "The step failed with {type}.",
+  "shell.stepProblem.expressionFailed": "The {part} of the step failed: {kind}.",
+  "shell.stepProblem.writeRefused": "Saving {field} was refused: {reason}."
 }

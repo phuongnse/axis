@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from 'react'
 import type { InstanceDetail } from './inspection'
 import { durationText, stepRuns } from './instanceRuns'
 import { useMinuteClock } from './relativeTime'
+import { problemText } from './stepProblems'
 import { useText } from './texts'
 
 /** One text whose placeholders, such as `{process}`, take a node, so a link stays inside its sentence. */
@@ -37,7 +38,9 @@ export function useInstanceStatus(
   const since = durationText(current.startedAt, now.toISOString(), locale)
   if (instance.state === 'failed') {
     const call = current.calls.findLast((candidate) => candidate.state === 'failed')
-    const error = current.error ?? call?.attempts.at(-1)?.error ?? null
+    const last = call?.attempts.at(-1)
+    const error =
+      problemText(t, current.problem, current.error) ?? (last ? problemText(t, last.problem, last.error) : null)
     return {
       kind: 'error',
       text: filled(t('shell.inspector.status.failed'), {

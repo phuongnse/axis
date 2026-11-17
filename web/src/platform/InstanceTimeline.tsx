@@ -9,6 +9,7 @@ import type { CallAttempt, InstanceCall, InstanceDetail, InstanceTask, SubProces
 import { durationText, stepRuns, type StepRun } from './instanceRuns'
 import { ResolveDialog } from './ResolveDialog'
 import { useRunWords } from './runWords'
+import { problemText } from './stepProblems'
 import { useText } from './texts'
 import { EventTime } from './EventTime'
 
@@ -104,35 +105,38 @@ export function InstanceTimeline({
     )
 
   // A row of the timeline: a run of a step, or, inside it, a task, a call, an attempt of a call or a sub-process.
-  const attemptRow = (call: InstanceCall, attempt: CallAttempt): TimelineRow => ({
-    key: `${call.id}/${attempt.number}`,
-    step: call.step,
-    stepText: stepLabel(call.step),
-    stateKey: attempt.outcome === 'succeeded' ? 'done' : attempt.outcome === 'retryable' ? 'retried' : 'failed',
-    words: [attempt.error ?? '', attempt.httpStatus ?? '', attempt.traceId ?? ''].join(' '),
-    name: named(t('shell.inspector.timeline.attempt').replace('{number}', String(attempt.number)), ''),
-    what: (
-      <Flex vertical>
-        <span>
-          {attempt.error === null
-            ? attempt.httpStatus === null
-              ? t('shell.inspector.timeline.attemptOk')
-              : t('shell.inspector.timeline.attemptStatus').replace('{status}', String(attempt.httpStatus))
-            : attempt.httpStatus === null
-              ? attempt.error
-              : t('shell.inspector.timeline.attemptError')
-                  .replace('{status}', String(attempt.httpStatus))
-                  .replace('{error}', attempt.error)}
-        </span>
-        {traceId(attempt.traceId)}
-      </Flex>
-    ),
-    state: stateWords(
-      attempt.outcome === 'succeeded' ? 'done' : attempt.outcome === 'retryable' ? 'retried' : 'failed',
-    ),
-    startedAt: attempt.startedAt,
-    finishedAt: attempt.finishedAt,
-  })
+  const attemptRow = (call: InstanceCall, attempt: CallAttempt): TimelineRow => {
+    const error = problemText(t, attempt.problem, attempt.error)
+    return {
+      key: `${call.id}/${attempt.number}`,
+      step: call.step,
+      stepText: stepLabel(call.step),
+      stateKey: attempt.outcome === 'succeeded' ? 'done' : attempt.outcome === 'retryable' ? 'retried' : 'failed',
+      words: [error ?? '', attempt.httpStatus ?? '', attempt.traceId ?? ''].join(' '),
+      name: named(t('shell.inspector.timeline.attempt').replace('{number}', String(attempt.number)), ''),
+      what: (
+        <Flex vertical>
+          <span>
+            {error === null
+              ? attempt.httpStatus === null
+                ? t('shell.inspector.timeline.attemptOk')
+                : t('shell.inspector.timeline.attemptStatus').replace('{status}', String(attempt.httpStatus))
+              : attempt.httpStatus === null
+                ? error
+                : t('shell.inspector.timeline.attemptError')
+                    .replace('{status}', String(attempt.httpStatus))
+                    .replace('{error}', error)}
+          </span>
+          {traceId(attempt.traceId)}
+        </Flex>
+      ),
+      state: stateWords(
+        attempt.outcome === 'succeeded' ? 'done' : attempt.outcome === 'retryable' ? 'retried' : 'failed',
+      ),
+      startedAt: attempt.startedAt,
+      finishedAt: attempt.finishedAt,
+    }
+  }
   const callRow = (call: InstanceCall): TimelineRow => {
     const input =
       call.inputHidden || call.input === null || typeof call.input !== 'object'

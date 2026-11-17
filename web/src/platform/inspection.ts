@@ -1,3 +1,4 @@
+import type { StepProblem } from './stepProblems'
 import { apiFetch } from './api'
 import { parseRecordJson, type RecordProblem } from './records'
 
@@ -85,6 +86,8 @@ export interface PathEntry {
   decision: string | null
   output: unknown
   error: string | null
+  /** Proposed, see the review on #3650: the error as a code and its values, which the reader sees in their language. */
+  problem?: StepProblem | null
   /** The trace id of the run that wrote the entry, or `null` when it stored none. */
   traceId: string | null
 }
@@ -111,6 +114,8 @@ export interface CallAttempt {
   outcome: string
   httpStatus: number | null
   error: string | null
+  /** Proposed, see the review on #3650: the error as a code and its values, which the reader sees in their language. */
+  problem?: StepProblem | null
   /** The trace id of the run that wrote the row, or `null` when it stored none. */
   traceId: string | null
   /** Proposed, see the review on #3650: the answer to a connector call's attempt, `null` when none came back. */

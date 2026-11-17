@@ -1408,6 +1408,7 @@ const instanceDetail: InstanceDetail = {
           outcome: 'retryable',
           httpStatus: 503,
           error: 'Service Unavailable',
+          problem: { code: 'unavailable', values: {} },
           traceId: '0af7651916cd43dd8448eb211c80319c',
           response: {
             status: 503,
@@ -1534,6 +1535,7 @@ const instanceDetail: InstanceDetail = {
           outcome: 'retryable',
           httpStatus: 500,
           error: 'Internal Server Error',
+          problem: { code: 'serverError', values: {} },
           traceId: '8293a4b5c6d7e8f90112233445566778',
           response: {
             status: 500,
@@ -1556,6 +1558,7 @@ const instanceDetail: InstanceDetail = {
           outcome: 'retryable',
           httpStatus: null,
           error: 'The request timed out after 60 seconds.',
+          problem: { code: 'timeout', values: { seconds: '60' } },
           traceId: '93a4b5c6d7e8f9011223344556677889',
           response: null,
         },
