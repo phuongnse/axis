@@ -27,8 +27,10 @@ import {
   type ComponentType,
   createContext,
   type KeyboardEvent,
+  useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -72,8 +74,8 @@ function labelLines(label: string): number {
 }
 
 /** A step's card height: the taller one only when its label does not fit on one line. */
-function heightOf(step: ProcessGraphStep): number {
-  return labelLines(step.name) > 1 ? cardHeight.two : cardHeight.one
+function heightOf(step: ProcessGraphStep, drawn?: Readonly<Record<string, number>>): number {
+  return (drawn?.[step.id] ?? labelLines(step.name)) > 1 ? cardHeight.two : cardHeight.one
 }
 const handleSize = 10
 
@@ -156,6 +158,7 @@ const labelWidth = (text: string) => Math.ceil(text.length * 7 + 8)
 async function layOut(
   steps: readonly ProcessGraphStep[],
   transitions: readonly ProcessGraphTransitionView[],
+  drawn: Readonly<Record<string, number>>,
 ): Promise<Layout> {
   const graph: ElkNode = {
     id: 'process',
@@ -175,7 +178,7 @@ async function layOut(
       'elk.spacing.edgeLabel': '4',
       'elk.edgeLabels.inline': 'false',
     },
-    children: steps.map((step) => ({ id: step.id, width: nodeWidth, height: heightOf(step) })),
+    children: steps.map((step) => ({ id: step.id, width: nodeWidth, height: heightOf(step, drawn) })),
     edges: transitions
       .filter(
         (transition) =>
@@ -198,7 +201,7 @@ async function layOut(
         const step = steps.find((candidate) => candidate.id === id)
         return place === undefined || step === undefined
           ? undefined
-          : { ...place, width: nodeWidth, height: heightOf(step) }
+          : { ...place, width: nodeWidth, height: heightOf(step, drawn) }
       }
       const points = section
         ? straighten(
@@ -410,6 +413,20 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
   // every other border is 1 px.
   const width = data.tone === 'current' || found === data.id ? 2 : 1
   const Icon = stepIcons[data.kind] ?? ThunderboltOutlined
+  const reportLines = useContext(LabelDrawn)
+  const label = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    const element = label.current
+    if (element === null || typeof ResizeObserver === 'undefined') {
+      return
+    }
+    const measure = () =>
+      reportLines(data.id, Math.min(2, Math.max(1, Math.round(element.scrollHeight / labelType.lineHeight))))
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    measure()
+    return () => observer.disconnect()
+  }, [data.id, reportLines])
   const muted = data.tone === 'idle'
   return (
     <>
@@ -460,6 +477,7 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
         {/* The label's first line sits level with the icon: 4 px down, half of the 28 px tile less its 20 px line. */}
         <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, paddingTop: 4 }}>
           <strong
+            ref={label}
             style={{
               display: '-webkit-box',
               WebkitLineClamp: 2,
@@ -523,6 +541,12 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
 
 /** The step chosen on the graph, which its node marks while it stays chosen. */
 const FoundStep = createContext<string | null>(null)
+
+/**
+ * Tells the graph how many lines a card's label takes as the browser draws it, so a card is as tall as its label
+ * needs even when a font loads after the graph was laid out, as the label's own size is what counts.
+ */
+const LabelDrawn = createContext<(id: string, lines: number) => void>(() => {})
 
 const nodeTypes = { step: StepNodeView }
 
@@ -603,17 +627,24 @@ export function ProcessGraphCanvas({
 
   // The graph is laid out again only when its shape changes: its steps, their labels and its transitions. A page that
   // draws again, as when a step is chosen, keeps the layout and the view the reader has moved to.
+  // How many lines each card's label takes as drawn, which outranks the measure made before drawing.
+  const [drawn, setDrawn] = useState<Readonly<Record<string, number>>>({})
+  const labelDrawn = useCallback(
+    (id: string, lines: number) =>
+      setDrawn((current) => (current[id] === lines ? current : { ...current, [id]: lines })),
+    [],
+  )
   const shape = JSON.stringify([
-    steps.map((step) => [step.id, step.name]),
+    steps.map((step) => [step.id, step.name, heightOf(step, drawn)]),
     transitions.map((transition) => [transition.id, transition.source, transition.target, transition.label]),
   ])
-  const latest = useRef({ steps, transitions })
+  const latest = useRef({ steps, transitions, drawn })
   useEffect(() => {
-    latest.current = { steps, transitions }
+    latest.current = { steps, transitions, drawn }
   })
   useEffect(() => {
     let current = true
-    void layOut(latest.current.steps, latest.current.transitions).then((next) => {
+    void layOut(latest.current.steps, latest.current.transitions, latest.current.drawn).then((next) => {
       if (current) {
         setLayout(next)
       }
@@ -633,17 +664,17 @@ export function ProcessGraphCanvas({
         type: 'step',
         position: layout.places.get(step.id) ?? { x: 0, y: 0 },
         width: nodeWidth,
-        height: heightOf(step),
+        height: heightOf(step, drawn),
         // The card's size is known, so it is given as measured too: a node drawn again keeps it, and Find a step and
         // the fit can place it without waiting for the browser to measure it again.
-        measured: { width: nodeWidth, height: heightOf(step) },
+        measured: { width: nodeWidth, height: heightOf(step, drawn) },
         handles: [
-          { type: 'target', position: Position.Left, x: 0, y: heightOf(step) / 2, width: 1, height: 1 },
+          { type: 'target', position: Position.Left, x: 0, y: heightOf(step, drawn) / 2, width: 1, height: 1 },
           {
             type: 'source',
             position: Position.Right,
             x: nodeWidth - handleSize / 2,
-            y: heightOf(step) / 2 - handleSize / 2,
+            y: heightOf(step, drawn) / 2 - handleSize / 2,
             width: handleSize,
             height: handleSize,
           },
@@ -677,7 +708,7 @@ export function ProcessGraphCanvas({
         }
       }),
     }
-  }, [layout, steps, transitions, colour, Adornment, onTransitionClick])
+  }, [layout, steps, transitions, colour, Adornment, onTransitionClick, drawn])
 
   return (
     <section
@@ -695,51 +726,53 @@ export function ProcessGraphCanvas({
       onKeyDown={onKeyDown}
     >
       <FoundStep.Provider value={chosen}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          colorMode={mode}
-          minZoom={0.1}
-          // A small process is drawn at its own size, never zoomed in past it, so its text keeps the body size.
-          maxZoom={1}
-          // React Flow is MIT licensed; its attribution may go, as Axis draws its own controls and overview.
-          proOptions={{ hideAttribution: true }}
-          nodesDraggable={false}
-          nodesConnectable={onConnectEnd !== undefined}
-          nodesFocusable={false}
-          elementsSelectable={false}
-          edgesFocusable
-          deleteKeyCode={null}
-          zoomOnScroll={false}
-          onConnectEnd={onConnectEnd}
-          // With the controls a click chooses the step, then calls onStepClick, and a click on the ground clears the
-          // choice; without them, as in the designer, a click only calls onStepClick.
-          onNodeClick={
-            controls
-              ? (_, node) => {
-                  choose(node.id)
-                  onStepClick?.(node.id)
-                }
-              : onStepClick
-                ? (_, node) => onStepClick(node.id)
-                : undefined
-          }
-          onPaneClick={controls ? () => choose(null) : undefined}
-          onEdgeClick={onTransitionClick ? (_, edge) => onTransitionClick(edge.id) : undefined}
-        >
-          <FitOnLayout layout={layout} focus={focus} />
-          {controls && (
-            <ProcessGraphControls
-              area={area}
-              focus={focus}
-              steps={steps.map((step) => ({ id: step.id, label: step.name }))}
-              selected={chosen}
-              onSelect={choose}
-            />
-          )}
-        </ReactFlow>
+        <LabelDrawn.Provider value={labelDrawn}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            colorMode={mode}
+            minZoom={0.1}
+            // A small process is drawn at its own size, never zoomed in past it, so its text keeps the body size.
+            maxZoom={1}
+            // React Flow is MIT licensed; its attribution may go, as Axis draws its own controls and overview.
+            proOptions={{ hideAttribution: true }}
+            nodesDraggable={false}
+            nodesConnectable={onConnectEnd !== undefined}
+            nodesFocusable={false}
+            elementsSelectable={false}
+            edgesFocusable
+            deleteKeyCode={null}
+            zoomOnScroll={false}
+            onConnectEnd={onConnectEnd}
+            // With the controls a click chooses the step, then calls onStepClick, and a click on the ground clears the
+            // choice; without them, as in the designer, a click only calls onStepClick.
+            onNodeClick={
+              controls
+                ? (_, node) => {
+                    choose(node.id)
+                    onStepClick?.(node.id)
+                  }
+                : onStepClick
+                  ? (_, node) => onStepClick(node.id)
+                  : undefined
+            }
+            onPaneClick={controls ? () => choose(null) : undefined}
+            onEdgeClick={onTransitionClick ? (_, edge) => onTransitionClick(edge.id) : undefined}
+          >
+            <FitOnLayout layout={layout} focus={focus} />
+            {controls && (
+              <ProcessGraphControls
+                area={area}
+                focus={focus}
+                steps={steps.map((step) => ({ id: step.id, label: step.name }))}
+                selected={chosen}
+                onSelect={choose}
+              />
+            )}
+          </ReactFlow>
+        </LabelDrawn.Provider>
       </FoundStep.Provider>
     </section>
   )
