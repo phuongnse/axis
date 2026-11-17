@@ -1,4 +1,5 @@
 import { Flex, Result, Tag } from 'antd'
+import dayjs from 'dayjs'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { AxisTable } from '../platform/AxisTable'
@@ -7,18 +8,36 @@ import { ConsolePublishing } from '../platform/ConsolePublishing'
 import { ConsoleWebhookDeliveries } from '../platform/ConsoleWebhookDeliveries'
 import { PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useTableView } from '../platform/useTableView'
 import { ConsoleDeadLetters } from './ConsoleDeadLetters'
 import { ConsoleFailedWork } from './ConsoleFailedWork'
 import { ConsoleSchedules } from './ConsoleSchedules'
 import { usePlatform } from './context'
 
+const noParameters: string[] = []
+
+const applicationFields = [
+  { name: 'application', type: 'text' },
+  { name: 'release', type: 'text' },
+  { name: 'activatedAt', type: 'date' },
+] as const
+
+/** The release an application shows, as "#3 Spring", or null when it has no release. */
+function releaseText(row: ConsoleApplication): string | null {
+  return row.releaseNumber === null && !row.releaseLabel
+    ? null
+    : [row.releaseNumber === null ? null : `#${row.releaseNumber}`, row.releaseLabel].filter(Boolean).join(' ')
+}
+
 /**
  * The operator console for the platform operator. It shows the Tenant view: the status of the tenant of the host and a
- * table of its applications with each active release. Below it, the Failed work view lists the failed instances and the
- * calls with an unknown outcome, newest first, paged on the server with a filter on each column, whose state the address keeps under the `failedWork.`
- * names. Under it, the Webhook deliveries
+ * table of its applications with each active release. The table filters its own rows, kept in the address under
+ * `applications.`, see docs/reference/actions-and-controls.md#tables. Below it, the Failed work view lists the failed
+ * instances and the calls with an unknown outcome, newest first, paged on the server with a filter on each column, whose
+ * state the address keeps under the `failedWork.` names. Under it, the Webhook deliveries
  * view lists the recent webhook deliveries, paged on the server with the table toolbar, whose state the address keeps under
  * the `webhookDeliveries.` names. Then the Publishing view lists the release history and the publish requests of
  * one application, read only, and the Dead letters view lists the dead letters of every application and redelivers or
@@ -34,6 +53,15 @@ export function ConsolePage() {
   const [tenant, setTenant] = useState<ConsoleTenant>()
   const [forbidden, setForbidden] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
+  const applicationView = useTableView(
+    applicationFields,
+    recordPageSize,
+    noParameters,
+    false,
+    true,
+    false,
+    'applications.',
+  )
 
   useEffect(() => {
     const controller = new AbortController()
@@ -83,6 +111,7 @@ export function ConsolePage() {
               </Flex>
               <AxisTable<ConsoleApplication>
                 rowKey={(row) => row.id}
+                view={{ query: applicationView.view, onChange: applicationView.setView, paging: false }}
                 dataSource={tenant.applications}
                 emptyText={t('shell.console.tenant.empty')}
                 columns={[
@@ -91,23 +120,21 @@ export function ConsolePage() {
                     kind: 'freeText',
                     title: t('shell.console.tenant.application'),
                     dataIndex: 'name',
+                    filter: { kind: 'text', value: (row) => row.name },
                   },
                   {
                     key: 'release',
                     kind: 'freeText',
                     title: t('shell.console.tenant.release'),
-                    render: (_value, row) =>
-                      row.releaseNumber === null && !row.releaseLabel
-                        ? null
-                        : [row.releaseNumber === null ? null : `#${row.releaseNumber}`, row.releaseLabel]
-                            .filter(Boolean)
-                            .join(' '),
+                    render: (_value, row) => releaseText(row),
+                    filter: { kind: 'text', value: releaseText },
                   },
                   {
                     key: 'activatedAt',
                     kind: 'fixed',
                     title: t('shell.console.tenant.activatedAt'),
                     render: (_value, row) => new Date(row.activatedAt).toLocaleString(locale),
+                    filter: { kind: 'date', value: (row) => dayjs(row.activatedAt).format('YYYY-MM-DD') },
                   },
                 ]}
               />

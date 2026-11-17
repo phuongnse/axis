@@ -245,7 +245,9 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   of the view. A failed load shows the error in each table in place of its rows, and the requests
   table keeps its toolbar. It offers no publish or activate button.
 - **Tenant.** The tenant's status and each application's active release, as a table with the
-  application, the release number and label, and the activation time.
+  application, the release number and label, and the activation time. The table has Filter on
+  Application, Release and Activated (the day), kept in the address as `applications.filter`. It
+  shows every row with no pager.
 
 ## Commands
 

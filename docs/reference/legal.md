@@ -64,6 +64,9 @@ Axis lists the licence of everything it ships on a page that anyone can open.
   both by name or licence. A licence that is one SPDX identifier links its text on spdx.org, and one that is an
   `https` address links that address. Any other licence, such as an expression, a file name or `UNKNOWN`, shows as
   plain text.
+- **Filter on each list.** Each list has its own Filter on Package, Licence and, for a signed-in person, Version,
+  kept in the address as `npm.filter` and `nuget.filter`. A filter narrows only its own list, and the search box
+  still works alongside it.
 - **Built from what ships.** The build writes the list from the packages that ship, so it never falls behind them,
   and the SPA serves it. No list is kept by hand. `scripts/build.sh` runs `scripts/write-licences.mjs`, which writes
   the public `/licences.json`, with names and licences and no versions, and a server-side `licences.json` that also

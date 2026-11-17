@@ -1,6 +1,6 @@
 import { Flex, Input, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { fetchAboutVersion } from '../platform/about'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import {
@@ -13,13 +13,18 @@ import {
 } from '../platform/licences'
 import { PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
+import { useTableView } from '../platform/useTableView'
 import { usePlatform } from './context'
+
+const noParameters: string[] = []
 
 /**
  * The open source licences page, open without signing in. It names Axis's licence and links its text and Axis's source, which
  * points at the commit when the server's version names one. Below, the npm and NuGet packages Axis ships sit in two lists, one
- * above the other, that one search box filters by name or licence. Only a signed-in person sees versions.
+ * above the other, that one search box filters by name or licence. Each list has a Filter of its own, kept in the address as
+ * `npm.` and `nuget.`, see docs/reference/actions-and-controls.md#tables. Only a signed-in person sees versions.
  */
 export function LicencesPage() {
   const t = useText()
@@ -82,11 +87,15 @@ export function LicencesPage() {
             <PackageList
               title={t('shell.licences.npm')}
               entries={licences.npm.filter(matches)}
+              withVersions={hasVersions(licences.npm)}
+              prefix="npm."
               testName="licences-npm"
             />
             <PackageList
               title={t('shell.licences.nuget')}
               entries={licences.nuget.filter(matches)}
+              withVersions={hasVersions(licences.nuget)}
+              prefix="nuget."
               testName="licences-nuget"
             />
           </SectionParts>
@@ -96,13 +105,52 @@ export function LicencesPage() {
   )
 }
 
-function PackageList({ title, entries, testName }: { title: string; entries: LicencePackage[]; testName: string }) {
+/** Whether the packages carry versions. It looks at the whole list, so a search with no match keeps the column. */
+function hasVersions(packages: LicencePackage[]): boolean {
+  return packages.some((entry) => entry.version !== undefined)
+}
+
+function PackageList({
+  title,
+  entries,
+  withVersions,
+  prefix,
+  testName,
+}: {
+  title: string
+  entries: LicencePackage[]
+  withVersions: boolean
+  prefix: string
+  testName: string
+}) {
   const t = useText()
-  const withVersions = entries.some((entry) => entry.version !== undefined)
+  const fields = useMemo(
+    () => [
+      { name: 'name', type: 'text' as const },
+      ...(withVersions ? [{ name: 'version', type: 'text' as const }] : []),
+      { name: 'licence', type: 'text' as const },
+    ],
+    [withVersions],
+  )
+  const { view, setView } = useTableView(fields, recordPageSize, noParameters, false, true, false, prefix)
   const columns: AxisColumn<LicencePackage>[] = [
-    { key: 'name', kind: 'freeText', title: t('shell.licences.package'), dataIndex: 'name' },
+    {
+      key: 'name',
+      kind: 'freeText',
+      title: t('shell.licences.package'),
+      dataIndex: 'name',
+      filter: { kind: 'text', value: (entry) => entry.name },
+    },
     ...(withVersions
-      ? [{ key: 'version', kind: 'fixed' as const, title: t('shell.licences.version'), dataIndex: 'version' }]
+      ? [
+          {
+            key: 'version',
+            kind: 'fixed' as const,
+            title: t('shell.licences.version'),
+            dataIndex: 'version',
+            filter: { kind: 'text' as const, value: (entry: LicencePackage) => entry.version ?? null },
+          },
+        ]
       : []),
     {
       key: 'licence',
@@ -118,13 +166,14 @@ function PackageList({ title, entries, testName }: { title: string; entries: Lic
           entry.licence
         )
       },
+      filter: { kind: 'text', value: (entry) => entry.licence },
     },
   ]
   return (
     <SectionPart testName={testName} heading={{ title }}>
       <AxisTable<LicencePackage>
         rowKey={(entry) => `${entry.name}/${entry.version ?? ''}/${entry.licence}`}
-        pagination={false}
+        view={{ query: view, onChange: setView, paging: false }}
         dataSource={entries}
         emptyText={t('shell.licences.empty')}
         columns={columns}

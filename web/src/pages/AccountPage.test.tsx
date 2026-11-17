@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import dayjs from 'dayjs'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -77,11 +78,11 @@ function deleteCalls(fetchMock: ReturnType<typeof stubServer>) {
   return fetchMock.mock.calls.filter(([, init]) => init?.method === 'DELETE')
 }
 
-function renderPage() {
+function renderPage(address = '/account') {
   render(
     <PlatformContext.Provider value={platform}>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[address]}>
           <AccountPage />
         </MemoryRouter>
       </TextProvider>
@@ -307,5 +308,18 @@ describe('AccountPage', () => {
     expect(within(region).getByRole('heading', { level: 2 })).toBeVisible()
     await waitFor(() => expect(screen.getAllByRole('region')).toHaveLength(1))
     expect(screen.queryByRole('separator')).not.toBeInTheDocument()
+  })
+
+  it('narrows the sessions by a filter in the address, with no new request for the list', async () => {
+    const day = dayjs('2026-10-27T08:00:00Z').format('YYYY-MM-DD')
+    const filter = encodeURIComponent(JSON.stringify({ all: [{ field: 'signedInAt', op: 'eq', value: day }] }))
+    const fetchMock = stubServer(() => json(sessions(true)))
+    renderPage(`/account?sessions.filter=${filter}`)
+
+    expect(await screen.findAllByRole('button', { name: 'End' })).toHaveLength(1)
+    expect(screen.queryByText('This session')).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.filter(([input, init]) => input === '/api/me/sessions' && (init?.method ?? 'GET') === 'GET'),
+    ).toHaveLength(1)
   })
 })

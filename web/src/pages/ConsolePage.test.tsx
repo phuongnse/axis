@@ -266,6 +266,16 @@ describe('ConsolePage', () => {
     expect(screen.queryByTestId('console-forbidden')).toBeNull()
   })
 
+  it('narrows the tenant applications by a filter in the address, and hides the others', async () => {
+    const filter = encodeURIComponent(JSON.stringify({ all: [{ field: 'application', op: 'eq', value: 'Leave' }] }))
+    stubServer(tenantAndFailedWork)
+    renderPage(`/console?applications.filter=${filter}`)
+
+    const view = await screen.findByTestId('console-tenant')
+    expect(await within(view).findByText('Leave')).toBeVisible()
+    expect(within(view).queryByText('Purchasing')).not.toBeInTheDocument()
+  })
+
   it('labels a read-only tenant', async () => {
     stubServer((url) => json(url.startsWith('/api/console/tenant') ? { ...tenant, status: 'readOnly' } : failedWork))
     renderPage()
