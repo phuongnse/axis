@@ -209,7 +209,8 @@ be kept right.
   [page heading](studio-workspace.md#page-heading), not the toolbar. A `table` widget keeps the toolbar
   actions its author configures.
 - **Every control in one table.** `AxisTable` has every control below, and each view
-  turns on what it needs. Search, filter, sort, page and columns live in the address. A view is only a
+  turns on what it needs. Search, filter, sort, page and columns live in the address, except in a dialog's
+  table, which keeps them in the dialog. A view is only a
   filter kept there, so a link opens the same rows for anyone who follows it. A second table on a page puts a
   prefix of its own before each address name, as the console's Dead letters view does with `deadLetters.filter`.
 - **Sort.** A column sorts from its header when its values have an order a person uses: names, people,
@@ -220,7 +221,7 @@ be kept right.
   in the record API, and search looks in all of them. `AxisTable` draws the box, which says Search, and a
   table that holds all its rows searches them by itself, while a table paged on the server sends the text to
   the server. The text applies on Enter, on the search button and when the box is cleared, never on each
-  key, and a new search starts at page 1. Search, sort, page and page size live in the address. A table in a
+  key, and a new search starts at page 1. Search, filter, sort, page and page size live in the address. A table in a
   dialog, such as the [lookup](form-widget.md#lookup), keeps them in the dialog instead.
 - **Filter.** Filter is an icon button that carries the count of conditions in force, and
   opens a builder of conditions in groups of All or Any, with no limit on depth. A column can be filtered
@@ -228,7 +229,8 @@ be kept right.
   or date, each with empty and not empty. Apply puts it in force, and a condition with no value is left
   out. A chip stands for each condition and group, with Clear all. A table that holds all its rows filters
   them itself. A table paged on the server sends its filter to the server as the record API's `filter`. The
-  filter lives in the address as `filter`, in the shape of [the record API's filter](record-api.md#paging-and-sorting).
+  filter lives in the address as `filter` except in a dialog's table, in the shape of
+  [the record API's filter](record-api.md#paging-and-sorting).
   A second table on a page keeps its view under a prefix, as `fields.filter`. In a table that edits a draft, a filter
   only hides rows, and an edit to a hidden row stays in the draft. The table's `keep` option names the rows the
   filter never hides, such as a row added since the last save, so the author always sees what they just added. Only
