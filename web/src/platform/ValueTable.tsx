@@ -134,8 +134,8 @@ function DiffLine({ sign, tone, text }: { sign: string; tone: 'danger' | 'succes
   return (
     <span
       style={{
+        // The sign sits against its value, as a diff writes it.
         display: 'flex',
-        gap: spacing.xs,
         paddingInline: spacing.xs,
         borderRadius: 2,
         background: tint.background,
