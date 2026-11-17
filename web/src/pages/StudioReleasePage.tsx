@@ -1,5 +1,6 @@
 import { Descriptions, Flex, Spin, Typography } from 'antd'
 import { type HTMLAttributes, useContext, useEffect, useState } from 'react'
+import dayjs from 'dayjs'
 import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
@@ -21,8 +22,10 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useTableView } from '../platform/useTableView'
 import { PlatformContext } from './context'
 import { relaxedPointLabel } from './relaxEntries'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
@@ -37,6 +40,10 @@ interface ActivationRow {
   by: string
   replaced: number | null
   until: string | null
+  /** The local calendar day of `when`, `YYYY-MM-DD`, which the When filter compares. */
+  whenDay: string
+  /** The local calendar day of `until`, which the Until filter compares. Null for the live release and the last activation. */
+  untilDay: string | null
 }
 
 /** One row of the modules and packages table. */
@@ -46,6 +53,21 @@ interface PartRow {
   type: 'module' | 'package'
   version: string
 }
+
+// The two tables filter the columns that they show. Stable arrays keep useTableView from recomputing on each render.
+const partFields = [
+  { name: 'name', type: 'text' },
+  { name: 'type', type: 'enum' },
+  { name: 'version', type: 'text' },
+] as const
+const activationFields = [
+  { name: 'when', type: 'date' },
+  { name: 'by', type: 'text' },
+  { name: 'replaced', type: 'integer' },
+  { name: 'until', type: 'date' },
+] as const
+// The tables have no parameters of their own. A stable empty array keeps useTableView from recomputing on each render.
+const noParameters: readonly string[] = []
 
 /**
  * The page of one release, at `&view=release&release=N`: the heading "Release N" with the Live and Off-standard tags,
@@ -57,7 +79,8 @@ interface PartRow {
  * the modules and packages the release pins, and every activation of
  * the release. The Details part and the activations come from `history`, and the rest from the release route, which loads
  * again when `history` does. A number that the history lacks shows one line and a link to every release, and so does a
- * failed load.
+ * failed load. The parts table and the activations each have Filter on every column, kept in the address, with the
+ * activations under the `activations.` prefix, see docs/reference/actions-and-controls.md#tables.
  */
 export function StudioReleasePage({
   application,
@@ -185,6 +208,16 @@ function ReleaseContent({
   const { spacing } = useDesignTokens()
   const time = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' })
   const format = (value: string) => time.format(new Date(value))
+  const partView = useTableView(partFields, recordPageSize, noParameters, false, true)
+  const activationView = useTableView(
+    activationFields,
+    recordPageSize,
+    noParameters,
+    false,
+    true,
+    false,
+    'activations.',
+  )
 
   const sorted = [...history.items].sort((left, right) => Date.parse(left.activatedAt) - Date.parse(right.activatedAt))
   const ownIndexes = sorted.flatMap((item, index) => (item.number === release.number ? [index] : []))
@@ -207,13 +240,39 @@ function ReleaseContent({
       by: releasePublisher(item, t),
       replaced: sorted[index - 1]?.number ?? null,
       until: next !== undefined ? format(next.activatedAt) : release.live ? t('shell.studio.release.now') : null,
+      whenDay: dayjs(item.activatedAt).format('YYYY-MM-DD'),
+      untilDay: next !== undefined ? dayjs(next.activatedAt).format('YYYY-MM-DD') : null,
     }
   })
   const activationColumns: AxisColumn<ActivationRow>[] = [
-    { key: 'when', kind: 'fixed', title: t('shell.studio.release.when'), render: (_, row) => row.when },
-    { key: 'by', kind: 'freeText', title: t('shell.studio.release.by'), render: (_, row) => row.by },
-    { key: 'replaced', kind: 'fixed', title: t('shell.studio.release.replaced'), render: (_, row) => row.replaced },
-    { key: 'until', kind: 'fixed', title: t('shell.studio.release.until'), render: (_, row) => row.until },
+    {
+      key: 'when',
+      kind: 'fixed',
+      title: t('shell.studio.release.when'),
+      render: (_, row) => row.when,
+      filter: { kind: 'date', value: (row) => row.whenDay },
+    },
+    {
+      key: 'by',
+      kind: 'freeText',
+      title: t('shell.studio.release.by'),
+      render: (_, row) => row.by,
+      filter: { kind: 'text', value: (row) => row.by },
+    },
+    {
+      key: 'replaced',
+      kind: 'fixed',
+      title: t('shell.studio.release.replaced'),
+      render: (_, row) => row.replaced,
+      filter: { kind: 'number', value: (row) => row.replaced },
+    },
+    {
+      key: 'until',
+      kind: 'fixed',
+      title: t('shell.studio.release.until'),
+      render: (_, row) => row.until,
+      filter: { kind: 'date', value: (row) => row.untilDay },
+    },
   ]
 
   const parts = sortByName(
@@ -226,14 +285,34 @@ function ReleaseContent({
     (row) => (row.type === 'module' ? 0 : 1),
   )
   const partColumns: AxisColumn<PartRow>[] = [
-    { key: 'name', kind: 'freeText', title: t('shell.studio.release.name'), render: (_, row) => row.name },
+    {
+      key: 'name',
+      kind: 'freeText',
+      title: t('shell.studio.release.name'),
+      render: (_, row) => row.name,
+      filter: { kind: 'text', value: (row) => row.name },
+    },
     {
       key: 'type',
       kind: 'fixed',
       title: t('shell.studio.release.type'),
       render: (_, row) => t(`shell.studio.release.type.${row.type}`),
+      filter: {
+        kind: 'enum',
+        value: (row) => row.type,
+        options: (['module', 'package'] as const).map((type) => ({
+          value: type,
+          label: t(`shell.studio.release.type.${type}`),
+        })),
+      },
     },
-    { key: 'version', kind: 'fixed', title: t('shell.studio.release.version'), render: (_, row) => row.version },
+    {
+      key: 'version',
+      kind: 'fixed',
+      title: t('shell.studio.release.version'),
+      render: (_, row) => row.version,
+      filter: { kind: 'text', value: (row) => row.version },
+    },
   ]
 
   return (
@@ -315,7 +394,7 @@ function ReleaseContent({
             dataSource={parts}
             loading={false}
             emptyText={t('shell.studio.release.parts.none')}
-            pagination={false}
+            view={{ query: partView.view, onChange: partView.setView }}
             toolbar={{}}
           />
         </SectionPart>
@@ -326,7 +405,7 @@ function ReleaseContent({
             dataSource={activations}
             loading={false}
             emptyText={t('shell.studio.releases.empty')}
-            pagination={false}
+            view={{ query: activationView.view, onChange: activationView.setView }}
             toolbar={{}}
             rowAttributes={() => ({ 'data-testid': 'studio-release-activation' }) as HTMLAttributes<HTMLElement>}
           />
