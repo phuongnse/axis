@@ -14,12 +14,10 @@ import { jsonRows, parseJsonText, type ValueRow } from './valueRows'
  * toolbar, compact, every row shown; a nested value is a row of its own named by its path, see `jsonRows`. A
  * value is shown as it was written, a number with its source digits; `null` and empty text read in muted
  * words, so neither passes for text. It has no header row, as the developer tools' headers have none: each name, in
- * `textMuted` as a term's, says what its row is. Its name column is `nameWidth` wide in every table, a longer name
- * wrapping, so the tables one view stacks line up from top to bottom, as the developer tools' header sections do.
+ * `textMuted` as a term's, says what its row is. Its name and its value each take half its width, a longer name
+ * wrapping, so the tables one view stacks line up from top to bottom at any width, as the developer tools' header
+ * sections do.
  */
-/** Proposed, see the review on #3650: the width of a name column, its padding in. */
-const nameWidth = 160
-
 export function ValueTable({ rows, label }: { rows: readonly ValueRow[]; label: string }) {
   const t = useText()
   const muted = (text: string) => <Typography.Text type="secondary">{text}</Typography.Text>
@@ -28,16 +26,15 @@ export function ValueTable({ rows, label }: { rows: readonly ValueRow[]; label: 
       key: 'name',
       kind: 'fixed',
       title: t('shell.valueTable.name'),
-      // Every name column is as wide, so the tables a view stacks, such as a request's headers and body, line up.
-      onCell: () => ({
-        style: { width: nameWidth, minWidth: nameWidth, whiteSpace: 'normal', overflowWrap: 'anywhere' },
-      }),
+      // The name and the value each take half the table, so the tables a view stacks line up at any width.
+      onCell: () => ({ style: { width: '50%', whiteSpace: 'normal', overflowWrap: 'anywhere' } }),
       render: (_value, row) => <Typography.Text type="secondary">{row.name}</Typography.Text>,
     },
     {
       key: 'value',
       kind: 'freeText',
       title: t('shell.valueTable.value'),
+      onCell: () => ({ style: { width: '50%' } }),
       render: (_value, row) => {
         const value = row.value
         switch (value.kind) {
