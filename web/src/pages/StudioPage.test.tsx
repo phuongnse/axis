@@ -994,6 +994,30 @@ describe('StudioPage', () => {
     expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
   })
 
+  it('shows the loading state, not the rows of the previous kind, while another kind loads', async () => {
+    const fetchMock = stubServer()
+    let answer: (response: Response) => void = () => {}
+    const held = new Promise<Response>((resolve) => {
+      answer = resolve
+    })
+    vi.stubGlobal('fetch', (input: string, init?: RequestInit) =>
+      input.startsWith(`${folder}/kinds/form/`) ? held : fetchMock(input, init),
+    )
+    renderPage('/studio?app=PurchaseRequests&kind=entity')
+    expect(await screen.findByTestId(`studio-resource-${entityId}`)).toBeInTheDocument()
+
+    await userEvent.click(within(sidebar!).getByRole('link', { name: 'Forms' }))
+
+    expect(await screen.findByRole('heading', { level: 4, name: 'Forms' })).toBeInTheDocument()
+    expect(screen.queryByTestId(`studio-resource-${entityId}`)).not.toBeInTheDocument()
+    expect(screen.queryByTestId(`studio-resource-${formId}`)).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('studio-group-form')).getByRole('table')).toBeInTheDocument()
+
+    answer(json(kindList(`${folder}/kinds/form/resources`)))
+
+    expect(await screen.findByTestId(`studio-resource-${formId}`)).toBeInTheDocument()
+  })
+
   it('shows a load error when the folder cannot be loaded', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     stubServer()

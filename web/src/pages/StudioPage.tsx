@@ -697,7 +697,7 @@ function StudioWorkspace() {
                       ) : undefined
                     }
                   />
-                  <StudioKindList application={application!} kind={kind} folderRevision={folderRevision} />
+                  <StudioKindList key={kind} application={application!} kind={kind} folderRevision={folderRevision} />
                 </Flex>
               ) : (
                 <StudioOverview
