@@ -11,8 +11,6 @@ import {
   type OnConnectEnd,
   Position,
   ReactFlow,
-  Background,
-  BackgroundVariant,
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -409,7 +407,7 @@ export function ProcessGraphCanvas({
     setFound(id)
     window.setTimeout(() => setFound((current) => (current === id ? null : current)), 2000)
   }
-  const { colour } = useDesignTokens()
+  const { colour, radius } = useDesignTokens()
   const [layout, setLayout] = useState<Layout | null>(null)
 
   useEffect(() => {
@@ -487,8 +485,9 @@ export function ProcessGraphCanvas({
       aria-label={ariaLabel}
       // A graph with controls takes the focus, so its keys work; a designer's keeps its own order of Tab.
       tabIndex={controls ? 0 : undefined}
-      // In full screen the graph fills the screen on the page's surface.
-      style={{ height, position: 'relative', background: colour.surface }}
+      // The graph lies on the canvas colour, so its steps on the surface stand out with no pattern behind them, as
+      // Camunda Operate and Figma draw a diagram; in full screen it fills the screen the same way.
+      style={{ height, position: 'relative', background: colour.canvas, borderRadius: radius.base }}
       onKeyDown={onKeyDown}
     >
       <FoundStep.Provider value={found}>
@@ -515,8 +514,6 @@ export function ProcessGraphCanvas({
           onEdgeClick={onTransitionClick ? (_, edge) => onTransitionClick(edge.id) : undefined}
         >
           <FitOnLayout layout={layout} focus={focus} />
-          {/* A grid of fine lines under the graph, in the divider colour, as a canvas has. */}
-          <Background variant={BackgroundVariant.Lines} gap={24} lineWidth={1} color={colour.divider} />
           {controls && (
             <ProcessGraphControls
               area={area}
