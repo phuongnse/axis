@@ -1,4 +1,4 @@
-import { Space, Tag } from 'antd'
+import { Space } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
@@ -12,6 +12,7 @@ import { useReleaseTexts } from './useReleaseTexts'
 import { useTableView } from './useTableView'
 import { siteAddress } from './siteLinks'
 import { RecordLink } from './RecordLink'
+import { StatusTag } from './StatusTag'
 
 interface TaskInboxWidgetProps {
   sitePath: string
@@ -125,8 +126,8 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
           return (
             <Space size="small">
               <Link to={`${taskPath}/${task.id}`}>{label}</Link>
-              {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-              {task.claimedBy !== null && <Tag color="blue">{t('shell.tasks.claimedByYou')}</Tag>}
+              {/* Proposed: the inbox's statuses are StatusTags, see the reviews on #3263 and #3650. */}
+              {task.claimedBy !== null && <StatusTag tone="neutral">{t('shell.tasks.claimedByYou')}</StatusTag>}
             </Space>
           )
         },
@@ -155,8 +156,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
           task.dueAt === null ? null : (
             <Space size="small">
               {formatValue(dueAtField, task.dueAt, {}, { locale, text: t })}
-              {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-              {task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>}
+              {task.overdue && <StatusTag tone="attention">{t('shell.tasks.overdue')}</StatusTag>}
             </Space>
           ),
       },

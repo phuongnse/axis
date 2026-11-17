@@ -1,4 +1,4 @@
-import { Flex, Tabs, Tag } from 'antd'
+import { Flex, Tabs } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -18,6 +18,8 @@ import {
 } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { InstanceTimeline } from './InstanceTimeline'
+import { instanceTone } from './instanceRuns'
+import { StatusTag } from './StatusTag'
 import { useInstanceStatus } from './instanceStatus'
 import { PageActions, PageHeading } from './PageLayout'
 import { ProcessGraphCanvas, type ProcessGraphStep, type ProcessGraphTransitionView } from './ProcessGraph'
@@ -300,10 +302,7 @@ export function InstanceDetailView({
         // Proposed: a process is named by its title in each language, see the review on #3650.
         title={instance.processTitleKey ? t(instance.processTitleKey) : instance.process}
         line={t('shell.inspector.process')}
-        tags={
-          // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
-          <Tag color={instance.state === 'failed' ? 'error' : undefined}>{stateText(t, instance.state)}</Tag>
-        }
+        tags={<StatusTag tone={instanceTone(instance)}>{stateText(t, instance.state)}</StatusTag>}
       />
       <PageActions>
         <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />

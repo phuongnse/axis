@@ -1,4 +1,4 @@
-import { Flex, Tag, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AxisButton } from './AxisButton'
@@ -8,6 +8,7 @@ import type { CallAttempt, InstanceCall, InstanceDetail, InstanceTask, SubProces
 import { durationText, stepRuns, type StepRun } from './instanceRuns'
 import { filled } from './instanceStatus'
 import { ResolveDialog } from './ResolveDialog'
+import { StatusTag } from './StatusTag'
 import { useText } from './texts'
 import { EventTime } from './EventTime'
 
@@ -139,17 +140,26 @@ export function InstanceTimeline({
     )
   }
 
-  const stateWords = (value: 'done' | 'failed' | 'waiting' | 'running' | 'retried') =>
-    value === 'done' ? (
-      <Typography.Text type="secondary">{t('shell.inspector.timeline.stateDone')}</Typography.Text>
-    ) : value === 'retried' ? (
-      <Typography.Text type="secondary">{t('shell.inspector.timeline.stateRetried')}</Typography.Text>
-    ) : (
-      // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
-      <Tag color={value === 'failed' ? 'error' : 'processing'}>
-        {t(`shell.inspector.timeline.state${value[0].toUpperCase()}${value.slice(1)}`)}
-      </Tag>
-    )
+  // Proposed: every state of the timeline is a StatusTag, its tone saying what it asks of the reader, as the
+  // instance's own state is, see the reviews on #3263 and #3650: done ended well, retried and failed what they say, a
+  // wait for a person asks for attention, and running or a wait for an event needs nobody.
+  const stateWords = (value: 'done' | 'failed' | 'waiting' | 'running' | 'retried', forPerson = false) => (
+    <StatusTag
+      tone={
+        value === 'done'
+          ? 'success'
+          : value === 'failed'
+            ? 'danger'
+            : value === 'retried'
+              ? 'muted'
+              : value === 'waiting' && forPerson
+                ? 'attention'
+                : 'neutral'
+      }
+    >
+      {t(`shell.inspector.timeline.state${value[0].toUpperCase()}${value.slice(1)}`)}
+    </StatusTag>
+  )
   const callState = (call: InstanceCall) =>
     call.state === 'succeeded' ? 'done' : call.state === 'failed' ? 'failed' : ('running' as const)
   const named = (name: ReactNode, kind: string) => (
@@ -245,7 +255,7 @@ export function InstanceTimeline({
         : t('shell.inspector.timeline.taskDone')
             .replace('{person}', task.completedBy ?? assigneeText(task))
             .replace('{outcome}', outcomeLabel(task.step, task.outcome)),
-    state: stateWords(task.completedAt === null ? 'waiting' : 'done'),
+    state: stateWords(task.completedAt === null ? 'waiting' : 'done', true),
     startedAt: task.createdAt,
     finishedAt: task.completedAt,
   })
@@ -285,7 +295,10 @@ export function InstanceTimeline({
           : typeText(typeOf(run.step)),
       ),
       what: summary(run),
-      state: stateWords(run.state),
+      state: stateWords(
+        run.state,
+        run.tasks.some((task) => task.completedAt === null),
+      ),
       startedAt: run.startedAt,
       finishedAt: run.finishedAt,
       children: children.length > 0 ? children : undefined,

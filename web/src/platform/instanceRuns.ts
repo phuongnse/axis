@@ -91,3 +91,23 @@ export function durationText(from: string, to: string, locale: string): string {
   if (minutes > 0) return unit(minutes, 'minute')
   return unit(seconds % 60, 'second')
 }
+
+/**
+ * Proposed, see the review on #3650: the tone of an instance's state, as `StatusTag` reads it: waiting for a person, a
+ * task open at the step it is at, asks for attention; running or waiting for an event or a timer needs nobody;
+ * completed ended well, failed failed, and cancelled ended with nothing more to do.
+ */
+export function instanceTone(instance: InstanceDetail): 'neutral' | 'attention' | 'success' | 'danger' | 'muted' {
+  switch (instance.state) {
+    case 'completed':
+      return 'success'
+    case 'failed':
+      return 'danger'
+    case 'cancelled':
+      return 'muted'
+    default:
+      return instance.tasks.some((task) => task.step === instance.step && task.completedAt === null)
+        ? 'attention'
+        : 'neutral'
+  }
+}

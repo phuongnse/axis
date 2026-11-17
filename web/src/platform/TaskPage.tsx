@@ -1,10 +1,11 @@
-import { Flex, Form, Tag } from 'antd'
+import { Flex, Form } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisActionRow, AxisButton, AxisButtonGroup } from './AxisButton'
 import { PageActions, PageHeading } from './PageLayout'
 import { NotSet } from './EmptyValue'
 import { PartRule } from './SectionParts'
 import { RecordLink } from './RecordLink'
+import { StatusTag } from './StatusTag'
 import { TermList, type Term } from './TermList'
 import { RecordNotFound } from './RecordNotFound'
 import { SaveBar } from './SaveBar'
@@ -259,8 +260,9 @@ function TaskBody({
         title={t(task.labelKey)}
         line={t('shell.task.kind')}
         tags={
-          // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
-          task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>
+          // Proposed: an overdue task waits for a person past its due date, so it asks for attention, see the reviews on
+          // #3263 and #3650.
+          task.overdue && <StatusTag tone="attention">{t('shell.tasks.overdue')}</StatusTag>
         }
       />
       {facts.length > 0 && (

@@ -216,3 +216,20 @@ export function selectedItemTint(mode: ThemeMode): string {
 export function tableTheme(tokens: DesignTokens): ThemeConfig {
   return { components: { Table: { cellPaddingBlock: tokens.spacing.xs, cellPaddingInline: tokens.spacing.lg } } }
 }
+
+/**
+ * Proposed: the background and border of each status tone, from Ant Design's tints of the seed colours, as a diff reads
+ * its tints, see `StatusTag` and the reviews on #3263 and #3650.
+ */
+export function statusTints(
+  mode: ThemeMode,
+): Record<'neutral' | 'attention' | 'success' | 'danger' | 'muted', { background: string; border: string }> {
+  const token = theme.getDesignToken(antThemeFor(mode))
+  return {
+    neutral: { background: token.colorFillTertiary, border: token.colorBorderSecondary },
+    attention: { background: token.colorWarningBg, border: token.colorWarningBorder },
+    success: { background: token.colorSuccessBg, border: token.colorSuccessBorder },
+    danger: { background: token.colorErrorBg, border: token.colorErrorBorder },
+    muted: { background: 'transparent', border: token.colorBorderSecondary },
+  }
+}
