@@ -2774,5 +2774,21 @@
   "shell.valueTable.before": "Trước: {value}",
   "shell.inspector.graph.overdue": "quá hạn",
   "shell.inspector.graph.attempts": "{count} lần thử",
-  "shell.inspector.stateFor": "{state} {since}"
+  "shell.inspector.stateFor": "{state} {since}",
+  "shell.inspector.tab.diagram": "Sơ đồ",
+  "shell.inspector.tab.history": "Lịch sử",
+  "shell.inspector.tab.data": "Dữ liệu",
+  "shell.inspector.startedBy": "Khởi chạy bởi",
+  "shell.inspector.startedBy.user": "{name}",
+  "shell.inspector.startedBy.trigger": "Trigger: {name}",
+  "shell.inspector.startedBy.endpoint": "Endpoint: {name}",
+  "shell.inspector.startedBy.schedule": "Lịch: {name}",
+  "shell.inspector.startedBy.parent": "Quy trình: {name}",
+  "shell.inspector.duration": "Thời lượng",
+  "shell.inspector.instanceId": "ID lượt chạy",
+  "shell.inspector.startParameters": "Tham số khởi chạy",
+  "shell.inspector.noParameters": "Khởi chạy không kèm tham số.",
+  "shell.inspector.result": "Kết quả",
+  "shell.inspector.notEnded": "Lượt chạy chưa kết thúc.",
+  "shell.inspector.endedAtStep": "Kết thúc ở bước {step}."
 }

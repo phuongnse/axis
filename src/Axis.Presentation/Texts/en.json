@@ -2774,5 +2774,21 @@
   "shell.valueTable.before": "Before: {value}",
   "shell.inspector.graph.overdue": "overdue",
   "shell.inspector.graph.attempts": "{count} attempts",
-  "shell.inspector.stateFor": "{state} for {since}"
+  "shell.inspector.stateFor": "{state} for {since}",
+  "shell.inspector.tab.diagram": "Diagram",
+  "shell.inspector.tab.history": "History",
+  "shell.inspector.tab.data": "Data",
+  "shell.inspector.startedBy": "Started by",
+  "shell.inspector.startedBy.user": "{name}",
+  "shell.inspector.startedBy.trigger": "Trigger: {name}",
+  "shell.inspector.startedBy.endpoint": "Endpoint: {name}",
+  "shell.inspector.startedBy.schedule": "Schedule: {name}",
+  "shell.inspector.startedBy.parent": "Process: {name}",
+  "shell.inspector.duration": "Duration",
+  "shell.inspector.instanceId": "Instance ID",
+  "shell.inspector.startParameters": "Start parameters",
+  "shell.inspector.noParameters": "It started with no parameters.",
+  "shell.inspector.result": "Result",
+  "shell.inspector.notEnded": "The instance has not ended yet.",
+  "shell.inspector.endedAtStep": "Ended at {step}."
 }

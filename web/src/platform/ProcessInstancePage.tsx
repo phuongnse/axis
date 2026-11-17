@@ -1,4 +1,4 @@
-import { Flex, Tabs } from 'antd'
+import { Flex, Tabs, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -12,7 +12,6 @@ import {
   retryWarns,
   sendCommand,
   stateText,
-  timerDueAt,
   type InstanceCommand,
   type InstanceDetail,
 } from './inspection'
@@ -34,6 +33,8 @@ import { RecordNotFound } from './RecordNotFound'
 import { StepRunPanel } from './StepRunPanel'
 import { stepRunTabs, type StepRunTab } from './stepRunTabs'
 import { TermList, type Term } from './TermList'
+import { ValueTable } from './ValueTable'
+import { jsonRows } from './valueRows'
 import { ReasonDialog } from './ReasonDialog'
 import { SectionPart, SectionParts } from './SectionParts'
 import type { WidgetMetadata } from './site'
@@ -63,10 +64,10 @@ type InstanceState = InstanceDetail | null | typeof forbidden | 'failed'
 const dateTime = (name: string) => ({ name, type: 'date-time' }) as const
 
 /**
- * The tabs of an instance, in order: its facts, its steps on the process's graph, then its history, tasks, calls and
- * sub-processes.
+ * The tabs of an instance, in order: its steps on the process's graph, what it did, and the data it started and ended
+ * with, as AWS Step Functions and Temporal show an execution.
  */
-const instanceTabs = ['general', 'timeline', 'steps']
+const instanceTabs = ['diagram', 'history', 'data']
 
 /** How tall the graph of an instance's steps is drawn. */
 const graphHeight = 560
@@ -217,7 +218,6 @@ export function InstanceDetailView({
   const time = (name: string, value: string | null) =>
     value === null ? null : formatValue(dateTime(name), value, {}, { locale, text: t })
 
-  const due = timerDueAt(instance)
   const parentPage = instance.parent === null ? undefined : inspectors?.get(instance.parent.process)
 
   // The label of a transition out of a step, such as a task's outcome, from the process's texts, else its name.
@@ -228,6 +228,7 @@ export function InstanceDetailView({
     return labelKey ? t(labelKey) : name
   }
   const status = useInstanceStatus(instance, stepLabel, locale)
+  const clock = useMinuteClock()
   // Proposed: the timeline's search, filter, sort and page live in the address, and a click on a step in the graph
   // opens the timeline filtered to that step through the same filter, see the review on #3650.
   const { view: timelineView, setView: setTimelineView } = useTableView(
@@ -274,7 +275,7 @@ export function InstanceDetailView({
       { ...timelineView, page: 1, filter: { all: [{ field: 'step', op: 'eq', value: step }] } },
       recordPageSize,
     )
-    next.set('tab', 'timeline')
+    next.set('tab', 'history')
     setSearchParams(next, { preventScrollReset: true })
   }
 
@@ -286,6 +287,10 @@ export function InstanceDetailView({
   // docs/reference/actions-and-controls.md#showing-what-is-empty says. Started and Ended belong together, so they share
   // a row.
   const subject = instance.subject ?? null
+  // Proposed, see the review on #3650: what the platform keeps of the instance is a strip under its heading, always in
+  // view, as Camunda Operate, AWS Step Functions and Temporal head an instance: its record, when and by whom or what it
+  // started, how long it has run, its release and its id, and its parent when it has one.
+  const startedBy = instance.startedBy
   const facts: Term[] = [
     ...(subject === null
       ? []
@@ -298,32 +303,96 @@ export function InstanceDetailView({
                 {subject.label ?? subject.id}
               </RecordLink>
             ),
+            width: 3,
           },
         ]),
+    { key: 'createdAt', term: t('shell.inspector.createdAt'), value: time('createdAt', instance.createdAt), width: 2 },
     {
-      key: 'parent',
-      term: t('shell.inspector.parent'),
+      key: 'startedBy',
+      term: t('shell.inspector.startedBy'),
       value:
-        instance.parent === null ? (
+        startedBy === undefined ? (
           <NotSet />
-        ) : parentPage === undefined ? (
-          instance.parent.process
         ) : (
-          <Link to={inspectorPath(sitePath, parentPage, instance.parent.id)} data-testid="inspector-parent-link">
-            {instance.parent.process}
-          </Link>
+          <Flex vertical>
+            <span>{t(`shell.inspector.startedBy.${startedBy.kind}`).replace('{name}', startedBy.name)}</span>
+            {startedBy.via && <Typography.Text type="secondary">{startedBy.via}</Typography.Text>}
+          </Flex>
         ),
+      width: 2,
     },
-    { key: 'createdAt', term: t('shell.inspector.createdAt'), value: time('createdAt', instance.createdAt), width: 6 },
+    ...(instance.endedAt === null
+      ? []
+      : [{ key: 'endedAt', term: t('shell.inspector.endedAt'), value: time('endedAt', instance.endedAt), width: 2 }]),
     {
-      key: 'endedAt',
-      term: t('shell.inspector.endedAt'),
-      value: instance.endedAt === null ? <NotSet /> : time('endedAt', instance.endedAt),
-      width: 6,
+      key: 'duration',
+      term: t('shell.inspector.duration'),
+      value: durationText(instance.createdAt, instance.endedAt ?? clock.toISOString(), locale),
+      width: 2,
     },
-    ...(due === null ? [] : [{ key: 'dueAt', term: t('shell.inspector.dueAt'), value: time('dueAt', due) }]),
-    { key: 'release', term: t('shell.inspector.release'), value: instance.releaseNumber ?? instance.releaseId },
+    {
+      key: 'release',
+      term: t('shell.inspector.release'),
+      value: instance.releaseNumber ?? instance.releaseId,
+      width: 1,
+    },
+    {
+      key: 'id',
+      term: t('shell.inspector.instanceId'),
+      value: (
+        <Typography.Text copyable={{ text: instance.id }} ellipsis style={{ maxWidth: '100%' }}>
+          {instance.id.slice(0, 8)}
+        </Typography.Text>
+      ),
+      width: 2,
+    },
+    ...(instance.parent === null
+      ? []
+      : [
+          {
+            key: 'parent',
+            term: t('shell.inspector.parent'),
+            value:
+              parentPage === undefined ? (
+                instance.parent.process
+              ) : (
+                <Link to={inspectorPath(sitePath, parentPage, instance.parent.id)} data-testid="inspector-parent-link">
+                  {instance.parent.process}
+                </Link>
+              ),
+            width: 3,
+          },
+        ]),
   ]
+  // Proposed, see the review on #3650: the data the instance started with and, once it has ended, the end step it
+  // reached and the values it ended with, as AWS Step Functions' input and output and Temporal's input and result.
+  const dataTab = (
+    <Flex vertical gap={16}>
+      <div>
+        <Typography.Title level={5} style={{ margin: 0, marginBottom: 8, fontSize: 14 }}>
+          {t('shell.inspector.startParameters')}
+        </Typography.Title>
+        {instance.input === undefined || instance.input === null || Object.keys(instance.input).length === 0 ? (
+          <Typography.Text type="secondary">{t('shell.inspector.noParameters')}</Typography.Text>
+        ) : (
+          <ValueTable label={t('shell.inspector.startParameters')} rows={jsonRows(instance.input)} />
+        )}
+      </div>
+      <div>
+        <Typography.Title level={5} style={{ margin: 0, marginBottom: 8, fontSize: 14 }}>
+          {t('shell.inspector.result')}
+        </Typography.Title>
+        {instance.result === undefined || instance.result === null ? (
+          <Typography.Text type="secondary">{t('shell.inspector.notEnded')}</Typography.Text>
+        ) : (
+          <Flex vertical gap={8}>
+            <span>{t('shell.inspector.endedAtStep').replace('{step}', stepLabel(instance.result.step))}</span>
+            <ValueTable label={t('shell.inspector.result')} rows={jsonRows(instance.result.values)} />
+          </Flex>
+        )}
+      </div>
+    </Flex>
+  )
   const taken = new Set(instance.path.map((entry) => entry.step))
   // How many times each step ran, so a step run again shows it.
   const runCounts = new Map<string, number>()
@@ -464,55 +533,26 @@ export function InstanceDetailView({
         <InstanceCommands instance={instance} instancesPath={instancesPath} onChanged={onChanged} />
       </PageActions>
       {/* Proposed: a failed instance says at the top of its page where it stopped and why, as AWS Step Functions and
-          Camunda Operate do; a waiting one says nothing more than its tag and General, see the review on #3650. */}
+          Camunda Operate do; a waiting one says nothing more than its tag and the graph, see the review on #3650. */}
       {status?.kind === 'error' && (
         <div style={{ marginBottom: 16 }}>
           <AxisAlert data-testid="inspector-status" kind={status.kind} message={status.text} />
         </div>
       )}
+      <div data-testid="studio-section-inspector-details" style={{ marginBottom: 16 }}>
+        <TermList terms={facts} />
+      </div>
       <SectionParts>
-        {/* Proposed: a page with nothing to fill in has everything under its heading in tabs, its facts first as General,
-            the tab kept in the address, see the review on #3650. */}
+        {/* Proposed: everything under the strip is in tabs, the graph first, the tab kept in the address, see the
+            review on #3650. */}
         <SectionPart testName="inspector-tabs">
           <Tabs
             activeKey={tab}
             onChange={selectTab}
             items={[
               {
-                key: 'general',
-                label: t('shell.inspector.general'),
-                // Proposed: what the platform keeps of the instance, each fact on a row of its own, is its first tab,
-                // see the review on #3650.
-                children: (
-                  <div data-testid="studio-section-inspector-details">
-                    <TermList terms={facts} />
-                  </div>
-                ),
-              },
-              {
-                key: 'timeline',
-                label: t('shell.inspector.timeline'),
-                // Proposed: what the instance did is one timeline of its step runs, with the tasks, calls and
-                // sub-processes each started inside it, see the review on #3650.
-                children: (
-                  <InstanceTimeline
-                    instance={instance}
-                    instancesPath={instancesPath}
-                    sitePath={sitePath}
-                    inspectors={inspectors}
-                    locale={locale}
-                    stepLabel={stepLabel}
-                    outcomeLabel={outcomeLabel}
-                    view={timelineView}
-                    onViewChange={setTimelineView}
-                    onChanged={onChanged}
-                    onOpenRun={openRun}
-                  />
-                ),
-              },
-              {
-                key: 'steps',
-                label: t('shell.inspector.steps'),
+                key: 'diagram',
+                label: t('shell.inspector.tab.diagram'),
                 // Proposed: the steps are the process's graph, drawn as the process designer draws it, focused on the
                 // step the instance is at, each step run more than once marked with its count; a click on a step
                 // shows its runs in the timeline, see the review on #3650.
@@ -540,6 +580,32 @@ export function InstanceDetailView({
                     onStepClick={(id) => openRun(id)}
                   />
                 ),
+              },
+              {
+                key: 'history',
+                label: t('shell.inspector.tab.history'),
+                // Proposed: what the instance did is one timeline of its step runs, with the tasks, calls and
+                // sub-processes each started inside it, see the review on #3650.
+                children: (
+                  <InstanceTimeline
+                    instance={instance}
+                    instancesPath={instancesPath}
+                    sitePath={sitePath}
+                    inspectors={inspectors}
+                    locale={locale}
+                    stepLabel={stepLabel}
+                    outcomeLabel={outcomeLabel}
+                    view={timelineView}
+                    onViewChange={setTimelineView}
+                    onChanged={onChanged}
+                    onOpenRun={openRun}
+                  />
+                ),
+              },
+              {
+                key: 'data',
+                label: t('shell.inspector.tab.data'),
+                children: dataTab,
               },
             ]}
           />

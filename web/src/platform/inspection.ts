@@ -264,6 +264,15 @@ export interface InstanceDetail {
    */
   subject?: { entity: string; id: string; label: string | null } | null
   /**
+   * Proposed, see the review on #3650: who or what started the instance: a person, with the action they took, a
+   * trigger, an endpoint, a schedule, or the instance of a parent process.
+   */
+  startedBy?: { kind: 'user' | 'trigger' | 'endpoint' | 'schedule' | 'parent'; name: string; via?: string | null }
+  /** Proposed, see the review on #3650: the parameters the instance started with, under the masking rule. */
+  input?: Record<string, unknown> | null
+  /** Proposed, see the review on #3650: the end step an ended instance reached, and the values it ended with. */
+  result?: { step: string; values: Record<string, unknown> } | null
+  /**
    * Proposed, see D155 and the review on #3650: every path the instance is at, when it is at more than one step; `step`
    * then names the first.
    */
