@@ -6,10 +6,14 @@ import userEvent from '@testing-library/user-event'
 import { Profiler, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
+import { formatValue } from '../platform/formatValue'
 import { TextProvider } from '../platform/TextProvider'
 import { colourTokens, sizeTokens } from '../platform/designTokens'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
+import type { ExpressionReading as Reading, StudioNames } from '../platform/studio'
+import { PlatformContext, type Platform } from './context'
 import ExpressionEditor from './ExpressionEditor'
 import { rankEntries, type PanelEntry } from './expressionPanelEntries'
 import type { ScopeOption } from './expressionScope'
@@ -770,6 +774,246 @@ describe('ExpressionEditor expand', () => {
 
     expect(dialogView.state.doc.toString()).toBe("amount > 0''")
     expect(dialogView.state.selection.main.head).toBe(11)
+  })
+})
+
+describe('ExpressionEditor reading', () => {
+  /** The labels of the purchase request's fields and values, as the names answer lists them. */
+  const names = {
+    locales: ['en', 'vi'],
+    texts: [
+      { key: 'purchaseRequest.status', texts: { en: 'Status', vi: 'Trạng thái' }, usedBy: 1 },
+      { key: 'purchaseRequest.status.draft', texts: { en: 'Draft', vi: 'Nháp' }, usedBy: 1 },
+      { key: 'purchaseRequest.amount', texts: { en: 'Amount', vi: 'Số tiền' }, usedBy: 1 },
+      { key: 'purchaseRequest.urgent', texts: { en: 'Urgent', vi: 'Khẩn cấp' }, usedBy: 1 },
+      { key: 'purchaseRequest.dueDate', texts: { en: 'Due date', vi: 'Hạn chót' }, usedBy: 1 },
+    ],
+  } as unknown as StudioNames
+
+  /** The reading of `(status == 'draft' and amount >= 1000) or not (urgent or dueDate < date('2026-01-31'))`. */
+  const reading: Reading = {
+    kind: 'any',
+    items: [
+      {
+        kind: 'all',
+        items: [
+          {
+            kind: 'phrase',
+            words: 'equal',
+            slots: [
+              [{ kind: 'name', name: 'status', labelKey: 'purchaseRequest.status' }],
+              [{ kind: 'value', type: 'enum', value: 'draft', labelKey: 'purchaseRequest.status.draft' }],
+            ],
+          },
+          {
+            kind: 'phrase',
+            words: 'greater-or-equal',
+            slots: [
+              [{ kind: 'name', name: 'amount', labelKey: 'purchaseRequest.amount' }],
+              [{ kind: 'value', type: 'integer', value: 1000, labelKey: null }],
+            ],
+          },
+        ],
+      },
+      {
+        kind: 'none',
+        items: [
+          {
+            kind: 'phrase',
+            words: 'is-true',
+            slots: [[{ kind: 'name', name: 'urgent', labelKey: 'purchaseRequest.urgent' }]],
+          },
+          {
+            kind: 'phrase',
+            words: 'less.date',
+            slots: [
+              [{ kind: 'name', name: 'dueDate', labelKey: 'purchaseRequest.dueDate' }],
+              [{ kind: 'value', type: 'date', value: '2026-01-31', labelKey: null }],
+            ],
+          },
+        ],
+      },
+    ],
+  }
+
+  /** Renders the editor in a locale, with the answers of the check route and the scope route. */
+  function renderReading(locale: string, check: () => Response, scope?: unknown) {
+    vi.stubGlobal('fetch', routes(check, scope))
+    mountReading(locale)
+  }
+
+  function mountReading(locale: string) {
+    render(
+      <ThemeModeProvider>
+        <PlatformContext.Provider value={{ current: { locale, texts: {} } } as Platform}>
+          <TextProvider
+            catalogs={[
+              { texts: locale === 'vi' ? platformVietnamese : platformEnglish, fallbackTexts: platformEnglish },
+            ]}
+            development={false}
+          >
+            <ExpressionEditor
+              application="PurchaseRequests"
+              resourceId={resourceId}
+              path={path}
+              name="expression"
+              value="status == 'draft'"
+              required
+              draft={() => ({})}
+              options={() => []}
+              names={names}
+              onChange={vi.fn()}
+            />
+          </TextProvider>
+        </PlatformContext.Provider>
+      </ThemeModeProvider>,
+    )
+  }
+
+  const date = (locale: string) =>
+    formatValue({ name: '', type: 'date' }, '2026-01-31', {}, { locale, text: (key) => key })
+
+  it.each([
+    {
+      locale: 'en',
+      leadIn: 'In words:',
+      bold: ['Status', 'Amount', 'Urgent', 'Due date'],
+      andLine: 'Status is Draft and Amount is at least 1,000',
+      urgentLine: 'Urgent is yes',
+      dueLine: 'Due date is before',
+    },
+    {
+      locale: 'vi',
+      leadIn: 'Nghĩa là:',
+      bold: ['Trạng thái', 'Số tiền', 'Khẩn cấp', 'Hạn chót'],
+      andLine: 'Trạng thái bằng Nháp và Số tiền lớn hơn hoặc bằng 1.000',
+      urgentLine: 'Khẩn cấp là có',
+      dueLine: 'Hạn chót trước',
+    },
+  ])('reads the expression in $locale with its labels, values and numbers', async (copy) => {
+    renderReading(copy.locale, () => json({ type: 'boolean', diagnostics: [], reading }))
+
+    const line = await screen.findByTestId('studio-expression-reading')
+    expect(line).toHaveTextContent(copy.leadIn)
+    expect(Array.from(line.querySelectorAll('strong'), (label) => label.textContent)).toEqual(copy.bold)
+    expect(line).toHaveTextContent(copy.andLine)
+    expect(line).toHaveTextContent(copy.urgentLine)
+    expect(line).toHaveTextContent(`${copy.dueLine} ${date(copy.locale)}`)
+  })
+
+  it('reads a group that holds a group as a list, with a nested list under "None of these:"', async () => {
+    renderReading('en', () => json({ type: 'boolean', diagnostics: [], reading }))
+
+    const line = await screen.findByTestId('studio-expression-reading')
+    const group = within(line).getByText('At least one of these:').parentElement!
+    const [first, second] = Array.from(group.querySelector(':scope > ul')!.children)
+    expect(first).toHaveTextContent('Status is Draft and Amount is at least 1,000')
+    expect(first.querySelector('ul')).toBeNull()
+    expect(second).toHaveTextContent(/^None of these:/)
+    expect(Array.from(second.querySelectorAll('li'), (item) => item.textContent)).toEqual([
+      'Urgent is yes',
+      `Due date is before ${date('en')}`,
+    ])
+  })
+
+  it('shows no type line at a place that needs yes or no', async () => {
+    renderReading('en', () => json({ type: 'boolean', diagnostics: [], reading }), {
+      type: 'boolean',
+      fields: [],
+      functions: [],
+    })
+
+    await screen.findByTestId('studio-expression-reading')
+    await waitFor(() => expect(screen.queryByTestId('studio-expression-type')).not.toBeInTheDocument())
+  })
+
+  it('shows the type under the reading at a place that takes any type', async () => {
+    renderReading('en', () => json({ type: 'boolean', diagnostics: [], reading }), {
+      type: null,
+      fields: [],
+      functions: [],
+    })
+
+    const line = await screen.findByTestId('studio-expression-reading')
+    await waitFor(() => expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('Gives yes or no'))
+    expect(line.compareDocumentPosition(screen.getByTestId('studio-expression-type'))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+  })
+
+  it('shows the error, and no reading, while the check answers a diagnostic', async () => {
+    let answer: unknown = { type: 'boolean', diagnostics: [], reading }
+    renderReading('en', () => json(answer))
+    await screen.findByTestId('studio-expression-reading')
+
+    answer = { type: null, diagnostics: [{ code: 'AXC0030', message: 'Bad name.', start: 0, end: 5 }], reading: null }
+    act(() => editTo('nme > 1'))
+
+    await waitFor(() => expect(screen.getByTestId('studio-expression-error')).toHaveTextContent('Bad name. AXC0030'))
+    expect(screen.queryByTestId('studio-expression-reading')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['en', 'In words: today plus 7 days'],
+    ['vi', 'Nghĩa là: hôm nay cộng 7 ngày'],
+  ])('reads the function call addDays(today(), 7) in words in %s', async (locale, line) => {
+    renderReading(locale, () =>
+      json({
+        type: 'date',
+        diagnostics: [],
+        reading: {
+          kind: 'phrase',
+          words: 'fn.addDays',
+          slots: [
+            [{ kind: 'phrase', words: 'fn.today', slots: [] }],
+            [{ kind: 'value', type: 'integer', value: 7, labelKey: null }],
+          ],
+        },
+      }),
+    )
+
+    await waitFor(() => expect(screen.getByTestId('studio-expression-reading')).toHaveTextContent(line))
+  })
+
+  it('reads a field with no label as its name, and a text value between single quotes', async () => {
+    renderReading('en', () =>
+      json({
+        type: 'boolean',
+        diagnostics: [],
+        reading: {
+          kind: 'phrase',
+          words: 'equal',
+          slots: [
+            [{ kind: 'name', name: 'reference', labelKey: null }],
+            [{ kind: 'value', type: 'text', value: 'PR-', labelKey: null }],
+          ],
+        },
+      }),
+    )
+
+    const line = await screen.findByTestId('studio-expression-reading')
+    expect(line).toHaveTextContent("reference is 'PR-'")
+    expect(within(line).getByText('reference').tagName).toBe('STRONG')
+  })
+
+  it('asks for the scope again with the next check answer when the first one had none', async () => {
+    let scopeAnswer: () => Response = () => json({}, 404)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) =>
+        input === scopePath ? scopeAnswer() : json({ type: 'boolean', diagnostics: [], reading }),
+      ),
+    )
+    mountReading('en')
+
+    await screen.findByTestId('studio-expression-reading')
+    await waitFor(() => expect(screen.getByTestId('studio-expression-type')).toHaveTextContent('Gives yes or no'))
+
+    scopeAnswer = () => json({ type: 'boolean', fields: [], functions: [] })
+    act(() => editTo('urgent'))
+
+    await waitFor(() => expect(screen.queryByTestId('studio-expression-type')).not.toBeInTheDocument())
+    expect(screen.getByTestId('studio-expression-reading')).toBeInTheDocument()
   })
 })
 
