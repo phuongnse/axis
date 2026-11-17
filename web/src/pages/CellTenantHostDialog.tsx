@@ -6,6 +6,7 @@ import { AxisField } from '../platform/AxisField'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { requestCellTenantHost, type CellHostRequest } from '../platform/cell'
 import { requiredMark } from '../platform/requiredMark'
+import { recordPageSize, type TableQuery } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { usePlatform } from './context'
@@ -29,7 +30,8 @@ interface CellTenantHostDialogProps {
  * records that the customer must add, with the date the request expires. Add is on until a request runs. A click with
  * the host empty shows what is missing under the field, focuses it and sends nothing, see
  * docs/reference/actions-and-controls.md#fields. A refused request keeps the dialog open with the cell's reason. An
- * answered request calls `onAdded`, so the page can show the new request.
+ * answered request calls `onAdded`, so the page can show the new request. The records table has Filter on each of its
+ * columns, kept in the dialog and not in the address, see docs/reference/cell-console.md#actions.
  */
 export function CellTenantHostDialog({ tenant, onRefused, onAdded, onClose }: CellTenantHostDialogProps) {
   const t = useText()
@@ -39,6 +41,8 @@ export function CellTenantHostDialog({ tenant, onRefused, onAdded, onClose }: Ce
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [added, setAdded] = useState<CellHostRequest | null>(null)
+  // The records table's view is the dialog's own state, so it keeps nothing in the address, as a table in a dialog does.
+  const [query, setQuery] = useState<TableQuery>({ page: 1, pageSize: recordPageSize, sort: null })
 
   async function add(host: string) {
     setSending(true)
@@ -68,13 +72,33 @@ export function CellTenantHostDialog({ tenant, onRefused, onAdded, onClose }: Ce
       ]
     : []
   const columns: AxisColumn<RecordRow>[] = [
-    { key: 'type', kind: 'fixed', title: t('shell.cell.tenant.hostRecord.type'), render: (_value, row) => row.type },
-    { key: 'name', kind: 'freeText', title: t('shell.cell.tenant.hostRecord.name'), render: (_value, row) => row.name },
+    {
+      key: 'type',
+      kind: 'fixed',
+      title: t('shell.cell.tenant.hostRecord.type'),
+      render: (_value, row) => row.type,
+      filter: {
+        kind: 'enum',
+        value: (row) => row.type,
+        options: [
+          { value: 'TXT', label: 'TXT' },
+          { value: 'CNAME', label: 'CNAME' },
+        ],
+      },
+    },
+    {
+      key: 'name',
+      kind: 'freeText',
+      title: t('shell.cell.tenant.hostRecord.name'),
+      render: (_value, row) => row.name,
+      filter: { kind: 'text', value: (row) => row.name },
+    },
     {
       key: 'value',
       kind: 'freeText',
       title: t('shell.cell.tenant.hostRecord.value'),
       render: (_value, row) => row.value,
+      filter: { kind: 'text', value: (row) => row.value },
     },
   ]
 
@@ -106,6 +130,7 @@ export function CellTenantHostDialog({ tenant, onRefused, onAdded, onClose }: Ce
               rowKey={(row) => row.key}
               dataSource={records}
               columns={columns}
+              view={{ query, onChange: setQuery }}
               emptyText=""
             />
             <Typography.Text>

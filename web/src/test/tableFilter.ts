@@ -23,14 +23,14 @@ export const filterTexts = {
   'shell.table.filterOp.empty': 'is empty',
 }
 
-/** The filter builder's dialog. */
+/** The filter builder's dialog. A table in a dialog has the builder over its own dialog, so a test passes `scope`. */
 export const dialog = () => screen.getByRole('dialog')
 
-export const clickInDialog = (name: string, index = 0) =>
-  userEvent.click(within(dialog()).getAllByRole('button', { name })[index])
+export const clickInDialog = (name: string, index = 0, scope: HTMLElement = dialog()) =>
+  userEvent.click(within(scope).getAllByRole('button', { name })[index])
 
-/** Picks `title` in the `index`th picker named `name` of the filter dialog. */
-export async function pick(name: string, index: number, title: string) {
-  await userEvent.click(within(dialog()).getAllByRole('combobox', { name })[index])
+/** Picks `title` in the `index`th picker named `name` of the filter dialog, or of `scope` when given. */
+export async function pick(name: string, index: number, title: string, scope: HTMLElement = dialog()) {
+  await userEvent.click(within(scope).getAllByRole('combobox', { name })[index])
   await chooseOption(title)
 }
