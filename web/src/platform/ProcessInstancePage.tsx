@@ -26,6 +26,7 @@ import { PageActions, PageHeading } from './PageLayout'
 import { ProcessGraphCanvas, type ProcessGraphStep, type ProcessGraphTransitionView } from './ProcessGraph'
 import { RecordLink } from './RecordLink'
 import { RecordNotFound } from './RecordNotFound'
+import { StepRunsPanel } from './StepRunsPanel'
 import { TermList, type Term } from './TermList'
 import { ReasonDialog } from './ReasonDialog'
 import { SectionPart, SectionParts } from './SectionParts'
@@ -60,6 +61,9 @@ const dateTime = (name: string) => ({ name, type: 'date-time' }) as const
  * sub-processes.
  */
 const instanceTabs = ['general', 'timeline', 'steps']
+
+/** How tall the graph of an instance's steps is drawn. */
+const graphHeight = 560
 
 /** The timeline's columns that its filter and sort may name, kept in the address by `useTableView`. */
 const timelineFields = [
@@ -223,6 +227,8 @@ export function InstanceDetailView({
     true,
   )
   const [searchParams, setSearchParams] = useSearchParams()
+  // The step chosen on the graph, first the one the instance is at.
+  const [chosenStep, setChosenStep] = useState<string | null>(instance.step)
   const showStep = (step: string) => {
     const next = writeTableQuery(
       searchParams,
@@ -427,10 +433,30 @@ export function InstanceDetailView({
                     transitions={graphTransitions}
                     ariaLabel={t('shell.inspector.steps')}
                     testId="inspector-graph"
-                    height={560}
+                    height={graphHeight}
                     focus={instance.step}
                     controls
-                    onStepClick={showStep}
+                    // Proposed: a click on a step chooses it and shows its runs beside the graph, which stays in view,
+                    // as Camunda Operate shows a flow node's details; its runs in the timeline are a link away, see the
+                    // review on #3650.
+                    selected={chosenStep}
+                    onSelect={setChosenStep}
+                    aside={
+                      chosenStep === null ? undefined : (
+                        <StepRunsPanel
+                          instance={instance}
+                          step={chosenStep}
+                          stepLabel={stepLabel}
+                          outcomeLabel={outcomeLabel}
+                          inspectors={inspectors}
+                          sitePath={sitePath}
+                          locale={locale}
+                          maxHeight={graphHeight - 24 - 160}
+                          onClose={() => setChosenStep(null)}
+                          onShowInTimeline={showStep}
+                        />
+                      )
+                    }
                   />
                 ),
               },

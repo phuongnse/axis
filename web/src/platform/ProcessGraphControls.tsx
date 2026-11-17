@@ -21,7 +21,7 @@ const moving = 300
  * with their names in the reader's language as tooltips: Zoom in, Zoom out, Show the whole process, Go to the current
  * step where there is one, and Full screen, which gives the graph the whole screen through the browser's full screen
  * until Esc or Exit full screen. Find a step moves the view to a step chosen by its label and marks it. The keys +, −,
- * 0 and F do the same while the graph has the focus. An overview
+ * 0 and F do the same while the graph has the focus, and Esc clears the step chosen. An overview
  * at the corner, as Camunda Operate and Signavio show a long diagram, marks the part in view and moves the view where
  * it is dragged or clicked.
  */
@@ -29,21 +29,21 @@ export function ProcessGraphControls({
   area,
   focus,
   steps,
-  onFound,
+  selected,
+  onSelect,
 }: {
   area: RefObject<HTMLElement | null>
   focus?: string
   /** The steps Find a step offers, by their labels. */
   steps: readonly { id: string; label: string }[]
-  /** Called with the step Find a step shows, or `null` once it is cleared, so the graph marks it. */
-  onFound: (id: string | null) => void
+  /** The step chosen on the graph, which Find a step shows, and the call that chooses one, or none with `null`. */
+  selected: string | null
+  onSelect: (id: string | null) => void
 }) {
   const { zoomIn, zoomOut, fitView } = useReactFlow()
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
   const [full, setFull] = useState(false)
-  // The step Find a step shows: the one an instance is at, until another is chosen.
-  const [chosen, setChosen] = useState<string | null>(focus ?? null)
 
   useEffect(() => {
     const follow = () => setFull(document.fullscreenElement !== null && document.fullscreenElement === area.current)
@@ -82,6 +82,7 @@ export function ProcessGraphControls({
         '0': fitAll,
         f: toggle,
         F: toggle,
+        Escape: () => onSelect(null),
       }
       const run = act[event.key]
       if (run) {
@@ -124,7 +125,7 @@ export function ProcessGraphControls({
         <Select
           showSearch
           allowClear
-          value={chosen}
+          value={selected}
           placeholder={t('shell.graph.find')}
           aria-label={t('shell.graph.find')}
           // As wide as a step's card, so a long label reads whole.
@@ -132,8 +133,7 @@ export function ProcessGraphControls({
           optionFilterProp="label"
           options={steps.map((step) => ({ value: step.id, label: step.label }))}
           onChange={(id: string | null | undefined) => {
-            setChosen(id ?? null)
-            onFound(id ?? null)
+            onSelect(id ?? null)
             if (id !== null && id !== undefined) {
               find(id)
             }
@@ -182,8 +182,7 @@ export function ProcessGraphControls({
               icon={<AimOutlined />}
               onClick={() => {
                 // Going back to the current step shows it in Find a step too.
-                setChosen(focus)
-                onFound(focus)
+                onSelect(focus)
                 find(focus)
               }}
             />

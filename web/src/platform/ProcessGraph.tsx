@@ -10,6 +10,7 @@ import {
   type NodeProps,
   type OnConnectEnd,
   Position,
+  Panel,
   ReactFlow,
   useReactFlow,
 } from '@xyflow/react'
@@ -26,6 +27,7 @@ import {
 import {
   type ComponentType,
   createContext,
+  type ReactNode,
   type KeyboardEvent,
   useContext,
   useEffect,
@@ -516,7 +518,7 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
   )
 }
 
-/** The step Find a step shows, which its node marks while it stays chosen. */
+/** The step chosen on the graph, which its node marks while it stays chosen. */
 const FoundStep = createContext<string | null>(null)
 
 const nodeTypes = { step: StepNodeView }
@@ -544,6 +546,9 @@ export function ProcessGraphCanvas({
   onConnectEnd,
   focus,
   controls = false,
+  selected,
+  onSelect,
+  aside,
 }: {
   steps: readonly ProcessGraphStep[]
   transitions: readonly ProcessGraphTransitionView[]
@@ -561,11 +566,24 @@ export function ProcessGraphCanvas({
   focus?: string
   /** Proposed, see the review on #3650: Zoom in, Zoom out, Show the whole process and Full screen, for a graph too large to read whole. */
   controls?: boolean
+  /**
+   * Proposed, see the review on #3650: the step chosen on the graph, by a click on it or by Find a step, which it marks
+   * at the current step's weight in its own colour, and `null` for none; without it the graph keeps its own choice.
+   */
+  selected?: string | null
+  onSelect?: (id: string | null) => void
+  /** Proposed, see the review on #3650: what the graph shows beside it at its top right, such as the chosen step's runs. */
+  aside?: ReactNode
 }) {
   const { mode } = useThemeMode()
   const area = useRef<HTMLElement | null>(null)
-  // The step Find a step shows, marked as long as it stays chosen.
-  const [found, setFound] = useState<string | null>(focus ?? null)
+  // The step chosen on the graph, marked as long as it stays chosen.
+  const [ownChoice, setOwnChoice] = useState<string | null>(focus ?? null)
+  const chosen = selected !== undefined ? selected : ownChoice
+  const choose = (id: string | null) => {
+    setOwnChoice(id)
+    onSelect?.(id)
+  }
   const { colour, radius } = useDesignTokens()
   const [layout, setLayout] = useState<Layout | null>(null)
 
@@ -663,7 +681,7 @@ export function ProcessGraphCanvas({
       style={{ height, position: 'relative', background: colour.canvas, borderRadius: radius.base }}
       onKeyDown={onKeyDown}
     >
-      <FoundStep.Provider value={found}>
+      <FoundStep.Provider value={chosen}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -683,16 +701,26 @@ export function ProcessGraphCanvas({
           deleteKeyCode={null}
           zoomOnScroll={false}
           onConnectEnd={onConnectEnd}
-          onNodeClick={onStepClick ? (_, node) => onStepClick(node.id) : undefined}
+          // A designer's click opens the step it edits; a viewer's chooses the step, and a click on the ground clears it.
+          onNodeClick={
+            onStepClick ? (_, node) => onStepClick(node.id) : controls ? (_, node) => choose(node.id) : undefined
+          }
+          onPaneClick={controls && !onStepClick ? () => choose(null) : undefined}
           onEdgeClick={onTransitionClick ? (_, edge) => onTransitionClick(edge.id) : undefined}
         >
           <FitOnLayout layout={layout} focus={focus} />
+          {aside && (
+            <Panel position="top-right" style={{ margin: 12 }}>
+              {aside}
+            </Panel>
+          )}
           {controls && (
             <ProcessGraphControls
               area={area}
               focus={focus}
               steps={steps.map((step) => ({ id: step.id, label: step.name }))}
-              onFound={setFound}
+              selected={chosen}
+              onSelect={choose}
             />
           )}
         </ReactFlow>
