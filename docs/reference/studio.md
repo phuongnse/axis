@@ -471,8 +471,8 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
   - An entity grant, and no other, also edits its record filter and its fields. The **Fields** picker's
     help says an empty list grants every field, so clearing it removes the `fields` key.
   - Add grant adds a grant named after the cell's target with the first free number in the policy,
-    ignoring letter case, such as `purchaseRequest1`. A grant shows its name read-only. Remove deletes a
-    grant, but not the policy's last one.
+    ignoring letter case, such as `purchaseRequest1`. A grant shows its name read-only.
+  - **Delete grant.** _(planned for M35)_ It deletes a grant, but not the policy's last one.
 - **Saving.** Save is off while nothing changed. A click with a grant that has no ticked action says so under its
   actions, focuses them and sends nothing. It writes one file, with one patch that carries the version the panel
   loaded and changes only what the author edited. A stale version shows a conflict message, keeps the draft and offers
@@ -659,13 +659,15 @@ panel, its undo and its drag and drop.
   line for each of its diagnostics, with the code and the message. A widget is marked when a diagnostic
   of the page, of any severity, names its `path` or a path inside it, so a container is marked too when
   a widget inside it has one, even in a closed section or an inactive tab. A marked widget has a border
-  in the `danger` colour, "has diagnostics" in its text label, and `data-marked`. The marks follow the
+  in the `danger` colour, its text label, and `data-marked`. The marks follow the
   route's latest answer, and so the unsaved draft.
+- **Marked names.** _(planned for M35)_ A marked widget's text label reads "{name}, has problems", where the name is
+  its frame's name: the widget's type and the name it binds.
 - **Selection.** A click on the canvas or a pick in the widget tree selects a widget in both. A click
   selects the innermost widget under the pointer, and a click on the empty area of a container selects
   the container. The selected widget has `aria-current` and an outline in the primary colour. Every
   frame is a Tab stop, and Enter or Space selects it. A frame's name is its widget's type and the name
-  it binds, such as `table` and `PurchaseRequestList`, and says "has diagnostics" when it is marked. The
+  it binds, such as `table` and `PurchaseRequestList`, and reads as the marks above say when it is marked. The
   selection is kept across the Design and Form tabs while the resource stays open, and is not in the
   URL's `path`, which opens the Form tab.
 - **Property panel.** The side pane holds the whole widget tree and the panel of the selected widget,
@@ -821,7 +823,7 @@ Operations heading, and the JSON view stays as the second view of the same draft
   level 1. Choosing one adds `fields` and removes `in`, and a scalar type removes `fields`. The compiler
   reports placement and path errors after the save, see
   [structured payloads](integration-resources.md#structured-payloads).
-- **Output source.** An optional Source box holds a JSON Pointer into the response, and an empty box
+- **Read from.** _(planned for M35)_ An optional Source box holds a JSON Pointer into the response, and an empty box
   removes `source`.
 - **Unknown keys.** A key the editor does not show, in the file, in an operation or in `auth`, is saved
   unchanged.
@@ -841,13 +843,13 @@ the Assurance heading, and the JSON view stays as the second view of the same dr
   stored. No value is shown or stored. `oidc` shows the issuer, the client ID, and a choice of client
   credential: a client secret, or a client key for `private_key_jwt`, each option with its own help.
   `saml` shows the metadata. Name and Type carry the shared required mark.
-- **Label.** The "Continue with" label sits in Sign-in, after the bindings, and has its texts in every locale, see [label texts](#label-texts).
+- **Label.** _(planned for M35)_ The "Name on the sign-in button" field sits in Sign-in, after the bindings, and has its texts in every locale, see [label texts](#label-texts).
 - **Claims.** The display name, email and locale claims are name boxes that show their defaults,
   `name`, `email` and `locale`, until the author types another name.
 - **Roles.** The roles claim is a name box that shows `roles` by default. `values` are rows of a claim
   value and a role picked from the application's roles, one field to a line, with add and remove. With no rows, a claim
   value gives the role of the same name, and the editor says so.
-- **Assurance.** `acr` is a list of text rows, each with Remove below, and with none the key is removed.
+- **Assurance.** _(planned for M35)_ `acr` is a list of text rows, each with Delete below, and with none the key is removed.
 - **Unknown keys.** A key the editor does not show is saved unchanged.
 
 ### A site's sign-in

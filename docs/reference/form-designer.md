@@ -38,8 +38,8 @@ The canvas has no record, so it evaluates no condition and shows every field and
 with `visibleWhen`, `requiredWhen` or `readOnlyWhen` carries a mark that names each condition and shows
 its text from the draft, such as "Visible when: status == 'resolved'".
 
-A section or field that a diagnostic of the form names is marked as in the page designer: a frame with
-an error-coloured border, "has diagnostics" in its text label, and `data-marked`.
+A section or field that a diagnostic of the form names is marked as in the [page designer](studio.md#page-designer):
+a frame with an error-coloured border, its text label, and `data-marked`.
 
 ## Field palette
 
@@ -108,10 +108,10 @@ can remove it. Each add or remove is one Undo step, and a live region names what
   first one included, gets the first free name `step1`, `step2` and so on, ignoring letter case.
 - **A new part draws once it holds something.** Until a field goes into an empty section or step and its
   texts are written, the canvas shows its cannot-be-drawn notice.
-- **Remove section,** in a section's panel, takes it out of `sections` and of every step that lists it,
+- **Delete section,** _(planned for M35)_ in a section's panel, takes it out of `sections` and of every step that lists it,
   and its fields return to the palette. The step that listed it is selected. Conditions that name the
   removed section's fields are not rewritten.
-- **Remove step,** in a step's panel, keeps the step's sections in `sections`. No step then lists them,
+- **Delete step,** _(planned for M35)_ in a step's panel, keeps the step's sections in `sections`. No step then lists them,
   which the diagnostics flag (`AXC0230`), and nothing stays selected. Removing the last step removes
   `steps`, so the form goes back to one page.
 
@@ -125,8 +125,8 @@ The selection is kept across the Design, Form and JSON tabs while the resource s
 | Element | The panel shows                                                                                                                                                                                                 |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Field   | `readOnly`, its three conditions in the expression editor, its `width` and a Remove field button. The width is a whole number from 1 to 12, and the canvas draws the fields in their [columns](form-widget.md). |
-| Section | Its name, title and `visibleWhen`, a Remove section button and, on a form with steps, the Step picker                                                                                                           |
-| Step    | Its title and a Remove step button                                                                                                                                                                              |
+| Section | _(planned for M35)_ Its name, title and `visibleWhen`, a Delete section button and, on a form with steps, the Step picker                                                                                       |
+| Step    | _(planned for M35)_ Its title and a Delete step button                                                                                                                                                          |
 
 - **Conditions offer the form's fields.** The expression editor of a condition offers only the fields
   that the form lists, because a condition reads only those.
