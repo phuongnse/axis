@@ -250,6 +250,8 @@ export function ProcessGraphCanvas({
         colorMode={mode}
         fitView
         minZoom={0.1}
+        // A small process is drawn at its own size, never zoomed in past it, so its text keeps the body size.
+        maxZoom={1}
         nodesDraggable={false}
         nodesConnectable={onConnectEnd !== undefined}
         nodesFocusable={false}

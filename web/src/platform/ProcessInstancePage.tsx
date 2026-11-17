@@ -57,8 +57,8 @@ type InstanceState = InstanceDetail | null | typeof forbidden | 'failed'
 
 const dateTime = (name: string) => ({ name, type: 'date-time' }) as const
 
-/** The tabs of what an instance did, in order: its history, then its tasks, calls and sub-processes. */
-const instanceTabs = ['history', 'tasks', 'calls', 'subProcesses']
+/** The tabs of an instance, in order: its steps on the process's graph, then its history, tasks, calls and sub-processes. */
+const instanceTabs = ['steps', 'history', 'tasks', 'calls', 'subProcesses']
 
 /**
  * Shows one instance under the page of its process inspector: its state and step, the steps of
@@ -191,7 +191,6 @@ export function InstanceDetailView({
   stepNames = false,
 }: InstanceDetailViewProps) {
   const t = useText()
-  const { colour } = useDesignTokens()
   const stepsByName = useMemo(
     () => new Map(instance.graph.steps.map((step) => [step.name, step])),
     [instance.graph.steps],
@@ -419,11 +418,6 @@ export function InstanceDetailView({
   )
 
   const [tab, selectTab] = useAddressTab('tab', instanceTabs)
-  const tabLabel = (label: string, count: number) => (
-    <>
-      {label} <span style={{ color: colour.textMuted }}>{count}</span>
-    </>
-  )
   return (
     <div data-testid="inspector-instance">
       <PageHeading
@@ -444,28 +438,32 @@ export function InstanceDetailView({
         <SectionPart testName="inspector-details">
           <TermList terms={facts} />
         </SectionPart>
-        <SectionPart testName="inspector-steps" heading={{ title: t('shell.inspector.steps') }}>
-          {/* Proposed: the steps are the process's graph, drawn as the process designer draws it, with the steps the
-              instance has run and the transitions it took in the success colour and the step it is at in the
-              primary colour, see the review on #3650. */}
-          <ProcessGraphCanvas
-            steps={graphSteps}
-            transitions={graphTransitions}
-            ariaLabel={t('shell.inspector.steps')}
-            testId="inspector-graph"
-            height={400}
-          />
-        </SectionPart>
-        {/* Proposed: what the instance did is in tabs, as content of different kinds with nothing to fill in, the tab
-            kept in the address, each label with its count, see the review on #3650. */}
+        {/* Proposed: the instance's steps and what it did are in tabs, as content of different kinds with nothing to fill
+            in, the tab kept in the address, see the review on #3650. */}
         <SectionPart testName="inspector-tabs">
           <Tabs
             activeKey={tab}
             onChange={selectTab}
             items={[
               {
+                key: 'steps',
+                label: t('shell.inspector.steps'),
+                // Proposed: the steps are the process's graph, drawn as the process designer draws it, with the steps
+                // the instance has run and the transitions it took in the success colour and the step it is at in the
+                // primary colour, see the review on #3650.
+                children: (
+                  <ProcessGraphCanvas
+                    steps={graphSteps}
+                    transitions={graphTransitions}
+                    ariaLabel={t('shell.inspector.steps')}
+                    testId="inspector-graph"
+                    height={480}
+                  />
+                ),
+              },
+              {
                 key: 'history',
-                label: tabLabel(t('shell.inspector.history'), instance.path.length),
+                label: t('shell.inspector.history'),
                 children: (
                   <div data-testid="studio-section-inspector-history">
                     <AxisTable<PathEntry>
@@ -479,7 +477,7 @@ export function InstanceDetailView({
               },
               {
                 key: 'tasks',
-                label: tabLabel(t('shell.inspector.tasks'), instance.tasks.length),
+                label: t('shell.inspector.tasks'),
                 children: (
                   <div data-testid="studio-section-inspector-tasks">
                     <AxisTable<InstanceTask>
@@ -493,7 +491,7 @@ export function InstanceDetailView({
               },
               {
                 key: 'calls',
-                label: tabLabel(t('shell.inspector.calls'), instance.calls.length),
+                label: t('shell.inspector.calls'),
                 children: (
                   <div data-testid="studio-section-inspector-calls">
                     {instance.calls.length === 0 ? (
@@ -518,7 +516,7 @@ export function InstanceDetailView({
               },
               {
                 key: 'subProcesses',
-                label: tabLabel(t('shell.inspector.subProcesses'), instance.subProcesses.length),
+                label: t('shell.inspector.subProcesses'),
                 children: (
                   <div data-testid="studio-section-inspector-sub-processes">
                     <AxisTable<SubProcess>
