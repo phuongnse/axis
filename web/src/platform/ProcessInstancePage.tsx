@@ -1,4 +1,4 @@
-import { Button, Descriptions, Flex, Tag, Typography } from 'antd'
+import { Button, Descriptions, Flex, Tabs, Tag, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -36,6 +36,7 @@ import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
 import { useText, useTextCatalogs } from './texts'
 import { useDesignTokens } from './themeMode'
+import { useAddressTab } from './addressTab'
 import { useReleaseTexts } from './useReleaseTexts'
 
 interface ProcessInstancePageProps {
@@ -55,6 +56,9 @@ interface ProcessInstancePageProps {
 type InstanceState = InstanceDetail | null | typeof forbidden | 'failed'
 
 const dateTime = (name: string) => ({ name, type: 'date-time' }) as const
+
+/** The tabs of what an instance did, in order: its history, then its tasks, calls and sub-processes. */
+const instanceTabs = ['history', 'tasks', 'calls', 'subProcesses']
 
 /**
  * Shows one instance under the page of its process inspector: its state and step, the steps of
@@ -187,6 +191,7 @@ export function InstanceDetailView({
   stepNames = false,
 }: InstanceDetailViewProps) {
   const t = useText()
+  const { colour } = useDesignTokens()
   const stepsByName = useMemo(
     () => new Map(instance.graph.steps.map((step) => [step.name, step])),
     [instance.graph.steps],
@@ -413,6 +418,12 @@ export function InstanceDetailView({
     }),
   )
 
+  const [tab, selectTab] = useAddressTab('tab', instanceTabs)
+  const tabLabel = (label: string, count: number) => (
+    <>
+      {label} <span style={{ color: colour.textMuted }}>{count}</span>
+    </>
+  )
   return (
     <div data-testid="inspector-instance">
       <PageHeading
@@ -445,47 +456,81 @@ export function InstanceDetailView({
             height={400}
           />
         </SectionPart>
-        <SectionPart testName="inspector-history" heading={{ title: t('shell.inspector.history') }}>
-          <AxisTable<PathEntry>
-            rowKey={(row) => `${row.step}|${row.startedAt}|${row.finishedAt}`}
-            columns={historyColumns}
-            dataSource={instance.path}
-            emptyText={t('shell.inspector.noHistory')}
-          />
-        </SectionPart>
-        <SectionPart testName="inspector-tasks" heading={{ title: t('shell.inspector.tasks') }}>
-          <AxisTable<InstanceTask>
-            rowKey={(row) => row.id}
-            columns={taskColumns}
-            dataSource={instance.tasks}
-            emptyText={t('shell.inspector.noTasks')}
-          />
-        </SectionPart>
-        <SectionPart testName="inspector-calls" heading={{ title: t('shell.inspector.calls') }}>
-          {instance.calls.length === 0 ? (
-            <EmptyState text={t('shell.inspector.noCalls')} />
-          ) : (
-            <Flex vertical>
-              {instance.calls.map((call) => (
-                <CallItem
-                  key={call.id}
-                  call={call}
-                  instanceId={instance.id}
-                  instancesPath={instancesPath}
-                  onChanged={onChanged}
-                  stepLabel={stepLabel}
-                  attemptColumns={attemptColumns}
-                />
-              ))}
-            </Flex>
-          )}
-        </SectionPart>
-        <SectionPart testName="inspector-sub-processes" heading={{ title: t('shell.inspector.subProcesses') }}>
-          <AxisTable<SubProcess>
-            rowKey={(row) => row.id}
-            columns={subProcessColumns}
-            dataSource={instance.subProcesses}
-            emptyText={t('shell.inspector.noSubProcesses')}
+        {/* Proposed: what the instance did is in tabs, as content of different kinds with nothing to fill in, the tab
+            kept in the address, each label with its count, see the review on #3650. */}
+        <SectionPart testName="inspector-tabs">
+          <Tabs
+            activeKey={tab}
+            onChange={selectTab}
+            items={[
+              {
+                key: 'history',
+                label: tabLabel(t('shell.inspector.history'), instance.path.length),
+                children: (
+                  <div data-testid="studio-section-inspector-history">
+                    <AxisTable<PathEntry>
+                      rowKey={(row) => `${row.step}|${row.startedAt}|${row.finishedAt}`}
+                      columns={historyColumns}
+                      dataSource={instance.path}
+                      emptyText={t('shell.inspector.noHistory')}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: 'tasks',
+                label: tabLabel(t('shell.inspector.tasks'), instance.tasks.length),
+                children: (
+                  <div data-testid="studio-section-inspector-tasks">
+                    <AxisTable<InstanceTask>
+                      rowKey={(row) => row.id}
+                      columns={taskColumns}
+                      dataSource={instance.tasks}
+                      emptyText={t('shell.inspector.noTasks')}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: 'calls',
+                label: tabLabel(t('shell.inspector.calls'), instance.calls.length),
+                children: (
+                  <div data-testid="studio-section-inspector-calls">
+                    {instance.calls.length === 0 ? (
+                      <EmptyState text={t('shell.inspector.noCalls')} />
+                    ) : (
+                      <Flex vertical>
+                        {instance.calls.map((call) => (
+                          <CallItem
+                            key={call.id}
+                            call={call}
+                            instanceId={instance.id}
+                            instancesPath={instancesPath}
+                            onChanged={onChanged}
+                            stepLabel={stepLabel}
+                            attemptColumns={attemptColumns}
+                          />
+                        ))}
+                      </Flex>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                key: 'subProcesses',
+                label: tabLabel(t('shell.inspector.subProcesses'), instance.subProcesses.length),
+                children: (
+                  <div data-testid="studio-section-inspector-sub-processes">
+                    <AxisTable<SubProcess>
+                      rowKey={(row) => row.id}
+                      columns={subProcessColumns}
+                      dataSource={instance.subProcesses}
+                      emptyText={t('shell.inspector.noSubProcesses')}
+                    />
+                  </div>
+                ),
+              },
+            ]}
           />
         </SectionPart>
       </SectionParts>

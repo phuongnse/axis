@@ -1,6 +1,5 @@
 import { Col, Flex, Row, Tabs } from 'antd'
 import { createContext, Fragment, useContext, useMemo, type ReactNode } from 'react'
-import { useSearchParams } from 'react-router'
 import {
   isPlaceholder,
   type ColumnsWidgetMetadata,
@@ -10,6 +9,7 @@ import {
   type TabsWidgetMetadata,
   type WidgetMetadata,
 } from './site'
+import { useAddressTab } from './addressTab'
 import { PartRule, SectionPart } from './SectionParts'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -149,26 +149,16 @@ function Columns({ widget, renderLeaf }: { widget: ColumnsWidgetMetadata; render
 function TabsNode({ widget, renderLeaf }: { widget: TabsWidgetMetadata; renderLeaf: RenderLeaf }) {
   const t = useText()
   const parameters = useContext(TabParameters)
-  const [searchParams, setSearchParams] = useSearchParams()
   const name = parameters.get(widget) ?? 'tab'
-  // A value that is not a position of a tab selects the first tab and leaves the address as it is.
-  const raw = searchParams.get(name)
-  const position = raw !== null && /^\d+$/.test(raw) ? Number(raw) : 0
-  const selected = position >= 1 && position <= widget.tabs.length ? position : 1
-
-  function select(key: string) {
-    const next = new URLSearchParams(searchParams)
-    if (key === '1') {
-      next.delete(name)
-    } else {
-      next.set(name, key)
-    }
-    setSearchParams(next, { preventScrollReset: true })
-  }
+  // The tabs are kept in the address by their position, from 1.
+  const [selected, select] = useAddressTab(
+    name,
+    widget.tabs.map((_tab, index) => String(index + 1)),
+  )
 
   return (
     <Tabs
-      activeKey={String(selected)}
+      activeKey={selected}
       onChange={select}
       items={widget.tabs.map((tab, index) => ({
         key: String(index + 1),
