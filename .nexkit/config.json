@@ -150,7 +150,8 @@
         "~/.cache/axis-tools"
       ],
       "key_files": [
-        "scripts/lib/tools.sh"
+        "scripts/lib/tools.sh",
+        "samples/packages/*/requirements.txt"
       ]
     },
     {
