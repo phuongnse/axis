@@ -44,6 +44,13 @@ export function seedColumns(fields: SeedField[]): SeedField[] {
   )
 }
 
+/** The ids of the records of a seed's content, in order, for the grid to tell a record added since the last save. */
+export function savedRecordIds(content: Record<string, unknown> | undefined): unknown[] {
+  return Array.isArray(content?.records)
+    ? content.records.map((record) => (isObject(record) ? record.id : undefined))
+    : []
+}
+
 /** The JSON Pointer of a field's value in the seed's `records` array. */
 export function seedValuePointer(index: number, name: string): string {
   return `/records/${index}/values/${name.replaceAll('~', '~0').replaceAll('/', '~1')}`

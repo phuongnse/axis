@@ -229,6 +229,10 @@ be kept right.
   out. A chip stands for each condition and group, with Clear all. A table that holds all its rows filters
   them itself. A table paged on the server sends its filter to the server as the record API's `filter`. The
   filter lives in the address as `filter`, in the shape of [the record API's filter](record-api.md#paging-and-sorting).
+  A second table on a page keeps its view under a prefix, as `fields.filter`. In a table that edits a draft, a filter
+  only hides rows, and an edit to a hidden row stays in the draft. The table's `keep` option names the rows the
+  filter never hides, such as a row added since the last save, so the author always sees what they just added. Only
+  a table that holds all its rows reads `keep`, and only for the filter.
 - **Filter on every table** _(planned for M33)_. Every column of every table can be filtered on, a data source
   table's included.
 - **Columns control.** A table whose view turns it on has Columns, an icon button after Search and Filter. It
@@ -274,7 +278,9 @@ be kept right.
   has no Edit icon, see [opening things](#opening-things).
 - **An empty table keeps its header**, with the
   [empty state](#showing-what-is-empty) in its body.
-- **Paging.** A long table pages.
+- **Paging.** A long table pages. A table that edits a draft, such as Studio's seed grid and the entity designer's
+  Fields, turns paging off with the view's `paging` option and shows every row with no pager, because a pager would
+  move the row an author is editing. Only a table that holds all its rows reads it.
 - **How many.** A paged table says what it shows of how many, as "1–20 of 143", with the numbers in the
   language's format.
 - **Too little room.** A table measures its own width, as it changes. Its text columns

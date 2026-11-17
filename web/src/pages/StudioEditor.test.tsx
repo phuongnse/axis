@@ -86,21 +86,23 @@ function stub(seed: unknown, patch: () => Response = () => json({ version: 's2',
 
 function renderEditor() {
   render(
-    <ThemeModeProvider>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioEditor
-          application="Shop"
-          item={resources[0]}
-          resources={resources}
-          path={null}
-          diagnosticPaths={[]}
-          onOpen={vi.fn()}
-          onSaved={vi.fn()}
-          onTextsWritten={vi.fn()}
-          onDeleted={vi.fn()}
-        />
-      </TextProvider>
-    </ThemeModeProvider>,
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioEditor
+            application="Shop"
+            item={resources[0]}
+            resources={resources}
+            path={null}
+            diagnosticPaths={[]}
+            onOpen={vi.fn()}
+            onSaved={vi.fn()}
+            onTextsWritten={vi.fn()}
+            onDeleted={vi.fn()}
+          />
+        </TextProvider>
+      </ThemeModeProvider>
+    </MemoryRouter>,
   )
 }
 

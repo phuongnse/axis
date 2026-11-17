@@ -19,7 +19,9 @@ import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { referenceOptions, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
+import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
+import { useTableView } from '../platform/useTableView'
 import { LabelTexts } from './LabelTexts'
 import { type DesignerLayer, LayerMarkTag, RemovedRows } from './LayerMarkViews'
 import { Expression } from './ProcessFields'
@@ -252,9 +254,42 @@ function rowOrigins(fields: unknown[], origins: FieldOrigin[] | undefined): Fiel
   return fields.map((_, index) => origins?.[index] ?? null)
 }
 
+/** The columns of the Fields table that have a filter, by the name their filter has in the address. */
+const fieldTableFields = [
+  { name: 'name', type: 'text' },
+  { name: 'label', type: 'text' },
+  { name: 'type', type: 'enum' },
+  { name: 'required', type: 'enum' },
+  { name: 'unique', type: 'enum' },
+] as const
+
+/** The Fields table keeps no data source parameter in the address, only its view. */
+const noParameters: string[] = []
+
+/**
+ * What the Required and Unique columns filter on: Yes or No, and empty for a field whose type does not take the setting,
+ * as the cell shows nothing for it.
+ */
+function flagFilter(
+  setting: FieldSetting,
+  options: { value: string; label: string }[],
+): NonNullable<AxisColumn<FieldRow>['filter']> {
+  return {
+    kind: 'enum',
+    value: ({ field }) => {
+      const content = isContent(field) ? field : {}
+      return fieldSettings(text(content.type)).includes(setting) ? String(content[setting] === true) : null
+    },
+    options,
+  }
+}
+
 /**
  * The fields of the entity as a table, in the Fields section, with Add field on the right of its heading. Every cell is a
- * memo component of stable props, so a key in one row draws that row's cells and no other.
+ * memo component of stable props, so a key in one row draws that row's cells and no other. The table has a Filter on
+ * Name, Label, Type, Required and Unique, kept in the address as `fields.filter`. A filter only hides rows: every row
+ * shows on one page, an edit to a hidden row stays in the draft, and a field whose origin is `null`, one added since the
+ * last save, stays shown, see docs/reference/entity-designer.md#fields.
  */
 const Fields = memo(function Fields({
   fields,
@@ -274,6 +309,7 @@ const Fields = memo(function Fields({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { view, setView } = useTableView(fieldTableFields, recordPageSize, noParameters, false, true, false, 'fields.')
   // What the buttons of a row read when they are pressed, so they stay the same between draws.
   const latest = useRef({ fields, origins, onOriginsChange, onChange })
   useLayoutEffect(() => {
@@ -334,17 +370,30 @@ const Fields = memo(function Fields({
     )
   }
 
+  const yesNo = [
+    { value: 'true', label: t('shell.table.yes') },
+    { value: 'false', label: t('shell.table.no') },
+  ]
   const columns: AxisColumn<FieldRow>[] = [
     {
       key: 'name',
       kind: 'freeText',
       title: t('shell.studio.entity.fieldName'),
+      filter: { kind: 'text', value: ({ field }) => text(isContent(field) ? field.name : undefined) || null },
       render: (_, { field, index }) => <NameCell index={index} field={field} layer={layer} onChange={onChange} />,
     },
     {
       key: 'label',
       kind: 'freeText',
       title: t('shell.studio.entity.fieldLabel'),
+      // The label's text key is what the file holds, so it is always there, unlike the text in the author's language.
+      filter: {
+        kind: 'text',
+        value: ({ field }) => {
+          const label = isContent(field) ? field.label : undefined
+          return (isContent(label) ? text(label.textKey) : '') || null
+        },
+      },
       render: (_, { field, index }) => (
         <FieldLabel
           name={t('shell.studio.entity.fieldLabel')}
@@ -358,12 +407,18 @@ const Fields = memo(function Fields({
       key: 'type',
       kind: 'fixed',
       title: t('shell.studio.entity.fieldType'),
+      filter: {
+        kind: 'enum',
+        value: ({ field }) => text(isContent(field) ? field.type : undefined) || null,
+        options: fieldTypes.map((option) => ({ value: option, label: option })),
+      },
       render: (_, { field, index }) => <TypeCell index={index} field={field} onChange={onChange} />,
     },
     {
       key: 'required',
       kind: 'fixed',
       title: t('shell.studio.entity.required'),
+      filter: flagFilter('required', yesNo),
       render: (_, { field, index }) => (
         <Flag field={field} setting="required" pointer={`/fields/${index}/required`} onChange={onChange} />
       ),
@@ -372,6 +427,7 @@ const Fields = memo(function Fields({
       key: 'unique',
       kind: 'fixed',
       title: t('shell.studio.entity.unique'),
+      filter: flagFilter('unique', yesNo),
       render: (_, { field, index }) => (
         <Flag field={field} setting="unique" pointer={`/fields/${index}/unique`} onChange={onChange} />
       ),
@@ -420,6 +476,8 @@ const Fields = memo(function Fields({
         <Flex vertical gap="small">
           <AxisTable<FieldRow>
             dataSource={fields.map((field, index) => ({ field, index }))}
+            view={{ query: view, onChange: setView, paging: false }}
+            keep={(row) => origins !== undefined && (origins[row.index] ?? null) === null}
             rowKey={(row) => String(row.index)}
             emptyText={t('shell.table.empty')}
             rowAttributes={(row) =>

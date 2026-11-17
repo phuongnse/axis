@@ -30,6 +30,12 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
   Properties. It has a search, and Add field sits in the section's heading. Each row's menu has Move up,
   Move down and Remove, and each of these replaces the `fields` array. A field's name opens the
   [field drawer](#field-drawer), beside the table, so every field stays in sight however many settings it has.
+- **Filter.** The table has a Filter on Name, Label, Type, Required and Unique, and none on the settings or the
+  row's buttons. Name and Label filter as text, Label on its text key, which is what the file holds. Type filters as a
+  choice of the field types. Required and Unique filter as a choice of Yes or No, and a field whose type does not take
+  the setting counts as empty, as its cell shows nothing. The filter lives in the address as `fields.filter`. It only
+  hides rows: every row shows on one page with no pager, and an edit to a hidden row stays in the draft. A field whose
+  origin is new, one added since the last save, stays shown. The table has no search, sort or Columns.
 - **Type in words** _(planned for M33)_. The cell reads the type's name, and for a reference, references or child
   collection the entity it points to, by its label, as "Reference to Department" or "Child collection
   of Line item". The name shows only where that entity has no label. Enum and every other type read as

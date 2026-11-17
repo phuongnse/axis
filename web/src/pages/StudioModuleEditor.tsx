@@ -17,7 +17,7 @@ import {
 } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
 import { SectionParts } from '../platform/SectionParts'
-import { seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
+import { savedRecordIds, seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
 import {
   deleteStudioResource,
   fetchStudioModuleResource,
@@ -33,6 +33,7 @@ import {
 import { useStudioConnection } from '../platform/studioConnection'
 import { StudioNamesContext } from '../platform/studioNames'
 import { isObject } from '../platform/scenarioSteps'
+import { matchOrigins } from '../platform/entityMigrations'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -219,6 +220,9 @@ export function StudioModuleEditor({
     const { records: _records, ...properties } = schema.properties ?? {}
     return { ...schema, properties, required: schema.required?.filter((name) => name !== 'records') }
   }, [schema, seedFields])
+
+  const savedSeedIds = useMemo(() => savedRecordIds(loaded?.content), [loaded?.content])
+  const entityOrigins = useMemo(() => (loaded ? matchOrigins(loaded.content, draft) : undefined), [loaded, draft])
 
   const patch = useMemo(() => (loaded ? diffPatch(loaded.content, draft) : []), [loaded, draft])
   useUnsavedChanges(patch.length > 0)
@@ -468,6 +472,7 @@ export function StudioModuleEditor({
             <SeedGrid
               fields={seedFields!}
               records={draft.records}
+              savedIds={savedSeedIds}
               problems={problems}
               onChange={update}
               layer={designerLayer(seedKeyedLists)}
@@ -497,7 +502,12 @@ export function StudioModuleEditor({
       ) : item.kind === 'policy' ? (
         <StudioModulePolicy value={draft} onChange={change} layer={designerLayer(policyKeyedLists)} />
       ) : (
-        <EntityDesigner value={draft} onChange={change} layer={designerLayer(entityKeyedLists)} />
+        <EntityDesigner
+          value={draft}
+          onChange={change}
+          origins={entityOrigins}
+          layer={designerLayer(entityKeyedLists)}
+        />
       )}
       {conflict && (
         <AxisAlert
