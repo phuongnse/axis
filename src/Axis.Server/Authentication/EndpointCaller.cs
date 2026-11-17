@@ -5,6 +5,7 @@ using Axis.Data.Storage;
 using Axis.Server.CellApi;
 using Axis.Server.Tenancy;
 using Axis.Tenancy;
+using Axis.Tenancy.Realms;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -19,7 +20,8 @@ namespace Axis.Server.Authentication;
 /// audience and expiry against the tenant resolved from the host, with one JWT bearer scheme per
 /// tenant. It accepts a token only on endpoint paths, and there it reads no session cookie. The routes of the record API,
 /// the data source rows, process start and process inspection take a bearer token too, through
-/// <see cref="ServiceAccount"/>, and the MCP server's route takes a person's token through <see cref="McpCaller"/>. A tenant under <c>fapi2</c> accepts only a token that is bound to a DPoP key, sent as
+/// <see cref="ServiceAccount"/>, the MCP server's route takes a person's token through <see cref="McpCaller"/> and the
+/// routes of a package runner take the runner's token through <see cref="PackageRunnerCaller"/>. A tenant under <c>fapi2</c> accepts only a token that is bound to a DPoP key, sent as
 /// <c>Authorization: DPoP</c> with a proof (see <see cref="DpopProof"/>).
 /// </summary>
 internal static class EndpointCaller
@@ -31,7 +33,7 @@ internal static class EndpointCaller
     /// The default scheme of every request: the bearer token on endpoint paths, the operator realm's bearer token on a
     /// route of the provisioning API (see <see cref="CellOperator"/>) when the request carries a bearer token, the
     /// console operator's <see cref="CellOperatorSession"/> on such a route otherwise, the service account's bearer token
-    /// on a service account route, the person's bearer token on the MCP server's route, and the <see cref="Session"/> everywhere else.
+    /// on a service account route, the person's bearer token on the MCP server's route, the runner's bearer token on a package runner route, and the <see cref="Session"/> everywhere else.
     /// </summary>
     public const string RequestScheme = "Axis.Request";
 
@@ -102,7 +104,7 @@ internal static class EndpointCaller
             : null;
 
     /// <summary>
-    /// Registers the default request scheme, the endpoint caller, service account and MCP caller schemes and three JWT bearer
+    /// Registers the default request scheme, the endpoint caller, service account, MCP caller and package runner schemes and four JWT bearer
     /// schemes for each tenant in <paramref name="settings"/>, one for each kind of caller. A refresh of the tenant directory
     /// adds and removes bearer schemes later through <see cref="TenantSignInSchemes"/>. A tenant without
     /// <c>Oidc:EndpointAudience</c> accepts no endpoint caller token, and one without <c>Oidc:ServiceAudience</c>
@@ -128,6 +130,7 @@ internal static class EndpointCaller
                 IsEndpointPath(context.Request.Path) ? Scheme
                 : context.GetEndpoint()?.Metadata.GetMetadata<CellOperatorRoute>() is not null ? CellOperatorScheme(context)
                 : McpCaller.Applies(context) ? McpCaller.Scheme
+                : PackageRunnerCaller.Applies(context) ? PackageRunnerCaller.Scheme
                 : ServiceAccount.Applies(context) ? ServiceAccount.Scheme
                 : Session.Scheme);
 
@@ -157,11 +160,20 @@ internal static class EndpointCaller
                 return McpCaller.SchemeName(current.TenantId);
             });
 
+        builder.AddPolicyScheme(PackageRunnerCaller.Scheme, displayName: null, options =>
+            options.ForwardDefaultSelector = context =>
+            {
+                var current = context.RequestServices.GetRequiredService<ITenantContextAccessor>().Current
+                    ?? throw new InvalidOperationException("No tenant context is set.");
+                return PackageRunnerCaller.SchemeName(current.TenantId);
+            });
+
         foreach (var tenantId in settings.Current.Keys)
         {
             builder.AddScheme<JwtBearerOptions, JwtBearerHandler>(SchemeName(tenantId), displayName: null, configureOptions: null);
             builder.AddScheme<JwtBearerOptions, JwtBearerHandler>(ServiceAccount.SchemeName(tenantId), displayName: null, configureOptions: null);
             builder.AddScheme<JwtBearerOptions, JwtBearerHandler>(McpCaller.SchemeName(tenantId), displayName: null, configureOptions: null);
+            builder.AddScheme<JwtBearerOptions, JwtBearerHandler>(PackageRunnerCaller.SchemeName(tenantId), displayName: null, configureOptions: null);
         }
 
         return builder;
@@ -172,7 +184,8 @@ internal static class EndpointCaller
 /// Builds the options of a tenant's bearer schemes from its settings, each time the options are created. The endpoint
 /// caller scheme expects <c>Oidc:EndpointAudience</c> and the service account scheme <c>Oidc:ServiceAudience</c>. The
 /// MCP caller scheme has no configured audience: it expects the request's own MCP URL, see <see cref="McpCaller.Resource"/>. The
-/// token checks and the claim mapping are the same for both. A token must be signed with an algorithm in
+/// package runner scheme expects <see cref="RealmPackageRunnerClient.Audience"/> and reads the runner's row, see
+/// <c>docs/reference/extension-packages.md#customer-hosted-runners</c>. The token checks and the claim mapping are the same for all. A token must be signed with an algorithm in
 /// <see cref="Algorithms"/> and must not be marked as another type than an access token, so an ID token is refused.
 /// A refused token writes a warning with the tenant and the reason. The reason is a fixed text, or the type name of the
 /// exception that the token library threw, and never the exception message or any part of the token. The client still gets
@@ -240,13 +253,18 @@ internal sealed partial class BearerCallerOptions(TenantSignInSettings settings,
         {
             prefix = McpCaller.SchemePrefix;
         }
+        else if (name.StartsWith(PackageRunnerCaller.SchemePrefix, StringComparison.Ordinal))
+        {
+            prefix = PackageRunnerCaller.SchemePrefix;
+        }
         else
         {
             return;
         }
 
         var mcp = prefix == McpCaller.SchemePrefix;
-        var caller = mcp ? "mcp" : prefix == ServiceAccount.SchemePrefix ? "service account" : "endpoint";
+        var runner = prefix == PackageRunnerCaller.SchemePrefix;
+        var caller = mcp ? "mcp" : runner ? "package runner" : prefix == ServiceAccount.SchemePrefix ? "service account" : "endpoint";
         var tenantId = name[prefix.Length..];
         if (settings.Find(tenantId) is not { } tenant)
         {
@@ -255,7 +273,10 @@ internal sealed partial class BearerCallerOptions(TenantSignInSettings settings,
 
 
         // An MCP token's audience depends on the request's host, so the library's check is off and OnTokenValidated makes it.
-        var audience = mcp ? null : prefix == ServiceAccount.SchemePrefix ? tenant.ServiceAudience : tenant.EndpointAudience;
+        var audience = mcp ? null
+            : runner ? RealmPackageRunnerClient.Audience
+            : prefix == ServiceAccount.SchemePrefix ? tenant.ServiceAudience
+            : tenant.EndpointAudience;
         var dpopRequired = tenant.Profile == TenantSignInProfiles.Fapi2;
         options.Authority = tenant.Authority;
         options.Audience = audience;
@@ -328,6 +349,29 @@ internal sealed partial class BearerCallerOptions(TenantSignInSettings settings,
                 if (mcp && !token.Audiences.Contains(McpCaller.Resource(context.Request), StringComparer.Ordinal))
                 {
                     Refuse(context, "The token's audience is not this MCP server.");
+                    return;
+                }
+
+                // A runner is the client of its own row, so the row decides at every request, even for a token that has not expired.
+                if (runner)
+                {
+                    var azp = context.Principal?.FindFirst("azp")?.Value;
+                    if (!RealmPackageRunnerClient.TryReadId(azp, out var runnerId))
+                    {
+                        Refuse(context, "The token is not a package runner's.");
+                        return;
+                    }
+
+                    var runnerConnection = await context.HttpContext.RequestServices.GetRequiredService<TenantDatabase>()
+                        .GetConnectionAsync(context.HttpContext.RequestAborted);
+                    if (await PackageRunners.FindAsync(runnerConnection, runnerId, context.HttpContext.RequestAborted) is not { RevokedAt: null } row
+                        || !string.Equals(row.ClientId, azp, StringComparison.Ordinal))
+                    {
+                        Refuse(context, "The package runner is missing or revoked.");
+                        return;
+                    }
+
+                    context.Principal = EndpointCaller.CreatePrincipal(tenantId, runnerId.ToString(), azp!, [], azp);
                     return;
                 }
 

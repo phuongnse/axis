@@ -654,8 +654,6 @@ implements the operation context over it.
 
 ### Customer-hosted runners
 
-_(planned for M37)_
-
 A customer-hosted runner runs in the customer's own network and connects out to the installation with
 a credential of its own. It keeps the staging, retries and history of the engine, but none of the runner
 limits above, because the customer owns the machine. The code, its secrets and the systems it reaches
@@ -667,9 +665,9 @@ never leave the customer, see [D148](../decisions/d148-packages-in-c-typescript-
   like a service account. Its access token's audience is `axis-package-runner`, so it reaches only the
   runner's routes, and a service account route refuses it because it lacks `Oidc:ServiceAudience`. Axis
   keeps no copy of the secret.
-- **The contract stays with Axis.** The worker reads `idempotent` and `timeout` from the manifest, and checks a
+- **The contract stays with Axis.** _(planned for M37)_ The worker reads `idempotent` and `timeout` from the manifest, and checks a
   posted result against `output`.
-- **The program.** The customer runs `docker run ... axis-package-host-<language> connect`, Axis's own
+- **The program.** _(planned for M37)_ The customer runs `docker run ... axis-package-host-<language> connect`, Axis's own
   [runner image](installation.md#images) with the `connect` command. It reads the built packages from
   `Extensions:Path`, where `build` writes them, and the customer builds each package with the same `build`
   command, which scans its dependencies, see [building a package](#building-a-package). An instance runs one
@@ -680,14 +678,14 @@ never leave the customer, see [D148](../decisions/d148-packages-in-c-typescript-
   answers `409` naming the package and the version, and the instance exits with code 1. So a mismatch shows
   when the runner starts, and not at a call. The author publishes first, and the calls wait `pending` until
   the runner starts.
-- **Upgrades.** During an upgrade the customer runs both versions side by side until the old instances end.
-- **Calls out only.** The runner connects to the tenant's host over HTTPS. No connection goes from Axis
+- **Upgrades.** _(planned for M37)_ During an upgrade the customer runs both versions side by side until the old instances end.
+- **Calls out only.** _(planned for M37)_ The runner connects to the tenant's host over HTTPS. No connection goes from Axis
   into the customer's network.
-- **Taking a call and posting its result.** The runner takes a call under a lease and posts the result, see
+- **Taking a call and posting its result.** _(planned for M37)_ The runner takes a call under a lease and posts the result, see
   [staging a package call](process-execution.md#staging-a-package-call) for the lease and the outcomes. It
   takes only calls of its tenant to a package it registered and to the exact version whose manifest the
   release pins.
-- **Its own secrets.** The take carries no binding value. The SDK answers `GetHttpClient` and `GetSecret`
+- **Its own secrets.** _(planned for M37)_ The take carries no binding value. The SDK answers `GetHttpClient` and `GetSecret`
   from the runner's own settings, `Connect:Urls:<binding>` and `Connect:Secrets:<binding>`, by the binding
   names that the manifest declares.
 - **Revoked.** Every runner request reads the runner's row, so the next request of a revoked runner answers
@@ -705,11 +703,9 @@ The `connect` command reads these settings, as environment variables with the na
 
 #### Routes
 
-_(planned for M37)_
-
 | Route | Body | Answer |
 | --- | --- | --- |
-| `POST /api/package-runner/packages` _(planned for M37)_ | `{ "packages": [{ "manifest": {...} }] }` | `204`. It adds to the registered list, or `409` |
+| `POST /api/package-runner/packages` | `{ "packages": [{ "manifest": {...} }] }` | `204`. It adds to the registered list, or `409` |
 | `POST /api/package-runner/calls/take` _(planned for M37)_ | `{ "packages": [{ "id": "purchasing-tools", "version": "1.0.0" }] }`, the registered packages that this instance holds | `200` with `{ "leaseId", "package", "version", "operation", "operationId", "input", "leaseUntil" }`, or `204` when no call waits |
 | `POST /api/package-runner/leases/{leaseId}/result` _(planned for M37)_ | `{ "outcome": "succeeded", "output": {...} }`, `{ "outcome": "retryable" }` or `{ "outcome": "failed", "error": "<exception type>" }` | `204` |
 
@@ -719,7 +715,7 @@ _(planned for M37)_
   checked for its lease: a lease of another runner or an unknown one answers `404`, and a lease that has
   ended or already holds a result answers `409`. A registration is checked against the releases, and a
   manifest that differs from a pin, or has none, answers `409`, see [registering](#customer-hosted-runners).
-- **What a take gives.** A take gives only calls whose release pins the registered manifest of the package.
+- **What a take gives.** _(planned for M37)_ A take gives only calls whose release pins the registered manifest of the package.
 
 ## An application's packages
 

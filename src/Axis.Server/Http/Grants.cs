@@ -54,6 +54,15 @@ internal static class Grants
             title: "A valid bearer token is needed for the MCP server.");
     }
 
+    /// <summary>The 401 of a package runner's call without a valid runner token, with the tenant's <c>WWW-Authenticate</c> challenge.</summary>
+    public static IResult PackageRunnerTokenRequired(HttpContext context)
+    {
+        BearerChallenge.Write(context);
+        return Results.Problem(
+            statusCode: StatusCodes.Status401Unauthorized,
+            title: "A valid package runner token is needed for this request.");
+    }
+
     public static IResult Forbidden() =>
         Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "You have no grant for this action.");
 
