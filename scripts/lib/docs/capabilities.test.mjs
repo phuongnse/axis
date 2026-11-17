@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { beforeEach, describe, test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { checkCapabilities } from './capabilities.mjs'
 import { useTempRoot } from './testing.mjs'
 
 const fixture = useTempRoot()
 const { write } = fixture
 const messages = () => fixture.messages(checkCapabilities)
+const script = fileURLToPath(new URL('../../check-docs.mjs', import.meta.url))
 const page = 'docs/capabilities.md'
 
 const writePage = (rows) => {
@@ -36,6 +39,23 @@ describe('capability map', () => {
     assert.deepEqual(messages(), [
       `${page}:${lineOf(text, 'Run two')}: 'Run two paths at once' has no home: link the doc section that holds its rule, or put the planned marker of the milestone that builds it alone in the cell`,
     ])
+  })
+
+  test('the docs check reports a row with no home from the command line and exits 1', () => {
+    const text = writePage(['| Run two paths at once | Missing |'])
+
+    const result = spawnSync(process.execPath, [script, '--root', fixture.root()], {
+      encoding: 'utf8',
+      env: { ...process.env, NEXKIT_BASE_SHA: '' },
+    })
+
+    assert.equal(result.status, 1)
+    assert.deepEqual(
+      result.stderr.split('\n').filter((line) => line.startsWith(page)),
+      [
+        `${page}:${lineOf(text, 'Run two')}: 'Run two paths at once' has no home: link the doc section that holds its rule, or put the planned marker of the milestone that builds it alone in the cell`,
+      ],
+    )
   })
 
   test('reports a planned marker that shares its cell with other words', () => {

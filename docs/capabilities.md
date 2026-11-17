@@ -216,7 +216,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | --- | --- |
 | Sort, page and filter any list | [Paging and sorting](reference/record-api.md#paging-and-sorting) |
 | Filter a report's rows | [Query parameters](reference/data-sources.md#query-parameters) |
-| Filter on every column of every table | _(planned for M33)_ |
+| Filter on every column of every table | [Tables](reference/actions-and-controls.md#tables) |
 | Search the text of a list | [Paging and sorting](reference/record-api.md#paging-and-sorting) |
 | Search across every kind of record at once | _(planned for M53)_ |
 | Replace a saved view with the current search, filter and sort | _(planned for M33)_ |
