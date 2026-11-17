@@ -13,6 +13,8 @@ import type {
 } from '../platform/console'
 import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
+import { optionTexts } from '../test/antd'
+import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { PlatformContext, type Platform } from './context'
 import { ConsolePage } from './ConsolePage'
 
@@ -131,6 +133,10 @@ const failedWork: ConsoleFailedWorkPage = {
   page: 1,
   pageSize: 20,
   totalCount: 45,
+  processes: [
+    { id: 'p1', name: 'Approve', applicationId: 'a1', application: 'Leave' },
+    { id: 'p2', name: 'Review', applicationId: 'a2', application: 'Purchasing' },
+  ],
 }
 
 const deliveriesPath = '/api/console/webhook-deliveries'
@@ -314,7 +320,7 @@ describe('ConsolePage', () => {
 
     const view = await screen.findByTestId('console-failed-work')
     expect(await within(view).findByText('Timed out.')).toBeVisible()
-    expect(failedWorkRequests(fetchMock)).toEqual(['/api/console/failed-work?page=1&pageSize=20'])
+    expect(failedWorkRequests(fetchMock)).toEqual(['/api/console/failed-work'])
     for (const title of ['Application', 'Process', 'Instance', 'Step or call', 'Failed', 'Error']) {
       expect(within(view).getByRole('columnheader', { name: title })).toBeVisible()
     }
@@ -350,23 +356,46 @@ describe('ConsolePage', () => {
 
     await userEvent.click(within(view).getByTitle('2'))
 
-    await waitFor(() => expect(failedWorkRequests(fetchMock)).toContain('/api/console/failed-work?page=2&pageSize=20'))
+    await waitFor(() => expect(failedWorkRequests(fetchMock)).toContain('/api/console/failed-work?page=2'))
+    expect(screen.getByTestId('location')).toHaveTextContent('failedWork.page=2')
   })
 
-  it('filters the failed work by application and returns to the first page', async () => {
+  it('offers a filter on each column of the failed work', async () => {
+    stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
+    renderPage()
+    const view = await screen.findByTestId('console-failed-work')
+    expect(await within(view).findByText('Timed out.')).toBeVisible()
+
+    await userEvent.click(within(view).getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+
+    expect(optionTexts()).toEqual(['Application', 'Process', 'Instance', 'Step or call', 'Failed', 'Error'])
+  })
+
+  it('requests the failed work with the filter and keeps it in the address', async () => {
     const fetchMock = stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
     renderPage()
     const view = await screen.findByTestId('console-failed-work')
     expect(await within(view).findByText('Timed out.')).toBeVisible()
     await userEvent.click(within(view).getByTitle('2'))
-    await waitFor(() => expect(failedWorkRequests(fetchMock)).toContain('/api/console/failed-work?page=2&pageSize=20'))
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('failedWork.page=2'))
 
-    await userEvent.click(within(view).getByRole('combobox'))
-    await userEvent.click(await screen.findByTitle('Purchasing'))
+    await userEvent.click(within(view).getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'Application')
+    await pick('Value', 0, 'Purchasing')
+    await clickInDialog('Apply')
 
+    const filter = JSON.stringify({ all: [{ field: 'application', op: 'eq', value: 'a2' }] })
     await waitFor(() =>
-      expect(failedWorkRequests(fetchMock).at(-1)).toBe('/api/console/failed-work?page=1&pageSize=20&application=a2'),
+      expect(
+        failedWorkRequests(fetchMock)
+          .map((url) => new URL(url, 'http://localhost').searchParams.get('filter'))
+          .at(-1),
+      ).toBe(filter),
     )
+    const location = screen.getByTestId('location')
+    expect(new URLSearchParams(location.textContent ?? '').get('failedWork.filter')).toBe(filter)
+    expect(location).not.toHaveTextContent('failedWork.page')
   })
 
   it('lists the webhook deliveries', async () => {
