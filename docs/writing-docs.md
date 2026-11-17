@@ -300,8 +300,9 @@ agrees.
       decision, that no planned marker names a milestone the roadmap calls Done or sits in a sentence, the size
       limits, the word limits of AGENTS.md, the scripts that its Commands table names, the [ASVS](reference/asvs.md#requirements) and threat model tables, and the
       [development users](reference/security.md#development-users) table against the development
-      realm, and the Studio spec folders table of the [E2E stack](testing.md#the-e2e-stack) against the
-      specs. It fails a row of the [capability map](capabilities.md) that has neither a link nor a planned
+      realm, the Studio spec folders table of the [E2E stack](testing.md#the-e2e-stack) against the
+      specs, and the [repository layout](repository-layout.md#repository-layout) tree against the folders
+      and the projects of `Axis.slnx`. It fails a row of the [capability map](capabilities.md) that has neither a link nor a planned
       marker. It also checks the decisions that the code and the docs cite, the sections the code links and
       the milestones the code names, as [references in the code](#references-in-the-code) says. It runs one
       module per rule under `scripts/lib/docs/`, each with its own test.
