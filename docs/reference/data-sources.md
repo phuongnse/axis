@@ -76,6 +76,10 @@ A grouped data source adds `aggregate`, and its rows are groups, not records:
   [expressions](expressions.md#names-and-references). Each name matches ignoring letter case. A
   path cannot go through or end at a `child-collection`. A `null` reference along the path gives
   `null` and the row is kept, because each hop is a left join.
+- **System fields** _(planned for M41)_. A `path`, whether it ends at the root entity or at an entity along a
+  reference, may name a [system field](resource-files.md#system-fields), such as `updatedAt` or
+  `department.createdBy`, and so may the `filter`, as it names a field. A `sort` names them through a projected
+  field. Their types are `date-time` and `text`, and a user who may read the row may read them.
 - **`parameters`.** Typed inputs of the filter. A parameter has a `name`, a `type` and `required`,
   which defaults to `false`. A [customization layer](customization-layers.md#list-keys) finds a
   parameter by its `name`. The types are the scalar field types plus `enum` and `reference`. An

@@ -49,6 +49,12 @@ record's audit records are read through its history route.
 | `GET /api/apps/{app}/entities/{module}/{entity}/records/{id}/history?page=&pageSize=`  | One page of audit records of a module entity's record, see [the history route](record-audit.md#the-history-route) |
 | `POST /api/apps/{app}/forms/{form}/state`                                              | The form state of a draft record, see [form state](record-form-state.md#form-state)                                                   |
 
+**Recycle bin routes** _(planned for M41)_. The routes that restore and purge a deleted record, and the
+list of records in the bin, are in [recycle-bin.md](recycle-bin.md).
+
+**A record at a time** _(planned for M41)_. A read of one record takes `?at=` and answers the record as it was
+at that time, see [a record at a time](record-audit.md#a-record-at-a-time).
+
 `{app}` is the name of an active release, and `{entity}` an entity name in that
 release. Both match ignoring letter case. `{id}` is a record id in the
 hyphenated 8-4-4-4-12 hex form, in either letter case.
@@ -142,6 +148,42 @@ index, and so does each index an entity declares, see
 [schema planning](storage.md#schema-planning). A filter on a field no index
 covers reads the whole entity table.
 
+### System fields
+
+_(planned for M41)_
+
+Every record has four system fields, which answer beside `id` and `version` and are never entries of
+`values`:
+
+```json
+{
+  "id": "6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7",
+  "version": 2,
+  "createdAt": "2026-10-06T02:00:00.123456Z",
+  "createdBy": "requester",
+  "updatedAt": "2026-10-06T02:05:00.123456Z",
+  "updatedBy": "reviewer",
+  "values": { "name": "Desk" },
+  "labels": {}
+}
+```
+
+- **Names and types.** `createdAt` and `updatedAt` are `date-time` values, written as in
+  [reading values](#reading-values). `createdBy` and `updatedBy` are `text`: a user id, a service account id,
+  or `system`.
+- **Who sets them.** The server sets them in the write's transaction, so they hold the start time of the
+  transaction, as `now()` does. A create sets `createdAt` and `createdBy`, and `updatedAt` and `updatedBy`
+  to the same values. An update, including one with an empty `values`, a process step and a
+  [restore](recycle-bin.md#restore) set `updatedAt` and `updatedBy`. The actor is the actor of the write's
+  [audit record](record-audit.md#audit-records-and-history), and a seed record has `system`.
+- **Never written.** A body cannot set them. They are not fields, so a name in `values` that is one of
+  them is an unknown field, and an entity cannot declare one, see
+  [system fields](resource-files.md#system-fields).
+- **Who reads them.** A user who may read the record reads them, with no `fields` entry needed, because they
+  are not fields of the entity. A create response for a user with no `read` grant has none.
+- **Why not `values`.** A field named like them would clash with a declared field, and a client that reads
+  `values` and sends it back would send them.
+
 ## Reading values
 
 Each field type has one JSON form in a read:
@@ -202,6 +244,10 @@ A list takes a page, a page size, a sort, a filter and a search text in its quer
   does not speed it up. A search over 100,000 records with two searched fields
   answers a page within 2 s, and `SearchPerformanceTests` fails when it takes
   2 s or more.
+- **System fields** _(planned for M41)_. `sort` and `filter` may name `createdAt`, `createdBy`, `updatedAt`
+  and `updatedBy`, which are not entries of `values`, see [system fields](#system-fields). `createdAt` and
+  `updatedAt` are `date` fields for the operators below, and `createdBy` and `updatedBy` are `text`. They
+  need no field grant, and the names match exactly like a field name.
 - **Order.** Records are ordered by the sort column and then by `id`
   ascending, also for descending sorts. Without `sort`, they are ordered by
   `id` alone. `NULL` values follow the PostgreSQL defaults: last when
@@ -238,6 +284,29 @@ is a state conflict, not a `400`. It is only reported once the query is valid.
 A list with no `sort`, `search` or `filter` on a pending field answers with the stored
 values. A single read computes the pending field on the spot.
 
+### Changes since a time
+
+_(planned for M41)_
+
+Another system reads what changed since its last read with the list's own `filter` and `sort`, so there is
+one way to filter a list. This reads the records created or changed since the time:
+
+```text
+GET /api/apps/{app}/entities/{entity}/records?sort=updatedAt&filter={"all":[{"field":"updatedAt","op":"gte","value":"2026-10-06T02:00:00.000000Z"}]}
+```
+
+- **What it finds.** A record created since the time has `updatedAt` equal to `createdAt`, so it is in. A
+  record that a [restore](recycle-bin.md#restore) brought back is in too.
+- **Where to start next.** The next read starts from the `updatedAt` of the last record of this one, with
+  `gte`, so a record that shares the instant is not missed. `updatedAt` is the start time of the write's
+  transaction, so a write that is still open when a read runs commits with an earlier time. A reader
+  starts a little before its last `updatedAt` and treats a record it sees twice as the same record.
+- **Deletions.** A deleted record is not in the list. The bin list, filtered on `deletedAt` with `gte`, has
+  the records deleted since the time, see [the bin list](recycle-bin.md#the-bin-list). A record that was
+  purged before the read is in neither list, so a reader reads at least once in the
+  [period](recycle-bin.md#the-period).
+- **Access.** The grants, the read filters and the field checks are those of the list.
+
 ## Create, update and delete
 
 Writes go through the record command in `Axis.Processes`, which hosts without
@@ -269,13 +338,16 @@ HTTP also call. The record API maps its outcome to the responses below.
   in the same transaction, as `system`. The user needs no `start` grant. A
   write that fails starts none, and a start that is skipped never fails the
   write.
-- **Delete.** `DELETE` removes the record by id only. It needs no body and no
+- **Delete.** `DELETE` deletes the record by id only. It needs no body and no
   version. The response is `204` with no body. A record that another record
   references through a `reference` field is kept, and the response is `409`.
   So is a record that is the subject of a running or waiting process instance.
   A delete that commits also starts the processes of the matching
   [delete triggers](process-events.md#delete-triggers) in the same transaction,
   as `system`. A delete that is refused starts none.
+- **Recycle bin** _(planned for M41)_. A delete keeps the record in the [recycle bin](recycle-bin.md#deleting-into-the-bin)
+  with its child rows, files and references, and nowhere else shows it. Only a record outside the bin makes the
+  `409` for a referenced record, so a record in the bin never blocks the delete of the record it refers to.
 - **Content type.** Both need `Content-Type: application/json`. The media
   type matches ignoring letter case. The only allowed parameter is `charset`
   with the value `utf-8`, in any letter case. A cross-site page can send a

@@ -71,7 +71,7 @@ cannot use up a replica.
 | ---------- | ------------------------------------------------------------- | -------------------- | ----------------------- |
 | Sign-in    | `GET /api/auth/sign-in` and `GET /api/auth/callback`, and the [cell console](cell-console.md#sign-in)'s `GET /api/cell/auth/sign-in` and `GET /api/cell/auth/callback` | Client address       | `RateLimits:SignIn`     |
 | Session    | Every other route that takes a session                        | Tenant and user      | `RateLimits:Session`    |
-| Bearer     | Inbound endpoints and [service accounts](security.md#service-accounts) | Tenant and caller id | `RateLimits:Bearer`     |
+| Bearer     | Inbound endpoints, [service accounts](security.md#service-accounts) and [customer-hosted runners](extension-packages.md#customer-hosted-runners) | Tenant and caller id | `RateLimits:Bearer`     |
 | Publishing | Studio validate, publish, preview, activate and test requests | Tenant and user      | `RateLimits:Publishing` |
 | MCP        | `/mcp`, the [MCP server](mcp-server.md)                       | Tenant and client id | `RateLimits:Mcp`        |
 
@@ -132,5 +132,5 @@ cannot use up a replica.
   the `429` with `Retry-After` and one refusal in the metric with `axis.partition` `mcp`, while another client of the
   same tenant still passes.
 - **A unit test** reads every route from the server's endpoint data source and fails on a route that is not open and
-  has no partition, that takes a bearer token and has no bearer partition, or that is the MCP route and has no MCP
+  has no partition, that takes a bearer token and has no bearer partition, that is a runner route and has no bearer partition, or that is the MCP route and has no MCP
   partition.

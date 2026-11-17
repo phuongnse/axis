@@ -334,7 +334,7 @@ command routes do.
 - **Revoke.** The server stores `revoked_at` and the audit record, then deletes the client. An unknown id answers
   `404`. When the identity provider fails, the route answers `502`, the stored revoke stays, and repeating the
   revoke deletes the client. A repeat keeps the first revoke time and writes no second record.
-- **The runner's requests.** _(planned for M37)_ From the stored revoke on, the runner's requests answer `401`, see
+- **The runner's requests.** From the stored revoke on, the runner's requests answer `401`, see
   [customer-hosted runners](extension-packages.md#customer-hosted-runners).
 - **Last call.** `lastCallAt` is the time of the runner's last take of a call. It is `null` before the first.
 - **Audit.** A create and a revoke each write an audit record, see [audit](#audit).

@@ -172,6 +172,11 @@ listed field differs from the value before the update. A value that is only comp
 pending field is not a change by the write. A child collection in `fields` counts as changed whenever
 the update body sets it, because an update replaces all its rows.
 
+**Restores** _(planned for M41)_. A [restore](recycle-bin.md#restore) starts the data change triggers that list
+`restore` in `on`, as `system`, in the restore's transaction and after `record.restored`. The restored record is
+the subject, and it is the record as the restore left it. A trigger that lists only `create` or `update` does not
+start on it.
+
 The triggers run in the order of the release, after the record and its `record.created` or
 `record.updated` audit record are written and before the commit:
 

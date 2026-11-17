@@ -13,7 +13,7 @@ namespace Axis.Server.Tests;
 
 /// <summary>
 /// Every route of the server is either open or has a rate limit partition. The routes come from the server's
-/// endpoint data source, so a route added later without a partition fails here. An endpoint route also has the bearer partition, and the MCP server's route has the MCP partition.
+/// endpoint data source, so a route added later without a partition fails here. An endpoint route and a package runner route also have the bearer partition, and the MCP server's route has the MCP partition.
 /// </summary>
 public sealed partial class RateLimitRouteTests
 {
@@ -51,7 +51,7 @@ public sealed partial class RateLimitRouteTests
     }
 
     [Fact]
-    public async Task Every_other_route_has_a_partition_an_endpoint_route_the_bearer_one_and_the_MCP_route_the_MCP_one()
+    public async Task Every_other_route_has_a_partition_an_endpoint_or_runner_route_the_bearer_one_and_the_MCP_route_the_MCP_one()
     {
         await using var factory = CreateFactory();
 
@@ -67,6 +67,10 @@ public sealed partial class RateLimitRouteTests
             {
                 Assert.True(limit.Mcp, $"{pattern} is an MCP route and has no MCP partition.");
                 Assert.False(limit.Bearer, $"{pattern} is an MCP route and counts in the bearer partition.");
+            }
+            else if (route.Metadata.GetMetadata<PackageRunnerRoute>() is not null)
+            {
+                Assert.True(limit.Bearer, $"{pattern} is a package runner route and has no bearer partition.");
             }
             else if (EndpointCaller.IsEndpointPath(ParameterPattern().Replace(pattern, "x")))
             {

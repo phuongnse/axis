@@ -636,3 +636,26 @@ An entity's `indexes` declare the database indexes that its queries need, as a l
   - `AXC0276`: a field of a type that an index cannot hold, at the same path.
 - **Every reference.** Every `reference` field and every child table's `owner_id` is indexed without
   a declaration.
+
+## System fields
+
+_(planned for M41)_
+
+Every record has four system fields that the server keeps, so an entity does not declare them.
+
+| Name | Type | Holds |
+| --- | --- | --- |
+| `createdAt` | `date-time` | When the record was created |
+| `createdBy` | `text` | The user, service account or `system` that created it |
+| `updatedAt` | `date-time` | When the record was last changed |
+| `updatedBy` | `text` | Who last changed it |
+
+- **Reserved.** An entity field named `createdAt`, `createdBy`, `updatedAt` or `updatedBy`, ignoring letter
+  case, is `AXC0392`, at `/fields/{i}/name`. A `sort`, a `filter`, a data source path and an expression
+  name them as they name a field, with no new syntax, because the names are plain.
+- **Where they are used.** The record API answers and filters them, see
+  [system fields](record-api.md#system-fields), and a [data source](data-sources.md#resource-shape) may project,
+  filter and sort on them. A migration and a seed never set them.
+- **Why they are not fields.** A field is a declared column that a body writes and a release changes by a
+  migration. The system fields are the same in every entity and are never written, so a release never
+  needs a migration for them.

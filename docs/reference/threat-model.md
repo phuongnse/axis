@@ -10,7 +10,7 @@ the model.
 The model has four scopes, and each scope has its own file or files. A scope's letter starts its ids, and
 an id is unique across every file.
 
-- **P**, [the product](threat-model-product.md): the server, worker, SPA, Studio, the MCP server and the agent host, packages and connectors.
+- **P**, [the product](threat-model-product.md): the server, worker, SPA, Studio, the MCP server and the agent host, packages and connectors. [History and recovery](threat-model-product-history.md) holds its threats to the history of records, the tenant's audit and the recycle bin.
 - **P**, [the identity provider and personal data](threat-model-identity-and-personal-data.md): the identity provider Axis ships and the personal data Axis holds.
 - **I**, [the installation](threat-model-installation.md): the operator's install, its images, hosts, databases, backups and secrets, and the cell console.
 - **B**, [the way Axis is built](threat-model-build.md): NexKit, CI, the AI agents and the repository.

@@ -299,7 +299,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
     }
 
     /// <summary>Signs the token's header and payload again with a key the realm never published, keeping its key id.</summary>
-    private static string Resign(string token)
+    internal static string Resign(string token)
     {
         var parts = token.Split('.');
         using var key = RSA.Create(2048);
