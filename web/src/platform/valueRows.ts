@@ -12,6 +12,8 @@ export interface ValueRow {
     | { kind: 'text' | 'number' | 'boolean' | 'expression'; text: string }
     | { kind: 'null' | 'empty' }
     | { kind: 'fields' | 'items'; count: number }
+  /** Proposed, see the review on #3650: the expression a value sent came from, from the step's mapping. */
+  source?: string
 }
 
 /**
@@ -86,5 +88,19 @@ export function mappingRows(mapping: unknown, path = ''): ValueRow[] {
       ]
     }
     return [{ key: at, name: at, value: { kind: 'expression', text: String(expression) } }]
+  })
+}
+
+/**
+ * The rows of a value a step sent, each with the expression of the step's mapping it came from: a row named
+ * `lines[0].quantity` came from the mapping's `lines[].quantity`.
+ */
+export function sentRows(value: unknown, mapping: unknown): ValueRow[] {
+  const sources = new Map(
+    mappingRows(mapping).flatMap((row) => (row.value.kind === 'expression' ? [[row.name, row.value.text]] : [])),
+  )
+  return jsonRows(value).map((row) => {
+    const source = sources.get(row.name.replace(/\[\d+\]/g, '[]'))
+    return source === undefined ? row : { ...row, source }
   })
 }

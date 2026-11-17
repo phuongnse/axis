@@ -103,6 +103,8 @@ export interface InstanceTask {
   completedBy: string | null
   createdAt: string
   completedAt: string | null
+  /** Proposed, see the review on #3650: when the task is due, from its step's `dueIn`, or `null` without one. */
+  dueAt?: string | null
 }
 
 /** An attempt or reconciliation lookup of a call. `kind` is `attempt` or `lookup`. */
@@ -232,6 +234,11 @@ export interface InstanceDetail {
   subProcesses: SubProcess[]
   /** The operator commands the signed-in user may take on the instance now, such as `cancel` and `retry`. */
   commands: string[]
+  /**
+   * Proposed, see the review on #3650: where the instance's process is in Studio, its application and resource id, so a
+   * step opens in the process designer. The server sends it only to a person who may author the application.
+   */
+  studio?: { application: string; resource: string } | null
 }
 
 /**

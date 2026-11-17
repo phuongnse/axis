@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { jsonRows, mappingRows, parseJsonText, textRows } from './valueRows'
+import { jsonRows, mappingRows, parseJsonText, sentRows, textRows } from './valueRows'
 
 describe('valueRows', () => {
   it('makes a row of each value at any depth, named by its path, and keeps a number as written', () => {
@@ -33,6 +33,20 @@ describe('valueRows', () => {
       ['amount', { kind: 'expression', text: 'totalAmount' }],
       ['lines', { kind: 'expression', text: 'lineItems' }],
       ['lines[].quantity', { kind: 'expression', text: 'quantity' }],
+    ])
+  })
+})
+
+describe('sentRows', () => {
+  it('shows beside each value sent the expression of the mapping it came from', () => {
+    const rows = sentRows(
+      { amount: '18500', lines: [{ quantity: '10' }], extra: 'x' },
+      { amount: 'totalAmount', lines: { from: 'lineItems', fields: { quantity: 'quantity' } } },
+    )
+    expect(rows.map((row) => [row.name, row.source])).toEqual([
+      ['amount', 'totalAmount'],
+      ['lines[0].quantity', 'quantity'],
+      ['extra', undefined],
     ])
   })
 })

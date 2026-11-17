@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { CodeBlock } from './CodeBlock'
 import { useText } from './texts'
-import { jsonRows, parseJsonText, type ValueRow } from './valueRows'
+import { jsonRows, parseJsonText, sentRows, type ValueRow } from './valueRows'
 
 /**
  * Proposed, see the review on #3650: names and their values as a table of two columns, as Postman and the browser's
@@ -55,6 +55,15 @@ export function ValueTable({
       },
     },
   ]
+  // A value a step sent shows the expression it came from beside it.
+  if (rows.some((row) => row.source !== undefined)) {
+    columns.push({
+      key: 'source',
+      kind: 'fixed',
+      title: t('shell.valueTable.source'),
+      render: (_value, row) => (row.source === undefined ? null : <Typography.Text code>{row.source}</Typography.Text>),
+    })
+  }
   return (
     <section aria-label={label}>
       <AxisTable<ValueRow>
@@ -73,7 +82,7 @@ export function ValueTable({
  * a switch to the JSON itself, laid out and copyable, as Postman's Pretty and Raw and Logic Apps' raw inputs; any other
  * text, such as HTML, shows as it is.
  */
-export function BodyView({ text, label }: { text: string; label: string }) {
+export function BodyView({ text, label, mapping }: { text: string; label: string; mapping?: unknown }) {
   const t = useText()
   const [shown, setShown] = useState<'table' | 'json'>('table')
   const parsed = parseJsonText(text)
@@ -95,7 +104,7 @@ export function BodyView({ text, label }: { text: string; label: string }) {
         style={{ alignSelf: 'flex-start' }}
       />
       {shown === 'table' ? (
-        <ValueTable label={label} rows={jsonRows(parsed)} />
+        <ValueTable label={label} rows={mapping === undefined ? jsonRows(parsed) : sentRows(parsed, mapping)} />
       ) : (
         <CodeBlock label={label} value={text} />
       )}

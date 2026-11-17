@@ -1356,6 +1356,7 @@ const instanceDetail: InstanceDetail = {
       completedBy: 'Dana Lee',
       createdAt: '2026-03-02T09:00:34.000000Z',
       completedAt: '2026-03-03T14:10:00.000000Z',
+      dueAt: '2026-03-05T09:00:34.000000Z',
     },
     {
       id: '0192f600-0000-7000-8000-000000000002',
@@ -1367,6 +1368,7 @@ const instanceDetail: InstanceDetail = {
       completedBy: 'Alex Morgan',
       createdAt: '2026-03-03T14:10:00.000000Z',
       completedAt: '2026-03-03T16:45:00.000000Z',
+      dueAt: null,
     },
     {
       id: '0192f600-0000-7000-8000-000000000003',
@@ -1378,6 +1380,7 @@ const instanceDetail: InstanceDetail = {
       completedBy: 'Dana Lee',
       createdAt: '2026-03-03T16:45:01.000000Z',
       completedAt: '2026-03-05T10:02:00.000000Z',
+      dueAt: '2026-03-06T16:45:01.000000Z',
     },
     {
       id: '0192f600-0000-7000-8000-000000000004',
@@ -1389,6 +1392,7 @@ const instanceDetail: InstanceDetail = {
       completedBy: 'Priya Shah',
       createdAt: '2026-03-05T10:02:00.000000Z',
       completedAt: '2026-03-06T11:30:00.000000Z',
+      dueAt: '2026-03-08T10:02:00.000000Z',
     },
   ],
   calls: [
@@ -1612,6 +1616,7 @@ const instanceDetail: InstanceDetail = {
     },
   ],
   commands: ['cancel'],
+  studio: { application: 'purchase-requests', resource: '4b60c03e-02d0-4329-80c6-75f972190399' },
 }
 
 const deadLetterPage: DeadLetterPage = {

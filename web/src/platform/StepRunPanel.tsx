@@ -3,12 +3,11 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
-import { AxisTable, type AxisColumn } from './AxisTable'
-import { CodeBlock } from './CodeBlock'
 import { BodyView, ValueTable } from './ValueTable'
-import { jsonRows, mappingRows, textRows } from './valueRows'
+import { mappingRows, sentRows, textRows } from './valueRows'
 import { EmptyDash } from './EmptyValue'
 import { EventTime } from './EventTime'
+import { studioResourceAddress } from './studioAddress'
 import { inspectorPath } from './inspectorPages'
 import type { CallAttempt, InstanceCall, InstanceDetail, StepDefinition } from './inspection'
 import { durationText, stepRuns, type StepRun } from './instanceRuns'
@@ -36,7 +35,6 @@ function isoDurationText(value: unknown, locale: string): string | null {
 
 const record = (value: unknown): Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
-const list = (value: unknown): Record<string, unknown>[] => (Array.isArray(value) ? value.map(record) : [])
 const words = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value))
 
 /** The tone of an attempt's outcome: it ended well, it will be tried again, it failed, or nobody knows yet. */
@@ -126,7 +124,6 @@ export function StepRunPanel({
   if (calls.length > 0 || operation === 'updateRecord') shown.push('output')
   if (calls.some((call) => call.attempts.length > 0)) shown.push('attempts')
   if (failed) shown.push('error')
-  if (graphStep?.definition !== undefined) shown.push('definition')
   const current = shown.includes(tab) ? tab : 'overview'
 
   const operationText =
@@ -136,7 +133,7 @@ export function StepRunPanel({
         ? t('shell.stepRun.operation.package')
         : t(`shell.stepRun.operation.${operation}`)
   const kind = [typeText(graphStep?.type ?? ''), operationText].filter(Boolean).join(' · ')
-  // A step the definition names opens in the panel, as every reference opens what it names.
+  // A step a run names opens in the panel, as every reference opens what it names.
   const stepName = (name: unknown) =>
     typeof name === 'string' ? (
       <AxisButton role="link" inline onClick={() => onOpen(name, null)}>
@@ -145,13 +142,6 @@ export function StepRunPanel({
     ) : (
       <EmptyDash />
     )
-  // An expression reads as code; a mapping inside a mapping, such as a list's fields, reads as a block of JSON.
-  const code = (value: unknown) =>
-    typeof value === 'object' && value !== null ? (
-      <CodeBlock label={words(value)} value={value} maxHeight={200} />
-    ) : (
-      <Typography.Text code>{words(value)}</Typography.Text>
-    )
   const muted = (text: ReactNode) => <Typography.Text type="secondary">{text}</Typography.Text>
   const notSet = muted(t('shell.value.notSet'))
   const heading = (text: ReactNode) => (
@@ -159,6 +149,47 @@ export function StepRunPanel({
       {text}
     </Typography.Title>
   )
+  const stepIndex = instance.graph.steps.findIndex((candidate) => candidate.name === step)
+  // Proposed, see the review on #3650: what a run that waits waits for, and until when: an event, and when the wait
+  // gives up and where it goes then; or a timer, and when it goes on. The engine keeps the time as the run's due time;
+  // the prototype works it out from the step.
+  const waitTerms = (shown: StepRun): Term[] => {
+    if (shown.finishedAt !== null) {
+      return []
+    }
+    const terms: Term[] = []
+    const after = (value: unknown) => {
+      const match =
+        typeof value === 'string' ? /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(value) : null
+      if (match === null) return null
+      const [days, hours, minutes, seconds] = match.slice(1).map((part) => Number(part ?? 0))
+      return new Date(
+        Date.parse(shown.startedAt) + (((days * 24 + hours) * 60 + minutes) * 60 + seconds) * 1000,
+      ).toISOString()
+    }
+    if (typeof definition.event === 'string') {
+      terms.push({ key: 'waitingFor', term: t('shell.stepRun.waitingFor'), value: definition.event })
+      const timeout = record(definition.timeout)
+      const due = after(timeout.after)
+      if (due !== null) {
+        terms.push({
+          key: 'givesUp',
+          term: t('shell.stepRun.givesUp'),
+          value: (
+            <Flex vertical align="flex-start">
+              <EventTime at={due} locale={locale} />
+              {muted(<>→ {stepName(timeout.next)}</>)}
+            </Flex>
+          ),
+        })
+      }
+    }
+    const wake = after(definition.wait) ?? null
+    if (wake !== null) {
+      terms.push({ key: 'goesOn', term: t('shell.stepRun.goesOn'), value: <EventTime at={wake} locale={locale} /> })
+    }
+    return terms
+  }
 
   const overview = (shown: StepRun) => {
     const index = runs.indexOf(shown)
@@ -225,7 +256,23 @@ export function StepRunPanel({
       // sentence: a task's assignee, who completed it and with which outcome; a call's target, state and attempts,
       // whose detail is the Attempts tab; a sub-process's instance and state. A decision's Went to says it all.
       ...shown.tasks.flatMap((task): Term[] => [
-        { key: `assignee-${task.id}`, term: t('shell.stepRun.assignedTo'), value: assigneeText(task) },
+        { key: `assignee-${task.id}`, term: t('shell.stepRun.assignedTo'), value: assigneeText(task), width: 6 },
+        {
+          key: `due-${task.id}`,
+          term: t('shell.stepRun.due'),
+          value:
+            task.dueAt == null ? (
+              notSet
+            ) : (
+              <Flex align="center" gap="small" wrap>
+                <EventTime at={task.dueAt} locale={locale} />
+                {task.completedAt === null && task.dueAt < now.toISOString() && (
+                  <StatusTag tone="attention">{t('shell.stepRun.overdue')}</StatusTag>
+                )}
+              </Flex>
+            ),
+          width: 6,
+        },
         {
           key: `completedBy-${task.id}`,
           term: t('shell.stepRun.completedBy'),
@@ -270,6 +317,7 @@ export function StepRunPanel({
           </Flex>
         ),
       })),
+      ...waitTerms(shown),
       {
         key: 'trace',
         term: t('shell.stepRun.traceId'),
@@ -286,11 +334,20 @@ export function StepRunPanel({
     return (
       <Flex vertical gap={spacing.md}>
         <TermList terms={terms} />
-        <div>
-          <AxisButton role="link" onClick={() => onShowInTimeline(step)}>
+        <Flex gap={spacing.md} wrap>
+          <AxisButton role="link" inline onClick={() => onShowInTimeline(step)}>
             {t('shell.inspector.graph.showInTimeline')}
           </AxisButton>
-        </div>
+          {/* Proposed: how the step is set lives in Studio's process designer, so an author opens it there, see the
+              review on #3650; the server tells only an author where. */}
+          {instance.studio && stepIndex >= 0 && (
+            <Link
+              to={studioResourceAddress(instance.studio.application, instance.studio.resource, `/steps/${stepIndex}`)}
+            >
+              {t('shell.stepRun.openInStudio')}
+            </Link>
+          )}
+        </Flex>
       </Flex>
     )
   }
@@ -321,14 +378,14 @@ export function StepRunPanel({
             {call.request.body === null ? (
               muted(t('shell.stepRun.noBody'))
             ) : (
-              <BodyView label={t('shell.stepRun.body')} text={call.request.body} />
+              <BodyView label={t('shell.stepRun.body')} text={call.request.body} mapping={definition.input} />
             )}
           </Flex>
         ) : call.input === null ? (
           muted(t('shell.stepRun.notKept'))
         ) : (
           // A shown input lists its properties, each number with its source digits, as the process inspector shows it.
-          <ValueTable label={t('shell.stepRun.tab.input')} rows={jsonRows(call.input)} />
+          <ValueTable label={t('shell.stepRun.tab.input')} rows={sentRows(call.input, definition.input)} />
         )}
       </div>
     ))
@@ -497,164 +554,12 @@ export function StepRunPanel({
     </Flex>
   )
 
-  const definitionView = () => (
-    <Flex vertical gap={spacing.xs}>
-      {definitionTerms().length > 0 && <TermList terms={definitionTerms()} />}
-      {definition.set !== undefined && (
-        <>
-          {heading(t('shell.stepRun.definition.set'))}
-          {settingTable(definition.set, t('shell.stepRun.definition.set'), t('shell.stepRun.field'))}
-        </>
-      )}
-      {definition.input !== undefined && (
-        <>
-          {heading(t('shell.stepRun.definition.input'))}
-          {settingTable(definition.input, t('shell.stepRun.definition.input'), t('shell.stepRun.definition.input'))}
-        </>
-      )}
-      {definition.output !== undefined && (
-        <>
-          {heading(t('shell.stepRun.definition.output'))}
-          {writingTable(definition.output, t('shell.stepRun.definition.output'))}
-        </>
-      )}
-      {nextSteps().length > 0 && (
-        <>
-          {heading(t('shell.stepRun.next.title'))}
-          <section aria-label={t('shell.stepRun.next.title')}>
-            <AxisTable rowKey={(row) => row.key} dataSource={nextSteps()} columns={nextColumns} compact />
-          </section>
-        </>
-      )}
-      <div style={{ marginTop: spacing.sm }}>
-        <JsonFold value={definition} />
-      </div>
-    </Flex>
-  )
-
-  const definitionTerms = (): Term[] => {
-    const terms: Term[] = []
-    const add = (key: string, value: ReactNode) =>
-      terms.push({ key, term: t(`shell.stepRun.definition.${key}`), value })
-    if (definition.assignee !== undefined) {
-      const assignee = record(definition.assignee)
-      add(
-        'assignee',
-        typeof assignee.role === 'string'
-          ? t('shell.stepRun.definition.role').replace('{role}', assignee.role)
-          : code(assignee.user),
-      )
-    }
-    if (definition.form !== undefined) add('form', words(definition.form))
-    if (definition.dueIn !== undefined)
-      add('dueIn', isoDurationText(definition.dueIn, locale) ?? words(definition.dueIn))
-    const connector = record(definition.connector)
-    if (typeof connector.name === 'string') {
-      add('connector', connector.name)
-      add('operation', words(connector.operation))
-    } else if (operation !== null && operation.includes('/')) {
-      add('operation', operation)
-    }
-    if (definition.endpoint !== undefined) {
-      add('endpoint', code(`${definition.endpoint.method} ${definition.endpoint.path}`))
-    }
-    const retry = record(definition.retry)
-    if (retry.attempts !== undefined) {
-      add(
-        'retry',
-        t('shell.stepRun.retry')
-          .replace('{attempts}', String(retry.attempts))
-          .replace('{backoff}', isoDurationText(retry.backoff, locale) ?? words(retry.backoff)),
-      )
-    }
-    if (Array.isArray(definition.to)) {
-      add(
-        'to',
-        <Flex vertical>
-          {list(definition.to).map((to) => (
-            <span key={JSON.stringify(to)}>
-              {typeof to.role === 'string'
-                ? t('shell.stepRun.definition.role').replace('{role}', to.role)
-                : code(Object.values(to)[0])}
-            </span>
-          ))}
-        </Flex>,
-      )
-    }
-    if (Array.isArray(definition.channels)) {
-      add('channels', definition.channels.map((channel) => t(`shell.stepRun.channel.${words(channel)}`)).join(', '))
-    }
-    if (definition.message !== undefined) {
-      add('message', code(record(record(definition.message).subject).textKey))
-    }
-    if (typeof definition.process === 'string') add('process', definition.process)
-    if (definition.subject !== undefined && typeof definition.process === 'string')
-      add('subject', code(definition.subject))
-    if (typeof definition.event === 'string') add('event', definition.event)
-    if (definition.when !== undefined && definition.branches === undefined) add('onlyWhen', code(definition.when))
-    if (definition.wait !== undefined) add('wait', isoDurationText(definition.wait, locale) ?? words(definition.wait))
-    if (definition.until !== undefined) add('until', code(definition.until))
-    if (graphStep?.type === 'end') add('end', t('shell.stepRun.definition.ends'))
-    return terms
-  }
-
-  // Proposed, see the review on #3650: where the step goes, for every type the same table of when and the step it goes
-  // to: a decision's branches in order then Otherwise, a task's outcomes, an event that comes or a wait that runs out,
-  // a timer, or the step after one that is done.
-  const nextSteps = (): { key: string; when: ReactNode; next: unknown }[] => {
-    const rows: { key: string; when: ReactNode; next: unknown }[] = []
-    const duration = (value: unknown) => isoDurationText(value, locale) ?? words(value)
-    for (const branch of list(definition.branches)) {
-      rows.push({ key: `branch-${words(branch.name)}`, when: code(branch.when), next: branch.next })
-    }
-    if (definition.otherwise !== undefined) {
-      rows.push({ key: 'otherwise', when: t('shell.stepRun.next.otherwise'), next: definition.otherwise })
-    }
-    for (const outcome of list(definition.outcomes)) {
-      rows.push({
-        key: `outcome-${words(outcome.name)}`,
-        when: t('shell.stepRun.next.chose').replace('{outcome}', outcomeLabel(step, words(outcome.name))),
-        next: outcome.next,
-      })
-    }
-    if (definition.next !== undefined) {
-      const when =
-        typeof definition.event === 'string'
-          ? t('shell.stepRun.next.eventCame').replace('{event}', definition.event)
-          : definition.wait !== undefined
-            ? t('shell.stepRun.next.after').replace('{duration}', duration(definition.wait))
-            : definition.until !== undefined
-              ? t('shell.stepRun.next.until')
-              : t('shell.stepRun.next.done')
-      rows.push({ key: 'next', when, next: definition.next })
-    }
-    if (definition.timeout !== undefined) {
-      const timeout = record(definition.timeout)
-      rows.push({
-        key: 'timeout',
-        when: t('shell.stepRun.next.timeout').replace('{duration}', duration(timeout.after)),
-        next: timeout.next,
-      })
-    }
-    return rows
-  }
-  const nextColumns: AxisColumn<{ key: string; when: ReactNode; next: unknown }>[] = [
-    { key: 'when', kind: 'freeText', title: t('shell.stepRun.next.when'), render: (_value, row) => row.when },
-    {
-      key: 'next',
-      kind: 'freeText',
-      title: t('shell.stepRun.next.goesTo'),
-      render: (_value, row) => stepName(row.next),
-    },
-  ]
-
   const body: Record<StepRunTab, () => ReactNode> = {
     overview: () => (chosen === undefined ? muted(t('shell.inspector.graph.notReached')) : overview(chosen)),
     input,
     output,
     attempts,
     error,
-    definition: definitionView,
   }
 
   return (
@@ -680,14 +585,17 @@ export function StepRunPanel({
               }))}
             />
           )}
-          <Tabs
-            activeKey={current}
-            onChange={(key) => onTab(key as StepRunTab)}
-            items={shown.map((key) => ({ key, label: t(`shell.stepRun.tab.${key}`) }))}
-            // Narrow gaps, so the tabs of a call fit a panel `sidePanel` wide.
-            tabBarGutter={spacing.md}
-            tabBarStyle={{ marginBottom: 0 }}
-          />
+          {/* A run with one part, such as a wait's, shows it with no tab bar. */}
+          {shown.length > 1 && (
+            <Tabs
+              activeKey={current}
+              onChange={(key) => onTab(key as StepRunTab)}
+              items={shown.map((key) => ({ key, label: t(`shell.stepRun.tab.${key}`) }))}
+              // Narrow gaps, so the tabs of a call fit a panel `sidePanel` wide.
+              tabBarGutter={spacing.md}
+              tabBarStyle={{ marginBottom: 0 }}
+            />
+          )}
         </Flex>
       }
     >
@@ -759,21 +667,5 @@ function AttemptView({ attempt, locale, children }: { attempt: CallAttempt; loca
         </div>
       )}
     </section>
-  )
-}
-
-/** The step's definition as JSON, folded until asked for. */
-function JsonFold({ value }: { value: unknown }) {
-  const t = useText()
-  const [open, setOpen] = useState(false)
-  return (
-    <Flex vertical gap="small">
-      <div>
-        <AxisButton role="link" aria-expanded={open} onClick={() => setOpen(!open)}>
-          {t(open ? 'shell.stepRun.hideJson' : 'shell.stepRun.showJson')}
-        </AxisButton>
-      </div>
-      {open && <CodeBlock label={t('shell.stepRun.tab.definition')} value={value} />}
-    </Flex>
   )
 }
