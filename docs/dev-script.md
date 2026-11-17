@@ -21,31 +21,36 @@ Docker, .NET and Node, and works on a fresh clone.
 4. It starts PostgreSQL, Keycloak, Mailpit and the purchasing system stub with Docker Compose, and
    waits until PostgreSQL accepts connections and Keycloak's `axis` realm, Mailpit and the stub
    answer. The first run builds the stub's image.
-5. It installs the TypeScript sample extension package, `samples/packages/payment-terms`, offline, and builds the sample extension package, `samples/packages/PaymentReferences`, into
+5. It adds the `axis first login` flow to the `axis` realm through Keycloak's admin API, by running
+   `scripts/lib/development-realm.mjs`, and prints `[dev] Adding the axis first login flow to the axis realm`.
+   The realm sync names that flow on every brokered provider, and the import of `axis-realm.json` cannot
+   hold it. A Keycloak container that the script reuses gets the flow here too, see
+   [development realm and users](development.md#development-realm-and-users).
+6. It installs the TypeScript sample extension package, `samples/packages/payment-terms`, offline, and builds the sample extension package, `samples/packages/PaymentReferences`, into
    `artifacts/extensions`, where the Development settings of the server and the worker point
    `Extensions:Path`. The purchase request sample declares the package, so it does not activate
    without it. The worker runs with `Extensions:Isolation` `inProcess`, so it loads the C# package itself.
-6. It installs the built-in modules, `modules/*`, and the sample modules, `samples/modules/*`, into
+7. It installs the built-in modules, `modules/*`, and the sample modules, `samples/modules/*`, into
    `artifacts/modules/<id>/<version>/`, where the Development settings of the server and the worker
    point `Modules:Path`.
-7. It installs the built-in applications, `applications/*`, and any sample template under
+8. It installs the built-in applications, `applications/*`, and any sample template under
    `samples/templates/*`, into `artifacts/templates/<id>/<version>/`, and creates that folder even when
    there are none. The Development and E2E settings of the server point `Templates:Path` there. The
    production images, the Compose example and the Helm chart's server set no `Templates:Path`,
    so Studio lists no template there. In a cell the chart sets it on the publisher for the create job,
    see [the publisher in a cell](reference/installation.md#the-publisher-in-a-cell).
-8. It builds the agent host, `src/Axis.Agent`, before the server starts, and runs the built `Axis.Agent.dll`
+9. It builds the agent host, `src/Axis.Agent`, before the server starts, and runs the built `Axis.Agent.dll`
    at once, not under `dotnet watch`. With no `Ai` settings it runs idle, and it serves its health
    endpoints at `http://127.0.0.1:5209`, see [health checks](reference/health-checks.md#agent-host).
-9. It builds the Node.js package host, `src/Axis.PackageHost`, and runs the built `Axis.PackageHost.dll host`
-   at once, not under `dotnet watch`. The build output holds the Node.js runner beside the dll. The host
-   reads `artifacts/extensions` and listens on `127.0.0.1:5310` only, because the runner protocol has no
-   authentication. The worker's `Extensions__Runners__Node` names that address, see
-   [package runners](reference/extension-packages.md#package-runners).
-10. It runs the server and the worker under `dotnet watch` and the SPA on Vite, in one terminal. It
+10. It builds the Node.js package host, `src/Axis.PackageHost`, and runs the built `Axis.PackageHost.dll host`
+    at once, not under `dotnet watch`. The build output holds the Node.js runner beside the dll. The host
+    reads `artifacts/extensions` and listens on `127.0.0.1:5310` only, because the runner protocol has no
+    authentication. The worker's `Extensions__Runners__Node` names that address, see
+    [package runners](reference/extension-packages.md#package-runners).
+11. It runs the server and the worker under `dotnet watch` and the SPA on Vite, in one terminal. It
     starts the worker once the server has migrated the tenant databases. The SPA proxies `/api`,
     `/health` and `/licences.json` to the server, so the licences page works signed out too.
-11. It runs one publisher, `axis-admin publisher`, once the server has migrated the tenant databases.
+12. It runs one publisher, `axis-admin publisher`, once the server has migrated the tenant databases.
     The publisher runs from the built `Axis.Admin.dll`, not under `dotnet watch`. The script sets its
     tenant settings as environment variables of that process only, because `Axis.Admin` reads no
     `appsettings` file. They cover `default` and `default-preview`, so it runs preview requests too, see
