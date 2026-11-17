@@ -2501,7 +2501,7 @@
   "shell.studio.entity.addIndex": "Add index",
   "shell.studio.entity.removeIndex": "Remove index",
   "shell.studio.entity.addField": "Add field",
-  "shell.studio.entity.removeField": "Remove field",
+  "shell.studio.entity.removeField": "Remove",
   "shell.studio.entity.moveUp": "Move up",
   "shell.studio.entity.moveDown": "Move down",
   "shell.studio.entity.addValidation": "Add validation",
