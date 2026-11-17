@@ -399,6 +399,7 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
             Assert.False(string.IsNullOrEmpty(function.GetProperty("result").GetString()));
             Assert.False(string.IsNullOrEmpty(function.GetProperty("group").GetString()));
             Assert.False(string.IsNullOrEmpty(function.GetProperty("example").GetString()));
+            Assert.Equal("fn." + function.GetProperty("name").GetString(), function.GetProperty("words").GetString());
         }
     }
 

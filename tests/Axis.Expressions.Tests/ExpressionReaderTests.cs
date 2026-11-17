@@ -40,9 +40,9 @@ public sealed class ExpressionReaderTests
     private static ReadingNode Read(string text, ExpressionPlace? place = null) =>
         ExpressionReader.Read(text, place ?? _place) ?? throw new InvalidOperationException($"'{text}' has no reading.");
 
-    private static ReadingPhrase Phrase(string text, string words)
+    private static ReadingPhrase Phrase(string text, string words, ExpressionPlace? place = null)
     {
-        var phrase = Assert.IsType<ReadingPhrase>(Read(text));
+        var phrase = Assert.IsType<ReadingPhrase>(Read(text, place));
         Assert.Equal(words, phrase.Words);
         return phrase;
     }
@@ -221,6 +221,49 @@ public sealed class ExpressionReaderTests
     [Fact]
     public void An_item_expression_reads_its_names_in_the_scope_of_the_items_and_outer_reads_as_the_field()
     {
+        var phrase = Assert.IsType<ReadingPhrase>(ExpressionReader.Read("any(lines, price > outer.amount)", LinesPlace()));
+        var comparison = Assert.IsType<ReadingPhrase>(Assert.Single(phrase.Slots[1]));
+
+        Assert.Equal("fn.any", phrase.Words);
+        Assert.Equal(new ReadingName("lines", null), Assert.Single(phrase.Slots[0]));
+        Assert.Equal(new ReadingName("price", "line.price"), Assert.Single(comparison.Slots[0]));
+        Assert.Equal(new ReadingName("amount", "pr.amount"), Assert.Single(comparison.Slots[1]));
+    }
+
+    [Fact]
+    public void Count_with_a_condition_reads_with_its_own_words_and_count_alone_with_the_plain_ones()
+    {
+        var where = Phrase("count(lines, price > 1)", "fn.count.where", LinesPlace());
+        var plain = Phrase("count(lines)", "fn.count", LinesPlace());
+
+        Assert.Equal(2, where.Slots.Count);
+        Assert.Equal(new ReadingName("lines", null), Assert.Single(where.Slots[0]));
+        Assert.Single(plain.Slots);
+    }
+
+    [Fact]
+    public void A_function_that_takes_any_number_of_arguments_reads_them_all_in_one_list_slot()
+    {
+        var phrase = Phrase("concat(note, 'x', note)", "fn.concat");
+
+        Assert.Equal(new ReadingNode[] { new ReadingName("note", null), new ReadingValue("text", "x", null), new ReadingName("note", null) }, Assert.Single(phrase.Slots));
+    }
+
+    [Fact]
+    public void A_nested_call_reads_in_its_own_phrase_and_a_number_reads_as_its_value()
+    {
+        var phrase = Phrase("addDays(today(), 7)", "fn.addDays");
+        var today = Assert.IsType<ReadingPhrase>(Assert.Single(phrase.Slots[0]));
+
+        Assert.Equal(2, phrase.Slots.Count);
+        Assert.Equal("fn.today", today.Words);
+        Assert.Empty(today.Slots);
+        Assert.Equal(new ReadingValue("integer", 7L, null), Assert.Single(phrase.Slots[1]));
+    }
+
+    /// <summary>A place with the collection <c>lines</c> of items that have a <c>price</c>, and the field <c>amount</c> outside it.</summary>
+    private static ExpressionPlace LinesPlace()
+    {
         var items = new ExpressionScope(
             new Dictionary<string, ExpressionType> { ["price"] = ExpressionType.Decimal },
             labelKeys: new Dictionary<string, string> { ["price"] = "line.price" });
@@ -228,14 +271,7 @@ public sealed class ExpressionReaderTests
             new Dictionary<string, ExpressionType> { ["amount"] = ExpressionType.Decimal },
             collections: [new ExpressionCollection("lines", "line", items)],
             labelKeys: new Dictionary<string, string> { ["amount"] = "pr.amount" });
-
-        var phrase = Assert.IsType<ReadingPhrase>(ExpressionReader.Read("any(lines, price > outer.amount)", new ExpressionPlace(scope, ExpressionType.Null, false, false, false, false)));
-        var comparison = Assert.IsType<ReadingPhrase>(Assert.Single(phrase.Slots[1]));
-
-        Assert.Equal("fn.any", phrase.Words);
-        Assert.Equal(new ReadingName("lines", null), Assert.Single(phrase.Slots[0]));
-        Assert.Equal(new ReadingName("price", "line.price"), Assert.Single(comparison.Slots[0]));
-        Assert.Equal(new ReadingName("amount", "pr.amount"), Assert.Single(comparison.Slots[1]));
+        return new ExpressionPlace(scope, ExpressionType.Null, false, false, false, false);
     }
 
     [Theory]

@@ -383,13 +383,13 @@ memory. `null` fits every type, so the compile always type checks the place. The
 - **`type`** is the type the place needs, as in [Types](expressions.md#types), or null when any will do.
 - **`fields`** are the names in scope, in scope order, as `{ name, labelKey, type }`. `labelKey` is null
   for a name with no label, such as a parameter. A child collection is not listed.
-- **`functions`** are the functions and aggregates the type check allows at the place, as `{ name, parameters, result, group, example, description }`.
+- **`functions`** are the functions and aggregates the type check allows at the place, as `{ name, parameters, result, group, example, description, words }`.
   `result` is a type name or a parameter name. Signatures and groups are in [functions](expressions.md#functions) and [aggregates](expressions.md#aggregates).
   A place that runs as SQL, such as a filter or a migration value, lists only the [SQL subset](expressions.md#sql-subset).
 - **The language.** `description` is in the best `Accept-Language` match the platform has: `vi-VN` gives `vi`, else `en`.
 - **No type check.** A place checked without one, such as a migration value whose field types are not
   known yet, answers `{ type: null, fields: [], functions: [] }`.
-- **Reading words** _(planned for M33)_. Each function also has `words`, the key of its reading words under
+- **Reading words**. Each function also has `words`, the key of its reading words under
   `shell.studio.expression.reads.`, such as `fn.daysBetween`. It is the key that a phrase of the
   [reading](#expression-check) names.
 
@@ -434,6 +434,8 @@ may be left out.
   `in`, `of` or `fn.daysBetween`. Each slot is a list of parts: `{ kind: "name", name, labelKey }`, where a path's
   step is named by the field it resolves to; `{ kind: "value", type, value, labelKey }`, where `value` is the literal
   as JSON (a date as ISO 8601 text) and `labelKey` is an enum value's label key or null; or a nested phrase.
+  A function that takes any number of arguments, `concat` and `coalesce`, reads all of them in one slot, as a list.
+  `count` reads its list with `fn.count`, and with a condition as `fn.count.where`, which has two slots.
   A text literal compared with an enum, by `==`, `!=` or `in`, reads as a value of type `enum`, although the check
   types it as `text`, and its `labelKey` is that enum value's label key, or null when the field has no value labels. A
   place that the compile checks without a type check, as for a migration value whose type check waits for activation,

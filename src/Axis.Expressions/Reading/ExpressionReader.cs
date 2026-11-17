@@ -38,6 +38,29 @@ public static class ExpressionReader
         "join.and", "join.or",
     ];
 
+    /// <summary>The reading words of <c>count</c> with a condition. Without one, <c>count</c> reads with <c>fn.count</c>.</summary>
+    public const string CountWhereWords = "fn.count.where";
+
+    /// <summary>
+    /// The key, under <c>shell.studio.expression.reads.</c>, of the reading words of the function or aggregate
+    /// <paramref name="name"/>, such as <c>fn.daysBetween</c>. The reader and the expression scope both name a function by it.
+    /// </summary>
+    public static string FunctionWords(string name) => $"fn.{ExpressionFunctions.Get(name).Name}";
+
+    /// <summary>
+    /// The number of slots that the reader fills for each function's reading words, so each text holds <c>{0}</c> up to
+    /// the last slot. A function that takes any number of arguments fills one list slot. <c>count</c> fills one slot for
+    /// its list and two for <see cref="CountWhereWords"/>, see docs/reference/authoring.md#expression-check.
+    /// </summary>
+    public static IReadOnlyDictionary<string, int> FunctionSlots { get; } =
+        ExpressionFunctions.Names.Concat(ExpressionFunctions.AggregateNames)
+            .Select(name => (Words: FunctionWords(name), Slots: SlotsOf(ExpressionFunctions.Get(name))))
+            .Append((Words: CountWhereWords, Slots: 2))
+            .ToDictionary(item => item.Words, item => item.Slots);
+
+    private static int SlotsOf(FunctionSignature signature) =>
+        signature.MaxArguments == int.MaxValue || signature.Name == "count" ? 1 : signature.MaxArguments;
+
     /// <summary>
     /// The reading of <paramref name="text"/>, or null when it does not parse or, with a place, does not type check there.
     /// With a place, the text is checked again with the place's own scope, expected type and flags, and the reading
@@ -208,14 +231,27 @@ public static class ExpressionReader
         {
             if (call.Module is null && ExpressionFunctions.TryGet(call.Name, out var signature))
             {
-                return signature.Name is "date" or "dateTime" && call.Arguments is [TextLiteral literal]
-                    ? new ReadingValue(signature.Name == "date" ? "date" : "date-time", literal.Value, null)
-                    : new ReadingPhrase($"fn.{signature.Name}", [.. call.Arguments.Select(argument => (IReadOnlyList<ReadingNode>)[ReadPart(argument)])]);
+                if (signature.Name is "date" or "dateTime" && call.Arguments is [TextLiteral literal])
+                {
+                    return new ReadingValue(signature.Name == "date" ? "date" : "date-time", literal.Value, null);
+                }
+
+                var words = signature.Name == "count" && call.Arguments.Count == 2 ? CountWhereWords : FunctionWords(signature.Name);
+                return new ReadingPhrase(words, ReadArguments(signature, call.Arguments));
             }
 
             var name = check is not null && check.RuleCalls.TryGetValue(call, out var rule) ? rule.Name : call.Name;
             return new ReadingPhrase("rule", [[new ReadingName(name, null)], [.. call.Arguments.Select(ReadPart)]]);
         }
+
+        /// <summary>
+        /// The slots of a function's arguments: one slot for each argument, or one list slot that holds all of them for a
+        /// function that takes any number of arguments, see docs/reference/authoring.md#expression-check.
+        /// </summary>
+        private IReadOnlyList<IReadOnlyList<ReadingNode>> ReadArguments(FunctionSignature signature, IReadOnlyList<ExpressionNode> arguments) =>
+            signature.MaxArguments == int.MaxValue
+                ? [[.. arguments.Select(ReadPart)]]
+                : [.. arguments.Select(argument => (IReadOnlyList<ReadingNode>)[ReadPart(argument)])];
 
         private ExpressionType? TypeOf(ExpressionNode node) =>
             check is not null && check.Types.TryGetValue(node, out var type) ? type : null;
