@@ -65,8 +65,9 @@ function Figure({ state }: { state: PreviewState }) {
 }
 
 /**
- * The states of a preview that answers the same paths in each of them, one at a time under a Fixtures control. The
- * `state` query of the page, a state's caption in kebab case, picks the first one shown, else the first state does.
+ * The states of a preview that answers the same paths in each of them, or whose states are screens in frames, one at a
+ * time under a State control. The `state` query of the page, a state's caption in kebab case, picks the first one
+ * shown, else the first state does.
  */
 function Chooser({ states }: { states: readonly PreviewState[] }) {
   const { colour, spacing } = useDesignTokens()
@@ -80,9 +81,9 @@ function Chooser({ states }: { states: readonly PreviewState[] }) {
     <>
       <style>{'[data-fixtures] .ant-segmented-group { flex-wrap: wrap; }'}</style>
       <div data-fixtures style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm }}>
-        <span style={{ color: colour.textMuted }}>Fixtures</span>
+        <span style={{ color: colour.textMuted }}>State</span>
         <Segmented
-          aria-label="Fixtures"
+          aria-label="State"
           style={{ maxWidth: '100%' }}
           options={states.map(({ caption }) => caption)}
           value={state.caption}
@@ -105,7 +106,11 @@ export function Preview({ states }: { states: readonly PreviewState[] }) {
       <PageTheme>
         <TextProvider catalogs={catalogs} development>
           <Canvas>
-            {states.some((state) => state.fixtures) ? (
+            {/* Proposed: a preview whose states are screens, each in a frame, shows one state at a time, as one that
+                answers the same paths in each state does, so each screen shows at its full size and a link opens it,
+                see the review on #3650. */}
+            {states.some((state) => state.fixtures) ||
+            (states.length > 1 && states.every((state) => state.frameHeight !== undefined)) ? (
               <Chooser states={states} />
             ) : (
               states.map((state) => <Figure key={state.caption} state={state} />)

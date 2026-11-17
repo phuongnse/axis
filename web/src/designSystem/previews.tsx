@@ -253,7 +253,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
     ]),
   ),
   shell: [
-    { caption: 'Application site', draw: () => <ShellPreview />, entry: '/sample/requests', frameHeight: 600 },
+    { caption: 'Application site', draw: () => <ShellPreview />, entry: '/sample/requests', frameHeight: 800 },
     {
       caption: 'Navigation collapsed',
       draw: () => (
@@ -262,13 +262,13 @@ export const previews: Record<string, readonly PreviewState[]> = {
         </ClickOnMount>
       ),
       entry: '/sample/requests',
-      frameHeight: 600,
+      frameHeight: 800,
     },
     {
       caption: 'Form page',
       draw: () => <ShellPreview />,
       entry: { pathname: '/sample/request/new', state: { from: '/sample/requests' } },
-      frameHeight: 600,
+      frameHeight: 800,
     },
     // Proposed: a saved record's form page, with its action on the heading and its history, then the same page with a
     // change, which shows the save bar, see the review on #3650.
@@ -276,34 +276,34 @@ export const previews: Record<string, readonly PreviewState[]> = {
       caption: 'Saved record',
       draw: () => <ShellPreview />,
       entry: { pathname: `/sample/request/${requestId}`, state: { from: '/sample/requests' } },
-      frameHeight: 600,
+      frameHeight: 800,
     },
     // Proposed: an open task, and a task that does not exist, opened from the Tasks inbox, see the review on #3650.
     {
       caption: 'Task',
       draw: () => <ShellPreview />,
       entry: { pathname: `/sample/tasks/${openTaskId}`, state: { from: '/sample/tasks' } },
-      frameHeight: 600,
+      frameHeight: 800,
     },
     {
       caption: 'Task not found',
       draw: () => <ShellPreview />,
       entry: { pathname: `/sample/tasks/${missingTaskId}`, state: { from: '/sample/tasks' } },
-      frameHeight: 600,
+      frameHeight: 800,
     },
     // Proposed: a request's approval waiting at its review, opened from the Approvals inspector, see the review on #3650.
     {
       caption: 'Process instance',
       draw: () => <ShellPreview />,
       entry: { pathname: `/sample/instances/${instanceId}`, state: { from: '/sample/instances' } },
-      frameHeight: 600,
+      frameHeight: 800,
     },
     // Proposed: a request that does not exist, opened from Requests, see the review on #3650.
     {
       caption: 'Record not found',
       draw: () => <ShellPreview />,
       entry: { pathname: `/sample/request/${missingRequestId}`, state: { from: '/sample/requests' } },
-      frameHeight: 600,
+      frameHeight: 800,
     },
     {
       caption: 'Saved record with a change',
@@ -313,9 +313,9 @@ export const previews: Record<string, readonly PreviewState[]> = {
         </TypedOnMount>
       ),
       entry: { pathname: `/sample/request/${requestId}`, state: { from: '/sample/requests' } },
-      frameHeight: 600,
+      frameHeight: 800,
     },
-    { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: 600 },
+    { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: 800 },
     {
       caption: 'App switcher',
       draw: () => (
@@ -324,7 +324,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
         </ClickOnMount>
       ),
       entry: '/sample/requests',
-      frameHeight: 600,
+      frameHeight: 800,
     },
     {
       caption: 'Language and theme',
@@ -334,7 +334,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
         </ClickOnMount>
       ),
       entry: '/sample/requests',
-      frameHeight: 600,
+      frameHeight: 800,
     },
   ],
   studio: [
