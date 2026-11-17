@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
 import { describe, test } from 'node:test'
 import { freePort, isPortClash, startOnFreePorts } from './lib/free-ports.mjs'
+
+const RANGE_FILE = '/proc/sys/net/ipv4/ip_local_port_range'
 
 const clash = {
   status: 1,
@@ -62,5 +65,14 @@ describe('freePort', () => {
     const ports = []
     for (let i = 0; i < 200; i++) ports.push(await freePort())
     assert.equal(new Set(ports).size, ports.length)
+  })
+
+  // Reads the range itself, not through ephemeralRange, so the check does not depend on the code it checks.
+  test('never returns a port the system hands out for outgoing connections', { skip: !fs.existsSync(RANGE_FILE) }, async () => {
+    const [first, last] = fs.readFileSync(RANGE_FILE, 'utf8').trim().split(/\s+/).map(Number)
+    for (let i = 0; i < 200; i++) {
+      const port = await freePort()
+      assert.ok(port < first || port > last, `freePort returned ${port}, inside the range ${first}-${last}`)
+    }
   })
 })
