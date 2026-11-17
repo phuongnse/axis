@@ -47,6 +47,8 @@ record's audit records are read through its history route.
 | `POST /api/apps/{app}/entities/{module}/{entity}/records`                              | `201` with the new record of a module entity, see [routes](#routes)                                               |
 | `PATCH /api/apps/{app}/entities/{module}/{entity}/records/{id}`                        | `200` with the updated record of a module entity, see [routes](#routes)                                           |
 | `DELETE /api/apps/{app}/entities/{module}/{entity}/records/{id}`                       | `204` with no body, for a module entity, see [routes](#routes)                                                    |
+| `POST /api/apps/{app}/entities/{entity}/records/bulk` _(planned for M42)_ | `200` with a result for each record, see [bulk actions](#bulk-actions) |
+| `POST /api/apps/{app}/entities/{module}/{entity}/records/bulk` _(planned for M42)_ | `200` with a result for each record of a module entity, see [bulk actions](#bulk-actions) |
 | `GET /api/apps/{app}/entities/{module}/{entity}/records/{id}/history?page=&pageSize=`  | One page of audit records of a module entity's record, see [the history route](record-audit.md#the-history-route) |
 | `POST /api/apps/{app}/forms/{form}/state`                                              | The form state of a draft record, see [form state](record-form-state.md#form-state)                                                   |
 
@@ -413,6 +415,41 @@ HTTP also call. The record API maps its outcome to the responses below.
   decide. The `form` name is checked after the grant and record checks and
   before the content type and the body, so a user without the grant still
   gets `403` or `404`.
+
+### Bulk actions
+
+_(planned for M42)_
+
+`POST /api/apps/{app}/entities/{entity}/records/bulk` runs one operation on several records at once. The bulk
+actions of a [table](table-widget.md#bulk-actions) use it.
+
+```http
+POST /api/apps/{app}/entities/{entity}/records/bulk
+Content-Type: application/json
+
+{ "operation": "update", "records": [{ "id": "0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01", "version": 3 }], "values": { "status": "closed" } }
+```
+
+- **Operation.** `operation` is `update`, `delete` or `startProcess`. An `update` sets `values` on each record. A
+  `delete` deletes each record. A `startProcess` also names its `process` and starts it with each record as the
+  subject.
+- **Records.** `records` holds 1 to 100 distinct ids, the largest page a table offers. Any other count, or a repeated
+  id, is a `400` for the whole call, and nothing changes.
+- **The whole call.** The `401`, the CSRF `403`, the read-only tenant `403` and the content type `415` apply to the
+  whole call. A body of the wrong shape is a `400`.
+- **Each record.** Each record is checked and written as a single `PATCH`, `DELETE` or
+  [start](processes.md#start-endpoint) with that record would be, in its own transaction. It uses that record's
+  grants, record filters and field grants. So one row's `403`, `404`, `409` or `400` leaves the other rows alone.
+- **Versions.** An `update` names each record's `version`, and a record changed since it was read is a `409`, as in
+  [concurrency](#concurrency). A `delete` and a `startProcess` need only the ids.
+- **Repeats.** A start for a record whose instance is already running is a `409`. So a retry of the call, while that
+  instance runs, starts nothing twice.
+- **Answer.** The answer is `200` with `results: [{ id, status, errors? }]` in the order of the request. Each `status`
+  is the status that a single call for that record would answer, such as `200`, `403` or `409`.
+- **Audit and triggers.** Each write commits its own audit record and starts its triggers, as a single write does.
+- **Rate.** The server's [rate limits](headers-and-rate-limits.md#rate-limits) apply to the call.
+
+The reasons are in [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
 
 ## Concurrency
 
