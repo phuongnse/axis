@@ -232,7 +232,8 @@ be kept right.
   A second table on a page keeps its view under a prefix, as `fields.filter`. In a table that edits a draft, a filter
   only hides rows, and an edit to a hidden row stays in the draft. The table's `keep` option names the rows the
   filter never hides, such as a row added since the last save, so the author always sees what they just added. Only
-  a table that holds all its rows reads `keep`, and only for the filter.
+  a table that holds all its rows reads `keep`, and only for the filter. A column whose header is not plain text
+  names itself in the builder and its chips through `filter`'s `title`, and without one they show the header text.
 - **Filter on every table** _(planned for M33)_. Every column of every table can be filtered on, a data source
   table's included.
 - **Columns control.** A table whose view turns it on has Columns, an icon button after Search and Filter. It
@@ -271,7 +272,8 @@ be kept right.
   [empty state](#showing-what-is-empty) in its body.
 - **Paging.** A long table pages. A table that edits a draft, such as Studio's seed grid and the entity designer's
   Fields, turns paging off with the view's `paging` option and shows every row with no pager, because a pager would
-  move the row an author is editing. Only a table that holds all its rows reads it.
+  move the row an author is editing. Studio's policy matrix and the tables of a module contract also show every row
+  with no pager. Only a table that holds all its rows reads it.
 - **How many.** A paged table says what it shows of how many, as "1–20 of 143", with the numbers in the
   language's format.
 - **Too little room.** A table measures its own width, as it changes. Its text columns

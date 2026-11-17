@@ -1,11 +1,13 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { StudioConnectionContext } from '../platform/studioConnection'
 import { ThemeModeProvider } from '../platform/theme'
 import { chooseOption, formItem } from '../test/antd'
+import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { followLink, renderGuarded } from '../test/leaveGuard'
 import type { StudioDiagnostic, StudioResource } from '../platform/studio'
 import { StudioModuleContract } from './StudioModuleContract'
@@ -35,11 +37,13 @@ function renderView(response: Response) {
   const fetchMock = vi.fn(async (_input: string) => response)
   vi.stubGlobal('fetch', fetchMock)
   render(
-    <ThemeModeProvider>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioModuleContract application="Checklist App" module="checklists" id="contract-id" />
-      </TextProvider>
-    </ThemeModeProvider>,
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioModuleContract application="Checklist App" module="checklists" id="contract-id" />
+        </TextProvider>
+      </ThemeModeProvider>
+    </MemoryRouter>,
   )
   return fetchMock
 }
@@ -178,10 +182,30 @@ describe('StudioModuleContract', () => {
           </TextProvider>
         </ThemeModeProvider>
       )
-      const router = mount ? mount(ui) : render(ui) && undefined
+      const router = mount ? mount(ui) : render(<MemoryRouter>{ui}</MemoryRouter>) && undefined
       const puts = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT')
       return { puts, onWritten, router }
     }
+
+    it('keeps a state added since the last save shown under a filter that hides the saved ones', async () => {
+      renderLayered()
+      const states = await screen.findByTestId('studio-contract-states')
+      expect(rowTexts(states)).toHaveLength(4)
+
+      await userEvent.click(within(states).getByRole('button', { name: 'Filter' }))
+      await pick('Column', 0, 'State')
+      await pick('Operator', 0, 'is')
+      await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Value' }), 'open')
+      await clickInDialog('Apply')
+      expect(rowTexts(states)).toHaveLength(1)
+
+      await userEvent.click(screen.getByTestId('studio-contract-add-state'))
+      await userEvent.type(await screen.findByRole('textbox', { name: 'Name' }), 'review')
+      await userEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+      expect(await screen.findByRole('note', { name: 'Added review' })).toBeInTheDocument()
+      expect(rowTexts(states)).toHaveLength(2)
+    })
 
     it('marks an added state and transition Added with Remove, and the module rows have no Remove', async () => {
       renderLayered()
@@ -380,20 +404,22 @@ describe('StudioModuleContract', () => {
       )
       vi.stubGlobal('fetch', fetchMock)
       render(
-        <ThemeModeProvider>
-          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-            <StudioConnectionContext.Provider value={{ generation: 0, reconnecting: false, lost: () => {} }}>
-              <StudioModuleContract
-                application="Checklist App"
-                module="checklists"
-                id="contract-id"
-                manifest={manifest}
-                onManifestSaved={onManifestSaved}
-                onManifestStale={onManifestStale}
-              />
-            </StudioConnectionContext.Provider>
-          </TextProvider>
-        </ThemeModeProvider>,
+        <MemoryRouter>
+          <ThemeModeProvider>
+            <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+              <StudioConnectionContext.Provider value={{ generation: 0, reconnecting: false, lost: () => {} }}>
+                <StudioModuleContract
+                  application="Checklist App"
+                  module="checklists"
+                  id="contract-id"
+                  manifest={manifest}
+                  onManifestSaved={onManifestSaved}
+                  onManifestStale={onManifestStale}
+                />
+              </StudioConnectionContext.Provider>
+            </TextProvider>
+          </ThemeModeProvider>
+        </MemoryRouter>,
       )
       const patches = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')
       return { fetchMock, patches, onManifestSaved, onManifestStale }

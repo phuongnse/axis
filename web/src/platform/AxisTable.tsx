@@ -55,10 +55,12 @@ export type AxisColumn<T> = Omit<TableColumnType<T>, 'width' | 'render'> & {
    * What the column filters on, see docs/reference/actions-and-controls.md#tables: its kind of value and, for an enum,
    * its options. A column that gives it has a filter in the builder of any table with a view. Only a table that holds
    * its rows reads `value`, how a row gives the value (null is empty), so a table paged on the server may leave it out.
-   * A column without `filter` has no filter. Dates compare as ISO text.
+   * A column without `filter` has no filter. Dates compare as ISO text. A column whose header is not plain text gives a
+   * `title`, the name the builder and its chips show. Without it they show the header text, or the key.
    */
   filter?: {
     kind: FilterKind
+    title?: string
     value?: (row: T) => string | number | null
     options?: { value: string; label: string }[]
   }
@@ -345,7 +347,7 @@ export function AxisTable<T extends object>({
             ? [
                 {
                   key: column.key,
-                  title: typeof column.title === 'string' ? column.title : column.key,
+                  title: column.filter.title ?? (typeof column.title === 'string' ? column.title : column.key),
                   kind: column.filter.kind,
                   options: column.filter.options,
                 },

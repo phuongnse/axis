@@ -430,6 +430,9 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
   sources, the processes and the endpoints. A cell shows the OR of the role's actions from all its
   policies, as in [combining grants](security.md#combining-grants). A data source cell that lacks the
   `read` of its root entity warns and names that entity.
+- **Filter.** The table has a [Filter](actions-and-controls.md#tables) on the Role and on every target. A target filters
+  as text over the cell's actions, so "contains update" finds the roles that may update there. The filter is kept in
+  the address as `matrix.filter`, and every role shows on one page with no pager.
 - **A cell's grants.** Selecting a cell opens its grants under the table, each with its actions, its filter in the
   [expression editor](#expression-editor) and its fields in a field picker. The panel says the cell has no grant only
   when it shows none. An editable row whose cell has only shared grants lists them and offers Add grant.

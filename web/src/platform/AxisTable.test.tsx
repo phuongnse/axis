@@ -5,7 +5,7 @@ import { Button } from 'antd'
 import { useState, type HTMLAttributes } from 'react'
 import { MemoryRouter, useLocation, useNavigationType } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { chooseOption, tabTo } from '../test/antd'
+import { chooseOption, optionTexts, tabTo } from '../test/antd'
 import { withAntdStyles } from '../test/antdStyles'
 import { dialog, filterTexts } from '../test/tableFilter'
 import { AxisTable, type AxisColumn, type AxisRowAction, type AxisTableProps, type AxisTableToolbar } from './AxisTable'
@@ -548,6 +548,30 @@ describe('AxisTable', () => {
     })
     expect(screen.getByRole('row', { name: /Buy paper/ })).toBeInTheDocument()
     expect(screen.getAllByRole('row').filter((row) => within(row).queryAllByRole('cell').length > 0)).toHaveLength(2)
+  })
+
+  it('offers a column whose header is not plain text under its filter title', async () => {
+    renderTable({
+      columns: [
+        {
+          ...nameColumn,
+          title: (
+            <div>
+              <span>Name</span>
+              <small>text</small>
+            </div>
+          ),
+          filter: { kind: 'text', title: 'Due', value: (row) => row.name },
+        },
+        amountColumn,
+      ],
+      view: { query: { page: 1, pageSize: 20, sort: null }, onChange: vi.fn() },
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+
+    expect(optionTexts()).toEqual(['Due'])
   })
 
   describe('a view with paging off', () => {
