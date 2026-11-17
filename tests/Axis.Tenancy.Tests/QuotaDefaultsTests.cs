@@ -1,10 +1,12 @@
+using System.Globalization;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Axis.Tenancy;
 using Microsoft.Extensions.Configuration;
 
 namespace Axis.Tenancy.Tests;
 
-public sealed class QuotaDefaultsTests
+public sealed partial class QuotaDefaultsTests
 {
     [Fact]
     public void Every_quota_key_of_the_code_has_a_built_in_default()
@@ -26,21 +28,56 @@ public sealed class QuotaDefaultsTests
         Assert.Equal(keys.Count, QuotaDefaults.BuiltIn.Count);
     }
 
-    [Theory]
-    [InlineData("storage", 10737418240L)]
-    [InlineData("users", 50L)]
-    [InlineData("applications", 10L)]
-    [InlineData("emailsPerDay", 1000L)]
-    [InlineData("packageCpuSecondsPerDay", 0L)]
-    [InlineData("concurrentImports", 2L)]
-    [InlineData("concurrentConnectorCalls", 10L)]
-    [InlineData("concurrentQueries", 10L)]
-    [InlineData("workerWeight", 1L)]
-    [InlineData("authoringRequests", null)]
-    public void The_built_in_defaults_are_the_values_of_the_quotas_table(string quota, long? expected)
+    [Fact]
+    public void The_quotas_table_of_the_docs_matches_the_keys_and_defaults_of_the_code()
     {
-        Assert.Equal(expected, QuotaDefaults.BuiltIn[quota]);
-        Assert.Equal(expected, QuotaDefaults.Load(Settings(), Cell())[quota]);
+        var lines = File.ReadAllLines(Path.Combine(RepositoryRoot(), "docs", "reference", "tenant-quotas.md"));
+        var headers = Enumerable.Range(0, lines.Length).Where(index => QuotasTableHeader().IsMatch(lines[index])).ToList();
+        Assert.True(headers.Count == 1, $"Expected exactly one table with header '| Quota | What it counts | Default | Kind |' in docs/reference/tenant-quotas.md, found {headers.Count}.");
+
+        var documented = new Dictionary<string, long?>(StringComparer.Ordinal);
+        var problems = new List<string>();
+        // The line after the header is the separator row, not a quota.
+        for (var i = headers[0] + 2; i < lines.Length && lines[i].StartsWith('|'); i++)
+        {
+            var cells = lines[i].Split('|');
+            if (cells.Length < 5 || !QuotaKeyCell().IsMatch(cells[1].Trim()))
+            {
+                problems.Add($"A row of the quotas table in docs/reference/tenant-quotas.md has no quota key or no default: {lines[i].Trim()}");
+                continue;
+            }
+
+            var key = QuotaKeyCell().Match(cells[1].Trim()).Groups[1].Value;
+            if (!documented.TryAdd(key, ParseDefault(cells[3].Trim(), key)))
+            {
+                problems.Add($"'{key}' is in the quotas table of docs/reference/tenant-quotas.md more than once.");
+            }
+        }
+
+        foreach (var key in QuotaKeys.All.Where(key => !documented.ContainsKey(key)))
+        {
+            problems.Add($"Missing from the quotas table in docs/reference/tenant-quotas.md: {key}.");
+        }
+
+        foreach (var key in documented.Keys.Where(key => !QuotaKeys.All.Contains(key)))
+        {
+            problems.Add($"Not a quota of QuotaKeys: {key}.");
+        }
+
+        foreach (var key in QuotaDefaults.BuiltIn.Keys.Where(key => !documented.ContainsKey(key) && !QuotaKeys.All.Contains(key)))
+        {
+            problems.Add($"Missing from the quotas table in docs/reference/tenant-quotas.md: {key}.");
+        }
+
+        foreach (var (key, value) in documented)
+        {
+            if (QuotaDefaults.BuiltIn.TryGetValue(key, out var builtIn) && value != builtIn)
+            {
+                problems.Add($"'{key}' defaults to {Show(value)} in the docs and {Show(builtIn)} in QuotaDefaults.BuiltIn.");
+            }
+        }
+
+        Assert.True(problems.Count == 0, string.Join(" ", problems));
     }
 
     [Fact]
@@ -104,6 +141,53 @@ public sealed class QuotaDefaultsTests
         var defaults = QuotaDefaults.Load(Settings(), Cell());
 
         Assert.Throws<ArgumentException>(() => defaults["seats"]);
+    }
+
+    [GeneratedRegex(@"^\|\s*Quota\s*\|\s*What it counts\s*\|\s*Default\s*\|")]
+    private static partial Regex QuotasTableHeader();
+
+    [GeneratedRegex(@"^`([A-Za-z]+)`$")]
+    private static partial Regex QuotaKeyCell();
+
+    [GeneratedRegex(@"^([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)\s*(KiB|MiB|GiB)?$")]
+    private static partial Regex DefaultCell();
+
+    // The default of a row of the quotas table: a number with thousands commas, a number with KiB, MiB or GiB, or None.
+    private static long? ParseDefault(string cell, string quota)
+    {
+        if (cell == "None")
+        {
+            return null;
+        }
+
+        var match = DefaultCell().Match(cell);
+        if (!match.Success)
+        {
+            Assert.Fail($"The default '{cell}' of '{quota}' in docs/reference/tenant-quotas.md is not a number, a number with KiB, MiB or GiB, or None.");
+        }
+
+        var number = long.Parse(match.Groups[1].Value.Replace(",", string.Empty, StringComparison.Ordinal), NumberStyles.None, CultureInfo.InvariantCulture);
+        var unit = match.Groups[2].Value switch
+        {
+            "KiB" => 1024L,
+            "MiB" => 1024L * 1024,
+            "GiB" => 1024L * 1024 * 1024,
+            _ => 1L,
+        };
+        return number * unit;
+    }
+
+    private static string Show(long? value) => value is null ? "None" : value.Value.ToString(CultureInfo.InvariantCulture);
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Axis.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("Axis.slnx was not found above the test output folder.");
     }
 
     private static CellOptions Cell() => new() { Id = "vn-1", Region = "vn", TenantDomain = "vn.example.com" };
