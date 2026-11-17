@@ -21,9 +21,12 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import type { FilterKind } from '../platform/tableFilter'
+import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useUnsavedChanges } from '../platform/unsavedChanges'
+import { useTableView } from '../platform/useTableView'
 import { type ContractView, contractView } from './contractView'
 import {
   moduleIndex,
@@ -39,6 +42,9 @@ import {
 const StudioContractLifecycle = lazy(() => import('./StudioContractLifecycle'))
 
 type Content = Record<string, unknown>
+
+/** The contract's tables keep no data source parameter in the address, only their views. */
+const noParameters: string[] = []
 
 const statesList = '/lifecycle/states'
 const transitionsList = '/lifecycle/transitions'
@@ -214,18 +220,52 @@ function Points({ values }: { values: string[] }) {
   )
 }
 
+/** What a contract column filters on: its kind and how a row gives the value, with null for a cell that shows none. */
+interface ContractFilter<T> {
+  kind: FilterKind
+  value: (row: T) => string | number | null
+  options?: { value: string; label: string }[]
+}
+
+/**
+ * A table of the contract with a Filter on each column that gives `filter`, kept in the address under `prefix`. It
+ * shows every row on one page. A row that `keep` names stays shown under any filter.
+ */
 function ContractTable<T extends object>({
   testId,
   title,
+  prefix,
   rows,
   columns,
+  keep,
 }: {
   testId: string
   title: string
+  prefix: string
   rows: T[]
-  columns: { key: string; title: string; render: (row: T, index: number) => React.ReactNode }[]
+  columns: {
+    key: string
+    title: string
+    render: (row: T, index: number) => React.ReactNode
+    filter?: ContractFilter<T>
+  }[]
+  keep?: (row: T) => boolean
 }) {
   const t = useText()
+  // The signature keeps the fields the same between draws, as `useTableView` needs.
+  const signature = columns
+    .filter((column) => column.filter)
+    .map((column) => column.key)
+    .join(',')
+  const fields = useMemo(
+    () =>
+      signature
+        .split(',')
+        .filter(Boolean)
+        .map((name) => ({ name, type: 'text' as const })),
+    [signature],
+  )
+  const { view, setView } = useTableView(fields, recordPageSize, noParameters, false, true, false, prefix)
   if (rows.length === 0) {
     return null
   }
@@ -236,12 +276,22 @@ function ContractTable<T extends object>({
         rowKey={(entry) => String(entry.key)}
         emptyText={t('shell.table.empty')}
         dataSource={rows.map((row, key) => ({ key, row }))}
-        columns={columns.map((column) => ({
-          key: column.key,
-          kind: 'freeText' as const,
-          title: column.title,
-          render: (_: unknown, entry: { key: number; row: T }) => column.render(entry.row, entry.key),
-        }))}
+        view={{ query: view, onChange: setView, paging: false }}
+        keep={keep && ((entry) => keep(entry.row))}
+        columns={columns.map((column) => {
+          const { filter } = column
+          return {
+            key: column.key,
+            kind: 'freeText' as const,
+            title: column.title,
+            render: (_: unknown, entry: { key: number; row: T }) => column.render(entry.row, entry.key),
+            filter: filter && {
+              kind: filter.kind,
+              options: filter.options,
+              value: (entry: { key: number; row: T }) => filter.value(entry.row),
+            },
+          }
+        })}
       />
     </Flex>
   )
@@ -476,7 +526,10 @@ function RowName({ name, added, onRemove }: { name: string; added: boolean; onRe
  * point has a Relax button, which asks for a reason of 1 to 500 characters and adds the relax entry to the module's
  * entry in `application.json` with an `If-Match` patch. A relaxed point shows its reason and an Undo relax button, which
  * removes the entry, and the whole `relax` list when it was the last. `onManifestSaved` gets the file as written. A 409
- * shows that the file changed, and `onManifestStale` asks for it to be loaded again.
+ * shows that the file changed, and `onManifestStale` asks for it to be loaded again. Each table has a Filter on every
+ * column, kept in the address under the table's own prefix, and shows every row on one page. A state or transition that
+ * the saved contract does not have stays shown under any filter, see
+ * [module contracts in Studio](docs/reference/module-contracts.md#in-studio).
  */
 export function StudioModuleContract({
   application,
@@ -663,6 +716,10 @@ export function StudioModuleContract({
   }
 
   const noGuard = t('shell.studio.contract.noGuard')
+  const marksText = (row: ContractView['states'][number]) =>
+    [row.initial ? t('shell.studio.contract.initial') : '', row.deletable ? t('shell.studio.contract.deletable') : '']
+      .filter((mark) => mark !== '')
+      .join(', ')
   const relax: RelaxContext | undefined =
     manifest && moduleIndex(manifest.content, module) >= 0
       ? {
@@ -687,11 +744,14 @@ export function StudioModuleContract({
         <ContractTable
           testId="studio-contract-states"
           title={t('shell.studio.contract.states')}
+          prefix="states."
           rows={view.states}
+          keep={(row) => !savedStates.has(row.name)}
           columns={[
             {
               key: 'name',
               title: t('shell.studio.contract.state'),
+              filter: { kind: 'text', value: (row) => row.name },
               render: (row, index) => (
                 <RowName
                   name={row.name}
@@ -703,17 +763,16 @@ export function StudioModuleContract({
             {
               key: 'marks',
               title: t('shell.studio.contract.lifecycle'),
-              render: (row) =>
-                [
-                  row.initial ? t('shell.studio.contract.initial') : '',
-                  row.deletable ? t('shell.studio.contract.deletable') : '',
-                ]
-                  .filter((mark) => mark !== '')
-                  .join(', '),
+              filter: { kind: 'text', value: (row) => marksText(row) || null },
+              render: (row) => marksText(row),
             },
             {
               key: 'point',
               title: t('shell.studio.contract.point'),
+              filter: {
+                kind: 'text',
+                value: (row) => (isAdded(statesList, row.name, savedStates) ? null : row.points.join(', ') || null),
+              },
               render: (row) => (isAdded(statesList, row.name, savedStates) ? null : <Points values={row.points} />),
             },
           ]}
@@ -733,11 +792,14 @@ export function StudioModuleContract({
         <ContractTable
           testId="studio-contract-transitions"
           title={t('shell.studio.contract.transitions')}
+          prefix="transitions."
           rows={view.transitions}
+          keep={(row) => !savedTransitions.has(row.name)}
           columns={[
             {
               key: 'name',
               title: t('shell.studio.contract.name'),
+              filter: { kind: 'text', value: (row) => row.name },
               render: (row, index) => (
                 <RowName
                   name={row.name}
@@ -746,12 +808,31 @@ export function StudioModuleContract({
                 />
               ),
             },
-            { key: 'from', title: t('shell.studio.contract.from'), render: (row) => row.from.join(', ') },
-            { key: 'to', title: t('shell.studio.contract.to'), render: (row) => row.to },
-            { key: 'guard', title: t('shell.studio.contract.guard'), render: (row) => row.guard ?? noGuard },
+            {
+              key: 'from',
+              title: t('shell.studio.contract.from'),
+              filter: { kind: 'text', value: (row) => row.from.join(', ') || null },
+              render: (row) => row.from.join(', '),
+            },
+            {
+              key: 'to',
+              title: t('shell.studio.contract.to'),
+              filter: { kind: 'text', value: (row) => row.to || null },
+              render: (row) => row.to,
+            },
+            {
+              key: 'guard',
+              title: t('shell.studio.contract.guard'),
+              filter: { kind: 'text', value: (row) => row.guard || null },
+              render: (row) => row.guard ?? noGuard,
+            },
             {
               key: 'point',
               title: t('shell.studio.contract.point'),
+              filter: {
+                kind: 'text',
+                value: (row) => (isAdded(transitionsList, row.name, savedTransitions) ? null : row.point || null),
+              },
               render: (row) =>
                 isAdded(transitionsList, row.name, savedTransitions) ? null : <Point value={row.point} />,
             },
@@ -787,44 +868,111 @@ export function StudioModuleContract({
         <ContractTable
           testId="studio-contract-validations"
           title={t('shell.studio.contract.validations')}
+          prefix="validations."
           rows={view.validations}
           columns={[
-            { key: 'name', title: t('shell.studio.contract.name'), render: (row) => row.name },
-            { key: 'field', title: t('shell.studio.contract.field'), render: (row) => row.field },
-            { key: 'expression', title: t('shell.studio.contract.expression'), render: (row) => row.expression },
-            { key: 'point', title: t('shell.studio.contract.point'), render: (row) => <Point value={row.point} /> },
+            {
+              key: 'name',
+              title: t('shell.studio.contract.name'),
+              filter: { kind: 'text', value: (row) => row.name || null },
+              render: (row) => row.name,
+            },
+            {
+              key: 'field',
+              title: t('shell.studio.contract.field'),
+              filter: { kind: 'text', value: (row) => row.field || null },
+              render: (row) => row.field,
+            },
+            {
+              key: 'expression',
+              title: t('shell.studio.contract.expression'),
+              filter: { kind: 'text', value: (row) => row.expression || null },
+              render: (row) => row.expression,
+            },
+            {
+              key: 'point',
+              title: t('shell.studio.contract.point'),
+              filter: { kind: 'text', value: (row) => row.point || null },
+              render: (row) => <Point value={row.point} />,
+            },
           ]}
         />
         <ContractTable
           testId="studio-contract-effects"
           title={t('shell.studio.contract.effects')}
+          prefix="effects."
           rows={view.effects}
           columns={[
-            { key: 'name', title: t('shell.studio.contract.name'), render: (row) => row.name },
-            { key: 'on', title: t('shell.studio.contract.on'), render: (row) => row.on },
-            { key: 'creates', title: t('shell.studio.contract.creates'), render: (row) => row.entity },
-            { key: 'point', title: t('shell.studio.contract.point'), render: (row) => <Point value={row.point} /> },
+            {
+              key: 'name',
+              title: t('shell.studio.contract.name'),
+              filter: { kind: 'text', value: (row) => row.name || null },
+              render: (row) => row.name,
+            },
+            {
+              key: 'on',
+              title: t('shell.studio.contract.on'),
+              filter: { kind: 'text', value: (row) => row.on || null },
+              render: (row) => row.on,
+            },
+            {
+              key: 'creates',
+              title: t('shell.studio.contract.creates'),
+              filter: { kind: 'text', value: (row) => row.entity || null },
+              render: (row) => row.entity,
+            },
+            {
+              key: 'point',
+              title: t('shell.studio.contract.point'),
+              filter: { kind: 'text', value: (row) => row.point || null },
+              render: (row) => <Point value={row.point} />,
+            },
           ]}
         />
         <ContractTable
           testId="studio-contract-ceiling"
           title={t('shell.studio.contract.ceiling')}
+          prefix="ceiling."
           rows={view.ceiling}
           columns={[
             {
               key: 'slot',
               title: t('shell.studio.contract.slot'),
+              filter: {
+                kind: 'enum',
+                value: (row) => row.slot,
+                options: [...new Set(view.ceiling.map((row) => row.slot))].map((slot) => ({
+                  value: slot,
+                  label: slot === 'others' ? t('shell.studio.contract.others') : slot,
+                })),
+              },
               render: (row) => (row.slot === 'others' ? t('shell.studio.contract.others') : row.slot),
             },
-            { key: 'actions', title: t('shell.studio.moduleGrants.actions'), render: (row) => row.actions.join(', ') },
+            {
+              key: 'actions',
+              title: t('shell.studio.moduleGrants.actions'),
+              filter: { kind: 'text', value: (row) => row.actions.join(', ') || null },
+              render: (row) => row.actions.join(', '),
+            },
             {
               key: 'fields',
               title: t('shell.studio.moduleGrants.fields'),
+              filter: { kind: 'text', value: (row) => row.fields.join(', ') || null },
               render: (row) =>
                 row.fields.length === 0 ? t('shell.studio.moduleGrants.allFields') : row.fields.join(', '),
             },
-            { key: 'filter', title: t('shell.studio.moduleGrants.filter'), render: (row) => row.filter },
-            { key: 'point', title: t('shell.studio.contract.point'), render: (row) => <Point value={row.point} /> },
+            {
+              key: 'filter',
+              title: t('shell.studio.moduleGrants.filter'),
+              filter: { kind: 'text', value: (row) => row.filter || null },
+              render: (row) => row.filter,
+            },
+            {
+              key: 'point',
+              title: t('shell.studio.contract.point'),
+              filter: { kind: 'text', value: (row) => row.point || null },
+              render: (row) => <Point value={row.point} />,
+            },
           ]}
         />
         {conflict && (
