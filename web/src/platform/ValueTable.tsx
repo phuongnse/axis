@@ -2,7 +2,9 @@ import { Segmented, Typography } from 'antd'
 import { useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { CodeBlock } from './CodeBlock'
+import { NotSet } from './EmptyValue'
 import { useText } from './texts'
+import { visuallyHidden } from './visuallyHidden'
 import { jsonRows, parseJsonText, type ValueRow } from './valueRows'
 
 /**
@@ -49,15 +51,28 @@ export function ValueTable({ rows, label }: { rows: readonly ValueRow[]; label: 
           case 'expression':
             return <Typography.Text code>{value.text}</Typography.Text>
           case 'change':
-            // A change reads as the value after it, with the value before it under, muted.
+            // Proposed, see the review on #3650: a change reads as a unified diff does, the value before it struck
+            // through in `textMuted` on its own line, then the value after it, so a long text reads as well as a short
+            // one; an empty value is Not set, never struck. Assistive technology reads it as a sentence.
             return value.hidden ? (
               muted(t('shell.valueTable.hidden'))
             ) : (
-              <span style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ overflowWrap: 'anywhere' }}>{value.after ?? t('shell.value.notSet')}</span>
-                <Typography.Text type="secondary">
-                  {t('shell.valueTable.before').replace('{value}', value.before ?? t('shell.value.notSet'))}
-                </Typography.Text>
+              <span style={{ overflowWrap: 'anywhere' }}>
+                <span aria-hidden style={{ display: 'flex', flexDirection: 'column' }}>
+                  {value.before === null ? (
+                    <NotSet />
+                  ) : (
+                    <Typography.Text type="secondary" delete>
+                      {value.before}
+                    </Typography.Text>
+                  )}
+                  <span>{value.after === null ? <NotSet /> : value.after}</span>
+                </span>
+                <span style={visuallyHidden}>
+                  {t('shell.valueTable.changed')
+                    .replace('{before}', value.before ?? t('shell.value.notSet'))
+                    .replace('{after}', value.after ?? t('shell.value.notSet'))}
+                </span>
               </span>
             )
           default:

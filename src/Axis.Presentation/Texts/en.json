@@ -2693,7 +2693,6 @@
   "shell.stepRun.response": "Response",
   "shell.stepRun.noResponse": "No answer came back.",
   "shell.stepRun.truncated": "Cut at the size limit.",
-  "shell.stepRun.valuesIn": "The values are in the history of",
   "shell.stepRun.retry": "Up to {attempts} attempts, {backoff} apart",
   "shell.stepRun.attempt": "Attempt {number}",
   "shell.stepRun.lookup": "Lookup {number}",
@@ -2757,7 +2756,6 @@
   "shell.stepRun.subject": "Subject",
   "shell.stepRun.created": "Record created",
   "shell.valueTable.hidden": "Hidden",
-  "shell.valueTable.before": "Before: {value}",
   "shell.inspector.graph.overdue": "overdue",
   "shell.inspector.graph.attempts": "{count} attempts",
   "shell.inspector.stateFor": "{state} for {since}",
@@ -2776,7 +2774,6 @@
   "shell.inspector.startedVia.schedule": "Schedule",
   "shell.inspector.startedVia.parent": "Parent process",
   "shell.stepRun.read": "Values it read",
-  "shell.stepRun.fromAttempt": "from attempt {number}",
   "shell.stepRun.attemptColumn": "#",
   "shell.stepRun.result": "Result",
   "shell.table.showDetails": "Show the details",
@@ -2784,5 +2781,6 @@
   "shell.stepRun.thenGoesTo": "Then goes to",
   "shell.stepRun.ended": "Ended",
   "shell.inspector.openInStudio": "Open in Studio",
-  "shell.person.you": "(you)"
+  "shell.person.you": "(you)",
+  "shell.valueTable.changed": "Changed from {before} to {after}"
 }

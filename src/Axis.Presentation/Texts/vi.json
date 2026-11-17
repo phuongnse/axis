@@ -2693,7 +2693,6 @@
   "shell.stepRun.response": "Phản hồi",
   "shell.stepRun.noResponse": "Không nhận được phản hồi.",
   "shell.stepRun.truncated": "Đã cắt bớt vì vượt giới hạn kích thước.",
-  "shell.stepRun.valuesIn": "Giá trị nằm trong lịch sử của",
   "shell.stepRun.retry": "Tối đa {attempts} lần thử, cách nhau {backoff}",
   "shell.stepRun.attempt": "Lần thử {number}",
   "shell.stepRun.lookup": "Lần tra cứu {number}",
@@ -2757,7 +2756,6 @@
   "shell.stepRun.subject": "Tiêu đề",
   "shell.stepRun.created": "Bản ghi đã tạo",
   "shell.valueTable.hidden": "Đã ẩn",
-  "shell.valueTable.before": "Trước: {value}",
   "shell.inspector.graph.overdue": "quá hạn",
   "shell.inspector.graph.attempts": "{count} lần thử",
   "shell.inspector.stateFor": "{state} {since}",
@@ -2776,7 +2774,6 @@
   "shell.inspector.startedVia.schedule": "Lịch chạy",
   "shell.inspector.startedVia.parent": "Quy trình cha",
   "shell.stepRun.read": "Giá trị đã xét",
-  "shell.stepRun.fromAttempt": "của lần thử {number}",
   "shell.stepRun.attemptColumn": "#",
   "shell.stepRun.result": "Kết quả",
   "shell.table.showDetails": "Xem chi tiết",
@@ -2784,5 +2781,6 @@
   "shell.stepRun.thenGoesTo": "Sau đó đi tới",
   "shell.stepRun.ended": "Kết thúc",
   "shell.inspector.openInStudio": "Mở trong Studio",
-  "shell.person.you": "(bạn)"
+  "shell.person.you": "(bạn)",
+  "shell.valueTable.changed": "Đổi từ {before} thành {after}"
 }

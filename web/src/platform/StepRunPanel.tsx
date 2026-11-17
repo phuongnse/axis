@@ -446,12 +446,9 @@ export function StepRunPanel({
                     key: 'status',
                     term: t('shell.stepRun.status'),
                     value: (
-                      <Flex align="center" gap="small" wrap>
-                        <StatusTag tone={attempt.response.status < 400 ? 'success' : 'danger'}>
-                          {String(attempt.response.status)}
-                        </StatusTag>
-                        {muted(t('shell.stepRun.fromAttempt').replace('{number}', String(attempt.number)))}
-                      </Flex>
+                      <StatusTag tone={attempt.response.status < 400 ? 'success' : 'danger'}>
+                        {String(attempt.response.status)}
+                      </StatusTag>
                     ),
                   },
                 ]),
@@ -496,7 +493,9 @@ export function StepRunPanel({
           },
         ]
       }
-      const answered = call.attempts.findLast((attempt) => attempt.response !== undefined && attempt.response !== null)
+      // A call's Output is the answer of the attempt that settled it, its last; an earlier one is in Attempts.
+      const settled = call.attempts.filter((attempt) => attempt.kind === 'attempt').at(-1)
+      const answered = settled?.response == null ? undefined : settled
       return [
         ...calledTerm(call),
         ...(call.inputHidden
@@ -516,40 +515,33 @@ export function StepRunPanel({
       terms.push({
         key: 'changes',
         term: t('shell.stepRun.changes'),
+        // A step changes only the instance's record, which the page names, so the changes need no record of their own.
         value: (
-          <Flex vertical gap={spacing.xs}>
-            <ValueTable
-              label={t('shell.stepRun.changes')}
-              rows={made.changes.map((change) => ({
-                key: change.field,
-                name: change.labelKey ? t(change.labelKey) : change.field,
-                value: { kind: 'change', before: change.before, after: change.after, hidden: change.hidden === true },
-              }))}
-            />
-            {instance.subject &&
-              muted(
-                <>
-                  {t('shell.stepRun.valuesIn')}{' '}
-                  <RecordLink entity={instance.subject.entity} id={instance.subject.id}>
-                    {instance.subject.label ?? instance.subject.id}
-                  </RecordLink>
-                </>,
-              )}
-          </Flex>
+          <ValueTable
+            label={t('shell.stepRun.changes')}
+            rows={made.changes.map((change) => ({
+              key: change.field,
+              name: change.labelKey ? t(change.labelKey) : change.field,
+              value: { kind: 'change', before: change.before, after: change.after, hidden: change.hidden === true },
+            }))}
+          />
         ),
       })
     }
     if (made?.event !== undefined) {
-      terms.push({
-        key: 'event',
-        term: t('shell.stepRun.eventRaised'),
-        value: (
-          <Flex vertical gap={spacing.xs}>
-            <span>{made.event.labelKey ? t(made.event.labelKey) : made.event.name}</span>
-            <ValueTable label={t('shell.stepRun.eventFields')} rows={textRows(made.event.fields)} />
-          </Flex>
-        ),
-      })
+      // The event and its fields are facts of their own, as a notification's are.
+      terms.push(
+        {
+          key: 'event',
+          term: t('shell.stepRun.eventRaised'),
+          value: made.event.labelKey ? t(made.event.labelKey) : made.event.name,
+        },
+        {
+          key: 'eventFields',
+          term: t('shell.stepRun.eventFields'),
+          value: <ValueTable label={t('shell.stepRun.eventFields')} rows={textRows(made.event.fields)} />,
+        },
+      )
     }
     // The people a step notified, by which channels and with which subject, are facts of their own, as every other.
     if (made?.notified !== undefined) {
