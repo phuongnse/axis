@@ -26,6 +26,8 @@ of a brokered provider, and the page shows the sessions only.
   with nothing changed.
 - **The last authenticator stays.** Remove is off on a person's only authenticator, because every
   account needs one, see [accounts](user-administration.md#accounts).
+- **Filter.** The Authenticators table has Filter on Name and Added (the day), kept in the address as
+  `authenticators.filter`. It narrows the rows the page already holds and sends no request.
 
 ### Sessions
 
@@ -35,6 +37,9 @@ sign-in first. A signed-out visit shows the sign-in prompt, because the list cal
 - **Rows.** A row shows Signed in and Last active, in the current locale. A This session tag marks the
   session in use now. It has no End button, because the person ends it with Sign out, which also ends
   the identity provider's session.
+- **Filter.** The sessions table has Filter on Signed in and Last active, each by the day in the person's
+  own time zone. The filter is kept in the address as `sessions.filter` and narrows the rows the page
+  already holds, with no new request.
 - **Ending sessions.** Every other row has an End button (`DELETE /api/me/sessions/{id}`). End all
   other sessions (`DELETE /api/me/sessions`) is disabled when no other session exists. After a `204` or
   a `403`, the page loads the list again, and any other answer shows an error message.
@@ -255,6 +260,9 @@ tenant with no directory row. A `403` or `404` is not logged, and any other fail
 `shell.users.connectedApps.*`.
 
 - **Mode.** A choice of "All", "Allow list" or "None" shows the stored mode. Each option has its own help.
+- **Filter.** The table of apps with consent has Filter on Name, Client ID, People who consented and Last used
+  (the day). The filter is kept in the address as `connectedApps.filter` and narrows the rows the tab already
+  holds, with no new request.
 - **Client IDs.** Under "Allow list", an editable list of client IDs shows. A typed ID is added with Enter. The tab keeps
   the list when another mode is chosen and sends it under every mode, because the server stores it under every mode.
 - **Save.** The "Save" button sends both values with `PUT /api/tenant/outside-clients`, then reads
