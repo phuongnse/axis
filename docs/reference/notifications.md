@@ -225,6 +225,19 @@ A bell in the header shows the signed-in user's unread count and opens their not
   and after any mark read. There is no timer. A failure to read the list hides the bell and never
   shows the sign-in prompt.
 
+## Task notices
+
+_(planned for M43)_
+
+A person hears in the application and by email when a task is given to them, moved to them by an
+[absence](user-administration.md#absences), or reassigned to them.
+
+- **Claim-mode tasks.** A role task that waits to be claimed notifies the role in the application only.
+- **Chosen holders.** A task that [sharing role tasks](task-api.md#sharing-role-tasks) gives to a holder, by
+  `fewestOpen` or `turn`, notifies that holder.
+- **Email links.** The email lists one link for each outcome. Each link opens the
+  [task page](task-inbox-widget.md#deciding-from-an-email) with that outcome chosen.
+
 ## Email
 
 A `notify` step or a task escalation with the `email` channel stages one email for each address in its
@@ -309,6 +322,10 @@ sign-in. A later sign-in updates it.
   [reassign](task-deadlines.md#reassign), the search route of a
   [`userId` field](resource-files.md#entity-field-types-and-constraints) and the actor names of the
   history views, and no other route lists them.
+- **Roles.** _(planned for M43)_ Each sign-in also keeps the application roles it carried, for
+  [sharing role tasks](task-api.md#sharing-role-tasks).
+- **Delegates.** _(planned for M43)_ The profiles also serve the delegate picker of an
+  [absence](user-administration.md#absences).
 
 ## Mail settings
 

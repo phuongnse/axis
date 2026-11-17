@@ -74,16 +74,16 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Give a task to a named person or one an expression picks | [Steps](reference/processes.md#steps) |
 | Give a task to a role, and let one holder claim it | [Claim and release](reference/task-deadlines.md#claim-and-release) |
 | Give a task to a line manager or a department head | [The organization module](reference/built-in-modules.md#the-organization-module) |
-| Give a task to a list of people | _(planned for M43)_ |
-| Give a task to a role within one department | _(planned for M43)_ |
+| Give a task to a list of people | [Steps](reference/processes.md#steps) _(planned for M43)_ |
+| Give a task to a role within one department | [Steps](reference/processes.md#steps) _(planned for M43)_ |
 | Ask several people and decide by all, any, a majority or a set number | [A task for several people](reference/task-api.md#a-task-for-several-people) _(planned for M38)_ |
 | Add an approver while a request is in progress | [Add a person](reference/task-deadlines.md#add-a-person) _(planned for M38)_ |
 | Give a task to someone else, with a reason | [Reassign](reference/task-deadlines.md#reassign) |
-| Share tasks by workload or in turn | _(planned for M43)_ |
+| Share tasks by workload or in turn | [Sharing role tasks](reference/task-api.md#sharing-role-tasks) _(planned for M43)_ |
 | Give an absent approver's approvals to a delegate | [The approval process](reference/built-in-modules.md#the-approval-process) |
-| Delegate during an absence in every process, moving tasks already open | _(planned for M43)_ |
+| Delegate during an absence in every process, moving tasks already open | [Absences](reference/user-administration.md#absences) _(planned for M43)_ |
 | Keep a person from deciding their own request | [The request contract](reference/built-in-modules.md#the-request-contract) |
-| Keep one person from deciding two steps of the same case | _(planned for M43)_ |
+| Keep one person from deciding two steps of the same case | [Who may act](reference/task-api.md#who-may-act) _(planned for M43)_ |
 | Give a step to the person who decided an earlier one | [The accountable user](reference/module-contracts.md#the-accountable-user) |
 
 ### Working on tasks
@@ -99,11 +99,11 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Promise a response or resolution time with an SLA that pauses, warns and escalates | [SLAs](reference/working-time.md#slas) _(planned for M39)_ |
 | Move the case on when a task's deadline passes | [Escalations and deadline](reference/task-deadlines.md#escalations-and-deadline) |
 | List my open tasks | [Task inbox widget](reference/task-inbox-widget.md#task-inbox-widget) |
-| List the tasks I completed | _(planned for M43)_ |
+| List the tasks I completed | [Completed tasks](reference/task-inbox-widget.md#completed-tasks) _(planned for M43)_ |
 | Notify people in the application or by email from a step | [Notify operation](reference/notifications.md#notify-operation) |
-| Tell a person when a task is given to them | _(planned for M43)_ |
-| Approve several tasks at once | _(planned for M43)_ |
-| Approve from an email | _(planned for M43)_ |
+| Tell a person when a task is given to them | [Task notices](reference/notifications.md#task-notices) _(planned for M43)_ |
+| Approve several tasks at once | [Deciding several tasks](reference/task-inbox-widget.md#deciding-several-tasks) _(planned for M43)_ |
+| Approve from an email | [Deciding from an email](reference/task-inbox-widget.md#deciding-from-an-email) _(planned for M43)_ |
 | Work on tasks on a phone screen | [Narrow width](reference/frontend.md#narrow-width) |
 | Push notifications to a phone | _(planned for M46)_ |
 

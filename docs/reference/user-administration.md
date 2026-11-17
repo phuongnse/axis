@@ -446,6 +446,41 @@ nothing else in the realm.
   settings. Its secret is stored encrypted in the tenant directory, see
   [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step).
 
+## Absences
+
+_(planned for M43)_
+
+A person says when they are away, and which delegate takes their open tasks meanwhile. An absence covers every
+application in the tenant, and every process, so no process needs a step for it.
+
+| Route | What it does |
+| ----- | ------------ |
+| `GET /api/me/absence` _(planned for M43)_ | Reads the signed-in person's absence |
+| `PUT /api/me/absence` _(planned for M43)_ | Sets the absence, replacing the one there is |
+| `DELETE /api/me/absence` _(planned for M43)_ | Ends the absence |
+
+- **Own absence only.** The routes read and write the signed-in person's absence. No route names another
+  person, so nobody sets, reads or ends someone else's.
+- **One absence.** A person has at most one absence. `PUT` replaces it, and `DELETE` ends it.
+- **The body.** `PUT` takes `from` and `until`, which are instants such as `2026-12-20T00:00:00Z`, and
+  `delegate`, the user id of another person in the tenant. The account page sends the start of the first day and
+  the end of the last day in the browser's time zone, see [absence](platform-pages.md#absence).
+- **Answers.** `GET` answers `200` with the absence, or `204` when there is none. Writes need the
+  [CSRF header](record-api.md#create-update-and-delete).
+- **Refusals.** A `400` is keyed `/delegate` when the delegate has no profile, or is the person themselves. It is
+  keyed `/until` when `until` is not after `from`, or lies in the past.
+- **Moving tasks.** When `from` comes, the worker moves each open user task of the person to the delegate, with
+  `onBehalfOf` set to the person. A role task the person claimed is released.
+- **New tasks.** Until `until`, a task that would go to the person goes to the delegate.
+- **Excluded delegates.** A task whose delegate is excluded from it stays with the absent person. An excluded
+  person is never made a delegate, see [who may act](task-api.md#who-may-act).
+- **The delegate's absence.** The delegate's own absence is not followed. A task moves once, to the delegate.
+- **After the absence.** Tasks that moved stay with the delegate after `until`.
+- **Storage.** Each absence is a row of `axis.absences` in the tenant database.
+- **Audit.** `absence.set` has the person as actor, with details `from`, `until` and `delegate`, all `null` on
+  `DELETE`. Each task that moves writes `task.delegated`, with the actor `system` and details `taskId`, `from`
+  (the absent person) and `to` (the delegate).
+
 ## Audit
 
 Each command writes one audit record in the tenant database, with the administrator as actor. A user command also names the user it acts on.

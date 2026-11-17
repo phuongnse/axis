@@ -50,6 +50,17 @@ sign-in first. A signed-out visit shows the sign-in prompt, because the list cal
 - **Texts.** Its texts are `shell.account.sessions`, the menu entry, and `shell.account.sessions.*` for
   the page.
 
+### Absence
+
+_(planned for M43)_
+
+The Absence section shows the person's absence from `GET /api/me/absence`, with a From and an Until date
+field and a Delegate user picker. The picker is the one that [reassign](task-deadlines.md#reassign) uses.
+Save sends the dates and the delegate with `PUT`, and End absence sends `DELETE`. Both buttons are
+`AxisButton`s, and the fields are `AxisField`s. A refused request shows its errors in place, with
+`placeProblemErrors`. The dates follow [absences](user-administration.md#absences). Its texts are
+`shell.account.absence.*`.
+
 ## Users page
 
 The platform route `/users` is the users page, where an administrator manages the tenant's users and

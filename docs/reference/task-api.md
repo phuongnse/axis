@@ -12,6 +12,7 @@ escalations and deadlines are in [task deadlines and claims](task-deadlines.md).
 | `GET /api/apps/{app}/tasks/{id}`             | Reads one task, see [read one task](#read-one-task)                                               |
 | `POST /api/apps/{app}/tasks/{id}/form-state` | Answers what the task's form shows for a draft, see [form state of a task](#form-state-of-a-task) |
 | `POST /api/apps/{app}/tasks/{id}/complete`   | Completes a task with an outcome, see [completing a task](#completing-a-task)                     |
+| `POST /api/apps/{app}/tasks/complete-many` _(planned for M43)_ | Decides several tasks with one outcome, see [deciding several tasks](#deciding-several-tasks) |
 
 ## Who may act
 
@@ -22,6 +23,11 @@ it, so a task assigned to a role the active release does not declare can be list
 by nobody. This is checked on every request. Policies add to this check and never replace it. A
 claimed role task is listed and may be completed only by its claimer, see
 [Claim and release](task-deadlines.md#claim-and-release).
+
+- **Delegate.** _(planned for M43)_ The delegate of an assignee who is away may act on the task, and the task
+  read shows `onBehalfOf`, see [absences](user-administration.md#absences).
+- **Excluded people.** _(planned for M43)_ An excluded person may not list, read, claim or complete the task.
+  The answer is the `403` of [task API errors](#task-api-errors).
 
 ## Policies on tasks
 
@@ -103,6 +109,11 @@ are ordered by `dueAt` ascending with no due date last, then by `createdAt`, the
   worked out when read. It is `null` for a fixed-time due date and for an overdue task.
 - **`atRisk`** _(planned for M39)_. `true` when the task is at risk, see
   [Task states](task-deadlines.md#task-states).
+- **Completed tasks.** _(planned for M43)_ `state=open` is the default. `state=completed` lists the tasks the
+  user completed, newest `completedAt` first, and each item adds `completedAt` and `outcome`. Any other
+  `state` is a `400` keyed `state`.
+- **Outcomes.** _(planned for M43)_ Each item lists `outcomes`, as [read one task](#read-one-task) does, so the
+  inbox can offer the outcomes that every selected task shares.
 
 The list answers within 300 ms for a holder of a role with 1,000 open role tasks, 300 of them claimed
 by others, and its count reads through the task index. This is the Reads objective of
@@ -181,6 +192,8 @@ three calls takes 300 ms or more.
 - `commands` lists what the user may do with the task now, and `reassignRoles` the roles they may
   reassign it to. The claim, release, reassign and complete responses carry both too, see
   [Inbox and task page](task-deadlines.md#inbox-and-task-page).
+- **`onBehalfOf`** _(planned for M43)_. The user id of the absent assignee the task was moved from, or `null`,
+  see [absences](user-administration.md#absences).
 
 ## Form state of a task
 
@@ -277,6 +290,47 @@ answered. Everything else on this page holds for each of these tasks, as for any
 - **Adding a person.** A person may be added to an open task, see
   [add a person](task-deadlines.md#add-a-person).
 
+## Sharing role tasks
+
+_(planned for M43)_
+
+A `role` assignee's `give` says how its task goes to a holder of the role. The task stays a role task, claimed
+for the holder it goes to. The role is checked again each time the holder acts, so a holder picked from a
+profile that no longer carries the role cannot act.
+
+- **`claim`.** The default. The task waits for a holder to claim it, see
+  [claim and release](task-deadlines.md#claim-and-release).
+- **`fewestOpen`.** The task goes to the eligible holder with the fewest open tasks in the application.
+- **`turn`.** The task goes to the eligible holder whose last task from this step is oldest, or who has none.
+  Ties are broken by user id. No table keeps the turn: the task rows hold it.
+- **Holders.** The holders are the people given the role, see [roles](user-administration.md#roles), and the
+  people whose last sign-in carried it, kept in their profile, see [user profiles](notifications.md#user-profiles).
+  People who are excluded or away are skipped.
+- **No holder.** With no eligible holder, the task stays an unclaimed role task, and any holder may claim it.
+
+## Deciding several tasks
+
+_(planned for M43)_
+
+`POST /api/apps/{app}/tasks/complete-many` decides several tasks with one outcome. Each task is decided as a
+single completion would decide it.
+
+```http
+POST /api/apps/{app}/tasks/complete-many
+Content-Type: application/json
+
+{ "outcome": "approve", "tasks": ["0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01"] }
+```
+
+- `tasks` holds 1 to 100 distinct task ids, the largest page of the [task list](#list-my-tasks).
+- The `401`, the CSRF `403` and the read-only `403` apply to the whole call. A body of the wrong shape is a `400`.
+- Each task is checked and completed as [completing a task](#completing-a-task) says, with no `values` and no
+  `version`, in its own transaction. A task whose form has a visible field that is required and empty is refused
+  for that task.
+- The answer is `200` with `results: [{ id, status, title, errors? }]` in the order of the request. Each `status`
+  is the status that a single completion of that task answers, such as `200` or `403`.
+- Each completed task writes its `task.completed` record, as a single completion does.
+
 ## Task API errors
 
 Every task route answers a failure with a problem detail, as the [record API](record-api.md#errors)
@@ -325,6 +379,9 @@ is a `403` before any of these checks, and so is one in a
     "status": 403
   }
   ```
+
+  **Excluded.** _(planned for M43)_ An excluded person gets this same `403`, see
+  [who may act](#who-may-act).
 
 - **`409` for a decided task.** The task is not `open`. Another completion came first, which covers a
   later completion and the loser of two concurrent ones, or the task is `cancelled` or `expired`, see
