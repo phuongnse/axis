@@ -62,24 +62,29 @@ These parts still hold:
 
 These parts change:
 
-- **Each author's own key runs their requests.** An author connects their own Anthropic API key, sealed
-  as [D149](d149-a-persons-secrets-are-sealed-for-the-host-that-uses-them-and-every-secret-rests-on-a-key-service.md)
+- **Each author's own key runs their requests.** _(planned for M35)_ An author connects their own
+  Anthropic API key, sealed as
+  [D149](d149-a-persons-secrets-are-sealed-for-the-host-that-uses-them-and-every-secret-rests-on-a-key-service.md)
   says, and that key pays for the requests the author sends. See
   [a person's own key](../reference/model-bindings.md#a-persons-own-key).
-- **Axis counts no requests.** There is no `authoringRequests` quota, and a plan includes no requests.
-- **No installation key runs requests, and no tenant holds a model key.** The installation's key encrypts
-  the installation's own secrets only, and `Ai:AllowTenantKeys` goes. See
+- **Axis counts no requests.** _(planned for M35)_ There is no `authoringRequests` quota, and a plan
+  includes no requests.
+- **No installation key runs requests, and no tenant holds a model key.** _(planned for M35)_ The
+  installation's key encrypts the installation's own secrets only, and `Ai:AllowTenantKeys` goes. See
   [a tenant's own key](../reference/model-bindings.md#a-tenants-own-key).
-- **A tenant setting turns AI authoring off.** It is named "Authors may use AI with their own Anthropic
-  key" and is on by default. Off, it refuses new sends, and requests already sent go on. See
-  [AI authoring](../reference/user-administration.md#ai-authoring).
-- **Claude comes first,** through an Anthropic API key, and the Axis SaaS default binding uses it.
+- **A tenant setting turns AI authoring off.** _(planned for M35)_ It is named "Authors may use AI with
+  their own Anthropic key" and is on by default. Off, it refuses new sends, and requests already sent
+  go on. See [AI authoring](../reference/user-administration.md#ai-authoring).
+- **Claude comes first,** _(planned for M35)_ through an Anthropic API key, and the Axis SaaS default
+  binding uses it.
 - **A Claude subscription works only through the MCP server,** that is through an outside client such as
   Claude Code, which signs in as the person and uses the subscription itself.
-- **The review runs on the request's own binding, with its author's key.** There is no review model of
-  its own, so `Ai:ReviewBinding` goes.
+- **The review runs on the request's own binding, with its author's key.** _(planned for M35)_ There is
+  no review model of its own, so `Ai:ReviewBinding` goes.
 
 ## Consequences
+
+_(planned for M35)_
 
 - Each author pays for their own AI use, and Axis carries no model cost and no request quota.
 - A person who has no key cannot send an authoring request, and a binding that needs no key, such as a
