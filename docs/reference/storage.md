@@ -160,6 +160,9 @@ label, or renaming an entity while keeping its `id`, never touches storage.
 | Version column               | `version` (`bigint`)                                                      | 7          |
 | Computed release column      | `computed_release_id` (`uuid`, null), on tables that are not child tables | 19         |
 | Field column                 | `f_` + field name in lowercase                                            | at most 62 |
+| Created columns _(planned for M41)_ | `created_at` (`timestamptz`) and `created_by` (`text`), on tables that are not child tables | 10 |
+| Updated columns _(planned for M41)_ | `updated_at` (`timestamptz`) and `updated_by` (`text`), on tables that are not child tables | 10 |
+| Deleted columns _(planned for M41)_ | `deleted_at` (`timestamptz`, null) and `deleted_by` (`text`, null), set while the record is in the [recycle bin](recycle-bin.md), on tables that are not child tables | 10 |
 | Primary key                  | `pk_` + table                                                             | 37         |
 | Unique constraint            | `uq_` + table + `_` + hash of the column name                             | 54         |
 | Foreign key                  | `fk_` + table + `_` + hash of the column name                             | 54         |
@@ -306,6 +309,10 @@ The tables:
 
 - **Tenant version.** The tenant `version` grows on every change to the tenant, its hosts, its
   bindings or its platform providers.
+- **Recycle bin period** _(planned for M41)_. `platform.tenants` also holds `recycle_bin_days`, an `integer` from 1
+  to 365 that is 30 by default, the tenant's [recycle bin period](recycle-bin.md#the-period). Each change raises the
+  tenant `version`, and writes a [platform audit record](tenant-setting-commands.md#platform-audit-records) in the same
+  transaction, `tenant recycle-bin set`.
 - **Schema version.** The `schema_version` is text: the id of the newest EF Core migration across
   the configuration, data and processes contexts that `Axis.Admin` applied to the tenant database,
   empty until the first migration. A host serves a tenant only when this value is the one the host
@@ -657,6 +664,9 @@ blocking a large table.
 - **Declared indexes.** An entity's `indexes` add the declared indexes, with the columns in the order
   of `fields`. A declared index over one `reference` field has the same name as the automatic index
   on that field, so they are one index, which is unique when the declared one is.
+- **Unique values and the bin** _(planned for M41)_. A `unique` field or index is a partial unique index over the
+  records outside the recycle bin, `where deleted_at is null`, so a new record may take the unique value of a
+  record in the bin, and a restore finds it held, see [restore](recycle-bin.md#restore).
 - **Changes.** The planner adds an index the release declares and the table lacks, and drops an
   `ix_` index the release no longer declares, which needs no migration. Changing the field list of an
   index is a drop and a create under the new name. An index of the same name with another `unique`
@@ -718,6 +728,19 @@ user or service account as actor, and so do the actions that [audit actions](#au
 - **Append only.** A `BEFORE UPDATE OR DELETE` row trigger and a `BEFORE TRUNCATE` statement trigger
   raise an exception with SQLSTATE `23001` (`restrict_violation`), so no row can be changed or
   removed, even by raw SQL.
+- **Values** _(planned for M41)_. The `details` of a record action hold `changes`, the old and new value of each
+  change, with a sensitive value as ciphertext, see [values in history](record-audit.md#values-in-history).
+- **The erasure path** _(planned for M41)_. The append-only triggers let one path through, the update that the
+  [erasure of history values](record-audit.md#erasing-values-from-history) makes to `details`, and nothing else.
+- **Search index** _(planned for M41)_. An index on `(occurred_at desc, id desc)` and one on `(actor, occurred_at desc)`
+  serve the [tenant's audit](record-audit.md#the-tenants-audit), which filters by person, application, entity,
+  record, action and time.
+- **Recycle bin and history actions** _(planned for M41)_. These actions write audit records beside those of
+  [audit actions](#audit-actions), each in the transaction of its change. `record.restored` and `record.purged` set `application_id`, `entity_id` and `record_id`
+  and have `{ "version" }` as `details`, with the user as `actor`, or `system` for a purge at the end of the period.
+  `auditRecords.exported` has the administrator as `actor`, `{ "format", "rowCount", "truncated" }` as `details` and
+  no other id. `history.erased` has the administrator as `actor`, no other id and `{ "auditRecords" }` as `details`,
+  the number of audit records changed. None holds a value.
 
 ### Audit actions
 

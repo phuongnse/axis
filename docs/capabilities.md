@@ -169,10 +169,11 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Capability | Where |
 | --- | --- |
 | Who changed a record, when and which fields | [Audit records and history](reference/record-audit.md#audit-records-and-history) |
-| The old and new value of each change | _(planned for M41)_ |
-| Search and export of a tenant's audit records | _(planned for M41)_ |
-| When a record was last changed and by whom, as fields | _(planned for M41)_ |
-| Delete a record and restore it later | _(planned for M41)_ |
+| The old and new value of each change | [Values in history](reference/record-audit.md#values-in-history) _(planned for M41)_ |
+| See a record as it was at a time | [A record at a time](reference/record-audit.md#a-record-at-a-time) _(planned for M41)_ |
+| Search and export of a tenant's audit records | [The tenant's audit](reference/record-audit.md#the-tenants-audit) _(planned for M41)_ |
+| When a record was last changed and by whom, as fields | [System fields](reference/record-api.md#system-fields) _(planned for M41)_ |
+| Delete a record and restore it later | [Recycle bin](reference/recycle-bin.md) _(planned for M41)_ |
 | Two people never overwrite each other's changes | [Concurrency](reference/record-api.md#concurrency) |
 | Lock a record while one person edits it | _(planned for M53)_ |
 | Keep a ledger whose records are only added, never changed | _(planned for M53)_ |
@@ -479,7 +480,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Create or update by a key in one import | [Rows and references](reference/import-export.md#rows-and-references) |
 | Create or update by a key through the API | _(planned for M45)_ |
 | Write many records in one API call | _(planned for M45)_ |
-| Read only the records changed since a time | _(planned for M45)_ |
+| Read only the records changed since a time | [Changes since a time](reference/record-api.md#changes-since-a-time) _(planned for M41)_ |
 | Publish an OpenAPI document of an application's API | _(planned for M45)_ |
 | Query records through OData or GraphQL | _(planned for M54)_ |
 | Client libraries for an application's API | _(planned for M45)_ |

@@ -232,6 +232,27 @@
       "status": "proposed"
     },
     {
+      "concept": "Recycle bin",
+      "en": "recycle bin",
+      "vi": "thùng rác",
+      "status": "proposed",
+      "note": "Where a deleted record waits before it is removed for good, and from where it is restored."
+    },
+    {
+      "concept": "Action: Purge",
+      "en": "Purge",
+      "vi": "Xóa vĩnh viễn",
+      "status": "proposed",
+      "note": "Removes a record in the recycle bin for good. Delete moves a record into the recycle bin."
+    },
+    {
+      "concept": "Audit (of the tenant)",
+      "en": "audit",
+      "vi": "nhật ký kiểm toán",
+      "status": "proposed",
+      "note": "The page where an administrator searches and exports every audit record of the tenant."
+    },
+    {
       "concept": "Path (of an instance)",
       "en": "path",
       "vi": "luồng",

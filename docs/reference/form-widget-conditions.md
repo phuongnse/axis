@@ -8,7 +8,7 @@ form widget in [form widget](form-widget.md).
 
 ## Conditions
 
-The widget asks the [form state endpoint](record-api.md#form-state) for the states of the fields as the
+The widget asks the [form state endpoint](form-state.md#form-state) for the states of the fields as the
 person edits, and shows its answer.
 
 - **Calls.** The widget calls the endpoint with the draft values and the touched fields.

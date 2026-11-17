@@ -7,10 +7,10 @@ found, rated and checked, and
 [D106](../decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md) says why Axis keeps
 the model.
 
-The model has four scopes, each in a file of its own. A scope's letter starts its ids, and an id is
+The model has four scopes, each with a file of its own. A scope's letter starts its ids, and an id is
 unique across every file.
 
-- **P**, [the product](threat-model-product.md): the server, worker, SPA, Studio, the MCP server and the agent host, packages, connectors, identity provider and personal data.
+- **P**, [the product](threat-model-product.md): the server, worker, SPA, Studio, the MCP server and the agent host, packages, connectors, identity provider and personal data. [History and recovery](threat-model-product-history.md) holds its threats to the history of records, the tenant's audit and the recycle bin.
 - **I**, [the installation](threat-model-installation.md): the operator's install, its images, hosts, databases, backups and secrets, and the cell console.
 - **B**, [the way Axis is built](threat-model-build.md): NexKit, CI, the AI agents and the repository.
 - **C**, [the control plane](threat-model-control-plane.md): the sign-up page, the control plane's calls to the cells, the directory's DNS writes, the payment webhooks, the e-invoice provider, and the billing portal's sign-in and pages.

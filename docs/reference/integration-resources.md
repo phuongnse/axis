@@ -508,6 +508,11 @@ when its `amount` changes, and the amount is 1000 or more, in
   expression over the record before the delete, see
   [Delete triggers](process-events.md#delete-triggers). A data change trigger
   that does not list `delete` has no `parameters`.
+- **Restore** _(planned for M41)_. `on` may also list `restore`, with `create` and `update`, and never with
+  `delete`. A trigger that lists it starts when a [restore](recycle-bin.md#restore) brings a record back from the
+  recycle bin, and the restored record is the subject. A trigger that lists `restore` has `fields` as for a
+  create: a restore passes it. Authors choose whether a restore starts a process, because a restore is not a
+  create and runs no sequence or default again.
 - `fields` is optional. If present, it is a non-empty, unique list. On an
   update, the trigger fires only when one of the named fields changed. A
   create always passes it.

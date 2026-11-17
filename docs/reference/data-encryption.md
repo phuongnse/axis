@@ -34,6 +34,13 @@ A sensitive value is encrypted by the server and the worker, so PostgreSQL only 
   recomputed it yet, and an aggregate over a `references` field read the decrypted value, as they read any field. So do
   rules and process expressions. Process inspection still hides it, see
   [sensitive fields](roles-and-policies.md#sensitive-fields).
+- **History values** _(planned for M41)_. The old and new value of a sensitive field in an audit record's
+  `changes` are encrypted in the same format with the tenant's data key, as base64 text in the JSON. The
+  associated data is the one of the field, so a history value does not decrypt as another field's. A history value
+  keeps the data key number it was written under, because the audit record is append only and only the
+  [erasure path](record-audit.md#erasing-values-from-history) may change it, so a rotation leaves it alone and
+  `retire` keeps every data key that a history value still names. An erasure removes the value's ciphertext from
+  the audit record and leaves the tenant's data key alone.
 
 ### Where the cipher runs
 
@@ -61,6 +68,9 @@ collection, and none writes a sensitive value in clear.
   stored. Its record steps, task completions, seeds and process steps use the cipher. A read under a grant whose
   `filter` tests an exact lookup field matches through the lookup hashes, and so do a data source `filter` and a
   measure's `filter` in the rows, the export and the id read of the trigger fan-out.
+- **History** _(planned for M41)_. The history route, the record at a time and the tenant's audit with its export
+  decrypt a history value with the cipher, for a user who may read the field. They never write one in clear, and no
+  audit record holds a sensitive value in clear.
 - **Triggers and start conditions** _(planned for M30)_. The data change trigger, the event trigger start, the task
   escalation and the inbound endpoint start condition read a record that holds a stored sensitive value with the
   cipher.
@@ -253,6 +263,10 @@ names one.
   exits with code `1`. Run `rotate` again, then `retire`.
 - **Done.** Otherwise it prints `<id> data-key retire ok: <d> data keys, <l> lookup keys deleted`. A tenant with no
   older key prints it with `0` and writes no record.
+- **History keeps its keys** _(planned for M41)_. A history value, see
+  [sensitive field values](#sensitive-field-values), is never re-encrypted, so `retire` does not count it and does
+  not delete a data key that a history value names. It deletes lookup keys as before. A tenant that keeps history
+  of sensitive values therefore keeps the older data keys that wrote them.
 - **Restart first.** Restart the hosts, or wait until they have read the new keys, before `retire`: a host that still
   writes with a deleted key stores values that no host can read after it restarts.
 

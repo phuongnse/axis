@@ -9,7 +9,7 @@ in [resource files](resource-files.md).
 ## Form conditions and steps
 
 A form's conditions are expressions that the server evaluates through the
-[form state endpoint](record-api.md#form-state) and the
+[form state endpoint](form-state.md#form-state) and the
 [task form state route](task-api.md#form-state-of-a-task), so the SPA has no evaluator of its own. The
 server enforces `requiredWhen` on write, and on task completion it also refuses a value for a hidden or
 `readOnlyWhen` field.

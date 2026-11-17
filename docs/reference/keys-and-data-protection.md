@@ -123,7 +123,9 @@ Axis encrypts only the secrets, the values of `sensitive` fields and tenant back
 - **Encryption at rest.** The operator's PostgreSQL or disk encryption protects these records. Axis encrypts no column. Test: none, because the control is the operator's.
 - **Encryption in transit.** Every connection uses TLS, see [TLS](installation.md#tls). Test: `DatabaseTlsRequirementTests`.
 - **Integrity.** Each audit record is written in the same transaction as the change it records. The database rejects any update, delete or truncate of the audit table. Test: `AuditRecordTests`.
+- **Erasing history** _(planned for M41)_. The one exception to the audit table's integrity is the audited [erasure path](record-audit.md#erasing-values-from-history). It clears values from history, writes `history.erased` and never drops the tenant's data key.
 - **Retention.** The database rejects any delete of an audit record. Notifications are deleted after `Notifications:RetentionDays`, 90 days by default. Other records last as long as the application keeps them. Test: `NotificationRetentionTests`.
+- **Deleted records** _(planned for M41)_. A deleted record waits in the [recycle bin](recycle-bin.md) for the period the tenant sets, 30 days by default, before the worker purges it. Its history stays.
 - **Logging.** Field values never appear in a log, a span or telemetry. Test: `TraceCorrelationTests`.
 - **Access to logs.** As for Restricted. Test: `TraceCorrelationTests`.
 - **Access control.** Policies and field grants, as for Restricted. Test: `RecordFieldPolicyTests`.
