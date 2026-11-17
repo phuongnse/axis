@@ -188,7 +188,8 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   outcome is `unknown`, across every process of every application. An entry opens the
   [instance detail](process-inspection.md#instance-detail) at `/console/instances/{id}`, with the
   graph, the history, the tasks and the calls. The page is outside every site, so it has no
-  release texts and shows step names, not their labels. It offers the commands that the detail
+  release texts and shows step names, not their labels. Its tables filter as the
+  [instance page's](process-inspector-widget.md#instance-page) do. It offers the commands that the detail
   lists. The view is paged on the server. Its table has the toolbar of
   [tables](actions-and-controls.md#tables) with Filter, and a pager. Each column filters, and the
   Application and Process columns filter by name, so the view has no Application picker. The

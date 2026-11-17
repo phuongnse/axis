@@ -6,12 +6,16 @@ import { AxisTable, type AxisColumn } from './AxisTable'
 import { EmptyState } from './EmptyState'
 import { formatValue } from './formatValue'
 import {
+  attemptKinds,
+  attemptOutcomes,
   fetchInstance,
   forbidden,
   instanceCommands,
+  instanceStates,
   retryWarns,
   sendCommand,
   stateText,
+  taskStates,
   timerDueAt,
   type CallAttempt,
   type InstanceCommand,
@@ -27,9 +31,12 @@ import { ResolveDialog } from './ResolveDialog'
 import { SectionPart, SectionParts } from './SectionParts'
 import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
+import { localDay } from './tableFilter'
+import { recordPageSize } from './tableQuery'
 import { useText, useTextCatalogs } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useReleaseTexts } from './useReleaseTexts'
+import { useTableView } from './useTableView'
 
 interface ProcessInstancePageProps {
   sitePath: string
@@ -49,6 +56,47 @@ type InstanceState = InstanceDetail | null | typeof forbidden | 'failed'
 
 const dateTime = (name: string) => ({ name, type: 'date-time' }) as const
 
+// The tables filter the columns that they show. Stable arrays keep useTableView from recomputing on each render.
+const historyFields = [
+  { name: 'step', type: 'text' },
+  { name: 'startedAt', type: 'date' },
+  { name: 'finishedAt', type: 'date' },
+  { name: 'decision', type: 'text' },
+  { name: 'error', type: 'text' },
+  { name: 'traceId', type: 'text' },
+] as const
+const taskFields = [
+  { name: 'step', type: 'text' },
+  { name: 'assignee', type: 'text' },
+  { name: 'state', type: 'enum' },
+  { name: 'outcome', type: 'text' },
+  { name: 'completedBy', type: 'text' },
+  { name: 'createdAt', type: 'date' },
+  { name: 'completedAt', type: 'date' },
+] as const
+const attemptFields = [
+  { name: 'kind', type: 'enum' },
+  { name: 'number', type: 'integer' },
+  { name: 'startedAt', type: 'date' },
+  { name: 'finishedAt', type: 'date' },
+  { name: 'outcome', type: 'enum' },
+  { name: 'httpStatus', type: 'integer' },
+  { name: 'error', type: 'text' },
+  { name: 'traceId', type: 'text' },
+] as const
+const subProcessFields = [
+  { name: 'process', type: 'text' },
+  { name: 'step', type: 'text' },
+  { name: 'state', type: 'enum' },
+  { name: 'createdAt', type: 'date' },
+  { name: 'endedAt', type: 'date' },
+] as const
+// The tables have no parameters of their own. A stable empty array keeps useTableView from recomputing on each render.
+const noParameters: readonly string[] = []
+
+/** The options of an enum column that shows the API's word as it is. */
+const wordOptions = (words: readonly string[]) => words.map((word) => ({ value: word, label: word }))
+
 /**
  * Shows one instance under the page of its process inspector: its state and step, the steps of
  * the release it is pinned to with the path marked, the history, the tasks, the calls with their
@@ -56,6 +104,11 @@ const dateTime = (name: string) => ({ name, type: 'date-time' }) as const
  * and each sub-process link to their instance on the first navigation page whose process inspector
  * names their process, and show without a link when there is none. A step the path holds is marked as taken, and the step the instance is at is marked as
  * current. A call whose input is hidden shows the fixed "hidden" text and no value.
+ *
+ * The History, Tasks and Sub-processes tables and each call's Attempts table hold all their rows, show them with no
+ * pager and have Filter on every column but the Open link. Each keeps its filter in the address under a prefix of its
+ * own: `history.`, `tasks.`, `subProcesses.` and `attempts.{callId}.`, and a date filters on the local day of its time,
+ * see docs/reference/process-inspector-widget.md#instance-page.
  *
  * Step labels come from the texts of the instance's release, then the site texts and the platform
  * texts. A step without a label shows its name. If the release texts fail to load, the page shows
@@ -179,6 +232,17 @@ export function InstanceDetailView({
 }: InstanceDetailViewProps) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
+  const historyView = useTableView(historyFields, recordPageSize, noParameters, false, true, false, 'history.')
+  const taskView = useTableView(taskFields, recordPageSize, noParameters, false, true, false, 'tasks.')
+  const subProcessView = useTableView(
+    subProcessFields,
+    recordPageSize,
+    noParameters,
+    false,
+    true,
+    false,
+    'subProcesses.',
+  )
   const rowStyle = { paddingBlock: spacing.sm, borderBlockEnd: `1px solid ${colour.divider}` }
   const stepsByName = useMemo(
     () => new Map(instance.graph.steps.map((step) => [step.name, step])),
@@ -198,6 +262,7 @@ export function InstanceDetailView({
     key: 'traceId',
     kind: 'fixed' as const,
     title: t('shell.inspector.traceId'),
+    filter: { kind: 'text' as const, value: (row: { traceId: string | null }) => row.traceId },
     render: (_v: unknown, row: { traceId: string | null }) =>
       row.traceId === null ? null : (
         <Typography.Text code copyable>
@@ -211,98 +276,181 @@ export function InstanceDetailView({
       kind: 'freeText',
       title: t('shell.inspector.step'),
       render: (_v, row) => stepLabel(row.step),
+      filter: { kind: 'text', value: (row) => stepLabel(row.step) },
     },
     {
       key: 'startedAt',
       kind: 'fixed',
       title: t('shell.inspector.startedAt'),
       render: (_v, row) => time('startedAt', row.startedAt),
+      filter: { kind: 'date', value: (row) => localDay(row.startedAt) },
     },
     {
       key: 'finishedAt',
       kind: 'fixed',
       title: t('shell.inspector.finishedAt'),
       render: (_v, row) => time('finishedAt', row.finishedAt),
+      filter: { kind: 'date', value: (row) => localDay(row.finishedAt) },
     },
     {
       key: 'decision',
       kind: 'fixed',
       title: t('shell.inspector.decision'),
       render: (_v, row) => row.decision ?? null,
+      filter: { kind: 'text', value: (row) => row.decision ?? null },
     },
-    { key: 'error', kind: 'freeText', title: t('shell.inspector.error'), render: (_v, row) => row.error ?? null },
+    {
+      key: 'error',
+      kind: 'freeText',
+      title: t('shell.inspector.error'),
+      render: (_v, row) => row.error ?? null,
+      filter: { kind: 'text', value: (row) => row.error ?? null },
+    },
     traceIdColumn,
   ]
   const taskColumns: AxisColumn<InstanceTask>[] = [
-    { key: 'step', kind: 'freeText', title: t('shell.inspector.step'), render: (_v, row) => stepLabel(row.step) },
+    {
+      key: 'step',
+      kind: 'freeText',
+      title: t('shell.inspector.step'),
+      render: (_v, row) => stepLabel(row.step),
+      filter: { kind: 'text', value: (row) => stepLabel(row.step) },
+    },
     {
       key: 'assignee',
       kind: 'freeText',
       title: t('shell.inspector.assignee'),
       render: (_v, row) => `${row.assigneeKind}: ${row.assignee}`,
+      filter: { kind: 'text', value: (row) => `${row.assigneeKind}: ${row.assignee}` },
     },
-    { key: 'state', kind: 'fixed', title: t('shell.inspector.state'), render: (_v, row) => row.state },
-    { key: 'outcome', kind: 'fixed', title: t('shell.inspector.outcome'), render: (_v, row) => row.outcome ?? null },
+    {
+      key: 'state',
+      kind: 'fixed',
+      title: t('shell.inspector.state'),
+      render: (_v, row) => row.state,
+      filter: { kind: 'enum', value: (row) => row.state, options: wordOptions(taskStates) },
+    },
+    {
+      key: 'outcome',
+      kind: 'fixed',
+      title: t('shell.inspector.outcome'),
+      render: (_v, row) => row.outcome ?? null,
+      filter: { kind: 'text', value: (row) => row.outcome ?? null },
+    },
     {
       key: 'completedBy',
       kind: 'freeText',
       title: t('shell.inspector.completedBy'),
       render: (_v, row) => row.completedBy ?? null,
+      filter: { kind: 'text', value: (row) => row.completedBy ?? null },
     },
     {
       key: 'createdAt',
       kind: 'fixed',
       title: t('shell.inspector.createdAt'),
       render: (_v, row) => time('createdAt', row.createdAt),
+      filter: { kind: 'date', value: (row) => localDay(row.createdAt) },
     },
     {
       key: 'completedAt',
       kind: 'fixed',
       title: t('shell.inspector.completedAt'),
       render: (_v, row) => time('completedAt', row.completedAt),
+      filter: { kind: 'date', value: (row) => localDay(row.completedAt) },
     },
   ]
   const attemptColumns: AxisColumn<CallAttempt>[] = [
-    { key: 'kind', kind: 'fixed', title: t('shell.inspector.kind'), render: (_v, row) => row.kind },
-    { key: 'number', kind: 'fixed', title: t('shell.inspector.number'), render: (_v, row) => row.number },
+    {
+      key: 'kind',
+      kind: 'fixed',
+      title: t('shell.inspector.kind'),
+      render: (_v, row) => row.kind,
+      filter: { kind: 'enum', value: (row) => row.kind, options: wordOptions(attemptKinds) },
+    },
+    {
+      key: 'number',
+      kind: 'fixed',
+      title: t('shell.inspector.number'),
+      render: (_v, row) => row.number,
+      filter: { kind: 'number', value: (row) => row.number },
+    },
     {
       key: 'startedAt',
       kind: 'fixed',
       title: t('shell.inspector.startedAt'),
       render: (_v, row) => time('startedAt', row.startedAt),
+      filter: { kind: 'date', value: (row) => localDay(row.startedAt) },
     },
     {
       key: 'finishedAt',
       kind: 'fixed',
       title: t('shell.inspector.finishedAt'),
       render: (_v, row) => time('finishedAt', row.finishedAt),
+      filter: { kind: 'date', value: (row) => localDay(row.finishedAt) },
     },
-    { key: 'outcome', kind: 'fixed', title: t('shell.inspector.outcome'), render: (_v, row) => row.outcome },
+    {
+      key: 'outcome',
+      kind: 'fixed',
+      title: t('shell.inspector.outcome'),
+      render: (_v, row) => row.outcome,
+      filter: { kind: 'enum', value: (row) => row.outcome, options: wordOptions(attemptOutcomes) },
+    },
     {
       key: 'httpStatus',
       kind: 'fixed',
       title: t('shell.inspector.httpStatus'),
       render: (_v, row) => row.httpStatus ?? null,
+      filter: { kind: 'number', value: (row) => row.httpStatus ?? null },
     },
-    { key: 'error', kind: 'freeText', title: t('shell.inspector.error'), render: (_v, row) => row.error ?? null },
+    {
+      key: 'error',
+      kind: 'freeText',
+      title: t('shell.inspector.error'),
+      render: (_v, row) => row.error ?? null,
+      filter: { kind: 'text', value: (row) => row.error ?? null },
+    },
     traceIdColumn,
   ]
 
   const subProcessColumns: AxisColumn<SubProcess>[] = [
-    { key: 'process', kind: 'freeText', title: t('shell.inspector.process'), render: (_v, row) => row.process },
-    { key: 'step', kind: 'freeText', title: t('shell.inspector.step'), render: (_v, row) => stepLabel(row.step) },
-    { key: 'state', kind: 'fixed', title: t('shell.inspector.state'), render: (_v, row) => stateText(t, row.state) },
+    {
+      key: 'process',
+      kind: 'freeText',
+      title: t('shell.inspector.process'),
+      render: (_v, row) => row.process,
+      filter: { kind: 'text', value: (row) => row.process },
+    },
+    {
+      key: 'step',
+      kind: 'freeText',
+      title: t('shell.inspector.step'),
+      render: (_v, row) => stepLabel(row.step),
+      filter: { kind: 'text', value: (row) => stepLabel(row.step) },
+    },
+    {
+      key: 'state',
+      kind: 'fixed',
+      title: t('shell.inspector.state'),
+      render: (_v, row) => stateText(t, row.state),
+      filter: {
+        kind: 'enum',
+        value: (row) => row.state,
+        options: instanceStates.map((value) => ({ value, label: stateText(t, value) })),
+      },
+    },
     {
       key: 'createdAt',
       kind: 'fixed',
       title: t('shell.inspector.createdAt'),
       render: (_v, row) => time('createdAt', row.createdAt),
+      filter: { kind: 'date', value: (row) => localDay(row.createdAt) },
     },
     {
       key: 'endedAt',
       kind: 'fixed',
       title: t('shell.inspector.endedAt'),
       render: (_v, row) => time('endedAt', row.endedAt),
+      filter: { kind: 'date', value: (row) => localDay(row.endedAt) },
     },
     {
       key: 'open',
@@ -394,6 +542,7 @@ export function InstanceDetailView({
             rowKey={(row) => `${row.step}|${row.startedAt}|${row.finishedAt}`}
             columns={historyColumns}
             dataSource={instance.path}
+            view={{ query: historyView.view, onChange: historyView.setView, paging: false }}
             emptyText={t('shell.inspector.noHistory')}
           />
         </SectionPart>
@@ -402,6 +551,7 @@ export function InstanceDetailView({
             rowKey={(row) => row.id}
             columns={taskColumns}
             dataSource={instance.tasks}
+            view={{ query: taskView.view, onChange: taskView.setView, paging: false }}
             emptyText={t('shell.inspector.noTasks')}
           />
         </SectionPart>
@@ -429,6 +579,7 @@ export function InstanceDetailView({
             rowKey={(row) => row.id}
             columns={subProcessColumns}
             dataSource={instance.subProcesses}
+            view={{ query: subProcessView.view, onChange: subProcessView.setView, paging: false }}
             emptyText={t('shell.inspector.noSubProcesses')}
           />
         </SectionPart>
@@ -490,13 +641,23 @@ interface CallItemProps {
 }
 
 /**
- * One call: where it goes, its state, its input and its attempts. A call the server marks resolvable
- * also has a Resolve button. The page never decides who may resolve.
+ * One call: where it goes, its state, its input and its attempts. The Attempts table filters on each column and keeps
+ * its filter in the address under `attempts.{callId}.`, see docs/reference/process-inspector-widget.md#instance-page.
+ * A call the server marks resolvable also has a Resolve button. The page never decides who may resolve.
  */
 function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attemptColumns }: CallItemProps) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
   const [resolving, setResolving] = useState(false)
+  const attemptView = useTableView(
+    attemptFields,
+    recordPageSize,
+    noParameters,
+    false,
+    true,
+    false,
+    `attempts.${call.id}.`,
+  )
   const target = call.connector ?? `${call.package}@${call.version}`
   const input = call.inputHidden ? null : inputEntries(call.input)
   return (
@@ -545,6 +706,7 @@ function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attem
         rowKey={(row) => `${row.kind}|${row.number}|${row.startedAt}`}
         columns={attemptColumns}
         dataSource={call.attempts}
+        view={{ query: attemptView.view, onChange: attemptView.setView, paging: false }}
         emptyText={t('shell.inspector.noAttempts')}
       />
     </Flex>

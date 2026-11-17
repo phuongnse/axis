@@ -76,6 +76,13 @@ wrong form show the not-found page, and the instance is not requested.
   yet." in place of its table, see [Attempts](process-inspection.md#attempts). A call whose
   `inputHidden` is `true` shows "hidden" in place of its input. A shown input is a list of its
   top-level properties, where a number keeps its source digits.
+- **Filter.** The History, Tasks and Sub-processes tables and each call's Attempts table have Filter on
+  each column that holds a value, of the column's kind, as [tables](actions-and-controls.md#tables)
+  say. The Open link has none. Each table holds its rows and filters them itself, with no pager. Its
+  filter is in the address under its own prefix: `history.`, `tasks.`, `subProcesses.` and
+  `attempts.{callId}.`. A date filters on the local day of its time. A step and an assignee filter on
+  the text the cell shows. A task state, an attempt kind, an attempt outcome and a sub-process state
+  filter as a choice.
 - **Subject, timer and parent.** An instance without a subject shows "No subject" in place of the
   subject id. An instance that is `waiting` at a `timer` step shows a Due row with the `dueAt` of that
   step's latest history row, and the row is left out in any other case. An instance that a sub-process

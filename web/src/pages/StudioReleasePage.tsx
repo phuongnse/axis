@@ -1,6 +1,5 @@
 import { Descriptions, Flex, Spin, Typography } from 'antd'
 import { type HTMLAttributes, useContext, useEffect, useState } from 'react'
-import dayjs from 'dayjs'
 import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
@@ -22,6 +21,7 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { localDay } from '../platform/tableFilter'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -240,8 +240,8 @@ function ReleaseContent({
       by: releasePublisher(item, t),
       replaced: sorted[index - 1]?.number ?? null,
       until: next !== undefined ? format(next.activatedAt) : release.live ? t('shell.studio.release.now') : null,
-      whenDay: dayjs(item.activatedAt).format('YYYY-MM-DD'),
-      untilDay: next !== undefined ? dayjs(next.activatedAt).format('YYYY-MM-DD') : null,
+      whenDay: localDay(item.activatedAt)!,
+      untilDay: next !== undefined ? localDay(next.activatedAt) : null,
     }
   })
   const activationColumns: AxisColumn<ActivationRow>[] = [
