@@ -12,12 +12,16 @@ import { csrfHeaders } from '../csrf'
 import { cellValue, expectShown, fieldLabel } from '../fields'
 import { useJourneySession } from '../sessions'
 import {
+  addEntityField,
   addListItem,
   addMapping,
+  closeEntityField,
   createResource,
   deleteResource,
   doneListItem,
+  entityFieldAction,
   jsonViewText,
+  openEntityField,
   openFormTab,
   openKind,
   openListItem,
@@ -84,6 +88,8 @@ test.describe('the author builds the asset management application with Studio on
   }
 
   async function save(page: Page, answers: [field: string, choice: string][] = []) {
+    // The save is not made from inside an open field.
+    await closeEntityField(page)
     // A save with a migration posts one changes call, and a save without one patches the resource.
     const answer = page.waitForResponse(
       (response) => {
@@ -238,7 +244,7 @@ test.describe('the author builds the asset management application with Studio on
   }
 
   async function addField(page: Page, index: number, name: string) {
-    await page.getByRole('button', { name: 'Add field', exact: true }).click()
+    await addEntityField(page, index)
     await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(name)
   }
 
@@ -413,10 +419,12 @@ test.describe('the author builds the asset management application with Studio on
       await expectForm(page)
       await writeLabel(page, 'studio-field-/label', text(`${camel}.label`))
 
+      await openEntityField(page, 0)
       await page.getByTestId('studio-field-/fields/0/required').getByRole('checkbox').check()
       await page.getByTestId('studio-field-/fields/0/maxLength').getByRole('spinbutton').fill('100')
       await pick(page, 'studio-field-/fields/0/label', `${camel}.name`, `${camel}.name`)
 
+      await closeEntityField(page)
       await pick(page, 'studio-field-/displayField', 'name')
       await save(page, [
         ['name', 'Skip'],
@@ -437,6 +445,7 @@ test.describe('the author builds the asset management application with Studio on
     await createResource(page, 'entity', 'Attachment')
     await expectForm(page)
     await writeLabel(page, 'studio-field-/label', text('attachment.label'))
+    await openEntityField(page, 0)
     await page.getByTestId('studio-field-/fields/0/name').getByRole('textbox').fill('file')
     await pick(page, 'studio-field-/fields/0/type', 'file')
     await addTags(page, 'studio-field-/fields/0/accept', ['application/pdf', 'image/*'])
@@ -452,6 +461,7 @@ test.describe('the author builds the asset management application with Studio on
     await createResource(page, 'entity', 'MaintenanceEntry')
     await expectForm(page)
     await writeLabel(page, 'studio-field-/label', text('maintenance.label'))
+    await openEntityField(page, 0)
     await page.getByTestId('studio-field-/fields/0/name').getByRole('textbox').fill('date')
     await pick(page, 'studio-field-/fields/0/type', 'date')
     await page.getByTestId('studio-field-/fields/0/required').getByRole('checkbox').check()
@@ -498,6 +508,7 @@ test.describe('the author builds the asset management application with Studio on
 
     // Row 0 is the starter `name` field, which stays `name`. The sample orders `number` before it, so the author adds
     // `number` below it and moves it up. Its sequence is AssetNumber.
+    await openEntityField(page, 0)
     await page.getByTestId('studio-field-/fields/0/required').getByRole('checkbox').check()
     await page.getByTestId('studio-field-/fields/0/maxLength').getByRole('spinbutton').fill('200')
     await page.getByTestId('studio-field-/fields/0/searchable').getByRole('switch').click()
@@ -508,7 +519,7 @@ test.describe('the author builds the asset management application with Studio on
     await page.getByTestId('studio-field-/fields/1/maxLength').getByRole('spinbutton').fill('20')
     await pick(page, 'studio-field-/fields/1/sequence', 'AssetNumber')
     await pick(page, 'studio-field-/fields/1/label', 'asset.number', 'asset.number')
-    await page.getByTestId('studio-field-/fields/1').getByRole('button', { name: 'Move up', exact: true }).click()
+    await entityFieldAction(page, 1, 'Move up')
 
     await addField(page, 2, 'category')
     await pick(page, 'studio-field-/fields/2/type', 'reference')
@@ -576,6 +587,7 @@ test.describe('the author builds the asset management application with Studio on
     await pick(page, 'studio-field-/fields/12/target', 'Software')
     await pick(page, 'studio-field-/fields/12/label', 'asset.software', 'asset.software')
 
+    await closeEntityField(page)
     await pick(page, 'studio-field-/displayField', 'name')
     await save(page, [
       ['name', 'Skip'],
