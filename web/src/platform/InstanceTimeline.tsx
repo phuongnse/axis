@@ -3,15 +3,23 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AxisButton } from './AxisButton'
 import { AxisTable, type AxisColumn } from './AxisTable'
-import { NotSet } from './EmptyValue'
 import { inspectorPath } from './inspectorPages'
-import type { CallAttempt, InstanceCall, InstanceDetail, InstanceTask } from './inspection'
+import type { CallAttempt, InstanceCall, InstanceDetail, InstanceTask, SubProcess } from './inspection'
 import { durationText, stepRuns, type StepRun } from './instanceRuns'
 import { filled } from './instanceStatus'
 import { ResolveDialog } from './ResolveDialog'
-import { SectionPart, SectionParts } from './SectionParts'
-import { TermList, type Term } from './TermList'
 import { useText } from './texts'
+
+/** One row of the timeline, with the rows inside it, which the table folds. */
+interface TimelineRow {
+  key: string
+  name: ReactNode
+  what: ReactNode
+  state: ReactNode
+  startedAt: string | null
+  finishedAt: string | null
+  children?: TimelineRow[]
+}
 
 interface InstanceTimelineProps {
   instance: InstanceDetail
@@ -32,8 +40,9 @@ interface InstanceTimelineProps {
 /**
  * Proposed, see the review on #3650: what an instance did, one row for each run of a step, oldest first, as event
  * histories show it. A row says what happened in a sentence: who chose which outcome, where a decision went, how a
- * call went over its attempts, which sub-process ran; a failed or waiting run is marked. Opening a row shows its
- * times, its trace ID, and each task, call and sub-process it started, with a call's input, attempts and Resolve.
+ * call went over its attempts, which sub-process ran; a failed or waiting run is marked. A run is a group row, as a
+ * request's history in Studio has, that opens to a row for each task, call and sub-process it started, in the same
+ * columns, and a call opens to a row for each attempt, with its trace ID; a call's input and Resolve are in its row.
  */
 export function InstanceTimeline({
   instance,
@@ -131,168 +140,174 @@ export function InstanceTimeline({
     )
   }
 
-  const state = (run: StepRun) =>
-    run.state === 'done' ? (
+  const stateWords = (value: 'done' | 'failed' | 'waiting' | 'running' | 'retried') =>
+    value === 'done' ? (
       <Typography.Text type="secondary">{t('shell.inspector.timeline.stateDone')}</Typography.Text>
+    ) : value === 'retried' ? (
+      <Typography.Text type="secondary">{t('shell.inspector.timeline.stateRetried')}</Typography.Text>
     ) : (
       // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
-      <Tag color={run.state === 'failed' ? 'error' : 'processing'}>
-        {t(`shell.inspector.timeline.state${run.state[0].toUpperCase()}${run.state.slice(1)}`)}
+      <Tag color={value === 'failed' ? 'error' : 'processing'}>
+        {t(`shell.inspector.timeline.state${value[0].toUpperCase()}${value.slice(1)}`)}
       </Tag>
     )
-
-  const columns: AxisColumn<StepRun>[] = [
-    {
-      key: 'step',
-      kind: 'freeText',
-      title: t('shell.inspector.step'),
-      render: (_v, run) => (
-        <Flex vertical>
-          <Typography.Text strong>{stepLabel(run.step)}</Typography.Text>
-          <Typography.Text type="secondary">
-            {run.number > 1
-              ? t('shell.inspector.timeline.typeRun')
-                  .replace('{type}', typeText(typeOf(run.step)))
-                  .replace('{number}', String(run.number))
-              : typeText(typeOf(run.step))}
-          </Typography.Text>
-        </Flex>
-      ),
-    },
-    { key: 'what', kind: 'freeText', title: t('shell.inspector.timeline.what'), render: (_v, run) => summary(run) },
-    { key: 'state', kind: 'fixed', title: t('shell.inspector.state'), render: (_v, run) => state(run) },
-    {
-      key: 'startedAt',
-      kind: 'fixed',
-      title: t('shell.inspector.startedAt'),
-      render: (_v, run) => time('startedAt', run.startedAt),
-    },
-    {
-      key: 'duration',
-      kind: 'fixed',
-      title: t('shell.inspector.timeline.duration'),
-      render: (_v, run) => durationText(run.startedAt, run.finishedAt ?? now, locale),
-    },
-  ]
-
-  const attemptColumns: AxisColumn<CallAttempt>[] = [
-    { key: 'number', kind: 'fixed', title: t('shell.inspector.number'), render: (_v, row) => row.number },
-    {
-      key: 'startedAt',
-      kind: 'fixed',
-      title: t('shell.inspector.startedAt'),
-      render: (_v, row) => time('startedAt', row.startedAt),
-    },
-    {
-      key: 'duration',
-      kind: 'fixed',
-      title: t('shell.inspector.timeline.duration'),
-      render: (_v, row) => durationText(row.startedAt, row.finishedAt, locale),
-    },
-    { key: 'outcome', kind: 'fixed', title: t('shell.inspector.outcome'), render: (_v, row) => row.outcome },
-    {
-      key: 'httpStatus',
-      kind: 'fixed',
-      title: t('shell.inspector.httpStatus'),
-      render: (_v, row) => row.httpStatus ?? null,
-    },
-    { key: 'error', kind: 'freeText', title: t('shell.inspector.error'), render: (_v, row) => row.error ?? null },
-  ]
-
+  const callState = (call: InstanceCall) =>
+    call.state === 'succeeded' ? 'done' : call.state === 'failed' ? 'failed' : ('running' as const)
+  const named = (name: ReactNode, kind: string) => (
+    <Flex vertical>
+      <Typography.Text strong>{name}</Typography.Text>
+      <Typography.Text type="secondary">{kind}</Typography.Text>
+    </Flex>
+  )
   const traceId = (value: string | null) =>
-    value === null ? (
-      <NotSet />
-    ) : (
-      <Typography.Text code copyable>
-        {value}
+    value === null ? null : (
+      <Typography.Text type="secondary">
+        {t('shell.inspector.traceId')}{' '}
+        <Typography.Text code copyable>
+          {value}
+        </Typography.Text>
       </Typography.Text>
     )
 
-  const details = (run: StepRun): ReactNode => (
-    <SectionParts>
-      <SectionPart testId={`inspector-run-${run.key}`}>
-        <TermList
-          terms={[
-            {
-              key: 'startedAt',
-              term: t('shell.inspector.startedAt'),
-              value: time('startedAt', run.startedAt),
-              width: 6,
-            },
-            {
-              key: 'finishedAt',
-              term: t('shell.inspector.finishedAt'),
-              value: run.finishedAt === null ? <NotSet /> : time('finishedAt', run.finishedAt),
-              width: 6,
-            },
-            { key: 'traceId', term: t('shell.inspector.traceId'), value: traceId(run.traceId) },
-          ]}
-        />
-      </SectionPart>
-      {run.tasks.map((task) => (
-        <SectionPart key={task.id} testId={`inspector-task-${task.id}`} heading={{ title: stepLabel(task.step) }}>
-          <TermList
-            terms={[
-              { key: 'assignee', term: t('shell.inspector.assignee'), value: assigneeText(task) },
-              {
-                key: 'outcome',
-                term: t('shell.inspector.outcome'),
-                value: task.outcome === null ? <NotSet /> : outcomeLabel(task.step, task.outcome),
-                width: 6,
-              },
-              {
-                key: 'completedBy',
-                term: t('shell.inspector.completedBy'),
-                value: task.completedBy ?? <NotSet />,
-                width: 6,
-              },
-            ]}
-          />
-        </SectionPart>
-      ))}
-      {run.calls.map((call) => {
-        const input =
-          call.inputHidden || call.input === null || typeof call.input !== 'object'
-            ? []
-            : Object.entries(call.input as Record<string, unknown>)
-        const inputTerms: Term[] = call.inputHidden
-          ? [{ key: 'input', term: t('shell.inspector.input'), value: t('shell.inspector.hidden') }]
-          : input.map(([name, value]) => ({
-              key: `input-${name}`,
-              term: name,
-              value: typeof value === 'object' ? JSON.stringify(value) : String(value),
-            }))
-        return (
-          <SectionPart
-            key={call.id}
-            testId={`inspector-call-${call.id}`}
-            heading={{ title: targetOf(call), line: callSummary(call) }}
-            action={
-              call.resolvable && call.outputs ? (
-                <AxisButton
-                  role="secondary"
-                  data-testid={`inspector-resolve-${call.id}`}
-                  onClick={() => setResolving(call)}
-                >
-                  {t('shell.inspector.commands.resolve')}
-                </AxisButton>
-              ) : undefined
-            }
-          >
-            <Flex vertical gap="middle">
-              {inputTerms.length > 0 && <TermList terms={inputTerms} />}
-              <AxisTable<CallAttempt>
-                rowKey={(row) => `${row.kind}|${row.number}|${row.startedAt}`}
-                columns={attemptColumns}
-                dataSource={call.attempts}
-                emptyText={t('shell.inspector.noAttempts')}
-              />
-            </Flex>
-          </SectionPart>
-        )
-      })}
-    </SectionParts>
-  )
+  // A row of the timeline: a run of a step, or, inside it, a task, a call, an attempt of a call or a sub-process.
+  const attemptRow = (call: InstanceCall, attempt: CallAttempt): TimelineRow => ({
+    key: `${call.id}/${attempt.number}`,
+    name: named(t('shell.inspector.timeline.attempt').replace('{number}', String(attempt.number)), ''),
+    what: (
+      <Flex vertical>
+        <span>
+          {attempt.error === null
+            ? attempt.httpStatus === null
+              ? t('shell.inspector.timeline.attemptOk')
+              : t('shell.inspector.timeline.attemptStatus').replace('{status}', String(attempt.httpStatus))
+            : attempt.httpStatus === null
+              ? attempt.error
+              : t('shell.inspector.timeline.attemptError')
+                  .replace('{status}', String(attempt.httpStatus))
+                  .replace('{error}', attempt.error)}
+        </span>
+        {traceId(attempt.traceId)}
+      </Flex>
+    ),
+    state: stateWords(
+      attempt.outcome === 'succeeded' ? 'done' : attempt.outcome === 'retryable' ? 'retried' : 'failed',
+    ),
+    startedAt: attempt.startedAt,
+    finishedAt: attempt.finishedAt,
+  })
+  const callRow = (call: InstanceCall): TimelineRow => {
+    const input =
+      call.inputHidden || call.input === null || typeof call.input !== 'object'
+        ? []
+        : Object.entries(call.input as Record<string, unknown>)
+    return {
+      key: call.id,
+      name: named(
+        targetOf(call),
+        t(call.kind === 'package' ? 'shell.inspector.timeline.packageCall' : 'shell.inspector.timeline.connectorCall'),
+      ),
+      what: (
+        <Flex vertical align="flex-start">
+          <span>{callSummary(call)}</span>
+          {call.inputHidden ? (
+            <Typography.Text type="secondary">{t('shell.inspector.timeline.inputHidden')}</Typography.Text>
+          ) : (
+            input.map(([name, value]) => (
+              <Typography.Text key={name} type="secondary">
+                {`${name}: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`}
+              </Typography.Text>
+            ))
+          )}
+          {call.resolvable && call.outputs && (
+            <AxisButton
+              role="secondary"
+              size="small"
+              data-testid={`inspector-resolve-${call.id}`}
+              onClick={() => setResolving(call)}
+            >
+              {t('shell.inspector.commands.resolve')}
+            </AxisButton>
+          )}
+        </Flex>
+      ),
+      state: stateWords(callState(call)),
+      startedAt: call.attempts[0]?.startedAt ?? null,
+      finishedAt: call.attempts.at(-1)?.finishedAt ?? null,
+      children: call.attempts.length > 0 ? call.attempts.map((attempt) => attemptRow(call, attempt)) : undefined,
+    }
+  }
+  const taskRow = (task: InstanceTask): TimelineRow => ({
+    key: task.id,
+    name: named(assigneeText(task), t('shell.inspector.stepType.task')),
+    what:
+      task.outcome === null
+        ? t('shell.inspector.timeline.taskOpen').replace('{assignee}', assigneeText(task))
+        : t('shell.inspector.timeline.taskDone')
+            .replace('{person}', task.completedBy ?? assigneeText(task))
+            .replace('{outcome}', outcomeLabel(task.step, task.outcome)),
+    state: stateWords(task.completedAt === null ? 'waiting' : 'done'),
+    startedAt: task.createdAt,
+    finishedAt: task.completedAt,
+  })
+  const childRow = (child: SubProcess): TimelineRow => {
+    const page = inspectors?.get(child.process)
+    const key = `shell.inspector.states.${child.state}`
+    return {
+      key: child.id,
+      name: named(
+        page === undefined ? (
+          child.process
+        ) : (
+          <Link to={inspectorPath(sitePath, page, child.id)} data-testid={`inspector-subprocess-${child.id}`}>
+            {child.process}
+          </Link>
+        ),
+        t('shell.inspector.stepType.subProcess'),
+      ),
+      what: t(key) === key ? child.state : t(key),
+      state: stateWords(child.endedAt === null ? 'running' : child.state === 'failed' ? 'failed' : 'done'),
+      startedAt: child.createdAt,
+      finishedAt: child.endedAt,
+    }
+  }
+  const runRow = (run: StepRun): TimelineRow => {
+    const children = [...run.tasks.map(taskRow), ...run.calls.map(callRow), ...run.subProcesses.map(childRow)]
+    return {
+      key: run.key,
+      name: named(
+        stepLabel(run.step),
+        run.number > 1
+          ? t('shell.inspector.timeline.typeRun')
+              .replace('{type}', typeText(typeOf(run.step)))
+              .replace('{number}', String(run.number))
+          : typeText(typeOf(run.step)),
+      ),
+      what: summary(run),
+      state: stateWords(run.state),
+      startedAt: run.startedAt,
+      finishedAt: run.finishedAt,
+      children: children.length > 0 ? children : undefined,
+    }
+  }
+
+  const columns: AxisColumn<TimelineRow>[] = [
+    { key: 'step', kind: 'freeText', title: t('shell.inspector.step'), render: (_v, row) => row.name },
+    { key: 'what', kind: 'freeText', title: t('shell.inspector.timeline.what'), render: (_v, row) => row.what },
+    { key: 'state', kind: 'fixed', title: t('shell.inspector.state'), render: (_v, row) => row.state },
+    {
+      key: 'startedAt',
+      kind: 'fixed',
+      title: t('shell.inspector.startedAt'),
+      render: (_v, row) => (row.startedAt === null ? null : time('startedAt', row.startedAt)),
+    },
+    {
+      // Took, as a request's history in Studio says it, see the reviews on #3263 and #3650.
+      key: 'took',
+      kind: 'fixed',
+      title: t('shell.inspector.timeline.took'),
+      render: (_v, row) => (row.startedAt === null ? null : durationText(row.startedAt, row.finishedAt ?? now, locale)),
+    },
+  ]
 
   return (
     <Flex vertical gap="middle" data-testid="inspector-timeline">
@@ -304,15 +319,11 @@ export function InstanceTimeline({
           </AxisButton>
         </Flex>
       )}
-      <AxisTable<StepRun>
-        rowKey={(run) => run.key}
+      <AxisTable<TimelineRow>
+        rowKey={(row) => row.key}
         columns={columns}
-        dataSource={runs}
+        dataSource={runs.map(runRow)}
         emptyText={t('shell.inspector.noHistory')}
-        details={{
-          content: (run) => (run.tasks.length + run.calls.length > 0 || run.traceId !== null ? details(run) : null),
-          name: (run) => stepLabel(run.step),
-        }}
       />
       {resolving && resolving.outputs && (
         <ResolveDialog

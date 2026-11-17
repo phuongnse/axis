@@ -162,12 +162,6 @@ export interface AxisTableProps<T> {
   rowAttributes?: (row: T, index?: number) => HTMLAttributes<HTMLElement>
   /** The test id of the table's outer element. */
   testId?: string
-  /**
-   * Proposed, see the review on #3650: what a row shows when it is opened, under it across the table, or `null` for a
-   * row with nothing more. Each such row has an expand button before its first cell, named Show details or Hide details
-   * with the row's name, and a click on the row opens it too.
-   */
-  details?: { content: (row: T) => ReactNode | null; name: (row: T) => string }
 }
 
 /** Column key of the row actions. A field name starts with a letter, so no field column has it. */
@@ -224,7 +218,6 @@ export function AxisTable<T extends object>({
   blankRow,
   rowAttributes,
   testId,
-  details,
 }: AxisTableProps<T>) {
   const t = useText()
   // The shell sets the locale of Ant Design's ConfigProvider. Outside it, there is none.
@@ -374,6 +367,10 @@ export function AxisTable<T extends object>({
   const line: CSSProperties = { lineHeight: `${tokens.size.smallControl}px`, verticalAlign: 'top' }
   // The cells that stay leave room under their content for the moved lines, which run across the whole row.
   const staysRoom: CSSProperties = { paddingBottom: `calc(${tokens.spacing.xs}px + var(${movedHeight}, 0px))` }
+  // Proposed, see the reviews on #3263 and #3650: only a table with a group row folds rows, so every other table draws
+  // its cells as they are.
+  const grouped = (pageRows ?? []).some((row) => Array.isArray((row as { children?: unknown }).children))
+  const foldRoom = tokens.spacing.xs / 2 + tokens.size.smallControl + tokens.spacing.xs / 2
   const antColumns: TableColumnType<T>[] = shown
     .filter((column) => !room.moved.includes(column.key))
     .map(
@@ -393,7 +390,13 @@ export function AxisTable<T extends object>({
       ) => {
         const freeText = kind === 'freeText'
         const width = freeText ? share : freeTexts === 0 && column.key === lastKey ? undefined : fitContent
-        const sizing: CSSProperties = { width, ...(freeText ? {} : { whiteSpace: 'nowrap' }), ...line }
+        const sizing: CSSProperties = {
+          width,
+          ...(freeText ? {} : { whiteSpace: 'nowrap' }),
+          ...line,
+          // In a table with group rows, the first column's padding holds the fold with room on either side.
+          ...(grouped && position === 0 ? { paddingInlineStart: foldRoom } : {}),
+        }
         const sortable = view !== undefined && (Boolean(column.sorter) || sortValue !== undefined)
         const original = shown.find((candidate) => candidate.key === column.key)!
         return {
@@ -425,6 +428,8 @@ export function AxisTable<T extends object>({
               ) : freeText ? (
                 <div
                   style={{
+                    // In a table with group rows, the first column's words sit beside the fold, not under it.
+                    ...(grouped && position === 0 ? { display: 'inline-block', verticalAlign: 'top' } : {}),
                     minWidth: freeTextMinWidth,
                     maxWidth: freeTextMaxWidth,
                     whiteSpace: 'normal',
@@ -601,6 +606,33 @@ export function AxisTable<T extends object>({
               // Ant Design otherwise switches to a fixed layout once a column is fixed.
               tableLayout="auto"
               dataSource={pageRows as T[] | undefined}
+              // Proposed: a row with `children` is a group row the table opens and closes, see the reviews on #3263 and #3650.
+              // Its fold is the right arrow that turns down when open, as a diff's file folds. It hangs in the first
+              // column's padding, widened to hold it with room on either side, so every row's words start where the
+              // column's heading does, and each level of rows starts one such room further in.
+              expandable={
+                grouped
+                  ? {
+                      indentSize: foldRoom,
+                      expandIcon: ({ expandable, expanded, onExpand, record }) =>
+                        expandable ? (
+                          <AxisButton
+                            role="icon"
+                            size="small"
+                            nameKey={expanded ? 'shell.table.collapseRow' : 'shell.table.expandRow'}
+                            aria-expanded={expanded}
+                            icon={<FoldIcon open={expanded} />}
+                            style={{
+                              marginInlineStart: -(foldRoom - tokens.spacing.xs / 2),
+                              marginInlineEnd: tokens.spacing.xs / 2,
+                              verticalAlign: 'top',
+                            }}
+                            onClick={(event) => onExpand(record, event)}
+                          />
+                        ) : null,
+                    }
+                  : undefined
+              }
               loading={loading}
               // The table gives the space that EmptyState no longer keeps, so an empty table keeps its height.
               locale={{
@@ -631,29 +663,6 @@ export function AxisTable<T extends object>({
                   : false
               }
               onRow={rowAttributes}
-              expandable={
-                details
-                  ? {
-                      expandedRowRender: (row) => details.content(row),
-                      rowExpandable: (row) => details.content(row) !== null,
-                      expandRowByClick: true,
-                      expandIcon: ({ expanded, expandable, record, onExpand }) =>
-                        expandable ? (
-                          <AxisButton
-                            role="icon"
-                            nameKey={expanded ? 'shell.table.hideDetails' : 'shell.table.showDetails'}
-                            nameSuffix={details.name(record)}
-                            icon={<FoldIcon open={expanded} />}
-                            aria-expanded={expanded}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              onExpand(record, event)
-                            }}
-                          />
-                        ) : null,
-                    }
-                  : undefined
-              }
               onChange={view ? onViewChange : onChange}
               styles={{ header: { row }, body: { row } }}
             />
