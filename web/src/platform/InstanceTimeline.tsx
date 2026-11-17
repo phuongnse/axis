@@ -8,6 +8,7 @@ import { inspectorPath } from './inspectorPages'
 import type { CallAttempt, InstanceCall, InstanceDetail, InstanceTask, SubProcess } from './inspection'
 import { durationText, stepRuns, type StepRun } from './instanceRuns'
 import { ResolveDialog } from './ResolveDialog'
+import { useMinuteClock } from './relativeTime'
 import { useRunWords } from './runWords'
 import { problemText } from './stepProblems'
 import { useText } from './texts'
@@ -77,8 +78,8 @@ export function InstanceTimeline({
     value,
     label: t(`shell.inspector.timeline.state${value[0].toUpperCase()}${value.slice(1)}`),
   }))
-  // A run not yet finished lasts until the page was drawn.
-  const [now] = useState(() => new Date().toISOString())
+  // A run not yet finished lasts until now.
+  const now = useMinuteClock().toISOString()
   const { typeOf, typeText, assigneeText, targetOf, callSummary, summary, stateWords } = useRunWords({
     instance,
     stepLabel,

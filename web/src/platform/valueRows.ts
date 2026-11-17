@@ -12,8 +12,7 @@ export interface ValueRow {
     | { kind: 'text' | 'number' | 'boolean' | 'expression'; text: string }
     | { kind: 'null' | 'empty' }
     | { kind: 'fields' | 'items'; count: number }
-  /** Proposed, see the review on #3650: the expression a value sent came from, from the step's mapping. */
-  source?: string
+    | { kind: 'change'; before: string | null; after: string | null; hidden: boolean }
 }
 
 /**
@@ -70,37 +69,4 @@ export function textRows(values: Record<string, string>): ValueRow[] {
     name,
     value: text === '' ? { kind: 'empty' } : { kind: 'text', text },
   }))
-}
-
-/**
- * The rows of a step's mapping, each a name and the expression it maps to. A list's mapping, `{ "from", "fields" }`,
- * is a row that reads the list from `from`, then a row for each of its fields, named `list[].field`.
- */
-export function mappingRows(mapping: unknown, path = ''): ValueRow[] {
-  const entries = typeof mapping === 'object' && mapping !== null ? Object.entries(mapping) : []
-  return entries.flatMap(([name, expression]): ValueRow[] => {
-    const at = pathOf(path, name, false)
-    if (typeof expression === 'object' && expression !== null && 'from' in expression) {
-      const { from, fields } = expression as { from: unknown; fields?: unknown }
-      return [
-        { key: at, name: at, value: { kind: 'expression', text: String(from) } },
-        ...mappingRows(fields, `${at}[]`),
-      ]
-    }
-    return [{ key: at, name: at, value: { kind: 'expression', text: String(expression) } }]
-  })
-}
-
-/**
- * The rows of a value a step sent, each with the expression of the step's mapping it came from: a row named
- * `lines[0].quantity` came from the mapping's `lines[].quantity`.
- */
-export function sentRows(value: unknown, mapping: unknown): ValueRow[] {
-  const sources = new Map(
-    mappingRows(mapping).flatMap((row) => (row.value.kind === 'expression' ? [[row.name, row.value.text]] : [])),
-  )
-  return jsonRows(value).map((row) => {
-    const source = sources.get(row.name.replace(/\[\d+\]/g, '[]'))
-    return source === undefined ? row : { ...row, source }
-  })
 }

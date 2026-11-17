@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { FixedClock } from '../platform/relativeTime'
 import { HomePage } from '../pages/HomePage'
 import { PageRoute } from '../pages/PageRoute'
 import { PlatformContext, type Platform } from '../pages/context'
@@ -18,36 +19,41 @@ const platform: Platform = {
 }
 
 /** The shell's own routes over the fixtures: the platform home page, Studio, and the pages of an application site. */
+/** The time the shell's previews stand at, a few days after their fixtures' processes started. */
+const previewNow = new Date('2026-03-12T09:00:00Z')
+
 export function ShellPreview() {
   return (
-    <PlatformContext.Provider value={platform}>
-      <Routes>
-        <Route
-          index
-          element={
-            <PlatformShellRoute>
-              <HomePage />
-            </PlatformShellRoute>
-          }
-        />
-        <Route
-          path="studio"
-          element={
-            <PlatformShellRoute>
-              <StudioPage />
-            </PlatformShellRoute>
-          }
-        />
-        <Route path=":site" element={<SiteRoute />}>
-          <Route path=":page" element={<PageRoute />} />
-          <Route path=":page/new" element={<PageRoute form="new" />} />
-          {/* Proposed: a saved record's form page, as App.tsx routes it, see the review on #3650. */}
-          <Route path=":page/:id" element={<PageRoute form="edit" />} />
-          <Route path=":module/:page/new" element={<PageRoute form="new" />} />
-          <Route path=":module/:page/:id" element={<PageRoute form="edit" />} />
-        </Route>
-      </Routes>
-    </PlatformContext.Provider>
+    <FixedClock.Provider value={previewNow}>
+      <PlatformContext.Provider value={platform}>
+        <Routes>
+          <Route
+            index
+            element={
+              <PlatformShellRoute>
+                <HomePage />
+              </PlatformShellRoute>
+            }
+          />
+          <Route
+            path="studio"
+            element={
+              <PlatformShellRoute>
+                <StudioPage />
+              </PlatformShellRoute>
+            }
+          />
+          <Route path=":site" element={<SiteRoute />}>
+            <Route path=":page" element={<PageRoute />} />
+            <Route path=":page/new" element={<PageRoute form="new" />} />
+            {/* Proposed: a saved record's form page, as App.tsx routes it, see the review on #3650. */}
+            <Route path=":page/:id" element={<PageRoute form="edit" />} />
+            <Route path=":module/:page/new" element={<PageRoute form="new" />} />
+            <Route path=":module/:page/:id" element={<PageRoute form="edit" />} />
+          </Route>
+        </Routes>
+      </PlatformContext.Provider>
+    </FixedClock.Provider>
   )
 }
 

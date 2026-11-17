@@ -4,15 +4,16 @@ import { Link } from 'react-router'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { BodyView, ValueTable } from './ValueTable'
-import { mappingRows, sentRows, textRows } from './valueRows'
+import { jsonRows, textRows } from './valueRows'
 import { EmptyDash } from './EmptyValue'
 import { EventTime } from './EventTime'
+import { formatValue } from './formatValue'
 import { studioResourceAddress } from './studioAddress'
 import { inspectorPath } from './inspectorPages'
-import type { CallAttempt, InstanceCall, InstanceDetail, StepDefinition } from './inspection'
+import type { CallAttempt, InstanceCall, InstanceDetail, RunOutput, StepDefinition } from './inspection'
 import { durationText, stepRuns, type StepRun } from './instanceRuns'
 import { RecordLink } from './RecordLink'
-import { useMinuteClock } from './relativeTime'
+import { formatTimeUntil, useMinuteClock } from './relativeTime'
 import { useRunWords } from './runWords'
 import { SidePanel } from './SidePanel'
 import { StatusTag, type StatusTone } from './StatusTag'
@@ -38,6 +39,14 @@ const record = (value: unknown): Record<string, unknown> =>
 const words = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value))
 
 /** The tone of an attempt's outcome: it ended well, it will be tried again, it failed, or nobody knows yet. */
+/** Whether a run made or changed anything its Output shows. */
+const hasOutput = (made: RunOutput | undefined) =>
+  made !== undefined &&
+  ((made.changes?.length ?? 0) > 0 ||
+    made.event !== undefined ||
+    made.notified !== undefined ||
+    made.created !== undefined)
+
 /** The tone of a sub-process's state, as an instance's own state takes. */
 const childTones: Record<string, StatusTone> = {
   completed: 'success',
@@ -121,7 +130,7 @@ export function StepRunPanel({
 
   const shown: StepRunTab[] = ['overview']
   if (calls.length > 0) shown.push('input')
-  if (calls.length > 0 || operation === 'updateRecord') shown.push('output')
+  if (calls.length > 0 || hasOutput(chosen?.made)) shown.push('output')
   if (calls.some((call) => call.attempts.length > 0)) shown.push('attempts')
   if (failed) shown.push('error')
   const current = shown.includes(tab) ? tab : 'overview'
@@ -154,6 +163,16 @@ export function StepRunPanel({
       {text}
     </Typography.Title>
   )
+  // A due time is data, so it keeps the system's date and time, with how far ahead it is while it is to come.
+  const dueTime = (at: string) => {
+    const until = formatTimeUntil(at, locale, now)
+    return (
+      <Flex vertical>
+        <span>{formatValue({ name: 'due', type: 'date-time' }, at, {}, { locale, text: t }) as string}</span>
+        {until !== null && muted(until)}
+      </Flex>
+    )
+  }
   const stepIndex = instance.graph.steps.findIndex((candidate) => candidate.name === step)
   // Proposed, see the review on #3650: what a run that waits waits for, and until when: an event, and when the wait
   // gives up and where it goes then; or a timer, and when it goes on. The engine keeps the time as the run's due time;
@@ -173,7 +192,12 @@ export function StepRunPanel({
       ).toISOString()
     }
     if (typeof definition.event === 'string') {
-      terms.push({ key: 'waitingFor', term: t('shell.stepRun.waitingFor'), value: definition.event })
+      terms.push({
+        key: 'waitingFor',
+        term: t('shell.stepRun.waitingFor'),
+        // Proposed: an event is named by its label, as a step is, see the review on #3650.
+        value: typeof definition.eventLabelKey === 'string' ? t(definition.eventLabelKey) : definition.event,
+      })
       const timeout = record(definition.timeout)
       const due = after(timeout.after)
       if (due !== null) {
@@ -182,7 +206,7 @@ export function StepRunPanel({
           term: t('shell.stepRun.givesUp'),
           value: (
             <Flex vertical align="flex-start">
-              <EventTime at={due} locale={locale} />
+              {dueTime(due)}
               {muted(<>→ {stepName(timeout.next)}</>)}
             </Flex>
           ),
@@ -191,7 +215,7 @@ export function StepRunPanel({
     }
     const wake = after(definition.wait) ?? null
     if (wake !== null) {
-      terms.push({ key: 'goesOn', term: t('shell.stepRun.goesOn'), value: <EventTime at={wake} locale={locale} /> })
+      terms.push({ key: 'goesOn', term: t('shell.stepRun.goesOn'), value: dueTime(wake) })
     }
     return terms
   }
@@ -273,7 +297,7 @@ export function StepRunPanel({
               notSet
             ) : (
               <Flex align="center" gap="small" wrap>
-                <EventTime at={task.dueAt} locale={locale} />
+                {dueTime(task.dueAt)}
                 {task.completedAt === null && task.dueAt < now.toISOString() && (
                   <StatusTag tone="attention">{t('shell.stepRun.overdue')}</StatusTag>
                 )}
@@ -386,14 +410,14 @@ export function StepRunPanel({
             {call.request.body === null ? (
               muted(t('shell.stepRun.noBody'))
             ) : (
-              <BodyView label={t('shell.stepRun.body')} text={call.request.body} mapping={definition.input} />
+              <BodyView label={t('shell.stepRun.body')} text={call.request.body} />
             )}
           </Flex>
         ) : call.input === null ? (
           muted(t('shell.stepRun.notKept'))
         ) : (
           // A shown input lists its properties, each number with its source digits, as the process inspector shows it.
-          <ValueTable label={t('shell.stepRun.tab.input')} rows={sentRows(call.input, definition.input)} />
+          <ValueTable label={t('shell.stepRun.tab.input')} rows={jsonRows(call.input)} />
         )}
       </div>
     ))
@@ -449,29 +473,10 @@ export function StepRunPanel({
       </Flex>
     )
 
-  // A step's mappings are tables of two columns: a field it sets or an input it sends, and the expression that gives
-  // it; or a property of the answer, and the field it writes.
-  const settingTable = (mapping: unknown, label: string, nameTitle: string) => (
-    <ValueTable
-      label={label}
-      rows={mappingRows(mapping)}
-      nameTitle={nameTitle}
-      valueTitle={t('shell.stepRun.expression')}
-    />
-  )
-  const writingTable = (mapping: unknown, label: string) => (
-    <ValueTable
-      label={label}
-      rows={Object.entries(record(mapping)).map(([from, field]) => ({
-        key: from,
-        name: from,
-        value: { kind: 'text', text: words(field) },
-      }))}
-      nameTitle={t('shell.stepRun.fromAnswer')}
-      valueTitle={t('shell.stepRun.field')}
-    />
-  )
-
+  // Proposed, see the review on #3650: Output is what the run made or changed, with its values: a connector's answer,
+  // the values a package gave back, the fields it changed on the record before and after, an event it raised, the
+  // people it notified and a record it created. A step that makes nothing has no Output.
+  const made = chosen?.made
   const output = () => (
     <Flex vertical gap={spacing.xs}>
       {calls.map((call) => {
@@ -481,8 +486,8 @@ export function StepRunPanel({
         return (
           <div key={call.id}>
             {callHeading(call)}
-            {call.kind === 'connector' &&
-              (call.inputHidden ? (
+            {call.kind === 'connector' ? (
+              call.inputHidden ? (
                 hidden
               ) : answered === undefined ? (
                 muted(t('shell.stepRun.noResponse'))
@@ -491,16 +496,37 @@ export function StepRunPanel({
                   {heading(t('shell.stepRun.response').replace('{number}', String(answered.number)))}
                   {response(answered)}
                 </>
-              ))}
+              )
+            ) : (
+              <>
+                {heading(t('shell.stepRun.returned'))}
+                {call.returned === null || call.returned === undefined ? (
+                  call.inputHidden ? (
+                    hidden
+                  ) : (
+                    muted(t('shell.stepRun.nothingReturned'))
+                  )
+                ) : (
+                  <ValueTable label={t('shell.stepRun.returned')} rows={jsonRows(call.returned)} />
+                )}
+              </>
+            )}
           </div>
         )
       })}
-      {(definition.output !== undefined || definition.set !== undefined) && (
+      {made?.changes !== undefined && made.changes.length > 0 && (
         <>
-          {heading(t(definition.set !== undefined ? 'shell.stepRun.fieldsSet' : 'shell.stepRun.fieldsWritten'))}
-          {definition.set !== undefined
-            ? settingTable(definition.set, t('shell.stepRun.fieldsSet'), t('shell.stepRun.field'))
-            : writingTable(definition.output, t('shell.stepRun.fieldsWritten'))}
+          {heading(t('shell.stepRun.changes'))}
+          <ValueTable
+            label={t('shell.stepRun.changes')}
+            nameTitle={t('shell.stepRun.field')}
+            valueTitle={t('shell.stepRun.newValue')}
+            rows={made.changes.map((change) => ({
+              key: change.field,
+              name: change.labelKey ? t(change.labelKey) : change.field,
+              value: { kind: 'change', before: change.before, after: change.after, hidden: change.hidden === true },
+            }))}
+          />
           {instance.subject &&
             muted(
               <>
@@ -510,6 +536,41 @@ export function StepRunPanel({
                 </RecordLink>
               </>,
             )}
+        </>
+      )}
+      {made?.event !== undefined && (
+        <>
+          {heading(
+            t('shell.stepRun.eventRaised').replace(
+              '{event}',
+              made.event.labelKey ? t(made.event.labelKey) : made.event.name,
+            ),
+          )}
+          <ValueTable label={t('shell.stepRun.eventFields')} rows={textRows(made.event.fields)} />
+        </>
+      )}
+      {made?.notified !== undefined && (
+        <>
+          {heading(t('shell.stepRun.notified'))}
+          <TermList
+            terms={[
+              { key: 'to', term: t('shell.stepRun.sentTo'), value: made.notified.to.join(', ') },
+              {
+                key: 'channels',
+                term: t('shell.stepRun.channels'),
+                value: made.notified.channels.map((channel) => t(`shell.stepRun.channel.${channel}`)).join(', '),
+              },
+              { key: 'subject', term: t('shell.stepRun.subject'), value: made.notified.subject },
+            ]}
+          />
+        </>
+      )}
+      {made?.created !== undefined && (
+        <>
+          {heading(t('shell.stepRun.created'))}
+          <RecordLink entity={made.created.entity} id={made.created.id}>
+            {made.created.label ?? made.created.id}
+          </RecordLink>
         </>
       )}
     </Flex>

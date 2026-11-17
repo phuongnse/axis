@@ -846,6 +846,7 @@ const stepDefinitions: Record<string, StepDefinition> = {
   },
   waitGoodsReceipt: {
     event: 'GoodsReceived',
+    eventLabelKey: 'event.goodsReceived',
     when: 'purchaseOrderNumber = event.orderNumber',
     timeout: { after: 'P30D', next: 'remindReceipt' },
     next: 'threeWayMatch',
@@ -1216,6 +1217,12 @@ const instanceDetail: InstanceDetail = {
       decision: null,
       output: null,
       error: null,
+      made: {
+        changes: [
+          { field: 'budgetRemaining', labelKey: 'request.field.budgetRemaining', before: null, after: '42000' },
+          { field: 'withinBudget', labelKey: 'request.field.withinBudget', before: null, after: 'Yes' },
+        ],
+      },
       traceId: '0af7651916cd43dd8448eb211c80319c',
     },
     {
@@ -1306,6 +1313,12 @@ const instanceDetail: InstanceDetail = {
       decision: null,
       output: null,
       error: null,
+      made: {
+        changes: [
+          { field: 'vendorRiskScore', labelKey: 'request.field.vendorRiskScore', before: null, after: '72' },
+          { field: 'vendorStatus', labelKey: 'request.field.vendorStatus', before: 'New', after: 'Approved' },
+        ],
+      },
       traceId: '60718293a4b5c6d7e8f9011223344556',
     },
     {
@@ -1333,6 +1346,22 @@ const instanceDetail: InstanceDetail = {
       decision: null,
       output: null,
       error: null,
+      made: {
+        changes: [
+          {
+            field: 'purchaseOrderNumber',
+            labelKey: 'request.field.purchaseOrderNumber',
+            before: null,
+            after: 'PO-88412',
+          },
+          { field: 'status', labelKey: 'request.field.status', before: 'Approved', after: 'Ordered' },
+        ],
+        event: {
+          name: 'PurchaseOrderCreated',
+          labelKey: 'event.purchaseOrderCreated',
+          fields: { number: 'PO-88412', supplier: 'Ergo Office Ltd', total: '18500' },
+        },
+      },
       traceId: '8293a4b5c6d7e8f90112233445566778',
     },
     {
@@ -1342,6 +1371,9 @@ const instanceDetail: InstanceDetail = {
       decision: null,
       output: null,
       error: null,
+      made: {
+        notified: { to: ['Alex Morgan'], channels: ['inApp', 'email'], subject: 'Your order PO-88412 is placed' },
+      },
       traceId: '8293a4b5c6d7e8f90112233445566778',
     },
   ],
@@ -1521,6 +1553,7 @@ const instanceDetail: InstanceDetail = {
         amount: 18500,
       },
       inputHidden: false,
+      returned: { score: '72', status: 'approved' },
       resolvable: false,
     },
     {
@@ -2309,6 +2342,14 @@ export const siteTexts: Record<string, string> = {
   'request.task.review': 'Review the request',
   'process.approve.title': 'Purchase request approval',
   'process.contract.title': 'Contract review',
+  'event.goodsReceived': 'Goods received',
+  'event.purchaseOrderCreated': 'Purchase order created',
+  'request.field.budgetRemaining': 'Budget remaining',
+  'request.field.withinBudget': 'Within budget',
+  'request.field.vendorRiskScore': 'Vendor risk score',
+  'request.field.vendorStatus': 'Vendor status',
+  'request.field.purchaseOrderNumber': 'Purchase order number',
+  'request.field.status': 'Status',
   'contract.step.submit': 'Submit the contract',
   'contract.step.reviews': 'Reviews',
   'contract.branch.legal': 'Legal',

@@ -105,9 +105,23 @@ export interface InstancePath {
 }
 
 /** One occurrence of a step in the instance's history. */
+/**
+ * Proposed, see the review on #3650: what a step's run made or changed, with its values, for the Output of its run:
+ * the fields it changed on the record, before and after, an event it raised, the people it notified, and a record it
+ * created. A value the reader may not read comes as `null` with `hidden`.
+ */
+export interface RunOutput {
+  changes?: { field: string; labelKey: string | null; before: string | null; after: string | null; hidden?: boolean }[]
+  event?: { name: string; labelKey: string | null; fields: Record<string, string> }
+  notified?: { to: string[]; channels: string[]; subject: string }
+  created?: { entity: string; id: string; label: string | null }
+}
+
 export interface PathEntry {
   /** Proposed, see D155 and the review on #3650: the path that ran the step, when the instance had several. */
   path?: string
+  /** Proposed, see the review on #3650: what the run made or changed. */
+  made?: RunOutput
   step: string
   startedAt: string
   finishedAt: string
@@ -207,6 +221,8 @@ export interface InstanceCall {
   inputHidden: boolean
   /** Proposed, see the review on #3650: the request a connector call sent, `null` while hidden or not kept. */
   request?: CallRequest | null
+  /** Proposed, see the review on #3650: the values a package operation gave back, `null` while hidden. */
+  returned?: Record<string, unknown> | null
   /** Whether the signed-in user may resolve the call now. The server decides. */
   resolvable: boolean
   /** The outputs the operation declares. Only a resolvable call has them. */

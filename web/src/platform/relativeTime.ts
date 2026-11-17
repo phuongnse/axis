@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 
 /** The units a time ago is counted in, each with the seconds it holds, largest first. */
 const units: [Intl.RelativeTimeFormatUnit, number][] = [
@@ -41,10 +41,39 @@ export function isRecent(at: string | Date, now: Date = new Date()): boolean {
  * from "now" to "1 minute ago" while the page stays open, with no request.
  */
 export function useMinuteClock(): Date {
-  const [now, setNow] = useState(() => new Date())
+  const fixed = useContext(FixedClock)
+  const [now, setNow] = useState(() => fixed ?? new Date())
   useEffect(() => {
+    if (fixed !== null) {
+      return
+    }
     const timer = window.setInterval(() => setNow(new Date()), 60_000)
     return () => window.clearInterval(timer)
-  }, [])
-  return now
+  }, [fixed])
+  return fixed ?? now
+}
+
+/**
+ * Proposed, see the review on #3650: a time that stands for now, which the design system's previews give, so the
+ * durations, times ago and due dates of their fixtures read as they would on the day the fixtures were made. The
+ * running application gives none and reads the browser's clock.
+ */
+export const FixedClock = createContext<Date | null>(null)
+
+/**
+ * Proposed, see the review on #3650: how far ahead `at` is, in the locale's words, such as "in 27 days", for a due time
+ * beside its date and time; `null` once it has passed.
+ */
+export function formatTimeUntil(at: string | Date, locale: string, now: Date = new Date()): string | null {
+  const seconds = (new Date(at).getTime() - now.getTime()) / 1000
+  if (seconds <= 0) {
+    return null
+  }
+  const format = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+  for (const [unit, size] of units) {
+    if (seconds >= size) {
+      return format.format(Math.floor(seconds / size), unit)
+    }
+  }
+  return format.format(1, 'minute')
 }

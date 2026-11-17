@@ -1,4 +1,4 @@
-import type { InstanceCall, InstanceDetail, InstanceTask, SubProcess } from './inspection'
+import type { InstanceCall, InstanceDetail, InstanceTask, RunOutput, SubProcess } from './inspection'
 import type { StepProblem } from './stepProblems'
 
 /**
@@ -11,6 +11,8 @@ export interface StepRun {
   step: string
   /** Proposed, see D155 and the review on #3650: the path that ran it, when the instance had several. */
   path?: string
+  /** Proposed, see the review on #3650: what the run made or changed. */
+  made?: RunOutput
   number: number
   startedAt: string
   finishedAt: string | null
@@ -39,6 +41,7 @@ export function stepRuns(instance: InstanceDetail): StepRun[] {
       key: `${index}`,
       step: entry.step,
       path: entry.path,
+      made: entry.made,
       number,
       startedAt: entry.startedAt,
       finishedAt: entry.finishedAt,
