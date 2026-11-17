@@ -77,6 +77,7 @@ flowchart LR
 | P166 | A flood of large drafts fills the tenant database. | Browser and server | Denial of service | Medium | **Mitigated** | _(planned for M42)_ A person has one draft for each form, a body over 256 KiB answers 413, and the worker deletes a draft 30 days after its last save. See [form drafts](record-form-state.md#form-drafts). |
 | P169 | A person runs a bulk action on rows they may not write, or uses one row they may write to change many. | Browser and server | Elevation of privilege | High | **Mitigated** | _(planned for M42)_ Each record of a bulk call is checked and written as a single write of it, under its own grants and record filters, in its own transaction, see [bulk actions](record-api.md#bulk-actions). |
 | P170 | A flood of large bulk calls takes the server's time from other people and tenants. | Browser and server | Denial of service | Medium | **Mitigated** | _(planned for M42)_ A call takes at most 100 records, and the server's rate limits apply, see [bulk actions](record-api.md#bulk-actions) and [rate limits](headers-and-rate-limits.md#rate-limits). |
+| P171 | A `richText` value carries script, an event attribute or a `javascript:` link that runs in the browser of the next person who reads it. | Browser and server | Elevation of privilege | High | **Mitigated** | _(planned for M42)_ The server keeps only the allow list on every write, and the SPA draws only cleaned HTML, see [more field types](resource-files.md#more-field-types-and-properties). |
 
 **Administrator and calendar days** _(planned for M39)_
 

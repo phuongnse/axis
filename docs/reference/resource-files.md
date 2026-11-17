@@ -600,6 +600,21 @@ diagnostic.
   trigram index, see [schema planning](storage.md#schema-planning). `search` reads every searchable
   field that the user may read, and the display field, which is always searched, see
   [paging and sorting](record-api.md#paging-and-sorting).
+- **`multiline`** _(planned for M42)_. A boolean on a `text` field, `false` by default, that makes the field
+  take several lines. It may not be combined with `userId`, and on another type the compiler refuses it, as it
+  refuses any property on the wrong type. The form shows a text area, see [inputs](form-widget.md#inputs).
+  Stored and read values keep their line breaks. As [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) agrees.
+- **`richText`** _(planned for M42)_. A type stored as text, which keeps a cleaned subset of HTML. It takes
+  `required`, `maxLength`, which counts the cleaned HTML, and `searchable`, and the compiler refuses any other
+  property on it. A read returns the cleaned HTML. An expression may test it only with `is null` and
+  `is not null`, and it is no valid `sort` or `filter` field. A table cell and an export show its plain words.
+  As [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) agrees.
+- **Rich text cleaning** _(planned for M42)_. On every write path (the record API, imports, process steps, inbound
+  endpoints and seeds) the server keeps only these elements: `p`, `br`, `strong`, `em`, `u`, `s`, `h2`, `h3`, `ul`,
+  `ol`, `li`, `blockquote` and `a`. It drops any other element and keeps its text, and it drops `script` and
+  `style` with their text. It drops every attribute except an `a`'s `href`, and keeps that `href` only when it is an
+  `https:` or `mailto:` link. The email body is cleaned as a step of the same kind, with its own list, see
+  [email](notifications.md#email).
 
 ### Matched references
 
