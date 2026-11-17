@@ -12,7 +12,7 @@ import {
   type Key,
   type ReactNode,
 } from 'react'
-import { tableTheme } from './antTheme'
+import { cellPaddingInline, tableTheme } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { EmptyDash } from './EmptyValue'
 import { EmptyState } from './EmptyState'
@@ -162,6 +162,8 @@ export interface AxisTableProps<T> {
   rowAttributes?: (row: T, index?: number) => HTMLAttributes<HTMLElement>
   /** The test id of the table's outer element. */
   testId?: string
+  /** Proposed, see the review on #3650: `spacing-sm` on each side of a cell, for a table in a side panel. */
+  compact?: boolean
 }
 
 /** Column key of the row actions. A field name starts with a letter, so no field column has it. */
@@ -218,6 +220,7 @@ export function AxisTable<T extends object>({
   blankRow,
   rowAttributes,
   testId,
+  compact = false,
 }: AxisTableProps<T>) {
   const t = useText()
   // The shell sets the locale of Ant Design's ConfigProvider. Outside it, there is none.
@@ -238,7 +241,8 @@ export function AxisTable<T extends object>({
   })
   const tokens = useDesignTokens()
   // The same theme object between draws, so the cells under the table are not drawn again for nothing.
-  const theme = useMemo(() => tableTheme(tokens), [tokens])
+  const theme = useMemo(() => tableTheme(tokens, compact), [tokens, compact])
+  const padding = cellPaddingInline(tokens, compact)
   const narrow = useNarrowWidth()
   // The widths the columns need when drawn and not stretched. A moved column is not drawn, so it is remembered.
   const naturalWidths = useRef(new Map<string, number>())
@@ -280,7 +284,7 @@ export function AxisTable<T extends object>({
       const sizes = shown.map((column) => {
         const head = heads.get(column.key)
         if (column.kind === 'freeText') {
-          return { key: column.key, width: freeTextMinWidth + 2 * tokens.spacing.lg, priority: column.priority }
+          return { key: column.key, width: freeTextMinWidth + 2 * padding, priority: column.priority }
         }
         // With slack, a table with no free text stretches its last column past what it needs.
         const stretched = freeTexts === 0 && column.key === lastKey && drawn <= available
@@ -292,7 +296,7 @@ export function AxisTable<T extends object>({
       const { moved, scrolls } = makeRoom(available, others, sizes)
       // The moved lines of a row are as wide as the row's content, which starts after the checkbox and its padding.
       const selection = root.querySelector<HTMLElement>('th.ant-table-selection-column')?.offsetWidth ?? 0
-      const next = { moved, scrolls, lineWidth: Math.max(0, available - selection - 2 * tokens.spacing.lg) }
+      const next = { moved, scrolls, lineWidth: Math.max(0, available - selection - 2 * padding) }
       setRoom((current) =>
         current.scrolls === next.scrolls &&
         current.lineWidth === next.lineWidth &&

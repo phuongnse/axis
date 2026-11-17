@@ -4,6 +4,8 @@ import { Link } from 'react-router'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { CodeBlock } from './CodeBlock'
+import { BodyView, ValueTable } from './ValueTable'
+import { jsonRows, mappingRows, textRows } from './valueRows'
 import { EmptyDash } from './EmptyValue'
 import { EventTime } from './EventTime'
 import { inspectorPath } from './inspectorPages'
@@ -301,6 +303,8 @@ export function StepRunPanel({
   const hidden = muted(t('shell.stepRun.hidden'))
   const callHeading = (call: InstanceCall) => (calls.length > 1 ? heading(targetOf(call)) : null)
 
+  // Proposed, see the review on #3650: names and their values are tables, as Postman and Logic Apps show them: the
+  // request's query parameters and headers, a package call's input; a body is a table with a switch to its JSON.
   const input = () =>
     calls.map((call) => (
       <div key={call.id}>
@@ -309,61 +313,104 @@ export function StepRunPanel({
           hidden
         ) : call.request ? (
           <Flex vertical gap={spacing.xs}>
-            {heading(t('shell.stepRun.request'))}
-            <CodeBlock label={t('shell.stepRun.request')} value={`${call.request.method} ${call.request.url}`} />
+            {requestTerms(call.request.method, call.request.url)}
+            {queryRows(call.request.url).length > 0 && (
+              <>
+                {heading(t('shell.stepRun.query'))}
+                <ValueTable label={t('shell.stepRun.query')} rows={queryRows(call.request.url)} />
+              </>
+            )}
             {heading(t('shell.stepRun.headers'))}
-            <CodeBlock label={t('shell.stepRun.headers')} value={call.request.headers} />
+            <ValueTable label={t('shell.stepRun.headers')} rows={textRows(call.request.headers)} />
             {heading(t('shell.stepRun.body'))}
             {call.request.body === null ? (
               muted(t('shell.stepRun.noBody'))
             ) : (
-              <CodeBlock label={t('shell.stepRun.body')} value={call.request.body} />
+              <BodyView label={t('shell.stepRun.body')} text={call.request.body} />
             )}
           </Flex>
         ) : call.input === null ? (
           muted(t('shell.stepRun.notKept'))
         ) : (
-          // A shown input is a list of its top-level properties, each number with its source digits, as the
-          // process inspector shows it.
-          <TermList
-            terms={Object.entries(record(call.input)).map(([name, value]) => ({
-              key: name,
-              term: name,
-              value: typeof value === 'object' && value !== null ? code(value) : words(value),
-            }))}
-          />
+          // A shown input lists its properties, each number with its source digits, as the process inspector shows it.
+          <ValueTable label={t('shell.stepRun.tab.input')} rows={jsonRows(call.input)} />
         )}
       </div>
     ))
+
+  const requestTerms = (method: string, url: string) => {
+    const address = url.split('?', 1)[0]
+    return (
+      <TermList
+        terms={[
+          { key: 'method', term: t('shell.stepRun.method'), value: method, width: 3 },
+          {
+            key: 'url',
+            term: t('shell.stepRun.url'),
+            value: <span style={{ overflowWrap: 'anywhere' }}>{address}</span>,
+            width: 9,
+          },
+        ]}
+      />
+    )
+  }
+  const queryRows = (url: string) => {
+    const query = url.includes('?') ? url.slice(url.indexOf('?') + 1) : ''
+    return textRows(Object.fromEntries(new URLSearchParams(query)))
+  }
 
   const response = (attempt: CallAttempt) =>
     attempt.response === undefined ? null : attempt.response === null ? (
       muted(t('shell.stepRun.noResponse'))
     ) : (
       <Flex vertical gap={spacing.xs}>
-        <div>
-          <StatusTag tone={attempt.response.status < 400 ? 'success' : 'danger'}>
-            {String(attempt.response.status)}
-          </StatusTag>
-        </div>
+        <TermList
+          terms={[
+            {
+              key: 'status',
+              term: t('shell.stepRun.status'),
+              value: (
+                <StatusTag tone={attempt.response.status < 400 ? 'success' : 'danger'}>
+                  {String(attempt.response.status)}
+                </StatusTag>
+              ),
+            },
+          ]}
+        />
         {heading(t('shell.stepRun.headers'))}
-        <CodeBlock label={t('shell.stepRun.headers')} value={attempt.response.headers} />
+        <ValueTable label={t('shell.stepRun.headers')} rows={textRows(attempt.response.headers)} />
         {heading(t('shell.stepRun.body'))}
         {attempt.response.body === null ? (
           muted(t('shell.stepRun.noBody'))
         ) : (
-          <CodeBlock label={t('shell.stepRun.body')} value={attempt.response.body} />
+          <BodyView label={t('shell.stepRun.body')} text={attempt.response.body} />
         )}
         {attempt.response.truncated && muted(t('shell.stepRun.truncated'))}
       </Flex>
     )
 
-  const mapping = (value: unknown, reading: boolean): Term[] =>
-    Object.entries(record(value)).map(([name, expression]) => ({
-      key: name,
-      term: reading ? name : code(expression),
-      value: reading ? code(expression) : name,
-    }))
+  // A step's mappings are tables of two columns: a field it sets or an input it sends, and the expression that gives
+  // it; or a property of the answer, and the field it writes.
+  const settingTable = (mapping: unknown, label: string, nameTitle: string) => (
+    <ValueTable
+      label={label}
+      rows={mappingRows(mapping)}
+      nameTitle={nameTitle}
+      valueTitle={t('shell.stepRun.expression')}
+    />
+  )
+  const writingTable = (mapping: unknown, label: string) => (
+    <ValueTable
+      label={label}
+      rows={Object.entries(record(mapping)).map(([from, field]) => ({
+        key: from,
+        name: from,
+        value: { kind: 'text', text: words(field) },
+      }))}
+      nameTitle={t('shell.stepRun.fromAnswer')}
+      valueTitle={t('shell.stepRun.field')}
+    />
+  )
 
   const output = () => (
     <Flex vertical gap={spacing.xs}>
@@ -391,21 +438,9 @@ export function StepRunPanel({
       {(definition.output !== undefined || definition.set !== undefined) && (
         <>
           {heading(t(definition.set !== undefined ? 'shell.stepRun.fieldsSet' : 'shell.stepRun.fieldsWritten'))}
-          <TermList
-            terms={
-              definition.set !== undefined
-                ? Object.entries(record(definition.set)).map(([field, expression]) => ({
-                    key: field,
-                    term: field,
-                    value: code(expression),
-                  }))
-                : Object.entries(record(definition.output)).map(([from, field]) => ({
-                    key: from,
-                    term: words(field),
-                    value: code(from),
-                  }))
-            }
-          />
+          {definition.set !== undefined
+            ? settingTable(definition.set, t('shell.stepRun.fieldsSet'), t('shell.stepRun.field'))
+            : writingTable(definition.output, t('shell.stepRun.fieldsWritten'))}
           {instance.subject &&
             muted(
               <>
@@ -468,9 +503,29 @@ export function StepRunPanel({
   )
 
   const definitionView = () => (
-    <Flex vertical gap={spacing.md}>
+    <Flex vertical gap={spacing.xs}>
       <TermList terms={definitionTerms()} />
-      <JsonFold value={definition} />
+      {definition.set !== undefined && (
+        <>
+          {heading(t('shell.stepRun.definition.set'))}
+          {settingTable(definition.set, t('shell.stepRun.definition.set'), t('shell.stepRun.field'))}
+        </>
+      )}
+      {definition.input !== undefined && (
+        <>
+          {heading(t('shell.stepRun.definition.input'))}
+          {settingTable(definition.input, t('shell.stepRun.definition.input'), t('shell.stepRun.definition.input'))}
+        </>
+      )}
+      {definition.output !== undefined && (
+        <>
+          {heading(t('shell.stepRun.definition.output'))}
+          {writingTable(definition.output, t('shell.stepRun.definition.output'))}
+        </>
+      )}
+      <div style={{ marginTop: spacing.sm }}>
+        <JsonFold value={definition} />
+      </div>
     </Flex>
   )
 
@@ -523,27 +578,6 @@ export function StepRunPanel({
     }
     if (definition.endpoint !== undefined) {
       add('endpoint', code(`${definition.endpoint.method} ${definition.endpoint.path}`))
-    }
-    if (definition.set !== undefined) {
-      terms.push(...mapping(definition.set, true).map((term) => ({ ...term, key: `set-${term.key}` })))
-    }
-    if (definition.input !== undefined) {
-      add(
-        'input',
-        <TermList terms={mapping(definition.input, true).map((term) => ({ ...term, key: `input-${term.key}` }))} />,
-      )
-    }
-    if (definition.output !== undefined) {
-      add(
-        'output',
-        <TermList
-          terms={Object.entries(record(definition.output)).map(([from, field]) => ({
-            key: `output-${from}`,
-            term: code(from),
-            value: `→ ${words(field)}`,
-          }))}
-        />,
-      )
     }
     const retry = record(definition.retry)
     if (retry.attempts !== undefined) {

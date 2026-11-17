@@ -2725,5 +2725,21 @@
   "shell.stepProblem.notSent": "The call could not be sent ({type}).",
   "shell.stepProblem.exception": "The step failed with {type}.",
   "shell.stepProblem.expressionFailed": "The {part} of the step failed: {kind}.",
-  "shell.stepProblem.writeRefused": "Saving {field} was refused: {reason}."
+  "shell.stepProblem.writeRefused": "Saving {field} was refused: {reason}.",
+  "shell.valueTable.name": "Name",
+  "shell.valueTable.value": "Value",
+  "shell.valueTable.empty": "Empty",
+  "shell.valueTable.fields": "Fields: {count}",
+  "shell.valueTable.items": "Items: {count}",
+  "shell.valueTable.none": "Nothing",
+  "shell.valueTable.show": "Show as",
+  "shell.valueTable.table": "Table",
+  "shell.stepRun.method": "Method",
+  "shell.stepRun.url": "URL",
+  "shell.stepRun.query": "Query parameters",
+  "shell.stepRun.status": "Status",
+  "shell.stepRun.expression": "Expression",
+  "shell.stepRun.field": "Field",
+  "shell.stepRun.fromAnswer": "From the answer",
+  "shell.stepRun.definition.set": "Sets"
 }

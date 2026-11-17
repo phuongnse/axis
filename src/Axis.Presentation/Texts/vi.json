@@ -2725,5 +2725,21 @@
   "shell.stepProblem.notSent": "Không gửi được lời gọi ({type}).",
   "shell.stepProblem.exception": "Bước bị lỗi {type}.",
   "shell.stepProblem.expressionFailed": "Phần {part} của bước bị lỗi: {kind}.",
-  "shell.stepProblem.writeRefused": "Không lưu được {field}: {reason}."
+  "shell.stepProblem.writeRefused": "Không lưu được {field}: {reason}.",
+  "shell.valueTable.name": "Tên",
+  "shell.valueTable.value": "Giá trị",
+  "shell.valueTable.empty": "Rỗng",
+  "shell.valueTable.fields": "Trường: {count}",
+  "shell.valueTable.items": "Phần tử: {count}",
+  "shell.valueTable.none": "Không có",
+  "shell.valueTable.show": "Hiện dạng",
+  "shell.valueTable.table": "Bảng",
+  "shell.stepRun.method": "Method",
+  "shell.stepRun.url": "URL",
+  "shell.stepRun.query": "Tham số query",
+  "shell.stepRun.status": "Status",
+  "shell.stepRun.expression": "Biểu thức",
+  "shell.stepRun.field": "Trường",
+  "shell.stepRun.fromAnswer": "Từ phản hồi",
+  "shell.stepRun.definition.set": "Gán"
 }

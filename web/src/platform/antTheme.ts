@@ -211,10 +211,22 @@ export function selectedItemTint(mode: ThemeMode): string {
 /**
  * The cell padding of a table, see docs/reference/actions-and-controls.md#tables. A row is `spacing-xs` above and below
  * a line of the `smallControl` size, which a line of text and a small icon button both fill, and `spacing-lg` on each
- * side keeps columns apart. `AxisTable` applies it through a nested ConfigProvider.
+ * side keeps columns apart, `spacing-sm` in a compact table. `AxisTable` applies it through a nested ConfigProvider.
  */
-export function tableTheme(tokens: DesignTokens): ThemeConfig {
-  return { components: { Table: { cellPaddingBlock: tokens.spacing.xs, cellPaddingInline: tokens.spacing.lg } } }
+export function tableTheme(tokens: DesignTokens, compact = false): ThemeConfig {
+  return {
+    components: {
+      Table: { cellPaddingBlock: tokens.spacing.xs, cellPaddingInline: cellPaddingInline(tokens, compact) },
+    },
+  }
+}
+
+/**
+ * The padding on each side of a table's cell: `spacing-lg`, or `spacing-sm` for a compact table. Proposed, see the review
+ * on #3650: a table in a side panel is compact, so two columns of names and values fit its `sidePanel` width.
+ */
+export function cellPaddingInline(tokens: DesignTokens, compact: boolean): number {
+  return compact ? tokens.spacing.sm : tokens.spacing.lg
 }
 
 /**
