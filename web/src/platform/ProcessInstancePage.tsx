@@ -466,7 +466,7 @@ export function InstanceDetailView({
                     transitions={graphTransitions}
                     ariaLabel={t('shell.inspector.steps')}
                     testId="inspector-graph"
-                    height={480}
+                    height={560}
                   />
                 ),
               },
