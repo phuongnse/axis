@@ -675,6 +675,7 @@
   "shell.graph.zoomIn": "Phóng to",
   "shell.graph.zoomOut": "Thu nhỏ",
   "shell.graph.fit": "Xem toàn bộ quy trình",
+  "shell.graph.current": "Tới bước hiện tại",
   "shell.graph.fullScreen": "Toàn màn hình",
   "shell.graph.exitFullScreen": "Thoát toàn màn hình",
   "shell.graph.overview": "Toàn cảnh quy trình",

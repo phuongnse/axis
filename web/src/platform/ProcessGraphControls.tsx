@@ -1,18 +1,28 @@
-import { AimOutlined, FullscreenExitOutlined, FullscreenOutlined, MinusOutlined, PlusOutlined } from '@ant-design/icons'
+import {
+  AimOutlined,
+  ExpandOutlined,
+  FullscreenExitOutlined,
+  FullscreenOutlined,
+  MinusOutlined,
+  PlusOutlined,
+} from '@ant-design/icons'
 import { MiniMap, Panel, useReactFlow } from '@xyflow/react'
 import { useEffect, useState, type RefObject } from 'react'
 import { AxisButton } from './AxisButton'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
+/** How long a move of the view takes, in milliseconds. */
+const moving = 300
+
 /**
  * Proposed, see the review on #3650: the controls of a process graph too large to read whole, Axis's own icon buttons
- * with their names in the reader's language as tooltips: Zoom in, Zoom out, Show the whole process, and Full screen,
- * which gives the graph the whole screen through the browser's full screen until Esc or Exit full screen; and an
+ * with their names in the reader's language as tooltips: Zoom in, Zoom out, Show the whole process, Go to the current
+ * step where there is one, and Full screen, which gives the graph the whole screen through the browser's full screen until Esc or Exit full screen; and an
  * overview at the corner, as Camunda Operate and Signavio show a long diagram, which marks the part in view and moves
  * the view where it is dragged or clicked.
  */
-export function ProcessGraphControls({ area }: { area: RefObject<HTMLElement | null> }) {
+export function ProcessGraphControls({ area, focus }: { area: RefObject<HTMLElement | null>; focus?: string }) {
   const { zoomIn, zoomOut, fitView } = useReactFlow()
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
@@ -71,14 +81,33 @@ export function ProcessGraphControls({ area }: { area: RefObject<HTMLElement | n
             borderRadius: radius.base,
           }}
         >
-          <AxisButton role="icon" nameKey="shell.graph.zoomIn" icon={<PlusOutlined />} onClick={() => void zoomIn()} />
+          {/* Every move of the view is animated, so a click always shows what it did, even when little changes. */}
+          <AxisButton
+            role="icon"
+            nameKey="shell.graph.zoomIn"
+            icon={<PlusOutlined />}
+            onClick={() => void zoomIn({ duration: moving })}
+          />
           <AxisButton
             role="icon"
             nameKey="shell.graph.zoomOut"
             icon={<MinusOutlined />}
-            onClick={() => void zoomOut()}
+            onClick={() => void zoomOut({ duration: moving })}
           />
-          <AxisButton role="icon" nameKey="shell.graph.fit" icon={<AimOutlined />} onClick={() => void fitView()} />
+          <AxisButton
+            role="icon"
+            nameKey="shell.graph.fit"
+            icon={<ExpandOutlined />}
+            onClick={() => void fitView({ padding: 0.1, duration: moving })}
+          />
+          {focus !== undefined && (
+            <AxisButton
+              role="icon"
+              nameKey="shell.graph.current"
+              icon={<AimOutlined />}
+              onClick={() => void fitView({ nodes: [{ id: focus }], minZoom: 1, maxZoom: 1, duration: moving })}
+            />
+          )}
           <AxisButton
             role="icon"
             nameKey={full ? 'shell.graph.exitFullScreen' : 'shell.graph.fullScreen'}

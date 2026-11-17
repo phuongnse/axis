@@ -11,6 +11,8 @@ import {
   type OnConnectEnd,
   Position,
   ReactFlow,
+  Background,
+  BackgroundVariant,
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -475,6 +477,8 @@ export function ProcessGraphCanvas({
         minZoom={0.1}
         // A small process is drawn at its own size, never zoomed in past it, so its text keeps the body size.
         maxZoom={1}
+        // React Flow is MIT licensed; its attribution may go, as Axis draws its own controls and overview.
+        proOptions={{ hideAttribution: true }}
         nodesDraggable={false}
         nodesConnectable={onConnectEnd !== undefined}
         nodesFocusable={false}
@@ -487,7 +491,9 @@ export function ProcessGraphCanvas({
         onEdgeClick={onTransitionClick ? (_, edge) => onTransitionClick(edge.id) : undefined}
       >
         <FitOnLayout layout={layout} focus={focus} />
-        {controls && <ProcessGraphControls area={area} />}
+        {/* A dot grid under the graph, in the subtle border colour, as a canvas has. */}
+        <Background variant={BackgroundVariant.Dots} gap={16} size={1} color={colour.borderSubtle} />
+        {controls && <ProcessGraphControls area={area} focus={focus} />}
       </ReactFlow>
     </section>
   )
