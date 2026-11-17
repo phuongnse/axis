@@ -68,6 +68,7 @@ flowchart LR
 | P8 | A session stays open past its time limit or after an admin ends it. | Browser and server | Elevation of privilege | Medium | **Mitigated** | `SessionLifetimeTests` (a session ends after an hour idle or eight hours after sign in), `AdminTenantSessionEndTests` (ending one person's sessions leaves other people signed in). |
 | P100 | Crafted input to a parser, in a record body, an import file or an expression, crashes the parser or reaches SQL. | Browser and server | Tampering | High | **Mitigated** | `RecordBodyFuzzTests` (a body is accepted or refused with a 400 problem), `RecordImportFuzzTests` (any bytes give rows or refusals), `ExpressionFuzzTests` (no SQL the translator emits holds input text outside a parameter). |
 | P113 | The public `/licences` page tells an attacker which package versions Axis runs, and so which known weaknesses to try. | Browser and server | Information disclosure | Low | **Mitigated** | `LicenceEndpointTests` (an anonymous caller gets a 401 problem, and only a signed-in caller gets the versions). The public `/licences.json` holds names and licences only. |
+| P153 | A person without the `reassign` grant adds themselves or someone else to an open task for several people, to sway its outcome. | Browser and server | Elevation of privilege | High | **Mitigated** | _(planned for M38)_ The route needs the `reassign` grant on the task's process, answers a 403 without it, adds no task and writes `task.personAdded` with a reason. See [add a person](task-deadlines.md#add-a-person). |
 
 ### Server and databases
 
