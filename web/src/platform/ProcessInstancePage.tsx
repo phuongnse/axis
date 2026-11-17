@@ -227,8 +227,10 @@ export function InstanceDetailView({
     true,
   )
   const [searchParams, setSearchParams] = useSearchParams()
-  // The step chosen on the graph, first the one the instance is at.
+  // The step chosen on the graph, first the one the instance is at, and whether its panel is open: only a click on a
+  // step opens it, and it then follows the step chosen until it is closed.
   const [chosenStep, setChosenStep] = useState<string | null>(instance.step)
+  const [panelOpen, setPanelOpen] = useState(false)
   const showStep = (step: string) => {
     const next = writeTableQuery(
       searchParams,
@@ -436,13 +438,14 @@ export function InstanceDetailView({
                     height={graphHeight}
                     focus={instance.step}
                     controls
-                    // Proposed: a click on a step chooses it and shows its runs beside the graph, which stays in view,
+                    // Proposed: only a click on a step chooses it and shows its runs beside the graph, which stays in view,
                     // as Camunda Operate shows a flow node's details; its runs in the timeline are a link away, see the
                     // review on #3650.
                     selected={chosenStep}
                     onSelect={setChosenStep}
+                    onStepClick={() => setPanelOpen(true)}
                     aside={
-                      chosenStep === null ? undefined : (
+                      chosenStep === null || !panelOpen ? undefined : (
                         <StepRunsPanel
                           instance={instance}
                           step={chosenStep}
@@ -452,7 +455,7 @@ export function InstanceDetailView({
                           sitePath={sitePath}
                           locale={locale}
                           maxHeight={graphHeight - 24 - 160}
-                          onClose={() => setChosenStep(null)}
+                          onClose={() => setPanelOpen(false)}
                           onShowInTimeline={showStep}
                         />
                       )

@@ -363,16 +363,21 @@ const edgeTypes = { routed: RoutedEdge }
 
 /** Fits the view each time the layout changes, on the focused step or on the whole graph. */
 function FitOnLayout({ layout, focus }: { layout: Layout | null; focus?: string }) {
+  // Only a new layout fits the view, never a page that draws again, which would undo where the reader has moved to.
   const { fitView } = useReactFlow()
+  const fit = useRef(fitView)
+  useEffect(() => {
+    fit.current = fitView
+  })
   useEffect(() => {
     if (layout === null) {
       return
     }
     const frame = requestAnimationFrame(() => {
-      void fitView(focus === undefined ? undefined : { nodes: [{ id: focus }], minZoom: 1, maxZoom: 1 })
+      void fit.current(focus === undefined ? undefined : { nodes: [{ id: focus }], minZoom: 1, maxZoom: 1 })
     })
     return () => cancelAnimationFrame(frame)
-  }, [layout, focus, fitView])
+  }, [layout, focus])
   return null
 }
 
@@ -601,9 +606,19 @@ export function ProcessGraphCanvas({
     }
   }, [])
 
+  // The graph is laid out again only when its shape changes: its steps, their labels and its transitions. A page that
+  // draws again, as when a step is chosen, keeps the layout and the view the reader has moved to.
+  const shape = JSON.stringify([
+    steps.map((step) => [step.id, step.name]),
+    transitions.map((transition) => [transition.id, transition.source, transition.target, transition.label]),
+  ])
+  const latest = useRef({ steps, transitions })
+  useEffect(() => {
+    latest.current = { steps, transitions }
+  })
   useEffect(() => {
     let current = true
-    void layOut(steps, transitions).then((next) => {
+    void layOut(latest.current.steps, latest.current.transitions).then((next) => {
       if (current) {
         setLayout(next)
       }
@@ -611,7 +626,7 @@ export function ProcessGraphCanvas({
     return () => {
       current = false
     }
-  }, [steps, transitions, fontsReady])
+  }, [shape, fontsReady])
 
   const { nodes, edges } = useMemo(() => {
     if (layout === null) {
@@ -624,6 +639,9 @@ export function ProcessGraphCanvas({
         position: layout.places.get(step.id) ?? { x: 0, y: 0 },
         width: nodeWidth,
         height: heightOf(step),
+        // The card's size is known, so it is given as measured too: a node drawn again keeps it, and Find a step and
+        // the fit can place it without waiting for the browser to measure it again.
+        measured: { width: nodeWidth, height: heightOf(step) },
         handles: [
           { type: 'target', position: Position.Left, x: 0, y: heightOf(step) / 2, width: 1, height: 1 },
           {
@@ -701,11 +719,19 @@ export function ProcessGraphCanvas({
           deleteKeyCode={null}
           zoomOnScroll={false}
           onConnectEnd={onConnectEnd}
-          // A designer's click opens the step it edits; a viewer's chooses the step, and a click on the ground clears it.
+          // With the controls a click chooses the step, then calls onStepClick, and a click on the ground clears the
+          // choice; without them, as in the designer, a click only calls onStepClick.
           onNodeClick={
-            onStepClick ? (_, node) => onStepClick(node.id) : controls ? (_, node) => choose(node.id) : undefined
+            controls
+              ? (_, node) => {
+                  choose(node.id)
+                  onStepClick?.(node.id)
+                }
+              : onStepClick
+                ? (_, node) => onStepClick(node.id)
+                : undefined
           }
-          onPaneClick={controls && !onStepClick ? () => choose(null) : undefined}
+          onPaneClick={controls ? () => choose(null) : undefined}
           onEdgeClick={onTransitionClick ? (_, edge) => onTransitionClick(edge.id) : undefined}
         >
           <FitOnLayout layout={layout} focus={focus} />
