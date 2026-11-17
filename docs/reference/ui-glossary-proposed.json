@@ -163,6 +163,54 @@
       "en": "Rename",
       "vi": "Đổi tên",
       "status": "proposed"
+    },
+    {
+      "concept": "Calendar",
+      "en": "calendar",
+      "vi": "lịch làm việc",
+      "status": "proposed"
+    },
+    {
+      "concept": "Working time",
+      "en": "working time",
+      "vi": "giờ làm việc",
+      "status": "proposed"
+    },
+    {
+      "concept": "Day off",
+      "en": "day off",
+      "vi": "ngày nghỉ",
+      "status": "proposed"
+    },
+    {
+      "concept": "Make-up day",
+      "en": "make-up day",
+      "vi": "ngày làm bù",
+      "status": "proposed"
+    },
+    {
+      "concept": "SLA",
+      "en": "SLA",
+      "vi": "cam kết dịch vụ",
+      "status": "proposed"
+    },
+    {
+      "concept": "At risk",
+      "en": "at risk",
+      "vi": "sắp trễ hạn",
+      "status": "proposed"
+    },
+    {
+      "concept": "Fiscal year",
+      "en": "fiscal year",
+      "vi": "năm tài chính",
+      "status": "proposed"
+    },
+    {
+      "concept": "Quarter",
+      "en": "quarter",
+      "vi": "quý",
+      "status": "proposed"
     }
   ]
 }

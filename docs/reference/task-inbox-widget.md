@@ -29,6 +29,9 @@ A page whose widget is a `taskInbox` lists the signed-in user's open tasks in th
 - **Columns.** The columns are the task's label, from the step's label text key, the subject's label
   and the due date, formatted as a `date-time` cell. An empty subject label or due date shows the muted
   em dash, see [no value is a dash](actions-and-controls.md#text).
+- **Due time** _(planned for M39)_. A due date with a `dueTimeZone` shows in that time zone, with the zone
+  named, and with the `workingTimeLeft` beside it. A due date with no `dueTimeZone` shows as any
+  `date-time` cell does.
 - **Labels from each release.** The inbox loads the texts of each release its rows name through
   `releaseId`, once per release, so tasks from several releases each show their own release's labels.
   The table stays loading until those texts have arrived, and a failed load shows the inbox's load
@@ -36,6 +39,9 @@ A page whose widget is a `taskInbox` lists the signed-in user's open tasks in th
 - **Tags.** An overdue task shows a red "Overdue" tag beside its due date. A task with `claimedBy` set
   shows a "Claimed by you" tag beside its label. The task list returns a claimed task only to its
   claimer, so the signed-in user is always the claimer, and the inbox does not fetch the user.
+- **At risk** _(planned for M39)_. A task with `atRisk` that is not overdue shows an "At risk" tag in the
+  warning tone beside its due date. It is a `StatusTag`, see [shared widgets](shared-widgets.md). "Overdue"
+  stays the tag of a past due time.
 - **View.** The table has Search, Filter on Subject and Due, Columns, a sort on Subject and Due, Refresh
   and paging, see [tables](actions-and-controls.md#tables). Search, filter, sort, columns, page and page
   size live in the URL, and the widget sends `search`, `filter`, `sort`, `page` and `pageSize` to the
@@ -62,6 +68,8 @@ form of its step over the subject record and a button for each outcome.
   "Overdue" tag as the inbox when the task is overdue, and the form's sections over the subject record.
   The layout and the field types come from the task read's `form`, and the values from the subject
   record, read through the record API. The task page has no history panel.
+- **Due time and At risk** _(planned for M39)_. The due date shows in its `dueTimeZone` with the working
+  time left, and an "At risk" tag shows as in the inbox.
 - **Conditions and steps.** The form follows the form widget's conditions, see
   [form widget conditions](form-widget-conditions.md), through the task's
   [form state route](task-api.md#form-state-of-a-task). The call sends `values` and `touched` and no

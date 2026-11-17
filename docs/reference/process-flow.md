@@ -31,6 +31,8 @@ step runs or a moment that an expression gives:
   step left in its `revision` column. Its history output is
   `{ "state": "waiting", "dueAt" }`. The step writes no audit record while it
   waits.
+- **Working time** _(planned for M39)_. `wait` may be `{ "working": "PT8H" }`, counted on the step's or
+  the process's `calendar`, see [durations in working time](working-time.md#durations-in-working-time).
 - The item checks that the instance still waits at the revision the step left
   it at. Then it resumes the instance at `next`, writes `{ "next" }` and the
   `process.stepCompleted` audit record, and queues the instance's next
@@ -70,6 +72,8 @@ Events are raised by `raiseEvent` steps and by an inbound endpoint call that nam
   `dueIn`, and a bad one is `AXC0084` at `/steps/{i}/timeout/after`. `next`
   names the step taken when no event came in time, and a name that is no step
   is `AXC0070` at `/steps/{i}/timeout/next`.
+- **Working time** _(planned for M39)_. `timeout.after` may be `{ "working": "PT8H" }`, counted on the step's
+  or the process's `calendar`, see [durations in working time](working-time.md#durations-in-working-time).
 - **Which occurrence.** The step matches an occurrence in `axis.events` that
   names the instance's subject record, was raised at or after the instance's
   `created_at`, has not been used by this instance, and whose `when` is true.
