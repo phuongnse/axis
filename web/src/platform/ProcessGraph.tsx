@@ -45,25 +45,35 @@ const nodeWidth = 272
  * 8 + 4 + 20 or 40 + 2 + 22 + 8 px and the borders. Only a step whose label needs two lines is the taller.
  */
 const cardHeight = { one: 68, two: 88 }
+/** The label's type, the one the card draws it in and the one it is measured in, so both wrap alike. */
+const labelType = { size: 14, weight: 600, lineHeight: 20 }
 /** The room a label has on a card: its width less the padding, the icon's tile, the gap and the borders. */
 const labelRoom = nodeWidth - 2 * 12 - 28 - 12 - 2
 
-let measure: CanvasRenderingContext2D | null | undefined
-/** How wide a label is in the card's bold 14 px, from a canvas, else from its letters where there is none. */
-function labelWidthOf(label: string): number {
-  if (measure === undefined) {
-    measure = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d')
+let measurer: HTMLElement | null | undefined
+/**
+ * How many lines a label takes on a card, measured by the browser itself in a hidden copy of the label, of the same
+ * width, font, weight, size and line height, so it wraps exactly as the card does. Where there is no document, its
+ * letters give an estimate.
+ */
+function labelLines(label: string): number {
+  if (measurer === undefined) {
+    measurer = typeof document === 'undefined' ? null : document.createElement('span')
+    if (measurer) {
+      measurer.style.cssText = `position: absolute; visibility: hidden; left: -10000px; top: 0; width: ${labelRoom}px; font-family: ${typeTokens.fontFamily}; font-size: ${labelType.size}px; font-weight: ${labelType.weight}; line-height: ${labelType.lineHeight}px; white-space: normal; overflow-wrap: break-word;`
+      document.body.appendChild(measurer)
+    }
   }
-  if (measure === null) {
-    return label.length * 8
+  if (!measurer) {
+    return label.length * 8 > labelRoom ? 2 : 1
   }
-  measure.font = `600 14px ${typeTokens.fontFamily}`
-  return measure.measureText(label).width
+  measurer.textContent = label
+  return Math.max(1, Math.round(measurer.getBoundingClientRect().height / labelType.lineHeight))
 }
 
 /** A step's card height: the taller one only when its label does not fit on one line. */
 function heightOf(step: ProcessGraphStep): number {
-  return labelWidthOf(step.name) > labelRoom ? cardHeight.two : cardHeight.one
+  return labelLines(step.name) > 1 ? cardHeight.two : cardHeight.one
 }
 const handleSize = 10
 
@@ -450,7 +460,9 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              lineHeight: '20px',
+              fontSize: labelType.size,
+              fontWeight: labelType.weight,
+              lineHeight: `${labelType.lineHeight}px`,
             }}
           >
             {data.name}
@@ -557,6 +569,20 @@ export function ProcessGraphCanvas({
   const { colour, radius } = useDesignTokens()
   const [layout, setLayout] = useState<Layout | null>(null)
 
+  // The fonts change how labels wrap, so the graph is laid out again once they have loaded.
+  const [fontsReady, setFontsReady] = useState(false)
+  useEffect(() => {
+    let current = true
+    void document.fonts?.ready.then(() => {
+      if (current) {
+        setFontsReady(true)
+      }
+    })
+    return () => {
+      current = false
+    }
+  }, [])
+
   useEffect(() => {
     let current = true
     void layOut(steps, transitions).then((next) => {
@@ -567,7 +593,7 @@ export function ProcessGraphCanvas({
     return () => {
       current = false
     }
-  }, [steps, transitions])
+  }, [steps, transitions, fontsReady])
 
   const { nodes, edges } = useMemo(() => {
     if (layout === null) {
