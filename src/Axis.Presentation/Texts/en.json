@@ -676,6 +676,8 @@
   "shell.graph.zoomOut": "Zoom out",
   "shell.graph.fit": "Show the whole process",
   "shell.graph.current": "Go to the current step",
+  "shell.graph.find": "Find a step",
+  "shell.graph.actualSize": "Actual size",
   "shell.graph.fullScreen": "Full screen",
   "shell.graph.exitFullScreen": "Exit full screen",
   "shell.graph.overview": "Overview of the process",

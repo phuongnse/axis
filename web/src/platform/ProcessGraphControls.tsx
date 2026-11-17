@@ -6,7 +6,8 @@ import {
   MinusOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
-import { MiniMap, Panel, useReactFlow } from '@xyflow/react'
+import { MiniMap, Panel, useReactFlow, useViewport } from '@xyflow/react'
+import { Select, Tooltip } from 'antd'
 import { useEffect, useState, type RefObject } from 'react'
 import { AxisButton } from './AxisButton'
 import { useText } from './texts'
@@ -17,13 +18,28 @@ const moving = 300
 
 /**
  * Proposed, see the review on #3650: the controls of a process graph too large to read whole, Axis's own icon buttons
- * with their names in the reader's language as tooltips: Zoom in, Zoom out, Show the whole process, Go to the current
- * step where there is one, and Full screen, which gives the graph the whole screen through the browser's full screen until Esc or Exit full screen; and an
- * overview at the corner, as Camunda Operate and Signavio show a long diagram, which marks the part in view and moves
- * the view where it is dragged or clicked.
+ * with their names in the reader's language as tooltips: Zoom in, Zoom out, the zoom level, which returns to actual
+ * size, Show the whole process, Go to the current step where there is one, and Full screen, which gives the graph the
+ * whole screen through the browser's full screen until Esc or Exit full screen. Find a step moves the view to a step
+ * chosen by its label and marks it. The keys +, −, 1, 0 and F do the same while the graph has the focus. An overview
+ * at the corner, as Camunda Operate and Signavio show a long diagram, marks the part in view and moves the view where
+ * it is dragged or clicked.
  */
-export function ProcessGraphControls({ area, focus }: { area: RefObject<HTMLElement | null>; focus?: string }) {
-  const { zoomIn, zoomOut, fitView } = useReactFlow()
+export function ProcessGraphControls({
+  area,
+  focus,
+  steps,
+  onFound,
+}: {
+  area: RefObject<HTMLElement | null>
+  focus?: string
+  /** The steps Find a step offers, by their labels. */
+  steps: readonly { id: string; label: string }[]
+  /** Called with the step Find a step moved to, so the graph marks it. */
+  onFound: (id: string) => void
+}) {
+  const { zoomIn, zoomOut, zoomTo, fitView } = useReactFlow()
+  const { zoom } = useViewport()
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
   const [full, setFull] = useState(false)
@@ -41,6 +57,43 @@ export function ProcessGraphControls({ area, focus }: { area: RefObject<HTMLElem
       void area.current?.requestFullscreen()
     }
   }
+
+  const actualSize = () => void zoomTo(1, { duration: moving })
+  const fitAll = () => void fitView({ padding: 0.1, duration: moving })
+  const find = (id: string) => {
+    void fitView({ nodes: [{ id }], minZoom: 1, maxZoom: 1, duration: moving })
+    onFound(id)
+  }
+
+  // The keys work while the graph or something in it has the focus, never while a box takes typing.
+  useEffect(() => {
+    const element = area.current
+    if (!element) {
+      return
+    }
+    const press = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement
+      if (event.ctrlKey || event.metaKey || event.altKey || target.closest('input, textarea, .ant-select')) {
+        return
+      }
+      const act: Record<string, () => void> = {
+        '+': () => void zoomIn({ duration: moving }),
+        '=': () => void zoomIn({ duration: moving }),
+        '-': () => void zoomOut({ duration: moving }),
+        '1': actualSize,
+        '0': fitAll,
+        f: toggle,
+        F: toggle,
+      }
+      const run = act[event.key]
+      if (run) {
+        event.preventDefault()
+        run()
+      }
+    }
+    element.addEventListener('keydown', press)
+    return () => element.removeEventListener('keydown', press)
+  })
 
   return (
     <>
@@ -68,6 +121,24 @@ export function ProcessGraphControls({ area, focus }: { area: RefObject<HTMLElem
         maskStrokeWidth={2}
         style={{ border: `1px solid ${colour.borderSubtle}`, borderRadius: radius.base }}
       />
+      {/* Proposed: Find a step, a searchable list of the steps by label, see the review on #3650. */}
+      <Panel position="top-left">
+        <Select
+          showSearch
+          allowClear
+          value={null}
+          placeholder={t('shell.graph.find')}
+          aria-label={t('shell.graph.find')}
+          style={{ width: 240 }}
+          optionFilterProp="label"
+          options={steps.map((step) => ({ value: step.id, label: step.label }))}
+          onChange={(id: string | null) => {
+            if (id !== null && id !== undefined) {
+              find(id)
+            }
+          }}
+        />
+      </Panel>
       <Panel position="bottom-left">
         <div
           role="group"
@@ -86,19 +157,34 @@ export function ProcessGraphControls({ area, focus }: { area: RefObject<HTMLElem
             role="icon"
             nameKey="shell.graph.zoomIn"
             icon={<PlusOutlined />}
+            aria-keyshortcuts="+"
             onClick={() => void zoomIn({ duration: moving })}
           />
           <AxisButton
             role="icon"
             nameKey="shell.graph.zoomOut"
             icon={<MinusOutlined />}
+            aria-keyshortcuts="-"
             onClick={() => void zoomOut({ duration: moving })}
           />
+          <Tooltip title={t('shell.graph.actualSize')}>
+            <AxisButton
+              role="plain"
+              size="small"
+              aria-label={`${Math.round(zoom * 100)}%, ${t('shell.graph.actualSize')}`}
+              aria-keyshortcuts="1"
+              style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12, paddingInline: 0 }}
+              onClick={actualSize}
+            >
+              {`${Math.round(zoom * 100)}%`}
+            </AxisButton>
+          </Tooltip>
           <AxisButton
             role="icon"
             nameKey="shell.graph.fit"
             icon={<ExpandOutlined />}
-            onClick={() => void fitView({ padding: 0.1, duration: moving })}
+            aria-keyshortcuts="0"
+            onClick={fitAll}
           />
           {focus !== undefined && (
             <AxisButton
@@ -111,6 +197,7 @@ export function ProcessGraphControls({ area, focus }: { area: RefObject<HTMLElem
           <AxisButton
             role="icon"
             nameKey={full ? 'shell.graph.exitFullScreen' : 'shell.graph.fullScreen'}
+            aria-keyshortcuts="F"
             icon={full ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
             aria-pressed={full}
             onClick={toggle}

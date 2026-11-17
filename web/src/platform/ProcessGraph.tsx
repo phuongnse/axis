@@ -16,7 +16,16 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { type ComponentType, type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  type ComponentType,
+  createContext,
+  type KeyboardEvent,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { ProcessGraphControls } from './ProcessGraphControls'
 import { useDesignTokens, useThemeMode } from './themeMode'
 
@@ -256,6 +265,7 @@ function FitOnLayout({ layout, focus }: { layout: Layout | null; focus?: string 
 
 function StepNodeView({ data }: NodeProps<StepNode>) {
   const { colour, radius } = useDesignTokens()
+  const found = useContext(FoundStep)
   const edge = {
     plain: colour.border,
     selected: colour.primary,
@@ -291,6 +301,8 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
           background: colour.surface,
           border: `${width}px solid ${edge}`,
           borderRadius: radius.base,
+          boxShadow: found === data.id ? `0 0 0 4px ${colour.focusRing}` : undefined,
+          transition: 'box-shadow 200ms',
           cursor: 'pointer',
         }}
       >
@@ -343,6 +355,9 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
   )
 }
 
+/** The step Find a step moved to, which its node rings for a moment. */
+const FoundStep = createContext<string | null>(null)
+
 const nodeTypes = { step: StepNodeView }
 
 /**
@@ -388,6 +403,12 @@ export function ProcessGraphCanvas({
 }) {
   const { mode } = useThemeMode()
   const area = useRef<HTMLElement | null>(null)
+  // The step Find a step moved to, marked for a moment so the eye finds it.
+  const [found, setFound] = useState<string | null>(null)
+  const mark = (id: string) => {
+    setFound(id)
+    window.setTimeout(() => setFound((current) => (current === id ? null : current)), 2000)
+  }
   const { colour } = useDesignTokens()
   const [layout, setLayout] = useState<Layout | null>(null)
 
@@ -464,37 +485,48 @@ export function ProcessGraphCanvas({
       }}
       data-testid={testId}
       aria-label={ariaLabel}
+      // A graph with controls takes the focus, so its keys work; a designer's keeps its own order of Tab.
+      tabIndex={controls ? 0 : undefined}
       // In full screen the graph fills the screen on the page's surface.
       style={{ height, position: 'relative', background: colour.surface }}
       onKeyDown={onKeyDown}
     >
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        colorMode={mode}
-        minZoom={0.1}
-        // A small process is drawn at its own size, never zoomed in past it, so its text keeps the body size.
-        maxZoom={1}
-        // React Flow is MIT licensed; its attribution may go, as Axis draws its own controls and overview.
-        proOptions={{ hideAttribution: true }}
-        nodesDraggable={false}
-        nodesConnectable={onConnectEnd !== undefined}
-        nodesFocusable={false}
-        elementsSelectable={false}
-        edgesFocusable
-        deleteKeyCode={null}
-        zoomOnScroll={false}
-        onConnectEnd={onConnectEnd}
-        onNodeClick={onStepClick ? (_, node) => onStepClick(node.id) : undefined}
-        onEdgeClick={onTransitionClick ? (_, edge) => onTransitionClick(edge.id) : undefined}
-      >
-        <FitOnLayout layout={layout} focus={focus} />
-        {/* A dot grid under the graph, in the subtle border colour, as a canvas has. */}
-        <Background variant={BackgroundVariant.Dots} gap={16} size={1} color={colour.borderSubtle} />
-        {controls && <ProcessGraphControls area={area} focus={focus} />}
-      </ReactFlow>
+      <FoundStep.Provider value={found}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          colorMode={mode}
+          minZoom={0.1}
+          // A small process is drawn at its own size, never zoomed in past it, so its text keeps the body size.
+          maxZoom={1}
+          // React Flow is MIT licensed; its attribution may go, as Axis draws its own controls and overview.
+          proOptions={{ hideAttribution: true }}
+          nodesDraggable={false}
+          nodesConnectable={onConnectEnd !== undefined}
+          nodesFocusable={false}
+          elementsSelectable={false}
+          edgesFocusable
+          deleteKeyCode={null}
+          zoomOnScroll={false}
+          onConnectEnd={onConnectEnd}
+          onNodeClick={onStepClick ? (_, node) => onStepClick(node.id) : undefined}
+          onEdgeClick={onTransitionClick ? (_, edge) => onTransitionClick(edge.id) : undefined}
+        >
+          <FitOnLayout layout={layout} focus={focus} />
+          {/* A dot grid under the graph, in the subtle border colour, as a canvas has. */}
+          <Background variant={BackgroundVariant.Dots} gap={16} size={1} color={colour.borderSubtle} />
+          {controls && (
+            <ProcessGraphControls
+              area={area}
+              focus={focus}
+              steps={steps.map((step) => ({ id: step.id, label: step.name }))}
+              onFound={mark}
+            />
+          )}
+        </ReactFlow>
+      </FoundStep.Provider>
     </section>
   )
 }
