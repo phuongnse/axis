@@ -209,6 +209,7 @@ and operations, and where each is described:
 | `operation` with `raiseEvent`                           | Raises an event about the subject record                             | [Raise event step](process-events.md#raise-event-step)           |
 | `operation` with `createRecord`                         | Creates a record of another entity                                   | [Create record operation](process-flow.md#create-record-operation) |
 | `operation` with `notify`                               | Notifies users, roles or addresses in the site or by email           | [Notify operation](notifications.md#notify-operation)            |
+| `operation` with `makeDocument`                         | _(planned for M40)_ Makes a PDF or a Word file from a template and writes it to a `file` field | [Document step](document-templates.md#document-step)             |
 | `operation` with `setVariables`                         | _(planned for M38)_ Sets process variables                           | [Variables](#variables)                                          |
 | `timer`                                                 | Waits for a time                                                     | [Timer step](process-flow.md#timer-step)                         |
 | `waitEvent`                                             | Waits for an event about the subject record                          | [Wait for event step](process-flow.md#wait-for-event-step)       |

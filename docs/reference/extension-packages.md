@@ -197,6 +197,7 @@ public class RetryableException : Exception { }
   | `boolean` | `bool` | `bool` |
   | `date` | `DateOnly` | `datetime.date` |
   | `date-time` | `DateTimeOffset` | `datetime` with a time zone |
+  | [`file`](process-execution.md#files-in-calls) _(planned for M40)_ | `AxisFile` | `AxisFile` |
 
   A missing value is `null` in C# and `None` in Python.
 

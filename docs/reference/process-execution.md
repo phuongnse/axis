@@ -655,6 +655,47 @@ input under the same operation identity.
   output that does not fit gets a fixed sentence that names the package and the operation, and holds
   no value.
 
+## Files in calls
+
+_(planned for M40)_
+
+A file is a value that a call carries, so a purchase order goes to a purchasing system as a PDF and a signed
+contract comes back into a `file` field, as [D157](../decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md)
+agrees. This section covers a file that a connector call sends or receives and a file that a package operation
+takes or gives. The files themselves are in [file fields](file-fields.md), and a file that an email carries is in
+[email](notifications.md#email).
+
+- **A file input.** An operation input of the type `file` is mapped to the name of a `file` field of the
+  subject record, such as `"document": "contractDocument"`, or in a `list` input to a `file` field of the child
+  row. It is not an expression, because a file allows only `is null` and `is not null` in one. A required file
+  input whose field is `null` fails the step like any required input, with a message that names the input.
+- **Multipart.** An operation whose `encoding` is `multipart` sends its body as `multipart/form-data`. The file is
+  a part named as the input, with the file's stored name and media type, and each other `body` input is a text
+  part. An `object` or `list` input in such an operation is refused when the connector is compiled.
+- **In JSON.** An operation with the default encoding sends the file as a base64 string at the place of its
+  input in the JSON body.
+- **Bytes at send time.** The step stores the id of the file when it stages the call, never the bytes. The
+  worker reads them from the storage of the application's [`fileStorage` binding](file-fields.md#the-filestorage-manifest-property)
+  when it sends, so a retry sends the same file. A file that has been purged by then fails the attempt with a
+  message that names the input.
+- **A file output.** An operation output of the type `file` is read from the response: the whole body, or the
+  base64 string at its `source`. The step writes it as a new file in the `file` field that `output` names, and
+  the outcome's transaction attaches it to the subject record, as it writes any output. The media type comes from
+  `Content-Type`, and the name from `Content-Disposition`, or from the output's name when there is none.
+- **Checks on a file that comes in.** It meets the checks of an [upload](file-fields.md#upload): its declared type
+  is one Axis can check, its extension and content fit that type, it is not an executable or an SVG, and it is
+  within `maxSize` of the field and `Files:MaxSize`. A file that fails them fails the call as an output that does
+  not fit does, and nothing is stored.
+- **A package operation.** A package operation's input or output may have the type `file`, see the
+  [value types](extension-packages.md#contracts) of a package. The worker sends the bytes of an input file with
+  the call, and the runner never reads the storage. A file that the operation gives is checked and written to a
+  `file` field as a connector's output is.
+- **No bytes in the records.** Step history, logs and audit hold the file's id and size, never its name or
+  bytes, so a file's content reaches only the call, see [file fields](file-fields.md#storage-and-clean-up).
+- **Compile checks.** A `file` input names a `file` field of the subject, or of the child entity of its `list`,
+  and a `file` output names a `file` field that no other output of the step writes. A `file` input in a
+  connector operation with the `GET` method is refused, because a `GET` has no body.
+
 ## Worker settings
 
 The worker's settings say which tenants it polls, how it claims and runs their work items and how long

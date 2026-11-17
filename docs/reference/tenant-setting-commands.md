@@ -37,6 +37,8 @@ its releases resolve at run time: URLs, storage and secrets. These commands list
 | `tenant binding set <id> <name> --url <value>`      | Adds or replaces a `url` binding. The value is an absolute `http` or `https` URL.                                                                       |
 | `tenant binding set <id> <name> --storage database` | Adds or replaces a `storage` binding. Its only value is `database`, and any other value exits with code 2 and writes nothing, not even an audit record. |
 | `tenant binding set <id> <name> --secret`           | Adds or replaces a `secret` binding. The value comes from `AXIS_BINDING_SECRET`, or from standard input when the variable is not set.                   |
+| `tenant binding set <id> <name> --storage s3 ...` _(planned for M40)_ | Adds or replaces a `storage` binding that names an S3 object storage: its endpoint and bucket, with the name of the `secret` binding that holds its credentials. It checks that the bucket answers before it stores anything. |
+| `tenant files move <id> --to <binding>` _(planned for M40)_ | Moves the files of a tenant to the storage that the binding names, see [moving files](#moving-files). |
 | `tenant binding remove <id> <name>`                 | Removes a binding. A binding that does not exist exits with code 2.                                                                                     |
 
 - **What the list shows.** A `url` binding shows its URL and a `storage` binding its value, `database`.
@@ -57,6 +59,27 @@ its releases resolve at run time: URLs, storage and secrets. These commands list
   hosts, so a change made before then would be lost.
 - **After a restore.** A restored tenant needs its secret bindings set again, and this command does
   it. See [tenant restore](tenant-backup-and-restore.md#tenant-restore).
+
+### Moving files
+
+_(planned for M40)_
+
+`tenant files move <id> --to <binding>` moves the bytes of a tenant's files from the storage they are in to the
+storage of a `storage` binding of the tenant, for example from the tenant database to an S3 object storage and
+back, as [D157](../decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md)
+agrees.
+
+- **The binding, not the release.** The command changes the tenant's `fileStorage` binding to point at the new
+  storage. The release and the application's manifest stay as they are.
+- **Resumable.** It copies each file, checks its SHA-256 against the one in `axis.files` and only then marks
+  the file as stored in the new storage. A run that stops, for a failed copy or a lost connection, leaves
+  every file readable where it is, and the next run goes on with the files that remain.
+- **Nothing is lost.** The command removes a file from the old storage only after all of the tenant's files
+  are in the new one. Reads and uploads go on while it runs, and a file that
+  changes meanwhile is copied again.
+- **A provisioning tenant.** It exits with code 2, as the other commands that change something do.
+- **Audit.** One record when it starts and one when it ends, see
+  [platform audit records](#platform-audit-records).
 
 ## Sign-in settings
 
@@ -480,6 +503,7 @@ A command writes its record either when its work for a tenant starts or together
 | `tenant data-key retire`                                                                                                         | After its count passes and before the delete. A refused run, and one with nothing to delete, write none                                                                         | `data_key:<i>` and `lookup_key:<j>` for each key it deletes                                        |
 | `tenant sign-in set`                                                                                                             | With the change                                                                                                                                                                 | `accounts`, then `provider:<name>` for each provider, never a value                                |
 | `tenant binding set`, `tenant binding remove`                                                                                    | With the change                                                                                                                                                                 | `binding:<name>`                                                                                   |
+| `tenant files move` _(planned for M40)_                                                                                          | When the work starts and when it ends                                                                                                                                           | `binding:<name>` of the target storage, and `files: <n>` at the end                                |
 | `tenant host add`, `tenant host remove`                                                                                          | With the change                                                                                                                                                                 | `host:<host>`, and `site:<path>` for a site's host                                                 |
 | `tenant host move`                                                                                                               | With the change, one record on the target tenant                                                                                                                                | `host:<host>` and `from:<source id>`                                                               |
 | `tenant email set`, `tenant email clear`                                                                                         | With the change                                                                                                                                                                 | The [mail settings](#mail-settings) it was given, or `email`                                       |

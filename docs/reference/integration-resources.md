@@ -96,6 +96,10 @@ release. These rules say where the values live, how they are checked and how the
   of the tenant directory, and its value is `database`. See
   [the application manifest](file-fields.md#the-filestorage-manifest-property) and
   [file fields](file-fields.md#storage-and-clean-up).
+- **An S3 storage binding.** _(planned for M40)_ A `storage` binding's value may also name an S3 object
+  storage, with its endpoint and bucket, and the credentials come from a `secret` binding. Its files live
+  outside the tenant database, and a [command](tenant-setting-commands.md#deployment-bindings) moves a
+  tenant's files between the two. See [object storage](file-fields.md#storage-and-clean-up).
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
   must be `https`. Activation checks each connector's base URL binding, each
   webhook's `url` binding and
@@ -333,6 +337,10 @@ anywhere in the response through its `source`. Bodies are always JSON.
 - **`GET`.** A `GET` may have `path`, `query` and `header` inputs, but no
   `body` input. The JSON body of any other method holds only the `body`
   inputs.
+- **`file`.** _(planned for M40)_ An operation input may have the type `file`, which sends a file of the
+  subject record. The operation's `encoding` says how it goes: `multipart`, as a part of a
+  `multipart/form-data` body, or `json`, the default, encoded as base64 in the JSON body. An output may have the
+  type too, and the step writes the file to a `file` field. See [files in calls](process-execution.md#files-in-calls).
 - **`object` and `list`.** An `object` input has nested `fields`. A `list`
   input's items are objects with `fields`. Both need at least one nested field,
   and a scalar input has none. A nested field takes no `in`. Only inputs may be
