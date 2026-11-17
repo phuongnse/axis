@@ -39,7 +39,9 @@ and the [Studio settings](../reference/host-settings.md#studio-settings).
 - The server holds no schema rights, but the publisher holds every tenant's schema role, so it is a
   high-value host and runs no HTTP endpoint.
 - Activating the same content twice changes nothing, so a request that runs again does no harm.
-- Nothing commits Studio's edits to git.
+- Nothing commits Studio's edits to the application's source repository. Studio records each edit
+  as a revision in its own repository outside the folder, see
+  [revisions](../reference/revisions-and-drafts.md#the-repository).
 - There is no approval flow between two people, only the second role.
 - After a stored release is activated, the live release and the folder differ until the author
   fixes the folder.
