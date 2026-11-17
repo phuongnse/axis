@@ -124,7 +124,7 @@ export function StepRunPanel({
   // A step the definition names opens in the panel, as every reference opens what it names.
   const stepName = (name: unknown) =>
     typeof name === 'string' ? (
-      <AxisButton role="link" onClick={() => onOpen(name, null)}>
+      <AxisButton role="link" inline onClick={() => onOpen(name, null)}>
         {stepLabel(name)}
       </AxisButton>
     ) : (
@@ -158,7 +158,7 @@ export function StepRunPanel({
     const reason =
       transition?.on == null ? null : graphStep?.type === 'task' ? outcomeLabel(step, transition.on) : transition.on
     const runLink = (target: StepRun) => (
-      <AxisButton role="link" onClick={() => onOpen(target.step, target.number)}>
+      <AxisButton role="link" inline onClick={() => onOpen(target.step, target.number)}>
         {stepLabel(target.step)}
         {runs.filter((candidate) => candidate.step === target.step).length > 1
           ? ` · ${t('shell.stepRun.runNumber').replace('{number}', String(target.number))}`

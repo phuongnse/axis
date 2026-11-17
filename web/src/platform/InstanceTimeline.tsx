@@ -255,7 +255,7 @@ export function InstanceTimeline({
       ].join(' '),
       name: named(
         onOpenRun ? (
-          <AxisButton role="link" onClick={() => onOpenRun(run.step, run.number)}>
+          <AxisButton role="link" inline onClick={() => onOpenRun(run.step, run.number)}>
             {stepLabel(run.step)}
           </AxisButton>
         ) : (

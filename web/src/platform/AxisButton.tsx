@@ -26,6 +26,11 @@ export type AxisButtonProps =
       icon?: never
       /** A text trigger that opens a menu ends in a caret, see docs/reference/actions-and-controls.md#menus. */
       caret?: boolean
+      /**
+       * Proposed, see the review on #3650: a `link` inside a line of text or a value, such as a step a run came from,
+       * takes the line's height and no padding, as a link in text does, so it sits on the text's spacing.
+       */
+      inline?: boolean
     })
   | (Omit<Base, 'children' | 'aria-label'> & {
       role: 'icon'
@@ -246,7 +251,7 @@ export function AxisActionRow({
  * `secondary` and `destructive` are text buttons, `main` in `primaryText` and `destructive` in `dangerText`. `plain` is
  * a borderless text button in the text colour, for header controls such as the account button. `caret` adds a down
  * caret after the text of any text role. `link` is a button drawn as a link, in `primaryText`, for an action that goes to
- * no address. The role is not passed on to the DOM.
+ * no address; `inline` gives it a line of text's height, for a link inside text or a value. The role is not passed on to the DOM.
  */
 export function AxisButton(props: AxisButtonProps) {
   const { colour } = useDesignTokens()
@@ -254,7 +259,7 @@ export function AxisButton(props: AxisButtonProps) {
 
   if (props.role === 'icon') return <IconButton {...props} />
 
-  const { role, style, disabled, caret, children, ...rest } = props
+  const { role, style, disabled, caret, inline, children, ...rest } = props
   const body = {
     ...rest,
     children: caret
@@ -297,7 +302,14 @@ export function AxisButton(props: AxisButtonProps) {
           {...body}
           type="link"
           disabled={disabled}
-          style={{ ...tinted(colour.primaryText), paddingInline: 0, ...style }}
+          style={{
+            ...tinted(colour.primaryText),
+            paddingInline: 0,
+            ...(inline
+              ? { height: 'auto', padding: 0, border: 0, lineHeight: 'inherit', verticalAlign: 'baseline' }
+              : {}),
+            ...style,
+          }}
         />
       )
   }
