@@ -225,8 +225,8 @@ export function StepRunPanel({
     return terms
   }
 
-  // Proposed, see the review on #3650: Overview lists the run's facts one a line, each label beside its value, as AWS
-  // Step Functions lists a state's details: when it started and how long it took, then what it did by what it holds, a
+  // Proposed, see the review on #3650: Overview lists the run's facts as terms, each label above its value and each on a
+  // row of its own, as every page that shows one thing lists its facts: when it started and how long it took, then what it did by what it holds, a
   // task's assignee, due time, who completed it and with which outcome, a call's target and attempts, a sub-process's
   // instance, what a wait waits for; then where it came from and went to and why, and its trace ID. Its state is the tag
   // beside the panel's title, and its end is its start and its duration, so neither is a line of its own.
@@ -249,11 +249,18 @@ export function StepRunPanel({
       </AxisButton>
     )
     const terms: Term[] = [
-      { key: 'started', term: t('shell.stepRun.started'), value: <EventTime at={shown.startedAt} locale={locale} /> },
+      // When it started and how long it took belong together, so they share a row; every other fact has its own.
+      {
+        key: 'started',
+        term: t('shell.stepRun.started'),
+        value: <EventTime at={shown.startedAt} locale={locale} />,
+        width: 6,
+      },
       {
         key: 'duration',
         term: t('shell.stepRun.duration'),
         value: durationText(shown.startedAt, shown.finishedAt ?? now.toISOString(), locale),
+        width: 6,
       },
       ...shown.tasks.flatMap((task): Term[] => [
         { key: `assignee-${task.id}`, term: t('shell.stepRun.assignedTo'), value: assigneeText(task) },
@@ -340,7 +347,7 @@ export function StepRunPanel({
     ]
     return (
       <Flex vertical gap={spacing.md}>
-        <TermList terms={terms} layout="side" />
+        <TermList terms={terms} />
         <Flex gap={spacing.md} wrap>
           <AxisButton role="link" inline onClick={() => onShowInTimeline(step)}>
             {t('shell.inspector.graph.showInTimeline')}
@@ -572,7 +579,6 @@ export function StepRunPanel({
         term: t('shell.stepRun.notified'),
         value: (
           <TermList
-            layout="side"
             terms={[
               { key: 'to', term: t('shell.stepRun.sentTo'), value: made.notified.to.join(', ') },
               {
