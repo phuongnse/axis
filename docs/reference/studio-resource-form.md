@@ -221,7 +221,7 @@ release routes are in [release page](studio-workspace.md#release-page).
 `GET .../resource-activity` answers `{ items }`, one for each resource of the folder and of the modules the
 application uses, each `{ id, module, status, titles, descriptions, modifiedBy, modifiedAt }`. It is a route of
 its own, so the resource list stays free of the database. Studio's [kind lists](studio.md#kind-lists-and-module-resources)
-read it. Like every Studio route it answers `401` without a session and `403` without the author role.
+build on the same read through the [kind list route](#kind-list). Like every Studio route it answers `401` without a session and `403` without the author role.
 
 - **`status`** is `new`, `changed` or `published`, against the live release, comparing each file as canonical
   JSON. A file the release does not hold is new, and with no live release every file is. A file it holds that
@@ -239,3 +239,45 @@ read it. Like every Studio route it answers `401` without a session and `403` wi
   git or by hand shows the dash rather than the wrong person. A module resource's writer is whoever last
   wrote its layer. `modifiedBy` is the user's current profile name, else the name stored with the write.
   A record that fails is logged and never fails the write.
+
+### Kind list
+
+`GET /api/studio/apps/{application}/kinds/{kind}/resources` answers one page of a kind's list in Studio, see
+[kind lists](studio.md#kind-lists-and-module-resources), as `{ items, page, pageSize, totalCount }`. Its rows are the
+folder's own resources of the kind and the resources of that kind in the module versions the application pins, read as
+the [resource activity](#resource-activity) is, so each has its status and its last write. Like every Studio route it
+answers `401` without a session and `403` without the author role, and `404` for an unknown application. A kind with no
+resources answers an empty page.
+
+Each item is `{ id, title, locale, description, module, moduleLabel, status, modifiedBy, modifiedAt }`.
+
+- **`locale`** is the UI locale, as the query parameter `locale`, and is `en` when it is missing. Titles and
+  descriptions are chosen as `textIn` of Studio does: the text in the locale, else in `en`, a blank one counting as
+  missing.
+- **`title`** is the text the row shows and sorts by. A text resource's title is its locale tag, such as `vi`, and its
+  item has `locale` set, so the browser shows the language's name, which the server cannot name. Any other title is the
+  resource's label in the locale, then in `en`, then its name, then its kind's singular name, as
+  `shell.studio.nav.kindOne.<kind>` says, in the locale and then in `en`. A module resource's name has no `<module>/` prefix.
+- **`description`** is the resource's description in the locale, else null.
+- **`module` and `moduleLabel`** are the module's id and the label of the module version the application pins, else the
+  id, for a module resource, and null for the folder's own.
+- **`status`, `modifiedBy` and `modifiedAt`** are as in the resource activity.
+
+The route takes the record API's `page`, `pageSize`, `sort`, `search` and `filter`, as
+[paging and sorting](record-api.md#paging-and-sorting) defines them, through the
+[shared list query](shared-widgets.md#which-widget). The columns are `name`, `description`, `module` and `modifiedBy`,
+which are text, `status`, which is an enum of `new`, `changed` and `published`, and `modifiedAt`, which is a date.
+
+- **`sort`.** One column. With none, the rows are in name order, ignoring letter case, then by id. A sort on `name`
+  ignores letter case, one on `status` orders New, Changed, Published and puts a scenario, which has none, last
+  ascending, and one on `modifiedAt` orders by the full time.
+- **`search`.** Keeps the rows whose `name`, `description` or `module` contains the text, ignoring letter case. The
+  `module` it compares is the label. Status is a filter and not a search term, because the search compares stored values.
+- **`filter`.** The same groups and operators as the record API. A condition on `modifiedAt` takes a day,
+  `YYYY-MM-DD`, and compares the day of the write in UTC.
+- **`totalCount`.** How many rows match, before the page is cut. A page past the end is `200` with empty `items` and
+  the real `totalCount`.
+
+A `page`, `pageSize`, `sort`, `search` or `filter` that is invalid, including a `sort` or a `filter` on a column the list
+does not hold, is `400` with a problem whose `errors` name the parameter. Each request compiles the folder and reads
+the tenant database for every kind before it keeps one, as the resource activity route does.

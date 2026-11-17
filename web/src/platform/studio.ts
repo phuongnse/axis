@@ -578,28 +578,48 @@ export async function fetchStudioNames(application: string, signal?: AbortSignal
   return (await response.json()) as StudioNames
 }
 
-/** One resource's status and last write, as `GET .../resource-activity` answers it, see docs/reference/studio-resource-form.md#resource-activity. */
-export interface StudioResourceActivity {
+/**
+ * One row of a kind's list, as `GET .../kinds/{kind}/resources` answers it, see docs/reference/studio-resource-form.md#kind-list.
+ * `title` is the text the row shows, and sorts by on the server. `locale` is set for a text resource, which shows the language's name.
+ * `module` and `moduleLabel` are set for a module resource.
+ */
+export interface StudioKindListItem {
   id: string
+  title: string
+  locale: string | null
+  description: string | null
   module: string | null
+  moduleLabel: string | null
   status: 'new' | 'changed' | 'published' | null
-  titles: Record<string, string> | null
-  descriptions: Record<string, string> | null
   modifiedBy: string | null
   modifiedAt: string | null
 }
 
-/** Loads the status and last write of every resource the application uses, as `GET .../resource-activity` answers them. */
-export async function fetchStudioResourceActivity(
+/** One page of a kind's list, with how many rows match in all. */
+export interface StudioKindList {
+  items: StudioKindListItem[]
+  totalCount: number
+}
+
+/**
+ * Loads one page of a kind's list with its titles in `locale`. `query` is the record API's `page`, `pageSize`, `sort`,
+ * `search` and `filter` as a query string, see docs/reference/studio-resource-form.md#kind-list. A 401 shows the
+ * sign-in prompt and throws, as any other failure does.
+ */
+export async function fetchStudioKindList(
   application: string,
+  kind: string,
+  locale: string,
+  query: string,
   signal?: AbortSignal,
-): Promise<StudioResourceActivity[]> {
-  const path = `/api/studio/apps/${encodeURIComponent(application)}/resource-activity`
+): Promise<StudioKindList> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/kinds/${encodeURIComponent(kind)}/resources?locale=${encodeURIComponent(locale)}${query ? `&${query}` : ''}`
   const response = await studioFetch(path, { signal })
   if (!response.ok) {
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
-  return ((await response.json()) as { items: StudioResourceActivity[] }).items
+  const { items, totalCount } = (await response.json()) as StudioKindList
+  return { items, totalCount }
 }
 
 /** A role or connector slot of an installed module, with its label in each locale that has one. */

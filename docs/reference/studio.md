@@ -89,21 +89,22 @@ resource opens it alone, under its [name](studio-workspace.md#names), with its e
 
 - **One list for every kind**. A kind's list is the
   [standard table](actions-and-controls.md#tables), with the same columns for every kind: Name,
-  Description, Status, Last modified by and Last modified at. Every column always shows, and a cell with
-  no value shows the dash. Name is a link. A list does not show the inside of a resource, such as its
+  Description, Status, Last modified by and Last modified at. Every column shows unless Columns hides it, and a
+  cell with no value shows the dash. Name is a link. A list does not show the inside of a resource, such as its
   fields or references, a file name, or a count that leads nowhere.
-- **A module's resources**. The resources of the modules that the application uses are in the same list, from the
-  application's [names](authoring.md#names). Each is named by its label in the [resource activity](studio-resource-form.md#resource-activity),
-  else without the `<module>/` prefix, and has a neutral tag of its module's label from `GET /api/studio/catalog`, else the module's id.
-  Its description, status and last write come from the activity too. There is no Module column. A kind with no label in its format,
-  such as a policy, keeps its name. A module's resource has a status, as a new module version or a layer changes it.
-- **Status**. New, Changed or Published, from the
-  [resource activity route](studio-resource-form.md#resource-activity). While it loads the cell says so, and when it
-  fails it says Unavailable.
-- **Its controls** _(planned for M33)_. The list has Refresh and page sizes of 10, 20, 50 and 100, and sorts by
-  Name, Status, in the order New, Changed, Published, Last modified by and Last modified at. It searches
-  the name, the description, the module and the status, and filters on its columns in the browser, so the
-  module, a tag and not a column, is not a filter.
+- **The server builds the rows**. The [kind list route](studio-resource-form.md#kind-list) answers one page with
+  its names in the UI locale. A failed load shows one error above the table.
+- **A module's resources**. The resources of the modules that the application uses are in the same list. Each is
+  named by its label, else without the `<module>/` prefix, and has a neutral tag of its module's label, else the
+  module's id. There is no Module column. A kind with no label, such as a policy, keeps its name. A text resource
+  shows its language, such as Vietnamese. A module's resource has a status, as a new module version or a layer changes it.
+- **Status**. New, Changed or Published, as the [resource activity](studio-resource-form.md#resource-activity) reads
+  it, and none for a scenario. The whole list loads at once, so the cell never says it is loading.
+- **Its controls**. Search, Filter, Columns, Refresh, a pager that says "1–20 of 45" with page sizes of 10, 20, 50
+  and 100, and a sort on Name, Status, Last modified by and Last modified at, all kept in the address and done on the
+  server. With no sort the rows are in name order. Description does not sort, because it is long text. Search looks in
+  the name, the description and the module, and Status is a filter, not a search term. The module, a tag and not a
+  column, is not a filter.
 
 A module resource opens in its kind's editor with the application's layer applied, as
 [customization layers in Studio](customization-layers.md#in-studio) describes. A module data source, rule, trigger,

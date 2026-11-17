@@ -1,37 +1,28 @@
-import { Button, Descriptions, Flex, Result, Tag, Typography } from 'antd'
+import { Button, Descriptions, Flex, Result, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { AxisActionRow } from '../platform/AxisButton'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
-import { sortByName } from '../platform/listOrder'
 import { ShellSidebar } from '../platform/shellSidebar'
 import { SiteMark } from '../platform/SiteMark'
 import {
   fetchStudioApps,
-  fetchStudioCatalog,
   fetchStudioDiagnostics,
   fetchStudioNames,
   fetchStudioResource,
-  fetchStudioResourceActivity,
   fetchStudioResources,
-  groupByKind,
   moduleResources,
-  type ModuleResourceItem,
   resourceTitle,
   ServerUnreachableError,
   type StudioApplication,
-  type StudioCatalog,
   studioAppDescription,
   studioAppTitle,
   type StudioDiagnostic,
   type StudioNames,
   type StudioResource,
-  type StudioResourceActivity,
   type StudioResourceItem,
-  textIn,
   waitForServer,
 } from '../platform/studio'
 import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
@@ -47,6 +38,7 @@ import { useHomeGrid } from './homeGrid'
 import { HomeTileStyle } from './HomeTileStyle'
 import { StudioEditor, type StudioEditorHandle } from './StudioEditor'
 import { StudioHistory, StudioRevisionPage } from './StudioHistory'
+import { StudioKindList } from './StudioKindList'
 import { ModuleResourceView } from './StudioModuleView'
 import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
@@ -59,23 +51,6 @@ import { StudioResourceMenu } from './StudioResourceMenu'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
 import { studioActiveEntry, studioNavigation } from './studioNavigation'
 import { StudioSidebar } from './StudioSidebar'
-
-/**
- * A row of a kind's list: one of the application's own resources, or a module resource of the application's modules.
- * `module` is the module's id for a module resource, else `null`. `title` is the text the row shows and sorts by.
- */
-interface KindListRow {
-  id: string
-  title: string
-  descriptions: Readonly<Record<string, string>> | null | undefined
-  module: string | null
-}
-
-/** A module resource's name without its `<module>/` prefix, which shows when its activity has no label. */
-function unprefixed(item: ModuleResourceItem): string {
-  const prefix = `${item.module}/`
-  return item.name.startsWith(prefix) ? item.name.slice(prefix.length) : item.name
-}
 
 /** The tiles of the applications Studio may edit, in the UI locale with `en` as the fallback. Each opens its application. */
 function StudioApplicationTiles({ apps }: { apps: StudioApplication[] }) {
@@ -136,9 +111,6 @@ type FolderState =
 /** The names of one application, or null when they did not load. `application` says which one they were loaded for. */
 type NamesState = { application: string; names: StudioNames | null }
 
-/** The status and last write of one application's resources, or `failed`. `application` says which one they were loaded for. */
-type ActivityState = { application: string; items: StudioResourceActivity[] | 'failed' }
-
 /** The `application.json` of one application, or null when it did not load. `application` says which one it was loaded for. */
 type ManifestState = { application: string; resource: StudioResource | null }
 
@@ -181,12 +153,10 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
  * reconnect message shows. A failed scenario in the test results opens at its failing step, as a diagnostic does.
  * A process step that a diagnostic of the open resource names is marked on its graph.
- * A kind's list is one table with the columns Name, Description, Status, Last modified by and Last modified at, whose Name is a link. Its status and
- * last write come from the resource activity, which loads with the application and again after a save, a text write, a delete and a reconnect,
- * as the names do. While it reloads, the table keeps its last answer, and the Status cell says it is loading only until the first answer arrives.
- * The module resources of that kind that the application uses join the table, from the names, sorted with the application's own by the shown name.
- * A module resource is named by its label in the activity, else by its name without the `<module>/` prefix, and has a neutral tag beside the
- * name with its module's label from `GET /api/studio/catalog`, else the module's id. The catalog loads once an application is open, and again after a reconnect.
+ * A kind's list is `StudioKindList`: one table of the application's own resources of the kind and the module resources of that kind that
+ * the application uses, with the columns Name, Description, Status, Last modified by and Last modified at, whose Name is a link. The server
+ * builds and pages the rows, see docs/reference/studio.md#kind-lists-and-module-resources. The list loads again after a save, a text write,
+ * a delete and a reconnect, as the names do. A module resource has a neutral tag beside its name with its module's label.
  * A module resource of every kind but a contract and a scenario opens in its editor with the application's layer applied
  * and every input on, with no JSON tab, Delete, migration questions, Uses or Used by lists: an entity in the entity
  * designer, a process in the process designer, and a data source, rule, trigger, sequence and event in the schema
@@ -253,10 +223,8 @@ function StudioWorkspace() {
   const [previewHost, setPreviewHost] = useState<string | null>(null)
   const [folderRevision, setFolderRevision] = useState(0)
   const [namesState, setNamesState] = useState<NamesState>()
-  const [activityState, setActivityState] = useState<ActivityState>()
   const [manifestState, setManifestState] = useState<ManifestState>()
   const [manifestReload, setManifestReload] = useState(0)
-  const [catalog, setCatalog] = useState<StudioCatalog | null>(null)
   const publishing = useRef<StudioPublishingHandle>(null)
   const editor = useRef<StudioEditorHandle>(null)
   const [problemsOpen, setProblemsOpen] = useState(false)
@@ -346,53 +314,6 @@ function StudioWorkspace() {
     return () => controller.abort()
   }, [application, generation, folderRevision, lost])
 
-  useEffect(() => {
-    if (application === null) {
-      return
-    }
-    const controller = new AbortController()
-    fetchStudioResourceActivity(application, controller.signal).then(
-      (items) => setActivityState({ application, items }),
-      (error: unknown) => {
-        if (controller.signal.aborted) {
-          return
-        }
-        if (error instanceof ServerUnreachableError) {
-          lost()
-          return
-        }
-        console.warn(`Loading the resource activity of '${application}' failed`, error)
-        setActivityState({ application, items: 'failed' })
-      },
-    )
-    return () => controller.abort()
-  }, [application, generation, folderRevision, lost])
-
-  // The catalog is the same for every application, so it loads once an application is open, and again after a reconnect.
-  // Null when it did not load. Only a kind's list reads it, and that list exists only in an open application.
-  const applicationOpen = application !== null
-  useEffect(() => {
-    if (!applicationOpen) {
-      return
-    }
-    const controller = new AbortController()
-    fetchStudioCatalog(controller.signal).then(
-      (answer) => setCatalog(answer),
-      (error: unknown) => {
-        if (controller.signal.aborted) {
-          return
-        }
-        if (error instanceof ServerUnreachableError) {
-          lost()
-          return
-        }
-        console.warn('Loading the Studio catalog failed', error)
-        setCatalog(null)
-      },
-    )
-    return () => controller.abort()
-  }, [applicationOpen, generation, lost])
-
   const manifestId = useMemo(
     () =>
       (folder?.application === application && 'resources' in folder ? folder.resources : []).find(
@@ -435,125 +356,7 @@ function StudioWorkspace() {
         : [],
     [loaded, resourceId],
   )
-  const groups = useMemo(
-    () =>
-      kind === null
-        ? []
-        : groupByKind(resources, locale, (item) => resourceTitle(item, locale, t)).filter(
-            (group) => group.kind === kind,
-          ),
-    [resources, kind, locale, t],
-  )
   const allModuleGroups = useMemo(() => moduleResources(names, '', locale), [names, locale])
-  const moduleGroups = useMemo(
-    () => (kind === null ? [] : allModuleGroups.filter((group) => group.kind === kind)),
-    [allModuleGroups, kind],
-  )
-  // Undefined while the activity loads, 'failed' when it did not load, else each resource by its id in lower case.
-  const activity = useMemo(() => {
-    if (activityState?.application !== application) {
-      return undefined
-    }
-    return activityState.items === 'failed'
-      ? 'failed'
-      : new Map(activityState.items.map((item) => [item.id.toLowerCase(), item]))
-  }, [activityState, application])
-  /** A resource's activity once it has loaded, or undefined while it loads and after it fails. */
-  const activityOf = useCallback(
-    (id: string) => (activity instanceof Map ? activity.get(id.toLowerCase()) : undefined),
-    [activity],
-  )
-  const timeFormat = useMemo(
-    () => new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' }),
-    [locale],
-  )
-  const { colour } = useDesignTokens()
-  const moduleLabels = useMemo(
-    () => new Map((catalog?.modules ?? []).map((module) => [module.id, module.label])),
-    [catalog],
-  )
-  // The application's own resources and the module resources of this kind, sorted together by the shown name.
-  const kindRows = useMemo<KindListRow[]>(() => {
-    const own = (groups[0]?.items ?? []).map((item): KindListRow => ({
-      id: item.id,
-      title: resourceTitle(item, locale, t),
-      descriptions: item.descriptions,
-      module: null,
-    }))
-    const shared = (moduleGroups[0]?.items ?? []).map((item): KindListRow => {
-      const resource = activityOf(item.id)
-      return {
-        id: item.id,
-        title: textIn(resource?.titles, locale) ?? unprefixed(item),
-        descriptions: resource?.descriptions,
-        module: item.module,
-      }
-    })
-    return sortByName([...own, ...shared], (row) => row.title, locale)
-  }, [groups, moduleGroups, activityOf, locale, t])
-  const listColumns: AxisColumn<KindListRow>[] = [
-    {
-      key: 'name',
-      kind: 'freeText',
-      title: t('shell.studio.list.name'),
-      render: (_value, row) => (
-        <Flex gap="small" align="center" wrap>
-          <Link data-testid={`studio-resource-${row.id}`} to={studioResourceAddress(application!, row.id)}>
-            {row.title}
-          </Link>
-          {row.module !== null && (
-            <Tag
-              variant="outlined"
-              style={{
-                color: colour.textMuted,
-                borderColor: colour.border,
-                background: 'transparent',
-                marginInlineEnd: 0,
-              }}
-            >
-              {moduleLabels.get(row.module) ?? row.module}
-            </Tag>
-          )}
-        </Flex>
-      ),
-    },
-    {
-      key: 'description',
-      kind: 'freeText',
-      title: t('shell.studio.list.description'),
-      render: (_value, row) => textIn(row.descriptions, locale) ?? null,
-    },
-    {
-      key: 'status',
-      kind: 'fixed',
-      title: t('shell.studio.list.status'),
-      render: (_value, row) => {
-        if (activity === undefined) {
-          return t('shell.studio.list.status.loading')
-        }
-        if (activity === 'failed') {
-          return t('shell.studio.list.status.unavailable')
-        }
-        const status = activityOf(row.id)?.status
-        return status ? t(`shell.studio.list.status.${status}`) : null
-      },
-    },
-    {
-      key: 'modifiedBy',
-      kind: 'freeText',
-      title: t('shell.studio.list.modifiedBy'),
-      render: (_value, row) => activityOf(row.id)?.modifiedBy ?? null,
-    },
-    {
-      key: 'modifiedAt',
-      kind: 'fixed',
-      title: t('shell.studio.list.modifiedAt'),
-      render: (_value, row) => {
-        const modifiedAt = activityOf(row.id)?.modifiedAt
-        return modifiedAt ? timeFormat.format(new Date(modifiedAt)) : null
-      },
-    },
-  ]
   const selected = resourceId === null ? undefined : resources.find((item) => item.id === resourceId.toLowerCase())
   const selectedModuleItem =
     resourceId === null || selected !== undefined
@@ -894,13 +697,7 @@ function StudioWorkspace() {
                       ) : undefined
                     }
                   />
-                  <AxisTable<KindListRow>
-                    testId={`studio-group-${kind}`}
-                    columns={listColumns}
-                    rowKey={(row) => row.id}
-                    dataSource={kindRows}
-                    pagination={false}
-                  />
+                  <StudioKindList key={kind} application={application!} kind={kind} folderRevision={folderRevision} />
                 </Flex>
               ) : (
                 <StudioOverview

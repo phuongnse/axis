@@ -101,6 +101,7 @@ namespace Axis.Server.Studio;
 /// copies. It reads the tenant database and changes nothing. It takes no list parameters: the band, Publishing and the release
 /// page read the whole history from it, and the Releases table pages <c>GET /api/studio/apps/{application}/release-list</c> instead.
 /// <c>GET /api/studio/apps/{application}/releases/{number}</c> and the release list are in <see cref="StudioReleaseEndpoints"/>.
+/// <c>GET /api/studio/apps/{application}/kinds/{kind}/resources</c>, the page of a kind's list, is in <see cref="StudioKindListEndpoints"/>.
 /// </summary>
 internal static class StudioEndpoints
 {
@@ -134,6 +135,7 @@ internal static class StudioEndpoints
         endpoints.MapStudioApplicationEndpoints();
         endpoints.MapStudioSettingsEndpoints();
         endpoints.MapStudioActivityEndpoints();
+        endpoints.MapStudioKindListEndpoints();
         endpoints.MapStudioPackageFileEndpoints();
     }
 

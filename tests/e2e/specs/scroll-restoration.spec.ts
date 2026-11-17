@@ -17,18 +17,15 @@ const scrollY = (page: Page) => page.evaluate(() => window.scrollY)
 test.describe('Studio on a copy of its own', () => {
   let copy: string
   let server: Awaited<ReturnType<typeof startServer>>
-  const roleIds: string[] = []
 
   test.beforeAll(async () => {
     copy = await mkdtemp(path.join(os.tmpdir(), 'axis-scroll-'))
     await cp(purchaseRequests, copy, { recursive: true })
     for (let index = 0; index < 40; index++) {
       const name = `scroll-${String(index).padStart(2, '0')}`
-      const id = randomUUID()
-      roleIds.push(id)
       await writeFile(
         path.join(copy, 'roles', `${name}.json`),
-        JSON.stringify({ id, kind: 'role', name, formatVersion: 1, label: { textKey: 'role.employee' } }),
+        JSON.stringify({ id: randomUUID(), kind: 'role', name, formatVersion: 1, label: { textKey: 'role.employee' } }),
       )
     }
     server = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Folders__0: copy })
@@ -44,10 +41,16 @@ test.describe('Studio on a copy of its own', () => {
   test('an author goes Back from a resource to the same place in a long kind list', async ({ page }) => {
     await useSession(page, 'author')
     await page.setViewportSize({ width: 1280, height: 600 })
-    const late = roleIds[roleIds.length - 2]
-    const lateButton = page.getByTestId(`studio-resource-${late}`)
+    const rows = page.locator('[data-testid^="studio-resource-"]')
 
-    await page.goto(`${server.url}/studio?app=PurchaseRequests&kind=role`)
+    // A kind's list shows 20 resources a page, so the page size of 100 keeps all 45 roles in one long page.
+    await page.goto(`${server.url}/studio?app=PurchaseRequests&kind=role&pageSize=100`)
+    // The added roles share one label, so the server orders them by id. The row to go back to is the one the table
+    // shows second to last, whatever its id is.
+    await expect.poll(() => rows.count()).toBeGreaterThan(40)
+    const lateTestId = await rows.nth((await rows.count()) - 2).getAttribute('data-testid')
+    const late = lateTestId!.slice('studio-resource-'.length)
+    const lateButton = page.getByTestId(lateTestId!)
     await lateButton.scrollIntoViewIfNeeded()
     const before = await scrollY(page)
     expect(before).toBeGreaterThan(0)
@@ -57,7 +60,7 @@ test.describe('Studio on a copy of its own', () => {
     await expect.poll(() => scrollY(page)).toBe(0)
 
     await page.goBack()
-    await expect(page).toHaveURL(/[?&]kind=role$/)
+    await expect(page).toHaveURL(/[?&]kind=role&pageSize=100$/)
     await expect(lateButton).toBeVisible()
     await expect.poll(() => scrollY(page)).toBe(before)
   })
