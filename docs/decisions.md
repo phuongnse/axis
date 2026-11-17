@@ -30,7 +30,7 @@ the files agree, title and status included.
 | [D16](decisions/d16-expression-language.md) | Expression language | **Agreed** |
 | [D17](decisions/d17-entity-logic-and-child-collections.md) | Entity logic and child collections | **Agreed** |
 | [D18](decisions/d18-data-sources.md) | Data sources | **Agreed** |
-| [D19](decisions/d19-process-resource-and-worker-host.md) | Process resource and worker host | **Agreed** |
+| D19 | Process resource and worker host | Superseded by [D155](decisions/d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md), [last text](https://github.com/phuongnse/axis/blob/2640788b185b96029678960a3ae7799f48c0a350/docs/decisions/d19-process-resource-and-worker-host.md) |
 | [D20](decisions/d20-human-tasks-task-inbox-and-forms.md) | Human tasks, task inbox and forms | **Agreed** |
 | [D21](decisions/d21-development-test-users-audit-records-and-sequences.md) | Development test users, audit records and sequences | **Agreed** |
 | [D22](decisions/d22-current-time-and-time-zones.md) | Current time and time zones | **Agreed** |
@@ -80,7 +80,7 @@ the files agree, title and status included.
 | [D66](decisions/d66-a-visual-form-designer-for-form-resources.md) | A visual form designer for form resources | **Agreed** |
 | [D67](decisions/d67-live-widget-previews-in-the-design-system.md) | Live widget previews in the design system | **Agreed** |
 | [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) | Issues of several milestones run at once | **Agreed** |
-| [D69](decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md) | Timer, wait for event and sub-process steps, loops and create record | **Agreed** |
+| D69 | Timer, wait for event and sub-process steps, loops and create record | Superseded by [D155](decisions/d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md), [last text](https://github.com/phuongnse/axis/blob/2640788b185b96029678960a3ae7799f48c0a350/docs/decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md) |
 | [D70](decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md) | Processes without a subject, scheduled jobs and delete triggers | **Agreed** |
 | [D71](decisions/d71-task-deadlines-escalation-claim-and-reassign.md) | Task deadlines, escalation, claim and reassign | **Agreed** |
 | [D72](decisions/d72-a-delivery-limit-and-dead-letters.md) | A delivery limit and dead letters | **Agreed** |
@@ -166,3 +166,4 @@ the files agree, title and status included.
 | [D152](decisions/d152-every-screen-says-where-things-stand-with-at-most-one-main-action.md) | Every screen says where things stand, with at most one main action | **Agreed** |
 | [D153](decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md) | A person's table views and columns are kept on the server, and the address still wins | **Agreed** |
 | [D154](decisions/d154-every-capability-an-organization-needs-has-a-home-and-a-capability-map-keeps-it-so.md) | Every capability an organization needs has a home, and a capability map keeps it so | **Agreed** |
+| [D155](decisions/d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md) | Processes run paths at once, repeat steps, give tasks to many people and take error paths | **Agreed** |

@@ -6,7 +6,7 @@ Status: **Agreed**
 
 Applications need things that happen to start work: a step that announces an outcome, a record that
 changes, a time of day, as [what applications use most](../domain/knowledge.md#what-applications-use-most)
-says. [D19](d19-process-resource-and-worker-host.md) runs a process for one record, with one running
+says. [D155](d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md) runs a process for one record, with one running
 instance per process and record. A start must happen at most once after a crash, and a broken
 trigger must not block a user's save.
 
