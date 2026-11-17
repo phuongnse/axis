@@ -9,6 +9,7 @@ import { durationText, stepRuns, type StepRun } from './instanceRuns'
 import { filled } from './instanceStatus'
 import { ResolveDialog } from './ResolveDialog'
 import { useText } from './texts'
+import { TimeAgo } from './TimeAgo'
 
 /** One row of the timeline, with the rows inside it, which the table folds. */
 interface TimelineRow {
@@ -30,7 +31,6 @@ interface InstanceTimelineProps {
   stepLabel: (name: string) => string
   /** The label of a transition out of a step, such as a task's outcome, from the process's texts, else its name. */
   outcomeLabel: (step: string, name: string) => string
-  time: (name: string, value: string | null) => ReactNode
   /** Shows only the runs of this step, until Show all clears it. */
   only: string | null
   onShowAll: () => void
@@ -52,7 +52,6 @@ export function InstanceTimeline({
   locale,
   stepLabel,
   outcomeLabel,
-  time,
   only,
   onShowAll,
   onChanged,
@@ -301,7 +300,8 @@ export function InstanceTimeline({
       key: 'startedAt',
       kind: 'fixed',
       title: t('shell.inspector.startedAt'),
-      render: (_v, row) => (row.startedAt === null ? null : time('startedAt', row.startedAt)),
+      // Proposed: a run's start is how long ago it was, the exact time its tooltip, see the review on #3650.
+      render: (_v, row) => (row.startedAt === null ? null : <TimeAgo at={row.startedAt} locale={locale} />),
     },
     {
       // Proposed: how long a run, a call or an attempt lasted is its Duration, the one term for it, see the review on

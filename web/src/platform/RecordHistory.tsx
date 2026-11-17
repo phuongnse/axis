@@ -11,6 +11,7 @@ import { PartRule, SectionPart } from './SectionParts'
 import { fetchHistory, historyPageSize, type HistoryItem, type HistoryPage } from './records'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
+import { TimeAgo } from './TimeAgo'
 import { useDesignTokens } from './themeMode'
 
 interface RecordHistoryProps {
@@ -83,7 +84,6 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
   const wantsLinks = state.result?.items.some((item) => typeof item.inspectPath === 'string') ?? false
   const inspectors = useInspectorPages(sitePath, pages, wantsLinks)
 
-  const time = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' })
   const items = state.result?.items ?? []
   const totalCount = state.result?.totalCount ?? 0
 
@@ -119,7 +119,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
                         </Typography.Text>
                         <Typography.Text>{actorOf(item, t)}</Typography.Text>
                         <Typography.Text type="secondary">
-                          <time dateTime={item.occurredAt}>{time.format(new Date(item.occurredAt))}</time>
+                          <TimeAgo at={item.occurredAt} locale={locale} />
                         </Typography.Text>
                         {target !== null && inspectorPage !== undefined && (
                           <Link

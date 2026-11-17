@@ -197,7 +197,7 @@ export function InstanceDetailView({
       : stepsByName.get(step)?.transitions.find((transition) => transition.on === name)?.labelKey
     return labelKey ? t(labelKey) : name
   }
-  const status = useInstanceStatus(instance, stepLabel, time)
+  const status = useInstanceStatus(instance, stepLabel, locale)
   const [only, setOnly] = useState<string | null>(null)
 
   // Proposed, see the review on #3650: the instance is headed by its process, its state a tag beside it and its kind the
@@ -348,7 +348,6 @@ export function InstanceDetailView({
                     locale={locale}
                     stepLabel={stepLabel}
                     outcomeLabel={outcomeLabel}
-                    time={time}
                     only={only}
                     onShowAll={() => setOnly(null)}
                     onChanged={onChanged}

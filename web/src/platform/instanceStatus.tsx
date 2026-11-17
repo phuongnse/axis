@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from 'react'
 import type { InstanceDetail } from './inspection'
 import { stepRuns } from './instanceRuns'
 import { useText } from './texts'
+import { TimeAgo } from './TimeAgo'
 
 /** One text whose placeholders, such as `{process}`, take a node, so a link stays inside its sentence. */
 export function filled(text: string, values: Record<string, ReactNode>): ReactNode {
@@ -20,7 +21,7 @@ export function filled(text: string, values: Record<string, ReactNode>): ReactNo
 export function useInstanceStatus(
   instance: InstanceDetail,
   stepLabel: (name: string) => string,
-  time: (name: string, value: string | null) => ReactNode,
+  locale: string,
 ): { kind: 'error' | 'info'; text: ReactNode } | null {
   const t = useText()
   if (instance.endedAt !== null && instance.state !== 'failed') {
@@ -31,7 +32,7 @@ export function useInstanceStatus(
   if (current === undefined) {
     return null
   }
-  const since = time('since', current.startedAt)
+  const since = <TimeAgo at={current.startedAt} locale={locale} />
   if (instance.state === 'failed') {
     const call = current.calls.findLast((candidate) => candidate.state === 'failed')
     const error = current.error ?? call?.attempts.at(-1)?.error ?? null
