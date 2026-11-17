@@ -56,7 +56,7 @@ export function Expression({
 
 /**
  * A field with a picker over the application's names of one kind, or a plain box while the names have not loaded. An
- * empty `help` draws no help line.
+ * empty `help` draws no help line. `required` marks the field, as `AxisField` does, and the screen checks the value.
  */
 export function NamePicker({
   pointer,

@@ -1101,7 +1101,7 @@ test.describe('the author builds the asset management application with Studio on
     await page
       .getByTestId('studio-field-/steps/0/to/0')
       .locator('label')
-      .filter({ has: page.getByRole('radio', { name: 'Role', exact: true }) })
+      .filter({ has: page.getByRole('radio', { name: /^Role/ }) })
       .click()
     await pickLabelled(page, 'studio-field-/steps/0/to/0/role', 'roles', 'asset-manager')
     await page

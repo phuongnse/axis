@@ -68,6 +68,10 @@ const drawnPaths = [
   'steps.escalations.notify.message.values',
   'steps.escalations.notify.open.parameters',
   'steps.escalations.notify.to',
+  'steps.escalations.notify.to.kind',
+  'steps.escalations.notify.to.kind.user',
+  'steps.escalations.notify.to.kind.role',
+  'steps.escalations.notify.to.kind.email',
   'steps.escalations.notify.to.user',
   'steps.escalations.notify.to.role',
   'steps.escalations.notify.to.email',
@@ -102,6 +106,12 @@ const drawnPaths = [
   'steps.fields',
   'steps.entity',
   'steps.input',
+  'steps.input.name',
+  'steps.input.kind',
+  'steps.input.kind.value',
+  'steps.input.kind.object',
+  'steps.input.kind.list',
+  'steps.input.value',
   'steps.input.fields',
   'steps.input.from',
   'steps.output',
@@ -112,6 +122,10 @@ const drawnPaths = [
   'steps.message.values',
   'steps.open.parameters',
   'steps.to',
+  'steps.to.kind',
+  'steps.to.kind.user',
+  'steps.to.kind.role',
+  'steps.to.kind.email',
   'steps.to.user',
   'steps.to.role',
   'steps.to.email',
@@ -437,7 +451,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     const notify = '/steps/1/escalations/0/notify'
     await userEvent.click(field(`${notify}/to`).getByRole('button', { name: 'Add recipient' }))
     // The radio input of a button group has no pointer events, so the click goes to its label.
-    await userEvent.click(field(`${notify}/to/0`).getByRole('radio', { name: 'Role' }).closest('label')!)
+    await userEvent.click(field(`${notify}/to/0`).getByRole('radio', { name: /^Role/ }).closest('label')!)
     await chooseOption('finance-reviewer', screen.getByTestId(`studio-field-${notify}/to/0/role`))
     await userEvent.click(field(`${notify}/channels`).getByRole('checkbox', { name: 'In-app' }))
     await userEvent.type(field(`${notify}/message/subject`).getByRole('textbox', { name: 'Text key' }), 'task.approve')
@@ -858,6 +872,17 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
       expect(at(pointer).getByRole('group', { name: escalation(path) })).toHaveAccessibleDescription(
         escalation(`${path}.help`),
       )
+    })
+
+    it('draws the recipient type of each recipient as a radio group, each option with its help', () => {
+      for (const row of ['to/0', 'to/1', 'to/2']) {
+        const group = at(row).getByRole('radiogroup', { name: escalation('to.kind') })
+        expect(group).toHaveAccessibleDescription(escalation('to.kind.help'))
+        for (const option of ['user', 'role', 'email']) {
+          const radio = within(group).getByRole('radio', { name: new RegExp(`^${escalation(`to.kind.${option}`)}`) })
+          expect(radio).toHaveAccessibleDescription(escalation(`to.kind.${option}.help`))
+        }
+      }
     })
   })
 

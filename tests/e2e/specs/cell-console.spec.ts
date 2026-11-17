@@ -77,6 +77,8 @@ test('a platform operator signs in with a password and a code, sees the tenants 
   await expectNoViolations(page)
 
   await navigate(page, 'Tenants')
+  // Wait for the Tenants page before typing, or the search lands on the Jobs page and aborts the tenants request.
+  await expect(page.getByTestId('cell-tenants')).toBeVisible()
   const search = page.getByRole('searchbox', { name: 'Search', exact: true })
   await search.fill(tenant)
   await search.press('Enter')
