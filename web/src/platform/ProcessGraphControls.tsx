@@ -6,8 +6,8 @@ import {
   MinusOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
-import { MiniMap, Panel, useReactFlow, useViewport } from '@xyflow/react'
-import { Select, Tooltip } from 'antd'
+import { MiniMap, Panel, useReactFlow } from '@xyflow/react'
+import { Select } from 'antd'
 import { useEffect, useState, type RefObject } from 'react'
 import { AxisButton } from './AxisButton'
 import { useText } from './texts'
@@ -18,10 +18,10 @@ const moving = 300
 
 /**
  * Proposed, see the review on #3650: the controls of a process graph too large to read whole, Axis's own icon buttons
- * with their names in the reader's language as tooltips: Zoom in, Zoom out, the zoom level, which returns to actual
- * size, Show the whole process, Go to the current step where there is one, and Full screen, which gives the graph the
- * whole screen through the browser's full screen until Esc or Exit full screen. Find a step moves the view to a step
- * chosen by its label and marks it. The keys +, −, 1, 0 and F do the same while the graph has the focus. An overview
+ * with their names in the reader's language as tooltips: Zoom in, Zoom out, Show the whole process, Go to the current
+ * step where there is one, and Full screen, which gives the graph the whole screen through the browser's full screen
+ * until Esc or Exit full screen. Find a step moves the view to a step chosen by its label and marks it. The keys +, −,
+ * 0 and F do the same while the graph has the focus. An overview
  * at the corner, as Camunda Operate and Signavio show a long diagram, marks the part in view and moves the view where
  * it is dragged or clicked.
  */
@@ -38,8 +38,7 @@ export function ProcessGraphControls({
   /** Called with the step Find a step moved to, so the graph marks it. */
   onFound: (id: string) => void
 }) {
-  const { zoomIn, zoomOut, zoomTo, fitView } = useReactFlow()
-  const { zoom } = useViewport()
+  const { zoomIn, zoomOut, fitView } = useReactFlow()
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
   const [full, setFull] = useState(false)
@@ -58,7 +57,6 @@ export function ProcessGraphControls({
     }
   }
 
-  const actualSize = () => void zoomTo(1, { duration: moving })
   const fitAll = () => void fitView({ padding: 0.1, duration: moving })
   const find = (id: string) => {
     void fitView({ nodes: [{ id }], minZoom: 1, maxZoom: 1, duration: moving })
@@ -80,7 +78,6 @@ export function ProcessGraphControls({
         '+': () => void zoomIn({ duration: moving }),
         '=': () => void zoomIn({ duration: moving }),
         '-': () => void zoomOut({ duration: moving }),
-        '1': actualSize,
         '0': fitAll,
         f: toggle,
         F: toggle,
@@ -167,18 +164,6 @@ export function ProcessGraphControls({
             aria-keyshortcuts="-"
             onClick={() => void zoomOut({ duration: moving })}
           />
-          <Tooltip title={t('shell.graph.actualSize')}>
-            <AxisButton
-              role="plain"
-              size="small"
-              aria-label={`${Math.round(zoom * 100)}%, ${t('shell.graph.actualSize')}`}
-              aria-keyshortcuts="1"
-              style={{ fontVariantNumeric: 'tabular-nums', fontSize: 12, paddingInline: 0 }}
-              onClick={actualSize}
-            >
-              {`${Math.round(zoom * 100)}%`}
-            </AxisButton>
-          </Tooltip>
           <AxisButton
             role="icon"
             nameKey="shell.graph.fit"

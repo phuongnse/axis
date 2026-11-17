@@ -677,7 +677,6 @@
   "shell.graph.fit": "Xem toàn bộ quy trình",
   "shell.graph.current": "Tới bước hiện tại",
   "shell.graph.find": "Tìm bước",
-  "shell.graph.actualSize": "Cỡ thật",
   "shell.graph.fullScreen": "Toàn màn hình",
   "shell.graph.exitFullScreen": "Thoát toàn màn hình",
   "shell.graph.overview": "Toàn cảnh quy trình",

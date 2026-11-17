@@ -515,8 +515,8 @@ export function ProcessGraphCanvas({
           onEdgeClick={onTransitionClick ? (_, edge) => onTransitionClick(edge.id) : undefined}
         >
           <FitOnLayout layout={layout} focus={focus} />
-          {/* A dot grid under the graph, in the subtle border colour, as a canvas has. */}
-          <Background variant={BackgroundVariant.Dots} gap={16} size={1} color={colour.borderSubtle} />
+          {/* A grid of fine lines under the graph, in the divider colour, as a canvas has. */}
+          <Background variant={BackgroundVariant.Lines} gap={24} lineWidth={1} color={colour.divider} />
           {controls && (
             <ProcessGraphControls
               area={area}
