@@ -573,4 +573,5 @@ each binding.
   type `money`, and also `currency`, the fixed currency code, or `currencyColumn`, the name of the
   column that holds the code. A measure's `currencyColumn` is a group column, and a projected or
   group column's is the sibling column that reads the currency field on the same record. Both are
-  left out of the JSON when they do not apply.
+  left out of the JSON when they do not apply. A measure column has `"measure": true`, and every other
+  column leaves the property out.

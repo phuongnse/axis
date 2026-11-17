@@ -403,12 +403,12 @@ public static class ApplicationSites
         };
         if (field is null || type != FieldTypes.Name(FieldType.Money))
         {
-            return new(measure.Name, type, null, null, null, null);
+            return new(measure.Name, type, null, null, null, null, Measure: true);
         }
 
         return field.CurrencyField is null
-            ? new(measure.Name, type, null, null, null, null, Currency: field.Currency)
-            : new(measure.Name, type, null, null, null, null, CurrencyColumn: CurrencyColumnOf(aggregate.GroupBy, measure.Field!, field.CurrencyField)?.Name);
+            ? new(measure.Name, type, null, null, null, null, Currency: field.Currency, Measure: true)
+            : new(measure.Name, type, null, null, null, null, CurrencyColumn: CurrencyColumnOf(aggregate.GroupBy, measure.Field!, field.CurrencyField)?.Name, Measure: true);
     }
 
     // The column that reads the currency field on the same record as the money field: the same
