@@ -14,6 +14,7 @@ The rest of the process reference is on these pages:
 | [Task API](task-api.md)                       | Listing, reading and completing tasks                                                            |
 | [Task deadlines and claims](task-deadlines.md) | Escalations, deadlines, overdue tasks, claim, release and reassign                               |
 | [Process flow](process-flow.md)               | Timer, wait for event and sub-process steps, loops, `createRecord`, processes without a subject |
+| [Process blocks](process-blocks.md)           | _(planned for M38)_ Parallel and repeat steps, their structure, limits and compile checks        |
 | [Notifications](notifications.md)             | The `notify` operation, in-app notifications and email                                           |
 | [Process execution](process-execution.md)     | How the worker runs steps, connector calls, package operations and the worker settings          |
 | [Process events](process-events.md)           | Raised events, triggers and schedules                                                            |
@@ -183,8 +184,13 @@ payment reference from the sample extension package, see
 - `steps` is an array of step objects. Each has a `name` and a `type`, and its other properties
   depend on the type, see [Steps](#steps). A [customization layer](customization-layers.md#list-keys)
   finds a step, a branch or a task's outcome by its `name`.
+- **`variables`.** _(planned for M38)_ A list of `{ "name", "type" }`, with `"list": true` for a list,
+  that the steps read and set. See [Variables](#variables).
 - Transitions name the next step by its name: `next`, `branches[].next`, `otherwise` and a task's
   `outcomes[].next`.
+- **Blocks and error paths.** _(planned for M38)_ A `parallel` branch's `start`, a `repeat` body's `start`
+  and an `onError` entry's `next` are transitions too. See [Process blocks](process-blocks.md#structure)
+  and [Error paths](#error-paths).
 - `kind` is the resource kind. Steps use `type`, as fields and widgets do.
 
 ## Steps
@@ -202,9 +208,12 @@ and operations, and where each is described:
 | `operation` with `raiseEvent`                           | Raises an event about the subject record                             | [Raise event step](process-events.md#raise-event-step)           |
 | `operation` with `createRecord`                         | Creates a record of another entity                                   | [Create record operation](process-flow.md#create-record-operation) |
 | `operation` with `notify`                               | Notifies users, roles or addresses in the site or by email           | [Notify operation](notifications.md#notify-operation)            |
+| `operation` with `setVariables`                         | _(planned for M38)_ Sets process variables                           | [Variables](#variables)                                          |
 | `timer`                                                 | Waits for a time                                                     | [Timer step](process-flow.md#timer-step)                         |
 | `waitEvent`                                             | Waits for an event about the subject record                          | [Wait for event step](process-flow.md#wait-for-event-step)       |
 | `subProcess`                                            | Starts another process and waits until it ends                       | [Sub-process step](process-flow.md#sub-process-step)             |
+| `parallel`                                              | _(planned for M38)_ Runs branches at once and goes on when its rule of completion holds | [Parallel step](process-blocks.md#parallel-step) |
+| `repeat`                                                | _(planned for M38)_ Runs its body for each item, a number of times, while or until a condition | [Repeat step](process-blocks.md#repeat-step) |
 | `end`                                                   | Completes the instance                                               | Below                                                            |
 
 - **`decision`.** `branches` is an ordered list, and each branch has a `name`, a `when` expression
@@ -229,6 +238,17 @@ and operations, and where each is described:
     people before that. See [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
   - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`, such as `approve`,
     `return` and `reject`. Each names the step taken when the task is completed with it.
+  - **Several assignees.** _(planned for M38)_ In place of `user` or `role`, `assignee` may hold `users`,
+    an object `{ "from", "user" }`. `from` is a child collection or a `references` field of the subject
+    record, and `user` is an expression that gives the user id of each item. Each person gets a task of
+    their own, and each answer is kept.
+  - **Completion.** _(planned for M38)_ A task with `users` needs a `completion`, which has a `rule` and an
+    `otherwise`. The rules are `all`, `any`, `majority` and `count`, and `count` also needs a `count`, a
+    positive whole number. `all` decides when every person chooses one outcome. `any` decides on the first
+    answer. `majority` decides when more than half choose one outcome, and `count` when `count` people do.
+    `otherwise` names one of the task's outcomes, which is taken when no outcome can still win. The task is
+    decided as soon as no answer still to come can change its outcome, and the open tasks of the others are
+    then closed.
 
   The step's transaction evaluates the assignee, creates the task as `open` and sets the instance to
   `waiting`. A `user` expression that gives `null` or blank text fails the step. Completing the task
@@ -238,6 +258,64 @@ and operations, and where each is described:
   in the step's transaction, so computed fields are recomputed and validations run, and a validation
   failure fails the step.
 - **`end`.** The instance is `completed` when it reaches an `end` step, which has no `next`.
+
+## Variables
+
+_(planned for M38)_
+
+A process keeps data of its own in variables. A variable belongs to the instance, so every path of the
+instance reads and sets the same one. Inspection shows a variable's value under the masking rule that a
+call's input follows.
+
+```json
+"variables": [
+  { "name": "reviewNotes", "type": "text" },
+  { "name": "failedLines", "type": "text", "list": true }
+]
+```
+
+- **Declaring.** `variables` is a list beside `entity` or `parameters`, and each variable has a `name` and
+  a `type`. The types are the scalar types of rule parameters: `text`, `integer`, `decimal`, `boolean`,
+  `date` and `date-time`. `list` is `true` for a list of values. Names are unique, ignoring letter case,
+  and a name that a field, a parameter or a rule already has is refused.
+- **Starting.** A variable starts as `null`, or as an empty list when `list` is `true`.
+- **Reading.** An expression reads a variable by its name. A list is read through
+  [aggregates](expressions.md#aggregates).
+- **Setting.** The `setVariables` operation has a `set` that maps variable names to expressions, with the
+  scope of a `when`. Each value must fit its variable's type. The step writes in its own transaction, and a
+  later write replaces an earlier one.
+- **Checks.** A variable's declaration is checked with `AXC0387`. A `set` key that names no variable, or a
+  `gather.into` that is not a list variable, is `AXC0388`. A value of the wrong type is `AXC0048`.
+
+## Error paths
+
+_(planned for M38)_
+
+An error path lets a process take another route when a step fails for good. A step that still fails after
+its own retries takes the path for its kind of failure, instead of ending its path. A call to an ERP
+system that cannot take an order is one case.
+
+```json
+"onError": [
+  { "error": "call", "next": "tellBuyer" },
+  { "error": "any", "next": "markFailed" }
+]
+```
+
+- **Kinds.** Each entry names an `error` of one kind:
+  - `call`: a connector or package call failed.
+  - `record`: a record write failed, such as a validation.
+  - `expression`: an expression failed at run time.
+  - `limit`: a limit was reached, such as the `maxPasses` of a repeat.
+  - `any`: any failure that the other entries of the step do not name.
+- **Retries first.** An error path is taken only after the step's own retry policy runs out. See
+  [connector calls](process-execution.md#connector-calls).
+- **Next step.** `next` names a step of the same list, see [structure](process-blocks.md#structure). The
+  history keeps the error that was taken.
+- **No error path.** When no entry matches, the path fails. Its block then fails, and the instance fails.
+  Only an operator can retry it, see [retry](process-inspection.md#retry).
+- **Checks.** `AXC0389` reports an unknown kind, a kind that the step already has, and an `onError` on an
+  `end` step.
 
 ## Compile checks
 
@@ -322,6 +400,16 @@ Each code is in the [diagnostic code table](diagnostic-codes.md).
   checked like other labels (`AXC0028`).
 - Every expression gets the usual syntax, type and cost diagnostics, see
   [Diagnostics](expressions.md#diagnostics).
+- **Blocks.** _(planned for M38)_ A `parallel` or `repeat` step is checked as
+  [Compile checks](process-blocks.md#compile-checks) says.
+- **Several assignees.** _(planned for M38)_ A task's `users` and its `completion` are checked with `AXC0390`
+  and `AXC0381`, see [Several assignees](#steps).
+- **Variables.** _(planned for M38)_ A variable's declaration is checked with `AXC0387`, and a `setVariables`
+  key with `AXC0388`, see [Variables](#variables).
+- **Error paths.** _(planned for M38)_ An `onError` entry is checked with `AXC0389`, see
+  [Error paths](#error-paths).
+- **Waits for several events.** _(planned for M38)_ A `waitEvent` step with `events` is checked with
+  `AXC0391`, see [Wait for event step](process-flow.md#wait-for-event-step).
 
 | Step                        | Has                                              | Has none of                                                                                                                              |
 | --------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -336,7 +424,15 @@ Each code is in the [diagnostic code table](diagnostic-codes.md).
 | `end`                       | Nothing more                                     | `next`, `branches`, `otherwise`, `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields`, `wait`, `until` and the task properties |
 | `timer`                     | `next`                                           | `branches`, `otherwise`, `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields` and the task properties |
 | `waitEvent`                 | `event` and `next`                               | Any property but `when` and `timeout`                                                                                                    |
+| _(planned for M38)_ `parallel`                 | `branches` and `next`                            | Any property but `branches`, `completion` and `next`                                                                                     |
+| _(planned for M38)_ `repeat`                   | Exactly one of `forEach`, `times`, `while` and `until`, with `start`, `steps` and `next` | Any property not listed in [Repeat step](process-blocks.md#repeat-step)                  |
+| _(planned for M38)_ `operation` with `setVariables` | `set` with at least one variable and `next`  | `branches`, `otherwise`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields` and the task properties |
+| _(planned for M38)_ `waitEvent` with `events`  | `events`                                         | Any property but `events` and `timeout`                                                                                                  |
 | `subProcess`                | `process` and `next`                             | Any property but `subject` and `parameters`                                                                                              |
+
+- **Error paths and skip.** _(planned for M38)_ Every step but `end` may have `onError`, see
+  [Error paths](#error-paths). An `end` in a repeat body may have `skip`, see
+  [Repeat step](process-blocks.md#repeat-step).
 
 ## Start endpoint
 
@@ -559,11 +655,13 @@ raises `FinanceThreshold()` to 15000.
 
 ## Limits
 
-Two limits apply to every process, and an author should know them when writing one.
+These limits apply to every process, and an author should know them when writing one.
 
 - **Loops only through a waiting step.** A process may not contain a cycle that has no `task`,
   `timer` or `waitEvent` step, because it would run for ever (`AXC0073`). See
   [Loops](process-flow.md#loops).
+- **Repeats end by their own limits.** _(planned for M38)_ A repeat needs no waiting step in its loop,
+  because its own limits end it. See [limits](process-blocks.md#limits).
 - **No user check on an assignee.** The user id that a `user` assignee gives is not checked against
   any list of users, so a wrong id creates a task that nobody sees. A
   [reassign](task-deadlines.md#reassign) checks its target against the

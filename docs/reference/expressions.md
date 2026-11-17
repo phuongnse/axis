@@ -318,6 +318,9 @@ Each use has its own scope:
     [collections through a path](#collections-through-a-path-and-the-outer-record).
   - A process without a subject sees its parameters and the named rules instead. See
     [processes](processes.md#steps) and [process flow](process-flow.md).
+  - **Variables and passes.** _(planned for M38)_ A process reads its
+    [variables](processes.md#variables) by name. A [repeat's](process-blocks.md#repeat-step) body reads
+    its pass as `<as>.item` and `<as>.number`.
 - **Scope in a navigate action.** On a table row, bare names are the row's columns, or the record's
   fields for a table over an entity, and on a form and a detail they are the record's fields. In a
   table's toolbar there are no names. The scope has no rules and no aggregates.
