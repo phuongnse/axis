@@ -53,9 +53,15 @@ A record stays in the bin for 30 days, or the period the tenant sets.
   setting in the tenant directory, as the
   [application packages switch](user-administration.md#application-packages) is, see
   [storage](storage.md#platform-database). A bound keeps the bin from becoming permanent storage.
-  Each change that alters the value writes `recycleBin.periodChanged`.
-- **Access.** `GET` and `PUT` of the setting are for an administrator, checked as the other tenant
-  routes are: a `401` without a session, then a `403` for a user who is not an administrator.
+- **Audit.** Each accepted `PUT` writes a platform audit record, `tenant recycle-bin set`, in one
+  transaction with the change, with `recycleBinDays` in `changed` and never a record, see
+  [when a record is written](tenant-setting-commands.md#when-a-record-is-written). The period is
+  not in the tenant database, so no audit record of the tenant's audit holds it.
+- **Access.** `GET` and `PUT` of the setting are for an administrator, checked in this order as the
+  application packages routes are: a signed-in user (`401`), `Users:AdministratorRole` (`403`), then a
+  tenant with a row in the tenant directory that is not a preview tenant (`404`), and for `PUT` the
+  body (`400`). A tenant with no directory row, under the configuration source, has no setting to
+  read or change, so both routes answer `404` and its records keep the default of 30 days.
 - **Expiry.** A record's period ends `days` after `deleted_at`. A new period applies to every record in
   the bin, also to one deleted before the change.
 - **The job.** A job of the worker purges the records whose period has ended, in batches, as `system`,

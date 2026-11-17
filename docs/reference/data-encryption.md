@@ -36,10 +36,11 @@ A sensitive value is encrypted by the server and the worker, so PostgreSQL only 
   [sensitive fields](roles-and-policies.md#sensitive-fields).
 - **History values** _(planned for M41)_. The old and new value of a sensitive field in an audit record's
   `changes` are encrypted in the same format with the tenant's data key, as base64 text in the JSON. The
-  associated data is the one of the field, so a history value does not decrypt as another field's. A key
-  rotation re-encrypts history values too, and `retire` refuses while one names an older key. An erasure removes
-  the value's ciphertext from the audit record and leaves the tenant's data key alone, see
-  [erasing values from history](record-audit.md#erasing-values-from-history).
+  associated data is the one of the field, so a history value does not decrypt as another field's. A history value
+  keeps the data key number it was written under, because the audit record is append only and only the
+  [erasure path](record-audit.md#erasing-values-from-history) may change it, so a rotation leaves it alone and
+  `retire` keeps every data key that a history value still names. An erasure removes the value's ciphertext from
+  the audit record and leaves the tenant's data key alone.
 
 ### Where the cipher runs
 
@@ -262,6 +263,10 @@ names one.
   exits with code `1`. Run `rotate` again, then `retire`.
 - **Done.** Otherwise it prints `<id> data-key retire ok: <d> data keys, <l> lookup keys deleted`. A tenant with no
   older key prints it with `0` and writes no record.
+- **History keeps its keys** _(planned for M41)_. A history value, see
+  [sensitive field values](#sensitive-field-values), is never re-encrypted, so `retire` does not count it and does
+  not delete a data key that a history value names. It deletes lookup keys as before. A tenant that keeps history
+  of sensitive values therefore keeps the older data keys that wrote them.
 - **Restart first.** Restart the hosts, or wait until they have read the new keys, before `retire`: a host that still
   writes with a deleted key stores values that no host can read after it restarts.
 

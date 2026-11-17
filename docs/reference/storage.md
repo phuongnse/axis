@@ -311,7 +311,8 @@ The tables:
   bindings or its platform providers.
 - **Recycle bin period** _(planned for M41)_. `platform.tenants` also holds `recycle_bin_days`, an `integer` from 1
   to 365 that is 30 by default, the tenant's [recycle bin period](recycle-bin.md#the-period). Each change raises the
-  tenant `version`.
+  tenant `version`, and writes a [platform audit record](tenant-setting-commands.md#platform-audit-records) in the same
+  transaction, `tenant recycle-bin set`.
 - **Schema version.** The `schema_version` is text: the id of the newest EF Core migration across
   the configuration, data and processes contexts that `Axis.Admin` applied to the tenant database,
   empty until the first migration. A host serves a tenant only when this value is the one the host
@@ -735,10 +736,8 @@ user or service account as actor, and so do the actions that [audit actions](#au
   serve the [tenant's audit](record-audit.md#the-tenants-audit), which filters by person, application, entity,
   record, action and time.
 - **Recycle bin and history actions** _(planned for M41)_. These actions write audit records beside those of
-  [audit actions](#audit-actions), each in the
-  transaction of its change. `record.restored` and `record.purged` set `application_id`, `entity_id` and `record_id`
+  [audit actions](#audit-actions), each in the transaction of its change. `record.restored` and `record.purged` set `application_id`, `entity_id` and `record_id`
   and have `{ "version" }` as `details`, with the user as `actor`, or `system` for a purge at the end of the period.
-  `recycleBin.periodChanged` has the administrator as `actor`, `{ "days" }` as `details` and no other id.
   `auditRecords.exported` has the administrator as `actor`, `{ "format", "rowCount", "truncated" }` as `details` and
   no other id. `history.erased` has the administrator as `actor`, no other id and `{ "auditRecords" }` as `details`,
   the number of audit records changed. None holds a value.

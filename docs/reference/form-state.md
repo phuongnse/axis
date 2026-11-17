@@ -1,6 +1,6 @@
 # Form state endpoint
 
-The form state endpoint is the one route of the record API that writes nothing: it answers for a
+The form state endpoint is a `POST` route of the record API that writes nothing: it answers for a
 draft. The other routes, the record shape and the errors are in [record-api.md](record-api.md).
 
 ## Form state

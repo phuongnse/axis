@@ -543,6 +543,10 @@ The publisher and the server also write records for the operator's work in a cel
   transaction with the change, with the administrator as actor and `applicationPackages` in `changed`. Each accepted
   `PUT` writes one, also when the value is unchanged. See
   [application packages](user-administration.md#application-packages).
+- **Recycle bin period** _(planned for M41)_. `PUT /api/tenant/recycle-bin/settings` writes
+  `tenant recycle-bin set` in one transaction with the change, with the administrator as actor and
+  `recycleBinDays` in `changed`. Each accepted `PUT` writes one, also when the value is unchanged. See
+  [the period](recycle-bin.md#the-period).
 - **Connected app revokes.** `POST /api/tenant/connected-apps/{clientId}/revoke` writes `tenant connected-app revoke` after
   the consents are deleted, with the administrator as actor and `consent` in `changed`, never a client id. A revoke that
   fails at the identity provider writes none, and the repeat that finishes it writes one. See
