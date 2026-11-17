@@ -2739,7 +2739,7 @@
   "shell.stepRun.status": "Status",
   "shell.stepRun.due": "Due",
   "shell.stepRun.overdue": "Overdue",
-  "shell.stepRun.waitingFor": "Waiting for",
+  "shell.stepRun.waitingFor": "Waits for",
   "shell.stepRun.givesUp": "Gives up at",
   "shell.stepRun.goesOn": "Goes on at",
   "shell.stepRun.openInStudio": "Open the step in Studio",
@@ -2784,5 +2784,6 @@
   "shell.stepRun.result": "Result",
   "shell.table.showDetails": "Show the details",
   "shell.table.hideDetails": "Hide the details",
-  "shell.stepRun.thenGoesTo": "Then goes to"
+  "shell.stepRun.thenGoesTo": "Then goes to",
+  "shell.stepRun.ended": "Ended"
 }

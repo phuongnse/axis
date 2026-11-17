@@ -340,9 +340,18 @@ export function InstanceDetailView({
         ),
       width: 2,
     },
-    ...(instance.endedAt === null
-      ? []
-      : [{ key: 'endedAt', term: t('shell.inspector.endedAt'), value: time('endedAt', instance.endedAt), width: 2 }]),
+    // A fact the instance always has always shows, Not set while it has not ended, see the rule on #3650.
+    {
+      key: 'endedAt',
+      term: t('shell.inspector.endedAt'),
+      value:
+        instance.endedAt === null ? (
+          <Typography.Text type="secondary">{t('shell.value.notSet')}</Typography.Text>
+        ) : (
+          time('endedAt', instance.endedAt)
+        ),
+      width: 2,
+    },
     {
       key: 'duration',
       term: t('shell.inspector.duration'),

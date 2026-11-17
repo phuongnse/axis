@@ -2739,7 +2739,7 @@
   "shell.stepRun.status": "Status",
   "shell.stepRun.due": "Hạn",
   "shell.stepRun.overdue": "Quá hạn",
-  "shell.stepRun.waitingFor": "Đang chờ",
+  "shell.stepRun.waitingFor": "Chờ",
   "shell.stepRun.givesUp": "Thôi chờ lúc",
   "shell.stepRun.goesOn": "Chạy tiếp lúc",
   "shell.stepRun.openInStudio": "Mở bước trong Studio",
@@ -2784,5 +2784,6 @@
   "shell.stepRun.result": "Kết quả",
   "shell.table.showDetails": "Xem chi tiết",
   "shell.table.hideDetails": "Ẩn chi tiết",
-  "shell.stepRun.thenGoesTo": "Sau đó đi tới"
+  "shell.stepRun.thenGoesTo": "Sau đó đi tới",
+  "shell.stepRun.ended": "Kết thúc"
 }

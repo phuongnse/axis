@@ -165,20 +165,17 @@ export function StepRunPanel({
   // Proposed, see the review on #3650: a trace ID shows its first 8 characters and copies whole, as the instance's ID.
   const traceId = (id: string | null) =>
     id === null ? (
-      <EmptyDash />
+      notSet
     ) : (
       <Typography.Text copyable={{ text: id }} style={{ fontFamily: 'monospace' }}>
         {id.slice(0, 8)}
       </Typography.Text>
     )
   const stepIndex = instance.graph.steps.findIndex((candidate) => candidate.name === step)
-  // Proposed, see the review on #3650: what a run that waits waits for, and until when: an event, and when the wait
-  // gives up and where it goes then; or a timer, and when it goes on. The engine keeps the time as the run's due time;
+  // Proposed, see the review on #3650: what a wait's run waits for, and until when, whether it still waits or not: an
+  // event, and when the wait gives up and where it goes then; or a timer, and when it goes on. The engine keeps the time as the run's due time;
   // the prototype works it out from the step.
   const waitTerms = (shown: StepRun): Term[] => {
-    if (shown.finishedAt !== null) {
-      return []
-    }
     const terms: Term[] = []
     const after = (value: unknown) => {
       const match =
@@ -237,8 +234,9 @@ export function StepRunPanel({
       </AxisButton>
     )
     const terms: Term[] = [
-      // Facts that belong together share a row: when it started and how long it took, when a wait gives up and where it
-      // goes then, where the run came from and where it went; every other fact has its own.
+      // A fact every run has always shows, Not set while it is empty; only what does not apply to the run is left out,
+      // see the rule on #3650. Facts that belong together share a row: when it started and ended, when a wait gives up
+      // and where it goes then, where the run came from and where it went; every other fact has its own.
       {
         key: 'started',
         term: t('shell.stepRun.started'),
@@ -246,10 +244,15 @@ export function StepRunPanel({
         width: 6,
       },
       {
+        key: 'ended',
+        term: t('shell.stepRun.ended'),
+        value: shown.finishedAt === null ? notSet : <EventTime at={shown.finishedAt} locale={locale} />,
+        width: 6,
+      },
+      {
         key: 'duration',
         term: t('shell.stepRun.duration'),
         value: durationText(shown.startedAt, shown.finishedAt ?? now.toISOString(), locale),
-        width: 6,
       },
       ...shown.tasks.flatMap((task): Term[] => [
         { key: `assignee-${task.id}`, term: t('shell.stepRun.assignedTo'), value: assigneeText(task) },
@@ -319,26 +322,23 @@ export function StepRunPanel({
         value: before === undefined ? muted(t('shell.stepRun.start')) : runLink(before),
         width: 6,
       },
-      // A run that has not ended has gone nowhere yet, which its state already says, so it has no Went to. The outcome
-      // or branch that chose the next step follows it on its line.
-      ...(shown.finishedAt === null
-        ? []
-        : [
-            {
-              key: 'wentTo',
-              term: t('shell.stepRun.wentTo'),
-              width: 6,
-              value:
-                after === undefined ? (
-                  muted(t('shell.stepRun.ended.instance'))
-                ) : (
-                  <span>
-                    {runLink(after)}
-                    {reason !== null && muted(` — ${reason}`)}
-                  </span>
-                ),
-            },
-          ]),
+      // The outcome or branch that chose the next step follows it on its line.
+      {
+        key: 'wentTo',
+        term: t('shell.stepRun.wentTo'),
+        width: 6,
+        value:
+          shown.finishedAt === null ? (
+            notSet
+          ) : after === undefined ? (
+            muted(t('shell.stepRun.ended.instance'))
+          ) : (
+            <span>
+              {runLink(after)}
+              {reason !== null && muted(` — ${reason}`)}
+            </span>
+          ),
+      },
       { key: 'trace', term: t('shell.stepRun.traceId'), value: traceId(shown.traceId) },
     ]
     return (
