@@ -325,8 +325,11 @@ A new record has no history panel.
 - **Time.** The time uses the user's locale, with the medium date and time styles.
 - **Summary.** The summary is built from the details: the labels of the fields it names, then the task
   outcome, then the step. An entry whose details name none of them has no summary. Outcome and step
-  names show as declared, such as `approve`. Comments and other field values are never shown, because
-  audit records never hold them.
+  names show as declared, such as `approve`. Comments are never shown, because audit records never hold
+  them.
+- **Values** _(planned for M41)_. An entry that changed fields shows each field's label with its old and new
+  value, as [values in history](record-audit.md#values-in-history) holds them. A field the person may not
+  read shows only its label, so the person sees that it changed and not what it was.
 - **Summary lines**. In the summary the field labels are joined by commas, and the
   task outcome and the step each take a line of their own, never joined by a separator, see
   [text](actions-and-controls.md#text).

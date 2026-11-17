@@ -185,7 +185,7 @@ three calls takes 300 ms or more.
 ## Form state of a task
 
 `POST /api/apps/{app}/tasks/{id}/form-state` answers what the task's form shows for a draft, as the
-record API's [form state](record-api.md#form-state) does for a record form. It needs
+record API's [form state](form-state.md#form-state) does for a record form. It needs
 `Content-Type: application/json` and the [CSRF header](record-api.md#create-update-and-delete).
 
 ```json

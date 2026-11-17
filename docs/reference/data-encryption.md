@@ -34,6 +34,12 @@ A sensitive value is encrypted by the server and the worker, so PostgreSQL only 
   recomputed it yet, and an aggregate over a `references` field read the decrypted value, as they read any field. So do
   rules and process expressions. Process inspection still hides it, see
   [sensitive fields](roles-and-policies.md#sensitive-fields).
+- **History values** _(planned for M41)_. The old and new value of a sensitive field in an audit record's
+  `changes` are encrypted in the same format with the tenant's data key, as base64 text in the JSON. The
+  associated data is the one of the field, so a history value does not decrypt as another field's. A key
+  rotation re-encrypts history values too, and `retire` refuses while one names an older key. An erasure removes
+  the value's ciphertext from the audit record and leaves the tenant's data key alone, see
+  [erasing values from history](record-audit.md#erasing-values-from-history).
 
 ### Where the cipher runs
 
@@ -61,6 +67,9 @@ collection, and none writes a sensitive value in clear.
   stored. Its record steps, task completions, seeds and process steps use the cipher. A read under a grant whose
   `filter` tests an exact lookup field matches through the lookup hashes, and so do a data source `filter` and a
   measure's `filter` in the rows, the export and the id read of the trigger fan-out.
+- **History** _(planned for M41)_. The history route, the record at a time and the tenant's audit with its export
+  decrypt a history value with the cipher, for a user who may read the field. They never write one in clear, and no
+  audit record holds a sensitive value in clear.
 - **Triggers and start conditions** _(planned for M30)_. The data change trigger, the event trigger start, the task
   escalation and the inbound endpoint start condition read a record that holds a stored sensitive value with the
   cipher.
