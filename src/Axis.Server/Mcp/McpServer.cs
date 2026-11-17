@@ -148,7 +148,7 @@ internal static partial class McpServer
             [_applicationInput, _writeDraftInput, _moduleInput, _idInput, _layerContentInput]),
         new(
             CheckExpressionTool,
-            "Checks an expression at a path of one resource of your draft, in the draft's context, and answers its type and diagnostics. Writes nothing.",
+            "Checks an expression at a path of one resource of your draft, in the draft's context, and answers its type, diagnostics and reading. Writes nothing.",
             [_applicationInput, _writeDraftInput, _idInput, _pathInput, _expressionInput]),
         new(
             ValidateDraftTool,
