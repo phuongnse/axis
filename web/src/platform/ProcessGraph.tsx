@@ -38,8 +38,10 @@ import { StatusTag, type StatusTone } from './StatusTag'
 import { Tooltip } from 'antd'
 import { useDesignTokens, useThemeMode } from './themeMode'
 
+// Room for a label on two lines and the line under it, a status tag's 22 px: 8 + 4 + 2 × 20 + 2 + 22 + 8 px and the
+// borders, so nothing is cut.
 const nodeWidth = 272
-const nodeHeight = 72
+const nodeHeight = 88
 const handleSize = 10
 
 /**
@@ -385,7 +387,7 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
           gap: spacing.sm,
           width: '100%',
           height: '100%',
-          padding: spacing.sm,
+          padding: `${spacing.xs}px ${spacing.sm}px`,
           overflow: 'hidden',
           textAlign: 'left',
           font: 'inherit',
@@ -419,7 +421,7 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
           <strong
             style={{
               display: '-webkit-box',
-              WebkitLineClamp: data.status ? 1 : 2,
+              WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
               lineHeight: '20px',

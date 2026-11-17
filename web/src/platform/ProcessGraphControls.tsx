@@ -127,7 +127,8 @@ export function ProcessGraphControls({
           value={chosen}
           placeholder={t('shell.graph.find')}
           aria-label={t('shell.graph.find')}
-          style={{ width: 240 }}
+          // As wide as a step's card, so a long label reads whole.
+          style={{ width: 272 }}
           optionFilterProp="label"
           options={steps.map((step) => ({ value: step.id, label: step.label }))}
           onChange={(id: string | null | undefined) => {
