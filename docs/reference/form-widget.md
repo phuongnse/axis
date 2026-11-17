@@ -225,7 +225,7 @@ A child collection field shows its rows as a table under the field's label.
   [buttons](actions-and-controls.md#buttons). It appends a row with every child field `null`, and
   focus moves to the row's first input. Rows cannot be reordered.
 - **Sending.** When rows were added, removed or edited, the form sends the whole row list, as
-  [child rows](record-api.md#child-rows-computed-fields-and-validations) describes. Each row holds its
+  [child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations) describes. Each row holds its
   non-null child fields in declaration order, without its computed fields. Rows are compared by value
   with the rows the form started from, so an edit that is typed and then undone leaves the collection
   out of the body.

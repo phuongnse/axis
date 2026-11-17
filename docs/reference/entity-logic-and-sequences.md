@@ -88,7 +88,7 @@ compile, given that rule. A module entity's validation calls the rules of its ow
   record as it will be stored and after computed fields are calculated. A validation fails when its
   condition is `false` or `null`, or stops with a run-time error. The validations of a child entity
   run on each row that the body sends. See
-  [the record API](record-api.md#child-rows-computed-fields-and-validations).
+  [record child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations).
 
 - **Computed fields.** A field with an `expression` is a computed field.
   - The expression type must match the field's type, under the
@@ -110,11 +110,11 @@ compile, given that rule. A module entity's validation calls the rules of its ow
   - Clients cannot write it. A body that sets it, even to `null`, is a `400` at its pointer with the
     message "Cannot be set.". A run-time error is a `400` at its pointer with "Could not be
     computed.". A value that does not fit the column gets the message that a body value would get.
-    See [the record API](record-api.md#child-rows-computed-fields-and-validations) and
+    See [record child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations) and
     [child tables and computed columns](child-tables-and-computed-columns.md#child-tables-and-computed-columns).
 - **Child collections.** The field type `child-collection` needs a `target` that names the child
   entity. Its rows are read and written only through the owner record, as
-  [the record API](record-api.md#child-rows-computed-fields-and-validations) describes.
+  [record child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations) describes.
 - **Limits on a child entity.** A child entity:
   - is owned by exactly one `child-collection` field (`AXC0039`);
   - is never the `target` of a `reference` or `references` field (`AXC0040`);
@@ -123,7 +123,7 @@ compile, given that rule. A module entity's validation calls the rules of its ow
   - has no `child-collection` or `references` fields (`AXC0041`). It may have `reference` fields, as
     real line items point to a product. A reference from a child row gets a foreign key, and its
     labels follow the rows, see
-    [child rows](record-api.md#child-rows-computed-fields-and-validations). Its index comes with the
+    [child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations). Its index comes with the
     platform indexes on every reference column.
 
 ## Sequences

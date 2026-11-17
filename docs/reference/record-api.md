@@ -2,9 +2,10 @@
 
 The record API reads and writes the records of an application's entities over HTTP, under the
 user's policies. This page covers its routes, the record shape, paging, writes, concurrency, errors
-and request bodies and values. The form state endpoint is in [record form state](record-form-state.md).
-How another system calls an inbound endpoint is in [inbound-endpoints.md](inbound-endpoints.md), and the
-audit records and history of a record are in [record-audit.md](record-audit.md).
+and request bodies and values. The form state endpoint is in [record form state](record-form-state.md). Child rows, computed
+fields and validations are in [record child rows](record-child-rows-and-validations.md).
+How another system calls an inbound endpoint is in [inbound-endpoints.md](inbound-endpoints.md), and
+the audit records and history of a record are in [record-audit.md](record-audit.md).
 
 ## Access
 
@@ -92,7 +93,7 @@ references:
 under its declared name, in declaration order. A field that is SQL `NULL` is `null`; it is never left out.
 A `child-collection` field is an array of its rows, in their stored order. It
 is `[]` when the record has no rows. List responses leave it out. See
-[Child rows, computed fields and validations](#child-rows-computed-fields-and-validations).
+[Child rows, computed fields and validations](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations).
 
 `labels` maps each `reference` field that is not `null` to the display field
 value of the referenced record, so a page can show "Finance" without one more
@@ -197,7 +198,7 @@ Each field type has one JSON form in a read:
 | `date` | A string `yyyy-MM-dd` |
 | `date-time` | A string in UTC with exactly six fraction digits and `Z`, such as `2026-10-06T02:00:00.123456Z`. PostgreSQL stores microseconds, so no precision is lost |
 | `reference` | A string with the record id in the lowercase hyphenated form. Its label is in `labels` |
-| `child-collection` | An array of row objects in stored order, in a single read and in the response of a create or update. List responses leave it out. See [Child rows](#child-rows-computed-fields-and-validations) |
+| `child-collection` | An array of row objects in stored order, in a single read and in the response of a create or update. List responses leave it out. See [Child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations) |
 | `money` | A number written as for `decimal`. The currency is the field's, or the value of its `currencyField` |
 | `file` | An object `{ "id", "name", "mediaType", "size" }`, or `null`, also in child rows and in list responses. See [file fields](file-fields.md#field-and-value) |
 | `references` | An array of record ids, in the order they were written. Its labels are an array in the same order in `labels`. List responses leave it out, as for a child collection |
@@ -451,7 +452,7 @@ A request is checked in this order, and the first failure is the response:
    pending field, `409`.
 9. Fields the user may not write, `403`.
 10. The matched references, then the computed fields and the validations, `400`, as
-    [Child rows, computed fields and validations](#child-rows-computed-fields-and-validations)
+    [Child rows, computed fields and validations](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations)
     says, then storage (`400`, `404` or `409`).
 11. On create and update, the new record outside every `create` or `update` filter, `403`.
 
@@ -535,7 +536,7 @@ release.
   `/values/<field>`.
 - **`400` for a validation.** A record that breaks one of its entity's
   validations is a validation problem keyed at the validation's field. See
-  [Child rows, computed fields and validations](#child-rows-computed-fields-and-validations).
+  [Child rows, computed fields and validations](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations).
 - **`415`.** A `POST` or `PATCH` without `Content-Type` or with any type other
   than `application/json` with an optional `utf-8` charset.
 - **`409` for a unique value.** A value that repeats the value of a `unique`
@@ -706,136 +707,6 @@ failed validation is its text key instead. Messages may use
 field type names and limits from the model. They never contain a table,
 column, constraint or schema name, a PostgreSQL type name, exception text, or
 text from the request; the key already says where the problem is.
-
-## Child rows, computed fields and validations
-
-A record may hold child rows, computed fields and validations, which the record
-shape and the bodies above include. Computed fields and validations can
-[aggregate](expressions.md#aggregates) over the child rows.
-
-A record with a child collection holds its rows inside `values`:
-
-```json
-{
-  "id": "6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7",
-  "version": 2,
-  "values": {
-    "title": "Standing desks",
-    "total": 2550.90,
-    "lineItems": [
-      { "description": "Desk", "quantity": 2, "unitPrice": 1250.45, "amount": 2500.90 },
-      { "description": "Cable tray", "quantity": 1, "unitPrice": 50.00, "amount": 50.00 }
-    ]
-  },
-  "labels": {}
-}
-```
-
-- **Rows.** A row is a flat object of the child entity's fields, in
-  declaration order. It has no id. Rows are ordered by `position`, and the
-  array index is the position. A row includes its computed values.
-- **Reads.** A single read and the response of a create or update include the
-  collections. List responses leave them out.
-- **Create.** A missing collection means no rows. `null` is an error at
-  `/values/<collection>`.
-- **Update.** A missing collection keeps its rows. An array replaces all the
-  rows, in the same transaction, and increments the owner's `version`. `null`
-  is an error at `/values/<collection>`. A stale `version` is a `409`, and no
-  row changes.
-- **References.** A child entity may have `reference` fields. The labels of a
-  row's references come with the rows, as `labels` above describes. A row
-  that names a record that does not exist is a `400` at its cell,
-  `/values/<collection>/<index>/<field>`, with the message of a root
-  reference. A delete of a record that a child row points to is the `409` for
-  a referenced record. Once the owner record is deleted, its rows go with it
-  and the target can be deleted.
-- **No routes of its own.** A child entity has no record routes. Every method
-  on `/api/apps/{app}/entities/{child}/records` is a `404` with the same title
-  as an unknown entity.
-- **Parsing.** A row is parsed like a create body, so a required field of the
-  child entity must be present in every row. An array element that is not an
-  object is an error at its index. A row error is keyed
-  `/values/<collection>/<index>/<field>`, with a zero-based index.
-- **Computed fields.** A body that sets a computed field, of the owner or of
-  a row, even to `null`, is an error at its pointer with the message "Cannot
-  be set.". The server calculates the value on every create and update of the
-  record, including an update with no values, and stores it in the same
-  statement as the other values. Child rows are calculated before the owner.
-  A single read, and the response of an update, return a pending
-  field computed with the active release when the row's stamp is out of date.
-  A create always computes with the active release, so its response needs no
-  such step. A run-time error there reads `null`, and the read answers `200`.
-  The read stores nothing. A list shows the stored value. See
-  [Recomputing computed fields](migrations.md#recomputing-computed-fields).
-- **Aggregates.** An aggregate of the owner, such as `sum(lineItems, amount)`,
-  reads the rows the write stores. When the body sends the collection, it
-  reads the body's rows after their own computed fields. When an update
-  leaves the collection out, it reads the stored rows. A create without the
-  collection has no rows. A stored row value that cannot be evaluated
-  exactly is a `400` at the row's pointer, such as
-  `/values/lineItems/0/amount`, with "Cannot be evaluated exactly.".
-- **Delete.** Deleting the owner deletes its rows.
-
-A write runs its computed fields and validations in this order:
-
-1. Computed fields and validations run only on a body that parsed cleanly.
-   A body with parse errors is answered with those errors alone.
-2. On update of an entity with computed fields or validations, the stored
-   record is read first, with its rows and sets. An unknown record is still a `404`,
-   never a `400`.
-   The server then builds the record as it will be stored: the stored values,
-   the changes from the body, the
-   [matched references](resource-files.md#matched-references) set from them, the rows it will
-   store and the computed fields. A computed field that
-   fails is a `400`, and then no validation runs. So a change to one field
-   can break a validation reported on another.
-3. The validations of the entity and of each row the body sends run, inside
-   the write's transaction, so `now()` is that transaction's start time. A
-   validation's aggregates read the same rows as the computed fields, so
-   `count(lineItems) >= 1` refuses a create without rows and an update that
-   sends an empty array. Rows an update leaves out are unchanged and are not
-   checked again as rows, but the owner's aggregates still read them. An
-   aggregate over a `references` field reads the target records of the ids the
-   body sends, or of the stored set when an update leaves the field out, and a
-   create without the field has an empty set. It reads them whatever the
-   user's read grants and record filters on the target entity. An id that
-   names no record is left out of the aggregate, and then storage refuses it.
-   Any failure is a `400`.
-4. Storage runs. It answers as described above, for example `409` for a stale
-   `version`.
-
-A failure is keyed `/values/<field>` or by a row path such as
-`/values/lineItems/1/quantity`. Each key holds one message. When several
-validations fail on one key, it reports the first in declaration order. Every
-other key is reported in the same response. The message is the validation's
-text key, and the client shows the text in the user's locale. The client gets
-validation as the user types from the [form state endpoint](record-form-state.md#form-state).
-
-A run-time error in an expression, or a computed value that does not fit its
-field, such as one with more fraction digits than `scale`, rejects the write
-with a `400` at that field's pointer. A run-time error in a computed field has
-the message "Could not be computed.". A value that does not fit gets the
-message a body value would get, such as "Must have at most 2 fraction
-digits.". Values are never rounded. So on an entity with computed fields or
-validations, a `decimal` value that the interpreter cannot hold exactly
-(see [expression types](expressions.md#types)) is a `400` at its own
-pointer, with the message "Cannot be evaluated exactly.", and no validation
-of that record runs. A stored decimal of a target record that cannot be held
-exactly is the same `400`, at the pointer of the `references` field.
-
-For example, a create or update with `quantity` `0` in the second row is
-answered with `400`:
-
-```json
-{
-  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
-  "title": "One or more validation errors occurred.",
-  "status": 400,
-  "errors": {
-    "/values/lineItems/1/quantity": ["lineItem.quantityPositive"]
-  }
-}
-```
 
 ## Inbound endpoints
 
