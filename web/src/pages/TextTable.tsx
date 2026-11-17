@@ -66,7 +66,7 @@ export function TextTable({
     ],
     [ids],
   )
-  const { view, setView } = useTableView(fields, recordPageSize, [], true, true, false, '', tableKey)
+  const { view, setView, saved } = useTableView(fields, recordPageSize, [], true, true, false, '', tableKey)
 
   async function add() {
     const key = newKey.trim()
@@ -102,7 +102,7 @@ export function TextTable({
         testId="studio-text-table"
         rowKey={(row) => row.key}
         dataSource={keys.map((key) => ({ key }))}
-        view={{ query: view, onChange: setView }}
+        view={{ query: view, onChange: setView, saved }}
         emptyText={t('shell.table.empty')}
         rowAttributes={(row) =>
           ({ 'data-testid': 'studio-text-row', 'data-key': row.key }) as HTMLAttributes<HTMLElement>

@@ -214,7 +214,7 @@ export function StudioReleasesList({
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale
   const { generation, lost } = useStudioConnection()
-  const { view, setView } = useTableView(
+  const { view, setView, saved } = useTableView(
     releaseFields,
     recordPageSize,
     noParameters,
@@ -321,6 +321,7 @@ export function StudioReleasesList({
           view={{
             query: view,
             onChange: setView,
+            saved,
             pageSizes: tablePageSizes(),
             total: list?.totalCount ?? 0,
             search: true,

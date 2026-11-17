@@ -150,6 +150,19 @@
       "vi": "Thu hồi",
       "status": "proposed",
       "note": "Removes every person's consent to an MCP client, or a package runner's credential."
+    },
+    {
+      "concept": "View (of a table)",
+      "en": "view",
+      "vi": "dạng xem",
+      "status": "proposed",
+      "note": "A table's saved search, filter and sort under a name."
+    },
+    {
+      "concept": "Action: Rename",
+      "en": "Rename",
+      "vi": "Đổi tên",
+      "status": "proposed"
     }
   ]
 }

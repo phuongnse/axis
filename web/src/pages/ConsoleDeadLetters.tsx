@@ -60,7 +60,7 @@ const deadLetterStates = ['open', 'redelivered', 'discarded']
  */
 export function ConsoleDeadLetters({ applications, locale }: ConsoleDeadLettersProps) {
   const t = useText()
-  const { view, setView } = useTableView(
+  const { view, setView, saved } = useTableView(
     deadLetterFields,
     recordPageSize,
     noParameters,
@@ -170,6 +170,7 @@ export function ConsoleDeadLetters({ applications, locale }: ConsoleDeadLettersP
         view={{
           query: view,
           onChange: setView,
+          saved,
           pageSizes: tablePageSizes(),
           total: page?.totalCount ?? 0,
           search: true,

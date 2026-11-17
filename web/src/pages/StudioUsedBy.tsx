@@ -134,7 +134,7 @@ export function StudioUsedBy({
       ),
     [rows, locale, t],
   )
-  const { view, setView } = useTableView(
+  const { view, setView, saved } = useTableView(
     usedByFields,
     recordPageSize,
     [],
@@ -182,7 +182,7 @@ export function StudioUsedBy({
       columns={columns}
       rowKey={(row) => row.key}
       dataSource={rows}
-      view={{ query: view, onChange: setView }}
+      view={{ query: view, onChange: setView, saved }}
       loading={usedBy === undefined && !failed}
       emptyText={t('shell.studio.usedBy.none')}
       failure={failed ? <AxisAlert kind="error" message={t('shell.studio.referencesFailed')} /> : undefined}

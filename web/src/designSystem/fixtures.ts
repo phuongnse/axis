@@ -1270,6 +1270,7 @@ export const routes: Record<string, () => unknown> = {
   [`${blankRequestsPath}/${requestId}`]: () => blankRecord,
   [emptyTasksPath]: () => emptyTaskPage,
   [noRowsPath]: () => emptyRecordPage,
+  [`/api/me/tables/site.${sitePath}.requests`]: () => noTableChoices,
   [`/api/me/tables/site.${sitePath}.tasks`]: () => noTableChoices,
   [`/api/me/tables/site.${sitePath}.instances`]: () => noTableChoices,
   [`/api/sites/${sitePath}/texts/${locale}`]: () => ({ texts: siteTexts }),

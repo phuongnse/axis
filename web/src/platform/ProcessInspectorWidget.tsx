@@ -72,7 +72,11 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
   // The server sets the path on every process inspector.
   const instancesPath = widget.instancesPath!
   const instancePath = siteAddress(sitePath, pageName.toLowerCase())
-  const { view: query, setView } = useTableView(
+  const {
+    view: query,
+    setView,
+    saved,
+  } = useTableView(
     instanceFields,
     recordPageSize,
     noParameters,
@@ -201,6 +205,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
         view={{
           query,
           onChange: setView,
+          saved,
           total: load.page?.totalCount ?? 0,
           pageSizes,
           search: true,

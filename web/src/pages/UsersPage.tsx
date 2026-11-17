@@ -87,7 +87,7 @@ export function UsersPage() {
   const { size } = useDesignTokens()
   const platform = usePlatform()
   const { locale } = platform.current
-  const { view, setView } = useTableView(userFields, recordPageSize, noParameters, true, true, true, '', 'users')
+  const { view, setView, saved } = useTableView(userFields, recordPageSize, noParameters, true, true, true, '', 'users')
   const query = recordQuery(view)
   const [list, setList] = useState<UserList>()
   const [refusal, setRefusal] = useState<Exclude<UserListResult['kind'], 'ok'>>()
@@ -262,6 +262,7 @@ export function UsersPage() {
                     view={{
                       query: view,
                       onChange: setView,
+                      saved,
                       pageSizes: tablePageSizes(),
                       total: list.totalCount,
                       search: true,

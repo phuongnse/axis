@@ -21,11 +21,13 @@ import { markCurrentPage } from './pagination'
 import { matchesFilter, type FilterGroup, type FilterKind } from './tableFilter'
 import { TableFilterButton, TableFilterChips, type FilterColumn } from './TableFilter'
 import { TableColumnsButton } from './TableColumns'
+import { TableViewsButton } from './TableViews'
 import { shownColumns, type TableQuery, type TableSort } from './tableQuery'
 import { makeRoom, type ColumnPriority } from './tableRoom'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
+import type { TableSavedViews } from './useTableView'
 import { visuallyHidden } from './visuallyHidden'
 
 /**
@@ -80,6 +82,8 @@ export interface AxisTableView {
   search?: boolean
   /** Whether the table has the Columns button. */
   columns?: boolean
+  /** The person's saved views of a table with a key, which `useTableView` gives. The Views button shows when it is set. */
+  saved?: TableSavedViews
   /**
    * Whether the table pages its rows. With `false`, every row shows and there is no pager. Only a table that holds its
    * rows reads it, see docs/reference/actions-and-controls.md#tables.
@@ -116,7 +120,7 @@ export interface AxisBulkAction<T> {
 
 /**
  * The toolbar of every table, see docs/reference/actions-and-controls.md#tables. AxisTable draws the view's Search, Filter
- * and Columns on the left. The toolbar gives the right side: Refresh, the secondary actions such as Import and Export, and
+ * Columns and Views on the left. The toolbar gives the right side: Refresh, the secondary actions such as Import and Export, and
  * the main action last. Each is there only when the table has it.
  */
 export interface AxisTableToolbar {
@@ -201,7 +205,7 @@ const foldFrom = 3
 
 /**
  * The one table of the platform, see docs/reference/actions-and-controls.md#tables. It draws the toolbar in its fixed
- * order, with the Columns button after Search and Filter for a view that turns it on, the columns by their kind, rows and a header of the `tableRow` size, the row actions, folded into one "…" menu
+ * order, with the Columns button after Search and Filter for a view that turns it on, then the Views button for a view with `saved`, the columns by their kind, rows and a header of the `tableRow` size, the row actions, folded into one "…" menu
  * from three on or below 992 px, the row checkboxes and the selection bar of the bulk actions, the paging, the columns that move under their row and then the sideways scrolling when the page is narrower than the columns, and the em
  * dash for an empty cell.
  */
@@ -470,6 +474,7 @@ export function AxisTable<T extends object>({
     searchable ||
     filterable ||
     arrangeable ||
+    view?.saved !== undefined ||
     toolbar.onRefresh !== undefined ||
     toolbar.secondary !== undefined ||
     toolbar.main !== undefined
@@ -516,9 +521,9 @@ export function AxisTable<T extends object>({
     <Flex ref={tableRef} vertical gap="middle" aria-busy={loading} data-testid={testId}>
       {hasToolbar && (
         <Flex justify="space-between" align="center" gap="small" wrap>
-          {/* The search box keeps its own width, so Filter and Columns follow it on one line, see
+          {/* The search box keeps its own width, so Filter, Columns and Views follow it on one line, see
               docs/reference/actions-and-controls.md#tables. */}
-          {(searchable || filterable || arrangeable) && (
+          {(searchable || filterable || arrangeable || view?.saved !== undefined) && (
             <Flex gap="small" wrap style={{ minWidth: 0 }}>
               {searchable && (
                 <Input.Search
@@ -545,6 +550,7 @@ export function AxisTable<T extends object>({
                   onApply={onColumns}
                 />
               )}
+              {view?.saved && <TableViewsButton saved={view.saved} />}
             </Flex>
           )}
           <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
