@@ -366,25 +366,43 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
 - **Checking.** The editor checks its text once when it first draws, and 300 ms after each keystroke it
   sends the text to the [expression check route](authoring.md#expression-check), and shows only the
   latest answer. An empty text, required or not, is not sent. It underlines the range from `start` to
-  `end` and shows the message and then its error code under the editor, or the result `type` in words
-  when there is no error. From its first draw or a keystroke until the answer to its latest text
-  arrives or the check fails, and while its code loads, the editor has `aria-busy="true"`. An empty
-  text leaves it not busy. Tests wait on this busy state before they click on the Form tab, see
-  [flaky tests](../development.md#flaky-tests).
+  `end` and shows the message and then its error code under the editor. From its first draw or a keystroke
+  until the answer to its latest text arrives or the check fails, and while its code loads, the editor has
+  `aria-busy="true"`. An empty text leaves it not busy. Tests wait on this busy state before they click on
+  the Form tab, see [flaky tests](../development.md#flaky-tests).
 - **No answer.** The check places the text in the saved resource, so a place inside a field or an item
   that is not saved yet has no answer, while a new property of a saved object has one, see
   [the place](authoring.md#expression-check). With no answer, or an answer of `400` or `401`, the last
   result stays on screen. A `401` does not show the sign-in prompt, so the draft is kept. The editor
   never blocks Save.
-- **What the place needs.** A line under the box says what the place needs, as "Needs to
-  give yes or no", until the expression gives a type, then "Gives yes or no", with the type in words.
-  A validation, a condition or a filter needs a boolean, and a computed field or a default the field's
-  type. A place that takes any type shows no "Needs" line.
+- **One line under the box** _(planned for M33)_. An empty box shows what the place needs, as "Needs to
+  give yes or no". Once the expression reads back, the reading takes the place of "Gives …", since a
+  type that does not match is already an error. A validation, a condition or a filter needs a boolean,
+  and a computed field or a default the field's type. A place that takes any type keeps "Gives …" under
+  the reading.
+- **Reads back in words** _(planned for M33)_. While the expression has no error, an "In words:" line under the
+  box reads it back, in every place, because every place uses this editor. A field reads as its label in bold,
+  and a path as the labels of its fields, such as "Name of Supplier". An enum value reads as its value label,
+  `true` and `false` as yes and no, and `null` as no value. Numbers and dates read in the author's language.
+  A comparison reads in words: "is at least", "has no value", and "is one of" with the list joined by "or".
+  A comparison of dates reads as before or after. A yes-or-no field on its own reads as being yes, and after
+  `not` as being no. Arithmetic keeps ×, ÷ and −. Each function has words of its own, such as "the days from
+  … to …" for `daysBetween`. `amount * 1.1` reads "Amount × 1.1", and `addDays(today(), 7)` reads "today plus
+  7 days". With an error the line is hidden, and the error shows. The reading comes from the
+  [expression check](authoring.md#expression-check), and its words are texts in every locale, so a change of
+  language needs no new check.
+- **Groups read as the expression groups them** _(planned for M33)_. A group of only `and`, or only `or`, reads
+  on one line, joined in the author's language. A group that holds a group reads as a list under "All of these:"
+  or "At least one of these:", so `and` binding tighter than `or` shows. `not` before a group reads under "Not
+  all of these:" for `and`, and under "None of these:" for `or`.
+- **The box is one line, with Expand inside it** _(planned for M33)_. The box starts one line high, like a text
+  field. Expand is a small icon button inside the box, at the end of its first line, and each line keeps room at
+  its end, so the text never runs under it. The box in the Expand dialog shows at least eight lines.
 - **An error in words.** An error reads first in words, with its code after it, small. An
   empty expression is not sent to be checked. The box wraps long lines and grows with them.
 - **A function's signature.** In a call to an allowed function, a line shows `contains(text, text)` and what it does,
   with the parameter at the cursor in bold, counted by the commas at the call's own level. Outside a call, none.
-- **Expand.** An icon beside the box, next in Tab order, opens the expression in a large dialog, with an editor
+- **Expand.** Expand, next in Tab order after the box, opens the expression in a large dialog, with an editor
   that checks and saves like the box, and a panel of tabs Fields, Operators and Functions, with every rule
   allowed there. A click inserts the name at the cursor. A search looks in all three, best first: a name that
   is the words, then one that starts with them, then one that holds them, then one whose description does.
