@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Packages;
+using Axis.Core.Tenancy;
+using Axis.Data.Records;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Server.Applications;
@@ -28,6 +30,14 @@ namespace Axis.Server.Processes;
 /// the lease, and <c>204</c> when no call waits. A runner that is revoked while the request runs answers <c>401</c> and takes nothing. Like a
 /// registration, a take is never refused over the <c>storage</c> quota, because it is running work.
 /// </para>
+/// <para>
+/// <c>POST /api/package-runner/leases/{leaseId}/result</c> reads <c>{ "outcome": "succeeded", "output": {...} }</c>, and any other body, such as the
+/// outcomes <c>retryable</c> and <c>failed</c>, answers <c>400</c>. In one transaction, <see cref="PackageCallResults"/> records the call the same way
+/// the worker does after a run, and the answer is <c>204</c>, also when the output does not fit and the call and its instance fail. A lease
+/// that is unknown, or that another runner holds, answers <c>404</c>. A lease whose call is no longer <c>sending</c>, whose lease has ended or whose
+/// instance no longer waits on the step answers <c>409</c> and changes nothing. A result is never refused over the <c>storage</c> quota, because it
+/// is running work. A runner that is revoked while the request runs is not checked again, so its next request answers <c>401</c>.
+/// </para>
 /// </summary>
 internal static class PackageRunnerEndpoints
 {
@@ -35,6 +45,7 @@ internal static class PackageRunnerEndpoints
     {
         endpoints.MapPost("/api/package-runner/packages", RegisterAsync);
         endpoints.MapPost("/api/package-runner/calls/take", TakeAsync);
+        endpoints.MapPost("/api/package-runner/leases/{leaseId}/result", ResultAsync);
     }
 
     private static async Task<IResult> RegisterAsync(
@@ -111,6 +122,67 @@ internal static class PackageRunnerEndpoints
         return Results.Ok(new TakeResponse(take.LeaseId, take.Package, take.Version, take.Operation, take.OperationId, take.Input, take.LeaseUntil));
     }
 
+    private static async Task<IResult> ResultAsync(
+        HttpContext context,
+        string leaseId,
+        TenantDatabase database,
+        PackageCatalog packages,
+        ActiveApplicationResolver resolver,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        using var body = await ReadBodyAsync(context.Request, cancellationToken);
+        if (body is null || ReadSucceeded(body.RootElement) is not { } output)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "The body needs the outcome succeeded and an output object.");
+        }
+
+        if (!Guid.TryParseExact(leaseId, "D", out var lease))
+        {
+            return LeaseNotKnown();
+        }
+
+        var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
+        var runnerId = Guid.Parse(EndpointCaller.Read(context.User)!.Id);
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // The write limit comes first, so it also bounds the wait for a call that another request has locked.
+        await database.LimitWriteAsync(transaction, cancellationToken);
+        var outcome = await PackageCallResults.RecordSucceededAsync(
+            transaction,
+            tenantId,
+            runnerId,
+            lease,
+            output,
+            packages,
+            resolver.GetReleaseModelAsync,
+            new RecordCipher(sensitive, tenantId),
+            loggerFactory,
+            cancellationToken);
+        switch (outcome)
+        {
+            case PackageCallResultOutcome.UnknownLease:
+                await transaction.RollbackAsync(cancellationToken);
+                return LeaseNotKnown();
+            case PackageCallResultOutcome.Conflict:
+                await transaction.RollbackAsync(cancellationToken);
+                return Results.Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "The lease has ended or its call already has a result.");
+            default:
+                await transaction.CommitAsync(cancellationToken);
+                return Results.NoContent();
+        }
+    }
+
+    private static IResult LeaseNotKnown() =>
+        Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The lease is not known.");
+
     /// <summary>The parsed body, or null when it is not JSON.</summary>
     private static async Task<JsonDocument?> ReadBodyAsync(HttpRequest request, CancellationToken cancellationToken)
     {
@@ -186,6 +258,25 @@ internal static class PackageRunnerEndpoints
         }
 
         return packages;
+    }
+
+    /// <summary>
+    /// The <c>output</c> of <c>{ "outcome": "succeeded", "output": {...} }</c>, or null when the shape is wrong: the outcome must be exactly
+    /// <c>succeeded</c> and the output an object. Other properties are ignored.
+    /// </summary>
+    private static JsonObject? ReadSucceeded(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object
+            || !root.TryGetProperty("outcome", out var outcome)
+            || outcome.ValueKind != JsonValueKind.String
+            || outcome.GetString() != "succeeded"
+            || !root.TryGetProperty("output", out var output)
+            || output.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        return JsonNode.Parse(output.GetRawText())!.AsObject();
     }
 
     private static bool TryReadText(JsonElement manifest, string property, out string value)

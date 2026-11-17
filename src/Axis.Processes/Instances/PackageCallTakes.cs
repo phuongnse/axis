@@ -54,7 +54,7 @@ public static class PackageCallTakes
             if (model.Processes.FirstOrDefault(candidate => candidate.Id == call.ProcessId) is { } process
                 && process.TryGetStep(call.Step, out var found)
                 && found is PackageOperationStepModel { CustomerHosted: true } step
-                && await FindManifestAsync(transaction, installed, call, cancellationToken) is { } manifest
+                && await FindManifestAsync(transaction, installed, call.ReleaseId, call.Package, call.Version, cancellationToken) is { } manifest
                 && manifest.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, call.Operation, StringComparison.OrdinalIgnoreCase)) is { } operation
                 && PackageCallHandler.ReadInput(call.Input, operation) is { } values)
             {
@@ -73,14 +73,14 @@ public static class PackageCallTakes
     }
 
     /// <summary>
-    /// The manifest of the call's package: the installed package's, or for an application's own package the one in the release's
-    /// source. It must name the call's id and version.
+    /// The manifest of the package <paramref name="package"/> <paramref name="version"/> of a call pinned to <paramref name="releaseId"/>: the
+    /// installed package's, or for an application's own package the one in the release's source. It must name the package's id and version.
     /// </summary>
-    private static async Task<PackageManifest?> FindManifestAsync(
-        NpgsqlTransaction transaction, PackageCatalog installed, TakeableCall call, CancellationToken cancellationToken)
+    internal static async Task<PackageManifest?> FindManifestAsync(
+        NpgsqlTransaction transaction, PackageCatalog installed, Guid releaseId, string package, string version, CancellationToken cancellationToken)
     {
-        var manifest = installed.Find(call.Package, call.Version)?.Manifest
-            ?? await ReleasePackageFiles.LoadSourceManifestAsync(transaction, call.ReleaseId, call.Package, cancellationToken);
-        return manifest is not null && manifest.Id == call.Package && manifest.Version == call.Version ? manifest : null;
+        var manifest = installed.Find(package, version)?.Manifest
+            ?? await ReleasePackageFiles.LoadSourceManifestAsync(transaction, releaseId, package, cancellationToken);
+        return manifest is not null && manifest.Id == package && manifest.Version == version ? manifest : null;
     }
 }

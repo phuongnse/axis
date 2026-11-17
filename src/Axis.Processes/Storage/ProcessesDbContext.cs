@@ -225,6 +225,9 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.HasIndex(c => new { c.ProcessInstanceId, c.Step, c.StagedRevision })
                 .IsUnique()
                 .HasDatabaseName("ux_package_calls_process_instance_id_step_staged_revision");
+
+            // A runner's result finds its call by the lease, and a lease belongs to one call.
+            call.HasIndex(c => c.LeaseId).IsUnique().HasDatabaseName("ux_package_calls_lease_id");
             call.HasOne<ProcessInstanceRow>()
                 .WithMany()
                 .HasForeignKey(c => c.ProcessInstanceId)

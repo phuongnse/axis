@@ -101,6 +101,23 @@ public sealed class PackageRunnerRegistrationTests(PostgreSqlFixture database, K
             await Check("take: blank id", id, good.Token, """{ "packages": [{ "id": "", "version": "1.0.0" }] }""", route: Take);
             await Check("take: a version that is not text", id, good.Token, """{ "packages": [{ "id": "tools", "version": 1 }] }""", route: Take);
 
+            // The result route is checked in the same order, and reads { "outcome": "succeeded", "output": {...} }. Only the lease decides the 404.
+            var result = $"/api/package-runner/leases/{Guid.NewGuid()}/result";
+            const string ResultBody = """{ "outcome": "succeeded", "output": { "total": "5" } }""";
+            await Check("result: unknown host", "unknown", good.Token, ResultBody, route: result);
+            await Check("result: no token", id, null, ResultBody, route: result);
+            await Check("result: revoked runner", id, revoked.Token, ResultBody, route: result);
+            await Check("result: revoked runner with a bad body", id, revoked.Token, "{}", route: result);
+            await Check("result: no body", id, good.Token, null, route: result);
+            await Check("result: not JSON", id, good.Token, "not json", route: result);
+            await Check("result: not a JSON content type", id, good.Token, ResultBody, "text/plain", result);
+            await Check("result: no outcome", id, good.Token, """{ "output": {} }""", route: result);
+            await Check("result: retryable", id, good.Token, """{ "outcome": "retryable", "error": "Busy" }""", route: result);
+            await Check("result: failed", id, good.Token, """{ "outcome": "failed", "error": "Broken" }""", route: result);
+            await Check("result: no output", id, good.Token, """{ "outcome": "succeeded" }""", route: result);
+            await Check("result: an output that is not an object", id, good.Token, """{ "outcome": "succeeded", "output": 5 }""", route: result);
+            await Check("result: a lease that is not known", id, good.Token, ResultBody, route: result);
+
             Assert.Equal(
                 [
                     ("unknown host", HttpStatusCode.NotFound),
@@ -135,6 +152,19 @@ public sealed class PackageRunnerRegistrationTests(PostgreSqlFixture database, K
                     ("take: no version", HttpStatusCode.BadRequest),
                     ("take: blank id", HttpStatusCode.BadRequest),
                     ("take: a version that is not text", HttpStatusCode.BadRequest),
+                    ("result: unknown host", HttpStatusCode.NotFound),
+                    ("result: no token", HttpStatusCode.Unauthorized),
+                    ("result: revoked runner", HttpStatusCode.Unauthorized),
+                    ("result: revoked runner with a bad body", HttpStatusCode.Unauthorized),
+                    ("result: no body", HttpStatusCode.BadRequest),
+                    ("result: not JSON", HttpStatusCode.BadRequest),
+                    ("result: not a JSON content type", HttpStatusCode.BadRequest),
+                    ("result: no outcome", HttpStatusCode.BadRequest),
+                    ("result: retryable", HttpStatusCode.BadRequest),
+                    ("result: failed", HttpStatusCode.BadRequest),
+                    ("result: no output", HttpStatusCode.BadRequest),
+                    ("result: an output that is not an object", HttpStatusCode.BadRequest),
+                    ("result: a lease that is not known", HttpStatusCode.NotFound),
                 ],
                 statuses);
         }
@@ -163,11 +193,14 @@ public sealed class PackageRunnerRegistrationTests(PostgreSqlFixture database, K
             using var serviceOnRunnerRoute = await PackageRunnerServer.RegisterAsync(client, service, _sumManifest);
             using var serviceOnTake = await PackageRunnerServer.PostAsync(
                 client, Take, service, """{ "packages": [{ "id": "tools", "version": "1.0.0" }] }""");
+            using var serviceOnResult = await PackageRunnerServer.PostAsync(
+                client, $"/api/package-runner/leases/{Guid.NewGuid()}/result", service, """{ "outcome": "succeeded", "output": {} }""");
             using var runnerOnRecordRoute = await PackageRunnerServer.GetAsync(client, RecordRoute, runner.Token);
             using var serviceOnRecordRoute = await PackageRunnerServer.GetAsync(client, RecordRoute, service);
 
             Assert.Equal(HttpStatusCode.Unauthorized, serviceOnRunnerRoute.StatusCode);
             Assert.Equal(HttpStatusCode.Unauthorized, serviceOnTake.StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, serviceOnResult.StatusCode);
             Assert.Equal(HttpStatusCode.Unauthorized, runnerOnRecordRoute.StatusCode);
             Assert.NotEqual(HttpStatusCode.Unauthorized, serviceOnRecordRoute.StatusCode);
         }

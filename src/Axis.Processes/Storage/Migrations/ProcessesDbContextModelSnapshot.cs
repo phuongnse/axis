@@ -591,6 +591,10 @@ namespace Axis.Processes.Storage.Migrations
                     b.HasKey("Id")
                         .HasName("pk_package_calls");
 
+                    b.HasIndex("LeaseId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_package_calls_lease_id");
+
                     b.HasIndex("ProcessInstanceId", "Step", "StagedRevision")
                         .IsUnique()
                         .HasDatabaseName("ux_package_calls_process_instance_id_step_staged_revision");
