@@ -91,6 +91,26 @@ public sealed class ExpressionType : IEquatable<ExpressionType>
 
     public static bool operator !=(ExpressionType? left, ExpressionType? right) => !(left == right);
 
+    /// <summary>
+    /// The type in the notation of the Types table in docs/reference/expressions.md: <c>text</c>, <c>integer</c>, <c>decimal</c>,
+    /// <c>boolean</c>, <c>date</c>, <c>date-time</c>, <c>enum</c>, <c>reference</c>, <c>file</c> or <c>null</c>.
+    /// Unlike <see cref="ToString"/> it leaves out the field or entity.
+    /// </summary>
+    public string Notation => Kind switch
+    {
+        ExpressionTypeKind.Null => "null",
+        ExpressionTypeKind.Text => "text",
+        ExpressionTypeKind.Integer => "integer",
+        ExpressionTypeKind.Decimal => "decimal",
+        ExpressionTypeKind.Boolean => "boolean",
+        ExpressionTypeKind.Date => "date",
+        ExpressionTypeKind.DateTime => "date-time",
+        ExpressionTypeKind.Enum => "enum",
+        ExpressionTypeKind.Reference => "reference",
+        ExpressionTypeKind.File => "file",
+        _ => Kind.ToString(),
+    };
+
     /// <summary>The type as messages name it, such as <c>date-time</c> or <c>enum of 'status'</c>.</summary>
     public override string ToString() => Kind switch
     {
