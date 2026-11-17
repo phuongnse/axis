@@ -87,7 +87,7 @@ the files agree, title and status included.
 | [D73](decisions/d73-in-app-and-email-notifications.md) | In-app and email notifications | **Agreed** |
 | [D74](decisions/d74-a-visual-process-designer.md) | A visual process designer | **Agreed** |
 | D75 | The application time zone | Superseded by [D156](decisions/d156-working-time-calendars-durations-in-working-hours-and-slas.md), [last text](https://github.com/phuongnse/axis/blob/27b802cb21dc1a322b24a4456b4ecd3b5c89a473/docs/decisions/d75-the-application-time-zone.md) |
-| [D76](decisions/d76-file-money-and-enum-label-field-types.md) | File, money and enum label field types | **Agreed** |
+| D76 | File, money and enum label field types | Superseded by [D157](decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md), [last text](https://github.com/phuongnse/axis/blob/11688aa43b8dfa85639ba00e0b14cd9baea8a54f/docs/decisions/d76-file-money-and-enum-label-field-types.md) |
 | [D77](decisions/d77-indexes-defaults-and-ranges.md) | Indexes, defaults and ranges | **Agreed** |
 | [D78](decisions/d78-references-from-child-rows-and-many-to-many.md) | References from child rows and many-to-many | **Agreed** |
 | [D79](decisions/d79-import-and-export-under-policies.md) | Import and export under policies | **Agreed** |
@@ -168,3 +168,4 @@ the files agree, title and status included.
 | [D154](decisions/d154-every-capability-an-organization-needs-has-a-home-and-a-capability-map-keeps-it-so.md) | Every capability an organization needs has a home, and a capability map keeps it so | **Agreed** |
 | [D155](decisions/d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md) | Processes run paths at once, repeat steps, give tasks to many people and take error paths | **Agreed** |
 | [D156](decisions/d156-working-time-calendars-durations-in-working-hours-and-slas.md) | Working time: calendars, durations in working hours, and SLAs | **Agreed** |
+| [D157](decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md) | Files reach calls and emails, show in the page, keep their versions, and documents come from Word templates | **Agreed** |

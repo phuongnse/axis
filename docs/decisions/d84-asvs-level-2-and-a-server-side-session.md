@@ -13,7 +13,7 @@ cannot be revoked.
 
 - **ASVS 5.0, Level 2.** The identity provider meets the account controls, because Axis has no
   passwords, and the operator meets malware scanning of uploads
-  ([D76](d76-file-money-and-enum-label-field-types.md)).
+  ([D157](d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md)).
 - **One tracking page** lists each requirement once with its status and evidence, and
   `scripts/check-docs.mjs` checks it.
 - **The session lives on the server.** A tenant database row holds it, keyed by a hash of a random
