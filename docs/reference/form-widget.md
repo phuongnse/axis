@@ -266,6 +266,32 @@ The form sends only what changed, and shows the server's answer where it belongs
 - **Keys.** Enter in a date or date-time picker only confirms the picked value and never sends the
   form. Enter in a text input sends the form, as in any form.
 
+### Form drafts
+
+_(planned for M42)_
+
+A form for a new record keeps a form draft: the person's typing, saved on the server as they type, for
+that person only. It is removed when the record is saved, and after 30 days. The routes, limits and
+checks are in [form drafts](record-form-state.md#form-drafts). A form draft is not the authoring
+[Draft](../domain/concepts.md).
+
+- **Scope.** Only a widget that names a `form`, on a new record, for a person with a `create` grant on
+  the form's entity. A widget that names only an `entity`, a saved record and the task page keep no
+  draft.
+- **Saving.** The widget sends a `PUT` 2 s after the last change. It sends the values that a create
+  would send, but no file field and no file cell. It does not save before the first change, nor when
+  nothing has changed since the last save. A failed save shows nothing, and the next change tries
+  again.
+- **Restoring.** When a new form opens, the widget reads the draft. Its values fill the fields that
+  the form shows and the person may write, as typed values over the first values and the `defaults`.
+  The widget then asks for the form state as it does on open. A notice above the form says that the
+  draft was restored and when it was saved, and offers Discard.
+- **Dropping.** A successful create removes the draft on the server. Discard asks first, by
+  [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm), because a discarded
+  draft cannot be brought back. It then deletes the draft and opens the form as new. Cancel keeps the
+  draft.
+- **Storage.** The draft is on the server only. Nothing goes in the URL or in browser storage.
+
 ## Start process actions
 
 A `form` widget can declare `startProcess` actions, which save the record and start a process over it.

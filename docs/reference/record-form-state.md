@@ -1,6 +1,6 @@
 # Record form state
 
-The form state endpoint of the [record API](record-api.md).
+The form state endpoint and the form draft routes of the [record API](record-api.md).
 
 ## Form state
 
@@ -103,5 +103,51 @@ The checks run in this order, and the first failure is the response:
 The grant check is split because `recordId` is in the body, so the server
 cannot tell which grant the call needs before it reads the body. The call does
 not check `update` record filters. A save does.
+
+The problem details are as in [Errors](record-api.md#errors).
+
+## Form drafts
+
+_(planned for M42)_
+
+A form draft is the typing of one person on a form for a new record, kept on the server until the record
+is saved or 30 days pass. How the form widget saves, restores and drops it is in
+[form drafts](form-widget.md#form-drafts). It is not the authoring Draft of
+[concepts](../domain/concepts.md).
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/apps/{app}/forms/{form}/draft` _(planned for M42)_ | `200` with `{ "values", "savedAt" }`, or `204` when the person has none |
+| `PUT /api/apps/{app}/forms/{form}/draft` _(planned for M42)_ | Replaces the person's draft with `{ "values" }`, `204` |
+| `DELETE /api/apps/{app}/forms/{form}/draft` _(planned for M42)_ | Drops it, `204` also when there is none |
+
+`{form}` is a form name in the active release, ignoring letter case, as for the form state route. A
+`PUT` needs `Content-Type: application/json` and the [CSRF header](record-api.md#create-update-and-delete),
+and so does a `DELETE`.
+
+- **Key.** There is one draft for each signed-in person, application and form. No route names a person,
+  so nobody reads or changes the draft of another.
+- **Callers.** A service account token answers `403`.
+- **Body.** `values` is an object with the shape of the `values` of a write. Each key must be an
+  editable field of the form and not a file field, else `400`. The values are not type-checked, so
+  number text such as `1,5` stays as typed. A draft holds no file values.
+- **Size.** A body over 256 KiB answers `413`.
+- **Expiry.** A draft whose `savedAt` is over 30 days old reads as none. The worker deletes it, see
+  [system tables](storage.md#system-tables).
+- **Removal on create.** A create that carries `?form=` deletes the person's draft of that form in its
+  transaction. A refused create keeps the draft.
+- **Sensitive values.** A sensitive field's value is stored encrypted, see
+  [sensitive field values](data-encryption.md#sensitive-field-values).
+- **Side effects.** A draft write adds no audit record and uses no sequence number. It is never
+  refused over the `storage` quota, see [tenant quotas](tenant-quotas.md).
+
+The checks run in this order, and the first failure is the response:
+
+1. `401` when nobody is signed in.
+2. `404` for an unknown application or form.
+3. `403` when the person has no `create` grant on the form's entity.
+4. `415` for a wrong content type, then `400` for a malformed body.
+5. `413` for a body over 256 KiB.
+6. `403` for a field that the person may not write on create.
 
 The problem details are as in [Errors](record-api.md#errors).

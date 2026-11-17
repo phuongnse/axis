@@ -2,7 +2,7 @@
 
 The record API reads and writes the records of an application's entities over HTTP, under the
 user's policies. This page covers its routes, the record shape, paging, writes, concurrency, errors
-and request bodies and values. The form state endpoint is in [record form state](record-form-state.md). Child rows, computed
+and request bodies and values. The form state endpoint and the form draft routes are in [record form state](record-form-state.md). Child rows, computed
 fields and validations are in [record child rows](record-child-rows-and-validations.md).
 How another system calls an inbound endpoint is in [inbound-endpoints.md](inbound-endpoints.md), and
 the audit records and history of a record are in [record-audit.md](record-audit.md).
@@ -54,6 +54,9 @@ record's audit records are read through its history route.
 
 **Recycle bin routes** _(planned for M41)_. The routes that restore and purge a deleted record, and the
 list of records in the bin, are in [recycle-bin.md](recycle-bin.md).
+
+**Form draft routes** _(planned for M42)_. The routes that read, replace and delete a person's draft of a
+new record are in [form drafts](record-form-state.md#form-drafts).
 
 **A record at a time** _(planned for M41)_. A read of one record takes `?at=` and answers the record as it was
 at that time, see [a record at a time](record-audit.md#a-record-at-a-time).
