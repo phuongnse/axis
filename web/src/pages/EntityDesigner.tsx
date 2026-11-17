@@ -17,6 +17,7 @@ import {
 } from '../platform/entityFields'
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { referenceOptions, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { LabelTexts } from './LabelTexts'
@@ -80,6 +81,12 @@ function groupTexts(t: (key: string) => string, path: string) {
   return { title: label, help }
 }
 
+/** The heading and the line of an entity's section, from `shell.studio.section.entity.<name>`, see docs/reference/entity-designer.md#sections. */
+function sectionHeading(t: (key: string) => string, name: 'general' | 'fields' | 'validations' | 'indexes') {
+  const prefix = `shell.studio.section.entity.${name}`
+  return { title: t(prefix), line: t(`${prefix}.line`) }
+}
+
 /**
  * A picker over `options`, or over the application's names of `kind` when `options` is not given. It is a plain box
  * while the application's names have not loaded and `options` is not given.
@@ -131,15 +138,16 @@ const Picker = memo(function Picker({
 })
 
 /**
- * The designer of an entity. It shows the entity's name, label and display field, then its fields as a table of
- * name, label, type, required, unique and a settings column that shows only the settings the field's type takes,
- * and its validations as rows of a name, an expression, a message key and a field. A field can be added, removed and moved,
- * and a type change drops the settings the new type does not take. A computed field's `expression` and each
- * validation's expression use the expression editor, and so does a field's `default`, which has no field in scope.
- * A field's settings also include `min` and `max` in the type of the field, `minLength` and `searchable`, and they
- * hide `default`, `min`, `max` and `minLength` next to an `expression`, a `sequence` or `creator`. An Indexes list
- * under the fields adds, moves and removes the entity's `indexes`, each a name, a list of the entity's fields and a
- * Unique choice. The name of an index or a validation is shown as plain text, and an added one gets `index1` or
+ * The designer of an entity, in the sections General, Fields, Validations and Indexes, see
+ * docs/reference/entity-designer.md#sections. General shows the entity's name, label, description and display field.
+ * Fields is a table of name, label, type, required, unique and a settings column that shows only the settings the
+ * field's type takes, and Validations is rows of a name, an expression, a message key and a field. A field can be
+ * added, removed and moved, and a type change drops the settings the new type does not take. A computed field's
+ * `expression` and each validation's expression use the expression editor, and so does a field's `default`, which has
+ * no field in scope. A field's settings also include `min` and `max` in the type of the field, `minLength` and
+ * `searchable`, and they hide `default`, `min`, `max` and `minLength` next to an `expression`, a `sequence` or
+ * `creator`. The Indexes section, after Validations, adds, moves and removes the entity's `indexes`, each a name, a
+ * list of the entity's fields and a Unique choice. The name of an index or a validation is shown as plain text, and an added one gets `index1` or
  * `validation1`, the first name its list does not use. The designer edits the draft through `onChange`, so a key it
  * does not show, such as `id`, `kind` or an unknown key on a field, stays as it is. Every input has the id
  * `studio-field-<pointer>`, and each row of the table has the id of its field, so a diagnostic opens at its input or
@@ -181,48 +189,54 @@ export function EntityDesigner({
   const pickDisplayField = useCallback((next: string | undefined) => onChange('/displayField', next), [onChange])
 
   const designer = (
-    <Flex vertical gap="middle" data-testid="studio-entity-designer">
-      <div data-testid="studio-field-/name">
-        <AxisField {...fieldTexts(t, 'name')} required>
-          <Input value={text(value.name)} onChange={(event) => onChange('/name', event.target.value)} />
-        </AxisField>
-      </div>
-      <div data-testid="studio-field-/label">
-        <AxisFieldGroup {...groupTexts(t, 'label')}>
-          <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
-        </AxisFieldGroup>
-      </div>
-      <div data-testid="studio-field-/description">
-        <AxisFieldGroup {...groupTexts(t, 'description')}>
-          <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
-        </AxisFieldGroup>
-      </div>
-      <Picker
-        pointer="/displayField"
-        {...fieldTexts(t, 'displayField')}
-        options={fieldNames}
-        value={value.displayField}
-        required={false}
-        onPick={pickDisplayField}
-      />
-      <Fields
-        fields={fields}
-        readOnly={readOnly}
-        origins={origins}
-        warnings={warnings}
-        onOriginsChange={onOriginsChange}
-        layer={layer}
-        onChange={onChange}
-      />
-      <Indexes indexes={value.indexes} fields={fields ?? []} readOnly={readOnly} layer={layer} onChange={onChange} />
-      <Validations
-        validations={value.validations}
-        fieldNames={fieldNames}
-        readOnly={readOnly}
-        layer={layer}
-        onChange={onChange}
-      />
-    </Flex>
+    <div data-testid="studio-entity-designer">
+      <SectionParts>
+        <SectionPart testName="general" heading={sectionHeading(t, 'general')}>
+          <Flex vertical gap="middle">
+            <div data-testid="studio-field-/name">
+              <AxisField {...fieldTexts(t, 'name')} required>
+                <Input value={text(value.name)} onChange={(event) => onChange('/name', event.target.value)} />
+              </AxisField>
+            </div>
+            <div data-testid="studio-field-/label">
+              <AxisFieldGroup {...groupTexts(t, 'label')}>
+                <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
+              </AxisFieldGroup>
+            </div>
+            <div data-testid="studio-field-/description">
+              <AxisFieldGroup {...groupTexts(t, 'description')}>
+                <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+              </AxisFieldGroup>
+            </div>
+            <Picker
+              pointer="/displayField"
+              {...fieldTexts(t, 'displayField')}
+              options={fieldNames}
+              value={value.displayField}
+              required={false}
+              onPick={pickDisplayField}
+            />
+          </Flex>
+        </SectionPart>
+        <Fields
+          fields={fields}
+          readOnly={readOnly}
+          origins={origins}
+          warnings={warnings}
+          onOriginsChange={onOriginsChange}
+          layer={layer}
+          onChange={onChange}
+        />
+        <Validations
+          validations={value.validations}
+          fieldNames={fieldNames}
+          readOnly={readOnly}
+          layer={layer}
+          onChange={onChange}
+        />
+        <Indexes indexes={value.indexes} fields={fields ?? []} readOnly={readOnly} layer={layer} onChange={onChange} />
+      </SectionParts>
+    </div>
   )
 
   return readOnly ? <ConfigProvider componentDisabled>{designer}</ConfigProvider> : designer
@@ -239,8 +253,8 @@ function rowOrigins(fields: unknown[], origins: FieldOrigin[] | undefined): Fiel
 }
 
 /**
- * The fields of the entity as a table, with Add field below it. Every cell is a memo component of stable props, so a
- * key in one row draws that row's cells and no other.
+ * The fields of the entity as a table, in the Fields section, with Add field on the right of its heading. Every cell is a
+ * memo component of stable props, so a key in one row draws that row's cells and no other.
  */
 const Fields = memo(function Fields({
   fields,
@@ -305,17 +319,19 @@ const Fields = memo(function Fields({
     )
   }, [])
 
-  if (fields === undefined) {
-    return (
-      <div data-testid="studio-field-/fields">
-        <JsonOnly />
-      </div>
-    )
-  }
-
   function addField() {
     onChange('/fields', [...fields!, { name: '', type: 'text' }])
     onOriginsChange?.([...rowOrigins(fields!, origins), null])
+  }
+
+  if (fields === undefined) {
+    return (
+      <SectionPart testName="fields" heading={sectionHeading(t, 'fields')}>
+        <div data-testid="studio-field-/fields">
+          <JsonOnly />
+        </div>
+      </SectionPart>
+    )
   }
 
   const columns: AxisColumn<FieldRow>[] = [
@@ -389,8 +405,18 @@ const Fields = memo(function Fields({
   ]
 
   return (
-    <div data-testid="studio-field-/fields">
-      <AxisFieldGroup {...groupTexts(t, 'fields')}>
+    <SectionPart
+      testName="fields"
+      heading={sectionHeading(t, 'fields')}
+      action={
+        readOnly ? undefined : (
+          <AxisButton role="secondary" onClick={addField}>
+            {t('shell.studio.entity.addField')}
+          </AxisButton>
+        )
+      }
+    >
+      <div data-testid="studio-field-/fields">
         <Flex vertical gap="small">
           <AxisTable<FieldRow>
             dataSource={fields.map((field, index) => ({ field, index }))}
@@ -401,16 +427,10 @@ const Fields = memo(function Fields({
             }
             columns={columns}
           />
-          {readOnly ? null : (
-            <div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button onClick={addField}>{t('shell.studio.entity.addField')}</Button>
-            </div>
-          )}
           <RemovedRows layer={layer} list="/fields" />
         </Flex>
-      </AxisFieldGroup>
-    </div>
+      </div>
+    </SectionPart>
   )
 })
 
@@ -993,9 +1013,11 @@ const Indexes = memo(function Indexes({
 
   if (indexes !== undefined && !Array.isArray(indexes)) {
     return (
-      <div data-testid="studio-field-/indexes">
-        <JsonOnly />
-      </div>
+      <SectionPart testName="indexes" heading={sectionHeading(t, 'indexes')}>
+        <div data-testid="studio-field-/indexes">
+          <JsonOnly />
+        </div>
+      </SectionPart>
     )
   }
   const list: unknown[] = indexes ?? []
@@ -1020,8 +1042,8 @@ const Indexes = memo(function Indexes({
   }
 
   return (
-    <div data-testid="studio-field-/indexes">
-      <AxisFieldGroup {...groupTexts(t, 'indexes')}>
+    <SectionPart testName="indexes" heading={sectionHeading(t, 'indexes')}>
+      <div data-testid="studio-field-/indexes">
         <Flex vertical gap="small">
           {list.map((index, position) => {
             const pointer = `/indexes/${position}`
@@ -1084,8 +1106,8 @@ const Indexes = memo(function Indexes({
           )}
           <RemovedRows layer={layer} list="/indexes" />
         </Flex>
-      </AxisFieldGroup>
-    </div>
+      </div>
+    </SectionPart>
   )
 })
 
@@ -1107,16 +1129,18 @@ const Validations = memo(function Validations({
 
   if (validations !== undefined && !Array.isArray(validations)) {
     return (
-      <div data-testid="studio-field-/validations">
-        <JsonOnly />
-      </div>
+      <SectionPart testName="validations" heading={sectionHeading(t, 'validations')}>
+        <div data-testid="studio-field-/validations">
+          <JsonOnly />
+        </div>
+      </SectionPart>
     )
   }
   const list: unknown[] = validations ?? []
 
   return (
-    <div data-testid="studio-field-/validations">
-      <AxisFieldGroup {...groupTexts(t, 'validations')}>
+    <SectionPart testName="validations" heading={sectionHeading(t, 'validations')}>
+      <div data-testid="studio-field-/validations">
         <Flex vertical gap="small">
           {list.map((validation, index) => (
             <ValidationRow
@@ -1146,8 +1170,8 @@ const Validations = memo(function Validations({
           )}
           <RemovedRows layer={layer} list="/validations" />
         </Flex>
-      </AxisFieldGroup>
-    </div>
+      </div>
+    </SectionPart>
   )
 })
 

@@ -28,11 +28,11 @@ with no heading. A property that no section names goes to a last section with no
   a rule before it. A seed's records, an endpoint's values and event, a site's sign-in providers and a form's steps
   are such parts. Each is headed with its field's title and help, and the auto-accept switch is a part with no heading.
 - **Used by the generic form, most editors and the Overview.** The generic form, the seed, page, process, connector,
-  identity provider and scenario editors and the Studio Overview draw their sections through it.
-  A module data source, rule, trigger, sequence, event or seed draws the same parts, under its Customized tag and Reset all.
+  identity provider, entity designer and scenario editors and the Studio Overview draw their sections through it.
+  A module data source, rule, trigger, sequence, event, seed or entity draws the same parts, under its Customized tag and Reset all.
 - **Add… in the heading of every list part** _(planned for M33)_. The records, values, sign-in providers and steps
   parts put their Add… on the right of their heading.
-- **Every Studio form is built from it.** _(planned for M33)_ The entity designer draws its sections through it too.
+- **Every Studio form is built from it.** The entity designer draws its sections through it too.
 
 ## Fields
 
@@ -232,6 +232,9 @@ build on the same read through the [kind list route](#kind-list). Like every Stu
 - **`module`** is the module's id for a module's resource, else null.
 - **`titles` and `descriptions`** go with a module's resource: its label and description by locale, from
   the module's own texts. A resource of the folder has them null, because the resource list gives them.
+  A module resource's page heading reads its label from `titles`, in the author's language, with English as the
+  fallback. Without a label it shows the name without the `<module>/` prefix. Studio loads this route only while
+  such a resource is open, so the heading shows the name until the route answers.
 - **`modifiedBy` and `modifiedAt`.** Studio's writes record who wrote a file and when, with the version
   the write left, and a module's layer write counts too. The create, patch, `changes`, text write and module
   resource save and reset routes record, and undo, accepting an authoring request and creating an

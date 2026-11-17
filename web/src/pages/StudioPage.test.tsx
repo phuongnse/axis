@@ -32,6 +32,7 @@ const entityId = 'd9ccbf89-5004-4d52-8885-2ee377b7caa5'
 const formId = '5b6c7d8e-9f01-4a2b-8c3d-4e5f60718293'
 const departmentId = '0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b'
 const manifestId = 'f0e1d2c3-b4a5-4968-8776-655443322110'
+const employeeId = '0c5e2f1a-7d3b-4a6e-9f8c-2b1a0d9e8f7c'
 const folder = '/api/studio/apps/PurchaseRequests'
 
 const apps: (Partial<StudioApplication> & { name: string })[] = [
@@ -293,6 +294,9 @@ function stubServer(
     }
     if (input === `${folder}/names`) {
       return json(applicationNames)
+    }
+    if (input === `${folder}/resource-activity`) {
+      return json({ items: [] })
     }
     if (input.startsWith(`${folder}/kinds/`)) {
       return json(kindList(input))
@@ -1067,6 +1071,29 @@ describe('StudioPage', () => {
 
     expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}&path=%2Ffields%2F3%2Ftarget`)
     expect(await screen.findByTestId('studio-resource-details')).toHaveTextContent('/fields/3/target')
+  })
+
+  it.each([
+    ["its label in the author's language", { en: 'Employee', vi: 'Nhân viên' }, 'Nhân viên'],
+    ['its name without the module, when it has no label', {}, 'Employee'],
+  ])('shows a module entity by %s in its heading, never with the module', async (_, titles, heading) => {
+    const fetchMock = stubServer()
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input === namesPath) {
+        const employee = { id: employeeId, name: 'organization/Employee', module: 'organization', fields: [] }
+        return json({ ...applicationNames, entities: [...applicationNames.entities, employee] })
+      }
+      if (input === `${folder}/resource-activity`) {
+        const item = { id: employeeId, module: 'organization', status: null, titles, descriptions: {} }
+        return json({ items: [{ ...item, modifiedBy: null, modifiedAt: null }] })
+      }
+      return base(input, init)
+    })
+    renderPage(`/studio?app=PurchaseRequests&resource=${employeeId}`, 'vi')
+
+    expect(await screen.findByRole('heading', { level: 4, name: heading })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 4, name: 'organization/Employee' })).toBeNull()
   })
 
   it('scrolls the form field of the path in the address into view', async () => {
