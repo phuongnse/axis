@@ -270,7 +270,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Show validation messages as the person types | [Conditions](reference/form-widget-conditions.md#conditions) |
 | Split a form into wizard steps | [Steps](reference/form-conditions.md#steps) |
 | Default a field from the context, such as the current person or the page | _(planned for M42)_ |
-| Open a new record already filled in from its parent | _(planned for M42)_ |
+| Open a new record already filled in from its parent | [First values of a new record](reference/resource-files.md#first-values-of-a-new-record) _(planned for M42)_ |
 | Enter line items in a grid inside the form | [Child collections](reference/form-widget.md#child-collections) |
 | Reorder line items | _(planned for M42)_ |
 | Pick a record through a lookup with search | [Lookup](reference/form-widget.md#lookup) |
@@ -312,13 +312,13 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Show records on a Gantt chart or timeline | _(planned for M58)_ |
 | Show records on a map | _(planned for M58)_ |
 | Show one record read-only | [Detail widget](reference/detail-chart-kpi-widgets.md#detail-widget) |
-| Show a record's related lists on its page | _(planned for M42)_ |
+| Show a record's related lists on its page | [Address prefix](reference/table-widget.md#address-prefix) _(planned for M42)_ |
 | Show a key figure with a comparison | [KPI widget](reference/detail-chart-kpi-widgets.md#kpi-widget) |
-| Filter a dashboard and drill down from a chart | _(planned for M42)_ |
+| Filter a dashboard and drill down from a chart | [Filter bar](reference/data-sources.md#filter-bar) and [drill-down](reference/detail-chart-kpi-widgets.md#drill-down) _(planned for M42)_ |
 | Pivot rows into a cross table | _(planned for M54)_ |
 | Build a personal dashboard | _(planned for M54)_ |
 | Lay out a page in columns, tabs and sections | [Container widgets](reference/container-widgets.md#the-tree) |
-| Show fixed text, images and links on a page | _(planned for M42)_ |
+| Show fixed text, images and links on a page | [Content widget](reference/content-widget.md#content-widget) _(planned for M42)_ |
 | Open another page with values for its parameters | [Navigate](reference/table-widget.md#navigate) |
 | List a person's tasks | [Task inbox widget](reference/task-inbox-widget.md#task-inbox-widget) |
 | Decide a task on its own page | [Task page](reference/task-inbox-widget.md#task-page) |

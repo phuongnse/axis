@@ -84,6 +84,32 @@ Paging, sorting and search live in the URL, so reload, sharing and the back butt
   stored id, which does not match the label people see, and cannot sort a file. Repeated clicks on a header sort
   ascending, then descending, then not at all.
 
+### Address prefix
+
+_(planned for M42)_
+
+A table may set `prefix`, such as `"prefix": "orders"`, so that a page can hold several tables. The table's
+`search`, `filter`, `page`, `pageSize` and `sort`, and its unbound data source parameters, then live in the URL
+as `orders.search`, `orders.filter`, `orders.page`, `orders.pageSize`, `orders.sort` and `orders.{parameter}`.
+They keep the order and the rules of [paging and sorting](#paging-and-sorting). A table without a `prefix` keeps
+the plain keys, and a page has at most one such table.
+
+A page parameter never takes a prefix. So a table bound to a page parameter reads its value from the URL under
+the plain name, and every table bound to it follows the same value. A customer page with its orders and tickets
+looks like this:
+
+```json
+{
+  "widgets": [
+    { "type": "detail", "name": "customer", "entity": "Customer", "record": "customer" },
+    { "type": "table", "name": "orders", "prefix": "orders", "dataSource": "CustomerOrders", "parameters": { "customer": "customer" } },
+    { "type": "table", "name": "tickets", "prefix": "tickets", "dataSource": "CustomerTickets", "parameters": { "customer": "customer" } }
+  ]
+}
+```
+
+The table's key in the SPA takes the prefix too, see [the table key](frontend.md#table-views-and-columns).
+
 ### Values
 
 Values are formatted for display and never changed. The rules of [shown values](frontend.md#shown-values) apply.

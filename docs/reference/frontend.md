@@ -493,12 +493,14 @@ below answers `200`.
   [platform pages](platform-pages.md).
 - **History and recovery paths** _(planned for M41)_. The audit page at `/audit` and the recycle bin page at
   `/recycle-bin` are platform routes too, so `audit` and `recycle-bin` are reserved site paths.
-- **One owner for each part of the address.** A page holds at most one `table` and at most one `form`, `taskInbox` or
-  `processInspector`, and the compiler checks this. `?search=&page=&pageSize=&sort=` and the data source parameter
-  values belong to the page's one `table`. `/new` and `/{id}` belong to its one `form`. `/{taskId}` and
-  `/{instanceId}` belong to its one `taskInbox` or `processInspector`. The instance list of a `processInspector`
-  and the task list of a `taskInbox` also read `search`, `filter`, `columns`, `sort`, `page` and `pageSize`. A `kpi`, a `detail` and a `chart` own no part
-  of the address and read only page parameters, so they do not count.
+- **One owner for each part of the address** _(planned for M42)_. A page may hold several `table` widgets, each
+  owning its part of the address under its `prefix`, see [address prefix](table-widget.md#address-prefix). A table
+  without a prefix, at most one, owns `?search=&page=&pageSize=&sort=` and the data source parameter values. A page
+  holds at most one `form`, `taskInbox` or `processInspector`, and the compiler checks this. `/new` and `/{id}`
+  belong to its `form`. `/{taskId}` and `/{instanceId}` belong to its `taskInbox` or `processInspector`. The instance
+  list of a `processInspector` and the task list of a `taskInbox` also read `search`, `filter`, `columns`, `sort`,
+  `page` and `pageSize`. A `kpi`, a `detail`, a `chart` and a `content` widget own no part of the address and read
+  only page parameters, so they do not count.
 - **Letter case.** `{site}` is the site path, and `{page}` is the page name in lower case, as navigation links write
   it. The server matches both ignoring letter case.
 - **Page parameters.** A required page parameter that is missing from the URL, or has the wrong form, shows the
@@ -539,6 +541,8 @@ gives the reasons. The rules that a table follows are in [actions and controls](
   platform table's key is a fixed name for its screen, such as `console.deadLetters`,
   `studio.{application}.history` or `studio.{application}.{kind}`. A platform page with a second table gives that
   table a key of its own. A key in any other form answers `400`.
+- **A prefixed table's key** _(planned for M42)_. A table with a `prefix` has the key `site.{site path}.{page name}.{prefix}`,
+  in lower case.
 - **The answer.** Every route needs a session, see [sign-in needed](security.md#sign-in-needed), and answers `401`
   without one. The `GET` route never answers `404` for a key with nothing kept. It answers `columns: null` and
   `views: []` instead, so the SPA needs one call when a table opens.
@@ -571,6 +575,7 @@ and can nest.
 | `kpi`                        | shows one value of a data source                                                                                                  | [Detail, chart and KPI widgets](detail-chart-kpi-widgets.md) |
 | `taskInbox`                  | lists the signed-in user's open tasks, and opens one on the task page `/{site}/{inboxpage}/{taskId}`                              | [Task inbox widget](task-inbox-widget.md)                    |
 | `processInspector`           | lists the instances of one process and opens one                                                                                  | [Process inspector widget](process-inspector-widget.md)      |
+| `content` _(planned for M42)_ | shows fixed text, an image, a link or a note                                                                                     | [Content widget](content-widget.md)                          |
 | `columns`, `tabs`, `section` | hold other widgets: `columns` stack at narrow width, `tabs` keep the selected tab in `?tab=`, and a `section` can start collapsed | [Container widgets](container-widgets.md)                    |
 
 A widget opens another page, and sets its parameters, through a `navigate` action. A table opens and creates records

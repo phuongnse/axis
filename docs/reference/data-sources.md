@@ -584,3 +584,33 @@ each binding.
   group column's is the sibling column that reads the currency field on the same record. Both are
   left out of the JSON when they do not apply. A measure column has `"measure": true`, and every other
   column leaves the property out.
+
+### Filter bar
+
+_(planned for M42)_
+
+A page's `filterBar` lists entries that set its parameters. Each entry names a page parameter and gives
+its label as a text key, because a page parameter has no label of its own. An entry may also set
+`valueLabels` for an `enum` parameter, as a data source parameter does. The bar sits above the page's
+widgets, with one input per entry in list order. Each input is the kind that a data source table draws
+for its filter inputs, and applies the same way, see [table widget](table-widget.md#data-source-binding).
+
+A new value writes the page parameter into the URL and adds a history entry. Every table, chart and KPI
+bound to the parameter reads again, and a table starts from page 1. A required parameter's input cannot
+be cleared. Each entry names a page parameter once, ignoring letter case, and each label is checked as
+every text key is.
+
+```json
+{
+  "parameters": [
+    { "name": "from", "type": "date", "required": true },
+    { "name": "to", "type": "date", "required": true }
+  ],
+  "filterBar": [
+    { "parameter": "from", "label": { "textKey": "dashboard.from" } },
+    { "parameter": "to", "label": { "textKey": "dashboard.to" } }
+  ]
+}
+```
+
+A chart and a KPI on that page bind `from` and `to` with their `parameters` map, so both follow the bar.
