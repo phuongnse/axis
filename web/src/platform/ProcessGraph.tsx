@@ -29,6 +29,7 @@ import {
   type KeyboardEvent,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -41,47 +42,14 @@ import { useDesignTokens, useThemeMode } from './themeMode'
 
 const nodeWidth = 272
 /**
- * Proposed, see the review on #3650: a card is as tall as its label needs, one line or two with the line under it and a
- * status tag's 22 px: 8 + 4 + 20 or 40 + 2 + 22 + 8 px and the borders. A longer label ends in an ellipsis on its
- * second line, and its tooltip and accessible name hold it whole. The label's font is loaded before the graph is
- * measured and laid out, once, so the graph never moves as fonts load.
+ * Proposed, see the review on #3650: a card is as tall as it is drawn: its label takes one line or two, a longer one
+ * ending in an ellipsis with its tooltip and accessible name holding it whole. The graph draws each card hidden, once
+ * the label's font has loaded, measures it, and lays out with that height, as React Flow lays out with ELK; a card that
+ * changes size later, as when a font arrives late, lays the graph out again. `fallbackHeight` stands in before then.
  */
-const cardHeight = { one: 68, two: 88 }
+const fallbackHeight = 68
 /** The label's type, which the card draws it in and the measure uses, so both wrap alike. */
 const labelType = { size: 14, weight: 600, lineHeight: 20 }
-/** The room a label has on a card: its width less the padding, the icon's tile, the gap and the borders. */
-const labelRoom = nodeWidth - 2 * 12 - 28 - 12 - 2
-
-let measurer: HTMLElement | null | undefined
-/** How many lines a label takes on a card, measured by the browser in a hidden copy of the same width and type. */
-const measured = new Map<string, number>()
-function labelLines(label: string): number {
-  // A label is measured once, after its font has loaded, so a page drawn again does not measure it again.
-  const known = measured.get(label)
-  if (known !== undefined) {
-    return known
-  }
-  if (measurer === undefined) {
-    measurer = typeof document === 'undefined' ? null : document.createElement('span')
-    if (measurer) {
-      measurer.style.cssText = `position: absolute; visibility: hidden; left: -10000px; top: 0; width: ${labelRoom}px; font-family: ${typeTokens.fontFamily}; font-size: ${labelType.size}px; font-weight: ${labelType.weight}; line-height: ${labelType.lineHeight}px; white-space: normal; overflow-wrap: break-word;`
-      document.body.appendChild(measurer)
-    }
-  }
-  if (!measurer) {
-    return label.length * 8 > labelRoom ? 2 : 1
-  }
-  measurer.textContent = label
-  const lines = Math.max(1, Math.round(measurer.getBoundingClientRect().height / labelType.lineHeight))
-  measured.set(label, lines)
-  return lines
-}
-
-/** A card's height: the taller one only when its label does not fit on one line. */
-function heightOf(step: ProcessGraphStep): number {
-  return labelLines(step.name) > 1 ? cardHeight.two : cardHeight.one
-}
-
 /**
  * Loads the face the labels are drawn in before anything is measured: a browser loads a face only when text needs it,
  * so `document.fonts.ready` alone may settle first. A face that fails to load leaves the fallback, which the cards and
@@ -196,9 +164,9 @@ const labelWidth = (text: string) => Math.ceil(text.length * 7 + 8)
 async function layOut(
   steps: readonly ProcessGraphStep[],
   transitions: readonly ProcessGraphTransitionView[],
-  frames: readonly ProcessGraphFrame[] = [],
+  frames: readonly ProcessGraphFrame[],
+  heights: ReadonlyMap<string, number>,
 ): Promise<Layout> {
-  await labelFontLoaded()
   // Proposed, see D155: a frame is a node that holds its steps and frames, laid out inside it, and every transition is
   // routed across them, with its points in the graph's own coordinates.
   const nodes = new Map<string, ElkNode>()
@@ -226,7 +194,8 @@ async function layOut(
     }
     ;(parent !== undefined && nodes.has(parent) ? nodes.get(parent)!.children! : roots).push(node)
   }
-  for (const step of steps) place({ id: step.id, width: nodeWidth, height: heightOf(step) }, step.parent)
+  for (const step of steps)
+    place({ id: step.id, width: nodeWidth, height: heights.get(step.id) ?? fallbackHeight }, step.parent)
   for (const frame of frames) {
     if (!placed.has(frame.id)) {
       placed.add(frame.id)
@@ -279,7 +248,7 @@ async function layOut(
         x: origin.x + at.x,
         y: origin.y + at.y,
         width: child.width ?? nodeWidth,
-        height: child.height ?? cardHeight.one,
+        height: child.height ?? fallbackHeight,
       }
       absolute.set(child.id, rect)
       if (nodes.has(child.id)) {
@@ -488,7 +457,12 @@ const stepIcons: Record<string, ComponentType> = {
  * bold on up to two lines, and under it its state on an instance, a `StatusTag` and how long it lasted, or its type
  * in a designer. Its border says where an instance went: run, at, not reached or failed, or the step a designer edits.
  */
-function StepNodeView({ data }: NodeProps<StepNode>) {
+/**
+ * Proposed, see the review on #3650: a step's card, which the graph draws in its node and also, hidden, to measure it,
+ * so the height the layout gives a card is the height the card takes, in the same font and widths. The step an instance
+ * is at, and the step chosen, take a second pixel of their colour inside the border, which changes no size.
+ */
+function StepCard({ data, fill }: { data: ProcessGraphStep; fill: boolean }) {
   const { colour, radius, spacing } = useDesignTokens()
   const found = useContext(FoundStep)
   const edge = {
@@ -499,101 +473,106 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
     taken: colour.successText,
     idle: colour.borderSubtle,
   }[data.tone]
-  // One weight of emphasis: the step an instance is at, and the step Find a step shows, take 2 px in their own colour;
-  // every other border is 1 px.
-  const width = data.tone === 'current' || found === data.id ? 2 : 1
+  // One weight of emphasis: the step an instance is at, and the step Find a step shows, take 2 px in their own colour,
+  // the second inside the border, so the card keeps its size; every other border is 1 px.
+  const strong = data.tone === 'current' || found === data.id
   const Icon = stepIcons[data.kind] ?? ThunderboltOutlined
   const muted = data.tone === 'idle'
+  return (
+    <button
+      type="button"
+      data-testid={data.testId}
+      aria-label={data.ariaLabel}
+      aria-current={data.ariaCurrent ? 'true' : undefined}
+      data-marked={data.tone === 'error' ? 'true' : undefined}
+      data-tone={data.tone}
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: spacing.sm,
+        width: '100%',
+        height: fill ? '100%' : undefined,
+        padding: `${spacing.xs}px ${spacing.sm}px`,
+        overflow: 'hidden',
+        textAlign: 'left',
+        font: 'inherit',
+        color: muted ? colour.textMuted : colour.text,
+        background: colour.surface,
+        border: `1px solid ${edge}`,
+        boxShadow: strong ? `inset 0 0 0 1px ${edge}` : undefined,
+        borderRadius: radius.base,
+        cursor: 'pointer',
+      }}
+    >
+      <Tooltip title={data.type}>
+        <span
+          aria-hidden
+          style={{
+            display: 'flex',
+            flex: 'none',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 28,
+            height: 28,
+            borderRadius: radius.base,
+            color: data.tone === 'current' || data.tone === 'selected' ? colour.primaryText : colour.textMuted,
+            background: colour.canvas,
+          }}
+        >
+          <Icon />
+        </span>
+      </Tooltip>
+      {/* The label's first line sits level with the icon: 4 px down, half of the 28 px tile less its 20 px line. */}
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, paddingTop: 4 }}>
+        {/* At most two lines, then an ellipsis, with the whole label in a tooltip only when it is cut. */}
+        <Typography.Paragraph
+          ellipsis={{ rows: 2, tooltip: data.name }}
+          style={{
+            margin: 0,
+            color: 'inherit',
+            fontSize: labelType.size,
+            fontWeight: labelType.weight,
+            lineHeight: `${labelType.lineHeight}px`,
+          }}
+        >
+          {data.name}
+        </Typography.Paragraph>
+        {data.status ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, fontSize: 12, lineHeight: '20px' }}>
+            <StatusTag tone={data.status.tone}>{data.status.text}</StatusTag>
+            {data.status.detail !== undefined && (
+              <span
+                style={{
+                  color: colour.textMuted,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {data.status.detail}
+              </span>
+            )}
+          </span>
+        ) : (
+          // A step's type is its icon's tooltip, so the card says no more than a layer's mark under its label.
+          data.note !== undefined && (
+            <span style={{ fontSize: 12, lineHeight: '16px', color: colour.textMuted }}>
+              <span data-layer-mark={data.note.kind}>{data.note.text}</span>
+            </span>
+          )
+        )}
+      </span>
+    </button>
+  )
+}
+
+function StepNodeView({ data }: NodeProps<StepNode>) {
+  const { colour } = useDesignTokens()
   return (
     <>
       {/* Hidden, not removed, so React Flow still measures where a transition comes in. */}
       <Handle type="target" position={Position.Left} isConnectable={false} style={{ visibility: 'hidden' }} />
-      <button
-        type="button"
-        data-testid={data.testId}
-        aria-label={data.ariaLabel}
-        aria-current={data.ariaCurrent ? 'true' : undefined}
-        data-marked={data.tone === 'error' ? 'true' : undefined}
-        data-tone={data.tone}
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: spacing.sm,
-          width: '100%',
-          height: '100%',
-          padding: `${spacing.xs}px ${spacing.sm}px`,
-          overflow: 'hidden',
-          textAlign: 'left',
-          font: 'inherit',
-          color: muted ? colour.textMuted : colour.text,
-          background: colour.surface,
-          border: `${width}px solid ${edge}`,
-          borderRadius: radius.base,
-          cursor: 'pointer',
-        }}
-      >
-        <Tooltip title={data.type}>
-          <span
-            aria-hidden
-            style={{
-              display: 'flex',
-              flex: 'none',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 28,
-              height: 28,
-              borderRadius: radius.base,
-              color: data.tone === 'current' || data.tone === 'selected' ? colour.primaryText : colour.textMuted,
-              background: colour.canvas,
-            }}
-          >
-            <Icon />
-          </span>
-        </Tooltip>
-        {/* The label's first line sits level with the icon: 4 px down, half of the 28 px tile less its 20 px line. */}
-        <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, paddingTop: 4 }}>
-          {/* At most two lines, then an ellipsis, with the whole label in a tooltip only when it is cut. */}
-          <Typography.Paragraph
-            ellipsis={{ rows: 2, tooltip: data.name }}
-            style={{
-              margin: 0,
-              color: 'inherit',
-              fontSize: labelType.size,
-              fontWeight: labelType.weight,
-              lineHeight: `${labelType.lineHeight}px`,
-            }}
-          >
-            {data.name}
-          </Typography.Paragraph>
-          {data.status ? (
-            <span style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, fontSize: 12, lineHeight: '20px' }}>
-              <StatusTag tone={data.status.tone}>{data.status.text}</StatusTag>
-              {data.status.detail !== undefined && (
-                <span
-                  style={{
-                    color: colour.textMuted,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {data.status.detail}
-                </span>
-              )}
-            </span>
-          ) : (
-            <span style={{ fontSize: 12, lineHeight: '16px', color: colour.textMuted }}>
-              {data.type}
-              {data.note !== undefined && (
-                <>
-                  {' '}
-                  <span data-layer-mark={data.note.kind}>{data.note.text}</span>
-                </>
-              )}
-            </span>
-          )}
-        </span>
-      </button>
+      <StepCard data={data} fill />
       <Handle
         type="source"
         position={Position.Right}
@@ -724,6 +703,45 @@ export function ProcessGraphCanvas({
   }
   const { colour, radius } = useDesignTokens()
   const [layout, setLayout] = useState<Layout | null>(null)
+  // Each card's height as drawn, measured in the hidden copies below once the label's font has loaded.
+  const [heights, setHeights] = useState<ReadonlyMap<string, number> | null>(null)
+  const [fontReady, setFontReady] = useState(false)
+  useEffect(() => {
+    let current = true
+    void labelFontLoaded().then(() => {
+      if (current) {
+        setFontReady(true)
+      }
+    })
+    return () => {
+      current = false
+    }
+  }, [])
+  const measureLayer = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const layer = measureLayer.current
+    if (!fontReady || layer === null) {
+      return
+    }
+    const measure = () => {
+      const next = new Map<string, number>()
+      layer.querySelectorAll<HTMLElement>('[data-measure]').forEach((card) => {
+        next.set(card.dataset.measure ?? '', Math.ceil(card.getBoundingClientRect().height))
+      })
+      setHeights((before) =>
+        before !== null && before.size === next.size && [...next].every(([id, height]) => before.get(id) === height)
+          ? before
+          : next,
+      )
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') {
+      return
+    }
+    const observer = new ResizeObserver(measure)
+    layer.querySelectorAll('[data-measure]').forEach((card) => observer.observe(card))
+    return () => observer.disconnect()
+  })
 
   // The graph is laid out again only when its shape changes: its steps, their labels and its transitions. A page that
   // draws again, as when a step is chosen, keeps the layout and the view the reader has moved to.
@@ -737,8 +755,11 @@ export function ProcessGraphCanvas({
     latest.current = { steps, transitions, frames }
   })
   useEffect(() => {
+    if (heights === null) {
+      return
+    }
     let current = true
-    void layOut(latest.current.steps, latest.current.transitions, latest.current.frames).then((next) => {
+    void layOut(latest.current.steps, latest.current.transitions, latest.current.frames, heights).then((next) => {
       if (current) {
         setLayout(next)
       }
@@ -746,7 +767,7 @@ export function ProcessGraphCanvas({
     return () => {
       current = false
     }
-  }, [shape])
+  }, [shape, heights])
 
   const { nodes, edges } = useMemo(() => {
     if (layout === null) {
@@ -754,7 +775,7 @@ export function ProcessGraphCanvas({
     }
     // A frame comes before what it holds, as React Flow needs a parent before its children.
     const frameNodes = frames.map((frame): FrameNode => {
-      const size = layout.sizes.get(frame.id) ?? { width: nodeWidth, height: cardHeight.one }
+      const size = layout.sizes.get(frame.id) ?? { width: nodeWidth, height: fallbackHeight }
       return {
         id: frame.id,
         type: 'frame',
@@ -782,17 +803,24 @@ export function ProcessGraphCanvas({
           parentId: step.parent,
           position: layout.places.get(step.id) ?? { x: 0, y: 0 },
           width: nodeWidth,
-          height: heightOf(step),
+          height: heights?.get(step.id) ?? fallbackHeight,
           // The card's size is known, so it is given as measured too: a node drawn again keeps it, and Find a step and
           // the fit can place it without waiting for the browser to measure it again.
-          measured: { width: nodeWidth, height: heightOf(step) },
+          measured: { width: nodeWidth, height: heights?.get(step.id) ?? fallbackHeight },
           handles: [
-            { type: 'target', position: Position.Left, x: 0, y: heightOf(step) / 2, width: 1, height: 1 },
+            {
+              type: 'target',
+              position: Position.Left,
+              x: 0,
+              y: (heights?.get(step.id) ?? fallbackHeight) / 2,
+              width: 1,
+              height: 1,
+            },
             {
               type: 'source',
               position: Position.Right,
               x: nodeWidth - handleSize / 2,
-              y: heightOf(step) / 2 - handleSize / 2,
+              y: (heights?.get(step.id) ?? fallbackHeight) / 2 - handleSize / 2,
               width: handleSize,
               height: handleSize,
             },
@@ -827,7 +855,7 @@ export function ProcessGraphCanvas({
         }
       }),
     }
-  }, [layout, steps, transitions, frames, colour, Adornment, onTransitionClick])
+  }, [layout, steps, transitions, frames, heights, colour, Adornment, onTransitionClick])
 
   return (
     <section
@@ -845,6 +873,28 @@ export function ProcessGraphCanvas({
       onKeyDown={onKeyDown}
     >
       <FoundStep.Provider value={chosen}>
+        {/* Each card drawn once more, hidden and out of the way, at a card's width, so the layout takes the height the
+            card is drawn at, in the same font, after the label's font has loaded. */}
+        {fontReady && (
+          <div
+            ref={measureLayer}
+            aria-hidden
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: nodeWidth,
+              visibility: 'hidden',
+              pointerEvents: 'none',
+            }}
+          >
+            {steps.map((step) => (
+              <div key={step.id} data-measure={step.id} style={{ width: nodeWidth }}>
+                <StepCard data={{ ...step, testId: undefined }} fill={false} />
+              </div>
+            ))}
+          </div>
+        )}
         <ReactFlow
           nodes={nodes}
           edges={edges}
