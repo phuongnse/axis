@@ -1,11 +1,11 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { CellJob, CellTenant } from '../platform/cell'
-import { formItem } from '../test/antd'
-import { clickInDialog, pick } from '../test/tableFilter'
+import { chooseOption, formItem, openDropdown, optionTexts } from '../test/antd'
+import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { CellTenantsPage } from './CellTenantsPage'
@@ -188,6 +188,24 @@ async function loadedTable() {
 
 const address = () => screen.getByTestId('address').textContent!
 
+/** Scrolls the open dropdown's list, which antd draws only in part, to `top`. */
+function scrollOpenList(top: number) {
+  const holder = document.querySelector<HTMLElement>(
+    '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-dropdown-list-holder',
+  )
+  fireEvent.scroll(holder!, { target: { scrollTop: top } })
+}
+
+/** The options of the open list, read at the bottom and then at the top, as antd draws only the options in view. */
+function allOptionTexts() {
+  const texts = new Set<string>()
+  for (const top of [128, 0]) {
+    scrollOpenList(top)
+    optionTexts().forEach((text) => texts.add(text))
+  }
+  return texts
+}
+
 describe('CellTenantsPage', () => {
   afterEach(() => vi.unstubAllGlobals())
 
@@ -270,10 +288,71 @@ describe('CellTenantsPage', () => {
 
     await loadedTable()
     await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'Status')
     await pick('Value', 0, 'Suspended')
     await clickInDialog('Apply')
 
     const filter = { all: [{ field: 'status', op: 'eq', value: 'suspended' }] }
+    await waitFor(() => expect(queryOf(urls.at(-1)!).get('filter')).toBe(JSON.stringify(filter)))
+    expect(JSON.parse(new URLSearchParams(address()).get('filter')!)).toEqual(filter)
+  })
+
+  it('offers every column in the filter, each with the value control of its kind', async () => {
+    stubTenants(200, [acme, beta, gamma])
+    renderPage()
+
+    await loadedTable()
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    const column = () => within(dialog()).getByRole('combobox', { name: 'Column' })
+    await userEvent.click(column())
+    const titles = [
+      'shell.cell.tenants.id',
+      'shell.cell.tenants.status',
+      'shell.cell.tenants.application',
+      'shell.cell.tenants.hosts',
+      'shell.cell.tenants.failedInstances',
+      'shell.cell.tenants.unknownCalls',
+      'shell.cell.tenants.deadLetters',
+      'shell.cell.tenants.storage',
+      'shell.cell.tenants.users',
+      'shell.cell.tenants.applications',
+      'shell.cell.tenants.emailsToday',
+      'shell.cell.tenants.newestArchive',
+    ].map((key) => platformEnglish[key as keyof typeof platformEnglish])
+    await openDropdown()
+    expect([...allOptionTexts()].sort()).toEqual([...titles].sort())
+    // The list is closed again, so the picks below open it as a person does.
+    await userEvent.click(column())
+
+    await pick('Column', 0, 'Application')
+    expect(within(dialog()).getByRole('textbox', { name: 'Value' })).toBeInTheDocument()
+    await pick('Column', 0, 'Failed instances')
+    expect(within(dialog()).getByRole('spinbutton', { name: 'Value' })).toBeInTheDocument()
+    await userEvent.click(column())
+    await openDropdown()
+    scrollOpenList(128)
+    await chooseOption('Newest archive')
+    expect(dialog().querySelector('.ant-picker')).not.toBeNull()
+    // The list keeps its scroll when it opens again, so it goes back to the top before Status is picked.
+    await userEvent.click(column())
+    await openDropdown()
+    scrollOpenList(0)
+    await chooseOption('Status')
+    expect(within(dialog()).getByRole('combobox', { name: 'Value' })).toBeInTheDocument()
+  })
+
+  it('sends a number filter after Apply and keeps it in the address', async () => {
+    const urls = stubTenants(200, [acme, beta, gamma])
+    renderPage()
+
+    await loadedTable()
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Column', 0, 'Failed instances')
+    await pick('Operator', 0, 'is more than')
+    await userEvent.type(within(dialog()).getByRole('spinbutton', { name: 'Value' }), '1')
+    await clickInDialog('Apply')
+
+    const filter = { all: [{ field: 'instances', op: 'gt', value: 1 }] }
     await waitFor(() => expect(queryOf(urls.at(-1)!).get('filter')).toBe(JSON.stringify(filter)))
     expect(JSON.parse(new URLSearchParams(address()).get('filter')!)).toEqual(filter)
   })
