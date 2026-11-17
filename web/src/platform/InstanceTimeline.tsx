@@ -38,7 +38,7 @@ interface InstanceTimelineProps {
 }
 
 /**
- * Proposed, see the review on #3650: what an instance did, one row for each run of a step, oldest first, as event
+ * Proposed, see the review on #3650: what an instance did, one row for each run of a step, newest first, as event
  * histories show it. A row says what happened in a sentence: who chose which outcome, where a decision went, how a
  * call went over its attempts, which sub-process ran; a failed or waiting run is marked. A run is a group row, as a
  * request's history in Studio has, that opens to a row for each task, call and sub-process it started, in the same
@@ -233,7 +233,8 @@ export function InstanceTimeline({
       state: stateWords(callState(call)),
       startedAt: call.attempts[0]?.startedAt ?? null,
       finishedAt: call.attempts.at(-1)?.finishedAt ?? null,
-      children: call.attempts.length > 0 ? call.attempts.map((attempt) => attemptRow(call, attempt)) : undefined,
+      children:
+        call.attempts.length > 0 ? call.attempts.map((attempt) => attemptRow(call, attempt)).reverse() : undefined,
     }
   }
   const taskRow = (task: InstanceTask): TimelineRow => ({
@@ -271,7 +272,9 @@ export function InstanceTimeline({
     }
   }
   const runRow = (run: StepRun): TimelineRow => {
-    const children = [...run.tasks.map(taskRow), ...run.calls.map(callRow), ...run.subProcesses.map(childRow)]
+    const children = [...run.tasks.map(taskRow), ...run.calls.map(callRow), ...run.subProcesses.map(childRow)].sort(
+      (a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''),
+    )
     return {
       key: run.key,
       name: named(
@@ -301,10 +304,11 @@ export function InstanceTimeline({
       render: (_v, row) => (row.startedAt === null ? null : time('startedAt', row.startedAt)),
     },
     {
-      // Took, as a request's history in Studio says it, see the reviews on #3263 and #3650.
-      key: 'took',
+      // Proposed: how long a run, a call or an attempt lasted is its Duration, the one term for it, see the review on
+      // #3650.
+      key: 'duration',
       kind: 'fixed',
-      title: t('shell.inspector.timeline.took'),
+      title: t('shell.inspector.timeline.duration'),
       render: (_v, row) => (row.startedAt === null ? null : durationText(row.startedAt, row.finishedAt ?? now, locale)),
     },
   ]
@@ -322,7 +326,8 @@ export function InstanceTimeline({
       <AxisTable<TimelineRow>
         rowKey={(row) => row.key}
         columns={columns}
-        dataSource={runs.map(runRow)}
+        // Records in time are newest first, as docs/reference/actions-and-controls.md#list-order says.
+        dataSource={runs.map(runRow).reverse()}
         emptyText={t('shell.inspector.noHistory')}
       />
       {resolving && resolving.outputs && (

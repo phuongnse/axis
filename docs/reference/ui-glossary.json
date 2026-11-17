@@ -727,6 +727,13 @@
       "en": "Error",
       "vi": "lỗi",
       "status": "approved"
+    },
+    {
+      "concept": "Duration",
+      "en": "Duration",
+      "vi": "Thời lượng",
+      "status": "approved",
+      "note": "How long something lasted or lasts, such as a step run, a call or an attempt, or how long a timer waits. Never \"Took\", and never \"Thời gian\", which also reads as a point in time."
     }
   ]
 }

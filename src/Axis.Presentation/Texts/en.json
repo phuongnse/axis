@@ -639,7 +639,7 @@
   "shell.inspector.general": "General",
   "shell.inspector.timeline": "Timeline",
   "shell.inspector.timeline.what": "What happened",
-  "shell.inspector.timeline.took": "Took",
+  "shell.inspector.timeline.duration": "Duration",
   "shell.inspector.timeline.typeRun": "{type}, run {number}",
   "shell.inspector.timeline.role": "{role} (role)",
   "shell.inspector.timeline.callFailed": "{call} failed after {count} attempts.",
