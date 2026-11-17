@@ -165,3 +165,4 @@ the files agree, title and status included.
 | [D151](decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md) | Tables whose rows grow have the full toolbar, and a view is a filter kept in the address | **Agreed** |
 | [D152](decisions/d152-every-screen-says-where-things-stand-with-at-most-one-main-action.md) | Every screen says where things stand, with at most one main action | **Agreed** |
 | [D153](decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md) | A person's table views and columns are kept on the server, and the address still wins | **Agreed** |
+| [D154](decisions/d154-every-capability-an-organization-needs-has-a-home-and-a-capability-map-keeps-it-so.md) | Every capability an organization needs has a home, and a capability map keeps it so | **Agreed** |

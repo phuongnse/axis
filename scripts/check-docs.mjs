@@ -9,6 +9,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checkAgents } from './lib/docs/agents.mjs'
 import { checkAsvs } from './lib/docs/asvs.mjs'
+import { checkCapabilities } from './lib/docs/capabilities.mjs'
 import { checkDecisions } from './lib/docs/decisions.mjs'
 import { checkCodeReferences } from './lib/docs/code-references.mjs'
 import { checkDevelopmentUsers } from './lib/docs/development-users.mjs'
@@ -30,6 +31,7 @@ export const rules = [
   checkDevelopmentUsers,
   checkStudioSpecFolders,
   checkPlannedMarkers,
+  checkCapabilities,
   checkDecisions,
   checkCodeReferences,
 ]
@@ -51,7 +53,7 @@ function main(args) {
   )
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)
   if (problems.length > 0) return 1
-  console.log('The docs map, the decisions index, the planned markers and where they sit, the ASVS table, the threat model tables, the development users, the Studio spec folders table, the decisions, sections and milestones the code cites and the doc sizes, the skill word limit, the AGENTS.md word limits and the scripts it names are in order.')
+  console.log('The docs map, the decisions index, the planned markers and where they sit, the homes of the capability map, the ASVS table, the threat model tables, the development users, the Studio spec folders table, the decisions, sections and milestones the code cites and the doc sizes, the skill word limit, the AGENTS.md word limits and the scripts it names are in order.')
   return 0
 }
 
