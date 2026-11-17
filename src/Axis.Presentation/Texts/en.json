@@ -2757,5 +2757,11 @@
   "shell.stepRun.waitingFor": "Waiting for",
   "shell.stepRun.givesUp": "Gives up at",
   "shell.stepRun.goesOn": "Goes on at",
-  "shell.stepRun.openInStudio": "Open the step in Studio"
+  "shell.stepRun.openInStudio": "Open the step in Studio",
+  "shell.inspector.status.waitingAtSteps": "Waiting at {count} steps for {since}: {steps}.",
+  "shell.inspector.status.stepFor": "{step} for {assignee}",
+  "shell.graph.currents": "Go to a step the instance is at",
+  "shell.inspector.graph.completion.all": "All branches",
+  "shell.inspector.graph.completion.any": "Any branch",
+  "shell.inspector.stepType.parallel": "Parallel block"
 }

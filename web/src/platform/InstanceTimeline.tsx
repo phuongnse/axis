@@ -236,6 +236,14 @@ export function InstanceTimeline({
       finishedAt: child.endedAt,
     }
   }
+  // The branch a step sits in, as the block names it, or nothing outside a block.
+  const branchOf = (step: string) => {
+    const inBlock = instance.graph.steps.find((candidate) => candidate.name === step)?.inBlock
+    const branch = instance.graph.steps
+      .find((candidate) => candidate.name === inBlock?.block)
+      ?.parallel?.branches.find((candidate) => candidate.name === inBlock?.branch)
+    return branch === undefined ? '' : branch.labelKey ? t(branch.labelKey) : branch.name
+  }
   const runRow = (run: StepRun): TimelineRow => {
     const children = [...run.tasks.map(taskRow), ...run.calls.map(callRow), ...run.subProcesses.map(childRow)].sort(
       (a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''),
@@ -265,11 +273,17 @@ export function InstanceTimeline({
         ) : (
           stepLabel(run.step)
         ),
-        run.number > 1
-          ? t('shell.inspector.timeline.typeRun')
-              .replace('{type}', typeText(typeOf(run.step)))
-              .replace('{number}', String(run.number))
-          : typeText(typeOf(run.step)),
+        [
+          run.number > 1
+            ? t('shell.inspector.timeline.typeRun')
+                .replace('{type}', typeText(typeOf(run.step)))
+                .replace('{number}', String(run.number))
+            : typeText(typeOf(run.step)),
+          // Proposed, see D155 and the review on #3650: a run on a branch of a block names its branch.
+          branchOf(run.step),
+        ]
+          .filter(Boolean)
+          .join(' · '),
       ),
       what: summary(run),
       state: stateWords(

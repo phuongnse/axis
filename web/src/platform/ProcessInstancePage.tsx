@@ -18,12 +18,17 @@ import {
 } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { InstanceTimeline } from './InstanceTimeline'
-import { durationText, instanceTone } from './instanceRuns'
+import { durationText, instanceTone, stepRuns } from './instanceRuns'
 import { useMinuteClock } from './relativeTime'
 import { StatusTag } from './StatusTag'
 import { useInstanceStatus } from './instanceStatus'
 import { PageActions, PageHeading } from './PageLayout'
-import { ProcessGraphCanvas, type ProcessGraphStep, type ProcessGraphTransitionView } from './ProcessGraph'
+import {
+  ProcessGraphCanvas,
+  type ProcessGraphFrame,
+  type ProcessGraphStep,
+  type ProcessGraphTransitionView,
+} from './ProcessGraph'
 import { RecordLink } from './RecordLink'
 import { RecordNotFound } from './RecordNotFound'
 import { StepRunPanel } from './StepRunPanel'
@@ -295,7 +300,16 @@ export function InstanceDetailView({
             ),
           },
         ]),
-    { key: 'step', term: t('shell.inspector.step'), value: stepLabel(instance.step) },
+    // Proposed, see D155 and the review on #3650: an instance at several steps names each.
+    instance.paths !== undefined && instance.paths.length > 1
+      ? {
+          key: 'step',
+          term: t('shell.inspector.steps'),
+          value: new Intl.ListFormat(locale, { type: 'conjunction' }).format(
+            instance.paths.map((path) => stepLabel(path.step)),
+          ),
+        }
+      : { key: 'step', term: t('shell.inspector.step'), value: stepLabel(instance.step) },
     {
       key: 'parent',
       term: t('shell.inspector.parent'),
@@ -326,9 +340,28 @@ export function InstanceDetailView({
   for (const entry of instance.path) {
     runCounts.set(entry.step, (runCounts.get(entry.step) ?? 0) + 1)
   }
-  // The transitions the instance took: from each step of its path to the next, and from the last to the step it is at.
-  const walked = [...instance.path.map((entry) => entry.step), instance.step]
-  const tookTransition = new Set(walked.slice(1).map((step, index) => `${walked[index]}>${step}`))
+  // Proposed, see D155 and the review on #3650: every step the instance is at, one for each of its paths.
+  const atSteps = instance.paths?.map((path) => path.step) ?? [instance.step]
+  const atRuns = new Map(
+    stepRuns(instance)
+      .filter((run) => run.finishedAt === null)
+      .map((run) => [run.step, run]),
+  )
+  const blockOf = (name: string) => instance.graph.steps.find((candidate) => candidate.name === name)?.inBlock?.block
+  // The transitions the instance took: from each step of a path to the next on that path, and from the last to the
+  // step it is at. A transition into a block was taken when a step in it was reached.
+  const walkedPaths = new Map<string, string[]>()
+  for (const entry of instance.path) {
+    const key = entry.path ?? ''
+    walkedPaths.set(key, [...(walkedPaths.get(key) ?? []), entry.step])
+  }
+  for (const path of instance.paths ?? [{ id: '', step: instance.step, state: instance.state }]) {
+    walkedPaths.set(path.id, [...(walkedPaths.get(path.id) ?? []), path.step])
+  }
+  const tookTransition = new Set(
+    [...walkedPaths.values()].flatMap((walked) => walked.slice(1).map((step, index) => `${walked[index]}>${step}`)),
+  )
+  const reachedBlocks = new Set([...taken, ...atSteps].map(blockOf).filter((block) => block !== undefined))
   const to = t('shell.studio.processGraph.to')
   // A step's type in the reader's words, as the timeline names it.
   const stepTypeText = (type: string) => {
@@ -336,9 +369,34 @@ export function InstanceDetailView({
     return t(key) === key ? type : t(key)
   }
   const now = useMinuteClock()
-  const graphSteps = instance.graph.steps.map((step): ProcessGraphStep => {
-    const failed = instance.state === 'failed' && step.name === instance.step
-    const tone = failed ? 'error' : step.name === instance.step ? 'current' : taken.has(step.name) ? 'taken' : 'idle'
+  // Proposed, see D155 and the review on #3650: a parallel block is a frame round a frame for each of its branches,
+  // named with its rule of completion, and its steps are drawn inside their branch.
+  const graphFrames: ProcessGraphFrame[] = instance.graph.steps.flatMap((step) =>
+    step.parallel === undefined
+      ? []
+      : [
+          {
+            id: step.name,
+            kind: 'block' as const,
+            label: stepLabel(step.name),
+            note: t(`shell.inspector.graph.completion.${step.parallel.completion}`),
+            testId: `inspector-block-${step.name}`,
+          },
+          ...step.parallel.branches.map((branch) => ({
+            id: `${step.name}/${branch.name}`,
+            kind: 'branch' as const,
+            label: branch.labelKey ? t(branch.labelKey) : branch.name,
+            parent: step.name,
+          })),
+        ],
+  )
+  const graphSteps = instance.graph.steps.flatMap((step): ProcessGraphStep[] => {
+    if (step.parallel !== undefined) {
+      return []
+    }
+    const at = atSteps.includes(step.name)
+    const failed = instance.state === 'failed' && at
+    const tone = failed ? 'error' : at ? 'current' : taken.has(step.name) ? 'taken' : 'idle'
     const runs = runCounts.get(step.name) ?? 0
     const state =
       tone === 'current'
@@ -360,7 +418,11 @@ export function InstanceDetailView({
             tone: instanceTone(instance),
             text: stateText(t, instance.state),
             detail: lasted(
-              durationText(instance.path.at(-1)?.finishedAt ?? instance.createdAt, now.toISOString(), locale),
+              durationText(
+                atRuns.get(step.name)?.startedAt ?? instance.path.at(-1)?.finishedAt ?? instance.createdAt,
+                now.toISOString(),
+                locale,
+              ),
             ),
           }
         : tone === 'taken' && last !== undefined
@@ -370,22 +432,27 @@ export function InstanceDetailView({
               detail: lasted(durationText(last.startedAt, last.finishedAt, locale)),
             }
           : undefined
-    return {
-      id: step.name,
-      name: stepLabel(step.name),
-      type: stepTypeText(step.type),
-      kind: step.type,
-      status,
-      start: step.name === instance.graph.start,
-      tone,
-      ariaLabel: `${stepLabel(step.name)}, ${stepTypeText(step.type)}${state}${runs > 1 ? `, ${t('shell.inspector.graph.runs').replace('{count}', String(runs))}` : ''}`,
-      ariaCurrent: tone === 'current',
-      testId: `inspector-step-${step.name}`,
-    }
+    return [
+      {
+        id: step.name,
+        name: stepLabel(step.name),
+        type: stepTypeText(step.type),
+        kind: step.type,
+        status,
+        start: step.name === instance.graph.start,
+        tone,
+        ariaLabel: `${stepLabel(step.name)}, ${stepTypeText(step.type)}${state}${runs > 1 ? `, ${t('shell.inspector.graph.runs').replace('{count}', String(runs))}` : ''}`,
+        ariaCurrent: tone === 'current',
+        testId: `inspector-step-${step.name}`,
+        parent: step.inBlock ? `${step.inBlock.block}/${step.inBlock.branch}` : undefined,
+      },
+    ]
   })
   const graphTransitions = instance.graph.steps.flatMap((step) =>
     step.transitions.map((transition): ProcessGraphTransitionView => {
-      const took = tookTransition.has(`${step.name}>${transition.next}`)
+      const took =
+        tookTransition.has(`${step.name}>${transition.next}`) ||
+        (reachedBlocks.has(transition.next) && (taken.has(step.name) || step.name === instance.graph.start))
       return {
         id: `${step.name}>${transition.next}|${transition.on ?? ''}`,
         source: step.name,
@@ -470,6 +537,8 @@ export function InstanceDetailView({
                     testId="inspector-graph"
                     height={graphHeight}
                     focus={instance.step}
+                    frames={graphFrames}
+                    currents={atSteps.map((name) => ({ id: name, label: stepLabel(name) }))}
                     controls
                     // Proposed: a click on a step chooses it and opens its last run in the side panel, while the graph
                     // stays in view, as AWS Step Functions and Camunda Operate show a state's details beside its

@@ -81,9 +81,25 @@ export type ProcessGraphStep = {
   connectable?: boolean
   testId?: string
   handleTestId?: string
+  /** Proposed, see D155 and the review on #3650: the frame the step is drawn in, such as a branch of a block. */
+  parent?: string
 }
 
-/** One transition of a `ProcessGraphCanvas`, between two steps' ids. */
+/**
+ * Proposed, see D155 and the review on #3650: a frame the graph draws round steps, such as a `parallel` block, which
+ * transitions enter and leave as a whole, or one of its branches inside it, named by `label`, with `note` beside it,
+ * such as the block's rule of completion. A frame may sit in another one.
+ */
+export interface ProcessGraphFrame {
+  id: string
+  label: string
+  note?: string
+  kind: 'block' | 'branch'
+  parent?: string
+  testId?: string
+}
+
+/** One transition of a `ProcessGraphCanvas`, between two steps' or frames' ids. */
 export interface ProcessGraphTransitionView {
   id: string
   source: string
@@ -96,6 +112,7 @@ export interface ProcessGraphTransitionView {
 
 type StepNodeData = ProcessGraphStep
 type StepNode = Node<StepNodeData, 'step'>
+type FrameNode = Node<ProcessGraphFrame & Record<string, unknown>, 'frame'>
 
 /** A point of a laid-out graph, in its own coordinates. */
 interface Point {
@@ -111,7 +128,10 @@ interface Rect extends Point {
 
 /** Where ELK put each step and how it routed each transition: its points, and its label's centre. */
 interface Layout {
+  /** Each step's and frame's place, inside the frame it sits in, as React Flow places a child node. */
   places: Map<string, Point>
+  /** Each frame's size, which ELK gives it round what it holds. */
+  sizes: Map<string, { width: number; height: number }>
   routes: Map<string, { points: Point[]; label: Point | null }>
 }
 
@@ -129,7 +149,43 @@ const labelWidth = (text: string) => Math.ceil(text.length * 7 + 8)
 async function layOut(
   steps: readonly ProcessGraphStep[],
   transitions: readonly ProcessGraphTransitionView[],
+  frames: readonly ProcessGraphFrame[] = [],
 ): Promise<Layout> {
+  // Proposed, see D155: a frame is a node that holds its steps and frames, laid out inside it, and every transition is
+  // routed across them, with its points in the graph's own coordinates.
+  const nodes = new Map<string, ElkNode>()
+  for (const frame of frames) {
+    nodes.set(frame.id, {
+      id: frame.id,
+      layoutOptions: {
+        'elk.padding':
+          frame.kind === 'block' ? '[top=40,left=16,bottom=16,right=16]' : '[top=32,left=12,bottom=12,right=12]',
+        // A block's branches have no transitions between them, so they stand in one column, one under the other.
+        'elk.direction': 'RIGHT',
+      },
+      children: [],
+    })
+  }
+  const roots: ElkNode[] = []
+  const placed = new Set<string>()
+  const parentOf = new Map(frames.map((frame) => [frame.id, frame.parent]))
+  // A node goes into its frame, and a frame into its own, the first time a step inside it comes, so everything keeps
+  // the order the process gives it, which the layout follows from left to right.
+  const place = (node: ElkNode, parent: string | undefined) => {
+    if (parent !== undefined && nodes.has(parent) && !placed.has(parent)) {
+      placed.add(parent)
+      place(nodes.get(parent)!, parentOf.get(parent))
+    }
+    ;(parent !== undefined && nodes.has(parent) ? nodes.get(parent)!.children! : roots).push(node)
+  }
+  for (const step of steps) place({ id: step.id, width: nodeWidth, height: nodeHeight }, step.parent)
+  for (const frame of frames) {
+    if (!placed.has(frame.id)) {
+      placed.add(frame.id)
+      place(nodes.get(frame.id)!, frame.parent)
+    }
+  }
+  const known = new Set([...steps.map((step) => step.id), ...frames.map((frame) => frame.id)])
   const graph: ElkNode = {
     id: 'process',
     layoutOptions: {
@@ -147,13 +203,14 @@ async function layOut(
       'elk.layered.spacing.edgeEdgeBetweenLayers': '16',
       'elk.spacing.edgeLabel': '4',
       'elk.edgeLabels.inline': 'false',
+      'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+      // A block's branches keep the order the process gives them, from the top.
+      'elk.layered.crossingMinimization.forceNodeModelOrder': 'true',
+      'org.eclipse.elk.json.edgeCoords': 'ROOT',
     },
-    children: steps.map((step) => ({ id: step.id, width: nodeWidth, height: nodeHeight })),
+    children: roots,
     edges: transitions
-      .filter(
-        (transition) =>
-          steps.some((step) => step.id === transition.source) && steps.some((step) => step.id === transition.target),
-      )
+      .filter((transition) => known.has(transition.source) && known.has(transition.target))
       .map((transition): ElkExtendedEdge => ({
         id: transition.id,
         sources: [transition.source],
@@ -162,14 +219,32 @@ async function layOut(
       })),
   }
   const laid = await elk.layout(graph)
-  const places = new Map((laid.children ?? []).map((child) => [child.id, { x: child.x ?? 0, y: child.y ?? 0 }]))
+  const places = new Map<string, Point>()
+  const sizes = new Map<string, { width: number; height: number }>()
+  // Where each node is on the whole graph, which a route's straightening needs.
+  const absolute = new Map<string, Rect>()
+  const walk = (children: ElkNode[] | undefined, origin: Point) => {
+    for (const child of children ?? []) {
+      const at = { x: child.x ?? 0, y: child.y ?? 0 }
+      places.set(child.id, at)
+      const rect = {
+        x: origin.x + at.x,
+        y: origin.y + at.y,
+        width: child.width ?? nodeWidth,
+        height: child.height ?? nodeHeight,
+      }
+      absolute.set(child.id, rect)
+      if (nodes.has(child.id)) {
+        sizes.set(child.id, { width: child.width ?? 0, height: child.height ?? 0 })
+      }
+      walk(child.children, rect)
+    }
+  }
+  walk(laid.children, { x: 0, y: 0 })
   const routes = new Map(
     (laid.edges ?? []).map((edge) => {
       const section = edge.sections?.[0]
-      const rectOf = (id: string | undefined) => {
-        const place = id === undefined ? undefined : places.get(id)
-        return place === undefined ? undefined : { ...place, width: nodeWidth, height: nodeHeight }
-      }
+      const rectOf = (id: string | undefined) => (id === undefined ? undefined : absolute.get(id))
       const points = section
         ? straighten(
             [section.startPoint, ...(section.bendPoints ?? []), section.endPoint],
@@ -190,7 +265,7 @@ async function layOut(
       ]
     }),
   )
-  return { places, routes }
+  return { places, sizes, routes }
 }
 
 /** The shortest a bend of a transition may be: a shorter jog at either end is straightened. */
@@ -494,7 +569,43 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
 /** The step chosen on the graph, which its node marks while it stays chosen. */
 const FoundStep = createContext<string | null>(null)
 
-const nodeTypes = { step: StepNodeView }
+/**
+ * Proposed, see D155 and the review on #3650: a frame round the steps of a block or a branch: a block in a dashed
+ * border with its name and its rule of completion, a branch in a light border with its name.
+ */
+function FrameNodeView({ data }: NodeProps<FrameNode>) {
+  const { colour, radius, spacing } = useDesignTokens()
+  const block = data.kind === 'block'
+  return (
+    <>
+      <Handle type="target" position={Position.Left} isConnectable={false} style={{ visibility: 'hidden' }} />
+      <div
+        data-testid={data.testId}
+        role="group"
+        aria-label={data.note ? `${data.label}, ${data.note}` : data.label}
+        style={{
+          width: '100%',
+          height: '100%',
+          border: `1px ${block ? 'dashed' : 'solid'} ${block ? colour.border : colour.borderSubtle}`,
+          borderRadius: radius.base,
+          background: block ? 'transparent' : colour.surface,
+          padding: `${spacing.xs}px ${spacing.sm}px`,
+          fontSize: block ? 14 : 12,
+          lineHeight: '20px',
+          color: block ? colour.text : colour.textMuted,
+          pointerEvents: 'none',
+        }}
+      >
+        <span style={{ fontWeight: block ? 600 : 500 }}>{data.label}</span>
+        {data.note && <span style={{ color: colour.textMuted, marginInlineStart: spacing.xs }}>· {data.note}</span>}
+      </div>
+      <Handle type="source" position={Position.Right} isConnectable={false} style={{ visibility: 'hidden' }} />
+    </>
+  )
+}
+
+const nodeTypes = { step: StepNodeView, frame: FrameNodeView }
+const noFrames: readonly ProcessGraphFrame[] = []
 
 /**
  * Proposed, see the review on #3650: the one drawing of a process's steps and transitions, React Flow laid out by ELK
@@ -521,9 +632,18 @@ export function ProcessGraphCanvas({
   controls = false,
   selected,
   onSelect,
+  frames = noFrames,
+  currents,
 }: {
   steps: readonly ProcessGraphStep[]
   transitions: readonly ProcessGraphTransitionView[]
+  /** Proposed, see D155 and the review on #3650: the frames drawn round steps, such as a parallel block's branches. */
+  frames?: readonly ProcessGraphFrame[]
+  /**
+   * Proposed, see D155 and the review on #3650: every step an instance is at, which Go to the current step offers when
+   * there is more than one.
+   */
+  currents?: readonly { id: string; label: string }[]
   ariaLabel: string
   testId?: string
   height?: number
@@ -560,16 +680,17 @@ export function ProcessGraphCanvas({
   // The graph is laid out again only when its shape changes: its steps, their labels and its transitions. A page that
   // draws again, as when a step is chosen, keeps the layout and the view the reader has moved to.
   const shape = JSON.stringify([
-    steps.map((step) => [step.id, step.name]),
+    frames.map((frame) => [frame.id, frame.parent, frame.label]),
+    steps.map((step) => [step.id, step.name, step.parent]),
     transitions.map((transition) => [transition.id, transition.source, transition.target, transition.label]),
   ])
-  const latest = useRef({ steps, transitions })
+  const latest = useRef({ steps, transitions, frames })
   useEffect(() => {
-    latest.current = { steps, transitions }
+    latest.current = { steps, transitions, frames }
   })
   useEffect(() => {
     let current = true
-    void layOut(latest.current.steps, latest.current.transitions).then((next) => {
+    void layOut(latest.current.steps, latest.current.transitions, latest.current.frames).then((next) => {
       if (current) {
         setLayout(next)
       }
@@ -583,29 +704,54 @@ export function ProcessGraphCanvas({
     if (layout === null) {
       return { nodes: [], edges: [] }
     }
-    return {
-      nodes: steps.map((step): StepNode => ({
-        id: step.id,
-        type: 'step',
-        position: layout.places.get(step.id) ?? { x: 0, y: 0 },
-        width: nodeWidth,
-        height: nodeHeight,
-        // The card's size is known, so it is given as measured too: a node drawn again keeps it, and Find a step and
-        // the fit can place it without waiting for the browser to measure it again.
-        measured: { width: nodeWidth, height: nodeHeight },
+    // A frame comes before what it holds, as React Flow needs a parent before its children.
+    const frameNodes = frames.map((frame): FrameNode => {
+      const size = layout.sizes.get(frame.id) ?? { width: nodeWidth, height: nodeHeight }
+      return {
+        id: frame.id,
+        type: 'frame',
+        position: layout.places.get(frame.id) ?? { x: 0, y: 0 },
+        parentId: frame.parent,
+        width: size.width,
+        height: size.height,
+        measured: size,
+        selectable: false,
+        focusable: false,
+        zIndex: -1,
         handles: [
-          { type: 'target', position: Position.Left, x: 0, y: nodeHeight / 2, width: 1, height: 1 },
-          {
-            type: 'source',
-            position: Position.Right,
-            x: nodeWidth - handleSize / 2,
-            y: nodeHeight / 2 - handleSize / 2,
-            width: handleSize,
-            height: handleSize,
-          },
+          { type: 'target', position: Position.Left, x: 0, y: size.height / 2, width: 1, height: 1 },
+          { type: 'source', position: Position.Right, x: size.width - 1, y: size.height / 2, width: 1, height: 1 },
         ],
-        data: step,
-      })),
+        data: { ...frame },
+      }
+    })
+    return {
+      nodes: [
+        ...frameNodes,
+        ...steps.map((step): StepNode => ({
+          id: step.id,
+          type: 'step',
+          parentId: step.parent,
+          position: layout.places.get(step.id) ?? { x: 0, y: 0 },
+          width: nodeWidth,
+          height: nodeHeight,
+          // The card's size is known, so it is given as measured too: a node drawn again keeps it, and Find a step and
+          // the fit can place it without waiting for the browser to measure it again.
+          measured: { width: nodeWidth, height: nodeHeight },
+          handles: [
+            { type: 'target', position: Position.Left, x: 0, y: nodeHeight / 2, width: 1, height: 1 },
+            {
+              type: 'source',
+              position: Position.Right,
+              x: nodeWidth - handleSize / 2,
+              y: nodeHeight / 2 - handleSize / 2,
+              width: handleSize,
+              height: handleSize,
+            },
+          ],
+          data: step,
+        })),
+      ],
       edges: transitions.map((transition): Edge<RouteData, 'routed'> => {
         const stroke =
           transition.tone === 'selected' || transition.tone === 'current'
@@ -633,7 +779,7 @@ export function ProcessGraphCanvas({
         }
       }),
     }
-  }, [layout, steps, transitions, colour, Adornment, onTransitionClick])
+  }, [layout, steps, transitions, frames, colour, Adornment, onTransitionClick])
 
   return (
     <section
@@ -690,6 +836,7 @@ export function ProcessGraphCanvas({
             <ProcessGraphControls
               area={area}
               focus={focus}
+              currents={currents}
               steps={steps.map((step) => ({ id: step.id, label: step.name }))}
               selected={chosen}
               onSelect={choose}

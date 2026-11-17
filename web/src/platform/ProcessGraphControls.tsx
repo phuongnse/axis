@@ -7,7 +7,7 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import { MiniMap, Panel, useReactFlow } from '@xyflow/react'
-import { Select } from 'antd'
+import { Dropdown, Select } from 'antd'
 import { useEffect, useState, type RefObject } from 'react'
 import { AxisButton } from './AxisButton'
 import { useText } from './texts'
@@ -28,12 +28,15 @@ const moving = 300
 export function ProcessGraphControls({
   area,
   focus,
+  currents,
   steps,
   selected,
   onSelect,
 }: {
   area: RefObject<HTMLElement | null>
   focus?: string
+  /** Proposed, see D155 and the review on #3650: every step an instance is at, offered in a menu when there are several. */
+  currents?: readonly { id: string; label: string }[]
   /** The steps Find a step offers, by their labels. */
   steps: readonly { id: string; label: string }[]
   /** The step chosen on the graph, which Find a step shows, and the call that chooses one, or none with `null`. */
@@ -103,6 +106,9 @@ export function ProcessGraphControls({
         position="bottom-right"
         // Each step in the tone it has on the graph, so the overview shows where the instance went and where it is.
         nodeColor={(node) => {
+          if (node.type === 'frame') {
+            return 'transparent'
+          }
           const tone = (node.data as { tone?: string }).tone
           return tone === 'current' || tone === 'selected'
             ? colour.primary
@@ -175,17 +181,33 @@ export function ProcessGraphControls({
             aria-keyshortcuts="0"
             onClick={fitAll}
           />
-          {focus !== undefined && (
-            <AxisButton
-              role="icon"
-              nameKey="shell.graph.current"
-              icon={<AimOutlined />}
-              onClick={() => {
-                // Going back to the current step shows it in Find a step too.
-                onSelect(focus)
-                find(focus)
+          {currents !== undefined && currents.length > 1 ? (
+            // Proposed, see D155 and the review on #3650: an instance at several steps offers each in a menu.
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: currents.map((current) => ({ key: current.id, label: current.label })),
+                onClick: ({ key }) => {
+                  onSelect(key)
+                  find(key)
+                },
               }}
-            />
+            >
+              <AxisButton role="icon" nameKey="shell.graph.currents" icon={<AimOutlined />} />
+            </Dropdown>
+          ) : (
+            focus !== undefined && (
+              <AxisButton
+                role="icon"
+                nameKey="shell.graph.current"
+                icon={<AimOutlined />}
+                onClick={() => {
+                  // Going back to the current step shows it in Find a step too.
+                  onSelect(focus)
+                  find(focus)
+                }}
+              />
+            )
           )}
           <AxisButton
             role="icon"

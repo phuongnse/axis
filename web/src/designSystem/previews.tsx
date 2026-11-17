@@ -51,6 +51,7 @@ import {
   manyStepsRequestForm,
   missingRequestId,
   instanceId,
+  parallelInstanceId,
   missingTaskId,
   openTaskId,
   loadingRoutes,
@@ -296,6 +297,13 @@ export const previews: Record<string, readonly PreviewState[]> = {
       caption: 'Process instance',
       draw: () => <ShellPreview />,
       entry: { pathname: `/sample/instances/${instanceId}`, state: { from: '/sample/instances' } },
+      frameHeight: 800,
+    },
+    // Proposed: a contract's review at two branches of a parallel block at once, see D155 and the review on #3650.
+    {
+      caption: 'Process instance with parallel paths',
+      draw: () => <ShellPreview />,
+      entry: { pathname: `/sample/instances/${parallelInstanceId}`, state: { from: '/sample/instances' } },
       frameHeight: 800,
     },
     // Proposed: a request that does not exist, opened from Requests, see the review on #3650.

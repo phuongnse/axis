@@ -49,6 +49,30 @@ export function useInstanceStatus(
       }),
     }
   }
+  // Proposed, see D155 and the review on #3650: an instance at several steps names each, with whom it waits for.
+  const waiting = runs.filter((run) => run.finishedAt === null)
+  const whom = (run: (typeof runs)[number]) => {
+    const open = run.tasks.find((candidate) => candidate.outcome === null)
+    return open === undefined
+      ? stepLabel(run.step)
+      : t('shell.inspector.status.stepFor')
+          .replace('{step}', stepLabel(run.step))
+          .replace(
+            '{assignee}',
+            open.assigneeKind === 'role'
+              ? t('shell.inspector.timeline.role').replace('{role}', open.assignee)
+              : open.assignee,
+          )
+  }
+  if (waiting.length > 1) {
+    return {
+      kind: 'info',
+      text: t('shell.inspector.status.waitingAtSteps')
+        .replace('{count}', String(waiting.length))
+        .replace('{steps}', new Intl.ListFormat(locale, { type: 'conjunction' }).format(waiting.map(whom)))
+        .replace('{since}', since),
+    }
+  }
   const task = current.tasks.find((candidate) => candidate.outcome === null)
   return {
     kind: 'info',

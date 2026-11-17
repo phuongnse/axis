@@ -9,6 +9,8 @@ import type { StepProblem } from './stepProblems'
 export interface StepRun {
   key: string
   step: string
+  /** Proposed, see D155 and the review on #3650: the path that ran it, when the instance had several. */
+  path?: string
   number: number
   startedAt: string
   finishedAt: string | null
@@ -36,6 +38,7 @@ export function stepRuns(instance: InstanceDetail): StepRun[] {
     return {
       key: `${index}`,
       step: entry.step,
+      path: entry.path,
       number,
       startedAt: entry.startedAt,
       finishedAt: entry.finishedAt,
@@ -50,22 +53,36 @@ export function stepRuns(instance: InstanceDetail): StepRun[] {
     }
   })
   if (instance.endedAt === null) {
-    const number = (counts.get(instance.step) ?? 0) + 1
-    runs.push({
-      key: 'current',
-      step: instance.step,
-      number,
-      startedAt: instance.path.at(-1)?.finishedAt ?? instance.createdAt,
-      finishedAt: null,
-      decision: null,
-      error: null,
-      problem: null,
-      traceId: null,
-      state: instance.state === 'failed' ? 'failed' : instance.state === 'running' ? 'running' : 'waiting',
-      tasks: [],
-      calls: [],
-      subProcesses: [],
-    })
+    // Proposed, see D155 and the review on #3650: an instance at several steps has a run at each, which started when
+    // its path reached it: after the last step of that path, or else when the instance left its last shared step.
+    const shared = instance.path.filter((entry) => entry.path === undefined).at(-1)?.finishedAt
+    const current = instance.paths ?? [
+      { id: '', step: instance.step, state: instance.state === 'failed' ? 'failed' : instance.state },
+    ]
+    for (const path of current) {
+      const number = (counts.get(path.step) ?? 0) + 1
+      counts.set(path.step, number)
+      const before =
+        path.id === ''
+          ? instance.path.at(-1)?.finishedAt
+          : (instance.path.filter((entry) => entry.path === path.id).at(-1)?.finishedAt ?? shared)
+      runs.push({
+        key: path.id === '' ? 'current' : `current-${path.id}`,
+        step: path.step,
+        path: path.id === '' ? undefined : path.id,
+        number,
+        startedAt: before ?? instance.createdAt,
+        finishedAt: null,
+        decision: null,
+        error: null,
+        problem: null,
+        traceId: null,
+        state: path.state === 'failed' ? 'failed' : path.state === 'running' ? 'running' : 'waiting',
+        tasks: [],
+        calls: [],
+        subProcesses: [],
+      })
+    }
   }
   const runOf = (step: string, at: string) =>
     runs.find((run) => run.step === step && within(at, run.startedAt, run.finishedAt)) ??

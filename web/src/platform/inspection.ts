@@ -85,10 +85,29 @@ export interface GraphStep {
    * expressions and names, never a value.
    */
   definition?: StepDefinition
+  /**
+   * Proposed, see D155 and the review on #3650: a `parallel` block's branches, each named, with its label's text key,
+   * and the rule that makes the block done, such as `all`.
+   */
+  parallel?: { branches: { name: string; labelKey: string | null }[]; completion: string }
+  /** Proposed, see D155 and the review on #3650: the block and branch a step sits in, when it sits in one. */
+  inBlock?: { block: string; branch: string }
+}
+
+/**
+ * Proposed, see D155 and the review on #3650: a path of an instance that is running, waiting or failed at a step. An
+ * instance has one path, or one for each branch of a block it is in.
+ */
+export interface InstancePath {
+  id: string
+  step: string
+  state: string
 }
 
 /** One occurrence of a step in the instance's history. */
 export interface PathEntry {
+  /** Proposed, see D155 and the review on #3650: the path that ran the step, when the instance had several. */
+  path?: string
   step: string
   startedAt: string
   finishedAt: string
@@ -228,6 +247,11 @@ export interface InstanceDetail {
    * subject is, so the page links it, or `null` when the process has no subject.
    */
   subject?: { entity: string; id: string; label: string | null } | null
+  /**
+   * Proposed, see D155 and the review on #3650: every path the instance is at, when it is at more than one step; `step`
+   * then names the first.
+   */
+  paths?: InstancePath[]
   releaseId: string
   /** Proposed, see the review on #3650: the number of the release the instance is pinned to, as the list has it. */
   releaseNumber?: number | null

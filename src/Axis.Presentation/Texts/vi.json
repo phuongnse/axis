@@ -2757,5 +2757,11 @@
   "shell.stepRun.waitingFor": "Đang chờ",
   "shell.stepRun.givesUp": "Thôi chờ lúc",
   "shell.stepRun.goesOn": "Chạy tiếp lúc",
-  "shell.stepRun.openInStudio": "Mở bước trong Studio"
+  "shell.stepRun.openInStudio": "Mở bước trong Studio",
+  "shell.inspector.status.waitingAtSteps": "Đang chờ ở {count} bước trong {since}: {steps}.",
+  "shell.inspector.status.stepFor": "{step}, chờ {assignee}",
+  "shell.graph.currents": "Tới một bước lượt chạy đang ở",
+  "shell.inspector.graph.completion.all": "Tất cả nhánh",
+  "shell.inspector.graph.completion.any": "Một nhánh bất kỳ",
+  "shell.inspector.stepType.parallel": "Khối song song"
 }

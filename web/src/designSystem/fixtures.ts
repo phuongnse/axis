@@ -1619,6 +1619,168 @@ const instanceDetail: InstanceDetail = {
   studio: { application: 'purchase-requests', resource: '4b60c03e-02d0-4329-80c6-75f972190399' },
 }
 
+/** Proposed, see D155 and the review on #3650: a contract's review, now at two branches of a parallel block. */
+export const parallelInstanceId = 'c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f'
+
+/**
+ * A contract read by legal and finance side by side while the vendor is screened, then put to the board: the
+ * vendor's branch is done, and legal and finance still wait, so the instance is at two steps at once.
+ */
+const parallelInstanceDetail: InstanceDetail = {
+  id: parallelInstanceId,
+  process: 'ContractReview',
+  processTitleKey: 'process.contract.title',
+  subjectId: requestId,
+  subject: { entity: 'Request', id: requestId, label: 'Standing desks for the new office' },
+  releaseId,
+  releaseNumber: 3,
+  state: 'waiting',
+  step: 'legalReview',
+  paths: [
+    { id: 'legal', step: 'legalReview', state: 'waiting' },
+    { id: 'finance', step: 'financeReview', state: 'waiting' },
+  ],
+  createdAt: '2026-03-09T08:00:00.000000Z',
+  endedAt: null,
+  graph: {
+    start: 'submitContract',
+    steps: [
+      {
+        name: 'submitContract',
+        type: 'operation',
+        labelKey: 'contract.step.submit',
+        transitions: [{ next: 'reviews', on: null }],
+      },
+      {
+        name: 'reviews',
+        type: 'parallel',
+        labelKey: 'contract.step.reviews',
+        transitions: [{ next: 'boardApproval', on: null }],
+        parallel: {
+          completion: 'all',
+          branches: [
+            { name: 'legal', labelKey: 'contract.branch.legal' },
+            { name: 'finance', labelKey: 'contract.branch.finance' },
+            { name: 'vendor', labelKey: 'contract.branch.vendor' },
+          ],
+        },
+      },
+      {
+        name: 'legalReview',
+        type: 'task',
+        labelKey: 'contract.task.legal',
+        transitions: [],
+        inBlock: { block: 'reviews', branch: 'legal' },
+      },
+      {
+        name: 'financeReview',
+        type: 'task',
+        labelKey: 'contract.task.finance',
+        transitions: [],
+        inBlock: { block: 'reviews', branch: 'finance' },
+      },
+      {
+        name: 'screenVendor',
+        type: 'operation',
+        labelKey: 'contract.step.screenVendor',
+        transitions: [{ next: 'vendorCleared', on: null }],
+        inBlock: { block: 'reviews', branch: 'vendor' },
+      },
+      {
+        name: 'vendorCleared',
+        type: 'decision',
+        labelKey: 'contract.step.vendorCleared',
+        transitions: [],
+        inBlock: { block: 'reviews', branch: 'vendor' },
+      },
+      {
+        name: 'boardApproval',
+        type: 'task',
+        labelKey: 'contract.task.board',
+        transitions: [
+          { next: 'signContract', on: 'approve', labelKey: 'approval.outcome.approve' },
+          { next: 'tellRejected', on: 'reject', labelKey: 'approval.outcome.reject' },
+        ],
+      },
+      {
+        name: 'signContract',
+        type: 'operation',
+        labelKey: 'contract.step.sign',
+        transitions: [{ next: 'signed', on: null }],
+      },
+      {
+        name: 'tellRejected',
+        type: 'operation',
+        labelKey: 'contract.step.tellRejected',
+        transitions: [{ next: 'rejected', on: null }],
+      },
+      { name: 'signed', type: 'end', labelKey: 'contract.step.signed', transitions: [] },
+      { name: 'rejected', type: 'end', labelKey: 'approval.step.rejected', transitions: [] },
+    ],
+  },
+  path: [
+    {
+      step: 'submitContract',
+      startedAt: '2026-03-09T08:00:00.000000Z',
+      finishedAt: '2026-03-09T08:00:01.000000Z',
+      decision: null,
+      output: null,
+      error: null,
+      traceId: 'b1c2d3e4f5a60718293a4b5c6d7e8f90',
+    },
+    {
+      path: 'vendor',
+      step: 'screenVendor',
+      startedAt: '2026-03-09T08:00:01.000000Z',
+      finishedAt: '2026-03-09T08:00:04.000000Z',
+      decision: null,
+      output: null,
+      error: null,
+      traceId: 'c2d3e4f5a60718293a4b5c6d7e8f90a1',
+    },
+    {
+      path: 'vendor',
+      step: 'vendorCleared',
+      startedAt: '2026-03-09T08:00:04.000000Z',
+      finishedAt: '2026-03-09T08:00:04.000000Z',
+      decision: null,
+      output: null,
+      error: null,
+      traceId: 'c2d3e4f5a60718293a4b5c6d7e8f90a1',
+    },
+  ],
+  tasks: [
+    {
+      id: '0192f700-0000-7000-8000-000000000001',
+      step: 'legalReview',
+      assigneeKind: 'role',
+      assignee: 'Legal',
+      state: 'open',
+      outcome: null,
+      completedBy: null,
+      createdAt: '2026-03-09T08:00:01.000000Z',
+      completedAt: null,
+      dueAt: '2026-03-12T08:00:01.000000Z',
+    },
+    {
+      id: '0192f700-0000-7000-8000-000000000002',
+      step: 'financeReview',
+      assigneeKind: 'role',
+      assignee: 'Finance',
+      state: 'open',
+      outcome: null,
+      completedBy: null,
+      createdAt: '2026-03-09T08:00:01.000000Z',
+      completedAt: null,
+      dueAt: '2026-03-12T08:00:01.000000Z',
+    },
+  ],
+  calls: [],
+  parent: null,
+  subProcesses: [],
+  commands: ['cancel'],
+}
+
 const deadLetterPage: DeadLetterPage = {
   items: [
     {
@@ -2146,6 +2308,20 @@ export const siteTexts: Record<string, string> = {
   'request.submit': 'Submit for approval',
   'request.task.review': 'Review the request',
   'process.approve.title': 'Purchase request approval',
+  'process.contract.title': 'Contract review',
+  'contract.step.submit': 'Submit the contract',
+  'contract.step.reviews': 'Reviews',
+  'contract.branch.legal': 'Legal',
+  'contract.branch.finance': 'Finance',
+  'contract.branch.vendor': 'Vendor',
+  'contract.task.legal': 'Legal review',
+  'contract.task.finance': 'Finance review',
+  'contract.step.screenVendor': 'Screen the vendor',
+  'contract.step.vendorCleared': 'Vendor cleared?',
+  'contract.task.board': 'Board approval',
+  'contract.step.sign': 'Sign the contract',
+  'contract.step.tellRejected': 'Tell the requester it was rejected',
+  'contract.step.signed': 'Signed',
   'approval.task.budget': 'Approve over budget',
   'approval.task.manager': 'Manager approval',
   'approval.task.revise': 'Revise the request',
@@ -2255,6 +2431,7 @@ export const routes: Record<string, () => unknown> = {
   [`${tasksPath}/${missingTaskId}`]: () => new Response(null, { status: 404 }),
   [instancesPath]: () => instancePage,
   [`${instancesPath}/${instanceId}`]: () => instanceDetail,
+  [`${instancesPath}/${parallelInstanceId}`]: () => parallelInstanceDetail,
   [`/api/sites/${sitePath}/texts/${locale}?release=${releaseId}`]: () => ({ texts: siteTexts }),
   [`/api/sites/${sitePath}/pages/instances`]: () => instancesPage,
   [deadLettersPath]: () => deadLetterPage,

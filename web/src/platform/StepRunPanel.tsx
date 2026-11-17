@@ -132,7 +132,12 @@ export function StepRunPanel({
       : operation.includes('/')
         ? t('shell.stepRun.operation.package')
         : t(`shell.stepRun.operation.${operation}`)
-  const kind = [typeText(graphStep?.type ?? ''), operationText].filter(Boolean).join(' · ')
+  // Proposed, see D155 and the review on #3650: a step on a branch of a block names its branch.
+  const branch = instance.graph.steps
+    .find((candidate) => candidate.name === graphStep?.inBlock?.block)
+    ?.parallel?.branches.find((candidate) => candidate.name === graphStep?.inBlock?.branch)
+  const branchText = branch === undefined ? null : branch.labelKey ? t(branch.labelKey) : branch.name
+  const kind = [typeText(graphStep?.type ?? ''), operationText, branchText].filter(Boolean).join(' · ')
   // A step a run names opens in the panel, as every reference opens what it names.
   const stepName = (name: unknown) =>
     typeof name === 'string' ? (
@@ -193,8 +198,11 @@ export function StepRunPanel({
 
   const overview = (shown: StepRun) => {
     const index = runs.indexOf(shown)
-    const before = runs[index - 1]
-    const after = runs[index + 1]
+    // Proposed, see D155 and the review on #3650: a run on a branch came from the run before it on that branch, or
+    // from the last step before the block, and goes on along that branch; a run outside a block skips the branches.
+    const along = (candidate: StepRun) => candidate.path === shown.path || candidate.path === undefined
+    const before = runs.slice(0, index).findLast(along)
+    const after = runs.slice(index + 1).find(along)
     const transition = graphStep?.transitions.find((candidate) => candidate.next === after?.step)
     const reason =
       transition?.on == null ? null : graphStep?.type === 'task' ? outcomeLabel(step, transition.on) : transition.on
