@@ -9,10 +9,10 @@ import {
   type OnConnectEnd,
   Position,
   ReactFlow,
-  Controls,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { type KeyboardEvent, type Ref, useMemo } from 'react'
+import { type KeyboardEvent, useMemo, useRef } from 'react'
+import { ProcessGraphControls } from './ProcessGraphControls'
 import { useDesignTokens, useThemeMode } from './themeMode'
 
 const nodeWidth = 240
@@ -201,17 +201,18 @@ export function ProcessGraphCanvas({
   testId?: string
   height?: number
   edgeType?: EdgeTypes[string]
-  sectionRef?: Ref<HTMLElement>
+  sectionRef?: (element: HTMLElement | null) => void
   onKeyDown?: (event: KeyboardEvent<HTMLElement>) => void
   onStepClick?: (id: string) => void
   onTransitionClick?: (id: string) => void
   onConnectEnd?: OnConnectEnd
   /** Proposed, see the review on #3650: the step the view opens on, at the size it is drawn at, else the whole graph. */
   focus?: string
-  /** Proposed, see the review on #3650: zoom in, zoom out and fit buttons, for a graph too large to read whole. */
+  /** Proposed, see the review on #3650: Zoom in, Zoom out, Show the whole process and Full screen, for a graph too large to read whole. */
   controls?: boolean
 }) {
   const { mode } = useThemeMode()
+  const area = useRef<HTMLElement | null>(null)
   const { colour } = useDesignTokens()
   const edgeTypes = useMemo(() => (edgeType ? { transition: edgeType } : undefined), [edgeType])
 
@@ -269,10 +270,14 @@ export function ProcessGraphCanvas({
 
   return (
     <section
-      ref={sectionRef}
+      ref={(element) => {
+        area.current = element
+        sectionRef?.(element)
+      }}
       data-testid={testId}
       aria-label={ariaLabel}
-      style={{ height, position: 'relative' }}
+      // In full screen the graph fills the screen on the page's surface.
+      style={{ height, position: 'relative', background: colour.surface }}
       onKeyDown={onKeyDown}
     >
       <ReactFlow
@@ -297,7 +302,7 @@ export function ProcessGraphCanvas({
         onNodeClick={onStepClick ? (_, node) => onStepClick(node.id) : undefined}
         onEdgeClick={onTransitionClick ? (_, edge) => onTransitionClick(edge.id) : undefined}
       >
-        {controls && <Controls showInteractive={false} />}
+        {controls && <ProcessGraphControls area={area} />}
       </ReactFlow>
     </section>
   )

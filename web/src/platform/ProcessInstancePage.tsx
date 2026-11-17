@@ -289,6 +289,11 @@ export function InstanceDetailView({
   const walked = [...instance.path.map((entry) => entry.step), instance.step]
   const tookTransition = new Set(walked.slice(1).map((step, index) => `${walked[index]}>${step}`))
   const to = t('shell.studio.processGraph.to')
+  // A step's type in the reader's words, as the timeline names it.
+  const stepTypeText = (type: string) => {
+    const key = `shell.inspector.stepType.${type}`
+    return t(key) === key ? type : t(key)
+  }
   const graphSteps = instance.graph.steps.map((step): ProcessGraphStep => {
     const failed = instance.state === 'failed' && step.name === instance.step
     const tone = failed ? 'error' : step.name === instance.step ? 'current' : taken.has(step.name) ? 'taken' : 'idle'
@@ -302,10 +307,10 @@ export function InstanceDetailView({
     return {
       id: step.name,
       name: stepLabel(step.name),
-      type: step.type,
+      type: stepTypeText(step.type),
       start: step.name === instance.graph.start,
       tone,
-      ariaLabel: `${stepLabel(step.name)}, ${step.type}${state}${runs > 1 ? `, ${t('shell.inspector.graph.runs').replace('{count}', String(runs))}` : ''}`,
+      ariaLabel: `${stepLabel(step.name)}, ${stepTypeText(step.type)}${state}${runs > 1 ? `, ${t('shell.inspector.graph.runs').replace('{count}', String(runs))}` : ''}`,
       badge: runs > 1 ? `×${runs}` : undefined,
       ariaCurrent: tone === 'current',
       testId: `inspector-step-${step.name}`,
