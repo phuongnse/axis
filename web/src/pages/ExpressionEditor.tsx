@@ -11,6 +11,7 @@ import {
   checkStudioExpression,
   fetchStudioExpressionScope,
   type ExpressionCheck,
+  type ExpressionReading as Reading,
   type ExpressionScope,
   type ExpressionScopeFunction,
   type StudioNames,
@@ -23,6 +24,7 @@ import { callAt } from './expressionCall'
 import { completeAt, insertAt } from './expressionCompletion'
 import { expressionLanguage } from './expressionLanguage'
 import { ExpressionPanel } from './ExpressionPanel'
+import { ExpressionReading } from './ExpressionReading'
 import type { ScopeOption } from './expressionScope'
 
 /** How long the author must stop typing before the expression is checked. */
@@ -55,6 +57,7 @@ export interface ExpressionEditorProps {
 interface Result {
   type: string | null
   error: { code: string; message: string } | null
+  reading: Reading | null
 }
 
 /** A code editor for one expression. It checks the text after the author stops typing and shows the newest answer. */
@@ -81,7 +84,7 @@ export default function ExpressionEditor({
   const dialogView = useRef<EditorView | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [themeCompartment] = useState(() => new Compartment())
-  const [result, setResult] = useState<Result>({ type: null, error: null })
+  const [result, setResult] = useState<Result>({ type: null, error: null, reading: null })
   const [checking, setChecking] = useState(true)
   // The text before the cursor, which says whether the cursor is inside a call.
   const [before, setBefore] = useState('')
@@ -89,12 +92,16 @@ export default function ExpressionEditor({
   const [loaded, setLoaded] = useState<{ placeKey: string; scope: ExpressionScope | null } | null>(null)
   // An answer for another place is not this place's scope.
   const scope = loaded?.placeKey === placeKey ? loaded.scope : null
+  const unanswered = loaded?.placeKey === placeKey && loaded.scope === null
+  // Counts the check answers that came while the scope had no answer, so the scope is asked again.
+  const [asks, setAsks] = useState(0)
   const latest = useRef({
     onChange,
     onView,
     required,
     options,
     scope,
+    unanswered,
     names,
     locale,
     t,
@@ -111,6 +118,7 @@ export default function ExpressionEditor({
       required,
       options,
       scope,
+      unanswered,
       names,
       locale,
       t,
@@ -122,6 +130,7 @@ export default function ExpressionEditor({
   })
 
   // The scope is loaded once per place, with the draft as it stands then, so a keystroke in the draft loads no more.
+  // A scope with no answer, such as one asked for a field that has no name yet, is asked again with the next check answer.
   useEffect(() => {
     const controller = new AbortController()
     fetchStudioExpressionScope(application, resourceId, path, latest.current.draft(), controller.signal).then(
@@ -133,7 +142,7 @@ export default function ExpressionEditor({
       () => {},
     )
     return () => controller.abort()
-  }, [application, resourceId, path, placeKey])
+  }, [application, resourceId, path, placeKey, asks])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -144,7 +153,7 @@ export default function ExpressionEditor({
       const id = counter
       const text = view.state.doc.toString()
       if (text === '') {
-        show(view, { type: null, diagnostics: [] })
+        show(view, { type: null, diagnostics: [], reading: null })
         setChecking(false)
         return
       }
@@ -155,6 +164,9 @@ export default function ExpressionEditor({
           }
           if (answer !== null) {
             show(view, answer)
+            if (latest.current.unanswered) {
+              setAsks((count) => count + 1)
+            }
           }
           setChecking(false)
         },
@@ -276,11 +288,20 @@ export default function ExpressionEditor({
           </Typography.Text>
         </div>
       ) : (
-        line !== null && (
-          <div>
-            <Typography.Text data-testid="studio-expression-type">{line}</Typography.Text>
-          </div>
-        )
+        <>
+          {result.reading !== null && (
+            <div data-testid="studio-expression-reading">
+              <Typography.Text type="secondary">{t('shell.studio.expression.inWords')}</Typography.Text>{' '}
+              <ExpressionReading reading={result.reading} names={names} locale={locale} />
+            </div>
+          )}
+          {/* The reading replaces what the place gives, unless the place takes any type, so the type shows under it. */}
+          {line !== null && (result.reading === null || !scope?.type) && (
+            <div>
+              <Typography.Text data-testid="studio-expression-type">{line}</Typography.Text>
+            </div>
+          )}
+        </>
       )}
       {expanded && (
         <Modal
@@ -329,7 +350,7 @@ export default function ExpressionEditor({
     const length = view.state.doc.length
     if (answer.diagnostics.length === 0) {
       view.dispatch(setDiagnostics(view.state, []))
-      setResult({ type: answer.type, error: null })
+      setResult({ type: answer.type, error: null, reading: answer.reading ?? null })
       return
     }
     const diagnostics: Diagnostic[] = answer.diagnostics.map((item) => {
@@ -346,7 +367,7 @@ export default function ExpressionEditor({
     })
     view.dispatch(setDiagnostics(view.state, diagnostics))
     const first = answer.diagnostics[0]
-    setResult({ type: null, error: { code: first.code, message: first.message } })
+    setResult({ type: null, error: { code: first.code, message: first.message }, reading: null })
   }
 }
 

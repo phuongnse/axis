@@ -172,7 +172,8 @@ test.describe('Studio creates a resource from a starter', () => {
     await field.getByRole('textbox').fill('length(name)')
     await expect(field.locator('.cm-lintRange-error')).toHaveCount(0)
     await expect(field.getByTestId('studio-expression-error')).toHaveCount(0)
-    await expect(field.getByTestId('studio-expression-type')).toContainText('Gives a whole number')
+    await expect(field.getByTestId('studio-expression-reading')).toBeVisible()
+    await expect(field.getByTestId('studio-expression-type')).toHaveCount(0)
   })
 
   test('an author builds money, file, references and labelled enum fields in the designer', async ({ page }) => {

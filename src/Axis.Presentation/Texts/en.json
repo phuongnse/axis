@@ -848,6 +848,7 @@
   "shell.studio.forbidden.message": "You need the author role to use Studio.",
   "shell.studio.expression.needs": "Needs to give {type}",
   "shell.studio.expression.gives": "Gives {type}",
+  "shell.studio.expression.inWords": "In words:",
   "shell.studio.expression.type.text": "text",
   "shell.studio.expression.type.integer": "a whole number",
   "shell.studio.expression.type.decimal": "a decimal number",

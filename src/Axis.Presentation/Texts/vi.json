@@ -848,6 +848,7 @@
   "shell.studio.forbidden.message": "Bạn cần vai trò tác giả để dùng Studio.",
   "shell.studio.expression.needs": "Cần trả về {type}",
   "shell.studio.expression.gives": "Trả về {type}",
+  "shell.studio.expression.inWords": "Nghĩa là:",
   "shell.studio.expression.type.text": "văn bản",
   "shell.studio.expression.type.integer": "số nguyên",
   "shell.studio.expression.type.decimal": "số thập phân",

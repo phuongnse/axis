@@ -157,7 +157,7 @@ test.describe('Studio on a copy of its own', () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${entity.id}`)
     const field = page.getByTestId('studio-field-/validations/0/expression')
     const editor = field.getByRole('textbox')
-    await expect(field.getByTestId('studio-expression-type')).toContainText('Gives yes or no')
+    await expect(field.getByTestId('studio-expression-reading')).toBeVisible()
 
     await editor.fill('title > 5')
     await expect(field.locator('.cm-lintRange-error')).toBeVisible()
@@ -165,7 +165,7 @@ test.describe('Studio on a copy of its own', () => {
 
     await editor.fill('totalAmount > 0')
     await expect(field.locator('.cm-lintRange-error')).toHaveCount(0)
-    await expect(field.getByTestId('studio-expression-type')).toContainText('Gives yes or no')
+    await expect(field.getByTestId('studio-expression-reading')).toContainText('is greater than 0')
 
     expect(await readFile(file, 'utf8')).toBe(before)
   })
@@ -181,7 +181,7 @@ test.describe('Studio on a copy of its own', () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${policy.id}`)
     await openListItem(page, '/grants', 0)
     const field = page.getByTestId('studio-field-/grants/0/filter')
-    await expect(field.getByTestId('studio-expression-type')).toContainText('Gives yes or no')
+    await expect(field.getByTestId('studio-expression-reading')).toBeVisible()
     const editor = field.getByRole('textbox')
     await editor.click()
     await editor.press('ControlOrMeta+A')
@@ -598,8 +598,8 @@ test.describe('Studio on a copy of its own', () => {
       await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${endpoint.id}`)
       const row = page.getByTestId('studio-field-/values/title')
       const expression = row.getByRole('textbox')
-      // The type line shows only once CodeMirror has replaced the read-only Suspense fallback.
-      await expect(row.getByTestId('studio-expression-type')).toBeVisible()
+      // The editor shows only once CodeMirror has replaced the read-only Suspense fallback.
+      await expect(row.locator('.cm-editor')).toBeVisible()
       await expression.fill('trim(title)')
       await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-saved')).toBeVisible()
