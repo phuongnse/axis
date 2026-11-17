@@ -4,7 +4,8 @@ This page describes what Studio's editors, designers and buttons do: creating ap
 resources, editing a resource, its references and checks, publishing, releases and tests, and the
 editor of each kind. How Studio is laid out, with its sidebar, band, Overview and Releases, is in
 [Studio workspace](studio-workspace.md), and the form that edits one resource is in
-[Studio resource form](studio-resource-form.md). The [entity designer](entity-designer.md), the
+[Studio resource form](studio-resource-form.md). The seed grid, the endpoint rows and the form steps are in
+[Studio form editors](studio-form-editors.md). The [entity designer](entity-designer.md), the
 [form designer](form-designer.md) and the [process designer](process-designer.md) have pages of their
 own. Studio calls the [authoring API](authoring.md), its settings are in
 [Studio settings](host-settings.md#studio-settings), and its texts are platform texts under
@@ -160,7 +161,8 @@ what changed.
   join it. A reload or closing the tab asks the browser's own question. A link opened in a new tab is not
   asked about, and neither is the move that Studio makes after a delete, because the draft went with the resource.
   A move that only changes the `search`, `filter`, `sort`, `page` or `pageSize` of a
-  [table](actions-and-controls.md#tables) is not asked about either, because the editor stays on screen.
+  [table](actions-and-controls.md#tables), under the table's prefix too, such as `fields.filter`, is not asked about
+  either, because the editor stays on screen.
 
 ## References
 
@@ -460,19 +462,19 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
 
 Each kind opens in the editor that fits it: a designer, a typed editor or the [generic form](#editor).
 
-| Kind               | Editor                                                                                         |
-| ------------------ | ---------------------------------------------------------------------------------------------- |
-| `entity`           | The [entity designer](entity-designer.md)                                                      |
-| `page`             | The [page editor](#page-editor) and the [page designer](#page-designer)                        |
-| `form`             | The generic form with the [form steps](#form-steps), and the [form designer](form-designer.md) |
-| `process`          | The [process editor](#process-editor) and the [process designer](process-designer.md)          |
-| `site`             | The generic form, with the [sign-in](#a-sites-sign-in) picker                                  |
-| `endpoint`         | The generic form, with [rows](#endpoint-rows) for its `values` and its `event`'s `fields`      |
-| `connector`        | The [connector editor](#connector-editor)                                                      |
-| `identityProvider` | The [identity provider editor](#identity-provider-editor)                                      |
-| `scenario`         | The [scenario editor](#scenario-editor)                                                        |
-| `seed`             | The [seed editor](#seed-editor)                                                                |
-| `text`             | The [text editor](text-editor.md)                                                              |
+| Kind               | Editor                                                                                                               |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `entity`           | The [entity designer](entity-designer.md)                                                                            |
+| `page`             | The [page editor](#page-editor) and the [page designer](#page-designer)                                              |
+| `form`             | The generic form with the [form steps](studio-form-editors.md#form-steps), and the [form designer](form-designer.md) |
+| `process`          | The [process editor](#process-editor) and the [process designer](process-designer.md)                                |
+| `site`             | The generic form, with the [sign-in](#a-sites-sign-in) picker                                                        |
+| `endpoint`         | The generic form, with [rows](studio-form-editors.md#endpoint-rows) for its `values` and its `event`'s `fields`      |
+| `connector`        | The [connector editor](#connector-editor)                                                                            |
+| `identityProvider` | The [identity provider editor](#identity-provider-editor)                                                            |
+| `scenario`         | The [scenario editor](#scenario-editor)                                                                              |
+| `seed`             | The [seed editor](studio-form-editors.md#seed-editor)                                                                |
+| `text`             | The [text editor](text-editor.md)                                                                                    |
 
 Every other kind, `application`, `rule`, `sequence`, `role`, `policy`, `dataSource`, `event`,
 `trigger`, `webhook` and `migration`, opens in the generic form. Every editor shows all of its kind's
@@ -854,48 +856,3 @@ draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
 - **Notifications.** An `expectNotification` step picks its recipient kind, a user, a role or an email
   address, and a channel, `inApp`, `email` or none, which reads both channels. Its expected values are
   key and value rows, like a stub's output.
-
-## Seed editor
-
-The seed editor's Form tab shows the seed's name, entity and `sync`, then its records as a grid in a part
-headed Records, with a rule above it. The grid has a row for each record and a column for each field of the
-seed's `entity`, and the JSON view stays as the second view of the same draft.
-
-- **Columns.** The input fits the field's type: a text box for `text`, `date`, `date-time` and
-  `reference`, a text box that stores a number for `integer`, `decimal` and `money`, a true or false
-  choice for `boolean`, and a choice of `values` for `enum`. A `reference` box checks the UUID form.
-  Each input follows the [record API's value rules](record-api.md#request-bodies-and-values).
-- **No column.** A computed field, a `sequence` field, a `creator` field and a `child-collection` field
-  get no column, because seeding rejects a value for the first three, and child collections stay as the
-  file has them. A value the grid does not show, an unknown key included, is saved unchanged.
-- **Rows.** Add record adds a row with a new record id, and Remove deletes the record from the draft.
-  Clearing a cell removes its key from the record's `values`, so the grid never writes `null`.
-- **Save.** A cell whose value would fail seeding, because it has the wrong type, is out of bounds or
-  is missing a required value, shows an error, and a click on Save focuses the first such cell and sends
-  nothing, also when the value comes from the JSON view.
-- **Fallback.** The entity is found by name among the folder's `entity` resources, ignoring letter
-  case. When it is not there, as for a module entity or a typo, the seed uses the generic form and the
-  JSON view.
-
-## Endpoint rows
-
-An endpoint keeps the generic form for its entity, process, input and output, and shows its `values`
-as rows of a field and an expression in the [expression editor](#expression-editor). The rows sit in a
-part headed Values, with help that says what they are. An endpoint with no values says so in one line, above
-Add mapping. Its `event` sits in a part headed Event, below the values.
-
-The field is picked from the fields of the endpoint's entity, found by name among the application's
-names, and is typed while those are unknown. Add mapping lists the fields that have no row. Renaming a
-row's field keeps its place in the file, and a value that is not an object is left to the JSON view.
-
-## Form steps
-
-A form keeps the generic form for its entity, sections and fields, with an
-[expression editor](#expression-editor) for each `visibleWhen`, `requiredWhen` and `readOnlyWhen`, and
-shows its `steps` as cards. The [form designer](form-designer.md) edits the same draft on a canvas.
-
-The cards sit in a part headed Steps. Each step card has a title, a section picker, Move up, Move down and
-Remove, and Add step appends a card. The picker lists the sections that have a `name`, so an unnamed section is
-not offered. Removing the last step removes `steps`, and the form goes back to one page. A condition offers the
-fields that the form lists, because a condition reads only those. A `steps` value that is not a list is left to
-the JSON view.

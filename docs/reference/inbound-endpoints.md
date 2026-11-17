@@ -332,7 +332,7 @@ state of an instance that an endpoint call started.
 
 ## Editing in Studio
 
-Studio edits an endpoint in the generic form, with [rows](studio.md#endpoint-rows) for its
+Studio edits an endpoint in the generic form, with [rows](studio-form-editors.md#endpoint-rows) for its
 `values`, and with a picker and rows for its `event`.
 
 - **Endpoint `event`.** The [Studio](studio.md) endpoint form shows the
