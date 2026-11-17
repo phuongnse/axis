@@ -382,7 +382,7 @@ Every `POST`, `PUT`, `PATCH` and `DELETE` under `/api` must carry `X-Axis-Csrf: 
   writes. See the record API's [CSRF header rule](record-api.md#create-update-and-delete).
 - Paths under `/api/apps/{app}/endpoints/` are exempt from the header, because they take a bearer token
   and no session cookie. So are the writes under `/api/cell/` that carry a bearer token, and a
-  [service account](#service-accounts) request.
+  [service account](#service-accounts) request or a [package runner](extension-packages.md#customer-hosted-runners)'s.
 
 ### Session lifetimes and re-authentication
 

@@ -6,8 +6,8 @@ using Microsoft.Extensions.Options;
 namespace Axis.Server.Authentication;
 
 /// <summary>
-/// Brings the OIDC client and the endpoint caller, service account and MCP caller schemes of each tenant in line with the tenants served now. A tenant
-/// that is served gains all four schemes, a tenant that is no longer served loses them, and a tenant whose settings changed
+/// Brings the OIDC client and the endpoint caller, service account, MCP caller and package runner schemes of each tenant in line with the tenants served now. A tenant
+/// that is served gains all five schemes, a tenant that is no longer served loses them, and a tenant whose settings changed
 /// builds its options again on their next use, which also fetches the identity provider's metadata again.
 /// </summary>
 internal sealed class TenantSignInSchemes(
@@ -28,6 +28,7 @@ internal sealed class TenantSignInSchemes(
             schemes.RemoveScheme(EndpointCaller.SchemeName(id));
             schemes.RemoveScheme(ServiceAccount.SchemeName(id));
             schemes.RemoveScheme(McpCaller.SchemeName(id));
+            schemes.RemoveScheme(PackageRunnerCaller.SchemeName(id));
         }
 
         settings.Replace(next);
@@ -39,6 +40,7 @@ internal sealed class TenantSignInSchemes(
             bearerOptions.TryRemove(EndpointCaller.SchemeName(id));
             bearerOptions.TryRemove(ServiceAccount.SchemeName(id));
             bearerOptions.TryRemove(McpCaller.SchemeName(id));
+            bearerOptions.TryRemove(PackageRunnerCaller.SchemeName(id));
         }
 
         foreach (var id in next.Keys.Where(id => !previous.ContainsKey(id)))
@@ -47,6 +49,7 @@ internal sealed class TenantSignInSchemes(
             schemes.TryAddScheme(new AuthenticationScheme(EndpointCaller.SchemeName(id), displayName: null, typeof(JwtBearerHandler)));
             schemes.TryAddScheme(new AuthenticationScheme(ServiceAccount.SchemeName(id), displayName: null, typeof(JwtBearerHandler)));
             schemes.TryAddScheme(new AuthenticationScheme(McpCaller.SchemeName(id), displayName: null, typeof(JwtBearerHandler)));
+            schemes.TryAddScheme(new AuthenticationScheme(PackageRunnerCaller.SchemeName(id), displayName: null, typeof(JwtBearerHandler)));
         }
     }
 }

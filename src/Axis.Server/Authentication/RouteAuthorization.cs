@@ -61,6 +61,7 @@ internal sealed class RouteRefusal : IAuthorizationMiddlewareResultHandler
         {
             var refusal = EndpointCaller.IsEndpointPath(context.Request.Path) ? Grants.EndpointTokenRequired(context)
                 : McpCaller.Applies(context) ? Grants.McpTokenRequired(context)
+                : PackageRunnerCaller.Applies(context) ? Grants.PackageRunnerTokenRequired(context)
                 : Grants.SignInRequired(context);
             await refusal.ExecuteAsync(context);
         }
