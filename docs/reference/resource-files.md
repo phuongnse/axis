@@ -157,6 +157,21 @@ A page holds one or more widgets. A leaf widget's `type` is `table`, `form`, `ta
   set `"inlineEdit": true`. A table over a data source may not. The compiler checks that a `process` takes the table's
   entity as its subject. It also checks that each field in `fields` is a field of that entity that is not computed,
   a sequence or a creator. See [bulk actions](table-widget.md#bulk-actions) and [inline edit](table-widget.md#inline-edit).
+- **Menu groups** _(planned for M42)_. A navigation entry may hold `entries` in place of its `page`, which makes it a
+  parent entry with a `label` and an optional `icon`. Its `entries` name pages, one level deep, such as
+  `{ "label": { "textKey": "purchasing.nav.reports" }, "icon": "chart", "entries": [{ "page": "Spend", "label": { "textKey": "purchasing.nav.spend" } }] }`.
+  The rule is [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md),
+  and its checks are in [sites](configuration.md#sites).
+- **A home page for each role** _(planned for M42)_. A site's `homePages` lists `{ "role", "page" }` entries, such as
+  `{ "role": "buyer", "page": "PurchaseRequests" }`. A person's home page is the page of the first entry whose role
+  they hold and whose page they may read. Otherwise it is the first navigation page they may read. The rule is
+  [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md),
+  and its checks are in [sites](configuration.md#sites).
+- **Brand** _(planned for M42)_. A site's `brand` is `{ "logo": "images/logo.png", "primary": "#1f6feb" }`. The `logo`
+  is a PNG, JPEG or WebP file in the application's `images` folder, under the same rule as a
+  [content widget](content-widget.md#content-widget) image. The `primary` is the site's main colour, and the compiler derives the other colours from it, see
+  [design tokens](frontend.md#design-tokens-and-previews). The rule is
+  [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
 
 ### Page parameters and navigate actions
 

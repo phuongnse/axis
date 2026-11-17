@@ -168,6 +168,15 @@ A site belongs to one application, and its `path` and locales are checked here.
   a name from Axis's list of [navigation icons](shell.md#navigation-icons), otherwise it is
   `AXC0004` at `/navigation/{i}/icon`.
 - **Labels.** Site titles and descriptions and navigation labels join the `AXC0028` check.
+- **Menu groups and home pages** _(planned for M42)_. An entry with `entries` names no `page` and holds at least one
+  entry, and an entry inside `entries` holds none. Otherwise the entry is refused at `/navigation/{i}`. A `homePages`
+  entry must name a loaded role and a loaded page, and a role named twice is refused at the later entry, at
+  `/homePages/{i}`. The rule is [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
+- **Brand** _(planned for M42)_. A `logo` that is not a PNG, JPEG or WebP file in `images` is refused at `/brand/logo`.
+  A `primary` that is not `#rrggbb` is refused at `/brand/primary`, and so is one whose derived colours miss the
+  [contrast thresholds](frontend.md#design-tokens-and-previews) in either mode. Those are `primaryText` at 4.5:1 on
+  `surface` and `canvas`, `onPrimary` at 4.5:1 on `primary`, and `focusRing` at 3:1 on `surface` and `canvas`. The rule
+  is [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
 
 ### Pages and widgets
 

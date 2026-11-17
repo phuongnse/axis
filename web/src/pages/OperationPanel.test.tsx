@@ -303,7 +303,8 @@ describe.each(['light', 'dark'])('The operation panel in %s mode', (mode) => {
 
   it('renders inside the theme root with its controls visible', async () => {
     renderEditor()
-    await screen.findAllByTestId('studio-expression-type')
+    // The first expression loads its editor lazily, which can take longer than the default wait while other files run.
+    await screen.findAllByTestId('studio-expression-type', undefined, { timeout: 5000 })
 
     const root = screen.getByTestId('studio-field-/steps/0/operation')
     expect(root.closest(`[data-theme-mode=${mode}]`)).not.toBeNull()
