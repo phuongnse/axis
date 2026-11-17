@@ -335,6 +335,32 @@
       "vi": "bản nháp biểu mẫu",
       "status": "proposed",
       "note": "On a form, \"draft\" alone may name it."
+    },
+    {
+      "concept": "Favourite",
+      "en": "favourite",
+      "vi": "mục yêu thích",
+      "status": "proposed",
+      "note": "A page or record a person keeps in their own list on a site."
+    },
+    {
+      "concept": "Recent items",
+      "en": "recent",
+      "vi": "gần đây",
+      "status": "proposed"
+    },
+    {
+      "concept": "Logo",
+      "en": "logo",
+      "vi": "logo",
+      "status": "proposed"
+    },
+    {
+      "concept": "Main colour",
+      "en": "main colour",
+      "vi": "màu chính",
+      "status": "proposed",
+      "note": "A site's colour, from which its other colours follow."
     }
   ]
 }

@@ -48,6 +48,12 @@ component holds a number of its own.
   keyboard focus of every control. `onPrimary` colours text and icons on a `primary` fill.
 - **Contrast.** Every text colour reaches 4.5:1, and every border and focus ring 3:1, on `surface` and `canvas` in both
   modes. `onPrimary` reaches 4.5:1 on `primary` in both modes. [Each preview](widget-previews.md#the-spec) is checked.
+- **A site's brand** _(planned for M42)_. A site's `brand.primary` is its main colour, see [sites](configuration.md#sites)
+  and [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
+  The compiler works out the light and dark `primary`, `primaryText`, `focusRing` and `onPrimary` from it, and the
+  compiled site carries them. The SPA draws that site's shell and pages with them in place of the token file's values,
+  and every other token keeps its value. The platform site, Studio and the consoles keep the token file. A colour that
+  misses the Contrast rule is refused when compiled. The look is left to design reviews.
 - **Shadow.** The shadow group holds `overlay`, the only shadow. Dialogs, menus, pickers and popovers cast it, and
   widgets, cards, sections and buttons cast none.
 - **Type, spacing and radius.** Type has the body and code fonts and the font size, spacing runs from `spacing-xs` to
@@ -189,7 +195,7 @@ tenant host.
     application sites, which never replace or merge into it. A test checks that every locale has exactly the same keys
     as English, and the placeholder and untranslated-text rules of [UI writing](ui-writing.md#checks).
 - **Application sites.** The sites of the tenant's active applications are found by path, not by application name,
-  because the path is what users see and one application can have several sites. Four endpoints describe them, and the page one has a second form for module pages.
+  because the path is what users see and one application can have several sites. Four endpoints describe them, the page one has a second form for module pages, and a person's favourites and recent items have routes of their own.
 
 | Route                                         | Response                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -198,6 +204,11 @@ tenant host.
 | `GET /api/sites/{path}/texts/{locale}`        | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `GET /api/sites/{path}/pages/{page}`          | the [page metadata](#page-metadata). The page of a module is `GET /api/sites/{path}/pages/{module id}/{name}`, two path segments as the record API writes a module entity. Its `name` is `{module id}/{name}` and its title and labels resolve from the module's texts                                                                                                                                                                                                                                                                                                                                                                          |
 | `GET /api/sites/{path}/pages/{module}/{page}` | the [page metadata](modules-and-templates.md#module-pages) of a module's page                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `GET /api/sites/{path}/favourites` _(planned for M42)_ | `{ "favourites": [ { "id", "page", "record", "label" } ] }`, newest first. `record` is `null` for a page alone, and `label` is the record's display field value, or `null` |
+| `POST /api/sites/{path}/favourites` _(planned for M42)_ | takes `{ "page", "record" }`, with `record` `null` for a page alone. Answers `201` with the favourite, or `200` with the one already kept |
+| `DELETE /api/sites/{path}/favourites/{id}` _(planned for M42)_ | `204`, for the person's own favourite |
+| `GET /api/sites/{path}/recent` _(planned for M42)_ | `{ "recent": [ { "page", "record", "label", "openedAt" } ] }`, latest first, at most 20 |
+| `POST /api/sites/{path}/recent` _(planned for M42)_ | takes `{ "page", "record" }` and notes it as opened now, `204` |
 
 - **Titles.** `titles` in the site list has one entry for each available locale of the site, from the locale as the
   site declares it to the title text, so the home page can show each site without one more request per site.
@@ -219,6 +230,18 @@ tenant host.
 - **Load time.** At typical size, a page with a three-level widget tree loads in under 2 s: its metadata, then the rows
   of its table, chart and KPIs read in parallel over 100,000 records. `PageLoadPerformanceTests` fails when the best of
   three loads takes 2 s or more.
+- **Favourites and recent items** _(planned for M42)_. The lists belong to the signed-in person, the application and the
+  site, and no route names a person. A `page` must be a page of the site's application. A `record` must be a record of
+  the entity that page shows, and one the person may read, otherwise `404`. A 101st favourite answers `409`, and the
+  recent list keeps the latest 20. A `GET` reads each `label` under the current grants, and leaves out a page or record
+  the person cannot read or that no longer exists. Writes need the [CSRF header](security.md#csrf-header). An `id` that
+  is not the person's own answers `404`. On a site's own host, only that site's path answers. The lists are described in
+  [favourites and recent items](shell.md#favourites-and-recent-items), and the rule is
+  [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
+- **Menu groups, home page and brand** _(planned for M42)_. `GET /api/sites/{path}` gives a parent entry `page: null`
+  with its `entries`. It adds `homePage`, the name of the person's home page, and `brand`, which is
+  `{ "logo", "colours" }` with the logo's address and the light and dark colours, or `null`. See
+  [sites](configuration.md#sites).
 
 ## Page metadata
 
@@ -489,6 +512,7 @@ below answers `200`.
 | `/{site}/{inboxpage}/{taskId}`         | the task page of the task with that id, under the page of a task inbox                                                                                                                                                                                                                                                                                                                                                                                              |
 | `/{site}/{inspectorpage}/{instanceId}` | the instance page of the process instance with that id, under the page of a process inspector                                                                                                                                                                                                                                                                                                                                                                       |
 
+- **A site's home page** _(planned for M42)_. `/{site}` redirects to the person's home page, see [layout](shell.md#layout).
 - **The home page's cards.** `/?signIn=failed`, `/?signIn=declined` and `/?signedOut` show a card in place of
   sign-in, see [the sign-in card](shell.md#the-sign-in-card).
 - **Reserved paths.** The sessions screen at `/account` and the users page at `/users` with a user's page at
