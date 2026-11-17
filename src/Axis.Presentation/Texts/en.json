@@ -2779,15 +2779,14 @@
   "shell.inspector.tab.history": "History",
   "shell.inspector.tab.data": "Data",
   "shell.inspector.startedBy": "Started by",
-  "shell.inspector.startedBy.user": "{name}",
-  "shell.inspector.startedBy.trigger": "Trigger: {name}",
-  "shell.inspector.startedBy.endpoint": "Endpoint: {name}",
-  "shell.inspector.startedBy.schedule": "Schedule: {name}",
-  "shell.inspector.startedBy.parent": "Process: {name}",
   "shell.inspector.duration": "Duration",
   "shell.inspector.instanceId": "Instance ID",
   "shell.inspector.notEnded": "The instance has not ended yet.",
   "shell.inspector.endedAtStep": "Ended at {step}.",
   "shell.inspector.output": "Output",
-  "shell.inspector.noInput": "It started with no input."
+  "shell.inspector.noInput": "It started with no input.",
+  "shell.inspector.startedVia.trigger": "Trigger",
+  "shell.inspector.startedVia.endpoint": "Endpoint",
+  "shell.inspector.startedVia.schedule": "Schedule",
+  "shell.inspector.startedVia.parent": "Parent process"
 }

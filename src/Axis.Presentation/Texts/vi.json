@@ -2779,15 +2779,14 @@
   "shell.inspector.tab.history": "Lịch sử",
   "shell.inspector.tab.data": "Dữ liệu",
   "shell.inspector.startedBy": "Khởi chạy bởi",
-  "shell.inspector.startedBy.user": "{name}",
-  "shell.inspector.startedBy.trigger": "Trigger: {name}",
-  "shell.inspector.startedBy.endpoint": "Endpoint: {name}",
-  "shell.inspector.startedBy.schedule": "Lịch: {name}",
-  "shell.inspector.startedBy.parent": "Quy trình: {name}",
   "shell.inspector.duration": "Thời lượng",
   "shell.inspector.instanceId": "ID lượt chạy",
   "shell.inspector.notEnded": "Lượt chạy chưa kết thúc.",
   "shell.inspector.endedAtStep": "Kết thúc ở bước {step}.",
   "shell.inspector.output": "Đầu ra",
-  "shell.inspector.noInput": "Khởi chạy không có đầu vào."
+  "shell.inspector.noInput": "Khởi chạy không có đầu vào.",
+  "shell.inspector.startedVia.trigger": "Trigger",
+  "shell.inspector.startedVia.endpoint": "Endpoint",
+  "shell.inspector.startedVia.schedule": "Lịch chạy",
+  "shell.inspector.startedVia.parent": "Quy trình cha"
 }

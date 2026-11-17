@@ -307,16 +307,35 @@ export function InstanceDetailView({
           },
         ]),
     { key: 'createdAt', term: t('shell.inspector.createdAt'), value: time('createdAt', instance.createdAt), width: 2 },
+    // Proposed, see the review on #3650: who or what started the instance reads one way for every kind: its name,
+    // then how, muted: a person and the action they took, or a trigger, an endpoint, a schedule or the parent process,
+    // whose instance the name opens.
     {
       key: 'startedBy',
       term: t('shell.inspector.startedBy'),
       value:
-        startedBy === undefined ? (
+        instance.parent !== null ? (
+          <span>
+            {parentPage === undefined ? (
+              instance.parent.process
+            ) : (
+              <Link to={inspectorPath(sitePath, parentPage, instance.parent.id)} data-testid="inspector-parent-link">
+                {instance.parent.process}
+              </Link>
+            )}
+            <Typography.Text type="secondary"> · {t('shell.inspector.startedVia.parent')}</Typography.Text>
+          </span>
+        ) : startedBy === undefined ? (
           <NotSet />
         ) : (
           <span>
-            {t(`shell.inspector.startedBy.${startedBy.kind}`).replace('{name}', startedBy.name)}
-            {startedBy.via && <Typography.Text type="secondary"> · {startedBy.via}</Typography.Text>}
+            {startedBy.name}
+            {(startedBy.kind === 'user' ? startedBy.via : t(`shell.inspector.startedVia.${startedBy.kind}`)) && (
+              <Typography.Text type="secondary">
+                {' · '}
+                {startedBy.kind === 'user' ? startedBy.via : t(`shell.inspector.startedVia.${startedBy.kind}`)}
+              </Typography.Text>
+            )}
           </span>
         ),
       width: 2,
@@ -346,23 +365,6 @@ export function InstanceDetailView({
       ),
       width: 2,
     },
-    ...(instance.parent === null
-      ? []
-      : [
-          {
-            key: 'parent',
-            term: t('shell.inspector.parent'),
-            value:
-              parentPage === undefined ? (
-                instance.parent.process
-              ) : (
-                <Link to={inspectorPath(sitePath, parentPage, instance.parent.id)} data-testid="inspector-parent-link">
-                  {instance.parent.process}
-                </Link>
-              ),
-            width: 3,
-          },
-        ]),
   ]
   // Proposed, see the review on #3650: the instance's Input, what it started with, and its Output, once it has ended the
   // end step it reached and the values it ended with, as AWS Step Functions names an execution's; they are facts of the
