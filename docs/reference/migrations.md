@@ -31,12 +31,12 @@ definitions, so Axis can tell which rows are out of date without computing them.
     child collection whose child entity has computed fields. That includes a record API write, an
     inbound endpoint create, a process step update or `createRecord` step pinned to an older release,
     a connector or package result write, a task completion, an operator's call
-    [resolve](process-inspection.md#resolve) and seed data. Work pinned to an older release stamps
+    [resolve](process-operator-commands.md#resolve) and seed data. Work pinned to an older release stamps
     that release, not the active one. A row written before the column existed has no stamp.
   - An update that leaves out such a collection did not recompute its rows, so it keeps the stamp
     only when the stamp already names the update's release, and otherwise sets it to `NULL`. A
     process step update, a connector or package result write, a task completion and an operator's
-    call [resolve](process-inspection.md#resolve) never send child rows, so they clear the stamp of a
+    call [resolve](process-operator-commands.md#resolve) never send child rows, so they clear the stamp of a
     row that has child rows with computed fields, unless it already names their release. A
     collection whose child entity has no computed field does not count.
   - Child rows recompute with their owner and carry no stamp.
@@ -405,8 +405,8 @@ switch of the active release.
   collide with it, which only makes a start wait longer.
 - **Who takes it.** The process start endpoint, the inbound endpoint, record API creates, updates and
   deletes, task completion, event delivery, `sync` event triggers, update triggers from worker steps,
-  schedule fan-out, and operator [retry](process-inspection.md#retry) and
-  [resolve](process-inspection.md#resolve). A record API create or update always takes it, because
+  schedule fan-out, and operator [retry](process-operator-commands.md#retry) and
+  [resolve](process-operator-commands.md#resolve). A record API create or update always takes it, because
   the new release may add triggers, and a delete takes it because the new release may add delete
   triggers.
 - **Activation holds it exclusively.** An activation with a pending migration takes the same lock
@@ -478,9 +478,9 @@ These limits follow from running migrations inside activation.
   start lock, so a long fill delays them.
 - **Draining old work.** Old work must finish before a destructive migration can run. An operator can
   drain it by cancelling the `running` and `waiting` old-release instances, see
-  [cancel](process-inspection.md#cancel). A call that is `sending` or `unknown` must settle or be
-  [resolved](process-inspection.md#resolve) first. A `failed` instance does not block the migration,
-  and a [retry](process-inspection.md#retry) of one is refused when the migration changed a column it
+  [cancel](process-operator-commands.md#cancel). A call that is `sending` or `unknown` must settle or be
+  [resolved](process-operator-commands.md#resolve) first. A `failed` instance does not block the migration,
+  and a [retry](process-operator-commands.md#retry) of one is refused when the migration changed a column it
   uses.
 - **Requests across the switch.** A record API create or update takes the start lock and runs again
   on the new release when the active release changed. A list, a read, a history or a delete that

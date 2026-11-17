@@ -24,7 +24,7 @@ never leaves an instance half moved.
   and sets the instance to `failed`. No step is retried. A `callConnector` step retries its call
   under its retry policy, see [Connector calls](#connector-calls), and so does a package operation
   step, see [Package operations](#package-operations). An operator can retry a `failed` instance, see
-  [Retry](process-inspection.md#retry).
+  [Retry](process-operator-commands.md#retry).
 - **Error paths.** _(planned for M38)_ A step that names an error path for its kind of failure takes
   it instead of failing its path, see [Paths](#paths).
 - **Work item errors.** When a work item's handler throws, its writes roll back. A following
@@ -261,7 +261,7 @@ for it as written. This section says what changes when paths run at once.
   with the output `{ "state": "cancelled", "block" }` is written for each cancelled path. A call that
   is `sending` or `unknown` settles on its call row and in the audit as it does for a cancelled
   instance, but it writes no output and moves no path. Lock order follows
-  [Cancel](process-inspection.md#cancel): the open tasks, then the instance, then the paths, parents
+  [Cancel](process-operator-commands.md#cancel): the open tasks, then the instance, then the paths, parents
   before children. A path that ends locks the same way, so two paths that end at once queue and exactly
   one of them sees the rule hold.
 - **Passes.** A `repeat` step's transaction reads its items once and inserts one path row for each item
@@ -414,7 +414,7 @@ although a failed connector call keeps its stored input. It sets the call to `pe
 input, 0 attempts and 0 lookups, clears the last status, the last error and the settled time, and sets
 `staged_revision` to the revision the step runs at again. The history row, the audit record and the
 work item are written again as above, with the same `operationId`. See
-[Retry](process-inspection.md#retry).
+[Retry](process-operator-commands.md#retry).
 
 **Each attempt.** A worker that claims the `connector.call` item does this:
 
@@ -521,7 +521,7 @@ the system what happened: it calls the operation's `lookup` with the operation i
 | **Found:** `200` with a body that fits the output                                                                 | The call settles as succeeded with that output, as after a successful attempt. Nothing is sent again                                                                                                                                                                                                                                 |
 | **Not found:** `404`, so the system never acted                                                                   | The call goes back to `pending` and is retried with the same identity, which counts as an attempt. The retry is due after the step's backoff for the attempts made, as any retry is. When no attempts are left, the instance becomes `failed`                                                                                         |
 | **Failed lookup:** any other answer, including another `2xx` and a `200` whose body does not fit, or a lookup that is never sent | The call stays `unknown`, with the lookup's status and error, and the lookup is tried again. The delay starts at `backoff` and doubles each time, up to 1 hour, with no limit. The call row counts the failed lookups in `lookups`, so the delay survives a worker restart, and the count is reset when the call goes back to `pending` |
-| **No lookup:** the operation declares none                                                                        | The call stays `unknown`, and the instance stays `waiting`. A history row with output `{ "operationId", "outcome": "unknown" }` makes it visible, and an operator resolves it, see [Resolve](process-inspection.md#resolve)                                                                                                           |
+| **No lookup:** the operation declares none                                                                        | The call stays `unknown`, and the instance stays `waiting`. A history row with output `{ "operationId", "outcome": "unknown" }` makes it visible, and an operator resolves it, see [Resolve](process-operator-commands.md#resolve)                                                                                                           |
 
 The first lookup runs at once after the unknown outcome, and only a failed lookup waits. The same
 `connector.call` item runs each lookup, under the same claim and fencing rules as an attempt, and a
@@ -646,7 +646,7 @@ operation in place of the HTTP request:
   `{ "state": "waiting", "operationId" }` and the audit record `operation.staged`. The call also
   stores the step's retry policy and the operation's `idempotent` flag, because a worker that lacks
   the pinned version cannot read them from the release.
-- **Staging again.** A step that runs again after an operator [retry](process-inspection.md#retry)
+- **Staging again.** A step that runs again after an operator [retry](process-operator-commands.md#retry)
   reuses its `failed` row, as a connector call does, under the same operation identity. It stores
   fresh input, the step's current retry policy, the operation's `idempotent` flag, the new
   `staged_revision` and 0 attempts, and clears the last error and the settled time.
@@ -725,7 +725,7 @@ input under the same operation identity.
   `{ "operationId", "outcome": "unknown" }` makes it visible. Its error is a fixed sentence, one for a
   timeout, one for a runner that exited and one for a call found `sending`. The call keeps its stored input, and it writes no
   `operation.called` audit record and no `process.failed`, because it has not settled. Packages have
-  no lookup, so an operator resolves it, see [Resolve](process-inspection.md#resolve).
+  no lookup, so an operator resolves it, see [Resolve](process-operator-commands.md#resolve).
 - **Audit.** Each settled call writes one audit record `operation.called`, with actor `system` and
   details `{ "package", "version", "operation", "operationId", "attempts", "outcome" }`. When it writes
   output fields, it also writes `record.updated`, as `updateRecord` does. A failed call also writes

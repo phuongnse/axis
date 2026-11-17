@@ -35,6 +35,8 @@ header, as the other session routes do. They are checked on the server whatever 
 | `GET /api/console/instances/{id}`                         | Answers one instance of the tenant, in the process inspection shape       |
 | `POST /api/console/instances/{id}/retry`                  | Runs the retry command of an instance on its active release               |
 | `POST /api/console/instances/{id}/cancel`                 | Runs the cancel command of an instance on its active release              |
+| `POST /api/console/instances/{id}/paths/{pathId}/cancel` _(planned for M38)_ | Runs the cancel command of one path of an instance |
+| `POST /api/console/instances/{id}/tasks/{taskId}/cancel` _(planned for M38)_ | Runs the cancel command of one open task of an instance |
 | `POST /api/console/instances/{id}/calls/{callId}/resolve` | Runs the resolve command of a call of an instance                         |
 | `GET /api/console/applications/{id}/publishing`           | Answers one application's release history and one page of its publish requests, read-only, the requests searched, filtered and sorted in PostgreSQL |
 | `GET /api/console/dead-letters`                           | Lists one page of the tenant's dead letters, searched, filtered and sorted in PostgreSQL |
@@ -103,9 +105,15 @@ header, as the other session routes do. They are checked on the server whatever 
   lists none, as in the process inspector. Otherwise `commands` is empty and no call is
   `resolvable`. When the application has no active release, the release the instance is pinned
   to stands in for the active one.
+- **Paths and variables.** _(planned for M38)_ The detail also answers `paths`, `variables` and the `commands`
+  of each path and task, as for a holder of the grants, with the operator role standing in for them.
+- **`POST /api/console/instances/{id}/paths/{pathId}/cancel` and `…/tasks/{taskId}/cancel`.** _(planned for M38)_
+  These check what the other command routes check, then the `pathId` or the `taskId`, which answers `404`
+  when it is not a hyphenated UUID or names no path or task of the instance. Then they run the
+  [process route's command](process-operator-commands.md#cancel-one-path-or-one-task) with the operator as actor.
 - **`POST /api/console/instances/{id}/retry`, `…/cancel` and `…/calls/{callId}/resolve`.**
   Check, in order, the content type (`415`), the body (`400`), which is the body of the
-  [process route](process-inspection.md#operator-commands), the `id` and then the `callId`
+  [process route](process-operator-commands.md#operator-commands), the `id` and then the `callId`
   (`404` when it is not a hyphenated UUID), the instance (`404` when none has the id), the
   active release of its application (`409` when it has none) and the instance's process in
   that release (`409` when it is no longer there). The CSRF middleware refuses a write without
@@ -196,6 +204,9 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   Process filter offers the processes of the active releases. The address keeps the view as
   `failedWork.filter`, `failedWork.page` and `failedWork.pageSize`, because the page has other
   tables.
+- **Paths, variables and cancels.** _(planned for M38)_ The instance detail that a failed-work entry opens
+  shows the paths, the variables and the cancel of one path or one task, as the
+  [instance page](process-inspector-widget.md#instance-page) does.
 - **Dead letters.** Event deliveries that reached the event delivery limit,
   including [webhook deliveries](outbound-webhooks.md#outbound-webhooks) and those that belong to
   no process. The view lists them in every state, newest first until it is sorted, and is paged on
@@ -255,9 +266,11 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
 The console runs the operator commands of processes and dead letters, with the operator role in place
 of the grants, and nothing that changes the tenant itself.
 
-- **Retry, cancel and resolve.** The [operator commands](process-inspection.md#operator-commands)
+- **Retry, cancel and resolve.** The [operator commands](process-operator-commands.md#operator-commands)
   with their rules, run from the instance detail. The operator role stands in for the `process`
   grants `retry`, `cancel` and `resolve`.
+- **Cancel one path or one task.** _(planned for M38)_ The [instance page](process-inspector-widget.md#commands)
+  offers a cancel of a path or a task whose `commands` list it, with a reason, as the instance cancel does.
 - **Redeliver and discard.** The commands on [dead letters](process-events.md#dead-letters), run
   from the Dead letters view. The operator role stands in for the `process` grant `retry`.
 - **A reason each time.** Every command needs a reason. It writes the same history rows and audit

@@ -96,6 +96,9 @@ wrong form show the not-found page, and the instance is not requested.
   navigation page whose process inspector names its process, with the same lookup as the record
   history's links. A relative whose process no navigation page inspects shows without a link. The page
   loads the pages' metadata only when the instance has a parent or a child.
+- **Paths and variables.** _(planned for M38)_ After the calls, a Paths part lists the instance's `paths`
+  with the block, the branch or pass, the step, the state, the revision and the start and end times. A
+  Variables part lists each variable with its value, and a hidden one shows "hidden", as a call input does.
 - **Labels.** Step labels come from the texts of the instance's `releaseId`, loaded with
   `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, as the inbox does. A step without a label
   shows its name.
@@ -115,6 +118,9 @@ The instance page runs the operator's commands on the instance and its calls, ea
 - **Retry warning.** The Retry dialog first warns when a call on the instance's current step has
   `failed`, and that call is a package call whose `idempotent` is not `true`. A failed connector call
   gets no warning.
+
+- **Cancel one path or one task.** _(planned for M38)_ Each path and task whose `commands` lists `cancel`
+  has a Cancel button, which opens the same reason dialog as the instance's.
 
 ### Resolve
 

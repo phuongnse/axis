@@ -611,7 +611,7 @@ Content-Type: application/json
 
 - **Grants.** Listing needs the `inspect` grant on the process, and redeliver and discard need its
   `retry` grant. The `reason` follows the rule of the
-  [operator commands](process-inspection.md#operator-commands). Listing does not check whether the
+  [operator commands](process-operator-commands.md#operator-commands). Listing does not check whether the
   user may read the event's record, because a dead letter holds ids and a fixed error text, never a
   record value.
 - **Widget.** The [process inspector widget](process-inspector-widget.md) lists the open dead letters

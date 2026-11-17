@@ -116,6 +116,7 @@ The `output` column holds what each step or event wrote:
 | `waitEvent`, `subProcess` and `createRecord` steps | As [process flow](process-flow.md) says for each step |
 | Operator cancel | `{ "command": "cancel" }` |
 | Operator retry | `{ "command": "retry" }` |
+| Operator cancel of one task _(planned for M38)_ | `{ "command": "cancel", "taskId" }` |
 | Call an operator resolved as succeeded | `{ "operationId", "outcome", "next", "resolved": true }`, plus `subjectVersion` when it wrote output fields |
 | Call an operator resolved as failed | `{ "operationId", "outcome": "failed", "resolved": true }` |
 | Failed step | Null |

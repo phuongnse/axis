@@ -672,9 +672,9 @@ without a grant. These rules say how grants combine into what a user may read an
   `export` and `import` on an entity, `read` and `export` on a data source, `start`, `inspect`,
   `cancel`, `retry`, `resolve` and `reassign` on a process, and `invoke` on an endpoint. `inspect`
   lists a process's instances, see [process inspection](process-inspection.md#process-inspection).
-  `cancel` stops a running or waiting instance, see [Cancel](process-inspection.md#cancel). `retry`
-  runs a failed instance again, see [Retry](process-inspection.md#retry). `resolve` settles an unknown
-  connector call, see [Resolve](process-inspection.md#resolve). Each is checked on its own. An entity
+  `cancel` stops a running or waiting instance, see [Cancel](process-operator-commands.md#cancel). `retry`
+  runs a failed instance again, see [Retry](process-operator-commands.md#retry). `resolve` settles an unknown
+  connector call, see [Resolve](process-operator-commands.md#resolve). Each is checked on its own. An entity
   grant may also have a record `filter` and a `fields` list. A user's grants are the grants of every
   policy they match.
 - **Default-deny.**
