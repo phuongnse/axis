@@ -41,7 +41,7 @@ widget names a role, never an Ant Design button type.
   where it does what text cannot: navigation that collapses to icons, a status or a severity, and the
   mark that identifies an application or a site.
 - **An action that asks for more ends in an ellipsis,** such as New application…, New resource…,
-  Publish…, Import…, Invite…, Reassign… and Choose…, so the person knows a dialog follows. The
+  Publish…, Import…, Invite…, Reassign… and Choose…, so the person knows a dialog or a page follows. The
   dialog's own button keeps the bare verb, such as Invite.
 - **Icon-only buttons** are only for actions repeated on every row, or where space is tight, and main
   toolbar actions keep their text. Every icon-only button shows its name as a tooltip on hover and on

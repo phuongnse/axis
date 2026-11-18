@@ -12,6 +12,7 @@ import {
   fetchStudioResource,
   filterResources,
   folderDiffers,
+  nextReleaseNumber,
   groupByKind,
   moduleResources,
   previewSiteUrl,
@@ -579,6 +580,29 @@ describe('folderDiffers', () => {
   it('is false when no release is active, or the folder has errors', () => {
     expect(folderDiffers(history({ active: null, folderContentHash: 'other' }))).toBe(false)
     expect(folderDiffers(history({ folderContentHash: null }))).toBe(false)
+  })
+})
+
+describe('nextReleaseNumber', () => {
+  const item = (number: number) => ({ number, contentHash: `hash-${number}` }) as StudioReleases['items'][number]
+  const history = (folderContentHash: string | null, numbers: number[]): StudioReleases => ({
+    active: null,
+    folderContentHash,
+    changes: null,
+    partChanges: null,
+    items: numbers.map(item),
+  })
+
+  it('is 1 when there is no release', () => {
+    expect(nextReleaseNumber(history('hash-1', []))).toBe(1)
+  })
+
+  it('is the highest number plus one for new content', () => {
+    expect(nextReleaseNumber(history('new', [3, 2, 5]))).toBe(6)
+  })
+
+  it('is the number of an earlier release that has the content', () => {
+    expect(nextReleaseNumber(history('hash-2', [3, 2, 5]))).toBe(2)
   })
 })
 

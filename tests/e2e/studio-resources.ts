@@ -101,6 +101,21 @@ export async function deleteResource(page: Page) {
   await confirmDialog(page, 'Delete')
 }
 
+/**
+ * Confirms the publish page that Publish… opened: it fills Label when `label` is given, chooses Publish once it is on and
+ * returns once the page has gone back to where Publish… was opened. The status line follows the request there.
+ */
+export async function confirmPublish(page: Page, label?: string) {
+  await expect(page).toHaveURL(/view=publish/)
+  if (label !== undefined) {
+    await page.getByRole('textbox', { name: 'Label', exact: true }).fill(label)
+  }
+  const publish = page.getByTestId('studio-publish-confirm')
+  await expect(publish).toBeEnabled()
+  await publish.click()
+  await expect(page).not.toHaveURL(/view=publish/)
+}
+
 /** Opens the New application… dialog from the application row of the sidebar, on a page that has an application open. */
 export async function openNewApplication(page: Page) {
   await page.getByTestId('studio-application-row').click()

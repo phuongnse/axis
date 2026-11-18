@@ -1,7 +1,7 @@
 import { Button, Descriptions, Flex, Result, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { AxisActionRow } from '../platform/AxisButton'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
@@ -54,8 +54,16 @@ import { StudioAskAi } from './StudioAskAi'
 import { StudioProblems } from './StudioProblems'
 import { StudioResourceMenu } from './StudioResourceMenu'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
+import { StudioPublishPage } from './StudioPublishPage'
 import { studioActiveEntry, studioNavigation } from './studioNavigation'
 import { StudioSidebar } from './StudioSidebar'
+
+/** The address Publish… was opened from, which the publish page keeps in its navigation state. */
+function publishOrigin(state: unknown): string | null {
+  return typeof state === 'object' && state !== null && 'publishFrom' in state && typeof state.publishFrom === 'string'
+    ? state.publishFrom
+    : null
+}
 
 /** The tiles of the applications Studio may edit, in the UI locale with `en` as the fallback. Each opens its application. */
 function StudioApplicationTiles({ apps }: { apps: StudioApplication[] }) {
@@ -147,9 +155,11 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * joins its kind's list, the Problems panel shows the diagnostics of the create, and the editor opens the resource.
  * A New application… item ends the application row's menu in the sidebar, and a button also sits on the list. Both show
  * only when `GET /api/me` answers `studioCreate: true`. A created application joins the menu and is picked at once.
- * Validate, Ask AI and Publish sit in the band. Ask AI shows only when `GET /api/me` answers `studioAi: true`, and opens the
- * request panel, `StudioAskAi`, which shares the one side panel with the Problems panel: opening one closes the other. Publish shows only when `GET /api/me` answers
- * `studioPublisher: true`. On the Releases view the release list shows the application's releases, with an Activate… button
+ * Validate, Ask AI and Publish… sit in the band. Ask AI shows only when `GET /api/me` answers `studioAi: true`, and opens the
+ * request panel, `StudioAskAi`, which shares the one side panel with the Problems panel: opening one closes the other. Publish… shows only when `GET /api/me` answers
+ * `studioPublisher: true`, and opens `&view=publish`, the `StudioPublishPage`, in place of the content, with no sidebar entry marked. The page keeps the
+ * address Publish… was opened from in the navigation state, and its Publish and Cancel replace its entry with that address, or with the Overview when it was opened from a link.
+ * Without `studioPublisher`, `&view=publish` shows the Overview, see docs/reference/studio.md#publishing. On the Releases view the release list shows the application's releases, with an Activate… button
  * for a publisher. A save, a text write or a delete loads the release history again, because the folder may now differ from the
  * active release. The Problems panel shows the diagnostics of a request that ended. When the server does not
  * answer, a reconnect message shows at the top. Studio checks the server with a
@@ -217,6 +227,7 @@ function StudioWorkspace() {
   const { generation, reconnecting, lost } = useStudioConnection()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const application = params.get('app')
   const resourceId = params.get('resource')
   const path = params.get('path')
@@ -227,6 +238,7 @@ function StudioWorkspace() {
   const releaseNumber = params.get('release')
   const releasePage = releaseView && releaseNumber !== null
   const historyView = params.get('view') === 'history'
+  const requestedPublish = params.get('view') === 'publish'
   const revisionId = params.get('revision')
   const requestsView = params.get('view') === 'requests'
   const requestId = params.get('request')
@@ -413,6 +425,19 @@ function StudioWorkspace() {
   }, [application, selectedModuleId, generation, folderRevision, lost])
   const activity = activityState?.application === application ? activityState.items : undefined
 
+  function openPublish() {
+    navigate(`/studio?${new URLSearchParams({ app: application!, view: 'publish' })}`, {
+      state: { publishFrom: location.pathname + location.search },
+    })
+  }
+
+  /** Goes back to the page Publish… was opened from, or to the Overview, and replaces the publish page's entry. */
+  function leavePublish() {
+    navigate(publishOrigin(location.state) ?? `/studio?${new URLSearchParams({ app: application! })}`, {
+      replace: true,
+    })
+  }
+
   function pickApplication(name: string) {
     setParams({ app: name })
   }
@@ -531,6 +556,7 @@ function StudioWorkspace() {
     )
   }
 
+  const publishView = requestedPublish && canPublish
   const overviewApp = apps.find((item) => item.name === application)
   const entries = studioNavigation(application, resources, allModuleGroups, t)
   const activeKey = studioActiveEntry(
@@ -571,6 +597,8 @@ function StudioWorkspace() {
               onToggleProblems={() => setOpenPanel((open) => (open === 'problems' ? null : 'problems'))}
               newResource={<StudioNewResource application={application!} resources={resources} onCreated={onCreated} />}
               releasesView={releasesView}
+              publishView={publishView}
+              onOpenPublish={openPublish}
               onDiagnostics={(diagnostics) =>
                 setFolder((current) =>
                   current && current.application === application && 'resources' in current
@@ -583,7 +611,14 @@ function StudioWorkspace() {
               ref={publishing}
             >
               {(history) =>
-                releasePage ? (
+                publishView ? (
+                  <StudioPublishPage
+                    history={history}
+                    busy={requestBusy || reconnecting}
+                    onPublish={(details) => publishing.current?.publish(details)}
+                    onLeave={leavePublish}
+                  />
+                ) : releasePage ? (
                   <StudioReleasePage
                     application={application!}
                     number={releaseNumber}

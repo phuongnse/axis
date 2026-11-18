@@ -1613,7 +1613,11 @@ describe('StudioPage publishing', () => {
   }
 
   /** `stubServer` where `/api/me` answers `me`, and the request routes answer in turn with `statuses`. */
-  function stubPublishing(me: () => Response, statuses: unknown[] = []) {
+  function stubPublishing(
+    me: () => Response,
+    statuses: unknown[] = [],
+    history: { folderContentHash: string; active: boolean } = { folderContentHash: 'hash-4', active: true },
+  ) {
     const fetchMock = stubServer()
     const base = fetchMock.getMockImplementation()!
     const answers = [...statuses]
@@ -1657,10 +1661,12 @@ describe('StudioPage publishing', () => {
       }
       if (input === `${folder}/releases`) {
         return json({
-          active: { releaseId, number: 3, contentHash: 'hash-3' },
-          folderContentHash: 'hash-3',
+          active: history.active ? { releaseId, number: 3, contentHash: 'hash-3' } : null,
+          folderContentHash: history.folderContentHash,
           changes: [],
-          items: [row(releaseId, 3, '2026-05-02T10:00:00Z'), row('older', 2, '2026-05-01T10:00:00Z')],
+          items: history.active
+            ? [row(releaseId, 3, '2026-05-02T10:00:00Z'), row('older', 2, '2026-05-01T10:00:00Z')]
+            : [],
         })
       }
       return base(input, init)
@@ -1688,13 +1694,120 @@ describe('StudioPage publishing', () => {
     await waitFor(() => expect(screen.queryAllByRole('button', { name: 'Publish…' })).toHaveLength(shown ? 1 : 0))
   })
 
-  it('opens the publish dialog from Publish… and confirms with its own Publish button', async () => {
+  it('opens the publish page from Publish… with its heading, line, fields and action bar', async () => {
     stubPublishing(publisher)
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
 
-    expect(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Publish' })).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests&view=publish')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Publish this application' })).toBeInTheDocument()
+    expect(
+      await screen.findByText('Everything below goes live as a new release, in place of release 3.'),
+    ).toBeInTheDocument()
+    const group = screen.getByRole('group', { name: 'The release' })
+    expect(within(group).getByRole('textbox', { name: 'Label' })).toHaveAttribute('maxlength', '100')
+    expect(within(group).getByRole('textbox', { name: 'Note' })).toHaveAttribute('maxlength', '2000')
+    expect(within(group).getByText('A short name for the release, such as Spring update.')).toBeInTheDocument()
+    expect(within(group).getByText('What changed and why, for whoever reads the release list.')).toBeInTheDocument()
+    expect(await screen.findByText('Goes live as release 4')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
+    expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled()
+    expect(screen.queryByTestId('studio-publish')).not.toBeInTheDocument()
+    // The page marks no sidebar entry.
+    expect(document.querySelector('[aria-current="page"]')).toBeNull()
+  })
+
+  it('opens the publish page from a link and shows the first-release line when nothing is live', async () => {
+    stubPublishing(publisher, [], { folderContentHash: 'hash-1', active: false })
+    renderPage('/studio?app=PurchaseRequests&view=publish')
+
+    expect(
+      await screen.findByText('Nothing is live yet. Everything below goes live as the first release.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Goes live as release 1')).toBeInTheDocument()
+    expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled()
+  })
+
+  it('shows the Overview at &view=publish without studioPublisher', async () => {
+    stubPublishing(() => json({ id: 'author', studio: true, studioPublisher: false }))
+    renderPage('/studio?app=PurchaseRequests&view=publish')
+
+    expect(await screen.findByRole('button', { name: 'Validate' })).toBeEnabled()
+    expect(screen.queryByRole('heading', { name: 'Publish this application' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('studio-publish-confirm')).not.toBeInTheDocument()
+  })
+
+  it('says everything is live and turns Publish off when the folder is the live release', async () => {
+    stubPublishing(publisher, [], { folderContentHash: 'hash-3', active: true })
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
+
+    expect(await screen.findByText('Everything is live, so there is nothing to publish.')).toBeInTheDocument()
+    expect(screen.getByTestId('studio-publish-confirm')).toBeDisabled()
+    expect(screen.queryByText(/Goes live as release/)).not.toBeInTheDocument()
+  })
+
+  it('reloads the release history when the publish page opens', async () => {
+    const fetchMock = stubPublishing(publisher, [], { folderContentHash: 'hash-3', active: true })
+    renderPage('/studio?app=PurchaseRequests&view=releases')
+    const publish = await screen.findByRole('button', { name: 'Publish…' })
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => input === `${folder}/releases`)).toBe(true))
+
+    const loaded = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input === `${folder}/releases`) {
+        const answer = await (await loaded(input, init)).json()
+        return json({ ...answer, folderContentHash: 'hash-4' })
+      }
+      return loaded(input, init)
+    })
+    await userEvent.click(publish)
+
+    expect(await screen.findByText('Goes live as release 4')).toBeInTheDocument()
+    expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled()
+  })
+
+  it('goes back to where Publish… was opened when Cancel is chosen, and sends nothing', async () => {
+    const fetchMock = stubPublishing(publisher)
+    renderPage('/studio?app=PurchaseRequests&view=releases')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests&view=releases$/)
+    expect(fetchMock.mock.calls.some(([input, init]) => input === `${folder}/publish` && init?.method === 'POST')).toBe(
+      false,
+    )
+  })
+
+  it('goes to the Overview from Cancel on a publish page opened from a link', async () => {
+    stubPublishing(publisher)
+    renderPage('/studio?app=PurchaseRequests&view=publish')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/)
+  })
+
+  it('sends only the filled values, goes back and shows the status there', async () => {
+    const fetchMock = stubPublishing(publisher)
+    renderPage('/studio?app=PurchaseRequests&view=releases')
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Note' }), 'Added the approval step')
+    await userEvent.click(await screen.findByText('Goes live as release 4'))
+    await userEvent.click(screen.getByTestId('studio-publish-confirm'))
+
+    expect(await screen.findByTestId('studio-request-status')).toHaveAttribute('data-status', 'queued')
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests&view=releases$/)
+    expect(screen.queryByRole('heading', { name: 'Publish this application' })).not.toBeInTheDocument()
+    const posts = fetchMock.mock.calls.filter(
+      ([input, init]) => input === `${folder}/publish` && init?.method === 'POST',
+    )
+    expect(posts).toHaveLength(1)
+    expect(JSON.parse(posts[0][1]!.body as string)).toEqual({ note: 'Added the approval step' })
   })
 
   it("heads the band's actions with New resource… and ends them with Publish…", async () => {
@@ -1719,8 +1832,10 @@ describe('StudioPage publishing', () => {
     ])
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
-    await userEvent.type(screen.getByRole('textbox', { name: 'Label (optional)' }), 'May')
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Label' }), 'May')
+    await userEvent.click(await screen.findByText('Goes live as release 4'))
+    await userEvent.click(screen.getByTestId('studio-publish-confirm'))
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/)
 
     const status = await screen.findByTestId('studio-request-status')
     expect(status).toHaveAttribute('data-status', 'queued')
@@ -1759,7 +1874,7 @@ describe('StudioPage publishing', () => {
       if (input === `${folder}/releases` && !sent) {
         return json({
           active: { releaseId: 'older', number: 2, contentHash: 'hash-2' },
-          folderContentHash: 'hash-2',
+          folderContentHash: 'hash-3',
           changes: [],
           items: [row('older', 2, '2026-05-01T10:00:00Z')],
         })
@@ -1772,7 +1887,8 @@ describe('StudioPage publishing', () => {
     ).toHaveLength(1)
 
     await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
+    await userEvent.click(await screen.findByText('Goes live as release 3'))
+    await userEvent.click(screen.getByTestId('studio-publish-confirm'))
 
     await vi.advanceTimersByTimeAsync(1000)
     await vi.advanceTimersByTimeAsync(1000)
@@ -1863,7 +1979,8 @@ describe('StudioPage publishing', () => {
     )
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
+    await userEvent.click(await screen.findByText('Goes live as release 4'))
+    await userEvent.click(screen.getByTestId('studio-publish-confirm'))
 
     expect(await screen.findByTestId('studio-request-error')).toHaveTextContent(
       'This tenant has reached its storage quota.',

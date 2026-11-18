@@ -1697,6 +1697,16 @@ export function folderDiffers(history: StudioReleases): boolean {
   )
 }
 
+/**
+ * The number the next publish gets, see docs/reference/studio.md#publishing. The server keeps one release for each content
+ * hash, so a folder that matches an earlier release gets that release's number again. Otherwise it is the highest
+ * number plus one, or 1 for the first release.
+ */
+export function nextReleaseNumber(history: StudioReleases): number {
+  const same = history.items.find((item) => item.contentHash === history.folderContentHash)
+  return same?.number ?? Math.max(0, ...history.items.map((item) => item.number)) + 1
+}
+
 /** A row of the change list: its name, its kind when it has one, and the resource it opens, which a removed file lacks. */
 export interface StudioChangeRow {
   key: string

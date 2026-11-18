@@ -64,7 +64,7 @@ export function studioNavigation(
   return entries
 }
 
-/** The key of the sidebar entry the address shows: an open resource's kind, the manifest's Settings, or a view. */
+/** The key of the sidebar entry the address shows: an open resource's kind, the manifest's Settings, or a view. The publish page marks none. */
 export function studioActiveEntry(
   params: URLSearchParams,
   resources: readonly StudioResourceItem[],
@@ -86,6 +86,9 @@ export function studioActiveEntry(
     return `kind:${kind}`
   }
   const view = params.get('view')
+  if (view === 'publish') {
+    return ''
+  }
   if (view === 'release') {
     return 'releases'
   }
