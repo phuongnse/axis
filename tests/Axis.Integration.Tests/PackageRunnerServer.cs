@@ -4,13 +4,21 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Axis.Admin;
+using Axis.Configuration.Packages;
+using Axis.Configuration.Tests;
+using Axis.Processes.Instances;
 using Axis.Processes.Storage;
+using Axis.Processes.Work;
 using Axis.Server.Tests;
+using Axis.Worker;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting.Internal;
+using Npgsql;
 
 namespace Axis.Integration.Tests;
 
@@ -145,6 +153,28 @@ internal sealed class PackageRunnerServer(PostgreSqlFixture database, KeycloakFi
             await DeleteRealmAsync(id);
             throw;
         }
+    }
+
+    // Runs the next due package.call item of the tenant on a worker that holds no package, as the worker does. Returns null when no item is due.
+    public static async Task<WorkItemOutcome?> RunPackageCallItemAsync(string tenantId, string tenantDatabase)
+    {
+        var runtime = PostgreSqlServer.RuntimeConnectionString(tenantDatabase);
+        using var packages = new TemporaryFolder();
+        var settings = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [$"Tenants:{tenantId}:Hosts:0"] = $"{tenantId}.vn.example.test",
+            [$"Tenants:{tenantId}:ConnectionString"] = runtime,
+            [PackageCatalog.PathSetting] = packages.Path,
+            [PackageIsolation.IsolationSetting] = "inProcess",
+        }).Build();
+        await using var worker = new ServiceCollection()
+            .AddLogging()
+            .AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Development", ContentRootPath = AppContext.BaseDirectory })
+            .BuildServiceProvider();
+        await using var connection = new NpgsqlConnection(runtime);
+        await connection.OpenAsync(CancellationToken);
+        var item = await WorkItemQueue.ClaimAsync(connection, tenantId, [ProcessStarts.PackageCallWorkItemKind], TimeSpan.FromSeconds(30), CancellationToken);
+        return item is null ? null : await worker.GetRequiredService<WorkItemRunner>().ExecuteAsync(item, CancellationToken);
     }
 
     // Creates a runner as the tenant's administrator, and signs in as its client.

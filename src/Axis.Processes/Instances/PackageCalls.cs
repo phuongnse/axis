@@ -153,7 +153,7 @@ internal static class PackageCalls
         }
 
         await using var command = new NpgsqlCommand(
-            $"SELECT {CallColumns}, runner_id, lease_until, lease_until < now() FROM axis.package_calls WHERE lease_id = @lease FOR UPDATE",
+            $"SELECT {CallColumns}, lease_until, lease_until < now() FROM axis.package_calls WHERE lease_id = @lease FOR UPDATE",
             Connection(transaction),
             transaction);
         command.Parameters.AddWithValue("lease", leaseId);
@@ -164,17 +164,13 @@ internal static class PackageCalls
         }
 
         var call = await ReadCallAsync(reader, cancellationToken);
-        return new LeasedPackageCall(
-            call,
-            await reader.IsDBNullAsync(13, cancellationToken) ? null : reader.GetGuid(13),
-            reader.GetFieldValue<DateTimeOffset>(14),
-            reader.GetBoolean(15));
+        return new LeasedPackageCall(call, reader.GetFieldValue<DateTimeOffset>(14), reader.GetBoolean(15));
     }
 
     private const string CallColumns =
         """
         id, process_instance_id, step, release_id, package, version, operation, state, attempts,
-        retry_attempts, retry_backoff, idempotent, input::text
+        retry_attempts, retry_backoff, idempotent, input::text, runner_id
         """;
 
     /// <summary>Maps a row that selects <see cref="CallColumns"/> first.</summary>
@@ -191,7 +187,8 @@ internal static class PackageCalls
             reader.GetInt32(8),
             new RetryPolicyModel(reader.GetInt32(9), reader.GetFieldValue<TimeSpan>(10)),
             reader.GetBoolean(11),
-            await reader.IsDBNullAsync(12, cancellationToken) ? null : reader.GetString(12));
+            await reader.IsDBNullAsync(12, cancellationToken) ? null : reader.GetString(12),
+            await reader.IsDBNullAsync(13, cancellationToken) ? null : reader.GetGuid(13));
 
     /// <summary>
     /// Marks the <c>pending</c> call <paramref name="id"/> <c>sending</c> and counts the attempt.
@@ -446,11 +443,10 @@ internal sealed record NewPackageCall(
     JsonObject Input);
 
 /// <summary>A call found by its lease, as <see cref="PackageCalls.LockLeasedAsync"/> reads it.</summary>
-/// <param name="Call">The call.</param>
-/// <param name="RunnerId">The runner that holds the lease, or <see langword="null"/> when the call stores none.</param>
+/// <param name="Call">The call, whose <see cref="LoadedPackageCall.RunnerId"/> is the runner that holds the lease.</param>
 /// <param name="LeaseUntil">The end of the lease.</param>
 /// <param name="Ended">Whether the end of the lease has passed by the database clock.</param>
-internal sealed record LeasedPackageCall(LoadedPackageCall Call, Guid? RunnerId, DateTimeOffset LeaseUntil, bool Ended);
+internal sealed record LeasedPackageCall(LoadedPackageCall Call, DateTimeOffset LeaseUntil, bool Ended);
 
 /// <summary>A package call as the worker that runs it loads it.</summary>
 /// <param name="Id">The call's operation identity.</param>
@@ -461,6 +457,7 @@ internal sealed record LeasedPackageCall(LoadedPackageCall Call, Guid? RunnerId,
 /// <param name="Retry">The retry policy stored when the call was staged.</param>
 /// <param name="Idempotent">Whether the operation is idempotent, stored when the call was staged.</param>
 /// <param name="Input">The stored input as JSON text, or <see langword="null"/> once the call settled.</param>
+/// <param name="RunnerId">The customer-hosted runner that last took the call, or <see langword="null"/> when none did. Only a take sets it.</param>
 internal sealed record LoadedPackageCall(
     Guid Id,
     Guid ProcessInstanceId,
@@ -473,4 +470,5 @@ internal sealed record LoadedPackageCall(
     int Attempts,
     RetryPolicyModel Retry,
     bool Idempotent,
-    string? Input);
+    string? Input,
+    Guid? RunnerId);

@@ -31,9 +31,11 @@ namespace Axis.Server.Processes;
 /// registration, a take is never refused over the <c>storage</c> quota, because it is running work.
 /// </para>
 /// <para>
-/// <c>POST /api/package-runner/leases/{leaseId}/result</c> reads <c>{ "outcome": "succeeded", "output": {...} }</c>, and any other body, such as the
-/// outcomes <c>retryable</c> and <c>failed</c>, answers <c>400</c>. In one transaction, <see cref="PackageCallResults"/> records the call the same way
-/// the worker does after a run, and the answer is <c>204</c>, also when the output does not fit and the call and its instance fail. A lease
+/// <c>POST /api/package-runner/leases/{leaseId}/result</c> reads <c>{ "outcome": "succeeded", "output": {...} }</c>, <c>{ "outcome": "retryable" }</c> or
+/// <c>{ "outcome": "failed", "error": "..." }</c> with a non-empty <c>error</c>, and any other body answers <c>400</c>. In one transaction,
+/// <see cref="PackageCallResults"/> records the call the same way the worker does after a run, and the answer is <c>204</c>, also when the output does
+/// not fit, when the runner posted <c>failed</c> or a <c>retryable</c> result has no attempt left and the call and its instance fail, and when a
+/// <c>retryable</c> result sets the call back to <c>pending</c>. A lease
 /// that is unknown, or that another runner holds, answers <c>404</c>. A lease whose call is no longer <c>sending</c>, whose lease has ended or whose
 /// instance no longer waits on the step answers <c>409</c> and changes nothing. A result is never refused over the <c>storage</c> quota, because it
 /// is running work. A runner that is revoked while the request runs is not checked again, so its next request answers <c>401</c>.
@@ -134,11 +136,11 @@ internal static class PackageRunnerEndpoints
         CancellationToken cancellationToken)
     {
         using var body = await ReadBodyAsync(context.Request, cancellationToken);
-        if (body is null || ReadSucceeded(body.RootElement) is not { } output)
+        if (body is null || ReadResult(body.RootElement) is not { } result)
         {
             return Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "The body needs the outcome succeeded and an output object.");
+                title: "The body needs the outcome succeeded with an output object, retryable, or failed with an error.");
         }
 
         if (!Guid.TryParseExact(leaseId, "D", out var lease))
@@ -153,12 +155,12 @@ internal static class PackageRunnerEndpoints
 
         // The write limit comes first, so it also bounds the wait for a call that another request has locked.
         await database.LimitWriteAsync(transaction, cancellationToken);
-        var outcome = await PackageCallResults.RecordSucceededAsync(
+        var outcome = await PackageCallResults.RecordAsync(
             transaction,
             tenantId,
             runnerId,
             lease,
-            output,
+            result,
             packages,
             resolver.GetReleaseModelAsync,
             new RecordCipher(sensitive, tenantId),
@@ -261,22 +263,32 @@ internal static class PackageRunnerEndpoints
     }
 
     /// <summary>
-    /// The <c>output</c> of <c>{ "outcome": "succeeded", "output": {...} }</c>, or null when the shape is wrong: the outcome must be exactly
-    /// <c>succeeded</c> and the output an object. Other properties are ignored.
+    /// The result of <c>{ "outcome": "succeeded", "output": {...} }</c>, <c>{ "outcome": "retryable" }</c> or
+    /// <c>{ "outcome": "failed", "error": "..." }</c>, or null when the shape is wrong: the outcome must be exactly one of the three, the output
+    /// of <c>succeeded</c> an object and the error of <c>failed</c> a non-empty string. Other properties are ignored.
     /// </summary>
-    private static JsonObject? ReadSucceeded(JsonElement root)
+    private static PackageCallResult? ReadResult(JsonElement root)
     {
         if (root.ValueKind != JsonValueKind.Object
             || !root.TryGetProperty("outcome", out var outcome)
-            || outcome.ValueKind != JsonValueKind.String
-            || outcome.GetString() != "succeeded"
-            || !root.TryGetProperty("output", out var output)
-            || output.ValueKind != JsonValueKind.Object)
+            || outcome.ValueKind != JsonValueKind.String)
         {
             return null;
         }
 
-        return JsonNode.Parse(output.GetRawText())!.AsObject();
+        switch (outcome.GetString())
+        {
+            case "succeeded":
+                return root.TryGetProperty("output", out var output) && output.ValueKind == JsonValueKind.Object
+                    ? new PackageCallResult.Succeeded(JsonNode.Parse(output.GetRawText())!.AsObject())
+                    : null;
+            case "retryable":
+                return new PackageCallResult.Retryable();
+            case "failed":
+                return TryReadText(root, "error", out var error) ? new PackageCallResult.Failed(error) : null;
+            default:
+                return null;
+        }
     }
 
     private static bool TryReadText(JsonElement manifest, string property, out string value)

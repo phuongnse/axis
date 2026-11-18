@@ -16,7 +16,8 @@ namespace Axis.Processes.Instances;
 /// runner's result share, see docs/reference/process-execution.md#staging-a-package-call. A fitting output is written to the subject record
 /// with the record update rules, the call is settled <c>succeeded</c>, the instance runs on to <c>next</c>, and the history row, the attempt row,
 /// the audit records, the data change triggers and the next step's work item follow. A call that cannot succeed is settled <c>failed</c> and
-/// its instance fails, with the audit records <c>operation.called</c> and <c>process.failed</c>. Every write runs in the caller's transaction.
+/// its instance fails, with the audit records <c>operation.called</c> and <c>process.failed</c>. A call that is retried is set back to <c>pending</c>
+/// with its attempt row. Every write runs in the caller's transaction.
 /// </summary>
 internal static class PackageCallRecords
 {
@@ -308,6 +309,25 @@ internal static class PackageCallRecords
             cancellationToken,
             processInstanceId: instance.Id);
         return null;
+    }
+
+    /// <summary>
+    /// The wait before the next attempt, which is the step's backoff doubled for each attempt made, or <see langword="null"/> when the retry
+    /// policy has no attempt left.
+    /// </summary>
+    public static TimeSpan? RetryDelay(PackageCallAttempt attempt) =>
+        attempt.Attempts < attempt.Call.Retry.Attempts ? ConnectorCallHandler.Backoff(attempt.Call.Retry, attempt.Attempts) : null;
+
+    /// <summary>
+    /// Sets the call back to <c>pending</c> with <paramref name="error"/>, keeping its stored input so the next attempt runs under the same
+    /// operation identity, and writes <paramref name="row"/> unless it is <see langword="null"/>, which means that no attempt was made. It writes
+    /// no history row and no audit record. The caller makes the next attempt due.
+    /// </summary>
+    public static async Task WriteRetryAsync(
+        NpgsqlTransaction transaction, string tenantId, PackageCallAttempt attempt, string error, CallAttempt? row, CancellationToken cancellationToken)
+    {
+        await PackageCalls.RetryAsync(transaction, attempt.Call.Id, error, cancellationToken);
+        await InsertAttemptAsync(transaction, Tags(tenantId, attempt), attempt.Call, row, cancellationToken);
     }
 
     /// <summary>
