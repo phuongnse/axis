@@ -1,11 +1,17 @@
 import { ConfigProvider } from 'antd'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
-import type { StudioRevisionChange } from '../platform/studio'
+import {
+  changeAuthors,
+  type StudioChangeAuthor,
+  type StudioLiveRevision,
+  type StudioRevisionChange,
+} from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
-import { StudioChanges, type StudioChangeFile } from './StudioChanges'
+import { StudioChanges, type StudioChangedFile } from './StudioChanges'
 
 const texts = {
   'shell.studio.history.before': 'Before',
@@ -24,6 +30,10 @@ const texts = {
   'shell.studio.changes.hideDiff': 'Hide the diff',
   'shell.studio.changes.showDiffName': 'Show the diff of {name}',
   'shell.studio.changes.hideDiffName': 'Hide the diff of {name}',
+  'shell.studio.releases.system': 'System',
+  'shell.studio.changes.changedBy': 'Changed by {authors}',
+  'shell.studio.changes.you': 'you',
+  'shell.studio.changes.aiRequest': 'the AI request “{name}”',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -57,20 +67,8 @@ const files: StudioRevisionChange[] = [
   },
 ]
 
-function renderChanges(changed: StudioChangeFile[] = files, options: { folded?: boolean } = {}) {
-  return render(
-    <ThemeModeProvider initialMode="light">
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <TextProvider catalogs={catalogs} development={false}>
-          <StudioChanges files={changed} resources={[]} folded={options.folded} />
-        </TextProvider>
-      </ConfigProvider>
-    </ThemeModeProvider>,
-  )
-}
-
 /** A layer file that adds `supplier`, changes `amount` and removes `notes` of the module's entity. */
-const layerFile: StudioChangeFile = {
+const layerFile: StudioChangedFile = {
   file: 'customizations/purchase-request.json',
   change: 'changed',
   id: 'layer-1',
@@ -91,6 +89,50 @@ const layerFile: StudioChangeFile = {
     ],
     removed: [{ list: '/fields', key: 'notes', content: null }],
   },
+}
+
+/** A live diff's file: its fields with the revisions that changed it since the live release, newest first. */
+type LiveFile = StudioChangedFile & { by: StudioLiveRevision[] }
+
+function renderWith<File extends StudioChangedFile>(
+  changed: File[],
+  changedBy?: { application: string; authors: (file: File) => StudioChangeAuthor[] },
+  folded = false,
+) {
+  return render(
+    <MemoryRouter>
+      <ThemeModeProvider initialMode="light">
+        <ConfigProvider theme={{ token: { motion: false } }}>
+          <TextProvider catalogs={catalogs} development={false}>
+            <StudioChanges files={changed} resources={[]} changedBy={changedBy} folded={folded} />
+          </TextProvider>
+        </ConfigProvider>
+      </ThemeModeProvider>
+    </MemoryRouter>,
+  )
+}
+
+function renderChanges(changed: StudioChangedFile[] = files, options: { folded?: boolean } = {}) {
+  return renderWith(changed, undefined, options.folded)
+}
+
+/** A revision of a live diff's `by`: the author's id, or null for a revision the server made, and an AI request, if any. */
+function revision(
+  id: string,
+  userId: string | null,
+  author: string,
+  authoringRequest: string | null = null,
+): StudioLiveRevision {
+  return {
+    id,
+    summary: 'Edit',
+    author,
+    userId,
+    client: userId === null ? null : 'studio',
+    request: null,
+    time: '2026-11-18T10:00:00Z',
+    authoringRequest,
+  }
 }
 
 function fileSection(file: string): HTMLElement {
@@ -134,6 +176,60 @@ describe('StudioChanges', () => {
     expect(removed).toHaveTextContent(/^.*—.*Removed/)
     expect(within(removed).getByText('Before')).toBeVisible()
     expect(within(removed).getByText('After')).toBeVisible()
+  })
+
+  it('shows no Changed by line without the option', () => {
+    renderChanges()
+
+    expect(screen.queryByTestId('studio-changes-by')).toBeNull()
+  })
+})
+
+describe('StudioChanges with Changed by', () => {
+  const application = 'PurchaseRequests'
+  // The reader is `author`, so a revision by `author` is "you".
+  const changedBy = (names: Map<string, string>) => ({
+    application,
+    authors: (file: LiveFile) => changeAuthors(file.by, 'author', names),
+  })
+
+  it('names the reader, each person and the AI request in the order of first change, the request as a link', () => {
+    // Newest first: the accept, then Sam Lee twice, then the reader, so the reader made the first change.
+    const by = [
+      revision('c', 'author', 'Ana', 'r1'),
+      revision('b', 'u2', 'Sam Lee'),
+      revision('a2', 'u2', 'Sam Lee'),
+      revision('a1', 'author', 'Ana'),
+    ]
+    const buyer: LiveFile = { ...files[1], titles: null, by }
+    renderWith([buyer], changedBy(new Map([['r1', 'Add a field.']])))
+
+    const line = within(fileSection('roles/buyer.json')).getByTestId('studio-changes-by')
+    expect(line).toHaveTextContent('Changed by you, Sam Lee, and the AI request “Add a field.”')
+    expect(within(line).getByRole('link', { name: 'the AI request “Add a field.”' })).toHaveAttribute(
+      'href',
+      '/studio?app=PurchaseRequests&view=requests&request=r1',
+    )
+  })
+
+  it('names the person who accepted a request whose name is not known', () => {
+    const buyer: LiveFile = { ...files[1], titles: null, by: [revision('c', 'author', 'Ana', 'r1')] }
+    renderWith([buyer], changedBy(new Map()))
+
+    const line = within(fileSection('roles/buyer.json')).getByTestId('studio-changes-by')
+    expect(line).toHaveTextContent(/^Changed by you$/)
+    expect(within(line).queryByRole('link')).toBeNull()
+  })
+
+  it('names a revision the server made System, and shows no line for a file no revision changed', () => {
+    const buyer: LiveFile = { ...files[1], titles: null, by: [revision('c', null, 'Axis')] }
+    const approver: LiveFile = { ...files[0], titles: null, by: [] }
+    renderWith([buyer, approver], changedBy(new Map()))
+
+    expect(within(fileSection('roles/buyer.json')).getByTestId('studio-changes-by')).toHaveTextContent(
+      /^Changed by System$/,
+    )
+    expect(within(fileSection('roles/approver.json')).queryByTestId('studio-changes-by')).toBeNull()
   })
 })
 

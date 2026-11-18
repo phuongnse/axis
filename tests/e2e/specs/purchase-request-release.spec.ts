@@ -52,9 +52,11 @@ async function releaseB(testInfo: TestInfo) {
  */
 async function studioServer(testInfo: TestInfo) {
   const folder = testInfo.outputPath('studio-publish')
+  const revisions = testInfo.outputPath('studio-revisions')
   await rm(folder, { recursive: true, force: true })
+  await rm(revisions, { recursive: true, force: true })
   await cp(purchaseRequests, folder, { recursive: true })
-  const server = await startServer({ Studio__Folders__0: folder })
+  const server = await startServer({ Studio__Folders__0: folder, Studio__RevisionsPath: revisions })
   return { server, folder }
 }
 
@@ -795,6 +797,12 @@ test.describe('the active release of the purchase request sample changes', () =>
       await expect(page).toHaveURL(/view=publish/)
       await expect(page.getByRole('heading', { name: 'Publish this application', exact: true })).toBeVisible()
       await expect(page.getByText(`Goes live as release ${maxNumber + 1}`, { exact: true })).toBeVisible()
+      // The hand save is the only change since the live release, and the author made it.
+      await expect(page.getByRole('heading', { name: '1 file changed since the live release', exact: true })).toBeVisible()
+      const changed = page.getByTestId('studio-changes-file')
+      await expect(changed).toHaveCount(1)
+      await expect(changed).toHaveAttribute('data-file', 'texts/en.json')
+      await expect(changed.getByTestId('studio-changes-by')).toHaveText('Changed by you')
       await confirmPublish(page, label)
       await expect(page).toHaveURL(/view=releases/)
       await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })

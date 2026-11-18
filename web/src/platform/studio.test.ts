@@ -8,6 +8,7 @@ import {
   checkStudioExpression,
   fetchAuthoringRequestDiff,
   fetchStudioExpressionScope,
+  fetchStudioLiveDiff,
   fetchStudioPolicyMatrix,
   fetchStudioRelease,
   fetchStudioResource,
@@ -88,6 +89,50 @@ describe('fetchStudioRelease', () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain('/api/studio/apps/Purchase%20Requests/releases/3')
     expect(await fetchStudioRelease('Purchase Requests', '99')).toBeNull()
     await expect(fetchStudioRelease('Purchase Requests', '3')).rejects.toBeInstanceOf(Error)
+  })
+})
+
+describe('fetchStudioLiveDiff', () => {
+  const entry = (file: string) => ({
+    file,
+    change: 'changed',
+    id: null,
+    kind: null,
+    name: null,
+    before: null,
+    after: null,
+    titles: null,
+    by: [],
+  })
+
+  it('loads every page of the live diff, following the cursor', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(json({ release: 3, resources: [entry('a.json')], cursor: 'next' }))
+      .mockResolvedValueOnce(json({ release: 3, resources: [entry('b.json')], cursor: null }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await fetchStudioLiveDiff('Purchase Requests')).toEqual({
+      release: 3,
+      resources: [entry('a.json'), entry('b.json')],
+    })
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/studio/apps/Purchase%20Requests/releases/live/diff')
+    expect(String(fetchMock.mock.calls[1][0])).toBe(
+      '/api/studio/apps/Purchase%20Requests/releases/live/diff?cursor=next',
+    )
+  })
+
+  it('answers null for a 404 and throws for any other failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response(null, { status: 404 }))
+        .mockResolvedValueOnce(new Response(null, { status: 500 })),
+    )
+
+    expect(await fetchStudioLiveDiff('PurchaseRequests')).toBeNull()
+    await expect(fetchStudioLiveDiff('PurchaseRequests')).rejects.toBeInstanceOf(Error)
   })
 })
 

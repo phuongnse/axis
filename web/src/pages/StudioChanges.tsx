@@ -1,17 +1,21 @@
 import { Flex, Typography } from 'antd'
-import { useContext, useState } from 'react'
+import { useContext, useState, type ReactNode } from 'react'
+import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
 import { EmptyDash } from '../platform/EmptyValue'
+import { FilledText } from '../platform/FilledText'
 import { fillText } from '../platform/fillText'
 import { keyedListsOf, layerMarks } from '../platform/layerMarks'
 import {
   type AuthoringRequestLayerChange,
   changeRows,
+  type StudioChangeAuthor,
   type StudioChangeRow,
   type StudioReleaseChange,
   type StudioResourceItem,
   type StudioRevisionChange,
 } from '../platform/studio'
+import { studioRequestAddress } from '../platform/studioAddress'
 import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -79,8 +83,48 @@ export function JsonDiff({ before, after }: { before: string | null; after: stri
   )
 }
 
-/** A changed file of a diff. `module` is the module resource a layer file changes, with the layer applied, on a layer file only. */
-export type StudioChangeFile = StudioRevisionChange & { module?: AuthoringRequestLayerChange }
+/**
+ * A file of {@link StudioChanges}: a revision's file, or a live diff's with its titles by locale, or null. `module` is the
+ * module resource a layer file changes, with the layer applied, on a layer file only.
+ */
+export type StudioChangedFile = StudioRevisionChange & {
+  titles?: Record<string, string> | null
+  module?: AuthoringRequestLayerChange
+}
+
+/**
+ * The line "Changed by" with each person who changed a file, in the order of their first change, each as a
+ * {@link StudioChangeAuthor}. The reader is "you", a server revision is "System", and an AI request is a link to its page.
+ */
+function ChangedBy({ application, authors }: { application: string; authors: StudioChangeAuthor[] }) {
+  const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const nodes: ReactNode[] = authors.map((author) => {
+    switch (author.type) {
+      case 'you':
+        return t('shell.studio.changes.you')
+      case 'system':
+        return t('shell.studio.releases.system')
+      case 'person':
+        return author.name
+      case 'request':
+        return (
+          <Link key={author.id} to={studioRequestAddress(application, author.id)}>
+            {fillText(t('shell.studio.changes.aiRequest'), { name: author.name })}
+          </Link>
+        )
+    }
+  })
+  // The authors joined as one list in the locale's words, each author's node in place of its index.
+  const list = new Intl.ListFormat(locale, { type: 'conjunction' })
+    .formatToParts(authors.map((_, index) => `${index}`))
+    .map((part) => (part.type === 'element' ? nodes[Number(part.value)] : part.value))
+  return (
+    <Typography.Text data-testid="studio-changes-by">
+      <FilledText text={t('shell.studio.changes.changedBy')} parts={{ authors: list }} />
+    </Typography.Text>
+  )
+}
 
 /**
  * The marks of a module resource that a layer changed, each element as its key and a tag with its accessible name, such as
@@ -110,16 +154,19 @@ function LayerMarks({ module }: { module: AuthoringRequestLayerChange }) {
 
 /**
  * One changed file: its name, its kind, its change and, when `folded`, a Show the diff link that opens its JSON. A layer
- * file is named by the module resource it changes and shows that resource's JSON and its marks.
+ * file is named by the module resource it changes and shows that resource's JSON and its marks. `changedBy` is the line
+ * of who changed the file, or null.
  */
 function ChangeFile({
   row,
   file,
   folded,
+  changedBy,
 }: {
   row: StudioChangeRow
-  file: StudioChangeFile | undefined
+  file: StudioChangedFile | undefined
   folded: boolean
+  changedBy: ReactNode
 }) {
   const t = useText()
   const { colour } = useDesignTokens()
@@ -150,6 +197,7 @@ function ChangeFile({
             </AxisButton>
           )}
         </Flex>
+        {changedBy}
         {module !== undefined && <LayerMarks module={module} />}
         {(!folded || open) && (
           <JsonDiff
@@ -166,17 +214,21 @@ function ChangeFile({
  * The files a revision or a draft changed, sorted by name: each shows its name, its kind (the em dash when it has none)
  * and Added, Changed or Removed, and under them its JSON before and after as a {@link JsonDiff}. `resources` are the
  * application's resources, which name a file's kind and title. With `folded`, each file starts closed behind Show the
- * diff, and a layer file is named by its module resource, with the layer's marks under it. See
- * docs/reference/shared-widgets.md#which-widget and docs/reference/ai-authoring-in-studio.md#revisions.
+ * diff, and a layer file is named by its module resource, with the layer's marks under it. With `changedBy`, the publish
+ * page's files also show "Changed by" under their header, from `authors` of each file. See
+ * docs/reference/shared-widgets.md#which-widget, docs/reference/ai-authoring-in-studio.md#revisions and
+ * docs/reference/studio.md#publishing.
  */
-export function StudioChanges({
+export function StudioChanges<File extends StudioChangedFile>({
   files,
   resources,
   folded = false,
+  changedBy,
 }: {
-  files: StudioChangeFile[]
+  files: File[]
   resources: StudioResourceItem[]
   folded?: boolean
+  changedBy?: { application: string; authors: (file: File) => StudioChangeAuthor[] }
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -185,15 +237,19 @@ export function StudioChanges({
     change: file.change,
     kind: file.module?.kind ?? file.kind,
     name: file.module ? (file.module.name ?? file.module.id) : file.name,
-    titles: null,
+    titles: file.titles ?? null,
     locale: null,
   }))
   const byKey = new Map(files.map((file) => [`${file.change}:${file.file}`, file]))
   return (
     <Flex vertical gap="middle">
-      {changeRows(changes, resources, locale, t).map((row) => (
-        <ChangeFile key={row.key} row={row} file={byKey.get(row.key)} folded={folded} />
-      ))}
+      {changeRows(changes, resources, locale, t).map((row) => {
+        const file = byKey.get(row.key)
+        const authors = file && changedBy ? changedBy.authors(file) : []
+        const by =
+          changedBy && authors.length > 0 ? <ChangedBy application={changedBy.application} authors={authors} /> : null
+        return <ChangeFile key={row.key} row={row} file={file} folded={folded} changedBy={by} />
+      })}
     </Flex>
   )
 }
