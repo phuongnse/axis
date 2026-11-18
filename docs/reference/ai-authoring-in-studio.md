@@ -117,7 +117,9 @@ to show. The page has no tabs and no stages bar.
   - **Idle** is a dash in `textMuted`, where a dropped or failed request left the item.
 - **Plan** is described in [the plan](#the-plan).
 - **Work** is described in [the Work item](#the-work-item).
-- **Result** shows what the request changes, as [the diff](#the-diff) describes.
+- **Result** shows once a ready or failed request has checks, and on an accepted request. Its mark is waiting
+  while the request is ready, done once it is accepted and idle when it failed. It is described in
+  [the diff](#the-diff).
 - **Dropped** is an idle item with the word Dropped and the time the request was dropped.
 
 ### The Work item
@@ -255,18 +257,115 @@ Only the author of the request approves its plan.
 
 _(planned for M35)_
 
-When a request is `ready`, its page shows what the draft changes and how its checks went, so the
-author can decide.
+The Result item shows what the request changes and how its checks and review went, so its author can decide.
+Its parts come in this order: the checks and the review, what changes, Preview the draft while the request
+is ready, then the accept's status or a conflict.
 
-- The page shows the draft's diff as a [revision's diff](#revisions) shows it, with a summary in words
-  for each resource. A layer shows the module resource with the layer applied, marked as the
-  [customization layers](customization-layers.md#in-studio) editor marks it.
-- The checks and the review show under the diff: diagnostics, each scenario with its result, and the
-  reviewer's notes.
-- **Accept** asks for an accept and shows its status. **Drop** ends the request and deletes the draft.
-- **A conflict** shows the resources that changed since the draft read them, and who changed them. The
-  author drops the request, or sends it again so that the agent works on the folder as it is now.
-- A `failed` request shows why, and its draft's diff, so the author can read what was done.
+### Checks and review
+
+Two lines open the Result item, Checks and Review. Each has its name in bold and its verdict as a
+[status tag](shared-widgets.md#which-widget). The verdicts start in one column, so the tags line up. Each
+line's summary sits under it, across the columns and flush with the name.
+
+- **Checks** reads Passed (`success`) or Failed (`danger`). Its summary reads "All scenarios pass" with no
+  count, "1 of 2 scenarios pass", or a compile's problems, such as "It does not compile: 2 problems".
+  **Show the checks**, or **Hide the checks** once it shows, ends the summary's line.
+- **Review** reads Changes requested (`attention`) while an open finding blocks the draft. It reads No changes
+  requested (`success`) otherwise, or Not reviewed (`muted`) when no review ran. Its summary is the review's own.
+  When Not reviewed, the author reads "Connect your AI to have a second AI review changes.", and anyone else
+  reads "No second AI reviewed this change, as its author has not connected their AI."
+- The review never reads Approved. Only the author approves a change, by accepting it.
+- A failed request whose review did not run shows no Review line.
+
+The checks' detail folds in under its line, inside it and indented `spacing-md`. It shows the compile's
+problems through [`StudioProblemList`](shared-widgets.md#which-widget), then the results of the scenarios,
+see [scenario results](#scenario-results). `spacing-xs` parts the lines of one group, and `spacing-sm` parts
+the review from the checks.
+
+### What the review found
+
+The review's findings sit under its summary, `spacing-sm` below it and indented `spacing-md` inside the Review
+line. Three groups follow, `spacing-md` apart. Each has a bold heading and shows only when it has something to show.
+
+- **Things to look at** lists the review's open findings in one flat list, blocking findings first. Each is a
+  bullet led by its kind, **Blocking:** or **Suggestion:**, then its words. Its resource, as a
+  [`ResourceReference`](shared-widgets.md#which-widget), ends its line and opens the resource at the finding's path.
+- **Acceptance criteria** has one item for each criterion of the approved plan, in the plan's order.
+- **Checklist** has one item for each item of Axis's checklist.
+
+Each item of the last two groups starts with its outcome: **Met:**, **Not met:** or **Skipped:**, which means the
+review could not check the item. Then come the item's words. A reviewer's short reason follows an item that is not
+met or skipped, on the same line and in the text colour. No column lines the items up.
+
+Each lead has an icon, which [`ReviewMark`](shared-widgets.md#which-widget) draws:
+
+| Lead       | Icon             | Colour        |
+| ---------- | ---------------- | ------------- |
+| Blocking   | Exclamation mark | `dangerText`  |
+| Suggestion | Bulb             | `warningText` |
+| Met        | Check            | `successText` |
+| Not met    | Cross            | `dangerText`  |
+| Skipped    | Dash             | `textMuted`   |
+
+The icons are outlined. Only the icon takes the colour, and the word and its colon stay in the text colour. The
+icon is hidden from assistive technology, which reads the word. Each item keeps its bullet, and the icon sits
+`spacing-xs` before the word, after the bullet. An icon goes with text only for a status or a severity, as
+[buttons](actions-and-controls.md#buttons) allows.
+
+### What changes
+
+[`StudioChanges`](shared-widgets.md#which-widget) draws the request's diff folded, as the publish page does. Each
+resource is a block under its name, its kind, its change and its line counts, with the summary its request wrote
+under it. The block opens to its JSON diff, see [revisions](#revisions).
+
+- The name is no link, because the resource in the application is the version before the draft.
+- A module resource shows the layer applied, marked as the [customization layers](customization-layers.md#in-studio)
+  editor marks it.
+- The diff comes from [the request diff](authoring-requests.md#routes). The page reads it again when the request
+  moves on.
+- A pointer to a resource that only the draft adds reads by its name and kind, as the diff names it. A test result,
+  a finding, a plan's implementation note or a History row can point to one. The pointer is a link that opens the
+  resource's block and scrolls to it. The page gives its diff to `DraftResourcesContext`, which
+  [`ResourceReference`](shared-widgets.md#which-widget) reads.
+
+### Scenario results
+
+Each scenario result has its outcome as a status tag in a column of its own: Passed (`success`), Failed (`danger`)
+or Skipped (`muted`). Then come its name, its kind and its time. The name is a link, and the kind and the time are
+muted, each `spacing-xs` from the last.
+
+- A skipped contract scenario belongs to a module, so its name stays text.
+- The time is a length of time in the same words as [the History's Duration](#the-history), such as "40 s".
+- A failure adds one sentence under the name, in the same column and in the text colour. It says where and why, such as
+  "Failed at step 2: The purchasing system did not answer at its test address."
+- The band's Run tests draws its results the same way, see [Studio](studio.md#running-tests).
+
+### Preview the draft
+
+**Preview the draft** is a `secondary` button after the diff. It shows while the request is ready, to its author,
+and only when the deployment has a preview host, `studioPreviewHost` in [`GET /api/me`](security.md#roles-and-the-current-user).
+
+- It sends [the draft preview](authoring-requests.md#routes) and follows it as the band's Preview does, with
+  `StudioRequestStatus`.
+- Once the preview succeeds, its status line ends with one link for each site on the preview host, named by the site,
+  such as "The preview is ready. Open Purchasing". The links are the band's own, see [publishing](studio.md#publishing).
+
+### Accepting
+
+- **Accept** sends the accept and shows its status: "Accepted. The change is in the application and in History. It is
+  not live until someone publishes." or "Not accepted. Nothing in the application changed." When it succeeds, the page
+  reads the request again.
+- **Accept anyway…** shows while an open blocking finding remains. It opens a `medium` dialog, "Accept without these
+  changes?", which says "AI's review asked for these changes. The draft goes into the application without them." The
+  dialog lists only the open blocking findings, drawn as [Things to look at](#what-the-review-found) draws them, with no
+  suggestions. Its buttons are **Accept anyway** and Cancel, and it sends the same accept route. The reason is that the
+  reviewer is an AI and may be wrong, and the author answers for the change.
+- **A conflict** shows a warning alert, "Someone changed these resources after AI read them, so nothing was accepted:",
+  with one bullet for each resource: its [`ResourceReference`](shared-widgets.md#which-widget), who changed it and when.
+  **Make the change again**, in the bar (see [the guide](#the-guide)), sends the [retry](authoring-requests.md#routes)
+  route. AI makes the change on a new draft from the folder as it is now, and the checks and the review run again.
+- **A failure** leaves the Result item idle. It shows the request's checks and its diff. Why it failed shows in
+  [the Work item](#the-work-item).
 
 ## Auto-accept
 
