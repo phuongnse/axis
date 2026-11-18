@@ -19,7 +19,6 @@ import {
   type InstanceDetail,
 } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
-import { readingText } from './readingText'
 import { InstanceTimeline } from './InstanceTimeline'
 import { durationText, instanceTone, stepRuns } from './instanceRuns'
 import { useMinuteClock } from './relativeTime'
@@ -225,23 +224,27 @@ export function InstanceDetailView({
 
   const parentPage = instance.parent === null ? undefined : inspectors?.get(instance.parent.process)
 
-  // The words of a transition out of a step: a task's outcome by its label from the process's texts; a decision branch,
-  // proposed, see the review on #3650, by its condition read in words, and the fallback branch as Otherwise; else its
-  // name.
-  const releaseLabel = (labelKey: string | null) => (labelKey && t(labelKey) !== labelKey ? t(labelKey) : undefined)
+  // The words of a transition out of a step: its label from the process's texts, a task outcome's or, proposed, see the
+  // review on #3650, a decision branch's as its author wrote it; else its name, as a step's is: a branch's name from the
+  // step's definition, its `on` being its index, and the fallback branch Otherwise.
   const outcomeLabel = (step: string, name: string) => {
     if (stepNames) {
       return name
     }
     const graphStep = stepsByName.get(step)
-    const transition = graphStep?.transitions.find((candidate) => candidate.on === name)
-    if (transition?.labelKey) {
-      return t(transition.labelKey)
+    const labelKey = graphStep?.transitions.find((candidate) => candidate.on === name)?.labelKey
+    if (labelKey) {
+      return t(labelKey)
     }
-    if (transition?.reading) {
-      return readingText(transition.reading, { label: releaseLabel, locale }, t)
+    if (graphStep?.type !== 'decision') {
+      return name
     }
-    return graphStep?.type === 'decision' && name === 'otherwise' ? t('shell.studio.process.otherwise') : name
+    if (name === 'otherwise') {
+      return t('shell.studio.process.otherwise')
+    }
+    const branches = graphStep.definition?.branches
+    const branch = Array.isArray(branches) ? (branches[Number(name)] as { name?: unknown } | undefined) : undefined
+    return typeof branch?.name === 'string' ? branch.name : name
   }
   const status = useInstanceStatus(instance, stepLabel, locale)
   const clock = useMinuteClock()

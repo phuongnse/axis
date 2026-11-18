@@ -241,7 +241,12 @@ export function StepRunPanel({
     const before = runs.slice(0, index).findLast(along)
     const after = runs.slice(index + 1).find(along)
     const transition = graphStep?.transitions.find((candidate) => candidate.next === after?.step)
-    const reason = transition?.on == null ? null : outcomeLabel(step, transition.on)
+    // Went to says why only in the author's words: a task's outcome, or a decision branch with its label; a branch with
+    // none is the step alone, as its name or Otherwise would say nothing to the reader.
+    const reason =
+      transition?.on == null || (graphStep?.type === 'decision' && !transition.labelKey)
+        ? null
+        : outcomeLabel(step, transition.on)
     const runLink = (target: StepRun) => (
       <AxisButton role="link" inline onClick={() => onOpen(target.step, target.number)}>
         {stepLabel(target.step)}

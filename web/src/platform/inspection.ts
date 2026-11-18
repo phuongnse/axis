@@ -1,5 +1,4 @@
 import type { StepProblem } from './stepProblems'
-import type { ExpressionReading } from './studio'
 import { apiFetch } from './api'
 import { parseRecordJson, type RecordProblem } from './records'
 
@@ -71,11 +70,6 @@ export interface GraphTransition {
    * branch's, from the instance's release, or `null` when it has none.
    */
   labelKey?: string | null
-  /**
-   * Proposed, see the review on #3650: a decision branch's condition read in words, the reading Studio's expression
-   * check answers, so a reader sees why an instance went that way. The fallback branch, `otherwise`, has none.
-   */
-  reading?: ExpressionReading | null
 }
 
 /** A step of the graph. `labelKey` is set only for a task step. */

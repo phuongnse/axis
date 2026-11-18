@@ -930,28 +930,12 @@ const instanceDetail: InstanceDetail = {
           {
             next: 'autoApprove',
             on: '0',
-            reading: {
-              kind: 'all',
-              items: [
-                {
-                  kind: 'phrase',
-                  words: 'is-true',
-                  slots: [[{ kind: 'name', name: 'catalogItem', labelKey: 'request.field.catalogItem' }]],
-                },
-                {
-                  kind: 'phrase',
-                  words: 'less',
-                  slots: [
-                    [{ kind: 'name', name: 'totalAmount', labelKey: 'request.field.totalAmount' }],
-                    [{ kind: 'value', type: 'decimal', value: 1000, labelKey: null }],
-                  ],
-                },
-              ],
-            },
+            labelKey: 'approval.branch.catalogItem',
           },
           {
             next: 'budgetCheck',
             on: 'otherwise',
+            labelKey: 'approval.branch.notCatalogItem',
           },
         ],
       },
@@ -985,15 +969,12 @@ const instanceDetail: InstanceDetail = {
           {
             next: 'managerApproval',
             on: '0',
-            reading: {
-              kind: 'phrase',
-              words: 'is-true',
-              slots: [[{ kind: 'name', name: 'withinBudget', labelKey: 'request.field.withinBudget' }]],
-            },
+            labelKey: 'approval.branch.withinBudget',
           },
           {
             next: 'budgetException',
             on: 'otherwise',
+            labelKey: 'approval.branch.overBudget',
           },
         ],
       },
@@ -1061,30 +1042,17 @@ const instanceDetail: InstanceDetail = {
           {
             next: 'cfoApproval',
             on: '0',
-            reading: {
-              kind: 'phrase',
-              words: 'greater',
-              slots: [
-                [{ kind: 'name', name: 'totalAmount', labelKey: 'request.field.totalAmount' }],
-                [{ kind: 'value', type: 'decimal', value: 50000, labelKey: null }],
-              ],
-            },
+            labelKey: 'approval.branch.over50000',
           },
           {
             next: 'financeApproval',
             on: '1',
-            reading: {
-              kind: 'phrase',
-              words: 'greater',
-              slots: [
-                [{ kind: 'name', name: 'totalAmount', labelKey: 'request.field.totalAmount' }],
-                [{ kind: 'value', type: 'decimal', value: 10000, labelKey: null }],
-              ],
-            },
+            labelKey: 'approval.branch.over10000',
           },
           {
             next: 'vendorRisk',
             on: 'otherwise',
+            labelKey: 'approval.branch.upTo10000',
           },
         ],
       },
@@ -1141,18 +1109,12 @@ const instanceDetail: InstanceDetail = {
           {
             next: 'createPurchaseOrder',
             on: '0',
-            reading: {
-              kind: 'phrase',
-              words: 'equal',
-              slots: [
-                [{ kind: 'name', name: 'vendorStatus', labelKey: 'request.field.vendorStatus' }],
-                [{ kind: 'value', type: 'text', value: 'approved', labelKey: null }],
-              ],
-            },
+            labelKey: 'approval.branch.approvedVendor',
           },
           {
             next: 'onboardVendor',
             on: 'otherwise',
+            labelKey: 'approval.branch.newVendor',
           },
         ],
       },
@@ -2546,8 +2508,15 @@ export const siteTexts: Record<string, string> = {
   'event.goodsReceived': 'Goods received',
   'request.field.budgetRemaining': 'Budget remaining',
   'request.field.withinBudget': 'Within budget',
-  'request.field.totalAmount': 'Total amount',
-  'request.field.catalogItem': 'Catalog item',
+  'approval.branch.catalogItem': 'Catalog item under 1,000',
+  'approval.branch.notCatalogItem': 'Needs a budget check',
+  'approval.branch.withinBudget': 'Within budget',
+  'approval.branch.overBudget': 'Over budget',
+  'approval.branch.over50000': 'Over 50,000',
+  'approval.branch.over10000': 'Over 10,000',
+  'approval.branch.upTo10000': 'Up to 10,000',
+  'approval.branch.approvedVendor': 'Approved vendor',
+  'approval.branch.newVendor': 'New vendor',
   'request.field.vendorRiskScore': 'Vendor risk score',
   'request.field.vendorStatus': 'Vendor status',
   'request.field.purchaseOrderNumber': 'Purchase order number',

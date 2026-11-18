@@ -25,8 +25,7 @@ import { callAt } from './expressionCall'
 import { completeAt, insertAt } from './expressionCompletion'
 import { expressionLanguage } from './expressionLanguage'
 import { ExpressionPanel } from './ExpressionPanel'
-import { ExpressionReading } from '../platform/ExpressionReading'
-import { labelText } from '../platform/studioNames'
+import { ExpressionReading } from './ExpressionReading'
 import type { ScopeOption } from './expressionScope'
 
 /** How long the author must stop typing before the expression is checked. */
@@ -303,11 +302,7 @@ export default function ExpressionEditor({
           {result.reading !== null && (
             <div data-testid="studio-expression-reading">
               <Typography.Text type="secondary">{t('shell.studio.expression.inWords')}</Typography.Text>{' '}
-              <ExpressionReading
-                reading={result.reading}
-                label={(labelKey) => (names ? labelText(names, labelKey, locale) : undefined)}
-                locale={locale}
-              />
+              <ExpressionReading reading={result.reading} names={names} locale={locale} />
             </div>
           )}
           {/* The reading replaces what the place gives, unless the place takes any type, so the type shows under it. */}
