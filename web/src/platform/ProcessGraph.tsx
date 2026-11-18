@@ -459,8 +459,10 @@ const stepIcons: Record<string, ComponentType> = {
  */
 /**
  * Proposed, see the review on #3650: a step's card, which the graph draws in its node and also, hidden, to measure it,
- * so the height the layout gives a card is the height the card takes, in the same font and widths. The step an instance
- * is at, and the step chosen, take a second pixel of their colour inside the border, which changes no size.
+ * so the height the layout gives a card is the height the card takes, in the same font and widths. Its border is as
+ * thick as the lines of the steps: 2 px on a step an instance ran, is at or failed at, as its lines are, the second
+ * pixel inside the border so the card keeps its size, and 1 px on any other. The step chosen, in a designer or by a
+ * click or Find a step, takes a ring of `focusRing` outside it, a shape no border has, so it shows on a card of any tone.
  */
 function StepCard({ data, fill }: { data: ProcessGraphStep; fill: boolean }) {
   const { colour, radius, spacing } = useDesignTokens()
@@ -473,9 +475,8 @@ function StepCard({ data, fill }: { data: ProcessGraphStep; fill: boolean }) {
     taken: colour.successText,
     idle: colour.borderSubtle,
   }[data.tone]
-  // One weight of emphasis: the step an instance is at, and the step Find a step shows, take 2 px in their own colour,
-  // the second inside the border, so the card keeps its size; every other border is 1 px.
-  const strong = data.tone === 'current' || found === data.id
+  const strong = data.tone === 'current' || data.tone === 'taken' || data.tone === 'error'
+  const chosen = data.tone === 'selected' || found === data.id
   const Icon = stepIcons[data.kind] ?? ThunderboltOutlined
   const muted = data.tone === 'idle'
   return (
@@ -500,6 +501,9 @@ function StepCard({ data, fill }: { data: ProcessGraphStep; fill: boolean }) {
         background: colour.surface,
         border: `1px solid ${edge}`,
         boxShadow: strong ? `inset 0 0 0 1px ${edge}` : undefined,
+        // `focusRing`, which reaches 3:1 on the canvas in both modes, as `primary` does not in dark mode.
+        outline: chosen ? `2px solid ${colour.focusRing}` : undefined,
+        outlineOffset: chosen ? 3 : undefined,
         borderRadius: radius.base,
         cursor: 'pointer',
       }}
@@ -687,7 +691,7 @@ export function ProcessGraphCanvas({
   controls?: boolean
   /**
    * Proposed, see the review on #3650: the step chosen on the graph, by a click on it or by Find a step, which it marks
-   * at the current step's weight in its own colour, and `null` for none; without it the graph keeps its own choice.
+   * with a ring outside its card, and `null` for none; without it the graph keeps its own choice.
    */
   selected?: string | null
   onSelect?: (id: string | null) => void
