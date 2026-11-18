@@ -64,6 +64,11 @@ const drawnPaths = [
   'label',
   'description',
   'displayField',
+  'fields.name',
+  'fields.label',
+  'fields.type',
+  'fields.required',
+  'fields.unique',
   'fields.helpText',
   'fields.maxLength',
   'fields.minLength',
@@ -502,6 +507,40 @@ describe('EntityDesigner', () => {
       { name: 'a', type: 'text' },
       { name: '', type: 'text' },
     ])
+  })
+
+  it('opens a field in a drawer named by its name, with its inputs at their ids, and keeps every row', async () => {
+    renderDesigner(entity())
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByTestId('studio-field-/fields/1/maxLength')).toBeNull()
+
+    const drawer = await openEntityField(1)
+
+    expect(drawer).toBe(screen.getByRole('dialog', { name: 'code' }))
+    for (const id of ['name', 'label', 'type', 'help', 'required', 'unique', 'maxLength']) {
+      expect(within(drawer).getByTestId(`studio-field-/fields/1/${id}`), id).toBeInTheDocument()
+    }
+    for (const [id, role, label] of [
+      ['name', 'textbox', 'Name'],
+      ['type', 'combobox', 'Type'],
+    ]) {
+      const area = within(within(drawer).getByTestId(`studio-field-/fields/1/${id}`))
+      expect(area.getByText('*'), id).toBeInTheDocument()
+      expect(area.getByRole(role, { name: label }), id).toHaveAttribute('aria-required', 'true')
+    }
+    expect(within(drawer).getByRole('textbox', { name: 'Name' })).toHaveValue('code')
+    // The table keeps every row, and only the row has a `studio-field-` id in it.
+    expect(screen.getAllByTestId(/^studio-field-\/fields\/\d+$/)).toHaveLength(3)
+    expect(entityFieldNames()).toEqual(['total', 'code', 'note'])
+  })
+
+  it('reads an empty name as Unnamed field in the table and in the drawer title', async () => {
+    renderDesigner(entity({ fields: [{ name: '', type: 'text' }] }))
+
+    expect(entityFieldNames()).toEqual(['Unnamed field'])
+    const drawer = await openEntityField(0)
+
+    expect(drawer).toBe(screen.getByRole('dialog', { name: 'Unnamed field' }))
   })
 
   it('marks the keys that the entity schema requires and no others, and announces them as required', () => {
@@ -958,30 +997,19 @@ describe('EntityDesigner', () => {
       )
     }
 
-    it('offers the name, label, type, Required and Unique columns, and applying Type is integer leaves only the integer fields', async () => {
+    it('offers the name, label and type columns, and applying Type is integer leaves only the integer fields', async () => {
       renderFiltered(['count', 'code', 'size', 'total'])
       expect(rows()).toHaveLength(4)
 
       await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
       await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
-      expect(optionTexts()).toEqual(['Field name', 'Field label', 'Field type', 'Required', 'Unique'])
+      expect(optionTexts()).toEqual(['Field name', 'Field label', 'Field type'])
       await chooseOption('Field type')
       await pick('Value', 0, 'integer')
       await clickInDialog('Apply')
 
       expect(entityFieldNames()).toEqual(['count', 'size'])
       expect(screen.queryByRole('list')).not.toBeInTheDocument()
-    })
-
-    it('filters Required as Yes or No, and leaves out a field whose type has no Required', async () => {
-      renderFiltered(['count', 'code', 'size', 'total'])
-
-      await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
-      await pick('Column', 0, 'Required')
-      await pick('Value', 0, 'Yes')
-      await clickInDialog('Apply')
-
-      expect(entityFieldNames()).toEqual(['count'])
     })
 
     it('keeps a field added since the last save shown, and hides a saved field that does not match', async () => {
@@ -1131,7 +1159,8 @@ describe('EntityDesigner', () => {
         name,
       ).toBe(false)
     }
-    await userEvent.keyboard('{Escape}')
+    // Escape would close the field drawer too, so the editor loses focus to close its list instead.
+    act(() => editor.blur())
 
     await userEvent.type(editor, 'total')
 
@@ -1260,25 +1289,15 @@ describe('EntityDesigner', () => {
       true,
     )
 
-    const inputs = [
-      ...screen.getAllByRole('textbox'),
-      ...screen.getAllByRole('combobox'),
-      ...screen.getAllByRole('checkbox'),
-      ...screen.getAllByRole('spinbutton'),
-      ...screen.getAllByRole('radio'),
+    const inputsOf = (scope: HTMLElement) => [
+      ...within(scope).queryAllByRole('textbox'),
+      ...within(scope).queryAllByRole('combobox'),
+      ...within(scope).queryAllByRole('checkbox'),
+      ...within(scope).queryAllByRole('spinbutton'),
+      ...within(scope).queryAllByRole('radio'),
     ]
-    expect(screen.getAllByRole('spinbutton').length).toBeGreaterThan(0)
-    expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(0)
-    for (const name of [/^Fixed code/, /^From a field/]) {
-      expect(screen.getByRole('radio', { name })).toBeDisabled()
-    }
-    for (const name of ['Max size (bytes)']) {
-      expect(screen.getByRole('spinbutton', { name })).toBeDisabled()
-    }
-    for (const name of ['Accepted media types', 'Label of open', 'Label of closed']) {
-      expect(screen.getByRole('combobox', { name })).toBeDisabled()
-    }
-    for (const input of inputs) {
+    // The table and the sections hold no field input: the settings are in the field drawer.
+    for (const input of inputsOf(screen.getByTestId('studio-entity-designer'))) {
       expect(input).toBeDisabled()
     }
     expect(within(screen.getByTestId('studio-field-/label')).getByRole('textbox')).toHaveValue('Invoice')
@@ -1290,6 +1309,36 @@ describe('EntityDesigner', () => {
     expect(fieldRows.length).toBeGreaterThan(0)
     for (const fieldRow of fieldRows) {
       expect(within(fieldRow).queryByRole('button', { name: 'Actions' })).toBeNull()
+    }
+
+    // Each name still opens its field's drawer, with every input in it off.
+    for (const [index, name] of ['code', 'status', 'total', 'price', 'receipt'].entries()) {
+      const drawer = await openEntityField(index)
+      expect(drawer).toBe(screen.getByRole('dialog', { name }))
+      const inputs = inputsOf(drawer)
+      expect(inputs.length).toBeGreaterThan(0)
+      for (const input of inputs) {
+        expect(input).toBeDisabled()
+      }
+      expect(within(drawer).getByRole('combobox', { name: 'Type' })).toBeDisabled()
+      if (index === 0) {
+        expect(within(drawer).getAllByRole('checkbox').length).toBeGreaterThan(0)
+      }
+      if (index === 3) {
+        for (const radio of [/^Fixed code/, /^From a field/]) {
+          expect(within(drawer).getByRole('radio', { name: radio })).toBeDisabled()
+        }
+      }
+      if (index === 4) {
+        expect(within(drawer).getByRole('spinbutton', { name: 'Max size (bytes)' })).toBeDisabled()
+        expect(within(drawer).getByRole('combobox', { name: 'Accepted media types' })).toBeDisabled()
+      }
+      if (index === 1) {
+        for (const label of ['Label of open', 'Label of closed']) {
+          expect(within(drawer).getByRole('combobox', { name: label })).toBeDisabled()
+        }
+      }
+      expect(within(screen.getAllByTestId(`studio-field-/fields/${index}`)[0]).getAllByRole('button')[0]).toBeEnabled()
     }
 
     await userEvent.type(
@@ -1457,14 +1506,14 @@ describe('typing in the entity designer', () => {
   }
 
   /**
-   * Waits until every expression editor is drawn and has both answers, then forgets the draws so far. An editor shows
-   * the type its place needs only once its scope has loaded, and the check answers with no type of its own.
+   * Waits until `editors` expression editors are drawn and have both answers, then forgets the draws so far. An editor
+   * shows the type its place needs only once its scope has loaded, and the check answers with no type of its own. The
+   * table draws none, so they are the three validations and the editors of the field whose drawer is open.
    */
-  async function settled() {
+  async function settled(editors: number) {
     await waitFor(() => {
-      // A default and an expression for each of the four fields, and the three validations.
-      expect(document.querySelectorAll('.cm-editor')).toHaveLength(11)
-      expect(screen.getAllByTestId('studio-expression-type')).toHaveLength(11)
+      expect(document.querySelectorAll('.cm-editor')).toHaveLength(editors)
+      expect(screen.getAllByTestId('studio-expression-type')).toHaveLength(editors)
       for (const editor of document.querySelectorAll('.cm-editor')) {
         expect(editor.closest('[aria-busy]')).toHaveAttribute('aria-busy', 'false')
       }
@@ -1478,14 +1527,13 @@ describe('typing in the entity designer', () => {
     draws.length = 0
   })
 
-  it('draws no other field row and no validation when a key goes into a field label', async () => {
+  it('draws no other field row and no validation when a key goes into a field label in the drawer', async () => {
     renderStable()
-    await settled()
+    await settled(3)
+    const drawer = await openEntityField(1)
+    await settled(5)
 
-    await userEvent.type(
-      within(within(await openEntityField(1)).getByTestId('studio-field-/fields/1/label')).getByRole('textbox'),
-      'x',
-    )
+    await userEvent.type(within(within(drawer).getByTestId('studio-field-/fields/1/label')).getByRole('textbox'), 'x')
 
     expect(saved().fields[1].label).toEqual({ textKey: 'x' })
     expect(draws.filter((pointer) => !pointer.startsWith('/fields/1/'))).toEqual([])
@@ -1493,7 +1541,7 @@ describe('typing in the entity designer', () => {
 
   it('draws no other validation and no field row when a key goes into a validation expression', async () => {
     renderStable()
-    await settled()
+    await settled(3)
 
     const editor = screen.getByTestId('studio-field-/validations/0/expression').querySelector('.cm-editor')!
     const view = EditorView.findFromDOM(editor as HTMLElement)!

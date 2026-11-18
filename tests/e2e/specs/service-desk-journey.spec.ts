@@ -301,7 +301,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         await input.fill(value)
         await input.press('Enter')
       }
-      await input.press('Escape')
+      await input.blur()
     }
 
     // Row 0 is the starter `name` field, which becomes `number`.
@@ -360,8 +360,6 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author removes the reopened status and converts the stored tickets to draft', async ({ page }) => {
-    // Studio names the migration after the UTC time of the save, so a fixed clock gives the committed file name.
-    await page.clock.setFixedTime(new Date('2026-10-25T12:00:00Z'))
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
@@ -374,6 +372,11 @@ test.describe('the author builds the service desk with Studio only', () => {
     // Backspace in the empty tags input removes the last tag, which is reopened.
     await values.getByRole('combobox').press('Backspace')
     await expect(values.getByText('reopened', { exact: true })).toHaveCount(0)
+    // Studio's removal message covers the drawer's Close button for 10 seconds, so the drawer closes after it is gone.
+    await expect(page.getByRole('button', { name: 'Undo removal', exact: true })).toBeHidden({ timeout: 15_000 })
+    await closeEntityField(page)
+    // Studio names the migration after the UTC time of the save, so a fixed clock gives the committed file name.
+    await page.clock.setFixedTime(new Date('2026-10-25T12:00:00Z'))
     await save(page, [['status', 'Add convert', "'draft'"]])
     await expectForm(page)
     await openKind(page, 'migration')

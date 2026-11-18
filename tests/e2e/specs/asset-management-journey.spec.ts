@@ -255,12 +255,12 @@ test.describe('the author builds the asset management application with Studio on
       await input.fill(value)
       await input.press('Enter')
     }
-    await input.press('Escape')
+    await input.blur()
   }
 
-  async function chooseFieldCurrency(page: Page, index: number) {
+  async function chooseFieldCurrency(page: Page) {
     await page
-      .getByTestId(`studio-field-/fields/${index}`)
+      .getByTestId('studio-field-drawer')
       .getByRole('radiogroup', { name: 'Currency source', exact: true })
       .getByText('From a field', { exact: true })
       .click()
@@ -481,7 +481,7 @@ test.describe('the author builds the asset management application with Studio on
 
     await addField(page, 3, 'cost')
     await pick(page, 'studio-field-/fields/3/type', 'money')
-    await chooseFieldCurrency(page, 3)
+    await chooseFieldCurrency(page)
     await pick(page, 'studio-field-/fields/3/currencyField', 'currency')
     await page.getByTestId('studio-field-/fields/3/min').getByRole('spinbutton').fill('0')
     await pick(page, 'studio-field-/fields/3/label', 'maintenance.cost', 'maintenance.cost')
@@ -559,7 +559,7 @@ test.describe('the author builds the asset management application with Studio on
 
     await addField(page, 7, 'purchaseCost')
     await pick(page, 'studio-field-/fields/7/type', 'money')
-    await chooseFieldCurrency(page, 7)
+    await chooseFieldCurrency(page)
     await pick(page, 'studio-field-/fields/7/currencyField', 'currency')
     await page.getByTestId('studio-field-/fields/7/min').getByRole('spinbutton').fill('0')
     await pick(page, 'studio-field-/fields/7/label', 'asset.purchaseCost', 'asset.purchaseCost')

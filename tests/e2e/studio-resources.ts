@@ -173,37 +173,46 @@ export async function waitForExpressions(page: Page) {
   ).toHaveCount(0)
 }
 
+/** The dialog of the open field drawer, found by what it holds, as its name is the field's name and changes when the name does. */
+function fieldDrawer(page: Page): Locator {
+  return page.getByRole('dialog').filter({ has: page.getByTestId('studio-field-drawer') })
+}
+
 /**
- * Closes the field drawer of the open entity, when one is open, and waits until it is gone. The Fields table has no
- * drawer yet, so this does nothing for now.
+ * Closes the field drawer of the open entity, when one is open, by its Close button, and waits until it is gone, see
+ * docs/reference/entity-designer.md#field-drawer.
  */
 export async function closeEntityField(page: Page) {
   const drawer = page.getByTestId('studio-field-drawer')
-  if ((await drawer.count()) === 0) {
+  if (!(await drawer.isVisible())) {
     return
   }
-  await page.keyboard.press('Escape')
-  await expect(drawer).toHaveCount(0)
+  await fieldDrawer(page).getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(drawer).toBeHidden()
 }
 
 /**
- * Makes field `index` of the open entity ready to edit. It closes an open field, scrolls the field's row into view and
- * waits until its name box shows. The Fields table holds each field's settings in its row, so the row is the editor.
+ * Makes field `index` of the open entity ready to edit: it closes an open field, clicks the name in the field's row and
+ * returns the field drawer's dialog once it has opened, named by the field's name.
  */
-export async function openEntityField(page: Page, index: number) {
+export async function openEntityField(page: Page, index: number): Promise<Locator> {
   await closeEntityField(page)
-  await page.getByTestId(`studio-field-/fields/${index}`).scrollIntoViewIfNeeded()
-  await expect(page.getByTestId(`studio-field-/fields/${index}/name`)).toBeVisible()
+  const link = page.getByTestId(`studio-field-/fields/${index}`).getByRole('cell').first().getByRole('button').first()
+  const name = (await link.textContent())!.trim()
+  await link.click()
+  await waitForDialog(page, name)
+  return fieldDrawer(page)
 }
 
 /**
- * Clicks Add field in the open entity and waits until the new field, at `index`, shows its name box. It closes an open
- * field first, because a drawer could cover the button.
+ * Clicks Add field in the open entity, waits until the new row, at `index`, shows, then opens the new field's drawer.
+ * It closes an open field first, because a drawer could cover the button.
  */
-export async function addEntityField(page: Page, index: number) {
+export async function addEntityField(page: Page, index: number): Promise<Locator> {
   await closeEntityField(page)
   await page.getByRole('button', { name: 'Add field', exact: true }).click()
-  await expect(page.getByTestId(`studio-field-/fields/${index}/name`)).toBeVisible()
+  await expect(page.getByTestId(`studio-field-/fields/${index}`)).toBeVisible()
+  return openEntityField(page, index)
 }
 
 /**

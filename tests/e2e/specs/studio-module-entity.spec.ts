@@ -80,9 +80,7 @@ test.describe("Studio edits a module entity as a layer", () => {
     await expect(access(layerFile)).rejects.toMatchObject({
       code: "ENOENT",
     });
-    await expect(page.getByTestId("studio-field-/fields/5/name")).toHaveCount(
-      0,
-    );
+    await expect(page.getByTestId("studio-field-/fields/5")).toHaveCount(0);
   });
 
   test("an author adds a field, sees it marked Added, and Reset to module removes it and the layer", async ({

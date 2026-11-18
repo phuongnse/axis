@@ -100,10 +100,10 @@ export const fieldTypeSettings: Record<FieldType, FieldSetting[]> = {
 
 /** The field keys of `entity.schema.json` that are not settings, and where each is edited. */
 export const fieldKeysEditedElsewhere: Record<string, string> = {
-  name: 'the name column',
-  type: 'the type column',
-  label: 'the label column',
-  help: 'the settings column',
+  name: 'the field drawer',
+  type: 'the field drawer',
+  label: 'the field drawer',
+  help: 'the field drawer',
   match: 'the JSON tab',
   userId: 'the JSON tab',
 }
