@@ -344,7 +344,8 @@ describe('the Design tab of a page', () => {
     await screen.findByTestId('studio-page-editor', {}, slow)
     await openTab('Design')
     const box = await screen.findByTestId('studio-canvas-placeholder', {}, slow)
-    expect(box).toHaveTextContent('This widget does not compile: columns')
+    expect(box).toHaveTextContent('This widget has errors')
+    expect(within(box).getByTestId('studio-canvas-placeholder-type')).toHaveTextContent('columns')
     expect(box).toHaveAttribute('data-path', '/widgets/1')
     expect(screen.getByTestId('kpi-tile')).toBeInTheDocument()
   })
@@ -360,7 +361,7 @@ describe('the Design tab of a page', () => {
     await screen.findByTestId('studio-page-editor', {}, slow)
     await openTab('Design')
     expect(await screen.findByTestId('studio-canvas-cannot-draw', {}, slow)).toHaveTextContent(
-      'The page cannot be drawn until its errors are fixed.',
+      'The page cannot show until its errors are fixed.',
     )
     expect(screen.queryByTestId('kpi-tile')).not.toBeInTheDocument()
   })
@@ -374,7 +375,7 @@ describe('the Design tab of a page', () => {
     await screen.findByTestId('studio-page-editor', {}, slow)
     await openTab('Design')
     expect(await screen.findByTestId('studio-canvas-failed', {}, slow)).toHaveTextContent(
-      'The page could not be drawn.',
+      'The page could not be shown.',
     )
   })
 
@@ -389,7 +390,7 @@ describe('the Design tab of a page', () => {
     await openTab('Design')
     const canvas = await screen.findByTestId('studio-page-canvas', {}, slow)
     await within(canvas).findByTestId('chart-widget', {}, slow)
-    const marked = within(canvas).getByRole('group', { name: /has problems$/ })
+    const marked = within(canvas).getByRole('group', { name: 'chart, has problems' })
     expect(marked).toHaveAttribute('data-path', '/widgets/1')
     expect(marked).toHaveAttribute('data-marked', 'true')
     const unmarked = within(canvas)
@@ -412,7 +413,8 @@ describe('the Design tab of a page', () => {
     await openTab('Design')
     const canvas = await screen.findByTestId('studio-page-canvas', {}, slow)
     const box = await within(canvas).findByTestId('studio-canvas-placeholder', {}, slow)
-    expect(box).toHaveTextContent('This widget does not compile: chart')
+    expect(box).toHaveTextContent('This widget has errors')
+    expect(within(box).getByTestId('studio-canvas-placeholder-type')).toHaveTextContent('chart')
     expect(within(box).getByTestId('studio-canvas-placeholder-diagnostic')).toHaveTextContent(
       "UnknownWidgetDataSource: The data source 'MissingSource' was not found. No loaded data source has that name.",
     )
@@ -937,8 +939,7 @@ describe('the Design tab of a page', () => {
       expect(posts.at(-1)!.widgets[1]).toEqual({ ...newWidget('kpi'), name: 'kpi1' })
       expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
       const announcement = palette.getByTestId('studio-palette-announcement')
-      expect(announcement).toHaveTextContent('Page')
-      expect(announcement).toHaveTextContent('position 2')
+      expect(announcement).toHaveTextContent(/^Inserted kpi in Page, position 2\.$/)
     })
 
     it('undoes a palette insert with Ctrl+Z and brings it back with Ctrl+Shift+Z', async () => {
@@ -968,7 +969,9 @@ describe('the Design tab of a page', () => {
         slow,
       )
       expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/1')).toHaveAttribute('aria-current', 'true')
-      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent('Page › section 2, position 2')
+      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent(
+        /^Inserted kpi in Page › section 2, position 2\.$/,
+      )
     })
 
     it('names each inserted widget with a name that is unique on the whole page', async () => {
@@ -1002,7 +1005,7 @@ describe('the Design tab of a page', () => {
       for (const type of ['section', 'columns', 'tabs']) {
         const button = palette.getByTestId(`studio-palette-${type}`)
         expect(button).toBeDisabled()
-        expect(button).toHaveAccessibleDescription('A container here would hold a list past level 4.')
+        expect(button).toHaveAccessibleDescription('A container here would nest past level 4.')
       }
       expect(palette.getByTestId('studio-palette-kpi')).toBeEnabled()
     })
@@ -1041,7 +1044,7 @@ describe('the Design tab of a page', () => {
       dropOn('section', { kind: 'list', pointer: '/widgets/0/widgets/0/widgets/0/widgets' })
 
       expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent(
-        'A container here would hold a list past level 4.',
+        'A container here would nest past level 4.',
       )
       expect(
         within(design).queryByTestId('studio-widget-/widgets/0/widgets/0/widgets/0/widgets/1'),
@@ -1059,9 +1062,7 @@ describe('the Design tab of a page', () => {
       expect(posts.at(-1)!.widgets[1]).toEqual({ ...newWidget('detail'), name: 'detail1' })
       expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
       const announcement = palette.getByTestId('studio-palette-announcement')
-      expect(announcement).toHaveTextContent('Inserted detail')
-      expect(announcement).toHaveTextContent('Page')
-      expect(announcement).toHaveTextContent('position 2')
+      expect(announcement).toHaveTextContent(/^Inserted detail in Page, position 2\.$/)
     })
 
     it('inserts before a widget dropped on its upper half', async () => {
@@ -1089,7 +1090,9 @@ describe('the Design tab of a page', () => {
         slow,
       )
       expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/1')).toHaveAttribute('aria-current', 'true')
-      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent('Page › section 2, position 2')
+      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent(
+        /^Inserted kpi in Page › section 2, position 2\.$/,
+      )
     })
 
     it('does nothing when the draft has no such target', async () => {
@@ -1213,7 +1216,9 @@ describe('the Design tab of a page', () => {
         title: { textKey: '' },
       })
       expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
-      expect(screen.getByTestId('studio-palette-announcement')).toHaveTextContent('Inserted chart')
+      expect(screen.getByTestId('studio-palette-announcement')).toHaveTextContent(
+        /^Inserted chart in Page, position 2\.$/,
+      )
     })
 
     it('inserts nothing when the choice is cancelled', async () => {
@@ -1240,8 +1245,7 @@ describe('the Design tab of a page', () => {
       expect(posts.at(-1)!.widgets[1]).toEqual({ type: 'table', name: 'table1', entity: 'Ticket' })
       expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
       const announcement = screen.getByTestId('studio-palette-announcement')
-      expect(announcement).toHaveTextContent('Inserted table')
-      expect(announcement).toHaveTextContent('position 2')
+      expect(announcement).toHaveTextContent(/^Inserted table in Page, position 2\.$/)
     })
 
     it('disables table with the one-table reason when the page already holds a table', async () => {
@@ -1319,14 +1323,13 @@ describe('the Design tab of a page', () => {
       await waitFor(() => expect(frame('/widgets/1')).toHaveAttribute('aria-current', 'true'), slow)
       expect(within(frame('/widgets/1')).getByTestId('kpi-tile')).toBeInTheDocument()
       const announcement = palette.getByTestId('studio-palette-announcement')
-      expect(announcement).toHaveTextContent('Moved kpi')
-      expect(announcement).toHaveTextContent('position 2')
+      expect(announcement).toHaveTextContent(/^Moved kpi to Page, position 2\.$/)
 
       drag('/widgets/1', { kind: 'list', pointer: '/widgets/2/widgets' })
 
       await waitFor(() => expect(posts.at(-1)!.widgets).toEqual([{ type: 'chart' }, section([{ type: 'kpi' }])]), slow)
       expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/0')).toHaveAttribute('aria-current', 'true')
-      expect(announcement).toHaveTextContent('Moved kpi to Page › section 2, position 1')
+      expect(announcement).toHaveTextContent(/^Moved kpi to Page › section 2, position 1\.$/)
     })
 
     it('moves a widget before another on its upper half', async () => {
@@ -1363,14 +1366,14 @@ describe('the Design tab of a page', () => {
 
       await waitFor(() => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['chart', 'kpi']), slow)
       expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
-      expect(announcement).toHaveTextContent('Moved kpi to Page, position 2')
+      expect(announcement).toHaveTextContent(/^Moved kpi to Page, position 2\.$/)
       await waitFor(() => expect(frame('/widgets/1')).toHaveFocus(), slow)
 
       await userEvent.keyboard('{Alt>}{ArrowUp}{/Alt}')
 
       await waitFor(() => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['kpi', 'chart']), slow)
       expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
-      expect(announcement).toHaveTextContent('Moved kpi to Page, position 1')
+      expect(announcement).toHaveTextContent(/^Moved kpi to Page, position 1\.$/)
       await waitFor(() => expect(frame('/widgets/0')).toHaveFocus(), slow)
     })
 
@@ -1434,7 +1437,7 @@ describe('the Design tab of a page', () => {
       drag('/widgets/1', { kind: 'list', pointer: '/widgets/0/widgets/0/widgets' })
 
       expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent(
-        'A container here would hold a list past level 4.',
+        'A container here would nest past level 4.',
       )
       await expectDraftUnchanged(nest)
     })
@@ -1445,9 +1448,7 @@ describe('the Design tab of a page', () => {
 
       drag('/widgets/1', { kind: 'list', pointer: '/widgets/0/widgets/0/widgets' }, { drop: false })
 
-      expect(screen.getByTestId('studio-drag-refusal')).toHaveTextContent(
-        'A container here would hold a list past level 4.',
-      )
+      expect(screen.getByTestId('studio-drag-refusal')).toHaveTextContent('A container here would nest past level 4.')
     })
 
     it('changes nothing and says nothing when a widget is dropped on itself', async () => {

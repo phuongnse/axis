@@ -662,8 +662,8 @@ panel, its undo and its drag and drop.
   a widget inside it has one, even in a closed section or an inactive tab. A marked widget has a border
   in the `danger` colour, its text label, and `data-marked`. The marks follow the
   route's latest answer, and so the unsaved draft.
-- **Marked names.** A marked widget's text label reads "{name}, has problems", where the name is
-  its frame's name: the widget's type and the name it binds.
+- **Marked names.** A marked widget's text label reads "{name}, has problems", where the name is its frame's
+  name: the widget's type and the name it binds, so a marked table reads "table, PurchaseRequestList, has problems".
 - **Selection.** A click on the canvas or a pick in the widget tree selects a widget in both. A click
   selects the innermost widget under the pointer, and a click on the empty area of a container selects
   the container. The selected widget has `aria-current` and an outline in the primary colour. Every
@@ -717,9 +717,10 @@ panel, its undo and its drag and drop.
   flagged while it is dragged: the drag overlay and the live region give the reason, and a drop there
   changes nothing. A drop on the widget itself changes nothing either. A move keeps all the widget's
   keys.
-- **What the live region says.** After an insert, a drop or a move the new or moved widget is selected,
-  and a live region names the list and the position where it landed, says "Moved" with the type, or
-  says that it cannot move further. The drag and drop library's own spoken messages are off, so the
+- **What the live region says.** After an insert, a drop or a move the new or moved widget is selected, and a live
+  region reads one sentence of the agreed texts, with the type, the list and the position filled in, such as
+  "Inserted table in Page, position 2." or "Moved kpi to Page › section 2, position 1." A move that cannot go
+  further says "The widget cannot move further." The drag and drop library's own spoken messages are off, so the
   live region is the only voice.
 - **Width switch.** It draws the canvas at desktop width, which fills the canvas area, or at phone
   width, where the columns stack to full width and tables use their narrow layout, even in a wide

@@ -1790,7 +1790,7 @@ describe('StudioEditor for a page', () => {
 
       await screen.findByTestId('studio-widget-/widgets/1', {}, slow)
       await userEvent.click(
-        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Remove widget' }),
+        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Delete' }),
       )
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()

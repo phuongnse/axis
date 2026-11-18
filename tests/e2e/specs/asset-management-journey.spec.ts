@@ -841,7 +841,7 @@ test.describe('the author builds the asset management application with Studio on
     await expect(frame(page, '/widgets/1')).toBeVisible()
     await panel
       .getByTestId('studio-widget-row-/widgets/0')
-      .getByRole('button', { name: 'Remove widget', exact: true })
+      .getByRole('button', { name: 'Delete', exact: true })
       .click()
     await expect(panel.getByTestId('studio-widget-/widgets/1')).toHaveCount(0)
     await save(page)
@@ -873,7 +873,7 @@ test.describe('the author builds the asset management application with Studio on
     await expect(panel.getByTestId('studio-widget-/widgets/2')).toBeVisible()
     await panel
       .getByTestId('studio-widget-row-/widgets/1')
-      .getByRole('button', { name: 'Remove widget', exact: true })
+      .getByRole('button', { name: 'Delete', exact: true })
       .click()
     await expect(panel.getByTestId('studio-widget-/widgets/2')).toHaveCount(0)
     await panel.getByTestId('studio-widget-/widgets/0').click()

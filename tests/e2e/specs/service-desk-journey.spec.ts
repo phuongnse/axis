@@ -928,7 +928,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(frame(page, '/widgets/1')).toBeVisible()
     await panel
       .getByTestId('studio-widget-row-/widgets/0')
-      .getByRole('button', { name: 'Remove widget', exact: true })
+      .getByRole('button', { name: 'Delete', exact: true })
       .click()
     await expect(panel.getByTestId('studio-widget-/widgets/1')).toHaveCount(0)
     await save(page)
@@ -987,7 +987,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(panel.getByTestId('studio-widget-/widgets/2')).toBeVisible()
     await panel
       .getByTestId('studio-widget-row-/widgets/1')
-      .getByRole('button', { name: 'Remove widget', exact: true })
+      .getByRole('button', { name: 'Delete', exact: true })
       .click()
     await expect(panel.getByTestId('studio-widget-/widgets/2')).toHaveCount(0)
     await panel.getByTestId('studio-widget-/widgets/0').click()
@@ -1035,7 +1035,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     // A table that is dragged into the chart's column by mistake is one move, and one undo puts it back below the columns.
     await dragTo(page, 'studio-page-design', frame(page, '/widgets/1'), frame(page, chart), 0.75)
-    await expect(page.getByTestId('studio-palette-announcement')).toContainText('Moved table')
+    await expect(page.getByTestId('studio-palette-announcement')).toContainText('Moved table to Page')
     await expect(frame(page, '/widgets/0/columns/1/widgets/1')).toBeVisible()
     await page.getByRole('button', { name: 'Undo', exact: true }).click()
     await expect(frame(page, '/widgets/0/columns/1/widgets/1')).toHaveCount(0)
