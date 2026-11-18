@@ -84,6 +84,29 @@ async function askAi(page: Page, text: string, app = application) {
   await page.waitForURL(/view=requests&request=/)
 }
 
+/**
+ * The spec's own publisher, with the server's Studio settings, the scenario role and the runtime role. The runtime role
+ * gives it the write lock that an accept takes, so without it the accept fails with "The draft is not found."
+ * It runs alone under the publishers' lock. See the layer test.
+ */
+function startSpecPublisher() {
+  return startPublisher(
+    {
+      Studio__ApplicationsPath: applications,
+      Studio__AuthorRole: 'author',
+      ConnectionStrings__Platform: required(
+        'AXIS_E2E_DATABASE',
+        'the PostgreSQL connection string of the runtime role',
+      ),
+      Scenarios__ServerConnectionString: required(
+        'AXIS_E2E_SCENARIO_DATABASE',
+        'the PostgreSQL connection string of the scenario role',
+      ),
+    },
+    { alone: true },
+  )
+}
+
 test.beforeAll(async () => {
   const created = await runAdmin(['tenant', 'create', tenant, '--host', host])
   expect(created.status, `${created.stdout}\n${created.stderr}`).toBe(0)
@@ -334,7 +357,8 @@ test('a request whose compile check fails in every fix round ends Failed, with w
 // no cell settings, it would fail a cell spec's `create`, `purge` and `export` jobs, and a cell spec's publisher would
 // claim this request's `test` request and look for the application under its own folder, where it is not. So
 // `startPublisher` holds a lock for each publisher's whole life: this one holds it alone, the cell specs' publishers share
-// it, and each side waits for the other. This publisher runs only from the approval until the request reads Ready.
+// it, and each side waits for the other. This publisher runs from the approval until the request reads Ready, and the
+// Accept test runs it again, from just before Accept until the accept ends, because it runs the accept too.
 test("a request whose work adds a field to a module entity's layer reaches Ready with its checks passed and the layer marked in its diff", async () => {
   // The scenarios of the module's contract run in the check, and a cell spec's publisher may hold the lock for a while.
   test.setTimeout(600_000)
@@ -426,17 +450,7 @@ test("a request whose work adds a field to a module entity's layer reaches Ready
     await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Awaiting approval', { timeout: 120_000 })
     await expect(page.getByText(layerPlan, { exact: true })).toBeVisible()
 
-    publisher = await startPublisher(
-      {
-        Studio__ApplicationsPath: applications,
-        Studio__AuthorRole: 'author',
-        Scenarios__ServerConnectionString: required(
-          'AXIS_E2E_SCENARIO_DATABASE',
-          'the PostgreSQL connection string of the scenario role',
-        ),
-      },
-      { alone: true },
-    )
+    publisher = await startSpecPublisher()
     try {
       await page.getByRole('button', { name: 'Approve plan', exact: true }).click()
       try {
@@ -476,6 +490,104 @@ test("a request whose work adds a field to a module entity's layer reaches Ready
 
     // The Accept tests that follow rely on this request, which stays Ready and belongs to the author.
     readyRequestUrl = page.url()
+  } finally {
+    await page.close()
+  }
+})
+
+test('another author sees the ready request and its diff, and whose accept it waits for, with no actions', async () => {
+  const context = await browser.newContext({ ignoreHTTPSErrors: true })
+  try {
+    const page = await signIn(context, colleague)
+    await page.goto(readyRequestUrl)
+    await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Ready')
+    const changed = page.getByTestId('studio-changes-file').filter({ hasText: 'Department' })
+    await expect(changed).toHaveCount(1)
+    await expect(
+      changed.getByRole('note', {
+        name: 'costCentre, added by this application',
+        exact: true,
+      }),
+    ).toHaveText('Added')
+    await expect(page.getByText('Waiting for its author to accept', { exact: true })).toBeVisible()
+    for (const name of ['Accept', 'Drop…']) {
+      await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
+    }
+  } finally {
+    await context.close()
+  }
+})
+
+test('the author accepts the ready layer change, sees Accepted and finds its revision first in History', async () => {
+  // The accept runs the module's contract scenarios and the template's own, as the layer test's check does.
+  test.setTimeout(600_000)
+  const page = await authorContext.newPage()
+  try {
+    await page.goto(readyRequestUrl)
+    await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Ready')
+    await expect(page.getByText('Checks and review passed', { exact: true })).toBeVisible()
+    const changed = page.getByTestId('studio-changes-file').filter({ hasText: 'Department' })
+    await expect(
+      changed.getByRole('note', {
+        name: 'costCentre, added by this application',
+        exact: true,
+      }),
+    ).toHaveText('Added')
+
+    // The accept is the publisher's work, so the spec's publisher runs from just before Accept until the accept ends.
+    let acceptId: string
+    publisher = await startSpecPublisher()
+    try {
+      const sent = page.waitForResponse(
+        (response) => response.request().method() === 'POST' && response.url().endsWith('/accept'),
+      )
+      await page.getByRole('button', { name: 'Accept', exact: true }).click()
+      const answer = await sent
+      expect(answer.status()).toBe(202)
+      acceptId = ((await answer.json()) as { id: string }).id
+
+      const status = page.getByTestId('studio-request-status')
+      try {
+        await expect(status).toHaveAttribute('data-status', /^(succeeded|failed)$/, { timeout: 300_000 })
+        expect(await status.getAttribute('data-status')).toBe('succeeded')
+      } catch (error) {
+        // The cause is in what the publisher printed and in the accept's publish request.
+        const accepted = await page.evaluate(
+          async (url) => (await fetch(url)).text(),
+          `/api/studio/apps/${approvalsApplication}/requests/${acceptId}`,
+        )
+        await test.info().attach('publisher-output', {
+          body: publisher.output(),
+          contentType: 'text/plain',
+        })
+        await test.info().attach('accept-request', { body: accepted, contentType: 'application/json' })
+        throw error
+      }
+    } finally {
+      await publisher.stop()
+      publisher = undefined
+    }
+
+    await expect(page.getByTestId('studio-request-status')).toHaveText(
+      'Accepted. The change is in the application and in History. It is not live until someone publishes.',
+    )
+    await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Accepted')
+
+    // The newest revision is the accept's. It names the accept's publish request and the request's author.
+    const read = (path: string) =>
+      page.evaluate(async (url) => (await fetch(url)).json(), `/api/studio/apps/${approvalsApplication}${path}`)
+    const requestId = new URL(readyRequestUrl).searchParams.get('request')
+    const requested = (await read(`/authoring-requests/${requestId}`)) as { author: string }
+    const { items } = (await read('/revisions')) as {
+      items: { id: string; request: string | null; userId: string | null }[]
+    }
+    expect(items[0]).toMatchObject({ request: acceptId, userId: requested.author })
+
+    await page.goto(`https://${host}/studio?app=${approvalsApplication}&view=history`)
+    const first = page.getByTestId('studio-revision-row').first()
+    await expect(first).toHaveAttribute('data-id', items[0].id)
+    await expect(first.getByTestId('studio-revision-link')).toHaveText('Accept draft')
+    await expect(first.getByText('Studio', { exact: true })).toBeVisible()
   } finally {
     await page.close()
   }

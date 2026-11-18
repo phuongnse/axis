@@ -807,8 +807,9 @@ jobs, such as the cell console spec and the cell quota journey, starts its own p
 same file, which reads the tenant directory with a cell's settings and runs the jobs. Both start it, with their server
 and browser, through `startCell` of `tests/e2e/cell.ts`, see [the E2E stack](testing.md#the-e2e-stack).
 The Ask AI agent spec starts a publisher too, with the server's Studio settings, for the scenarios of its request's
-checks. A publisher claims the work of every directory tenant, so `startPublisher` holds a PostgreSQL advisory lock for
-the publisher's whole life. The Ask AI agent spec's publisher takes it alone, and the cell specs' publishers share it.
+checks and of its accept. A publisher claims the work of every directory tenant, so `startPublisher` holds a PostgreSQL
+advisory lock for the publisher's whole life. The Ask AI agent spec's publisher takes it alone, and the cell specs'
+publishers share it.
 
 ## Widget previews
 
