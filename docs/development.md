@@ -327,9 +327,8 @@ These workflows run on `main`, and none of them gates a NexKit merge.
 
 - **CodeQL**, `.github/workflows/codeql.yml`, scans C# and TypeScript on hand-made pull requests to
   `main` and on `main`. Its alerts go to GitHub code scanning, and its check fails on a new high or
-  critical alert. It does not scan NexKit's pull requests: GitHub gives each one a run that waits for
-  approval and runs no job, and ends it as failed when the pull request merges, so a failed CodeQL run
-  on a `nexkit/` branch is not an alert. NexKit starts the scan on `main` every few merges, see
+  critical alert. A NexKit pull request gets a CodeQL run whose job is skipped, because the scan on
+  `main` covers NexKit's work. NexKit starts the scan on `main` every few merges, see
   [delivery](delivery.md#decisions).
 - **Performance**, `.github/workflows/performance.yml`, runs `scripts/performance.sh` on `main` when
   NexKit starts it, and on demand. NexKit watches it as it watches CI, so a failure that repeats opens
@@ -748,13 +747,17 @@ The realm `axis-operators`, from `samples/keycloak/axis-operators-realm.json`, i
 
 Development, Compose, `scripts/dev.sh` and E2E give the `default` tenant these bindings:
 
-| Binding                                | Value                                                  | Read by                                          |
-| -------------------------------------- | ------------------------------------------------------ | ------------------------------------------------ |
-| `CompanyIssuer`                        | The `company` realm's issuer URL                       | The purchase request sample's `company` provider |
-| `CompanyClientId`                      | `axis-broker`                                          | The same                                         |
-| `CompanyClientSecret`                  | `axis-broker-development-secret`                       | The same                                         |
-| `PurchaseRequestApprovedWebhookUrl`    | The stub's `/webhooks/purchase-request-approved` route | The purchase request sample's approval webhook   |
-| `PurchaseRequestApprovedWebhookSecret` | The stub's default webhook secret                      | The same                                         |
+| Binding                                | Value                                                  | Read by                                                    |
+| -------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------- |
+| `CompanyIssuer`                        | The `company` realm's issuer URL                       | The purchase request sample's `company` provider           |
+| `CompanyClientId`                      | `axis-broker`                                          | The same                                                   |
+| `CompanyClientSecret`                  | `axis-broker-development-secret`                       | The same                                                   |
+| `PurchasingSystemUrl`                  | The stub's base URL                                    | The purchase request sample's `PurchasingSystem` connector |
+| `PurchasingSystemTokenUrl`             | The stub's `/oauth/token` route                        | The same                                                   |
+| `PurchasingSystemClientId`             | `axis-purchasing`                                      | The same                                                   |
+| `PurchasingSystemClientSecret`         | `axis-development-purchasing-secret`                   | The same                                                   |
+| `PurchaseRequestApprovedWebhookUrl`    | The stub's `/webhooks/purchase-request-approved` route | The purchase request sample's approval webhook             |
+| `PurchaseRequestApprovedWebhookSecret` | The stub's default webhook secret                      | The same                                                   |
 
 ### The samples and their users
 

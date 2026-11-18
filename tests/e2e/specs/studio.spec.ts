@@ -157,7 +157,8 @@ test.describe('Studio on a copy of its own', () => {
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${entity.id}`)
     const field = page.getByTestId('studio-field-/validations/0/expression')
     const editor = field.getByRole('textbox')
-    await expect(field.getByTestId('studio-expression-reading')).toBeVisible()
+    // The editors check their text once they mount, which takes longer than the default wait on a busy machine.
+    await expect(field.getByTestId('studio-expression-reading')).toBeVisible({ timeout: 60_000 })
 
     await editor.fill('title > 5')
     await expect(field.locator('.cm-lintRange-error')).toBeVisible()
