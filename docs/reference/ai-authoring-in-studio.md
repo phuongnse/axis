@@ -59,13 +59,13 @@ request opens its own page.
 
 ## A request's page
 
-A request's page shows one request. Only its heading is built so far. [The feed](#the-feed) and
-[the guide](#the-guide) are planned for M35.
+A request's page shows one request: its heading, [the feed](#the-feed) and [the guide](#the-guide).
 
 ### The heading
 
-- The heading is the request's name. Until AI names the request, the name is the first sentence of its
-  words, cut at 80 characters with an ellipsis.
+- The heading is the request's name: the first sentence of its words, cut at 80 characters with an ellipsis.
+- **AI's name** _(planned for M35)_. Once AI names the request, the heading shows AI's name in place of the
+  first sentence, as [the request's answer](authoring-requests.md#routes) gives it.
 - The state sits beside the name as a [status tag](shared-widgets.md#which-widget), with its word from
   [the states](#the-states).
 - Under the name, `spacing-xs` apart, come the request's words in full. Then, in `textMuted`, comes the
@@ -77,7 +77,7 @@ A request's page shows one request. Only its heading is built so far. [The feed]
   used. An outside app is named by the name it registered with. The line is one sentence with no full stop.
   Nothing else on the page names an AI.
 - The page checks the request every second until it waits for its author or ends.
-- An unknown request shows "This request does not exist.".
+- An unknown request shows "This request does not exist."
 - **The link to the request panel** _(planned for M35)_. The unknown request's line also has an Ask AI link,
   which opens [the request panel](#the-request-panel).
 - **A failed action** _(planned for M35)_. A failed action shows "That did not work. Try again." in an
