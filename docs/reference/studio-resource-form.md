@@ -185,7 +185,8 @@ The JSON view is a CodeMirror editor with JSON highlighting and line numbers.
 - **Its look.** Its border is a field's, `border` with `radius-base`, and the gutter stays inside it.
   Its text keeps `spacing-sm` from the border.
 - **Its height.** It reaches down to `spacing-md` above the footer, or above the save bar while that
-  shows, at any window height, and scrolls inside.
+  shows, at any window height, and scrolls inside and stops at its end, as
+  [scroll areas](actions-and-controls.md#scroll-areas) say.
 - **Its colours are tokens.** Names are `primaryText`, strings `text`, numbers `infoText`, `true`,
   `false` and `null` `warningText`, and punctuation `textMuted`. A string stays plain because strings are
   most of what a person reads. The expression editor draws in the same colours, so no editor shows

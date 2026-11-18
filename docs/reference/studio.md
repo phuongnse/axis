@@ -422,6 +422,7 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
   that checks and saves like the box, and a panel of tabs Fields, Operators and Functions, with every rule
   allowed there. A click inserts the name at the cursor. A search looks in all three, best first: a name that
   is the words, then one that starts with them, then one that holds them, then one whose description does.
+  The dialog's body scrolls each tab's list, which has no scroll of its own, as [scroll areas](actions-and-controls.md#scroll-areas) say.
 - **Completion that explains.** Each choice has a short detail and an info panel while it is selected. A field
   shows its label and type in words, a function its signature, what it does and an example, and a rule its
   signature and the type it gives. An operator or value shows its words and an example.

@@ -243,7 +243,7 @@ describe('a dialog under the theme provider', () => {
     expect(document.querySelector<HTMLElement>('.ant-modal')!.style.width).toBe(`${sizeTokens.dialog[name]}px`)
   })
 
-  it('opens centred within the window margins, with its body scrolling and its title and buttons outside the body', () => {
+  it('opens centred within the window margins, with its body scrolling and stopping at its end, and its title and buttons outside the body', () => {
     render(
       <ThemeModeProvider>
         <Modal open title="Pick">
@@ -257,6 +257,7 @@ describe('a dialog under the theme provider', () => {
     expect(document.querySelector<HTMLElement>('.ant-modal')!.style.maxWidth).toBe('calc(100vw - 64px)')
     expect(document.querySelector<HTMLElement>('.ant-modal-container')!.style.maxHeight).toBe('calc(100vh - 64px)')
     expect(body.style.overflowY).toBe('auto')
+    expect(body.style.overscrollBehavior).toBe('contain')
     expect(within(body).queryByText('x')).not.toBeNull()
     expect(within(body).queryByRole('button', { name: /ok/i })).toBeNull()
     expect(within(body).queryByRole('button', { name: /cancel/i })).toBeNull()

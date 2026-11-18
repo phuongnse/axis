@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
+import { withAntdStyles } from '../test/antdStyles'
 import JsonView, { type JsonViewHandle } from './JsonView'
 import { jsonViewHeight, minHeight } from './jsonViewHeight'
 
@@ -34,6 +35,21 @@ describe('JsonView', () => {
 
     expect(screen.getByRole('textbox', { name: 'JSON' })).toBeInTheDocument()
     expect(document.querySelector('.cm-lineNumbers')).not.toBeNull()
+  })
+
+  describe('with antd styles', () => {
+    withAntdStyles()
+
+    it('stops the scroller at its end, so the page does not scroll', () => {
+      renderView('{}')
+
+      // jsdom's computed style drops a property it does not know, so the test reads the rules that match the scroller.
+      const scroller = document.querySelector<HTMLElement>('.cm-scroller')!
+      const rules = Array.from(document.styleSheets).flatMap((sheet) => Array.from(sheet.cssRules))
+      const styleRules = rules.filter((rule): rule is CSSStyleRule => 'selectorText' in rule)
+      const matching = styleRules.filter((rule) => scroller.matches(rule.selectorText))
+      expect(matching.map((rule) => rule.style.getPropertyValue('overscroll-behavior'))).toContain('contain')
+    })
   })
 
   it('reports an edit', () => {

@@ -167,10 +167,18 @@ export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMot
       style: { maxWidth: `calc(100vw - ${margins}px)` },
       // The padding sits in the header, body and footer, not the frame, so the body's scrollbar runs at the dialog's edge.
       // The body keeps spacing-xs under its content, so the footer adds the rest of spacing-lg above the buttons.
+      // The body is a scroll area: it stops at its end, so the page under the dialog does not scroll, see
+      // docs/reference/actions-and-controls.md#scroll-areas.
       styles: {
         container: { display: 'flex', flexDirection: 'column', maxHeight: `calc(100vh - ${margins}px)`, padding: 0 },
         header: { padding: `${spacing.lg}px ${spacing.lg}px 0` },
-        body: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: `${spacing.xs}px ${spacing.lg}px` },
+        body: {
+          flex: '1 1 auto',
+          minHeight: 0,
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
+          padding: `${spacing.xs}px ${spacing.lg}px`,
+        },
         footer: { marginTop: spacing.lg - spacing.xs, padding: `0 ${spacing.lg}px ${spacing.lg}px` },
       },
     },

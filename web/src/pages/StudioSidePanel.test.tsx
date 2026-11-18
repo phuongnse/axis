@@ -51,7 +51,7 @@ describe('StudioSidePanel', () => {
     renderPanel()
 
     const body = screen.getByText('Body text').parentElement!
-    expect(body).toHaveStyle({ overflowY: 'auto' })
+    expect(body).toHaveStyle({ overflowY: 'auto', overscrollBehavior: 'contain' })
     expect(body).not.toContainElement(screen.getByRole('heading', { name: 'Problems' }))
     expect(body).not.toContainElement(screen.getByTestId('panel-close'))
   })

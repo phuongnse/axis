@@ -55,7 +55,8 @@ export function StudioSidePanel({
             onClick={onClose}
           />
         </Flex>
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>{children}</div>
+        {/* A scroll area stops at its end, so the page does not scroll, see docs/reference/actions-and-controls.md#scroll-areas. */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>{children}</div>
       </aside>
     </ShellAside>
   )

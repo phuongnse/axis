@@ -77,8 +77,9 @@ their own controls where they expect them.
   end.
 - **Scrolling.** The page keeps the browser's own scroll. The header stays at the top and a compact
   band stays under it. The sidebar's background runs the page's height, while its navigation stays
-  under the header with a scroll of its own. A regular band and the footer scroll with the page. The
-  page declares its colour scheme, so every scrollbar, the page's and the sidebar's, follows the mode.
+  under the header with a scroll of its own. That scroll stops at its end, as
+  [scroll areas](actions-and-controls.md#scroll-areas) say. A regular band and the footer scroll with the
+  page. The page declares its colour scheme, so every scrollbar, the page's and the sidebar's, follows the mode.
 - **Flush page area.** Pages draw on `surface`, flush with the frame, with `spacing-lg` padding. A wide table
   scrolls inside its widget, so the page never scrolls sideways.
 - **Parts a rule apart.** A page's parts sit a `divider` rule apart, and each part's heading is an `h2` drawn at
