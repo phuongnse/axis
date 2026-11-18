@@ -1750,6 +1750,26 @@ describe('StudioPage publishing', () => {
     expect(screen.queryByText(/Goes live as release/)).not.toBeInTheDocument()
   })
 
+  it('reloads the release history when the publish page opens', async () => {
+    const fetchMock = stubPublishing(publisher, [], { folderContentHash: 'hash-3', active: true })
+    renderPage('/studio?app=PurchaseRequests&view=releases')
+    const publish = await screen.findByRole('button', { name: 'Publish…' })
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => input === `${folder}/releases`)).toBe(true))
+
+    const loaded = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input === `${folder}/releases`) {
+        const answer = await (await loaded(input, init)).json()
+        return json({ ...answer, folderContentHash: 'hash-4' })
+      }
+      return loaded(input, init)
+    })
+    await userEvent.click(publish)
+
+    expect(await screen.findByText('Goes live as release 4')).toBeInTheDocument()
+    expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled()
+  })
+
   it('goes back to where Publish… was opened when Cancel is chosen, and sends nothing', async () => {
     const fetchMock = stubPublishing(publisher)
     renderPage('/studio?app=PurchaseRequests&view=releases')

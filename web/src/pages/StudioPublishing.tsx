@@ -169,6 +169,16 @@ export function StudioPublishing({
   const [history, setHistory] = useState<StudioReleases | 'failed'>()
   const [historyRevision, setHistoryRevision] = useState(0)
 
+  // The publish page needs the history as the folder is now, since a file edited on disk or a change
+  // from another session does not reach this page, see studio.md#publishing.
+  const [historyForPublishView, setHistoryForPublishView] = useState(publishView)
+  if (historyForPublishView !== publishView) {
+    setHistoryForPublishView(publishView)
+    if (publishView) {
+      setHistory(undefined)
+    }
+  }
+
   useEffect(() => {
     const controller = new AbortController()
     fetchStudioReleases(application, controller.signal).then(setHistory, (error: unknown) => {
@@ -183,7 +193,7 @@ export function StudioPublishing({
       setHistory('failed')
     })
     return () => controller.abort()
-  }, [application, generation, historyRevision, folderRevision, lost])
+  }, [application, generation, historyRevision, folderRevision, publishView, lost])
 
   const diagnosticsHandler = useRef(onDiagnostics)
   useEffect(() => {
