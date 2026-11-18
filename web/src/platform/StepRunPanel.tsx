@@ -151,6 +151,33 @@ export function StepRunPanel({
     )
   const muted = (text: ReactNode) => <Typography.Text type="secondary">{text}</Typography.Text>
   const notSet = <NotSet />
+  // Proposed, see the review on #3650: what a call called is two facts on one row, as they belong together: the
+  // connector, or the extension package with its version, then the operation, each named by its glossary term, as Azure
+  // Logic Apps names an action's connector and operation. A cell of the timeline keeps them on one line, see `targetOf`.
+  const targetTerms = (call: InstanceCall, state?: ReactNode): Term[] => [
+    call.connector !== undefined && call.connector !== null
+      ? { key: `connector-${call.id}`, term: t('shell.stepRun.connector'), value: call.connector, width: 6 }
+      : {
+          key: `package-${call.id}`,
+          term: t('shell.stepRun.package'),
+          value: `${call.package ?? ''} ${call.version ?? ''}`.trim(),
+          width: 6,
+        },
+    {
+      key: `operation-${call.id}`,
+      term: t('shell.stepRun.operation'),
+      value:
+        state === undefined ? (
+          call.operation
+        ) : (
+          <Flex align="center" gap="small" wrap>
+            {call.operation}
+            {state}
+          </Flex>
+        ),
+      width: 6,
+    },
+  ]
   // A time set ahead, such as a due time, is data, not an event that happened, so it keeps the system's date and time
   // alone and never takes a time ago or ahead, as `EventTime` says.
   const dueTime = (at: string) => formatValue({ name: 'due', type: 'date-time' }, at, {}, { locale, text: t }) as string
@@ -274,20 +301,13 @@ export function StepRunPanel({
         },
       ]),
       ...shown.calls.flatMap((call): Term[] => [
-        {
-          key: `called-${call.id}`,
-          term: t('shell.stepRun.called'),
-          // The state of a step's one call is the step's; a step with several calls says each one's.
-          value:
-            shown.calls.length > 1 ? (
-              <Flex align="center" gap="small" wrap>
-                {targetOf(call)}
-                {stateWords(call.state === 'succeeded' ? 'done' : call.state === 'failed' ? 'failed' : 'running')}
-              </Flex>
-            ) : (
-              targetOf(call)
-            ),
-        },
+        // The state of a step's one call is the step's; a step with several calls says each one's.
+        ...targetTerms(
+          call,
+          shown.calls.length > 1
+            ? stateWords(call.state === 'succeeded' ? 'done' : call.state === 'failed' ? 'failed' : 'running')
+            : undefined,
+        ),
         {
           key: `attempts-${call.id}`,
           term: t('shell.stepRun.attemptCount'),
@@ -343,8 +363,7 @@ export function StepRunPanel({
 
   const hidden = muted(t('shell.stepRun.hidden'))
   // A step with several calls names each call's target first.
-  const calledTerm = (call: InstanceCall): Term[] =>
-    calls.length > 1 ? [{ key: 'called', term: t('shell.stepRun.called'), value: targetOf(call) }] : []
+  const calledTerm = (call: InstanceCall): Term[] => (calls.length > 1 ? targetTerms(call) : [])
   const bodyValue = (body: string | null) =>
     body === null ? muted(t('shell.stepRun.noBody')) : <BodyView label={t('shell.stepRun.body')} text={body} />
 

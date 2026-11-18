@@ -63,7 +63,8 @@ export function useRunWords({
           person: completedName(task),
           outcome: outcomeLabel(step, task.outcome),
         })
-  const targetOf = (call: InstanceCall) => `${call.connector ?? `${call.package}@${call.version}`} · ${call.operation}`
+  // A package's version follows its name after a space, as the step run panel writes it, see `targetTerms`.
+  const targetOf = (call: InstanceCall) => `${call.connector ?? `${call.package} ${call.version}`} · ${call.operation}`
 
   const callSummary = (call: InstanceCall) => {
     const target = targetOf(call)
