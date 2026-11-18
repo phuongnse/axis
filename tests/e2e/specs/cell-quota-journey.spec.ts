@@ -28,6 +28,8 @@ const administrators: Record<string, Page> = {}
 const host = (tenant: string) => `${tenant}.localhost`
 
 test.beforeAll(async () => {
+  // startCell may wait for the publisher lock while the Ask AI agent spec's publisher runs alone, see startPublisher.
+  test.setTimeout(480_000)
   // Offset 4, because the tenant create spec, the terms spec and the read-only spec serve their tenants on offsets 0 to 2
   // and the cell console spec on 3. The server reads the tenant directory every 2 seconds, so a new tenant and a changed
   // quota take effect within a few seconds.

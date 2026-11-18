@@ -62,7 +62,8 @@
 # while the main tenant stays on 127.0.0.1, so one server serves both. The preview tenant has no
 # deployment bindings, and the worker gets only its runtime connection string.
 # The same file creates axis_scenario, a role with CREATEDB that owns no database. Only the publisher gets it, as
-# Scenarios__ServerConnectionString, to run test scenarios, and the server sets Studio__Tests=true.
+# Scenarios__ServerConnectionString, to run test scenarios, and the server sets Studio__Tests=true. Playwright gets it
+# too, as AXIS_E2E_SCENARIO_DATABASE, for the publisher that the Ask AI agent spec starts.
 # A third tenant, journey, is for Studio journeys. This script creates its database axis_journey and its roles
 # axis_journey_schema and axis_journey_runtime through psql, because the init script is shared with Compose. A
 # second server serves it on 127.0.0.2, in the Testing environment, with Studio:ApplicationsPath set to a
@@ -503,9 +504,12 @@ if affected playwright; then
   export AXIS_E2E_IDENTITY_ADMIN_SECRET="$identity_admin_secret"
   # The role spec asks PostgreSQL for the roles in this container.
   export AXIS_E2E_POSTGRES_CONTAINER="$container"
-  # The role that creates the databases of test scenarios. Only the publisher gets it, below, and it connects to
+  # The role that creates the databases of test scenarios. Only the publisher and Playwright get it, below, and it connects to
   # the postgres maintenance database because it owns no database.
   scenario_database="Host=127.0.0.1;Port=$port;Database=postgres;Username=axis_scenario;Password=axis"
+  # The Ask AI agent spec starts a publisher of its own, which runs the scenarios of its request's checks, so Playwright
+  # gets this role too.
+  export AXIS_E2E_SCENARIO_DATABASE="$scenario_database"
 
   # The worker waits until the server, which Playwright starts, has migrated the database. It runs
   # from the built dll, because dotnet run starts a child process that kill would miss.

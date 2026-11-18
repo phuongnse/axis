@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test'
 import { expect, test } from '../test'
 import { sparePort } from '../activate'
-import { runAdmin } from '../admin-tool'
+import { runAdmin, startPublisher } from '../admin-tool'
 import { startAgentHost } from '../agent-host'
 import { csrfHeaders } from '../csrf'
 import { confirmDialog, waitForDialog } from '../dialogs'
@@ -39,6 +39,10 @@ const secondPlan = 'Add a required text field supplier to the Request entity.'
 const newPlan = 'Add a list field supplier to the Request entity, with the suppliers the company buys from.'
 const failingRequest = 'Add a cost centre that refers to a department.'
 const failingPlan = 'Add a CostCentre entity with an owner that refers to the Department entity.'
+// The second application comes from the approvals template, which pins the organization module.
+const approvalsApplication = 'AskAiApprovals'
+const layerRequest = 'Add a cost centre field to the department.'
+const layerPlan = 'Add a text field costCentre to the Department entity of the organization module.'
 const usage = { input_tokens: 1, output_tokens: 1 }
 
 let folder: string
@@ -49,11 +53,17 @@ let colleague: { username: string; password: string; secret: string }
 let server: Awaited<ReturnType<typeof startDirectoryServer>>
 let proxy: Awaited<ReturnType<typeof startTunnelProxy>>
 let browser: Browser
-let agent: { stop(): Promise<void> } | undefined
+let agent: Awaited<ReturnType<typeof startAgentHost>> | undefined
+// The folder of the server's applications, which the spec's own publisher serves too.
+let applications: string
+// The publisher that the layer test runs for its checks, see there.
+let publisher: Awaited<ReturnType<typeof startPublisher>> | undefined
 // A TOTP code cannot be reused within its period, so the author signs in once and the tests share this context.
 let authorContext: BrowserContext
 // The address of the first request, which the later tests open again.
 let firstRequestUrl: string
+// The address of the layer test's ready request. The Accept tests that follow it open it.
+let readyRequestUrl: string
 
 /** Signs `account` in on the tenant's host in `context` and leaves the page on the tenant's home. */
 async function signIn(context: BrowserContext, account: { username: string; password: string; secret: string }) {
@@ -65,9 +75,9 @@ async function signIn(context: BrowserContext, account: { username: string; pass
   return page
 }
 
-/** Sends `text` from the Ask AI panel of the application's Studio and waits until the page of the new request opens. */
-async function askAi(page: Page, text: string) {
-  await page.goto(`https://${host}/studio?app=${application}`)
+/** Sends `text` from the Ask AI panel of the Studio of `app` and waits until the page of the new request opens. */
+async function askAi(page: Page, text: string, app = application) {
+  await page.goto(`https://${host}/studio?app=${app}`)
   await page.getByTestId('studio-ask-ai').click()
   await page.getByRole('textbox', { name: 'Your request', exact: true }).fill(text)
   await page.getByTestId('studio-ask-ai-send').click()
@@ -104,7 +114,7 @@ test.beforeAll(async () => {
   )
 
   // Offset 9, because the other specs that start a server use offsets 0 to 6 and 8, and offset 7 is the port of the control plane.
-  const applications = path.join(folder, 'applications')
+  applications = path.join(folder, 'applications')
   await mkdir(applications)
   server = await startDirectoryServer(9, {
     Studio__AuthorRole: 'author',
@@ -120,6 +130,7 @@ test.beforeAll(async () => {
 })
 
 test.afterAll(async () => {
+  await publisher?.stop()
   await agent?.stop()
   await authorContext?.close()
   proxy?.close()
@@ -312,6 +323,159 @@ test('a request whose compile check fails in every fix round ends Failed, with w
     await expect(written.getByTestId('json-diff-after')).toHaveCount(0)
     await written.getByRole('button', { name: 'Show the diff of CostCentre', exact: true }).click()
     await expect(written.getByTestId('json-diff-after')).toContainText('"CostCentre"')
+  } finally {
+    await page.close()
+  }
+})
+
+// The layer test runs its own publisher, because the check's scenarios run as `test` publish requests, which only a
+// publisher that reads the tenant directory serves. The run's shared publisher reads the configured tenants. That
+// publisher claims the queued `platform.jobs` and publish requests of every directory tenant, whatever their kind. With
+// no cell settings, it would fail a cell spec's `create`, `purge` and `export` jobs, and a cell spec's publisher would
+// claim this request's `test` request and look for the application under its own folder, where it is not. So
+// `startPublisher` holds a lock for each publisher's whole life: this one holds it alone, the cell specs' publishers share
+// it, and each side waits for the other. This publisher runs only from the approval until the request reads Ready.
+test("a request whose work adds a field to a module entity's layer reaches Ready with its checks passed and the layer marked in its diff", async () => {
+  // The scenarios of the module's contract run in the check, and a cell spec's publisher may hold the lock for a while.
+  test.setTimeout(600_000)
+  // The first request's host would plan this request with the wrong answers.
+  await agent?.stop()
+  agent = undefined
+
+  // The module's own Department, with a text field added: the layer holds the difference to it.
+  const department = JSON.parse(
+    await readFile(
+      path.resolve(import.meta.dirname, '..', '..', '..', 'modules', 'organization', 'entities', 'department.json'),
+      'utf8',
+    ),
+  )
+  const layerAnswers = path.join(folder, 'answers-layer.json')
+  await writeFile(
+    layerAnswers,
+    JSON.stringify([
+      {
+        content: [{ type: 'text', text: layerPlan }],
+        stop_reason: 'end_turn',
+        usage,
+      },
+      {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'layer-1',
+            name: 'write_layer',
+            input: {
+              application: approvalsApplication,
+              module: 'organization',
+              id: department.id,
+              content: {
+                ...department,
+                fields: [...department.fields, { name: 'costCentre', type: 'text' }],
+              },
+            },
+          },
+        ],
+        stop_reason: 'tool_use',
+        usage,
+      },
+      {
+        content: [{ type: 'text', text: 'Done.' }],
+        stop_reason: 'end_turn',
+        usage,
+      },
+      {
+        content: [{ type: 'text', text: 'PASSED\nThe draft does the request.' }],
+        stop_reason: 'end_turn',
+        usage,
+      },
+    ]),
+  )
+  agent = await startAgentHost(
+    agentHostSettings({
+      healthUrl: `http://127.0.0.1:${await sparePort()}`,
+      platform: required('AXIS_E2E_DATABASE', 'the PostgreSQL connection string of the runtime role'),
+      secretKey: platformSecretKey,
+      proxyUrl: proxy.url,
+      trustDir,
+      answersFile: layerAnswers,
+    }),
+  )
+
+  const page = await authorContext.newPage()
+  try {
+    // The call runs in a page of the tenant's host, as the first test's does.
+    await page.goto(`https://${host}/`)
+    const made = await page.evaluate(
+      async ({ headers, name, template }) => {
+        const response = await fetch('/api/studio/apps', {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, template }),
+        })
+        return response.status
+      },
+      {
+        headers: csrfHeaders,
+        name: approvalsApplication,
+        template: 'approvals',
+      },
+    )
+    expect(made).toBe(201)
+
+    await askAi(page, layerRequest, approvalsApplication)
+    await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Awaiting approval', { timeout: 120_000 })
+    await expect(page.getByText(layerPlan, { exact: true })).toBeVisible()
+
+    publisher = await startPublisher(
+      {
+        Studio__ApplicationsPath: applications,
+        Studio__AuthorRole: 'author',
+        Scenarios__ServerConnectionString: required(
+          'AXIS_E2E_SCENARIO_DATABASE',
+          'the PostgreSQL connection string of the scenario role',
+        ),
+      },
+      { alone: true },
+    )
+    try {
+      await page.getByRole('button', { name: 'Approve plan', exact: true }).click()
+      try {
+        await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Ready', { timeout: 300_000 })
+      } catch (error) {
+        // The cause is in what the host and the publisher printed and in the request's steps.
+        const steps = await page.evaluate(
+          async (url) => (await fetch(url)).text(),
+          `/api/studio/apps/${approvalsApplication}/authoring-requests/${new URL(page.url()).searchParams.get('request')}`,
+        )
+        await test.info().attach('agent-host-output', {
+          body: agent?.output() ?? '',
+          contentType: 'text/plain',
+        })
+        await test.info().attach('publisher-output', {
+          body: publisher.output(),
+          contentType: 'text/plain',
+        })
+        await test.info().attach('request', { body: steps, contentType: 'application/json' })
+        throw error
+      }
+    } finally {
+      await publisher.stop()
+      publisher = undefined
+    }
+
+    await expect(page.getByTestId('studio-ai-request-checks')).toContainText('Passed')
+    // The diff lists the module's Department once, with the field the layer added marked.
+    const changed = page.getByTestId('studio-changes-file').filter({ hasText: 'Department' })
+    await expect(changed).toHaveCount(1)
+    await expect(
+      changed.getByRole('note', {
+        name: 'costCentre, added by this application',
+        exact: true,
+      }),
+    ).toHaveText('Added')
+
+    // The Accept tests that follow rely on this request, which stays Ready and belongs to the author.
+    readyRequestUrl = page.url()
   } finally {
     await page.close()
   }

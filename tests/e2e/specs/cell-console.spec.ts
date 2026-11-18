@@ -25,6 +25,8 @@ let member: RealmAccount
 let operator: Page
 
 test.beforeAll(async () => {
+  // startCell may wait for the publisher lock while the Ask AI agent spec's publisher runs alone, see startPublisher.
+  test.setTimeout(480_000)
   const created = await runAdmin(['tenant', 'create', tenant, '--host', tenantHost, '--administrator', `first-admin@${tenant}.test`])
   expect(created.status, `${created.stdout}\n${created.stderr}`).toBe(0)
   member = await addRealmAccount(tenant, { email: `member@${tenant}.test` })

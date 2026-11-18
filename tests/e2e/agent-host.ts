@@ -9,9 +9,9 @@ const agentDll = path.resolve(import.meta.dirname, '..', '..', 'src', 'Axis.Agen
  * `Health__Urls` with 200. The host plans the authoring requests that wait in `planning`, see
  * docs/reference/authoring-requests.md#the-agent-host. Build the settings with `agentHostSettings` from
  * scripts/lib/ai-eval-stack.mjs. Throws with the host's output when it exits, or when it is not ready within 60 seconds. `stop`
- * ends it with SIGTERM, and with SIGKILL after 15 seconds.
+ * ends it with SIGTERM, and with SIGKILL after 15 seconds. `output` gives what it printed.
  */
-export async function startAgentHost(settings: Record<string, string>): Promise<{ stop(): Promise<void> }> {
+export async function startAgentHost(settings: Record<string, string>): Promise<{ stop(): Promise<void>; output(): string }> {
   const child = spawn('dotnet', [agentDll], {
     env: { ...process.env, ...settings },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -41,7 +41,7 @@ export async function startAgentHost(settings: Record<string, string>): Promise<
     if (exitCode !== undefined) break
     if (second > 0) await new Promise((resolve) => setTimeout(resolve, 1000))
     if (exitCode !== undefined) break
-    if (await answersReady(url)) return { stop }
+    if (await answersReady(url)) return { stop, output: () => output }
   }
   const reason = exitCode !== undefined ? `The agent host exited with code ${exitCode}.` : 'The agent host never answered /health/ready with 200 within 60 seconds.'
   await stop()
