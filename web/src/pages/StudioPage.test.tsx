@@ -501,6 +501,7 @@ describe('StudioPage', () => {
     await openEntityField(0)
     const name = screen.getByTestId('studio-field-/fields/0/name')
     expect(within(name).getByRole('textbox')).toHaveValue('number')
+    await openEntityField(1)
     expect(within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')).toHaveValue('200')
     const label = screen.getByTestId('studio-field-/label')
     expect(within(label).queryByRole('textbox', { name: 'Text key' })).toBeNull()
@@ -567,6 +568,7 @@ describe('StudioPage', () => {
 
     await waitFor(() => expect(screen.queryByTestId('studio-conflict')).not.toBeInTheDocument())
     expect(reads()).toHaveLength(before + 1)
+    await openEntityField(1)
     expect(within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')).toHaveValue('200')
   })
 

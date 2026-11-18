@@ -15,7 +15,13 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { loadKindSchema } from '../platform/studioSchemas'
 import { chooseOption, selectRoot } from '../test/antd'
-import { addEntityField, entityFieldAction, entityFieldMenuItem, openEntityField } from '../test/entityFields'
+import {
+  addEntityField,
+  entityFieldAction,
+  entityFieldMenuItem,
+  entityFieldNames,
+  openEntityField,
+} from '../test/entityFields'
 import { editJson, jsonText, jsonView } from '../test/jsonView'
 import { buildProcessGraph } from './processGraph'
 import { StudioEditor } from './StudioEditor'
@@ -2290,9 +2296,7 @@ describe('StudioEditor for an entity', () => {
 
     await waitFor(() => expect(screen.queryByTestId('studio-migration-question')).not.toBeInTheDocument())
     expect(requests(fetchMock, 'PATCH') + requests(fetchMock, 'POST')).toBe(0)
-    expect(
-      screen.getAllByRole('textbox', { name: 'Field name' }).map((box) => (box as HTMLInputElement).value),
-    ).toEqual(['total', 'code', 'note'])
+    expect(entityFieldNames()).toEqual(['total', 'code', 'note'])
     expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
   })
 
@@ -2301,6 +2305,7 @@ describe('StudioEditor for an entity', () => {
     renderResource(designedItem)
 
     await addEntityField()
+    await openEntityField(3)
     await userEvent.type(within(screen.getByTestId('studio-field-/fields/3/name')).getByRole('textbox'), 'ab')
     await userEvent.clear(within(screen.getByTestId('studio-field-/fields/3/name')).getByRole('textbox'))
     await userEvent.type(within(screen.getByTestId('studio-field-/fields/3/name')).getByRole('textbox'), 'memo')
