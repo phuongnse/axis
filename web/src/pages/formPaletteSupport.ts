@@ -1,3 +1,4 @@
+import { fillText } from '../platform/fillText'
 import {
   dropPlace,
   moveField,
@@ -11,11 +12,13 @@ import {
 } from '../platform/formLayout'
 import type { ChangeHandler } from './SchemaForm'
 
-/** The name of the section at `index` for the outline and the live region: its `name`, or `Section N` without one. */
+/** The name of the section at `index` for the outline and the live region: its `name`, or the numbered section text without one. */
 export function sectionLabel(t: (key: string) => string, draft: Record<string, unknown>, index: number): string {
   const section = Array.isArray(draft.sections) ? (draft.sections[index] as unknown) : undefined
   const name = typeof section === 'object' && section !== null ? (section as { name?: unknown }).name : undefined
-  return typeof name === 'string' && name !== '' ? name : `${t('shell.studio.design.section')} ${index + 1}`
+  return typeof name === 'string' && name !== ''
+    ? name
+    : fillText(t('shell.studio.design.section'), { number: index + 1 })
 }
 
 /**
@@ -41,7 +44,11 @@ export function insertField(
   onChange(`/sections/${place.section}/fields`, [...fields.slice(0, index), { field: name }, ...fields.slice(index)])
   onSelect(`/sections/${place.section}/fields/${index}`)
   onAnnounce(
-    `${t('shell.studio.palette.inserted')} ${name}, ${sectionLabel(t, draft, place.section)}, ${t('shell.studio.palette.position')} ${index + 1}`,
+    fillText(t('shell.studio.palette.inserted'), {
+      name,
+      place: sectionLabel(t, draft, place.section),
+      position: index + 1,
+    }),
   )
 }
 
@@ -68,7 +75,11 @@ export function moveFieldTo(
   onChange('/sections', result.sections)
   onSelect(`/sections/${section}/fields/${index}`)
   onAnnounce(
-    `${t('shell.studio.palette.moved')} ${name}, ${sectionLabel(t, draft, section)}, ${t('shell.studio.palette.position')} ${index + 1}`,
+    fillText(t('shell.studio.palette.moved'), {
+      name,
+      place: sectionLabel(t, draft, section),
+      position: index + 1,
+    }),
   )
 }
 
@@ -101,7 +112,7 @@ export function removeField(
     fields.filter((_, index) => index !== place.index),
   )
   onSelect(`/sections/${place.section}`)
-  onAnnounce(`${t('shell.studio.design.removed')} ${name}, ${sectionLabel(t, draft, place.section)}`)
+  onAnnounce(fillText(t('shell.studio.design.removedFrom'), { name, place: sectionLabel(t, draft, place.section) }))
 }
 
 /**
@@ -127,15 +138,19 @@ export function moveSectionTo(
   const textKey = (step?.title as { textKey?: unknown } | undefined)?.textKey
   const named = step === undefined || !Array.isArray(step.sections) ? [] : (step.sections as unknown[])
   const position = step === undefined ? result.index : named.findIndex((name) => name === label)
-  const where =
-    to.step === null ? '' : `, ${typeof textKey === 'string' && textKey !== '' ? t(textKey) : `/steps/${to.step}`}`
   onChange('/sections', result.sections)
   if (result.steps !== undefined) {
     onChange('/steps', result.steps)
   }
   onSelect(`/sections/${result.index}`)
   onAnnounce(
-    `${t('shell.studio.palette.moved')} ${label}${where}, ${t('shell.studio.palette.position')} ${position + 1}`,
+    to.step === null
+      ? fillText(t('shell.studio.palette.movedTo'), { name: label, position: position + 1 })
+      : fillText(t('shell.studio.palette.moved'), {
+          name: label,
+          place: typeof textKey === 'string' && textKey !== '' ? t(textKey) : `/steps/${to.step}`,
+          position: position + 1,
+        }),
   )
 }
 
@@ -158,7 +173,7 @@ export function removeSectionAt(
     onChange('/steps', result.steps)
   }
   onSelect(result.step === undefined ? null : `/steps/${result.step}`)
-  onAnnounce(`${t('shell.studio.design.removed')} ${label}`)
+  onAnnounce(fillText(t('shell.studio.design.removed'), { name: label }))
 }
 
 /** Removes a step, keeps its sections, selects nothing and says which step left. */
@@ -179,7 +194,9 @@ export function removeStepAt(
   onChange('/steps', result.steps)
   onSelect(null)
   onAnnounce(
-    `${t('shell.studio.design.removed')} ${typeof textKey === 'string' && textKey !== '' ? t(textKey) : `/steps/${index}`}`,
+    fillText(t('shell.studio.design.removed'), {
+      name: typeof textKey === 'string' && textKey !== '' ? t(textKey) : `/steps/${index}`,
+    }),
   )
 }
 

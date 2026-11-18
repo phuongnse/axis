@@ -2,6 +2,7 @@ import { useDndContext, useDroppable } from '@dnd-kit/core'
 import { Flex, Segmented, Tag } from 'antd'
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useLocation } from 'react-router'
+import { fillText } from '../platform/fillText'
 import { FormCanvasContext, type FormCanvas } from '../platform/formCanvas'
 import { FormWidget } from '../platform/FormWidget'
 import { getAt } from '../platform/jsonPatch'
@@ -320,7 +321,7 @@ function StepSwitchEntry({
       onClick={onClick}
       style={{ outline: isOver ? `2px solid ${colour.primary}` : undefined, borderRadius: radius.base }}
     >
-      {step.marked ? `${t(step.titleKey)}, ${t('shell.studio.design.hasDiagnostics')}` : t(step.titleKey)}
+      {step.marked ? fillText(t('shell.studio.design.hasDiagnostics'), { name: t(step.titleKey) }) : t(step.titleKey)}
     </span>
   )
 }
@@ -328,7 +329,7 @@ function StepSwitchEntry({
 /**
  * A section or a field of the canvas. It has a border in the error colour when a diagnostic names it, and
  * `data-marked` then. One with a path is a Tab stop that Enter or Space selects. The selected one has an outline in the
- * primary colour and `aria-current`. Its name is its title or field name, and "has diagnostics" when marked. It shows a mark for each
+ * primary colour and `aria-current`. Its name is its title or field name, and "has problems" when marked. It shows a mark for each
  * condition the draft has on it.
  */
 function FormElementFrame({
@@ -370,7 +371,7 @@ function FormElementFrame({
       data-form-frame=""
       data-path={path}
       data-marked={marked ? 'true' : undefined}
-      aria-label={marked ? `${name}, ${t('shell.studio.design.hasDiagnostics')}` : name}
+      aria-label={marked ? fillText(t('shell.studio.design.hasDiagnostics'), { name }) : name}
       aria-current={selected ? 'true' : undefined}
       tabIndex={path === undefined ? undefined : 0}
       onKeyDown={(event) => {
@@ -392,7 +393,7 @@ function FormElementFrame({
     >
       {texts.map(({ key, text }) => (
         <Tag key={key} data-testid="studio-condition-mark" data-condition={key}>
-          {`${t(`shell.studio.design.${key}`)}: ${text}`}
+          {fillText(t('shell.studio.design.conditionMark'), { condition: t(`shell.studio.design.${key}`), text })}
         </Tag>
       ))}
       {children}

@@ -78,7 +78,7 @@ describe.each(['light', 'dark'])('FormSteps in %s mode', (mode) => {
       expect(card).toBeVisible()
       expect(within(card).getByRole('button', { name: 'Move up' })).toBeVisible()
       expect(within(card).getByRole('button', { name: 'Move down' })).toBeVisible()
-      expect(within(card).getByRole('button', { name: 'Remove' })).toBeVisible()
+      expect(within(card).getByRole('button', { name: 'Delete step' })).toBeVisible()
     }
     expect(screen.getByRole('button', { name: 'Add step' })).toBeVisible()
   })
@@ -152,14 +152,18 @@ describe('FormSteps', () => {
 
   it('removes one step by its place and removes the steps when the last one goes', async () => {
     const onChange = renderSteps(steps)
-    await userEvent.click(within(screen.getByTestId('studio-field-/steps/1')).getByRole('button', { name: 'Remove' }))
+    await userEvent.click(
+      within(screen.getByTestId('studio-field-/steps/1')).getByRole('button', { name: 'Delete step' }),
+    )
     expect(onChange).toHaveBeenLastCalledWith('/steps/1', undefined)
   })
 
   it('removes /steps when the only step is removed', async () => {
     const onChange = renderSteps([steps[0]])
 
-    await userEvent.click(within(screen.getByTestId('studio-field-/steps/0')).getByRole('button', { name: 'Remove' }))
+    await userEvent.click(
+      within(screen.getByTestId('studio-field-/steps/0')).getByRole('button', { name: 'Delete step' }),
+    )
 
     expect(onChange).toHaveBeenLastCalledWith('/steps', undefined)
   })

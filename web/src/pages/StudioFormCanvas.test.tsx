@@ -347,19 +347,16 @@ describe('the Design tab of a form', () => {
 
     const canvas = await openDesign()
     const steps = await screen.findByTestId('studio-form-steps', {}, slow)
-    await waitFor(
-      () => expect(within(steps).getByText(/Describe the problem, has diagnostics/)).toBeInTheDocument(),
-      slow,
-    )
+    await waitFor(() => expect(within(steps).getByText(/Describe the problem, has problems/)).toBeInTheDocument(), slow)
     expect(within(steps).getByText(/Describe the problem/)).toHaveAttribute('data-marked', 'true')
     expect(within(steps).getByText('Add details')).not.toHaveAttribute('data-marked')
 
     await userEvent.click(within(steps).getByText('Add details'))
-    const field = await within(canvas).findByRole('group', { name: 'resolution, has diagnostics' }, slow)
+    const field = await within(canvas).findByRole('group', { name: 'resolution, has problems' }, slow)
     expect(field).toHaveAttribute('data-marked', 'true')
     expect(field).toHaveAttribute('data-path', '/sections/1/fields/1')
     expect(within(canvas).getByRole('group', { name: 'status' })).not.toHaveAttribute('data-marked')
-    expect(within(canvas).getByRole('group', { name: 'The details, has diagnostics' })).toHaveAttribute(
+    expect(within(canvas).getByRole('group', { name: 'The details, has problems' })).toHaveAttribute(
       'data-marked',
       'true',
     )
@@ -372,7 +369,7 @@ describe('the Design tab of a form', () => {
     await openDesign()
 
     expect(await screen.findByTestId('studio-canvas-cannot-draw', {}, slow)).toHaveTextContent(
-      'The form cannot be drawn until its errors are fixed.',
+      'The form cannot show until its errors are fixed.',
     )
     expect(screen.queryByTestId('studio-form-steps')).not.toBeInTheDocument()
   })
@@ -559,7 +556,7 @@ describe('the Design tab of a form', () => {
     const checkbox = within(screen.getByTestId('studio-design-panel')).getByRole('checkbox', { name: 'Read-only' })
     expect(checkbox).toBeChecked()
     expect(checkbox).toBeDisabled()
-    expect(screen.getByTestId('studio-design-panel')).toHaveTextContent('The server sets this field')
+    expect(screen.getByTestId('studio-design-panel')).toHaveTextContent('Axis fills this field')
   })
 
   it('selects a step in the switch, shows its title and shows its sections', async () => {

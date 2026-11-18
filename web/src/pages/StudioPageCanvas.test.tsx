@@ -389,14 +389,14 @@ describe('the Design tab of a page', () => {
     await openTab('Design')
     const canvas = await screen.findByTestId('studio-page-canvas', {}, slow)
     await within(canvas).findByTestId('chart-widget', {}, slow)
-    const marked = within(canvas).getByRole('group', { name: /has diagnostics$/ })
+    const marked = within(canvas).getByRole('group', { name: /has problems$/ })
     expect(marked).toHaveAttribute('data-path', '/widgets/1')
     expect(marked).toHaveAttribute('data-marked', 'true')
     const unmarked = within(canvas)
       .getAllByTestId('studio-canvas-widget')
       .find((frame) => frame.getAttribute('data-path') === '/widgets/0')!
     expect(unmarked).not.toHaveAttribute('data-marked')
-    expect(unmarked).not.toHaveAccessibleName(/has diagnostics/)
+    expect(unmarked).not.toHaveAccessibleName(/has problems/)
   })
 
   it('lists the diagnostics of a placeholder and marks it, and still draws the rest of the page', async () => {
@@ -416,7 +416,7 @@ describe('the Design tab of a page', () => {
     expect(within(box).getByTestId('studio-canvas-placeholder-diagnostic')).toHaveTextContent(
       "UnknownWidgetDataSource: The data source 'MissingSource' was not found. No loaded data source has that name.",
     )
-    expect(within(canvas).getByRole('group', { name: /has diagnostics$/ })).toContainElement(box)
+    expect(within(canvas).getByRole('group', { name: /has problems$/ })).toContainElement(box)
     expect(within(canvas).getByTestId('kpi-tile')).toBeInTheDocument()
   })
 
@@ -680,14 +680,14 @@ describe('the Design tab of a page', () => {
         await userEvent.type(title.getByRole('textbox', { name: 'English' }), 'Requests')
         await act(() => vi.advanceTimersByTimeAsync(300))
         await waitFor(() => expect(canvas).toHaveAttribute('aria-busy', 'false'))
-        expect(within(canvas).getByRole('group', { name: /has diagnostics$/ })).toHaveAttribute('data-marked', 'true')
+        expect(within(canvas).getByRole('group', { name: /has problems$/ })).toHaveAttribute('data-marked', 'true')
 
         // Save holds at the text write. The draft is unchanged, so nothing posts and the stale drawing stays.
         await userEvent.click(screen.getByRole('button', { name: 'Save' }))
         const before = posts.length
         await act(() => vi.advanceTimersByTimeAsync(1000))
         expect(posts).toHaveLength(before)
-        expect(within(canvas).getByRole('group', { name: /has diagnostics$/ })).toHaveAttribute('data-marked', 'true')
+        expect(within(canvas).getByRole('group', { name: /has problems$/ })).toHaveAttribute('data-marked', 'true')
 
         // The text lands, then the patch changes the saved version: the canvas posts again and is busy until it draws.
         holdAnswers = true
@@ -700,7 +700,7 @@ describe('the Design tab of a page', () => {
 
         heldAnswers.shift()!()
         await waitFor(() => expect(canvas).toHaveAttribute('aria-busy', 'false'))
-        expect(within(canvas).queryByRole('group', { name: /has diagnostics$/ })).not.toBeInTheDocument()
+        expect(within(canvas).queryByRole('group', { name: /has problems$/ })).not.toBeInTheDocument()
       } finally {
         vi.useRealTimers()
       }
@@ -1326,7 +1326,7 @@ describe('the Design tab of a page', () => {
 
       await waitFor(() => expect(posts.at(-1)!.widgets).toEqual([{ type: 'chart' }, section([{ type: 'kpi' }])]), slow)
       expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/0')).toHaveAttribute('aria-current', 'true')
-      expect(announcement).toHaveTextContent('Moved kpi, Page › section 2, position 1')
+      expect(announcement).toHaveTextContent('Moved kpi to Page › section 2, position 1')
     })
 
     it('moves a widget before another on its upper half', async () => {
@@ -1363,14 +1363,14 @@ describe('the Design tab of a page', () => {
 
       await waitFor(() => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['chart', 'kpi']), slow)
       expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
-      expect(announcement).toHaveTextContent('Moved kpi, Page, position 2')
+      expect(announcement).toHaveTextContent('Moved kpi to Page, position 2')
       await waitFor(() => expect(frame('/widgets/1')).toHaveFocus(), slow)
 
       await userEvent.keyboard('{Alt>}{ArrowUp}{/Alt}')
 
       await waitFor(() => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['kpi', 'chart']), slow)
       expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
-      expect(announcement).toHaveTextContent('Moved kpi, Page, position 1')
+      expect(announcement).toHaveTextContent('Moved kpi to Page, position 1')
       await waitFor(() => expect(frame('/widgets/0')).toHaveFocus(), slow)
     })
 

@@ -453,7 +453,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
 
     await expect(
       page.getByTestId("studio-form-palette-announcement"),
-    ).toContainText("Inserted resolution");
+    ).toContainText("Inserted resolution in triage, position 4.");
     await expect(
       page.getByTestId("studio-form-palette-resolution"),
     ).toHaveCount(0);
@@ -490,7 +490,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     );
     await expect(
       page.getByTestId("studio-form-palette-announcement"),
-    ).toContainText("Moved number, triage, position 1");
+    ).toContainText("Moved number to triage, position 1.");
 
     const fieldsOf = async () => {
       await page.getByRole("tab", { name: "JSON", exact: true }).click();
@@ -544,7 +544,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
 
     await expect(
       page.getByTestId("studio-form-palette-announcement"),
-    ).toContainText("Moved problem");
+    ).toContainText(/^Moved problem to .+, position 2\.$/);
 
     const layout = async () => {
       await page.getByRole("tab", { name: "JSON", exact: true }).click();
@@ -595,8 +595,9 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       );
 
       const announcement = page.getByTestId("studio-form-palette-announcement");
-      await expect(announcement).toContainText("Moved details");
-      await expect(announcement).toContainText("position 2");
+      await expect(announcement).toContainText(
+        /^Moved details to .+, position 2\.$/,
+      );
       await expect(details).toHaveAttribute("aria-current", "true");
 
       await page
@@ -605,13 +606,13 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       await page.keyboard.press("Enter");
       await page.getByTestId("studio-design-remove-step").focus();
       await page.keyboard.press("Enter");
-      await expect(announcement).toContainText("Removed");
+      await expect(announcement).toContainText(/^Removed .+\.$/);
 
       await details.focus();
       await page.keyboard.press("Enter");
       await page.getByTestId("studio-design-remove-section").focus();
       await page.keyboard.press("Enter");
-      await expect(announcement).toContainText("Removed details");
+      await expect(announcement).toContainText("Removed details.");
       await expect(
         page.getByTestId("studio-form-palette-category"),
       ).toBeVisible();
@@ -695,7 +696,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
 
     await expect(
       page.getByTestId("studio-form-palette-announcement"),
-    ).toContainText("Moved status, triage, position 1");
+    ).toContainText("Moved status to triage, position 1.");
 
     await page.getByRole("tab", { name: "JSON", exact: true }).click();
     const json = page.getByRole("textbox", { name: "JSON", exact: true });
@@ -731,7 +732,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     ).toBeVisible();
     await expect(
       page.getByTestId("studio-form-palette-announcement"),
-    ).toContainText("Removed priority, triage");
+    ).toContainText("Removed priority from triage.");
     await expect(
       page.locator(
         '[data-testid="studio-outline-section"][data-path="/sections/1"]',

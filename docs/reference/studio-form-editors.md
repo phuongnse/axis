@@ -55,4 +55,4 @@ not offered. Removing the last step removes `steps`, and the form goes back to o
 fields that the form lists, because a condition reads only those. A `steps` value that is not a list is left to
 the JSON view.
 
-- **Delete step.** _(planned for M35)_ Each step card has a Delete step button, which removes that step.
+- **Delete step.** Each step card has a Delete step button, which removes that step.
