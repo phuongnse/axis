@@ -273,6 +273,19 @@ export async function prepareAuthoringRealm({ admin, realm, redirectUris, roles,
   await admin('POST', `${agentPath}/protocol-mappers/models`, rolesMapper(), 201)
   const platformRoles = await admin('GET', `${client.path}/roles`, undefined, 200)
   await admin('POST', `${agentPath}/scope-mappings/clients/${client.id}`, JSON.parse(platformRoles.body), 204)
+  return addAuthoringAccount({ admin, realm, roles, username })
+}
+
+/**
+ * Adds one more account to a realm that prepareAuthoringRealm prepared: `username` gets the client roles `roles` of the
+ * realm's `axis` client, a password and an authenticator of its own.
+ * @param {{ admin: (method: string, path: string, body?: unknown, ...statuses: number[]) => Promise<{ status: number, headers: object, setCookie: string[], body: string }>, realm: string, roles: string[], username: string }} options
+ * @returns {Promise<{ username: string, password: string, secret: string }>} The password, and the Base32 secret of the authenticator.
+ */
+export async function addAuthoringAccount({ admin, realm, roles, username }) {
+  const listed = await admin('GET', `/admin/realms/${realm}/clients?clientId=axis`, undefined, 200)
+  const { id } = JSON.parse(listed.body)[0]
+  const client = { id, path: `/admin/realms/${realm}/clients/${id}` }
   const password = secret()
   const otp = newOtpSecret()
   await addAccount({

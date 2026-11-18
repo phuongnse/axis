@@ -220,10 +220,15 @@ server starts on offset 9, from the directory, with Ask AI on through the script
 certificate for `*.eval.localhost` with an authority of its own, not the run's `*.localhost` certificate, because
 OpenSSL in the agent host refuses a wildcard with one label after it. A CONNECT proxy opens the tunnel from
 `ask-ai-agent.eval.localhost:443` to the server's https port, so the agent host calls the tenant's `/mcp` at its own
-address. The agent host is `Axis.Agent` in `Testing`, with `tests/e2e/agent-host.ts` and the scripted answer of a plan
-with no questions. The spec starts the agent host only after the request's page shows Planning, because a running host
-could plan the request before the page's first read. The page then shows Awaiting approval. The spec stops the agent host,
-the proxy, its browser and its server when the test ends.
+address. The agent host is `Axis.Agent` in `Testing`, with `tests/e2e/agent-host.ts` and the scripted answers of a plan
+per request: the first request's plan, a second request's plan and its new plan. A second author of the tenant, `colleague`,
+has the author role too. The spec starts the agent host only after the request's page shows Planning, because a running
+host could plan the request before the page's first read. The page then shows Awaiting approval with the plan. The
+colleague opens that request and sees the plan with no actions. The author asks for another plan with a comment on the
+second request, sees the new plan and drops it. The spec stops the agent host before the author approves the first
+request, because a running host would carry it past Working, and the page then shows Working. The author signs in once,
+because a code cannot be used twice within its period. The spec stops the proxy, its browser and its server when the
+test ends.
 
 **The cell console spec** starts a server of its own in `Testing`, on the next port offset, with the
 `Cell:*` settings of a cell, `Cell:ConsoleHost` set to `console.localhost` and the secret of the

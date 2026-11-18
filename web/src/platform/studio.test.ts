@@ -6,6 +6,7 @@ import { QuotaRefusedError } from './quota'
 import {
   changeRows,
   checkStudioExpression,
+  fetchAuthoringRequestDiff,
   fetchStudioExpressionScope,
   fetchStudioLiveDiff,
   fetchStudioPolicyMatrix,
@@ -132,6 +133,28 @@ describe('fetchStudioLiveDiff', () => {
 
     expect(await fetchStudioLiveDiff('PurchaseRequests')).toBeNull()
     await expect(fetchStudioLiveDiff('PurchaseRequests')).rejects.toBeInstanceOf(Error)
+  })
+})
+
+describe('fetchAuthoringRequestDiff', () => {
+  it('loads a page with its cursor, answers null for a 404 and throws on a 500', async () => {
+    const page = { start: 'a', tip: 'b', resources: [], cursor: 'next page' }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(json(page))
+      .mockResolvedValueOnce(json({ ...page, cursor: null }))
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await fetchAuthoringRequestDiff('Purchase Requests', 'r1')).toEqual(page)
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/studio/apps/Purchase%20Requests/authoring-requests/r1/diff')
+    await fetchAuthoringRequestDiff('Purchase Requests', 'r1', 'next page')
+    expect(String(fetchMock.mock.calls[1][0])).toBe(
+      '/api/studio/apps/Purchase%20Requests/authoring-requests/r1/diff?cursor=next%20page',
+    )
+    expect(await fetchAuthoringRequestDiff('Purchase Requests', 'gone')).toBeNull()
+    await expect(fetchAuthoringRequestDiff('Purchase Requests', 'r1')).rejects.toBeInstanceOf(Error)
   })
 })
 
