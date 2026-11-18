@@ -1,5 +1,6 @@
 import { Button, Card, Flex, Select, Typography } from 'antd'
 import { useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { unusedStepName } from '../platform/formLayout'
@@ -39,7 +40,8 @@ function sectionNames(sections: unknown): string[] {
  * The `steps` of a form as cards: a title, the sections the step shows, and buttons to move or delete it. The section
  * picker lists the named sections of the form, so the author picks names and does not type them. Removing the last step
  * removes `steps`, which turns the form back into one page. The cards sit in a part headed with the steps' title and
- * help, and edit the draft through `onChange`. A `steps` that is not a list is left to the JSON view.
+ * help, and edit the draft through `onChange`. A `steps` that is not a list is left to the JSON view. Its Add step sits on
+ * the right of the part's heading, see docs/reference/studio-resource-form.md#sections.
  */
 export function FormSteps({
   steps,
@@ -88,7 +90,15 @@ export function FormSteps({
   }
 
   return (
-    <SectionPart testName="steps" heading={heading}>
+    <SectionPart
+      testName="steps"
+      heading={heading}
+      action={
+        <AxisButton role="secondary" onClick={add}>
+          {t('shell.studio.formSteps.addStep')}
+        </AxisButton>
+      }
+    >
       <div data-testid="studio-field-/steps">
         <Flex vertical gap="small">
           {list.map((step, index) => {
@@ -134,10 +144,6 @@ export function FormSteps({
               </Card>
             )
           })}
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={add}>{t('shell.studio.formSteps.addStep')}</Button>
-          </div>
         </Flex>
       </div>
     </SectionPart>

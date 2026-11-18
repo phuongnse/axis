@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ConfigProvider } from 'antd'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -45,19 +46,21 @@ function ThemeRoot({ children }: { children: ReactNode }) {
   return <div data-theme-mode={useThemeMode().mode}>{children}</div>
 }
 
-function renderSteps(value: unknown, onChange = vi.fn(), available: unknown = sections) {
+function renderSteps(value: unknown, onChange = vi.fn(), available: unknown = sections, readOnly = false) {
   render(
-    <ThemeModeProvider>
-      <ThemeRoot>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioNamesContext.Provider value={names}>
-            <LabelTextsContext.Provider value={labelContext}>
-              <FormSteps steps={value} sections={available} onChange={onChange} />
-            </LabelTextsContext.Provider>
-          </StudioNamesContext.Provider>
-        </TextProvider>
-      </ThemeRoot>
-    </ThemeModeProvider>,
+    <ConfigProvider componentDisabled={readOnly}>
+      <ThemeModeProvider>
+        <ThemeRoot>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioNamesContext.Provider value={names}>
+              <LabelTextsContext.Provider value={labelContext}>
+                <FormSteps steps={value} sections={available} onChange={onChange} />
+              </LabelTextsContext.Provider>
+            </StudioNamesContext.Provider>
+          </TextProvider>
+        </ThemeRoot>
+      </ThemeModeProvider>
+    </ConfigProvider>,
   )
   return onChange
 }
@@ -85,6 +88,25 @@ describe.each(['light', 'dark'])('FormSteps in %s mode', (mode) => {
 })
 
 describe('FormSteps', () => {
+  it('puts Add step on the right of the heading and nowhere else in the part', () => {
+    renderSteps(steps)
+
+    const part = screen.getByTestId('studio-section-steps')
+    const body = screen.getByTestId('studio-field-/steps')
+    expect(within(part).getAllByRole('button', { name: 'Add step' })).toHaveLength(1)
+    expect(within(body).queryByRole('button', { name: 'Add step' })).toBeNull()
+    expect(
+      within(part).getByRole('button', { name: 'Add step' }).compareDocumentPosition(body) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('keeps Add step off when the editor is read-only', () => {
+    renderSteps(steps, vi.fn(), sections, true)
+
+    expect(screen.getByRole('button', { name: 'Add step' })).toBeDisabled()
+  })
+
   it('adds the first step by creating the steps', async () => {
     const onChange = renderSteps(undefined)
 

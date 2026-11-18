@@ -1,4 +1,5 @@
 import { Button, Flex, Typography } from 'antd'
+import { AxisButton } from '../platform/AxisButton'
 import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { ReferencePicker } from './ReferencePicker'
@@ -7,7 +8,8 @@ import type { ChangeHandler } from './SchemaForm'
 /**
  * The `signIn` list of a site: rows that each pick one of the application's identity providers by name, in a part
  * headed with the list's title and help. Removing the last row removes the key, and the form then says that the site
- * allows every provider.
+ * allows every provider. Its Add provider sits on the right of the part's heading, see
+ * docs/reference/studio-resource-form.md#sections.
  */
 export function SiteSignIn({
   providers,
@@ -25,6 +27,11 @@ export function SiteSignIn({
     <SectionPart
       testName="signIn"
       heading={{ title: t('shell.studio.site.signIn'), line: t('shell.studio.site.signIn.help') }}
+      action={
+        <AxisButton role="secondary" onClick={() => onChange('/signIn', [...entries, ''])}>
+          {t('shell.studio.site.addProvider')}
+        </AxisButton>
+      }
     >
       <div data-testid="studio-field-/signIn">
         <Flex vertical gap="small">
@@ -48,10 +55,6 @@ export function SiteSignIn({
               </Button>
             </Flex>
           ))}
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange('/signIn', [...entries, ''])}>{t('shell.studio.site.addProvider')}</Button>
-          </div>
           {entries.length === 0 && (
             <Typography.Text type="secondary" data-testid="studio-sign-in-all">
               {t('shell.studio.site.allProvidersHint')}

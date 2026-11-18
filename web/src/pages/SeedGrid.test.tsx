@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ConfigProvider } from 'antd'
 import { useState, type ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -46,23 +47,25 @@ const columns = fields.filter(
 /** The ids of the records as last saved. */
 const savedIds = records.map((record) => record.id)
 
-function renderGrid(onChange = vi.fn(), data: unknown = records) {
+function renderGrid(onChange = vi.fn(), data: unknown = records, readOnly = false) {
   render(
-    <MemoryRouter>
-      <ThemeModeProvider>
-        <ThemeRoot>
-          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-            <SeedGrid
-              fields={fields}
-              records={data}
-              savedIds={savedIds}
-              problems={seedProblems(data, columns)}
-              onChange={onChange}
-            />
-          </TextProvider>
-        </ThemeRoot>
-      </ThemeModeProvider>
-    </MemoryRouter>,
+    <ConfigProvider componentDisabled={readOnly}>
+      <MemoryRouter>
+        <ThemeModeProvider>
+          <ThemeRoot>
+            <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+              <SeedGrid
+                fields={fields}
+                records={data}
+                savedIds={savedIds}
+                problems={seedProblems(data, columns)}
+                onChange={onChange}
+              />
+            </TextProvider>
+          </ThemeRoot>
+        </ThemeModeProvider>
+      </MemoryRouter>
+    </ConfigProvider>,
   )
   return onChange
 }
@@ -188,6 +191,25 @@ describe('SeedGrid', () => {
 
     await userEvent.click(within(screen.getAllByTestId('studio-seed-row')[1]).getByRole('button', { name: 'Delete' }))
     expect(onChange).toHaveBeenLastCalledWith('/records/1', undefined)
+  })
+
+  it('puts Add record on the right of the heading and nowhere else in the part', () => {
+    renderGrid()
+
+    const part = screen.getByTestId('studio-section-records')
+    const body = screen.getByTestId('studio-field-/records')
+    expect(within(part).getAllByRole('button', { name: 'Add record' })).toHaveLength(1)
+    expect(within(body).queryByRole('button', { name: 'Add record' })).toBeNull()
+    expect(
+      within(part).getByRole('button', { name: 'Add record' }).compareDocumentPosition(body) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('keeps Add record off when the editor is read-only', () => {
+    renderGrid(vi.fn(), records, true)
+
+    expect(screen.getByRole('button', { name: 'Add record' })).toBeDisabled()
   })
 
   describe('filter', () => {

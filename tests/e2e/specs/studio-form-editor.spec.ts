@@ -95,7 +95,7 @@ test.describe("Studio edits form conditions and steps", () => {
       .fill("request");
     await doneListItem(page);
 
-    const steps = page.getByTestId("studio-field-/steps");
+    const steps = page.getByTestId("studio-section-steps");
     await steps.getByRole("button", { name: "Add step", exact: true }).click();
     await fillTexts(page, "studio-field-/steps/0/title", "Request", "Yêu cầu");
     await pickOptions(
