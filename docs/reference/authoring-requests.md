@@ -147,8 +147,10 @@ an accept, which [accepting](#accepting) describes.
   [D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
 - **Retrying a conflict as the author** _(planned for M35)_. Only the author of the request (`403` to anyone else)
   retries it. The route answers `409` unless the request is `ready` and its latest accept failed with `AXC0377`. It
-  clears the draft and moves the request to `working`, as the agent's retry does, see
-  [retrying a conflict](#accepting). It answers the request as it now is.
+  clears the draft, sets `round` back to 0 and moves the request to `working`. `Ai:RequestTimeout` counts from the
+  retry, and the token budget goes on, as requesting changes does above. Without that restart, the time limit of a
+  request that waited a long time for its author would stop it as `timedOut` before its next step. The agent's own
+  retry keeps its round and its time limit, see [retrying a conflict](#accepting). It answers the request as it now is.
 - **The request diff** _(planned for M35)_. Any author reads the changes of the request. A `ready` or `failed` request
   answers the changes of its draft, in the shape and the pages of the [draft diff](authoring-revisions.md#draft-diff).
   Once `accepted`, it answers the changes of the revision its accept made, as the
