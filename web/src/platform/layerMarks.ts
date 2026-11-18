@@ -139,3 +139,31 @@ export function markName(text: (key: string) => string, mark: LayerMark, name: s
   const key = mark === 'added' ? 'shell.studio.contract.addedName' : `shell.studio.module.${mark}Name`
   return fillText(text(key), { name })
 }
+
+/**
+ * The keyed lists and the maps of a resource of `kind`, read from `content` for a form, which keys its fields by section.
+ * It is the one mapping from a kind to its lists, so the module editor and a request's diff mark the same elements. A kind
+ * with no keyed list has none.
+ */
+export function keyedListsOf(kind: string, content: unknown): { keyedLists: KeyedLists; maps: readonly string[] } {
+  switch (kind) {
+    case 'entity':
+      return { keyedLists: entityKeyedLists, maps: [] }
+    case 'process':
+      return { keyedLists: processKeyedLists, maps: [] }
+    case 'page':
+      return { keyedLists: pageListKey, maps: [] }
+    case 'text':
+      return { keyedLists: {}, maps: textKeyedMaps }
+    case 'form':
+      return { keyedLists: formKeyedLists(content), maps: [] }
+    case 'seed':
+      return { keyedLists: seedKeyedLists, maps: [] }
+    case 'dataSource':
+      return { keyedLists: dataSourceKeyedLists, maps: [] }
+    case 'policy':
+      return { keyedLists: policyKeyedLists, maps: [] }
+    default:
+      return { keyedLists: {}, maps: [] }
+  }
+}

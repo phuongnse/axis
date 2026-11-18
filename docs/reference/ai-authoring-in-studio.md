@@ -274,23 +274,23 @@ A question is one that AI leaves to its author. A decision is a choice that AI m
 
 ## The diff
 
-_(planned for M35)_
-
-The Result item shows what the request changes and how its checks and review went, so its author can decide.
-Its parts come in this order: the checks and the review, what changes, Preview the draft while the request
-is ready, then the accept's status or a conflict.
+The Result part shows after the Plan, on a ready, failed or accepted request that has checks, so its author can
+decide. It shows what the request changes and how its checks and review went. Its parts come in this order: the
+checks and the review, then what changes. [Preview the draft](#preview-the-draft) and the accept's status, with
+[a conflict](#accepting), come after them.
 
 ### Checks and review
 
-Two lines open the Result item, Checks and Review. Each has its name in bold and its verdict as a
+Two lines open the Result part, Checks and Review. Each has its name in bold and its verdict as a
 [status tag](shared-widgets.md#which-widget). The verdicts start in one column, so the tags line up. Each
 line's summary sits under it, across the columns and flush with the name.
 
 - **Checks** reads Passed (`success`) or Failed (`danger`). Its summary reads "All scenarios pass" with no
-  count, "1 of 2 scenarios pass", or a compile's problems, such as "It does not compile: 2 problems".
-  **Show the checks**, or **Hide the checks** once it shows, ends the summary's line.
-- **Review** reads Changes requested (`attention`) while an open finding blocks the draft. It reads No changes
-  requested (`success`) otherwise, or Not reviewed (`muted`) when no review ran. Its summary is the review's own.
+  count, "1 of 2 scenarios pass", "The scenario fails." for one scenario, "Package tests fail", or a compile's
+  problems, such as "It does not compile: 2 problems". **Show the checks**, or **Hide the checks** once it shows, ends the summary's line.
+- **Review** reads Changes requested (`attention`) when the review asked for changes. It reads No changes requested
+  (`success`) when the review passed, or Not reviewed (`muted`) when a ready or accepted request had no review. A review
+  that asked for changes has its own text as its summary. A passed review stores no text, so it shows no summary.
   When Not reviewed, the author reads "Connect your AI to have a second AI review changes.", and anyone else
   reads "No second AI reviewed this change, as its author has not connected their AI."
 - The review never reads Approved. Only the author approves a change, by accepting it.
@@ -298,12 +298,14 @@ line's summary sits under it, across the columns and flush with the name.
 
 The checks' detail folds in under its line, inside it and indented `spacing-md`. It shows the compile's
 problems through [`StudioProblemList`](shared-widgets.md#which-widget), then the results of the scenarios,
-see [scenario results](#scenario-results). `spacing-xs` parts the lines of one group, and `spacing-sm` parts
-the review from the checks.
+see [scenario results](#scenario-results). The problems and the scenarios are plain rows for now.
+`spacing-xs` parts the lines of one group, and `spacing-sm` parts the review from the checks.
 
 ### What the review found
 
-The review's findings sit under its summary, `spacing-sm` below it and indented `spacing-md` inside the Review
+_(planned for M35)_
+
+Changes requested, as the Review line shows it, is for an open blocking finding. The review's findings sit under its summary, `spacing-sm` below it and indented `spacing-md` inside the Review
 line. Three groups follow, `spacing-md` apart. Each has a bold heading and shows only when it has something to show.
 
 - **Things to look at** lists the review's open findings in one flat list, blocking findings first. Each is a
@@ -333,21 +335,26 @@ icon is hidden from assistive technology, which reads the word. Each item keeps 
 
 ### What changes
 
-[`StudioChanges`](shared-widgets.md#which-widget) draws the request's diff folded, as the publish page does. Each
-resource is a block under its name, its kind, its change and its line counts, with the summary its request wrote
-under it. The block opens to its JSON diff, see [revisions](#revisions).
+[`StudioChanges`](shared-widgets.md#which-widget) draws the request's diff folded. Each resource is a block under its
+name, its kind and its change. The block starts closed behind **Show the diff** and opens to its JSON diff, see
+[revisions](#revisions).
 
+- **Line counts and summary** _(planned for M35)_. Each block shows its line counts, such as "+8 −3", and the summary its
+  request wrote under it.
 - The name is no link, because the resource in the application is the version before the draft.
-- A module resource shows the layer applied, marked as the [customization layers](customization-layers.md#in-studio)
-  editor marks it.
+- A layer file is named by the module resource it changes, with the layer applied. The elements the layer added,
+  changed or removed are listed under the name, each with its mark. A mark has the accessible name that the
+  [customization layers](customization-layers.md#in-studio) editor gives it. The page offers no Reset to module.
 - The diff comes from [the request diff](authoring-requests.md#routes). The page reads it again when the request
   moves on.
-- A pointer to a resource that only the draft adds reads by its name and kind, as the diff names it. A test result,
-  a finding, a plan's implementation note or a History row can point to one. The pointer is a link that opens the
-  resource's block and scrolls to it. The page gives its diff to `DraftResourcesContext`, which
+- **Pointers** _(planned for M35)_. A pointer to a resource that only the draft adds reads by its name and kind, as the
+  diff names it. A test result, a finding, a plan's implementation note or a History row can point to one. The pointer is a
+  link that opens the resource's block and scrolls to it. The page gives its diff to `DraftResourcesContext`, which
   [`ResourceReference`](shared-widgets.md#which-widget) reads.
 
 ### Scenario results
+
+_(planned for M35)_
 
 Each scenario result has its outcome as a status tag in a column of its own: Passed (`success`), Failed (`danger`)
 or Skipped (`muted`). Then come its name, its kind and its time. The name is a link, and the kind and the time are
@@ -361,6 +368,8 @@ muted, each `spacing-xs` from the last.
 
 ### Preview the draft
 
+_(planned for M35)_
+
 **Preview the draft** is a `secondary` button after the diff. It shows while the request is ready, to its author,
 and only when the deployment has a preview host, `studioPreviewHost` in [`GET /api/me`](security.md#roles-and-the-current-user).
 
@@ -370,6 +379,8 @@ and only when the deployment has a preview host, `studioPreviewHost` in [`GET /a
   such as "The preview is ready. Open Purchasing". The links are the band's own, see [publishing](studio.md#publishing).
 
 ### Accepting
+
+_(planned for M35)_
 
 - **Accept** sends the accept and shows its status: "Accepted. The change is in the application and in History. It is
   not live until someone publishes." or "Not accepted. Nothing in the application changed." When it succeeds, the page
@@ -383,8 +394,23 @@ and only when the deployment has a preview host, `studioPreviewHost` in [`GET /a
   with one bullet for each resource: its [`ResourceReference`](shared-widgets.md#which-widget), who changed it and when.
   **Make the change again**, in the bar (see [the guide](#the-guide)), sends the [retry](authoring-requests.md#routes)
   route. AI makes the change on a new draft from the folder as it is now, and the checks and the review run again.
-- **A failure** leaves the Result item idle. It shows the request's checks and its diff. Why it failed shows in
-  [the Work item](#the-work-item).
+
+### A failure
+
+A failed request shows the alert "AI could not finish this request." after the Plan. Its message is the reason the
+request failed, in words. The checks and the diff follow, as above. The reason comes from the newest step that
+ended, by its kind and its outcome:
+
+| Newest step                       | Reason                                                       |
+| --------------------------------- | ------------------------------------------------------------ |
+| A check that failed               | The checks still failed after the last fix round.            |
+| A review that asked for changes   | The review still asked for changes after the last fix round. |
+| Outcome `overBudget`              | The request used up its token budget.                        |
+| Outcome `timedOut`                | The request ran out of time.                                 |
+| Outcome `tokenEnded`              | Its author's sign-in ended before AI finished.               |
+| Outcome `noPlan`                  | AI did not write a plan.                                     |
+| Outcome `notAccepted`             | The draft could not be accepted.                             |
+| Any other outcome                 | A step did not finish.                                       |
 
 ## Auto-accept
 

@@ -21,7 +21,13 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useFollowJob } from '../platform/useFollowJob'
 import { PlatformContext } from './context'
-import { authoringRequestStates, endedAuthoringRequestStates, requestName } from './studioAuthoringRequest'
+import {
+  authoringRequestStates,
+  endedAuthoringRequestStates,
+  requestName,
+  requestResult,
+} from './studioAuthoringRequest'
+import { StudioAuthoringRequestResult } from './StudioAuthoringRequestResult'
 import { StudioPageHeading } from './StudioPageHeading'
 
 const workingStates: ReadonlySet<AuthoringRequestState> = new Set<AuthoringRequestState>([
@@ -50,11 +56,12 @@ function guideWords(state: AuthoringRequestState, isAuthor: boolean): string | n
 
 /**
  * One authoring request, from its name to its state. The heading shows the name, the state as a status tag and the words
- * in full, then the sender's line. Under it come the plan and the guide bar at the foot of the window, which gives the
- * request's author Approve plan, Change the plan… and Drop…. Until the request waits for its author or ends, the page
- * asks for it every second and keeps the last answer when a read fails. A request that does not exist shows its line
- * and, when `onAskAi` is given, an Ask AI link that opens the request panel. See
- * docs/reference/ai-authoring-in-studio.md#the-heading, #the-plan and #the-guide.
+ * in full, then the sender's line. Under it come the plan, then the failure alert of a failed request and the Result part
+ * of a ready, failed or accepted request, and the guide bar at the foot of the window, which gives the request's author
+ * Approve plan, Change the plan… and Drop…. Until the request waits for its author or ends, the page asks for it every
+ * second and keeps the last answer when a read fails. A request that does not exist shows its line and, when `onAskAi` is
+ * given, an Ask AI link that opens the request panel. See docs/reference/ai-authoring-in-studio.md#the-heading, #the-plan,
+ * #the-diff and #the-guide.
  */
 export function StudioAuthoringRequestPage({
   application,
@@ -115,6 +122,10 @@ export function StudioAuthoringRequestPage({
   const state = authoringRequestStates[request.state]
   const isAuthor = request.author === userId
   const words = guideWords(request.state, isAuthor)
+  const result = requestResult(request, isAuthor)
+  const showResult =
+    request.state === 'accepted' ||
+    ((request.state === 'ready' || request.state === 'failed') && result.checks !== null)
   const time = formatValue({ name: 'sentAt', type: 'date-time' }, request.sentAt, {}, { locale, text: t })
   const sender = fillText(
     t(request.author === userId ? 'shell.studio.aiRequest.sentByYou' : 'shell.studio.aiRequest.sentBy'),
@@ -188,6 +199,15 @@ export function StudioAuthoringRequestPage({
           )}
         </Flex>
       )}
+      {result.failureKey !== null && (
+        <AxisAlert
+          kind="error"
+          data-testid="studio-ai-request-failure"
+          message={t('shell.studio.aiRequest.failure')}
+          description={t(result.failureKey)}
+        />
+      )}
+      {showResult && <StudioAuthoringRequestResult application={application} request={request} isAuthor={isAuthor} />}
       {words !== null && (
         <ActionBar
           docked

@@ -1,5 +1,6 @@
 import { ConfigProvider } from 'antd'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import {
@@ -19,6 +20,16 @@ const texts = {
   'shell.studio.overview.change.changed': 'Changed',
   'shell.studio.overview.change.removed': 'Removed',
   'shell.studio.nav.kindOne.role': 'Role',
+  'shell.studio.module.added': 'Added',
+  'shell.studio.module.changed': 'Changed',
+  'shell.studio.module.removed': 'Removed',
+  'shell.studio.contract.addedName': '{name}, added by this application',
+  'shell.studio.module.changedName': '{name}, changed by this application',
+  'shell.studio.module.removedName': '{name}, removed by this application',
+  'shell.studio.changes.showDiff': 'Show the diff',
+  'shell.studio.changes.hideDiff': 'Hide the diff',
+  'shell.studio.changes.showDiffName': 'Show the diff of {name}',
+  'shell.studio.changes.hideDiffName': 'Hide the diff of {name}',
   'shell.studio.releases.system': 'System',
   'shell.studio.changes.changedBy': 'Changed by {authors}',
   'shell.studio.changes.you': 'you',
@@ -56,19 +67,44 @@ const files: StudioRevisionChange[] = [
   },
 ]
 
+/** A layer file that adds `supplier`, changes `amount` and removes `notes` of the module's entity. */
+const layerFile: StudioChangedFile = {
+  file: 'customizations/purchase-request.json',
+  change: 'changed',
+  id: 'layer-1',
+  kind: null,
+  name: null,
+  before: '{"target":"modules/purchasing/entities/request.json"}',
+  after: '{"target":"modules/purchasing/entities/request.json"}',
+  module: {
+    id: 'entity-1',
+    kind: 'entity',
+    name: 'PurchaseRequest',
+    file: 'modules/purchasing/entities/request.json',
+    before: '{"name":"PurchaseRequest","fields":[{"name":"amount"},{"name":"notes"}]}',
+    after: '{"name":"PurchaseRequest","fields":[{"name":"amount","type":"number"},{"name":"supplier"}]}',
+    marks: [
+      { path: '/fields/1', mark: 'added' },
+      { path: '/fields/0', mark: 'changed' },
+    ],
+    removed: [{ list: '/fields', key: 'notes', content: null }],
+  },
+}
+
 /** A live diff's file: its fields with the revisions that changed it since the live release, newest first. */
 type LiveFile = StudioChangedFile & { by: StudioLiveRevision[] }
 
 function renderWith<File extends StudioChangedFile>(
   changed: File[],
   changedBy?: { application: string; authors: (file: File) => StudioChangeAuthor[] },
+  folded = false,
 ) {
   return render(
     <MemoryRouter>
       <ThemeModeProvider initialMode="light">
         <ConfigProvider theme={{ token: { motion: false } }}>
           <TextProvider catalogs={catalogs} development={false}>
-            <StudioChanges files={changed} resources={[]} changedBy={changedBy} />
+            <StudioChanges files={changed} resources={[]} changedBy={changedBy} folded={folded} />
           </TextProvider>
         </ConfigProvider>
       </ThemeModeProvider>
@@ -76,8 +112,8 @@ function renderWith<File extends StudioChangedFile>(
   )
 }
 
-function renderChanges() {
-  return renderWith(files)
+function renderChanges(changed: StudioChangedFile[] = files, options: { folded?: boolean } = {}) {
+  return renderWith(changed, undefined, options.folded)
 }
 
 /** A revision of a live diff's `by`: the author's id, or null for a revision the server made, and an AI request, if any. */
@@ -194,5 +230,41 @@ describe('StudioChanges with Changed by', () => {
       /^Changed by System$/,
     )
     expect(within(fileSection('roles/approver.json')).queryByTestId('studio-changes-by')).toBeNull()
+  })
+})
+
+describe('StudioChanges folded', () => {
+  it('starts each file closed, and opens its JSON when Show the diff is used', async () => {
+    renderChanges(files, { folded: true })
+
+    const removed = fileSection('notes/old.json')
+    expect(within(removed).queryByTestId('json-diff-before')).not.toBeInTheDocument()
+    const show = within(removed).getByRole('button', { name: 'Show the diff of notes/old.json', expanded: false })
+    await userEvent.click(show)
+    expect(within(removed).getByTestId('json-diff-before')).toHaveTextContent('"gone": true')
+    expect(
+      within(removed).getByRole('button', { name: 'Hide the diff of notes/old.json', expanded: true }),
+    ).toBeVisible()
+  })
+
+  it('shows the module resource a layer file changes, named by it, with its marks and no reset', async () => {
+    renderChanges([layerFile], { folded: true })
+
+    const section = fileSection(layerFile.file)
+    expect(within(section).getByText('PurchaseRequest')).toBeVisible()
+    expect(within(section).getByRole('note', { name: 'supplier, added by this application' })).toHaveTextContent(
+      'Added',
+    )
+    expect(within(section).getByRole('note', { name: 'amount, changed by this application' })).toHaveTextContent(
+      'Changed',
+    )
+    expect(within(section).getByRole('note', { name: 'notes, removed by this application' })).toHaveTextContent(
+      'Removed',
+    )
+    expect(within(section).queryByRole('button', { name: /Reset/ })).not.toBeInTheDocument()
+
+    await userEvent.click(within(section).getByRole('button', { name: 'Show the diff of PurchaseRequest' }))
+    expect(within(section).getByTestId('json-diff-after')).toHaveTextContent('"supplier"')
+    expect(within(section).getByTestId('json-diff-after')).not.toHaveTextContent('"target"')
   })
 })

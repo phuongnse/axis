@@ -3,7 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { formatValue } from '../platform/formatValue'
-import type { AuthoringRequest, AuthoringRequestState } from '../platform/studio'
+import type {
+  AuthoringRequest,
+  AuthoringRequestDiff,
+  AuthoringRequestState,
+  AuthoringRequestStep,
+  StudioDiagnostic,
+} from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioAuthoringRequestPage } from './StudioAuthoringRequestPage'
@@ -38,6 +44,93 @@ function answer(body: AuthoringRequest | null) {
     : new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } })
 }
 
+const scenario = {
+  name: 'ApprovalBelowThreshold',
+  resourceId: 'r1',
+  file: 'scenarios/approval.json',
+  outcome: 'passed' as const,
+  durationMs: 10,
+  step: null,
+  path: null,
+  message: null,
+}
+
+/** A `check` step with the checks given, which pass or fail as `outcome` says. */
+function checkStep(checks: unknown, outcome: 'passed' | 'failed'): AuthoringRequestStep {
+  return {
+    kind: 'check',
+    summary: null,
+    outcome,
+    tokens: 0,
+    startedAt: sentAt,
+    finishedAt: sentAt,
+    checks: checks as AuthoringRequestStep['checks'],
+  }
+}
+
+const passedChecks = {
+  compile: { outcome: 'passed', diagnostics: [] },
+  packages: { outcome: 'notRun', items: [] },
+  scenarios: { outcome: 'passed', request: null, diagnostics: [], items: [scenario] },
+}
+
+const problem = (code: string): StudioDiagnostic => ({
+  code,
+  severity: 'error',
+  message: 'The reference has no target.',
+  file: 'entities/cost-centre.json',
+  path: '/fields/0',
+  resourceId: null,
+})
+
+const failedCompile = {
+  compile: { outcome: 'failed', diagnostics: [problem('AXIS-E101'), problem('AXIS-E102')] },
+  packages: { outcome: 'notRun', items: [] },
+  scenarios: { outcome: 'notRun', request: null, diagnostics: [], items: [] },
+}
+
+/** The changes of the request: an added entity, and a layer that marks one element of a module entity as each mark says. */
+const diff: AuthoringRequestDiff = {
+  start: 'c0',
+  tip: 'c1',
+  cursor: null,
+  resources: [
+    {
+      file: 'entities/cost-centre.json',
+      change: 'added',
+      id: 'e2',
+      kind: 'entity',
+      name: 'CostCentre',
+      before: null,
+      after: '{"name":"CostCentre"}',
+      target: null,
+    },
+    {
+      file: 'customizations/purchase-request.json',
+      change: 'changed',
+      id: 'l1',
+      kind: null,
+      name: null,
+      before: '{"target":"modules/purchasing/entities/request.json"}',
+      after: '{"target":"modules/purchasing/entities/request.json"}',
+      target: 'modules/purchasing/entities/request.json',
+      module: {
+        id: 'entity-1',
+        kind: 'entity',
+        name: 'PurchaseRequest',
+        file: 'modules/purchasing/entities/request.json',
+        before: '{"name":"PurchaseRequest","fields":[{"name":"amount"},{"name":"notes"}]}',
+        after: '{"name":"PurchaseRequest","fields":[{"name":"amount","type":"number"},{"name":"supplier"}]}',
+        marks: [
+          { path: '/fields/1', mark: 'added' },
+          { path: '/fields/0', mark: 'changed' },
+        ],
+        removed: [{ list: '/fields', key: 'notes', content: null }],
+      },
+    },
+  ],
+}
+
 /**
  * A server that answers by URL and method: a read answers the request as `server.current` holds it, and each action
  * answers with the request in the state it moves to, or with a 500 when `refuse` names it. `calls` lists the actions.
@@ -49,7 +142,10 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
     fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const action = String(input).split('/').pop() ?? ''
       if (init?.method !== 'POST') {
-        return answer(server.current)
+        // The changes of the request answer the diff, in one page.
+        return String(input).endsWith('/diff')
+          ? new Response(JSON.stringify(diff), { headers: { 'Content-Type': 'application/json' } })
+          : answer(server.current)
       }
       server.calls.push({ action, body: init.body === undefined ? undefined : JSON.parse(String(init.body)) })
       if (refuse.includes(action)) {
@@ -359,5 +455,79 @@ describe('requestName', () => {
     const long = 'a'.repeat(100)
 
     expect(requestName(long)).toBe(`${'a'.repeat(80)}…`)
+  })
+})
+
+describe('StudioAuthoringRequestPage Result part', () => {
+  it('shows a ready request with its checks passed and its review not run, to its author', async () => {
+    const server = serverOf(request({ state: 'ready', author: 'u1', steps: [checkStep(passedChecks, 'passed')] }))
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage({ userId: 'u1' })
+
+    const checks = await screen.findByTestId('studio-ai-request-checks')
+    expect(within(checks).getByText('Checks')).toBeVisible()
+    expect(within(checks).getByText('Passed')).toBeVisible()
+    expect(within(checks).getByText('All scenarios pass')).toBeVisible()
+    const review = screen.getByTestId('studio-ai-request-review')
+    expect(within(review).getByText('Not reviewed')).toBeVisible()
+    expect(within(review).getByText('Connect your AI to have a second AI review changes.')).toBeVisible()
+  })
+
+  it('tells another author that no second AI reviewed the change, with no actions', async () => {
+    const server = serverOf(request({ state: 'ready', author: 'u1', steps: [checkStep(passedChecks, 'passed')] }))
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage({ userId: 'u9' })
+
+    const review = await screen.findByTestId('studio-ai-request-review')
+    expect(within(review).getByText('Not reviewed')).toBeVisible()
+    expect(
+      within(review).getByText('No second AI reviewed this change, as its author has not connected their AI.'),
+    ).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Drop…' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Approve plan' })).not.toBeInTheDocument()
+  })
+
+  it('lists each resource of the diff folded, and names a layer by its module resource with its marks', async () => {
+    const server = serverOf(request({ state: 'ready', author: 'u1', steps: [checkStep(passedChecks, 'passed')] }))
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage({ userId: 'u1' })
+
+    const files = await screen.findAllByTestId('studio-changes-file')
+    expect(files).toHaveLength(2)
+    expect(screen.queryByTestId('json-diff-after')).not.toBeInTheDocument()
+
+    const layer = files.find((file) => file.dataset.file === 'customizations/purchase-request.json')!
+    expect(within(layer).getByText('PurchaseRequest')).toBeVisible()
+    expect(within(layer).getByRole('note', { name: 'supplier, added by this application' })).toHaveTextContent('Added')
+    expect(within(layer).getByRole('note', { name: 'amount, changed by this application' })).toHaveTextContent(
+      'Changed',
+    )
+    expect(within(layer).getByRole('note', { name: 'notes, removed by this application' })).toHaveTextContent('Removed')
+    expect(within(layer).queryByRole('button', { name: /Reset/ })).not.toBeInTheDocument()
+
+    await userEvent.click(within(layer).getByRole('button', { name: 'Show the diff of PurchaseRequest' }))
+    expect(within(layer).getByTestId('json-diff-after')).toHaveTextContent('"supplier"')
+  })
+
+  it('shows a failed request with its reason, its failed checks with both problems, and no review line', async () => {
+    const server = serverOf(
+      request({ state: 'failed', author: 'u1', round: 1, steps: [checkStep(failedCompile, 'failed')] }),
+    )
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage({ userId: 'u1' })
+
+    const alert = await screen.findByTestId('studio-ai-request-failure')
+    expect(within(alert).getByText('AI could not finish this request.')).toBeVisible()
+    expect(within(alert).getByText('The checks still failed after the last fix round.')).toBeVisible()
+
+    const checks = screen.getByTestId('studio-ai-request-checks')
+    expect(within(checks).getByText('Failed')).toBeVisible()
+    expect(within(checks).getByText('It does not compile: 2 problems')).toBeVisible()
+    expect(screen.queryByTestId('studio-ai-request-review')).not.toBeInTheDocument()
+
+    await userEvent.click(within(checks).getByRole('button', { name: 'Show the checks' }))
+    const detail = screen.getByTestId('studio-ai-request-checks-detail')
+    expect(within(detail).getByText('AXIS-E101')).toBeVisible()
+    expect(within(detail).getByText('AXIS-E102')).toBeVisible()
   })
 })

@@ -1648,7 +1648,41 @@ export type AuthoringRequestState =
   | 'dropped'
   | 'failed'
 
-/** An authoring request as the read route answers it. The page does not use its steps, so they are not listed. */
+/**
+ * The checks of a `check` step, `{ compile, packages, scenarios }`. The compile's diagnostics are those of `validate_draft`,
+ * and the scenario items are those of `run_scenarios`. A `notRun` outcome means the step did not reach that check.
+ */
+export interface AuthoringRequestChecks {
+  compile: { outcome: 'passed' | 'failed'; diagnostics: StudioDiagnostic[] }
+  packages: { outcome: 'passed' | 'failed' | 'notRun'; items: unknown[] }
+  scenarios: {
+    outcome: 'passed' | 'failed' | 'notRun'
+    request: string | null
+    diagnostics: StudioDiagnostic[]
+    items: (StudioScenarioResult | StudioSkippedScenarioResult)[]
+  }
+}
+
+/** The checks of a `review` step: its verdict, and the review's text when it asked for changes. */
+export interface AuthoringRequestReviewChecks {
+  review: { outcome: 'passed' | 'findings'; findings: string | null }
+}
+
+/**
+ * One step of an authoring request, in order. `outcome` says how the step ended, and `checks` holds the checks of a `check`
+ * or `review` step, null on any other. See docs/reference/authoring-requests.md#states.
+ */
+export interface AuthoringRequestStep {
+  kind: string
+  summary: string | null
+  outcome: string | null
+  tokens: number
+  startedAt: string
+  finishedAt: string | null
+  checks: AuthoringRequestChecks | AuthoringRequestReviewChecks | null
+}
+
+/** An authoring request as the read route answers it. `steps` is set only by the read route, and the other routes leave it out. */
 export interface AuthoringRequest {
   id: string
   application: string
@@ -1663,6 +1697,7 @@ export interface AuthoringRequest {
   sentAt: string
   approvedAt: string | null
   finishedAt: string | null
+  steps?: AuthoringRequestStep[]
 }
 
 /**

@@ -6,16 +6,16 @@ import { useText } from '../platform/texts'
 /**
  * The results of a test request, or the contract scenarios of a publish or validate: each scenario with passed or
  * failed, its time and, for a failure, its step and message. Selecting a failure calls `onSelect` with the scenario's
- * resource and the path of its failing step. A skipped contract scenario shows the relaxed point it covers and opens
- * nothing. While the request is queued or running it shows a note instead of rows, so an empty list never reads as a
- * pass. An ended request with no scenario results says that no scenario ran.
+ * resource and the path of its failing step, and without `onSelect` a failure is plain text. A skipped contract scenario
+ * shows the relaxed point it covers and opens nothing. While the request is queued or running it shows a note instead of
+ * rows, so an empty list never reads as a pass. An ended request with no scenario results says that no scenario ran.
  */
 export function StudioTestResults({
   request,
   onSelect,
 }: {
-  request: StudioRequest
-  onSelect: (resourceId: string, path: string) => void
+  request: Pick<StudioRequest, 'kind' | 'status' | 'scenarios'>
+  onSelect?: (resourceId: string, path: string) => void
 }) {
   const t = useText()
   const pending = request.status === 'queued' || request.status === 'running'
@@ -47,7 +47,7 @@ function ScenarioRow({
   onSelect,
 }: {
   scenario: StudioScenarioResult | StudioSkippedScenarioResult
-  onSelect: (resourceId: string, path: string) => void
+  onSelect?: (resourceId: string, path: string) => void
 }) {
   const t = useText()
   if (scenario.outcome === 'skipped') {
@@ -80,7 +80,7 @@ function ScenarioRow({
       {failed && scenario.message !== null && <Typography.Text type="danger">{scenario.message}</Typography.Text>}
     </Flex>
   )
-  if (!failed) {
+  if (!failed || onSelect === undefined) {
     return <div style={{ padding: '4px 15px' }}>{content}</div>
   }
   return (

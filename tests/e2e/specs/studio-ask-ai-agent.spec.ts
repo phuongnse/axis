@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -36,6 +37,8 @@ const secondRequest = 'Add a supplier field to the request.'
 const plan = 'Add a text field costCentre to the Request entity and show it on its form.'
 const secondPlan = 'Add a required text field supplier to the Request entity.'
 const newPlan = 'Add a list field supplier to the Request entity, with the suppliers the company buys from.'
+const failingRequest = 'Add a cost centre that refers to a department.'
+const failingPlan = 'Add a CostCentre entity with an owner that refers to the Department entity.'
 const usage = { input_tokens: 1, output_tokens: 1 }
 
 let folder: string
@@ -226,6 +229,89 @@ test('an author approves the plan and the request is Working', async () => {
     await page.getByRole('button', { name: 'Approve plan', exact: true }).click()
     await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Working')
     await expect(page.getByText('AI is working on it', { exact: true })).toBeVisible()
+  } finally {
+    await page.close()
+  }
+})
+
+test('a request whose compile check fails in every fix round ends Failed, with why it failed and its draft\'s diff', async () => {
+  // The first request's agent host is stopped, and the request is dropped, so the new host claims only this request.
+  const dropping = await authorContext.newPage()
+  try {
+    await dropping.goto(firstRequestUrl)
+    await dropping.getByRole('button', { name: 'Drop…', exact: true }).click()
+    await waitForDialog(dropping, 'Drop this request?')
+    await confirmDialog(dropping, 'Drop')
+    await expect(dropping.getByTestId('studio-ai-request-state')).toHaveText('Dropped')
+  } finally {
+    await dropping.close()
+  }
+
+  // The plan, then the work writes an entity that refers to a department the application lacks, then its end. Each fix round
+  // ends with no change, so the compile fails again. The one fix round stops the request as Failed.
+  const failingAnswers = path.join(folder, 'answers-failing.json')
+  const failingEntity = {
+    id: randomUUID(),
+    kind: 'entity',
+    name: 'CostCentre',
+    formatVersion: 1,
+    fields: [{ name: 'owner', type: 'reference', target: 'Department' }],
+  }
+  await writeFile(
+    failingAnswers,
+    JSON.stringify([
+      { content: [{ type: 'text', text: failingPlan }], stop_reason: 'end_turn', usage },
+      {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'entity-1',
+            name: 'write_resource',
+            input: { application, content: failingEntity },
+          },
+        ],
+        stop_reason: 'tool_use',
+        usage,
+      },
+      { content: [{ type: 'text', text: 'Done.' }], stop_reason: 'end_turn', usage },
+      { content: [{ type: 'text', text: 'Nothing to change.' }], stop_reason: 'end_turn', usage },
+    ]),
+  )
+  agent = await startAgentHost({
+    ...agentHostSettings({
+      healthUrl: `http://127.0.0.1:${await sparePort()}`,
+      platform: required('AXIS_E2E_DATABASE', 'the PostgreSQL connection string of the runtime role'),
+      secretKey: platformSecretKey,
+      proxyUrl: proxy.url,
+      trustDir,
+      answersFile: failingAnswers,
+    }),
+    Ai__FixRounds: '1',
+  })
+
+  const page = await authorContext.newPage()
+  try {
+    await askAi(page, failingRequest)
+    await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Awaiting approval', { timeout: 120_000 })
+    await expect(page.getByText(failingPlan, { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Approve plan', exact: true }).click()
+
+    await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Failed', { timeout: 120_000 })
+    const alert = page.getByTestId('studio-ai-request-failure')
+    await expect(alert).toContainText('AI could not finish this request.')
+    await expect(alert).toContainText('The checks still failed after the last fix round.')
+
+    const checks = page.getByTestId('studio-ai-request-checks')
+    await expect(checks).toContainText('Failed')
+    await expect(checks).toContainText('It does not compile')
+    await expect(page.getByTestId('studio-ai-request-review')).toHaveCount(0)
+
+    // The draft's diff lists the entity the work wrote, folded until its author asks for the diff.
+    const written = page.getByTestId('studio-changes-file').filter({ hasText: 'CostCentre' })
+    await expect(written).toHaveCount(1)
+    await expect(written.getByTestId('json-diff-after')).toHaveCount(0)
+    await written.getByRole('button', { name: 'Show the diff of CostCentre', exact: true }).click()
+    await expect(written.getByTestId('json-diff-after')).toContainText('"CostCentre"')
   } finally {
     await page.close()
   }
