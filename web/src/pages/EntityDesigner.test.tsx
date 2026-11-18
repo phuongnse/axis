@@ -22,7 +22,13 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
 import { chooseOption, clearPicker, clearSelect, openDropdown, optionTexts, removeTag } from '../test/antd'
-import { addEntityField, entityFieldAction, entityFieldMenuItem, openEntityField } from '../test/entityFields'
+import {
+  addEntityField,
+  entityFieldAction,
+  entityFieldMenuItem,
+  entityFieldNames,
+  openEntityField,
+} from '../test/entityFields'
 import { clickInDialog, dialog, pick } from '../test/tableFilter'
 import { EntityDesigner } from './EntityDesigner'
 import { ExpressionCheckContext } from './expressionCheckContext'
@@ -825,9 +831,6 @@ describe('EntityDesigner', () => {
       }),
     )
     const count = within(await openEntityField(0))
-    const total = within(await openEntityField(1))
-    const price = within(await openEntityField(2))
-
     await userEvent.type(count.getByRole('spinbutton', { name: 'Min' }), '0')
     await userEvent.type(count.getByRole('spinbutton', { name: 'Max' }), '10')
     expect(fields()[0]).toEqual({ name: 'count', type: 'integer', min: 0, max: 10 })
@@ -836,8 +839,11 @@ describe('EntityDesigner', () => {
     await userEvent.clear(count.getByRole('spinbutton', { name: 'Max' }))
     expect(fields()[0]).toEqual({ name: 'count', type: 'integer' })
 
+    const total = within(await openEntityField(1))
     await userEvent.type(total.getByRole('spinbutton', { name: 'Min' }), '-1.5')
     expect(fields()[1]).toEqual({ name: 'total', type: 'decimal', min: -1.5 })
+
+    const price = within(await openEntityField(2))
     await userEvent.type(price.getByRole('spinbutton', { name: 'Max' }), '99.25')
     expect(fields()[2]).toEqual({ name: 'price', type: 'money', currency: 'VND', max: 99.25 })
     await userEvent.clear(price.getByRole('spinbutton', { name: 'Max' }))
@@ -854,13 +860,12 @@ describe('EntityDesigner', () => {
       }),
     )
     const day = within(await openEntityField(0)).getByRole('textbox', { name: 'Min' })
-    const at = within(await openEntityField(1)).getByRole('textbox', { name: 'Min' })
-
     await userEvent.type(day, '2026-01-05{Enter}')
     expect(fields()[0]).toEqual({ name: 'day', type: 'date', min: '2026-01-05' })
     await clearPicker(within(await openEntityField(0)).getByTestId('studio-field-/fields/0/min'))
     expect(fields()[0]).toEqual({ name: 'day', type: 'date' })
 
+    const at = within(await openEntityField(1)).getByRole('textbox', { name: 'Min' })
     await userEvent.type(at, '2026-01-05 10:30:00{Enter}')
     const written = fields()[1].min as string
     expect(written).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00Z$/)
@@ -914,7 +919,9 @@ describe('EntityDesigner', () => {
   it('reaches the switch and the limit inputs with the keyboard', async () => {
     const fields = renderEditing(entity({ fields: [{ name: 'code', type: 'text' }] }))
 
-    screen.getByRole('switch', { name: 'Searchable' }).focus()
+    within(await openEntityField(0))
+      .getByRole('switch', { name: 'Searchable' })
+      .focus()
     await userEvent.keyboard(' ')
     expect(fields()[0]).toEqual({ name: 'code', type: 'text', searchable: true })
   })
@@ -942,10 +949,6 @@ describe('EntityDesigner', () => {
       { name: 'total', type: 'decimal', unique: true },
     ]
     const rows = () => screen.getAllByTestId(/^studio-field-\/fields\/\d+$/)
-    const rowNames = () =>
-      rows()
-        .map((row) => within(row).getByRole('textbox', { name: 'Field name' }))
-        .map((box) => (box as HTMLInputElement).value)
 
     function renderFiltered(origins: (string | null)[]) {
       render(
@@ -966,7 +969,7 @@ describe('EntityDesigner', () => {
       await pick('Value', 0, 'integer')
       await clickInDialog('Apply')
 
-      expect(rowNames()).toEqual(['count', 'size'])
+      expect(entityFieldNames()).toEqual(['count', 'size'])
       expect(screen.queryByRole('list')).not.toBeInTheDocument()
     })
 
@@ -978,7 +981,7 @@ describe('EntityDesigner', () => {
       await pick('Value', 0, 'Yes')
       await clickInDialog('Apply')
 
-      expect(rowNames()).toEqual(['count'])
+      expect(entityFieldNames()).toEqual(['count'])
     })
 
     it('keeps a field added since the last save shown, and hides a saved field that does not match', async () => {
@@ -990,14 +993,14 @@ describe('EntityDesigner', () => {
       await clickInDialog('Apply')
 
       // The decimal field `total` has no origin, so it is new and stays.
-      expect(rowNames()).toEqual(['count', 'size', 'total'])
+      expect(entityFieldNames()).toEqual(['count', 'size', 'total'])
     })
   })
 
   it('keeps the other keys of the entity when it sets a setting', async () => {
     const content = renderContent(entity({ fields: [{ name: 'count', type: 'integer' }] }))
 
-    await userEvent.type(screen.getByRole('spinbutton', { name: 'Min' }), '0')
+    await userEvent.type(within(await openEntityField(0)).getByRole('spinbutton', { name: 'Min' }), '0')
 
     expect(content()).toEqual(entity({ fields: [{ name: 'count', type: 'integer', min: 0 }] }))
   })
