@@ -9,6 +9,8 @@
 // host trusts that authority and reaches each tenant's MCP server at `https://<host>/mcp`, with no port, through a
 // local proxy that opens its tunnels to the server's https port, so the address and the token's audience are the ones
 // the realm writes. The stack's own client keeps plain http, so `createTenant` and its sign-in work on the http address.
+// The Playwright spec of the Ask AI agent uses the helpers that this file exports for its own tenant, certificate and
+// agent host, see docs/testing.md.
 //
 // The hosts run as one self-hosted installation, not as a cell, so every tenant shares one Studio folder. Each case's
 // application gets a name of its own, see applicationName. The server and the agent host run in the Testing
@@ -158,6 +160,136 @@ function systemCertDir() {
 }
 
 /**
+ * Makes the certificate of the tenant hosts in `folder`, signed by an authority of its own, and a folder, `trustDir`, that holds
+ * that authority alone. The certificate covers `*.eval.localhost`, see tenantDomain, and the agent host reads `trustDir` through
+ * SSL_CERT_DIR. Returns `{ serverDir, trustDir }`, the folder of the server certificate and the trust folder.
+ * @param {string} folder A folder of the run, which holds the new authority and the certificate.
+ * @returns {{ serverDir: string, trustDir: string }}
+ */
+export function issueTenantCertificate(folder) {
+  const { serverDir, trustDir } = issuePostgresCertificate({ folder, openssl: (...args) => run('openssl', args), name: `*.${tenantDomain}` })
+  run('openssl', ['rehash', trustDir])
+  return { serverDir, trustDir }
+}
+
+/**
+ * Starts a CONNECT proxy on a free loopback port. A tunnel to a tenant host on 443 goes to the server's https port, see
+ * tunnelTarget, so the agent host reaches the tenant's MCP server at its own address. `close` ends the proxy and every tunnel.
+ * @param {number} httpsPort The https port of the server that answers for the tenant hosts.
+ * @returns {Promise<{ url: string, close(): void }>} `url` is the address of the proxy, for HTTPS_PROXY.
+ */
+export async function startTunnelProxy(httpsPort) {
+  const sockets = new Set()
+  const server = http
+    .createServer((_, response) => {
+      response.writeHead(405)
+      response.end()
+    })
+    .on('connect', (connect, client, head) => {
+      const { host, port } = tunnelTarget(connect.url, httpsPort)
+      const upstream = net.connect(port, host, () => {
+        client.write('HTTP/1.1 200 Connection Established\r\n\r\n')
+        upstream.write(head)
+        upstream.pipe(client)
+        client.pipe(upstream)
+      })
+      sockets.add(client).add(upstream)
+      upstream.on('error', () => client.destroy())
+      client.on('error', () => upstream.destroy())
+      upstream.on('close', () => sockets.delete(upstream))
+      client.on('close', () => sockets.delete(client))
+    })
+  const port = await freePort()
+  await new Promise((resolve, reject) => server.once('error', reject).listen(port, '127.0.0.1', resolve))
+  return {
+    url: `http://127.0.0.1:${port}`,
+    close() {
+      server.close()
+      for (const socket of sockets) socket.destroy()
+    },
+  }
+}
+
+/**
+ * The settings of the agent host that reads the tenant directory and calls each tenant's MCP server through the proxy at
+ * `proxyUrl`, trusting the run's authority in `trustDir` next to the system's roots. The model side is agentEnvironment, with
+ * `binding` or `answersFile`. The agent host runs in Testing, see the header of this file.
+ * @param {{ healthUrl: string, platform: string, secretKey: string, proxyUrl: string, trustDir: string, binding?: string, answersFile?: string }} options
+ * @returns {Record<string, string>}
+ */
+export function agentHostSettings({ healthUrl, platform, secretKey, proxyUrl, trustDir, binding, answersFile }) {
+  return {
+    DOTNET_ENVIRONMENT: 'Testing',
+    Health__Urls: healthUrl,
+    Tenancy__Source: 'directory',
+    Tenancy__RefreshInterval: '00:00:02',
+    ConnectionStrings__Platform: platform,
+    Platform__SecretKey: secretKey,
+    HTTPS_PROXY: proxyUrl,
+    https_proxy: proxyUrl,
+    SSL_CERT_DIR: `${trustDir}:${systemCertDir()}`,
+    ...agentEnvironment({ binding, answersFile }),
+  }
+}
+
+/**
+ * Signs in to Keycloak as the `axis-admin` client, and returns `admin(method, path, body, ...statuses)`. It calls the admin API
+ * with that token, and throws unless the status is one of `statuses`. `body` is sent as JSON when it is not undefined.
+ * @param {{ keycloakUrl: string, adminSecret: string }} options
+ * @returns {Promise<(method: string, path: string, body?: unknown, ...statuses: number[]) => Promise<{ status: number, headers: object, setCookie: string[], body: string }>>}
+ */
+export async function keycloakAdmin({ keycloakUrl, adminSecret }) {
+  const token = await send(`${keycloakUrl}/realms/master/protocol/openid-connect/token`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: 'axis-admin', client_secret: adminSecret }).toString(),
+  })
+  if (token.status !== 200) throw new Error(`The admin token of Keycloak answered ${token.status}: ${token.body}`)
+  const accessToken = JSON.parse(token.body).access_token
+  return async (method, path, body, ...statuses) => {
+    const json = body === undefined ? undefined : JSON.stringify(body)
+    const headers = { authorization: `Bearer ${accessToken}` }
+    if (json !== undefined) headers['content-type'] = 'application/json'
+    const response = await send(`${keycloakUrl}${path}`, { method, headers, body: json })
+    if (!statuses.includes(response.status)) throw new Error(`${method} ${path} answered ${response.status}: ${response.body}`)
+    return response
+  }
+}
+
+/**
+ * Prepares the new realm `realm` for an author who uses the Ask AI agent. The realm's `axis` client gets `redirectUris` and
+ * `roles`. The agent client `axis-agent` gets a roles mapper and a scope mapping of those roles, because its exchanged token
+ * needs the author role, see docs/reference/authoring-requests.md#acting-for-the-author. The account `username` gets `roles`, a
+ * password and an authenticator of its own. `admin` is the admin call of keycloakAdmin.
+ * @param {{ admin: (method: string, path: string, body?: unknown, ...statuses: number[]) => Promise<{ status: number, headers: object, setCookie: string[], body: string }>, realm: string, redirectUris: string[], roles: string[], username: string }} options
+ * @returns {Promise<{ username: string, password: string, secret: string }>} The password, and the Base32 secret of the authenticator.
+ */
+export async function prepareAuthoringRealm({ admin, realm, redirectUris, roles, username }) {
+  const client = await preparePlatformClient({ admin, realm, redirectUris, roles })
+  // The agent host's client has no full scope, so the author's roles reach its exchanged token through a roles mapper and a
+  // scope mapping of the platform client's roles. The send refuses a token without the author role.
+  const agentList = await admin('GET', `/admin/realms/${realm}/clients?clientId=axis-agent`, undefined, 200)
+  const agentPath = `/admin/realms/${realm}/clients/${JSON.parse(agentList.body)[0].id}`
+  await admin('POST', `${agentPath}/protocol-mappers/models`, rolesMapper(), 201)
+  const platformRoles = await admin('GET', `${client.path}/roles`, undefined, 200)
+  await admin('POST', `${agentPath}/scope-mappings/clients/${client.id}`, JSON.parse(platformRoles.body), 204)
+  const password = secret()
+  const otp = newOtpSecret()
+  await addAccount({
+    admin,
+    realm,
+    client,
+    username,
+    email: username,
+    firstName: 'Author',
+    password,
+    credential: otpCredential(otp),
+    roles,
+  })
+  return { username, password, secret: otp }
+}
+
+/**
  * Starts the stack and returns `{ serverPort, httpsPort, keycloakUrl, agentHealthUrl, request, secureRequest, logs, stop }`. `request(host, path, { method, headers, body })`
  * sends an http request to the server with the Host header `host:serverPort`, and answers `{ status, headers, setCookie, body }`.
  * `secureRequest(host, path, { method, headers, body })` does the same over https on `httpsPort`, with the Host header `host` and the run's authority as the only root.
@@ -165,7 +297,8 @@ function systemCertDir() {
  * Give `binding` or `answersFile` for the agent host, see agentEnvironment. The tests of the stack take what createTenant needs from the other fields.
  */
 export async function startStack({ binding, answersFile } = {}) {
-  const agent = agentEnvironment({ binding, answersFile })
+  // Checks the agent host's model settings before anything starts.
+  agentEnvironment({ binding, answersFile })
   buildStack()
 
   const folder = mkdtempSync(join(tmpdir(), 'axis-ai-eval-'))
@@ -174,14 +307,12 @@ export async function startStack({ binding, answersFile } = {}) {
   const containers = []
   let stopped = false
 
-  const proxySockets = new Set()
   let proxy
 
   const stop = async () => {
     if (stopped) return
     stopped = true
     proxy?.close()
-    for (const socket of proxySockets) socket.destroy()
     await Promise.all(
       children.map(async ({ child, exited }) => {
         if (child.exitCode !== null || child.signalCode !== null) return
@@ -289,8 +420,7 @@ export async function startStack({ binding, answersFile } = {}) {
 
     // 3. The server, which reads tenants from the tenant directory and serves a new tenant after its next refresh.
     // It also serves https with a certificate for every tenant host, signed by an authority that only this run trusts.
-    const tls = issuePostgresCertificate({ folder, openssl: (...args) => run('openssl', args), name: `*.${tenantDomain}` })
-    run('openssl', ['rehash', tls.trustDir])
+    const tls = issueTenantCertificate(folder)
     const serverPort = await freePort()
     const httpsPort = await freePort()
     const studio = join(folder, 'apps')
@@ -348,44 +478,20 @@ export async function startStack({ binding, answersFile } = {}) {
 
     // 5. The agent host. It calls `https://<tenant host>/mcp` through a CONNECT proxy, which opens the tunnel to the
     // server's https port, and trusts the run's authority next to the system's roots. Plain http, such as Keycloak's, goes direct.
-    const proxyPort = await freePort()
-    proxy = http
-      .createServer((_, response) => {
-        response.writeHead(405)
-        response.end()
-      })
-      .on('connect', (connect, client, head) => {
-        const { host, port } = tunnelTarget(connect.url, httpsPort)
-        const upstream = net.connect(port, host, () => {
-          client.write('HTTP/1.1 200 Connection Established\r\n\r\n')
-          upstream.write(head)
-          upstream.pipe(client)
-          client.pipe(upstream)
-        })
-        proxySockets.add(client).add(upstream)
-        upstream.on('error', () => client.destroy())
-        client.on('error', () => upstream.destroy())
-        upstream.on('close', () => proxySockets.delete(upstream))
-        client.on('close', () => proxySockets.delete(client))
-      })
-    await new Promise((resolve, reject) => proxy.once('error', reject).listen(proxyPort, '127.0.0.1', resolve))
-    const proxyUrl = `http://127.0.0.1:${proxyPort}`
+    proxy = await startTunnelProxy(httpsPort)
     const agentPort = await freePort()
     const agentHealthUrl = `http://127.0.0.1:${agentPort}`
     const agentHost = start('agent', 'dotnet', [dll('Axis.Agent')], {
       cwd: join(root, 'src/Axis.Agent'),
-      settings: {
-        DOTNET_ENVIRONMENT: 'Testing',
-        Health__Urls: agentHealthUrl,
-        Tenancy__Source: 'directory',
-        Tenancy__RefreshInterval: '00:00:02',
-        ConnectionStrings__Platform: platform,
-        Platform__SecretKey: secretKey,
-        HTTPS_PROXY: proxyUrl,
-        https_proxy: proxyUrl,
-        SSL_CERT_DIR: `${tls.trustDir}:${systemCertDir()}`,
-        ...agent,
-      },
+      settings: agentHostSettings({
+        healthUrl: agentHealthUrl,
+        platform,
+        secretKey,
+        proxyUrl: proxy.url,
+        trustDir: tls.trustDir,
+        binding,
+        answersFile,
+      }),
     })
     await waitUntil(
       async () => {
@@ -440,43 +546,14 @@ export async function createTenant(stack, { id, start }) {
     if (body !== undefined) headers['content-type'] = 'application/x-www-form-urlencoded'
     return send(url, { method, headers, body })
   }
-  const token = await identity(`${stack.keycloakUrl}/realms/master/protocol/openid-connect/token`, new Map(), {
-    method: 'POST',
-    form: { grant_type: 'client_credentials', client_id: 'axis-admin', client_secret: stack.adminSecret },
-  })
-  if (token.status !== 200) throw new Error(`The admin token of Keycloak answered ${token.status}: ${token.body}`)
-  const accessToken = JSON.parse(token.body).access_token
-  const admin = async (method, path, body, ...statuses) => {
-    const json = body === undefined ? undefined : JSON.stringify(body)
-    const headers = { authorization: `Bearer ${accessToken}` }
-    if (json !== undefined) headers['content-type'] = 'application/json'
-    const response = await send(`${stack.keycloakUrl}${path}`, { method, headers, body: json })
-    if (!statuses.includes(response.status)) throw new Error(`${method} ${path} answered ${response.status}: ${response.body}`)
-    return response
-  }
-
-  // A new realm has no accounts, no redirect address and no roles mapper.
-  const client = await preparePlatformClient({ admin, realm: id, redirectUris: [`${origin}/*`], roles: ['author', 'publisher'] })
-  // The agent host's client has no full scope, so the author's roles reach its exchanged token through a roles mapper and a
-  // scope mapping of the platform client's roles. The send refuses a token without the author role.
-  const agentList = await admin('GET', `/admin/realms/${id}/clients?clientId=axis-agent`, undefined, 200)
-  const agentPath = `/admin/realms/${id}/clients/${JSON.parse(agentList.body)[0].id}`
-  await admin('POST', `${agentPath}/protocol-mappers/models`, rolesMapper(), 201)
-  const platformRoles = await admin('GET', `${client.path}/roles`, undefined, 200)
-  await admin('POST', `${agentPath}/scope-mappings/clients/${client.id}`, JSON.parse(platformRoles.body), 204)
-  const username = `author@${id}.test`
-  const password = secret()
-  const otp = newOtpSecret()
-  await addAccount({
+  const admin = await keycloakAdmin({ keycloakUrl: stack.keycloakUrl, adminSecret: stack.adminSecret })
+  // The author signs in on the http address, so the realm's redirect address is that origin.
+  const author = await prepareAuthoringRealm({
     admin,
     realm: id,
-    client,
-    username,
-    email: username,
-    firstName: 'Author',
-    password,
-    credential: otpCredential(otp),
+    redirectUris: [`${origin}/*`],
     roles: ['author', 'publisher'],
+    username: `author@${id}.test`,
   })
 
   const { jar } = await signIn({
@@ -485,9 +562,9 @@ export async function createTenant(stack, { id, start }) {
     realm: id,
     callbackOrigin: origin,
     returnUrl: '/',
-    username,
-    password,
-    secret: otp,
+    username: author.username,
+    password: author.password,
+    secret: author.secret,
   })
 
   const session = (path, { method = 'GET', body } = {}) => {
