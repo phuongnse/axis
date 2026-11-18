@@ -520,7 +520,8 @@ when its `amount` changes, and the amount is 1000 or more, in
   the same scope as a process's `when`.
 - It fires on every committed write through the record command: the record
   API, an inbound endpoint's create, a task form save, an `updateRecord` step,
-  a `createRecord` step, a connector output and a package operation output.
+  a `createRecord` step, a connector output, a package operation output and an
+  [import commit](import-export.md#commit).
 
 #### Schedule trigger
 
