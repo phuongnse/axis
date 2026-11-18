@@ -393,18 +393,20 @@ change, a design review and a sync are in the
 - **A prototype starts from `main` and changes only the SPA.** It never starts from another review's
   tag: a screen that an earlier review's issues have not built yet waits for them. It changes no
   server code. What a screen needs from an API is a fixture in the prototype and a contract in the
-  review's rule comments on the design issue, and NexKit builds it. When `main` changes code the
-  prototype touches, the session merges `main` into the branch and never rebases it, and `main` stays
-  the standard for behaviour and the prototype the standard for its look.
+  review's rule comments on the design issue, and NexKit builds it. At the start of every session and
+  before each step, the session merges `origin/main` into the branch and never rebases it. So the
+  previews differ from `main` only by what the review changes. `main` stays the standard for behaviour
+  and the prototype the standard for its look.
 - **The design runs ahead of the repository only by open issues.** While a design issue is open, the
   artifact holds its change and its last change note names the issue. A review does not change the
   artifact: it is published once the review's issues are merged, so nothing else in the artifact
   differs from the repository.
 - **A review's agreed rules are comments on its design issue.** The design issue stays short enough to
   read in one pass. Its body holds the review's scope and what the build must do beyond the docs,
-  because NexKit plans from the body. One comment holds the review's state: the prototype branch, what
-  is done, what waits for the owner, what comes next and each change's parts list. Before it builds a
-  change, the session lists each visible part with the shared widget, helper or token that draws it, as
+  because NexKit plans from the body. One comment holds the review's state: the prototype branch, the
+  `main` commit it stands on, what is done, what waits for the owner, what comes next and each change's
+  parts list. Before it builds a change, the session lists each visible part with the shared widget,
+  helper or token that draws it, as
   [which widget](reference/shared-widgets.md#which-widget) shows, and marks **new** each mechanism the
   change adds, so the owner decides only on what is new. The session edits that comment in place and
   never adds a second. The rules the owner agrees about one screen, or in one step of the review, share
