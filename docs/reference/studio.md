@@ -805,7 +805,7 @@ The connector editor's Form tab shows the connector's fields in the four
 each field with its label and [help](frontend.md#platform-field-help). Add operation sits on the
 Operations heading, and the JSON view stays as the second view of the same draft.
 
-- **No values.** A binding is a name, named by what it holds, and its help says which kind it is. No
+- **No values.** A binding is a name, and its help says what it holds and that the file keeps only its name. No
   value of a binding is shown or stored: the editor reads the resource and schema routes and the
   binding names, and writes only the resource, and the values stay in tenant settings.
 - **Bindings from the tenant.** A binding is chosen from the tenant's names of the kind it needs, see
@@ -840,7 +840,7 @@ the Assurance heading, and the JSON view stays as the second view of the same dr
 
 - **Type.** Choosing `accounts`, `oidc` or `saml` removes the keys the new type forbids and adds the
   bindings it requires, with an empty name. An `accounts` provider shows only General, Roles and Assurance.
-- **Bindings.** A binding is a name box, and its help says which kind it is and that only the name is
+- **Bindings.** A binding is a name box, and its help says what it holds and that only the name is
   stored. No value is shown or stored. `oidc` shows the issuer, the client ID, and a choice of client
   credential: a client secret, or a client key for `private_key_jwt`, each option with its own help.
   `saml` shows the metadata. Name and Type carry the shared required mark.
