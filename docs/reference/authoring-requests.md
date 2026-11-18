@@ -434,8 +434,11 @@ only [publishing](authoring.md#publishing) does.
 - **Conflicts.** A resource or a package file that changed since the draft recorded it is a conflict, and the
   accept answers it with one `AXC0377` diagnostic for each, naming the resource, its file and its
   new version, or the package file's path and its new version.
-- **Who changed it** _(planned for M35)_. Each `AXC0377` diagnostic also names who made the revision that changed the
-  resource, and when.
+- **Who changed it.** Each `AXC0377` diagnostic of an accept also carries `changedBy`, the author name of the newest
+  revision on `main` since the draft's start that changed the resource or the package file, and `changedAt`, that
+  revision's time as ISO 8601. The name is the one the revision stored, and a change made outside Studio is
+  named `Axis`. Both are null when no such revision is found, for example for a resource moved to a third path.
+  `GET .../requests/{id}` answers both on the accept's publish request, and no other diagnostic carries them.
 - **Retrying a conflict.** When the agent's accept meets a conflict, the request goes back to `working` with no
   draft. The agent reads the folder again, makes the change on a new draft and runs the checks and the review
   again, within the request's budgets: the request keeps its `round`, tokens and time limit. The conflicted draft

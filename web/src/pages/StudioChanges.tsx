@@ -2,6 +2,7 @@ import { Flex, Typography } from 'antd'
 import { useContext, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { EmptyDash } from '../platform/EmptyValue'
+import { FilledText } from '../platform/FilledText'
 import { fillText } from '../platform/fillText'
 import {
   changeRows,
@@ -75,7 +76,6 @@ export type StudioChangedFile = StudioRevisionChange & { titles?: Record<string,
 function ChangedBy({ application, authors }: { application: string; authors: StudioChangeAuthor[] }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const [before, after] = t('shell.studio.changes.changedBy').split('{authors}')
   const nodes: ReactNode[] = authors.map((author) => {
     switch (author.type) {
       case 'you':
@@ -92,12 +92,13 @@ function ChangedBy({ application, authors }: { application: string; authors: Stu
         )
     }
   })
-  const list = new Intl.ListFormat(locale, { type: 'conjunction' }).formatToParts(authors.map((_, index) => `${index}`))
+  // The authors joined as one list in the locale's words, each author's node in place of its index.
+  const list = new Intl.ListFormat(locale, { type: 'conjunction' })
+    .formatToParts(authors.map((_, index) => `${index}`))
+    .map((part) => (part.type === 'element' ? nodes[Number(part.value)] : part.value))
   return (
     <Typography.Text data-testid="studio-changes-by">
-      {before}
-      {list.map((part) => (part.type === 'element' ? nodes[Number(part.value)] : part.value))}
-      {after}
+      <FilledText text={t('shell.studio.changes.changedBy')} parts={{ authors: list }} />
     </Typography.Text>
   )
 }
