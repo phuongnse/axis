@@ -149,9 +149,11 @@ public sealed class StudioDraftTests(PostgreSqlFixture database) : IClassFixture
         File.WriteAllText(Path.Combine(folder.Path, file), "print('v2')\n");
         File.WriteAllText(Path.Combine(folder.Path, absent), "y");
         author.Revisions.RecordOutside();
+        var changed = author.Drafts.Conflicts(draft.Id).Value!;
         Assert.Equal(
             [new StudioDraftConflict(null, Version("print('v2')\n"), file), new StudioDraftConflict(null, Version("y"), absent)],
-            author.Drafts.Conflicts(draft.Id).Value!);
+            changed.Select(conflict => conflict with { Changed = null }));
+        Assert.All(changed, conflict => Assert.Equal("Axis", conflict.Changed?.Author));
 
         // A record that the code of an earlier release saved has no packageFiles, which reads as none.
         var path = Path.Combine(revisions.Path, Path.GetFileName(folder.Path) + ".git");
@@ -257,12 +259,14 @@ public sealed class StudioDraftTests(PostgreSqlFixture database) : IClassFixture
             new StudioDraftConflict(rule.Id, StudioFolder.List(folder.Path).Single(file => file.Id == rule.Id).Version),
             new StudioDraftConflict(policy, StudioFolder.List(folder.Path).Single(file => file.Id == policy).Version),
         };
-        Assert.Equal(expected.OrderBy(conflict => conflict.Id), conflicts);
+        Assert.Equal(expected.OrderBy(conflict => conflict.Id), conflicts.Select(conflict => conflict with { Changed = null }));
+        Assert.All(conflicts, conflict => Assert.Equal("Axis", conflict.Changed?.Author));
         Assert.DoesNotContain(conflicts, conflict => conflict.Id == unrelated.Id);
 
         File.Delete(Path.Combine(folder.Path, RuleFile));
         author.Revisions.RecordOutside();
-        Assert.Contains(new StudioDraftConflict(rule.Id, null), author.Drafts.Conflicts(draft.Id).Value!);
+        var removed = Assert.Single(author.Drafts.Conflicts(draft.Id).Value!, conflict => conflict.Id == rule.Id && conflict.Version is null);
+        Assert.Equal("Axis", removed.Changed?.Author);
     }
 
     [Fact]
