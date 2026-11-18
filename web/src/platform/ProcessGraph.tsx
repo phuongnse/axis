@@ -17,7 +17,12 @@ import '@xyflow/react/dist/style.css'
 import {
   ApartmentOutlined,
   BranchesOutlined,
+  CheckCircleFilled,
+  ClockCircleFilled,
   ClockCircleOutlined,
+  CloseCircleFilled,
+  ExclamationCircleFilled,
+  MinusCircleFilled,
   FlagOutlined,
   HourglassOutlined,
   ThunderboltOutlined,
@@ -35,19 +40,19 @@ import {
   useState,
 } from 'react'
 import { ProcessGraphControls } from './ProcessGraphControls'
-import { StatusTag, type StatusTone } from './StatusTag'
+import type { StatusTone } from './StatusTag'
 import { Tooltip, Typography } from 'antd'
 import { typeTokens } from './designTokens'
 import { useDesignTokens, useThemeMode } from './themeMode'
 
-const nodeWidth = 272
+const nodeWidth = 216
 /**
  * Proposed, see the review on #3650: a card is as tall as it is drawn: its label takes one line or two, a longer one
  * ending in an ellipsis with its tooltip and accessible name holding it whole. The graph draws each card hidden, once
  * the label's font has loaded, measures it, and lays out with that height, as React Flow lays out with ELK; a card that
  * changes size later, as when a font arrives late, lays the graph out again. `fallbackHeight` stands in before then.
  */
-const fallbackHeight = 68
+const fallbackHeight = 52
 /** The label's type, which the card draws it in and the measure uses, so both wrap alike. */
 const labelType = { size: 14, weight: 600, lineHeight: 20 }
 /**
@@ -66,10 +71,10 @@ async function labelFontLoaded(): Promise<void> {
 const handleSize = 10
 
 /**
- * How a step's node is drawn. `selected` is the step a designer edits, in the primary colour; `error` has a diagnostic,
- * in the danger colour; `current` is the step an instance is at, in the primary colour and twice as thick; `taken` is a
- * step an instance has run, in the success text colour; `idle` is a step an instance has not reached, its border and
- * text muted; `plain` is any other.
+ * How a step's node is drawn. `selected` is the step a designer edits, with a 2 px `primary` border; `error` has a
+ * diagnostic in a designer, with a `danger` border, or failed on an instance; `current` is the step an instance is at;
+ * `taken` is a step an instance has run; `idle` is a step an instance has not reached, its text muted; `plain` is any
+ * other. On an instance a step's state is its corner's icon, and its border is `borderSubtle` unless it is chosen.
  */
 export type ProcessGraphTone = 'plain' | 'selected' | 'error' | 'current' | 'taken' | 'idle'
 
@@ -459,24 +464,23 @@ const stepIcons: Record<string, ComponentType> = {
  */
 /**
  * Proposed, see the review on #3650: a step's card, which the graph draws in its node and also, hidden, to measure it,
- * so the height the layout gives a card is the height the card takes, in the same font and widths. Its border is as
- * thick as the lines of the steps: 2 px on a step an instance ran, is at or failed at, as its lines are, the second
- * pixel inside the border so the card keeps its size, and 1 px on any other. The step chosen, in a designer or by a
- * click or Find a step, takes a ring of `focusRing` outside it, a shape no border has, so it shows on a card of any tone.
+ * so the height the layout gives a card is the height the card takes, in the same font and widths. A card's state on an
+ * instance is its corner's icon, as Camunda Operate, n8n and Azure Logic Apps mark a run's steps, so its border says
+ * only which step is chosen: `borderSubtle` on every card, and 2 px of `primary` on the step chosen, in a designer or
+ * by a click or Find a step, the second pixel inside the border so the card keeps its size. A designer's step with a
+ * diagnostic keeps a `danger` border.
  */
 function StepCard({ data, fill }: { data: ProcessGraphStep; fill: boolean }) {
   const { colour, radius, spacing } = useDesignTokens()
   const found = useContext(FoundStep)
-  const edge = {
-    plain: colour.border,
-    selected: colour.primary,
-    error: colour.danger,
-    current: colour.primary,
-    taken: colour.successText,
-    idle: colour.borderSubtle,
-  }[data.tone]
-  const strong = data.tone === 'current' || data.tone === 'taken' || data.tone === 'error'
   const chosen = data.tone === 'selected' || found === data.id
+  const edge = chosen
+    ? colour.primary
+    : data.tone === 'error' && data.status === undefined
+      ? colour.danger
+      : data.tone === 'plain'
+        ? colour.border
+        : colour.borderSubtle
   const Icon = stepIcons[data.kind] ?? ThunderboltOutlined
   const muted = data.tone === 'idle'
   return (
@@ -490,7 +494,7 @@ function StepCard({ data, fill }: { data: ProcessGraphStep; fill: boolean }) {
       style={{
         display: 'flex',
         alignItems: 'flex-start',
-        gap: spacing.sm,
+        gap: spacing.xs,
         width: '100%',
         height: fill ? '100%' : undefined,
         padding: `${spacing.xs}px ${spacing.sm}px`,
@@ -500,10 +504,7 @@ function StepCard({ data, fill }: { data: ProcessGraphStep; fill: boolean }) {
         color: muted ? colour.textMuted : colour.text,
         background: colour.surface,
         border: `1px solid ${edge}`,
-        boxShadow: strong ? `inset 0 0 0 1px ${edge}` : undefined,
-        // `focusRing`, which reaches 3:1 on the canvas in both modes, as `primary` does not in dark mode.
-        outline: chosen ? `2px solid ${colour.focusRing}` : undefined,
-        outlineOffset: chosen ? 3 : undefined,
+        boxShadow: chosen ? `inset 0 0 0 1px ${edge}` : undefined,
         borderRadius: radius.base,
         cursor: 'pointer',
       }}
@@ -516,18 +517,18 @@ function StepCard({ data, fill }: { data: ProcessGraphStep; fill: boolean }) {
             flex: 'none',
             alignItems: 'center',
             justifyContent: 'center',
-            width: 28,
-            height: 28,
+            width: 24,
+            height: 24,
             borderRadius: radius.base,
-            color: data.tone === 'current' || data.tone === 'selected' ? colour.primaryText : colour.textMuted,
+            color: chosen ? colour.primaryText : colour.textMuted,
             background: colour.canvas,
           }}
         >
           <Icon />
         </span>
       </Tooltip>
-      {/* The label's first line sits level with the icon: 4 px down, half of the 28 px tile less its 20 px line. */}
-      <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, paddingTop: 4 }}>
+      {/* The label's first line sits level with the icon: 2 px down, half of the 24 px tile less its 20 px line. */}
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 0, minWidth: 0, paddingTop: 2 }}>
         {/* At most two lines, then an ellipsis, with the whole label in a tooltip only when it is cut. */}
         <Typography.Paragraph
           ellipsis={{ rows: 2, tooltip: data.name }}
@@ -541,12 +542,13 @@ function StepCard({ data, fill }: { data: ProcessGraphStep; fill: boolean }) {
         >
           {data.name}
         </Typography.Paragraph>
-        {data.status ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, fontSize: 12, lineHeight: '20px' }}>
-            <StatusTag tone={data.status.tone}>{data.status.text}</StatusTag>
-            {data.status.detail !== undefined && (
+        {data.status
+          ? // The state is the corner's icon; the line keeps how long the step lasted or how often it ran.
+            data.status.detail !== undefined && (
               <span
                 style={{
+                  fontSize: 12,
+                  lineHeight: '16px',
                   color: colour.textMuted,
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
@@ -555,18 +557,60 @@ function StepCard({ data, fill }: { data: ProcessGraphStep; fill: boolean }) {
               >
                 {data.status.detail}
               </span>
+            )
+          : // A step's type is its icon's tooltip, so the card says no more than a layer's mark under its label.
+            data.note !== undefined && (
+              <span style={{ fontSize: 12, lineHeight: '16px', color: colour.textMuted }}>
+                <span data-layer-mark={data.note.kind}>{data.note.text}</span>
+              </span>
             )}
-          </span>
-        ) : (
-          // A step's type is its icon's tooltip, so the card says no more than a layer's mark under its label.
-          data.note !== undefined && (
-            <span style={{ fontSize: 12, lineHeight: '16px', color: colour.textMuted }}>
-              <span data-layer-mark={data.note.kind}>{data.note.text}</span>
-            </span>
-          )
-        )}
       </span>
     </button>
+  )
+}
+
+/** Proposed, see the review on #3650: the icon of a step's state on an instance, in its tone's colour. */
+const stateIcons: Record<StatusTone, ComponentType<{ style?: React.CSSProperties }>> = {
+  success: CheckCircleFilled,
+  danger: CloseCircleFilled,
+  attention: ExclamationCircleFilled,
+  neutral: ClockCircleFilled,
+  muted: MinusCircleFilled,
+}
+
+/**
+ * Proposed, see the review on #3650: a step's state on an instance as an icon on its card's top right corner, on a disc
+ * of `surface` that cuts the border, with the state's words as its tooltip; the card's accessible name says it too.
+ */
+function StateBadge({ status }: { status: NonNullable<ProcessGraphStep['status']> }) {
+  const { colour } = useDesignTokens()
+  const tones: Record<StatusTone, string> = {
+    success: colour.successText,
+    danger: colour.dangerText,
+    attention: colour.warningText,
+    neutral: colour.infoText,
+    muted: colour.textMuted,
+  }
+  const Icon = stateIcons[status.tone]
+  return (
+    <Tooltip title={status.text}>
+      <span
+        aria-hidden
+        style={{
+          position: 'absolute',
+          top: -8,
+          right: -8,
+          display: 'flex',
+          padding: 1,
+          borderRadius: '50%',
+          background: colour.surface,
+          fontSize: 16,
+          lineHeight: 1,
+        }}
+      >
+        <Icon style={{ color: tones[status.tone] }} />
+      </span>
+    </Tooltip>
   )
 }
 
@@ -577,6 +621,7 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
       {/* Hidden, not removed, so React Flow still measures where a transition comes in. */}
       <Handle type="target" position={Position.Left} isConnectable={false} style={{ visibility: 'hidden' }} />
       <StepCard data={data} fill />
+      {data.status && <StateBadge status={data.status} />}
       <Handle
         type="source"
         position={Position.Right}
