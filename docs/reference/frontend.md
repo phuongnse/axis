@@ -135,7 +135,15 @@ A value reads the same in every widget: in an input, a read-only field, a table 
   KPI's dash carries a visually hidden `shell.kpi.empty` ("No value") for assistive technology. Words go where fields
   are read one by one, and a dash where values are read at a glance or compared. What tells an empty value from a
   typed one is the styling, in which no value is ever drawn, never the words.
-- **No identifiers.** No widget shows a GUID to a user.
+- **When something happened** _(planned)_. A record in time, such as a timeline's run, a history's entry or a
+  notification, reads within a week as how long ago, in the locale's words, such as "5 minutes ago". Its exact date and
+  time is its tooltip, read after the words, and the words move on once a minute. After a week it reads its date and
+  time, as above. A date or a time that is data, such as a field, a due date or an instance's Started, keeps its format.
+- **A duration under a second** _(planned)_. It reads "< 1 sec" ("< 1 giây").
+- **No identifiers.** No widget shows a whole GUID to a user. Only a copyable id shows part of one.
+- **A copyable id** _(planned)_. Where a person needs an id to quote, such as a process instance's ID or a run's trace
+  ID, the id shows its first 8 characters in the code font and copies the whole id, see
+  [which widget](shared-widgets.md#which-widget).
 
 ## Text resolution
 

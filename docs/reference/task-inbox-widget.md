@@ -36,9 +36,11 @@ A page whose widget is a `taskInbox` lists the signed-in user's open tasks in th
   `releaseId`, once per release, so tasks from several releases each show their own release's labels.
   The table stays loading until those texts have arrived, and a failed load shows the inbox's load
   error.
-- **Tags.** An overdue task shows a red "Overdue" tag beside its due date. A task with `claimedBy` set
+- **Tags.** An overdue task shows an "Overdue" tag beside its due date. A task with `claimedBy` set
   shows a "Claimed by you" tag beside its label. The task list returns a claimed task only to its
   claimer, so the signed-in user is always the claimer, and the inbox does not fetch the user.
+- **Tags as statuses** _(planned)_. Overdue is a `StatusTag` in `attention`, and Claimed by you a `StatusTag` in
+  `neutral`, see [which widget](shared-widgets.md#which-widget).
 - **At risk** _(planned for M39)_. A task with `atRisk` that is not overdue shows an "At risk" tag in the
   warning tone beside its due date. It is a `StatusTag`, see [shared widgets](shared-widgets.md). "Overdue"
   stays the tag of a past due time.

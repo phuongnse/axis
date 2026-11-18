@@ -431,13 +431,6 @@
       "note": "The step where AI makes its change, after its plan is approved. Shown as an item of a request's page."
     },
     {
-      "concept": "Duration",
-      "en": "duration",
-      "vi": "thời lượng",
-      "status": "proposed",
-      "note": "How long a step of an AI request took, as a column of its History table."
-    },
-    {
       "concept": "AI request state: Planning",
       "en": "Planning",
       "vi": "Đang lập kế hoạch",
