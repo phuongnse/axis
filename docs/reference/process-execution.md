@@ -487,9 +487,12 @@ row whose output is `{ "operationId", "outcome": "failed" }`. The transaction wr
 `connector.called`, with the same details as a successful call, and `process.failed`, both with the
 actor `system`.
 
-No request or response body is ever stored. The stored input lives only on the call row, which a
-connector call keeps after it settles, see [Call input kept](process-inspection.md#call-input-kept).
-It never appears in history, audit records or logs, and inspection shows it only under the
+The stored input lives only on the call row, which a connector call keeps after it settles, see
+[Call input kept](process-inspection.md#call-input-kept).
+
+**Request and responses.** _(planned)_ The call
+row also keeps the request, and each attempt keeps its response, with every secret as `[secret]`. Neither
+is copied to history, audit records or logs, and inspection shows them only under the
 [masking rule](process-inspection.md#values-and-masking).
 
 ### Call outcomes

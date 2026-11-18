@@ -194,6 +194,7 @@ payment reference from the sample extension package, see
   and an `onError` entry's `next` are transitions too. See [Process blocks](process-blocks.md#structure)
   and [Error paths](#error-paths).
 - `kind` is the resource kind. Steps use `type`, as fields and widgets do.
+- **`title`.** _(planned)_ A required text resource that names the process, as [resource files](resource-files.md#resource-file-shape) says.
 
 ## Steps
 
@@ -219,6 +220,8 @@ and operations, and where each is described:
 | `repeat`                                                | _(planned for M38)_ Runs its body for each item, a number of times, while or until a condition | [Repeat step](process-blocks.md#repeat-step) |
 | `end`                                                   | Completes the instance                                               | Below                                                            |
 
+- **Labels.** _(planned)_ Every step may have an optional `label`, a text resource, and so may each
+  `branches[]` entry of a decision. A task's `label` and each outcome's `label` stay required.
 - **`decision`.** `branches` is an ordered list, and each branch has a `name`, a `when` expression
   and a `next` step. A branch name is unique in its decision, ignoring letter case. The branches are
   evaluated in order and the first one that is true wins, and a `when` that gives `null` counts as
@@ -421,6 +424,8 @@ Each code is in the [diagnostic code table](diagnostic-codes.md).
   `/steps/{i}/outcomes/{j}/name`).
 - The `startCondition` message's text key, each task `label`'s and each outcome `label`'s exist,
   checked like other labels (`AXC0028`).
+- **Labels.** _(planned)_ `label` is a property of every step type and of a decision branch, not of a
+  task only. Each key joins the `AXC0028` check.
 - Every expression gets the usual syntax, type and cost diagnostics, see
   [Diagnostics](expressions.md#diagnostics).
 - **Blocks.** _(planned for M38)_ A `parallel` or `repeat` step is checked as

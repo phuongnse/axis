@@ -28,7 +28,7 @@ and keeps every part of it that still holds.
 - **A file keeps its earlier versions.** Replacing a file keeps the one before, up to a number of
   versions, and a person who may update the record lists them and restores one.
 - **Bytes go where a `storage` binding says.** `storage` is a kind of
-  [deployment binding](d25-connectors-deployment-bindings-and-secrets.md), named by the application
+  [deployment binding](d161-connector-calls-run-on-bindings-and-secrets-keep-their-request-and-responses-for-inspection-and-a-steps-error-is-a-code.md), named by the application
   manifest's `fileStorage`. Its value is `database`, the default, which keeps the bytes in the tenant
   database, or an object storage that speaks the S3 protocol, which keeps them outside it. A command
   moves a tenant's files from one to the other.

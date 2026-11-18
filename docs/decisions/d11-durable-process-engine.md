@@ -21,4 +21,4 @@ are retried blindly.
 ## Consequences
 
 A crash leaves no partial step, and every external call needs a way to settle an unknown outcome,
-which [D25](d25-connectors-deployment-bindings-and-secrets.md) gives.
+which [D161](d161-connector-calls-run-on-bindings-and-secrets-keep-their-request-and-responses-for-inspection-and-a-steps-error-is-a-code.md) gives.
