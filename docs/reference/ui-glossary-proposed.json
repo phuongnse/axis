@@ -135,6 +135,13 @@
       "status": "proposed"
     },
     {
+      "concept": "Action: Overwrite",
+      "en": "Overwrite",
+      "vi": "Ghi đè",
+      "status": "proposed",
+      "note": "Replaces a saved view's search, filter and sort with the current ones."
+    },
+    {
       "concept": "Calendar",
       "en": "calendar",
       "vi": "lịch làm việc",

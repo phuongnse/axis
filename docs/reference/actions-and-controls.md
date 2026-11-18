@@ -263,8 +263,8 @@ be kept right.
 - **Saved views.** A person saves a table's search, filter and sort under a name, and the view is kept on the server
   for that person and table. Views is an icon button after Columns, and it shows once the person's views have
   loaded. It opens a dialog that lists the person's views of the table by name, in the page language's collation,
-  with a Name field and Save view. A view's name opens it. A view is renamed in its own line, and deleted in its own
-  line after a question, so the dialog opens no dialog of its own.
+  with a Name field and Save view. A view's name opens it. A view is renamed in its own line, overwritten and
+  deleted in its own line after a question, so the dialog opens no dialog of its own.
 - **Opening a view.** It writes the view's search, filter and sort into the address at page 1, with a history entry,
   so Back returns. The columns, the page size and the data source values stay. An empty part of the view clears that
   part. The values are checked as the address's are, so a filter that names a field the table no longer has is
@@ -272,7 +272,11 @@ be kept right.
 - **A refused save.** A name that is empty or that another of the person's views has, ignoring letter case, is
   refused before anything is sent. Any other save the server refuses leaves the dialog open with "The view could not
   be saved.", and the address and the list stay as they were.
-- **Overwrite a view** _(planned)_. A person replaces a view's search, filter and sort with the current ones.
+- **Overwrite a view.** Overwrite replaces a view's search, filter and sort with the address's current ones, after
+  the question "Overwrite the view {name} with the current search, filter and sort?" in the view's own line. The
+  view keeps its name and its place in the list. The columns, the page size and the data source values stay out, as
+  they do on Save view. After the overwrite the line shows the view again and the dialog stays open. A write the
+  server refuses leaves the dialog open with "The view could not be overwritten.", and the list stays as it was.
 - **Which tables keep a choice.** A table whose view `useTableView` keeps in the address, and that
   has a key, keeps its columns and views on the server. A table in a dialog keeps its view in the dialog and keeps
   nothing. The cell console's tables pass no key, because its host has no tenant database. Studio's page canvas

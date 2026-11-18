@@ -13,7 +13,7 @@ import {
 } from './tableQuery'
 
 /**
- * The saved views of a table with a key, and the means to open, save, rename and delete them, see
+ * The saved views of a table with a key, and the means to open, save, rename, overwrite and delete them, see
  * docs/reference/actions-and-controls.md#tables. The writes answer whether the server took them.
  */
 export interface TableSavedViews {
@@ -23,6 +23,8 @@ export interface TableSavedViews {
   /** Saves the address's search, filter and sort under `name`. */
   save: (name: string) => Promise<boolean>
   rename: (view: SavedTableView, name: string) => Promise<boolean>
+  /** Replaces the view's search, filter and sort with the address's, and keeps its name. */
+  overwrite: (view: SavedTableView) => Promise<boolean>
   remove: (view: SavedTableView) => Promise<boolean>
 }
 
@@ -55,7 +57,7 @@ export function useTableView(
   saved: TableSavedViews | undefined
 } {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { choices, keepColumns, saveView, renameView, deleteView } = useTableChoices(tableKey)
+  const { choices, keepColumns, saveView, replaceView, deleteView } = useTableChoices(tableKey)
   const view = useMemo(
     () =>
       parseTableQuery(
@@ -130,6 +132,15 @@ export function useTableView(
     if (choices === undefined) {
       return undefined
     }
+    // What a saved view holds of the address: its search, filter and sort, and not the columns, page size or data source values.
+    const current = () => {
+      const written = writeTableQuery(new URLSearchParams(), view, defaultPageSize, parameterNames, prefix)
+      return {
+        search: written.get(`${prefix}search`),
+        filter: written.get(`${prefix}filter`),
+        sort: written.get(`${prefix}sort`),
+      }
+    }
     return {
       views: choices.views,
       open: (opened) => {
@@ -146,16 +157,9 @@ export function useTableView(
         const parsed = parseTableQuery(params, fields, defaultPageSize, [], searchable, filterable, false, prefix)
         setView({ ...view, page: 1, search: parsed.search, filter: parsed.filter, sort: parsed.sort })
       },
-      save: (name) => {
-        const written = writeTableQuery(new URLSearchParams(), view, defaultPageSize, parameterNames, prefix)
-        return saveView({
-          name,
-          search: written.get(`${prefix}search`),
-          filter: written.get(`${prefix}filter`),
-          sort: written.get(`${prefix}sort`),
-        })
-      },
-      rename: renameView,
+      save: (name) => saveView({ name, ...current() }),
+      rename: (renamed, name) => replaceView({ ...renamed, name }),
+      overwrite: (replaced) => replaceView({ ...replaced, ...current() }),
       remove: deleteView,
     }
   }, [
@@ -169,7 +173,7 @@ export function useTableView(
     prefix,
     setView,
     saveView,
-    renameView,
+    replaceView,
     deleteView,
   ])
   return { view, setView, saved }
