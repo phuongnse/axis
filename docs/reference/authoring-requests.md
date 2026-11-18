@@ -388,12 +388,14 @@ only [publishing](authoring.md#publishing) does.
   A refused call is a tool error that stores nothing. A call while an accept of the draft is queued or running
   answers that accept and stores no second one.
 
-- **Open blocking findings** _(planned for M35)_. `accept_draft` refuses with a tool error when the `open` findings of
-  the newest review hold a blocking finding, see [the review's shape](#states). The author's accept route does not
-  refuse, so the author stays the gate.
-- **The gate** _(planned for M35)_. When the rules above do not hold, `accept_draft` answers with the request page's
+- **Open blocking findings** _(planned for M35)_. `accept_draft` refuses when the `open` findings of the newest
+  review hold a blocking finding, see [the review's shape](#states), and sends the person to the request's page as
+  the gate below says. The author's accept route does not refuse, so the author stays the gate.
+- **The gate** _(planned for M35)_. Two refusals send the person to the request's page: the auto-accept rules above
+  do not hold, and the newest review has an open blocking finding. `accept_draft` then answers with the page's
   address as a URL elicitation, see [tools](mcp-server.md#tools), and the agent host's accept step records that as
-  `refused`.
+  `refused`. Every other refusal stays a tool error that stores nothing, such as a caller who is not the author of
+  the request, or a request that is not `ready`.
 - **Outside apps** _(planned for M35)_. `accept_draft` from an outside app works under the rules of a Studio request:
   the application allows auto-accept, the request asked for it when its plan was proposed, and the newest check and
   review passed. A `notReviewed` review never passes. The agent host's accept step claims an outside app's `ready`

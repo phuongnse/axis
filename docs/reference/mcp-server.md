@@ -192,8 +192,8 @@ A tool with an optional draft reads the working folder without it and the person
   `https://<host>/studio?app=<name>&request=<id>`, see
   [the request panel](ai-authoring-in-studio.md#the-request-panel).
 - **Gates** _(planned for M35)_. No tool approves a plan. A write on a request in `awaitingApproval`, and an
-  `accept_draft` that the rules refuse, answer the JSON-RPC error `-32042` (`URLElicitationRequiredError` of version
-  `2025-11-25`) whose `data.elicitations` holds one elicitation of the mode `url`, with an `elicitationId`, a
+  `accept_draft` that the rules refuse, answer the JSON-RPC error `-32042` (`URLElicitationRequiredError` of
+  [the pinned version](#route-and-transport)) whose `data.elicitations` holds one elicitation of the mode `url`, with an `elicitationId`, a
   `message` and the page's address as its `url`. A gate never uses form mode, because
   an AI drives the answer in form mode, while a URL opens Axis in the person's own browser session. A client that
   did not declare `elicitation.url` at `initialize` gets a tool error that names the address.
