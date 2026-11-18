@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -86,6 +86,29 @@ describe('ActionBar', () => {
     expect(entries[0]).not.toHaveAttribute('aria-disabled', 'true')
     expect(entries[1]).toHaveAttribute('aria-disabled', 'true')
     expect(screen.getByRole('button', { name: 'Publish…' })).toBeInTheDocument()
+  })
+})
+
+describe('a docked ActionBar', () => {
+  it('stays at the foot of the window across the nearest main and leaves its height in the page', () => {
+    renderIn(
+      <main>
+        <ActionBar docked data-testid="docked-bar" start={<span>Start</span>} />
+      </main>,
+    )
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ left: 240, width: 800 } as DOMRect)
+    window.dispatchEvent(new Event('resize'))
+
+    const wrapper = screen.getByTestId('docked-bar')
+    expect(wrapper).toHaveStyle({ position: 'fixed', bottom: '0px' })
+    return waitFor(() => expect(wrapper).toHaveStyle({ left: '240px', width: '800px' }))
+  })
+
+  it('is drawn in the flow, with no fixed wrapper, unless it is docked', () => {
+    renderIn(<ActionBar data-testid="plain-bar" start={<span>Start</span>} />)
+
+    expect(screen.queryByTestId('plain-bar')).toBeNull()
+    expect(screen.getByText('Start').closest('[data-action-bar]')?.parentElement?.style.position).not.toBe('fixed')
   })
 })
 

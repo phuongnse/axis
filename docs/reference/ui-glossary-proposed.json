@@ -403,6 +403,20 @@
       "note": "What AI will change in an application, which its author approves. It is not the billing plan, which is \"gói dịch vụ\"."
     },
     {
+      "concept": "Action: Approve plan",
+      "en": "Approve plan",
+      "vi": "Duyệt kế hoạch",
+      "status": "proposed",
+      "note": "The author's action that starts the work of an AI request once its plan is read."
+    },
+    {
+      "concept": "Action: Drop (an AI request)",
+      "en": "Drop",
+      "vi": "Bỏ yêu cầu",
+      "status": "proposed",
+      "note": "Ends an AI request. The Vietnamese is not \"Hủy\", because the same dialog has Cancel."
+    },
+    {
       "concept": "Work (of an AI request)",
       "en": "Work",
       "vi": "Thực hiện",

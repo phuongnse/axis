@@ -1642,6 +1642,46 @@ export async function fetchAuthoringRequest(
 }
 
 /**
+ * Posts an action on one authoring request, `approve`, `change-plan` or `drop`, and answers the request. A 401 shows the
+ * sign-in prompt and throws, as any other failed status does.
+ */
+async function postAuthoringRequestAction(
+  application: string,
+  id: string,
+  action: 'approve' | 'change-plan' | 'drop',
+  body?: { comment: string },
+): Promise<AuthoringRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests/${encodeURIComponent(id)}/${action}`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    ...(body === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as AuthoringRequest
+}
+
+/** Approves the plan of a request, which moves it to `working`, see docs/reference/authoring-requests.md#routes. */
+export function approveAuthoringRequest(application: string, id: string): Promise<AuthoringRequest> {
+  return postAuthoringRequestAction(application, id, 'approve')
+}
+
+/** Asks for another plan with the author's `comment` (1 to 2,000 characters), which moves the request back to `planning`. */
+export function changeAuthoringRequestPlan(
+  application: string,
+  id: string,
+  comment: string,
+): Promise<AuthoringRequest> {
+  return postAuthoringRequestAction(application, id, 'change-plan', { comment })
+}
+
+/** Drops a request, which ends it as `dropped`. */
+export function dropAuthoringRequest(application: string, id: string): Promise<AuthoringRequest> {
+  return postAuthoringRequestAction(application, id, 'drop')
+}
+
+/**
  * The answer of an undo: `undone` with the new revision, `blocked` with the later revisions that changed the same files,
  * or `start` for the start of history, which nothing undoes.
  */

@@ -18,9 +18,10 @@ request opens its own page.
   [D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
 - **After a send.** The main area opens the request's address,
   `/studio?app=<application>&view=requests&request=<id>`. The panel stays open and empty for the next request.
-- **The request's page** _(planned for M35)_. The plan shows there once AI has written it. The notices of AI
-  requests open the same address, see [tenant notices](notifications.md#tenant-notices). What the page shows is
-  in [a request's page](#a-requests-page).
+- **The request's page.** The plan shows there once AI has written it. What the page shows is in
+  [a request's page](#a-requests-page).
+- **Notices** _(planned for M35)_. The notices of AI requests open the same address, see
+  [tenant notices](notifications.md#tenant-notices).
 - **The panel lists no requests.** The panel has no list.
 - **The bell and the sidebar** _(planned for M35)_. The [bell](notifications.md#the-bell) tells an author when a
   request of theirs waits for them or ends, and the sidebar's AI requests entry, below, leads to every request.
@@ -80,8 +81,9 @@ A request's page shows one request: its heading, [the feed](#the-feed) and [the 
 - An unknown request shows "This request does not exist."
 - **The link to the request panel** _(planned for M35)_. The unknown request's line also has an Ask AI link,
   which opens [the request panel](#the-request-panel).
-- **A failed action** _(planned for M35)_. A failed action shows "That did not work. Try again." in an
-  [alert](shared-widgets.md#which-widget) above the feed.
+- A failed action shows "That did not work. Try again." in an
+  [alert](shared-widgets.md#which-widget) above the plan. A failed reply shows it inside its dialog instead, see
+  [replies](#replies).
 
 ### The states
 
@@ -167,49 +169,46 @@ Result, Started and Duration.
 
 ### The guide
 
-_(planned for M35)_
-
 The bar at the foot of the window guides the author in every state. It is an
 [action bar](actions-and-controls.md#buttons) with a few words of where the request stands, at most one main
 action, and the other actions before it. Actions that do not fit fold into More, and
 [what comes next](actions-and-controls.md#what-comes-next) gives the rule for every screen. Drop… sits in the
-bar, never in the heading.
+bar, never in the heading. Only the request's author sees its actions.
 
 | State                                         | Words                                                    | Main action                                                                                                       | Others                                                              |
 | --------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | AI writes the plan                            | AI is writing the plan                                   | none                                                                                                              | Drop…                                                               |
 | The plan waits, for its author                | Plan ready for your approval                             | Approve plan                                                                                                      | Drop…, Change the plan…                                             |
-| The plan waits with questions, for its author | "1 question to answer", or "<n> questions to answer"     | Answer…, which opens the reply as "Your answers"                                                                  | Drop…                                                               |
+| The plan waits with questions, for its author _(planned for M35)_ | "1 question to answer", or "<n> questions to answer"     | Answer…, which opens the reply as "Your answers"                                                                  | Drop…                                                               |
 | The plan waits, for anyone else               | Waiting for its author's approval                        | none                                                                                                              | none                                                                |
 | AI works, checks or reviews                   | AI is working on it                                      | none                                                                                                              | Drop…                                                               |
-| AI waits for an outside app                   | The app's line, as [below](#an-outside-apps-request) gives it | none                                                                                                         | Drop…                                                               |
-| Ready, a finding must change                  | "1 blocking finding", or "<n> blocking findings"         | Ask AI to fix it, which asks for changes with "Fix what the review found must change:" and each blocking finding as the comment | Drop…, Ask for other changes…, Accept anyway…, see [the diff](#the-diff) |
-| Ready, passed                                 | Checks and review passed                                 | Accept                                                                                                            | Drop…, Ask for other changes…                                       |
-| Ready, an accept met a conflict               | Resources changed since AI read them                     | Make the change again                                                                                             | Drop…                                                               |
-| Ready, for anyone else                        | Waiting for its author to accept                         | none                                                                                                              | none                                                                |
-| Accepting                                     | Accepting the draft                                      | none                                                                                                              | none                                                                |
-| Failed, for its author                        | AI could not finish                                      | Send again, which sends its words as a new request and opens it                                                   | Drop…                                                               |
+| AI waits for an outside app _(planned for M35)_ | The app's line, as [below](#an-outside-apps-request) gives it | none                                                                                                         | Drop…                                                               |
+| Ready, a finding must change _(planned for M35)_ | "1 blocking finding", or "<n> blocking findings"         | Ask AI to fix it, which asks for changes with "Fix what the review found must change:" and each blocking finding as the comment | Drop…, Ask for other changes…, Accept anyway…, see [the diff](#the-diff) |
+| Ready, passed _(planned for M35)_ | Checks and review passed                                 | Accept                                                                                                            | Drop…, Ask for other changes…                                       |
+| Ready, an accept met a conflict _(planned for M35)_ | Resources changed since AI read them                     | Make the change again                                                                                             | Drop…                                                               |
+| Ready, for anyone else _(planned for M35)_ | Waiting for its author to accept                         | none                                                                                                              | none                                                                |
+| Accepting _(planned for M35)_ | Accepting the draft                                      | none                                                                                                              | none                                                                |
+| Failed, for its author _(planned for M35)_ | AI could not finish                                      | Send again, which sends its words as a new request and opens it                                                   | Drop…                                                               |
 | Accepted                                      | Accepted. Live once published                            | none                                                                                                              | none                                                                |
 | Dropped                                       | Dropped. Nothing changed                                 | none                                                                                                              | none                                                                |
 
 ### Replies
 
-_(planned for M35)_
-
-Each reply opens a dialog drawn by [`ReasonDialog`](shared-widgets.md#which-widget). A reply takes up to
-2,000 characters, and its dialog has Cancel. A failure shows inside the dialog.
+A reply that asks for words opens a dialog drawn by [`ReasonDialog`](shared-widgets.md#which-widget). It takes up
+to 2,000 characters, and its dialog has Cancel. A failure shows inside the dialog.
 
 - **Change the plan…** is a secondary action for a plan that waits with no questions. Its `medium` dialog,
   "Change the plan", asks "What should the plan do differently?", and its button is **Ask for a new plan**.
-- **Answer…** is the main action while the plan has questions. Its `medium` dialog, "Answer the plan's
+- **Answer…** _(planned for M35)_ is the main action while the plan has questions. Its `medium` dialog, "Answer the plan's
   questions", asks for "Your answers". Its help says "AI writes the plan again with your answers, and you
   approve it." Its button is **Ask for a new plan**, and it sends the answers as a change of plan.
-- **Ask for other changes…** is a secondary action for a ready draft with no conflict. Its `medium` dialog,
+- **Ask for other changes…** _(planned for M35)_ is a secondary action for a ready draft with no conflict. Its `medium` dialog,
   "Ask for other changes", asks "What should AI change?". Its help says "AI works on the same draft with your
   comment, then the checks and the review run again." Its button is **Ask AI to change it**.
 - **Drop…** is a secondary action that opens a `small` dialog, "Drop this request?". It says that AI stops
-  working on the request and that its draft is deleted. Its button is **Drop**, in the destructive role.
-- **Send again** is the main action of a failed request. It sends the request's words as a new request and
+  working on the request and that its draft is deleted. It has Cancel and no field, and its button is **Drop**, in the
+  destructive role. A failed drop shows in [the page's alert](#the-heading).
+- **Send again** _(planned for M35)_ is the main action of a failed request. It sends the request's words as a new request and
   opens that request's page.
 
 ### An outside app's request
@@ -226,22 +225,37 @@ These lines are the bar's words and the Work item's line.
 
 ## The plan
 
-_(planned for M35)_
-
 A request waits for its author's approval of the plan before any change is made. The plan says what the
-application will change, so its author can decide. The page shows it as the Plan item of [the feed](#the-feed).
+application will change, so its author can decide. The page shows it as a part titled Plan, under the heading.
 
-The Plan item shows the plan in each of its states.
+The Plan part shows the plan in each of its states.
 
 - While AI writes the plan, a spinner and "AI is reading the application and writing a plan. Nothing changes
   until the plan is approved."
 - While the plan waits for its author, nothing sits beside its title, and the plan is open.
-- Once the plan is approved, the item reads "Approved on <time>", and the plan is folded under its summary.
-- The summary is under the title in every state once AI has written the plan. **Show the plan** or
-  **Hide the plan** follows it on the same line.
-- The author's comments that asked for another plan come first, oldest first, as "Asked for another plan:
-  “…”", in the text colour.
-- A request that failed before its plan was approved stops here, with its failure.
+- **Once the plan is approved** _(planned for M35)_. The item reads "Approved on <time>", and the plan is folded
+  under its summary.
+- **The summary** _(planned for M35)_. The summary is under the title in every state once AI has written the
+  plan. **Show the plan** or **Hide the plan** follows it on the same line.
+- **Earlier comments** _(planned for M35)_. The author's comments that asked for another plan come first, oldest
+  first, as "Asked for another plan: “…”", in the text colour.
+- **A failure before approval** _(planned for M35)_. A request that failed before its plan was approved stops
+  here, with its failure.
+
+The bar offers the author these actions while the plan waits.
+
+- **Approve plan** starts the work.
+- **Change the plan…** asks for another plan with the author's comment.
+- **Drop…** ends the request.
+
+Only the author of the request approves its plan.
+
+### The plan's groups
+
+_(planned for M35)_
+
+A plan with questions waits for its author's answers. While it has questions, the page offers **Answer…**
+and no **Approve plan**.
 
 The groups of the plan follow in this order. Each has a bold heading in the text colour, and it shows only
 when it has something to show.
@@ -257,15 +271,6 @@ when it has something to show.
 7. **Implementation notes** sit behind **Show the implementation notes**, with the edits grouped by resource.
 
 A question is one that AI leaves to its author. A decision is a choice that AI made, which its author may undo.
-
-A plan with questions waits for its author's answers. While it has questions, the page offers **Answer…**
-and no **Approve plan**. Without questions, the bar offers the author these actions.
-
-- **Approve plan** starts the work.
-- **Change the plan…** asks for another plan with the author's comment.
-- **Drop…** ends the request.
-
-Only the author of the request approves its plan.
 
 ## The diff
 
