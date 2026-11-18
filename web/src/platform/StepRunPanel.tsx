@@ -238,10 +238,22 @@ export function StepRunPanel({
     const before = runs.slice(0, index).findLast(along)
     const after = runs.slice(index + 1).find(along)
     const transition = graphStep?.transitions.find((candidate) => candidate.next === after?.step)
-    const branchTaken =
-      graphStep?.type === 'decision' && transition?.on != null && transition.labelKey
-        ? outcomeLabel(step, transition.on)
-        : null
+    // The branch a decision took, named as its author labelled it, or a step's one task's outcome; a wait that gave up
+    // says so in its own facts.
+    const task = shown.tasks.length === 1 ? shown.tasks[0] : undefined
+    const chooser: Term | null =
+      graphStep?.type === 'decision'
+        ? transition?.on != null && transition.labelKey
+          ? { key: 'branch', term: t('shell.stepRun.branch'), value: outcomeLabel(step, transition.on), width: 6 }
+          : null
+        : task !== undefined
+          ? {
+              key: `outcome-${task.id}`,
+              term: t('shell.stepRun.outcomeChosen'),
+              value: task.outcome === null ? notSet : outcomeLabel(step, task.outcome),
+              width: 6,
+            }
+          : null
     const runLink = (target: StepRun) => (
       <AxisButton role="link" inline onClick={() => onOpen(target.step, target.number)}>
         {stepLabel(target.step)}
@@ -294,11 +306,16 @@ export function StepRunPanel({
           term: t('shell.stepRun.completedBy'),
           value: task.completedBy === null ? notSet : completedName(task),
         },
-        {
-          key: `outcome-${task.id}`,
-          term: t('shell.stepRun.outcomeChosen'),
-          value: task.outcome === null ? notSet : outcomeLabel(step, task.outcome),
-        },
+        // A step's one task chose its way with its outcome, which sits beside Went to; a step with several says each one's.
+        ...(shown.tasks.length === 1
+          ? []
+          : [
+              {
+                key: `outcome-${task.id}`,
+                term: t('shell.stepRun.outcomeChosen'),
+                value: task.outcome === null ? notSet : outcomeLabel(step, task.outcome),
+              },
+            ]),
       ]),
       ...shown.calls.flatMap((call): Term[] => [
         // The state of a step's one call is the step's; a step with several calls says each one's.
@@ -333,12 +350,16 @@ export function StepRunPanel({
         ),
       })),
       ...waitTerms(shown),
+      // Proposed, see the review on #3650: what chose the way, a decision's Branch or a step's one task's Outcome, sits
+      // beside Went to, before it, so the row reads as it happened: what was chosen, then where it led. Came from then
+      // takes a row of its own.
       {
         key: 'cameFrom',
         term: t('shell.stepRun.cameFrom'),
         value: before === undefined ? muted(t('shell.stepRun.start')) : runLink(before),
-        width: 6,
+        width: chooser === null ? 6 : 12,
       },
+      ...(chooser === null ? [] : [chooser]),
       {
         key: 'wentTo',
         term: t('shell.stepRun.wentTo'),
@@ -350,9 +371,6 @@ export function StepRunPanel({
               ? muted(t('shell.stepRun.ended.instance'))
               : runLink(after),
       },
-      // Proposed, see the review on #3650: the branch a decision took is a fact of its own, named as its author labelled
-      // it; a task's outcome is its Outcome, and a wait that gave up says so in its own facts.
-      ...(branchTaken === null ? [] : [{ key: 'branch', term: t('shell.stepRun.branch'), value: branchTaken }]),
       { key: 'trace', term: t('shell.stepRun.traceId'), value: traceId(shown.traceId) },
     ]
     return <TermList terms={terms} />
