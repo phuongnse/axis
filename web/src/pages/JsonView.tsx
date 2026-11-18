@@ -229,7 +229,9 @@ const jsonTheme = sharedTheme((tokens, mode) => {
     codeEditorTheme(tokens, mode),
     EditorView.theme({
       '&': { height: '100%' },
-      '.cm-scroller': { overflow: 'auto' },
+      // A scroll area stops at its end, so the page does not scroll,
+      // see docs/reference/actions-and-controls.md#scroll-areas.
+      '.cm-scroller': { overflow: 'auto', overscrollBehavior: 'contain' },
       '.cm-content': { padding: `${spacing.sm}px 0` },
       '.cm-line': { paddingInline: `${spacing.sm}px` },
       '.cm-gutters': {

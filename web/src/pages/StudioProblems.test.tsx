@@ -39,4 +39,10 @@ describe('StudioProblems', () => {
     expect(screen.getByText('AXIS-E101')).toBeInTheDocument()
     expect(screen.queryByText('No problems.')).not.toBeInTheDocument()
   })
+
+  it('stops the panel at its end, so the page does not scroll', () => {
+    renderProblems([error])
+
+    expect(screen.getByTestId('studio-diagnostics')).toHaveStyle({ overscrollBehavior: 'contain' })
+  })
 })

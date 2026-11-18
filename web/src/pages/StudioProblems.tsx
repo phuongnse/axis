@@ -46,6 +46,9 @@ export function StudioProblems({
         width: panelWidth,
         maxHeight: `calc(100vh - ${top + spacing.md}px)`,
         overflowY: 'auto',
+        // A scroll area stops at its end, so the page does not scroll,
+        // see docs/reference/actions-and-controls.md#scroll-areas.
+        overscrollBehavior: 'contain',
         padding: spacing.sm,
         background: colour.surface,
         border: `1px solid ${colour.borderSubtle}`,

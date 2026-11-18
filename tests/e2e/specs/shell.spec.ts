@@ -243,6 +243,37 @@ test('the page scrolls in the browser while the header and the sidebar navigatio
   expect((await page.locator('#shell-sidebar nav').boundingBox())?.y).toBe(48)
 })
 
+test('the sidebar navigation stops at its end, so a wheel there does not scroll the page', async ({ page }) => {
+  // A short window makes the navigation hold more entries than it shows, so it has an end to reach.
+  await page.setViewportSize({ width: 992, height: 160 })
+  await useSession(page, 'requester')
+  await page.goto('/e2e/notes')
+  await expect(page.getByRole('menuitem', { name: 'Notes', exact: true })).toBeVisible()
+
+  await expect
+    .poll(async () => {
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+      return page.evaluate(() => window.scrollY)
+    })
+    .toBeGreaterThan(0)
+  await page.evaluate(() => window.scrollTo(0, 0))
+
+  const nav = page.locator('#shell-sidebar nav')
+  expect(await nav.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
+  await nav.evaluate((element) => {
+    element.scrollTop = element.scrollHeight
+  })
+  // A new gesture starts the next wheel, as a person's does after a pause.
+  await page.waitForTimeout(100)
+
+  await nav.hover()
+  await page.mouse.wheel(0, 400)
+  await page.waitForTimeout(300)
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  const atEnd = await nav.evaluate((element) => element.scrollTop + element.clientHeight >= element.scrollHeight - 1)
+  expect(atEnd).toBe(true)
+})
+
 test('the platform site has no sidebar and no collapse button', async ({ page }) => {
   await page.goto('/?signedOut')
 

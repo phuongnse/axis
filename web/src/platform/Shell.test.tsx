@@ -575,6 +575,15 @@ describe('Shell scrolling', () => {
     expect(screen.getByRole('banner')).toHaveStyle({ position: 'sticky', top: '0px' })
   })
 
+  it('stops the sidebar navigation at its end, so the page does not scroll', () => {
+    renderShell('en', ['/'], notesNavigation)
+
+    expect(screen.getByRole('navigation', { name: 'Menu' })).toHaveStyle({
+      overflowY: 'auto',
+      overscrollBehavior: 'contain',
+    })
+  })
+
   describe.each(['light', 'dark'] as const)('in %s mode', (mode) => {
     it('sets the colour scheme of the page, so scrollbars follow the mode', () => {
       localStorage.setItem('axis.themeMode', mode)

@@ -240,6 +240,9 @@ export function Shell({
                     top: headerHeight,
                     maxHeight: `calc(var(--shell-min-height, 100vh) - ${headerHeight}px)`,
                     overflowY: 'auto',
+                    // A scroll area stops at its end, so the page does not scroll,
+                    // see docs/reference/actions-and-controls.md#scroll-areas.
+                    overscrollBehavior: 'contain',
                   }}
                 >
                   {navigationContent(collapsed)}
