@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
 using Axis.Data.Storage;
+using Axis.Processes.Work;
 using Npgsql;
 
 namespace Axis.Processes.Instances;
@@ -24,17 +25,20 @@ public sealed record PackageCallTake(
 /// <summary>
 /// Lets a customer-hosted runner take the oldest <c>pending</c> call to a package it registered and holds, in the caller's transaction, see
 /// docs/reference/process-execution.md#staging-a-package-call. The call becomes <c>sending</c> with one more attempt, and stores the runner, a
-/// new lease and the end of the lease, which is the step's timeout from now. The caller commits. A call whose step is not customer-hosted, whose
+/// new lease and the end of the lease, which is the step's timeout from now. The take also queues a <c>package.call</c> work item that is due when the
+/// lease ends, which a posted result deletes, see docs/reference/process-execution.md#package-call-outcomes. The caller commits. A call whose step is not customer-hosted, whose
 /// manifest cannot be found or whose stored input no longer fits the manifest is passed over and stays <c>pending</c>.
 /// </summary>
 public static class PackageCallTakes
 {
+    /// <param name="tenantId">The tenant of the database, which the lease's work item names.</param>
     /// <param name="held">The packages the runner holds, which the call's package and version must be among.</param>
     /// <param name="installed">The installed packages, which hold the manifest of an installed package.</param>
     /// <param name="releaseOf">Gives the model of the release a call is pinned to.</param>
     /// <returns>The call that was taken, or <see langword="null"/> when no call waits for the runner.</returns>
     public static async Task<PackageCallTake?> TakeAsync(
         NpgsqlTransaction transaction,
+        string tenantId,
         Guid runnerId,
         IReadOnlyCollection<PackageRunnerPackage> held,
         PackageCatalog installed,
@@ -42,6 +46,7 @@ public static class PackageCallTakes
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(tenantId);
         ArgumentNullException.ThrowIfNull(held);
         ArgumentNullException.ThrowIfNull(installed);
         ArgumentNullException.ThrowIfNull(releaseOf);
@@ -61,6 +66,15 @@ public static class PackageCallTakes
                 var leaseId = Guid.CreateVersion7();
                 if (await PackageCalls.TakeAsync(transaction, call.Id, runnerId, leaseId, step.Timeout, cancellationToken) is { } leaseUntil)
                 {
+                    await WorkItemQueue.EnqueueAsync(
+                        transaction.Connection!,
+                        transaction,
+                        tenantId,
+                        ProcessStarts.PackageCallWorkItemKind,
+                        leaseUntil,
+                        cancellationToken,
+                        processInstanceId: call.ProcessInstanceId,
+                        packageCallId: call.Id);
                     return new PackageCallTake(
                         leaseId, call.Package, call.Version, call.Operation, call.Id, RunnerValues.Encode(operation.Input, values), leaseUntil);
                 }

@@ -324,7 +324,7 @@ internal static class PackageCalls
     {
         await using var command = new NpgsqlCommand(
             """
-            SELECT c.id, c.step, c.release_id, c.package, c.version, c.operation, c.input::text, i.process_id
+            SELECT c.id, c.step, c.release_id, c.package, c.version, c.operation, c.input::text, i.process_id, c.process_instance_id
             FROM axis.package_calls c
             JOIN axis.process_instances i ON i.id = c.process_instance_id
             WHERE c.state = @pending
@@ -362,7 +362,8 @@ internal static class PackageCalls
             reader.GetString(4),
             reader.GetString(5),
             await reader.IsDBNullAsync(6, cancellationToken) ? null : reader.GetString(6),
-            reader.GetGuid(7));
+            reader.GetGuid(7),
+            reader.GetGuid(8));
     }
 
     /// <summary>
@@ -397,6 +398,20 @@ internal static class PackageCalls
         return await reader.ReadAsync(cancellationToken) ? await reader.GetFieldValueAsync<DateTimeOffset>(0, cancellationToken) : null;
     }
 
+    /// <summary>
+    /// Deletes the <c>package.call</c> work items of the call <paramref name="callId"/>, which hold it back from a take or end a runner's lease.
+    /// </summary>
+    public static async Task DeleteItemsAsync(NpgsqlTransaction transaction, Guid callId, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "DELETE FROM axis.process_work_items WHERE package_call_id = @call AND kind = @kind",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("call", callId);
+        command.Parameters.AddWithValue("kind", ProcessStarts.PackageCallWorkItemKind);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static NpgsqlConnection Connection(NpgsqlTransaction transaction) =>
         transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
 }
@@ -410,6 +425,7 @@ internal static class PackageCalls
 /// <param name="Operation">The operation's declared name.</param>
 /// <param name="Input">The stored input as JSON text.</param>
 /// <param name="ProcessId">The process of the call's instance.</param>
+/// <param name="ProcessInstanceId">The call's instance.</param>
 internal sealed record TakeableCall(
     Guid Id,
     string Step,
@@ -418,7 +434,8 @@ internal sealed record TakeableCall(
     string Version,
     string Operation,
     string? Input,
-    Guid ProcessId);
+    Guid ProcessId,
+    Guid ProcessInstanceId);
 
 /// <summary>A package call that a package operation step stages for its instance.</summary>
 /// <param name="Id">The call's operation identity, a version 7 UUID.</param>

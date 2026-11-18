@@ -27,13 +27,13 @@ namespace Axis.Server.Processes;
 /// <c>POST /api/package-runner/calls/take</c> reads <c>{ "packages": [{ "id", "version" }] }</c>, the packages the runner instance holds. In one
 /// transaction, <see cref="PackageCallTakes"/> takes the oldest waiting call to one of them that the runner also registered, and the runner's last
 /// call time is set. The answer is <c>200</c> with the lease, the package, the version, the operation, the operation identity, the input and the end of
-/// the lease, and <c>204</c> when no call waits. A runner that is revoked while the request runs answers <c>401</c> and takes nothing. Like a
+/// the lease, and <c>204</c> when no call waits. The take also queues a <c>package.call</c> item that is due when the lease ends, see <see cref="PackageCallResults"/>. A runner that is revoked while the request runs answers <c>401</c> and takes nothing. Like a
 /// registration, a take is never refused over the <c>storage</c> quota, because it is running work.
 /// </para>
 /// <para>
 /// <c>POST /api/package-runner/leases/{leaseId}/result</c> reads <c>{ "outcome": "succeeded", "output": {...} }</c>, <c>{ "outcome": "retryable" }</c> or
 /// <c>{ "outcome": "failed", "error": "..." }</c> with a non-empty <c>error</c>, and any other body answers <c>400</c>. In one transaction,
-/// <see cref="PackageCallResults"/> records the call the same way the worker does after a run, and the answer is <c>204</c>, also when the output does
+/// <see cref="PackageCallResults"/> records the call the same way the worker does after a run and deletes the call's items, and the answer is <c>204</c>, also when the output does
 /// not fit, when the runner posted <c>failed</c> or a <c>retryable</c> result has no attempt left and the call and its instance fail, and when a
 /// <c>retryable</c> result sets the call back to <c>pending</c>. A lease
 /// that is unknown, or that another runner holds, answers <c>404</c>. A lease whose call is no longer <c>sending</c>, whose lease has ended or whose
@@ -91,6 +91,7 @@ internal static class PackageRunnerEndpoints
         TenantDatabase database,
         PackageCatalog packages,
         ActiveApplicationResolver resolver,
+        ITenantContextAccessor tenants,
         CancellationToken cancellationToken)
     {
         using var body = await ReadBodyAsync(context.Request, cancellationToken);
@@ -101,13 +102,14 @@ internal static class PackageRunnerEndpoints
                 title: "The body needs a list of packages, each with an id and a version.");
         }
 
+        var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
         var runnerId = Guid.Parse(EndpointCaller.Read(context.User)!.Id);
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         // The write limit comes first, so it also bounds the wait for a row that another take has locked.
         await database.LimitWriteAsync(transaction, cancellationToken);
-        var take = await PackageCallTakes.TakeAsync(transaction, runnerId, held, packages, resolver.GetReleaseModelAsync, cancellationToken);
+        var take = await PackageCallTakes.TakeAsync(transaction, tenantId, runnerId, held, packages, resolver.GetReleaseModelAsync, cancellationToken);
         if (take is null)
         {
             await transaction.CommitAsync(cancellationToken);

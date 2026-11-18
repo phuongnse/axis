@@ -57,6 +57,9 @@ public abstract record PackageCallResult
 /// fit, a release or manifest that does not match the call, a record write that is refused, and a <c>retryable</c> result with no attempt left fail
 /// the call and the instance, and the caller still commits. A refused write rolls back to a savepoint first. The caller commits after every outcome
 /// except <see cref="PackageCallResultOutcome.UnknownLease"/> and <see cref="PackageCallResultOutcome.Conflict"/>, which write nothing and are rolled back.
+/// Once the lease checks pass, the call's <c>package.call</c> items are deleted first, among them the one the take queued for the end of the lease. The
+/// worker records an unknown outcome when that item comes due with the call still <c>sending</c>, so a result that arrives after it answers
+/// <see cref="PackageCallResultOutcome.Conflict"/>.
 /// </summary>
 public static partial class PackageCallResults
 {
@@ -103,6 +106,9 @@ public static partial class PackageCallResults
         {
             return PackageCallResultOutcome.Conflict;
         }
+
+        // The lease holds, so no lease-end item may run on the call from here on.
+        await PackageCalls.DeleteItemsAsync(transaction, call.Id, cancellationToken);
 
         var logger = loggerFactory.CreateLogger(typeof(PackageCallResults));
         var model = await releaseOf(call.ReleaseId, cancellationToken);

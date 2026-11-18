@@ -665,7 +665,7 @@ never leave the customer, see [D148](../decisions/d148-packages-in-c-typescript-
   like a service account. Its access token's audience is `axis-package-runner`, so it reaches only the
   runner's routes, and a service account route refuses it because it lacks `Oidc:ServiceAudience`. Axis
   keeps no copy of the secret.
-- **The contract stays with Axis.** _(planned for M37)_ The worker reads `idempotent` and `timeout` from the manifest, and checks a
+- **The contract stays with Axis.** The worker reads `idempotent` and `timeout` from the manifest, and checks a
   posted result against `output`.
 - **The program.** _(planned for M37)_ The customer runs `docker run ... axis-package-host-<language> connect`, Axis's own
   [runner image](installation.md#images) with the `connect` command. It reads the built packages from

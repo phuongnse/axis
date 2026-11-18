@@ -75,7 +75,9 @@ namespace Axis.Processes.Instances;
 /// instance still waiting on the step at the revision the attempt saw. Each outcome transaction
 /// also writes one row to <c>axis.process_call_attempts</c>: the attempt with its times, its outcome
 /// class and a fixed error text, and no HTTP status. A call found <c>sending</c> gets an attempt row
-/// with the outcome <c>unknown</c>. No input value and no exception message is stored or logged.
+/// with the outcome <c>unknown</c>. The take of a customer-hosted runner queues an item that is due when its lease ends, so a call that the runner took
+/// and posted no result for is found <c>sending</c> then, and its error is the timeout's. An item of a <c>pending</c> call that a runner took only held
+/// it back from the next take until the backoff passed, so it is deleted. No input value and no exception message is stored or logged.
 /// </summary>
 internal sealed partial class PackageCallHandler(
     ReleaseModelCache models,
@@ -168,8 +170,10 @@ internal sealed partial class PackageCallHandler(
             {
                 // A worker crashed after it marked the call, so the operation may have acted. The
                 // attempt the crashed worker made is already counted.
+                // A call that a customer-hosted runner took is found sending when its lease ended with no result, see
+                // docs/reference/process-execution.md#package-call-outcomes.
                 errorClass = ErrorClass.Unknown;
-                error = UnknownOutcome;
+                error = call.RunnerId is null ? UnknownOutcome : TimedOut;
                 await transaction.RollbackAsync(cancellationToken);
             }
             else
