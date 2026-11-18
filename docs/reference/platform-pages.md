@@ -241,8 +241,6 @@ failure shows "The model key could not be loaded." and is logged. Its texts are 
 
 ### Application packages
 
-_(planned for M37)_
-
 The People tab has an "Application packages" section below Model key, where
 an administrator turns the tenant's application packages on or off, see
 [application packages](user-administration.md#application-packages). The section is a component of its own, like Model
