@@ -644,7 +644,7 @@ A request is shown as
 | `startedAt`       | When a publisher first started it, or null while `queued`                                                                                                                                                                  |
 | `finishedAt`      | When it reached `succeeded` or `failed`, or null before                                                                                                                                                                    |
 | `releaseId`       | The release a `publish` activated or an `activate` named, or null. A `validate` and a `test` have none                                                                                                                     |
-| `diagnostics`     | The diagnostics, in the form of [Diagnostics](#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings                                                                                         |
+| `diagnostics`     | The diagnostics, in the form of [Diagnostics](#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings. An `accept`'s `AXC0377` adds `changedBy` and `changedAt`, see [accepting](authoring-requests.md#accepting) |
 | `scenarios`       | The scenario outcomes, see below. For a `test`, empty until the request ends. For a `publish`, a `validate` or an `accept`, null until the request ends and when no scenario ran. Null for an `activate`                   |
 
 `scenarios` has one item for each scenario that ran, in file order: for a `test`, the application's

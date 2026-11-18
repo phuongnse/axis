@@ -568,9 +568,10 @@ internal sealed class Publisher(
 
         if (request.Kind == "accept")
         {
-            var accepted = await AcceptAsync(tenant, connections, request, activation, diagnostics, scenarioResults);
+            var conflicted = new Dictionary<Diagnostic, StudioRevision?>(ReferenceEqualityComparer.Instance);
+            var accepted = await AcceptAsync(tenant, connections, request, activation, diagnostics, scenarioResults, conflicted);
             await StopRenewalAsync(renewing, renewal);
-            await FinishAsync(tenant.Id, connections, request, new ReleaseRun(accepted, null), diagnostics, audit: false, ScenarioResultsJson(scenarioResults));
+            await FinishAsync(tenant.Id, connections, request, new ReleaseRun(accepted, null), diagnostics, audit: false, ScenarioResultsJson(scenarioResults), conflicted: conflicted);
             return;
         }
 
@@ -679,7 +680,8 @@ internal sealed class Publisher(
         ClaimedRequest request,
         TenantReleaseActivation activation,
         List<Diagnostic> diagnostics,
-        JsonArray scenarioResults)
+        JsonArray scenarioResults,
+        Dictionary<Diagnostic, StudioRevision?> conflicted)
     {
         const string notFound = "The draft is not found.";
         if (Studio?.WriteLock is not { } writeLock
@@ -726,9 +728,11 @@ internal sealed class Publisher(
                 var message = conflict.Version is null
                     ? $"The {subject} changed on main since the draft read it: main no longer has it."
                     : $"The {subject} changed on main since the draft read it: its version is now {conflict.Version}.";
-                diagnostics.Add(conflict.File is null
+                var diagnostic = conflict.File is null
                     ? new Diagnostic(DiagnosticCodes.AcceptConflict, message, resources.FirstOrDefault(resource => resource.Id == conflict.Id)?.File ?? "", "", conflict.Id)
-                    : new Diagnostic(DiagnosticCodes.AcceptConflict, message, conflict.File, ""));
+                    : new Diagnostic(DiagnosticCodes.AcceptConflict, message, conflict.File, "");
+                diagnostics.Add(diagnostic);
+                conflicted[diagnostic] = conflict.Changed;
                 _output.WriteLine($"{tenant.Id} draft failed: {DiagnosticCodes.AcceptConflict} {message}");
             }
 
@@ -927,7 +931,7 @@ internal sealed class Publisher(
 
     // The final status, the diagnostics and the audit record commit together, so a request never ends without its record. A
     // validate has no release audit record. A publisher that lost its claim changes nothing and writes no record.
-    private async Task FinishAsync(string tenantId, ITenantConnections connections, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit, string? scenarioResults = null, string? packageTests = null)
+    private async Task FinishAsync(string tenantId, ITenantConnections connections, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit, string? scenarioResults = null, string? packageTests = null, IReadOnlyDictionary<Diagnostic, StudioRevision?>? conflicted = null)
     {
         var connection = await connections.SchemaConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync();
@@ -936,7 +940,7 @@ internal sealed class Publisher(
         {
             command.Parameters.AddWithValue("status", run.Succeeded ? "succeeded" : "failed");
             command.Parameters.Add(new NpgsqlParameter("release", NpgsqlDbType.Uuid) { Value = ReleaseOf(request, run) is { } release ? release : DBNull.Value });
-            command.Parameters.Add(new NpgsqlParameter("diagnostics", NpgsqlDbType.Jsonb) { Value = DiagnosticsJson(diagnostics) });
+            command.Parameters.Add(new NpgsqlParameter("diagnostics", NpgsqlDbType.Jsonb) { Value = DiagnosticsJson(diagnostics, conflicted) });
             command.Parameters.Add(new NpgsqlParameter("scenarios", NpgsqlDbType.Jsonb) { Value = (object?)scenarioResults ?? DBNull.Value });
             command.Parameters.Add(new NpgsqlParameter("packageTests", NpgsqlDbType.Jsonb) { Value = (object?)packageTests ?? DBNull.Value });
             command.Parameters.AddWithValue("id", request.Id);
@@ -1037,16 +1041,27 @@ internal sealed class Publisher(
                 new JsonObject { ["requestId"] = requestId, ["releaseId"] = releaseId, ["number"] = number }));
     }
 
-    // Each entry has the shape of a Studio diagnostic.
-    private static string DiagnosticsJson(List<Diagnostic> diagnostics) =>
-        new JsonArray([.. diagnostics.Select(diagnostic => (JsonNode)new JsonObject
+    // Each entry has the shape of a Studio diagnostic. An accept's AXC0377 also has changedBy and changedAt, the author and time of
+    // the newest revision that changed the file, both null when none is found, see docs/reference/authoring-requests.md#accepting.
+    private static string DiagnosticsJson(List<Diagnostic> diagnostics, IReadOnlyDictionary<Diagnostic, StudioRevision?>? conflicted = null) =>
+        new JsonArray([.. diagnostics.Select(diagnostic =>
         {
-            ["code"] = diagnostic.Code,
-            ["severity"] = diagnostic.Severity == DiagnosticSeverity.Error ? "error" : "warning",
-            ["message"] = diagnostic.Message,
-            ["file"] = diagnostic.File,
-            ["path"] = diagnostic.Path,
-            ["resourceId"] = diagnostic.ResourceId?.ToString("D"),
+            var entry = new JsonObject
+            {
+                ["code"] = diagnostic.Code,
+                ["severity"] = diagnostic.Severity == DiagnosticSeverity.Error ? "error" : "warning",
+                ["message"] = diagnostic.Message,
+                ["file"] = diagnostic.File,
+                ["path"] = diagnostic.Path,
+                ["resourceId"] = diagnostic.ResourceId?.ToString("D"),
+            };
+            if (conflicted is not null && conflicted.TryGetValue(diagnostic, out var revision))
+            {
+                entry["changedBy"] = revision?.Author;
+                entry["changedAt"] = revision?.Time;
+            }
+
+            return (JsonNode)entry;
         })]).ToJsonString();
 
     private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string Kind, int Claims, string? Label, string? Note, Guid? ReleaseId, string Target, string? ScenarioNames, Guid? DraftId, string? Folder, string? Client, string? Package);
