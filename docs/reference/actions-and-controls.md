@@ -272,7 +272,7 @@ be kept right.
 - **A refused save.** A name that is empty or that another of the person's views has, ignoring letter case, is
   refused before anything is sent. Any other save the server refuses leaves the dialog open with "The view could not
   be saved.", and the address and the list stay as they were.
-- **Overwrite a view** _(planned for M33)_. A person replaces a view's search, filter and sort with the current ones.
+- **Overwrite a view** _(planned)_. A person replaces a view's search, filter and sort with the current ones.
 - **Which tables keep a choice.** A table whose view `useTableView` keeps in the address, and that
   has a key, keeps its columns and views on the server. A table in a dialog keeps its view in the dialog and keeps
   nothing. The cell console's tables pass no key, because its host has no tenant database. Studio's page canvas

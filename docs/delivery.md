@@ -60,12 +60,31 @@ that holds it.
   posts `/nexkit plan` or `/nexkit go`. Milestones group the work and do not order it: the issues of
   several milestones run at once, and only *blocked by* marks make one issue wait for another, in the
   same milestone or across milestones.
-- **Some issues are in no milestone.** Every other issue is in the milestone that delivers it. No
-  milestone delivers these kinds, and a milestone groups work but does not order it, as
-  [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) agrees. They are a `bug` issue
-  for CI on `main`, an issue NexKit opens for a flaky test, an issue for a Dependabot advisory, an
-  issue of the docs audit, a `process` issue, a [design issue](#design-changes) and a `refactor`
-  issue, such as one that a design review finds.
+- **An issue's milestone follows one test, taken in these steps.** A milestone then holds only the
+  work its "Done when" names, so its journey never waits for other work. As
+  [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) agrees, a milestone groups work
+  and does not order it.
+  1. **No milestone, and one label that names the kind,** for these kinds:
+
+     | Label | Kind |
+     | --- | --- |
+     | `nexkit:ci`, `nexkit:flaky`, `nexkit:dependabot` | NexKit's issues for a failure of CI on `main`, a flaky test, a Dependabot advisory |
+     | `bug` | A fix of something a closed milestone delivered |
+     | `process` | How Axis is built |
+     | `refactor` | One concern moved to one shared mechanism, which keeps its behaviour |
+     | `design` | A [design review](#design-changes) |
+     | `docs-audit` | An issue the docs audit opens |
+     | `improvement` | An improvement to a delivered feature that no milestone's [Done when](roadmap.md#milestones) names, such as the build and the docs of a design review of screens already built |
+
+  2. **Otherwise the milestone whose [Done when](roadmap.md#milestones) names what the issue builds:**
+     its features, the docs issues its readiness check asks for, its journey, its docs sweep, the builds
+     of a design review of the screens it brings, and fixes of what it builds while it is in progress.
+  3. **New capability that no row names is not filed,** until the owner adds it to a row's "Done
+     when" or adds a row.
+  4. **A part of a split and a follow-up take the same test.** A part builds part of its parent, so it
+     keeps the parent's milestone. A pull request carries its issue's milestone.
+  5. **A milestone exists on GitHub from its first issue,** titled `Mx <name>` as its roadmap row, and
+     not before.
 - **Bugs go first, then the work on how Axis is built.** Autopilot's [`priority`][nexkit-labels]
   setting lists the labels whose issues start before the others, in this order: `nexkit:ci` for a
   failure of CI on `main`, `nexkit:dependabot` for an advisory, `bug`, `nexkit:flaky` for a flaky
@@ -286,8 +305,8 @@ follows NexKit's rules too. Axis adds these rules for writing it.
   longer than 90 s" can be verified, while "Axis.Server.Tests finishes under 90 s" cannot, because
   no check reports the time against the limit.
 - **Docs and concepts.** The issue links to the doc sections it implements, is in the milestone that
-  delivers it or in none when [how issues run](#how-issues-run) says so, and names the concepts it
-  touches in its own text, in the terms of
+  [how issues run](#how-issues-run) picks for it, and names the concepts it touches in its own text,
+  in the terms of
   [concepts.md](domain/concepts.md), so triage can choose the [profile](#profiles). Its plan and its
   pull request then carry the `Docs:` line of
   [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct).
@@ -304,7 +323,8 @@ follows NexKit's rules too. Axis adds these rules for writing it.
   its plan lists the change under *Needs a hand-made change*, and the local agent session makes it as a
   [hand-made pull request](#hand-made-pull-requests) when the owner asks. A hand-made pull request that other work waits
   for closes an issue of its own, with the `hand-made` label, and the follow-ups are *blocked by* that
-  issue.
+  issue. A follow-up and a part of a split take their milestone by the same test, as
+  [how issues run](#how-issues-run) says.
 
 ## The life of a milestone
 
@@ -324,7 +344,8 @@ A milestone goes from a readiness check to its close in five steps.
 2. **Break it down.** On a *ready* verdict, the local agent breaks the milestone into issues, as the
    [roadmap](roadmap.md#how-work-is-planned) describes, and checks the [profiles](#profiles) against
    the new milestone's concepts and the models available, and sets the milestone's roadmap status to
-   In progress, in a NexKit issue. Profile fixes are hand-made pull requests. The issues of
+   In progress, in a NexKit issue. The milestone exists on GitHub from its first issue, as
+   [how issues run](#how-issues-run) says. Profile fixes are hand-made pull requests. The issues of
    new screens wait for a design issue, see [design changes](#design-changes).
 3. **Deliver the issues.** Each one follows the life of an issue above. Autopilot runs every ready
    issue of every milestone at once.
@@ -335,10 +356,10 @@ A milestone goes from a readiness check to its close in five steps.
    - the roadmap status of this milestone and the next one;
    - the **From** column of [concepts.md](domain/concepts.md) for every concept listed for this
      milestone, moved to a later milestone when the concept was not delivered;
-   - every *(planned for Mx)* marker for this milestone in any doc, removed when the work was built
-     and moved to a later milestone when it was not. A moved marker has an open issue in its new
-     milestone, which the sweep links in its pull request or opens first, as
-     [planned work](writing-docs.md#planned-work) says;
+   - every `_(planned for Mx)_` marker for this milestone in any doc, removed when the work was built,
+     otherwise moved, added to a row's "Done when" or changed to `_(planned)_`, as
+     [planned work](writing-docs.md#planned-work) says. A moved marker has an open issue in its new
+     milestone, which the sweep links in its pull request or opens first;
    - the doc sections that the milestone's pull requests changed: what is said twice is merged into
      its one home, what a later rule replaced is deleted, and the decisions they link hold only
      choices still in force;

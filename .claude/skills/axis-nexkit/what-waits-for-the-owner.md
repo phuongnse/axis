@@ -31,7 +31,7 @@ waits for them or needs them.
      [how issues run](../../../docs/delivery.md#how-issues-run) puts in no milestone. Recognise those
      kinds by their labels, such as `nexkit:flaky` for a flaky test issue, by the hidden `docs-audit`
      marker in the body of a docs audit issue, and by a link to the Design System artifact or a design
-     review in the body of a design issue. The row suggests the milestone that delivers the issue, or
+     review in the body of a design issue. The row suggests the milestone that how issues run picks, or none, or
      the label of its kind when that label is missing.
 4. Answer with one Markdown table, one row per item, with columns for the
    item, its link and the suggested action. When nothing waits, say so in one

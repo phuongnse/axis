@@ -71,10 +71,11 @@ marks between issues, in NexKit's `request` skill.
    [concepts.md](../../../docs/domain/concepts.md).
 2. Read the labels with `gh label list` and pick every one whose description
    fits. Every issue gets at least one label.
-3. Create it in the milestone that delivers it:
+3. Create it in the milestone that [how issues run](../../../docs/delivery.md#how-issues-run)
+   picks. If that milestone does not exist on GitHub yet, create it first, titled `Mx <name>`:
+   `gh api repos/{owner}/{repo}/milestones -f title='Mx <name>'`. Then:
    `gh issue create --title "<behaviour>" --milestone "<milestone>" --label "<a>,<b>" --body-file <file>`.
-   Leave out `--milestone` for an issue that
-   [how issues run](../../../docs/delivery.md#how-issues-run) puts in no milestone.
+   Leave out `--milestone` for an issue that how issues run puts in no milestone.
 4. Mark what it waits for, as NexKit's `request` skill says, before the next
    sweep, or autopilot plans it at once. A milestone's journey gets the
    `journey` label and its docs sweep the `docs-sweep` label, with no

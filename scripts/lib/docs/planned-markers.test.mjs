@@ -52,6 +52,23 @@ describe('planned markers', () => {
     assert.deepEqual(messages(), [])
   })
 
+  test('passes a bare planned marker under a heading, after a bold lead-in and in a table row', () => {
+    write(
+      'docs/reference/guide.md',
+      ['# Guide', '', '## Rules', '', '_(planned)_', '', '- **A rule** _(planned)_. Text.', '', '| Row | _(planned)_ |', ''].join('\n'),
+    )
+
+    assert.deepEqual(messages(), [])
+  })
+
+  test('reports a bare planned marker in a sentence', () => {
+    write('docs/reference/guide.md', '# Guide\n\nText _(planned)_ here.\n')
+
+    assert.deepEqual(messages(), [
+      'docs/reference/guide.md:3: _(planned)_ sits in a sentence: put it on a line of its own under the heading of a planned section, or right after the bold lead-in of a planned rule',
+    ])
+  })
+
   test('reports a marker in a sentence, and one on its own line that no heading heads', () => {
     write('docs/reference/guide.md', '# Guide\n\nText _(planned for M2)_ here.\n\nText.\n\n_(planned for M2)_\n')
 

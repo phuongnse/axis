@@ -54,6 +54,8 @@ test.describe('the journey tenant publishes a Studio application', () => {
       .getByRole('navigation', { name: 'Menu', exact: true })
       .getByRole('link', { name: 'Releases', exact: true })
       .click()
+    // Publish… returns to the page it was opened from, so it must open from the releases page, not the overview.
+    await expect(page).toHaveURL(/view=releases$/)
     await page.getByRole('button', { name: 'Publish…', exact: true }).click()
     await confirmPublish(page)
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
