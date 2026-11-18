@@ -90,8 +90,11 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     );
     await expect(chart).toHaveAttribute("data-marked", "true");
     await expect(chart.getByTestId("studio-canvas-placeholder")).toContainText(
-      "This widget has errors: chart",
+      "This widget has errors",
     );
+    await expect(
+      chart.getByTestId("studio-canvas-placeholder-type"),
+    ).toHaveText("chart");
     await expect(
       chart.getByTestId("studio-canvas-placeholder-diagnostic"),
     ).toContainText("The data source 'MissingSource' was not found.");

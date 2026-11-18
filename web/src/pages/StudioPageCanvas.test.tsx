@@ -344,7 +344,8 @@ describe('the Design tab of a page', () => {
     await screen.findByTestId('studio-page-editor', {}, slow)
     await openTab('Design')
     const box = await screen.findByTestId('studio-canvas-placeholder', {}, slow)
-    expect(box).toHaveTextContent('This widget has errors: columns')
+    expect(box).toHaveTextContent('This widget has errors')
+    expect(within(box).getByTestId('studio-canvas-placeholder-type')).toHaveTextContent('columns')
     expect(box).toHaveAttribute('data-path', '/widgets/1')
     expect(screen.getByTestId('kpi-tile')).toBeInTheDocument()
   })
@@ -412,7 +413,8 @@ describe('the Design tab of a page', () => {
     await openTab('Design')
     const canvas = await screen.findByTestId('studio-page-canvas', {}, slow)
     const box = await within(canvas).findByTestId('studio-canvas-placeholder', {}, slow)
-    expect(box).toHaveTextContent('This widget has errors: chart')
+    expect(box).toHaveTextContent('This widget has errors')
+    expect(within(box).getByTestId('studio-canvas-placeholder-type')).toHaveTextContent('chart')
     expect(within(box).getByTestId('studio-canvas-placeholder-diagnostic')).toHaveTextContent(
       "UnknownWidgetDataSource: The data source 'MissingSource' was not found. No loaded data source has that name.",
     )
