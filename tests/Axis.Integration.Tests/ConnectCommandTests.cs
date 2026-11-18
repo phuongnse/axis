@@ -13,33 +13,38 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The <c>connect</c> command of <c>Axis.PackageHost</c> against the server, with real PostgreSQL and Keycloak and the real C# runner of the test
-/// package, see <c>docs/reference/extension-packages.md#customer-hosted-runners</c>. The command runs in the test process and talks to the server
+/// The <c>connect</c> command of <c>Axis.PackageHost</c> against the server, with real PostgreSQL and Keycloak and the real runners of the C#, Node.js
+/// and Python test packages, see <c>docs/reference/extension-packages.md#customer-hosted-runners</c>. The command runs in the test process and talks to the server
 /// in memory. The server and the command each hold their own copy of the installed package. Each test makes the realm of its tenant with a unique
 /// name and deletes it at the end.
 /// </summary>
 public sealed class ConnectCommandTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>, IDisposable
 {
+    private const string NodeProbePackageId = "node-probe-package";
+
     private readonly PackageRunnerServer _server = new(database, keycloak);
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     public void Dispose() => _server.Dispose();
 
-    [Fact]
-    public async Task Connect_runs_the_probe_of_a_customer_hosted_package_in_its_runner_and_the_instance_completes_with_the_probes_status()
+    [Theory]
+    [InlineData(TestPackages.Id)]
+    [InlineData(NodeProbePackageId)]
+    [InlineData(TestPackages.PythonId)]
+    public async Task Connect_runs_the_probe_of_a_customer_hosted_package_in_the_runner_of_its_language_and_the_instance_completes_with_the_probes_status(string package)
     {
         await _server.PrepareAsync();
         var (id, tenantDatabase) = await _server.AddTenantAsync();
         try
         {
-            using var serverPackages = new TemporaryFolder().Install("1.0.0");
-            using var runnerPackages = new TemporaryFolder().Install("1.0.0");
+            using var serverPackages = Install(package);
+            using var runnerPackages = Install(package);
             var releases = new CustomerHostedReleases();
             var releaseId = await releases.ActivateInstalledProbeAsync(
-                tenantDatabase, id, PackageCatalog.Load(serverPackages.Path, PackageLoadMode.MetadataOnly), CancellationToken);
+                tenantDatabase, id, PackageCatalog.Load(serverPackages.Path, PackageLoadMode.MetadataOnly), CancellationToken, package);
             await PostgreSqlServer.GrantRuntimeRoleAsync(tenantDatabase, CancellationToken);
-            var (callId, instanceId, probeId) = await releases.StageProbeCallAsync(tenantDatabase, releaseId, CancellationToken);
+            var (callId, instanceId, probeId) = await releases.StageProbeCallAsync(tenantDatabase, releaseId, CancellationToken, package);
             await using var stub = await ConnectorStub.StartAsync();
             stub.Respond(202, "{}");
             await using var factory = _server.Start(serverPackages.Path);
@@ -124,6 +129,22 @@ public sealed class ConnectCommandTests(PostgreSqlFixture database, KeycloakFixt
         finally
         {
             await _server.DeleteRealmAsync(id);
+        }
+    }
+
+    // The Node.js probe package is not one of the builds that TestPackages installs, so it is copied as the build command leaves it.
+    private static TemporaryFolder Install(string package)
+    {
+        var folder = new TemporaryFolder();
+        switch (package)
+        {
+            case TestPackages.Id:
+                return folder.Install("1.0.0");
+            case TestPackages.PythonId:
+                return folder.InstallPython();
+            default:
+                PackageBuildCommand.Copy(Path.Combine(AppContext.BaseDirectory, "NodeProbePackage"), Path.Combine(folder.Path, package, "1.0.0"));
+                return folder;
         }
     }
 

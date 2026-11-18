@@ -28,6 +28,8 @@ def probe(input, context):
             headers={
                 "Authorization": "Bearer " + context.get_secret("TestToken"),
                 "Idempotency-Key": str(context.operation_id),
+                # urllib sends a body as a form unless the type is given, and the stub takes a form for a token request.
+                "Content-Type": "application/json",
             },
             body=b"{}",
         )

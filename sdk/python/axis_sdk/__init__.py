@@ -73,7 +73,7 @@ class OperationContext:
 
 
 class HttpClient:
-    """Sends requests to the host of a url binding. It follows no redirects and goes through the runner's proxy variables."""
+    """Sends requests to the host of a url binding. It follows no redirects. It uses the proxy variables only when the runner has them, which host mode sets and ``connect`` does not."""
 
     def __init__(self, base_url, binding, context):
         self.base_url = base_url if base_url.endswith('/') else base_url + '/'

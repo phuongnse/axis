@@ -1,6 +1,7 @@
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
+using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Naming;
 using Axis.Data.Storage;
@@ -16,7 +17,7 @@ namespace Axis.Integration.Tests;
 /// the registration check and the take in <c>docs/reference/extension-packages.md#customer-hosted-runners</c>. A release can also hold a process whose
 /// step calls the package, and a call that staging would leave for it, see <c>docs/reference/process-execution.md#staging-a-package-call</c>.
 /// A release can also hold the entity <c>Order</c> and the process <c>OrderSum</c>, whose subject is an order that the step writes its output to.
-/// A release can also pin the installed package <c>test-package</c> as customer-hosted, with the entity <c>Probe</c> and the process <c>ProbeCall</c>.
+/// A release can also pin an installed package with a <c>probe</c> operation, such as <c>test-package</c>, as customer-hosted, with the entity <c>Probe</c> and the process <c>ProbeCall</c>.
 /// </summary>
 internal sealed class CustomerHostedReleases
 {
@@ -127,8 +128,8 @@ internal sealed class CustomerHostedReleases
         }
         """;
 
-    // A process whose subject is a probe: the step passes its mode to the package's probe and writes the status it gets to the record.
-    private static readonly string _probeProcess =
+    // A process whose subject is a probe: the step passes its mode to the probe of the package and writes the status it gets to the record.
+    private static string ProbeProcess(string package) =>
         $$"""
         {
           "id": "{{_probeCallProcessId}}",
@@ -138,7 +139,7 @@ internal sealed class CustomerHostedReleases
           "entity": "Probe",
           "start": "probe",
           "steps": [
-            { "name": "probe", "type": "operation", "operation": "test-package/probe", "input": { "mode": "mode" }, "output": { "status": "status" }, "next": "done" },
+            { "name": "probe", "type": "operation", "operation": "{{package}}/probe", "input": { "mode": "mode" }, "output": { "status": "status" }, "next": "done" },
             { "name": "done", "type": "end" }
           ]
         }
@@ -160,20 +161,20 @@ internal sealed class CustomerHostedReleases
             ("processes/order-sum.json", _orderSumProcess));
 
     /// <summary>
-    /// Compiles the application with the installed package <c>test-package</c> 1.0.0 of <paramref name="catalog"/>, pinned as customer-hosted,
-    /// the entity <c>Probe</c> and the process <c>ProbeCall</c>, whose step <c>probe</c> runs <c>test-package/probe</c> with the record's <c>mode</c>
+    /// Compiles the application with the installed <paramref name="package"/> 1.0.0 of <paramref name="catalog"/>, pinned as customer-hosted,
+    /// the entity <c>Probe</c> and the process <c>ProbeCall</c>, whose step <c>probe</c> runs <c>&lt;package&gt;/probe</c> with the record's <c>mode</c>
     /// and writes its <c>status</c> to the record. It activates the release with the release activator, so the table of <c>Probe</c> exists. The caller
     /// grants the runtime role again, to reach the table.
     /// </summary>
-    public Task<Guid> ActivateInstalledProbeAsync(string connectionString, string tenantId, PackageCatalog catalog, CancellationToken cancellationToken) =>
+    public Task<Guid> ActivateInstalledProbeAsync(string connectionString, string tenantId, PackageCatalog catalog, CancellationToken cancellationToken, string package = TestPackages.Id) =>
         ActivateWithTablesAsync(
             connectionString,
             tenantId,
             catalog.Versions,
-            """[{ "id": "test-package", "version": "1.0.0", "runner": "customer" }]""",
+            $$"""[{ "id": "{{package}}", "version": "1.0.0", "runner": "customer" }]""",
             cancellationToken,
             ("entities/probe.json", _probeEntity),
-            ("processes/probe-call.json", _probeProcess));
+            ("processes/probe-call.json", ProbeProcess(package)));
 
     // Compiles the application and activates it with the release activator, which makes the tables of its entities. The activation enlists both
     // contexts in one transaction, so they share a connection.
@@ -230,11 +231,11 @@ internal sealed class CustomerHostedReleases
 
     /// <summary>
     /// Leaves the state that staging leaves for a call of <c>ProbeCall</c> at <paramref name="releaseId"/>: a probe with <c>mode</c> <c>declared</c> and no
-    /// <c>status</c>, an instance <c>waiting</c> on <c>probe</c> with the probe as its subject, and a <c>pending</c> call of <c>test-package/probe</c> with
+    /// <c>status</c>, an instance <c>waiting</c> on <c>probe</c> with the probe as its subject, and a <c>pending</c> call of <c>&lt;package&gt;/probe</c> with
     /// the input <c>{ "mode": "declared" }</c> and no work item. Returns the call's id, the instance's id and the probe's id.
     /// </summary>
     public async Task<(Guid CallId, Guid InstanceId, Guid ProbeId)> StageProbeCallAsync(
-        string connectionString, Guid releaseId, CancellationToken cancellationToken)
+        string connectionString, Guid releaseId, CancellationToken cancellationToken, string package = TestPackages.Id)
     {
         var probeId = Guid.NewGuid();
         var table = EntityNaming.QualifiedTable(EntityNaming.Table(ProbeEntityId));
@@ -249,7 +250,7 @@ internal sealed class CustomerHostedReleases
         }
 
         var (callId, instanceId) = await StageCallAsync(
-            connectionString, releaseId, _probeCallProcessId, ProbeEntityId, probeId, "test-package", "1.0.0", "probe", """{ "mode": "declared" }""", idempotent: false, cancellationToken);
+            connectionString, releaseId, _probeCallProcessId, ProbeEntityId, probeId, package, "1.0.0", "probe", """{ "mode": "declared" }""", idempotent: false, cancellationToken);
         return (callId, instanceId, probeId);
     }
 
