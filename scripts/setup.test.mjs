@@ -285,6 +285,18 @@ describe('scripts/setup.sh retries its network steps', () => {
     assert.equal(result.ran.length, commands.length + 1)
     assert.match(result.stderr, /Attempt 1 of 4 failed with status 124: limit dotnet restore Axis\.slnx/)
   })
+
+  test("keys NexKit's tools cache entry on tools.sh and the sample packages' requirements files, which pin what it holds", () => {
+    const config = JSON.parse(readFileSync(join(root, '.nexkit/config.json'), 'utf8'))
+    const tools = config.cache.find((entry) => entry.name === 'tools')
+    assert.deepEqual(tools.paths, ['~/.cache/axis-tools'])
+    assert.deepEqual([...tools.key_files].sort(), ['samples/packages/*/requirements.txt', 'scripts/lib/tools.sh'])
+    const result = runSetup()
+    assert.equal(result.status, 0, result.stderr)
+    const pinned = result.wheels.map((line) => line.match(/ -r (\S+)$/)[1])
+    assert.equal(pinned.length, requirementsFiles.length)
+    for (const file of pinned) assert.match(file, /^samples\/packages\/[^/]+\/requirements\.txt$/)
+  })
 })
 
 describe('scripts/lib/tools.sh limits every download', () => {
