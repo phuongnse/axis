@@ -6,14 +6,16 @@ import { CodeBlock } from './CodeBlock'
 import { useText } from './texts'
 import { ThemeModeContext, useDesignTokens } from './themeMode'
 import { visuallyHidden } from './visuallyHidden'
+import { useEmptyStyle } from './useEmptyStyle'
 import { jsonRows, parseJsonText, type ValueRow } from './valueRows'
 
 /**
  * Proposed, see the review on #3650: names and their values as a table of two columns, as Postman and the browser's
  * developer tools show headers and Azure Logic Apps an action's inputs and outputs. It is an `AxisTable` with no
  * toolbar, compact, every row shown; a nested value is a row of its own named by its path, see `jsonRows`. A
- * value is shown as it was written, a number with its source digits; `null` and empty text read in muted
- * words, so neither passes for text. It has no header row, as the developer tools' headers have none: each name, in
+ * value is shown as it was written, a number with its source digits; a word written in place of a value, `null`,
+ * Empty, a count of fields or items, or Hidden for a secret or a value the reader may not read, takes the empty
+ * value's style, as Not set does, so none passes for text. It has no header row, as the developer tools' headers have none: each name, in
  * `textMuted` as a term's, says what its row is. Its name takes 5 of 12 columns and its value 7, as values run longer
  * and a name wraps between its words where an address or an id would break in the middle; a longer name wraps, so the tables one view stacks line up from top to bottom at any width, as the developer tools' header
  * sections do.
@@ -27,7 +29,8 @@ const valueShare = `${(7 / 12) * 100}%`
 
 export function ValueTable({ rows, label }: { rows: readonly ValueRow[]; label: string }) {
   const t = useText()
-  const muted = (text: string) => <Typography.Text type="secondary">{text}</Typography.Text>
+  const emptyStyle = useEmptyStyle()
+  const muted = (text: string) => <span style={emptyStyle}>{text}</span>
   const columns: AxisColumn<ValueRow>[] = [
     {
       key: 'name',
@@ -49,6 +52,8 @@ export function ValueTable({ rows, label }: { rows: readonly ValueRow[]; label: 
             return muted('null')
           case 'empty':
             return muted(t('shell.valueTable.empty'))
+          case 'secret':
+            return muted(t('shell.valueTable.hidden'))
           case 'fields':
             return muted(t('shell.valueTable.fields').replace('{count}', String(value.count)))
           case 'items':

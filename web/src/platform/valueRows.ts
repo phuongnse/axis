@@ -10,7 +10,7 @@ export interface ValueRow {
   name: string
   value:
     | { kind: 'text' | 'number' | 'boolean' | 'expression'; text: string }
-    | { kind: 'null' | 'empty' }
+    | { kind: 'null' | 'empty' | 'secret' }
     | { kind: 'fields' | 'items'; count: number }
     | { kind: 'change'; before: string | null; after: string | null; hidden: boolean }
 }
@@ -53,9 +53,17 @@ export function jsonRows(value: unknown, path = ''): ValueRow[] {
   })
 }
 
+/**
+ * Proposed, see the review on #3650: the text the server writes in place of a secret, such as an `Authorization`
+ * header or a `secret` binding's value, see docs/reference/integration-resources.md. It is no value of the call's, so
+ * it reads as the hidden value it stands for.
+ */
+const secretPlaceholder = '[secret]'
+
 function leaf(value: unknown): ValueRow['value'] {
   if (value === null || value === undefined) return { kind: 'null' }
   if (value === '') return { kind: 'empty' }
+  if (value === secretPlaceholder) return { kind: 'secret' }
   if (typeof value === 'boolean') return { kind: 'boolean', text: String(value) }
   // A number kept as its source digits is text that reads as a number.
   const text = String(value)
@@ -67,6 +75,6 @@ export function textRows(values: Record<string, string>): ValueRow[] {
   return Object.entries(values).map(([name, text]) => ({
     key: name,
     name,
-    value: text === '' ? { kind: 'empty' } : { kind: 'text', text },
+    value: text === '' ? { kind: 'empty' } : text === secretPlaceholder ? { kind: 'secret' } : { kind: 'text', text },
   }))
 }

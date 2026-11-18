@@ -26,4 +26,12 @@ describe('valueRows', () => {
       { key: 'Accept', name: 'Accept', value: { kind: 'text', text: 'application/json' } },
     ])
   })
+
+  it("reads the server's secret placeholder as a secret, in a header and in a body, and other text as text", () => {
+    expect(textRows({ Authorization: '[secret]', Note: 'secret' }).map((row) => row.value)).toEqual([
+      { kind: 'secret' },
+      { kind: 'text', text: 'secret' },
+    ])
+    expect(jsonRows(parseJsonText('{"apiKey":"[secret]"}')).map((row) => row.value)).toEqual([{ kind: 'secret' }])
+  })
 })
