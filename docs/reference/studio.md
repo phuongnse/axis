@@ -662,7 +662,7 @@ panel, its undo and its drag and drop.
   a widget inside it has one, even in a closed section or an inactive tab. A marked widget has a border
   in the `danger` colour, its text label, and `data-marked`. The marks follow the
   route's latest answer, and so the unsaved draft.
-- **Marked names.** _(planned for M35)_ A marked widget's text label reads "{name}, has problems", where the name is
+- **Marked names.** A marked widget's text label reads "{name}, has problems", where the name is
   its frame's name: the widget's type and the name it binds.
 - **Selection.** A click on the canvas or a pick in the widget tree selects a widget in both. A click
   selects the innermost widget under the pointer, and a click on the empty area of a container selects

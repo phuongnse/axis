@@ -2096,13 +2096,15 @@ describe('StudioEditor for a form', () => {
     expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
   })
 
-  it('undoes a Remove section in one step, restoring sections and steps and returning the fields to the palette', async () => {
+  it('undoes a Delete section in one step, restoring sections and steps and returning the fields to the palette', async () => {
     stubForm(steppedContent)
     renderForm()
 
     await userEvent.click(await screen.findByRole('tab', { name: 'Design' }, slow))
     await userEvent.click(screen.getAllByTestId('studio-outline-section')[0])
-    await userEvent.click(screen.getByRole('button', { name: 'Remove section' }))
+    await userEvent.click(
+      within(screen.getByTestId('studio-design-panel')).getByRole('button', { name: 'Delete section' }),
+    )
     expect(screen.getAllByTestId('studio-outline-section')).toHaveLength(1)
     expect(screen.getByTestId('studio-form-palette-title')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled()
@@ -2114,13 +2116,15 @@ describe('StudioEditor for a form', () => {
     expect(draft.steps).toEqual(steppedContent.steps)
   })
 
-  it('undoes a Remove step in one step, restoring the step', async () => {
+  it('undoes a Delete step in one step, restoring the step', async () => {
     stubForm(steppedContent)
     renderForm()
 
     await userEvent.click(await screen.findByRole('tab', { name: 'Design' }, slow))
     await userEvent.click(screen.getAllByTestId('studio-outline-step')[1])
-    await userEvent.click(screen.getByRole('button', { name: 'Remove step' }))
+    await userEvent.click(
+      within(screen.getByTestId('studio-design-panel')).getByRole('button', { name: 'Delete step' }),
+    )
     expect(screen.getAllByTestId('studio-outline-step')).toHaveLength(1)
 
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))

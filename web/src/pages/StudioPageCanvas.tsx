@@ -14,6 +14,7 @@ import {
 import { useLocation } from 'react-router'
 import { setApiGuard } from '../platform/api'
 import { CanvasActionsContext } from '../platform/canvasActions'
+import { fillText } from '../platform/fillText'
 import { getAt } from '../platform/jsonPatch'
 import { actionKeyOf, childLists, widgetPointerOf, widgetSummary } from '../platform/pageWidgets'
 import { PageLayout } from '../platform/PageLayout'
@@ -318,7 +319,7 @@ function isContent(value: unknown): value is Record<string, unknown> {
 /**
  * A widget of the canvas. It has a border in the error colour when a diagnostic names it, and `data-marked` then. A
  * widget with a path is a Tab stop that Enter or Space selects. The selected one has an outline in the primary colour
- * and `aria-current`. Its name is its summary, or its type, and "has diagnostics" when marked. It tells the widgets
+ * and `aria-current`. Its name is its summary, or its type, and "has problems" when marked. It tells the widgets
  * inside that they are on the canvas, and which of their actions is selected. A widget with a path can be dragged with
  * the pointer to move it. The drag starts on the innermost frame under the pointer, and the widget is dimmed while it
  * is dragged. With `onMove`, Alt+ArrowDown or Alt+ArrowUp on the frame itself moves its widget. While a drag is over it
@@ -379,7 +380,7 @@ function CanvasWidgetFrame({
       data-path={path}
       data-marked={marked ? 'true' : undefined}
       data-drop-over={droppable.isOver ? 'true' : undefined}
-      aria-label={marked ? `${label}, ${t('shell.studio.design.hasDiagnostics')}` : label}
+      aria-label={marked ? fillText(t('shell.studio.design.hasDiagnostics'), { name: label }) : label}
       aria-current={selected ? 'true' : undefined}
       tabIndex={path === undefined ? undefined : 0}
       onKeyDown={(event) => {
