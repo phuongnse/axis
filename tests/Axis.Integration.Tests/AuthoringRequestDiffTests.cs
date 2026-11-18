@@ -29,6 +29,10 @@ public sealed class AuthoringRequestDiffTests : IAsyncLifetime
 
     private const string NoChanges = "The request has no draft and no accept.";
 
+    private const string BudgetLayer = "customizations/department-budgets/Budget.json";
+
+    private const string BudgetFile = "modules/department-budgets/entities/budget.json";
+
     private readonly PostgreSqlFixture _database = new();
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
@@ -118,32 +122,7 @@ public sealed class AuthoringRequestDiffTests : IAsyncLifetime
         // Before the accept, the request still answers its draft.
         Assert.Equal(2, (await GetAsync(employee, request)).GetProperty("resources").GetArrayLength());
 
-        using var accept = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{request}/accept", Host);
-        Assert.Equal(HttpStatusCode.Accepted, accept.StatusCode);
-        using var queued = await StudioPublishTests.ReadAsync(accept);
-        var publishRequest = queued.RootElement.GetProperty("id").GetGuid();
-
-        // The publisher writes the draft into the folder and records it as a revision, then marks the accept and the request.
-        var writeLock = factory.Services.GetRequiredService<IStudioWriteLock>();
-        await using (var held = (await StudioWrites.TryTakeAsync(writeLock, folder.Path, CancellationToken))!)
-        {
-            foreach (var (file, bytes) in drafts.Apply(draft, StudioFolder.Files(folder.Path)).Value!)
-            {
-                var target = Path.Combine(folder.Path, file);
-                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                await File.WriteAllBytesAsync(target, bytes, CancellationToken);
-            }
-
-            Assert.Null(drafts.CommitAccept(draft, "Accept draft", "author", "Author User", "studio", publishRequest).Refusal);
-        }
-
-        await PostgreSqlServer.AdminScalarAsync(
-            connectionString,
-            $"""
-            UPDATE axis.publish_requests SET status = 'succeeded', finished_at = now() WHERE id = '{publishRequest}';
-            UPDATE axis.authoring_requests SET state = 'accepted' WHERE id = '{request}'
-            """,
-            CancellationToken);
+        await AcceptAsync(factory, author, folder.Path, drafts, draft, connectionString, request);
 
         var list = await StudioReleaseHistoryTests.GetAsync(author, "/api/studio/apps/PurchaseRequests/revisions");
         var revisionIds = list.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetString()).ToList();
@@ -163,6 +142,49 @@ public sealed class AuthoringRequestDiffTests : IAsyncLifetime
         // An accepted request never gives a cursor, so any cursor is refused.
         using var withCursor = await author.SendAsync(RecordApiFixture.Request($"{Url}/{request}/diff?cursor=garbage", Host), CancellationToken);
         Assert.Equal(HttpStatusCode.BadRequest, withCursor.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_ready_requests_layer_entry_answers_the_module_entity_with_the_layer_applied_and_its_marks()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        var connectionString = await _database.CreateDatabaseAsync("arq_diff_layer_ready", CancellationToken);
+        await using var factory = NewFactory(folder.Path, connectionString, revisions.Path);
+        using var employee = factory.CreateClient().SignedInAs("employee");
+        var (drafts, draft) = await NewDraftAsync(factory, revisions.Path, folder.Path);
+        Assert.Null((await drafts.WriteLayerAsync(draft, "department-budgets", "Budget", CostCenterLayer(), CancellationToken)).Refusal);
+        var rule = (await drafts.ReadAsync(draft, Guid.Parse(RuleId), CancellationToken)).Value!;
+        var changed = JsonNode.Parse(rule.Bytes)!.AsObject();
+        changed["expression"] = "20000";
+        Assert.Null((await drafts.WriteAsync(draft, changed, CancellationToken)).Refusal);
+        var request = await InsertRequestAsync(connectionString, folder.Path, "ready", draft);
+
+        var entries = (await GetAsync(employee, request)).GetProperty("resources").EnumerateArray().ToList();
+
+        AssertCostCenterFieldAdded(entries.Single(entry => entry.GetProperty("file").GetString() == BudgetLayer));
+        var ruleEntry = entries.Single(entry => entry.GetProperty("id").GetString() == RuleId);
+        Assert.False(ruleEntry.TryGetProperty("module", out _));
+        Assert.False(ruleEntry.TryGetProperty("titles", out _));
+    }
+
+    [Fact]
+    public async Task An_accepted_requests_layer_entry_answers_the_module_entity_before_and_after_its_revision_with_the_field_marked()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        var connectionString = await _database.CreateDatabaseAsync("arq_diff_layer_accepted", CancellationToken);
+        await using var factory = NewFactory(folder.Path, connectionString, revisions.Path);
+        using var author = factory.CreateClient().SignedInAs("author");
+        using var employee = factory.CreateClient().SignedInAs("employee");
+        var (drafts, draft) = await NewDraftAsync(factory, revisions.Path, folder.Path);
+        Assert.Null((await drafts.WriteLayerAsync(draft, "department-budgets", "Budget", CostCenterLayer(), CancellationToken)).Refusal);
+        var request = await InsertRequestAsync(connectionString, folder.Path, "ready", draft);
+
+        await AcceptAsync(factory, author, folder.Path, drafts, draft, connectionString, request);
+
+        var entries = (await GetAsync(employee, request)).GetProperty("resources").EnumerateArray().ToList();
+        AssertCostCenterFieldAdded(entries.Single(entry => entry.GetProperty("file").GetString() == BudgetLayer));
     }
 
     [Fact]
@@ -212,6 +234,72 @@ public sealed class AuthoringRequestDiffTests : IAsyncLifetime
         var recorder = StudioRevisions.For(revisionsPath, folder, "author", "Author User", NullLogger<StudioRevisions>.Instance)!;
         var drafts = StudioDrafts.For(revisionsPath, folder, "author", "Author User", writeLock)!;
         return (drafts, (await drafts.CreateAsync(recorder, CancellationToken)).Value!.Id);
+    }
+
+    // The author's accept, as the publisher carries it out: the accept route queues an accept publish request, the draft is written
+    // into the folder and recorded as a revision, then the accept and the request are marked. The publisher runs in another process,
+    // so the test takes its steps.
+    private static async Task AcceptAsync(
+        WebApplicationFactory<Program> factory,
+        HttpClient author,
+        string folderPath,
+        StudioDrafts drafts,
+        string draft,
+        string connectionString,
+        Guid request)
+    {
+        using var accept = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{request}/accept", Host);
+        Assert.Equal(HttpStatusCode.Accepted, accept.StatusCode);
+        using var queued = await StudioPublishTests.ReadAsync(accept);
+        var publishRequest = queued.RootElement.GetProperty("id").GetGuid();
+
+        // The publisher writes the draft into the folder and records it as a revision, then marks the accept and the request.
+        var writeLock = factory.Services.GetRequiredService<IStudioWriteLock>();
+        await using (var held = (await StudioWrites.TryTakeAsync(writeLock, folderPath, CancellationToken))!)
+        {
+            foreach (var (file, bytes) in drafts.Apply(draft, StudioFolder.Files(folderPath)).Value!)
+            {
+                var target = Path.Combine(folderPath, file);
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                await File.WriteAllBytesAsync(target, bytes, CancellationToken);
+            }
+
+            Assert.Null(drafts.CommitAccept(draft, "Accept draft", "author", "Author User", "studio", publishRequest).Refusal);
+        }
+
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString,
+            $"""
+            UPDATE axis.publish_requests SET status = 'succeeded', finished_at = now() WHERE id = '{publishRequest}';
+            UPDATE axis.authoring_requests SET state = 'accepted' WHERE id = '{request}'
+            """,
+            CancellationToken);
+    }
+
+    // A layer that adds a field to the Budget entity of the department-budgets module.
+    private static JsonObject CostCenterLayer() =>
+        JsonNode.Parse("""{ "fields": [{ "name": "costCenter", "type": "text", "maxLength": 20 }] }""")!.AsObject();
+
+    // The module of the Budget layer entry is the entity with the layer applied after the change, with the field marked as added,
+    // and the entity before the change, which lacks the field.
+    private static void AssertCostCenterFieldAdded(JsonElement entry)
+    {
+        var module = entry.GetProperty("module");
+        Assert.Equal("entity", module.GetProperty("kind").GetString());
+        Assert.Equal(BudgetFile, module.GetProperty("file").GetString());
+        var after = FieldNames(module.GetProperty("after"));
+        var index = after.IndexOf("costCenter");
+        Assert.True(index >= 0);
+        Assert.DoesNotContain("costCenter", FieldNames(module.GetProperty("before")));
+        Assert.Contains(
+            module.GetProperty("marks").EnumerateArray(),
+            mark => mark.GetProperty("path").GetString() == $"/fields/{index}" && mark.GetProperty("mark").GetString() == "added");
+    }
+
+    private static List<string?> FieldNames(JsonElement text)
+    {
+        using var document = JsonDocument.Parse(text.GetString()!);
+        return [.. document.RootElement.GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("name").GetString())];
     }
 
     private static async Task<Guid> InsertRequestAsync(string connectionString, string folder, string state, string? draft)

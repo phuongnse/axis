@@ -153,12 +153,16 @@ an accept, which [accepting](#accepting) describes.
   retry keeps its round and its time limit, see [retrying a conflict](#accepting). It answers the request as it now is.
 - **The request diff.** Any author reads the changes of the request. A request with a draft that is not
   `accepted`, such as a `ready` or `failed` one, answers the changes of its draft, in the shape and the pages of the
-  [draft diff](authoring-revisions.md#draft-diff), read as its author's draft. A cursor the draft did not give
+  [draft diff](authoring-revisions.md#draft-diff), read as its author's draft, with `module` as below. A cursor the draft did not give
   answers `400` and a write lock that cannot be taken `503`, as the draft diff does. Once `accepted`, it answers the
   changes of the revision its accept made, as the [revision diff](authoring-revisions.md#diff) gives them, with `titles`,
   in one page as `{ start, tip, resources, cursor }`. `start` is the parent of that revision, `tip` is the revision
   and `cursor` is null, and a cursor answers `400`. A request with neither a draft nor an accept answers `404` with
   the title "The request has no draft and no accept."
+  A layer file's entry, one with a `target`, also has `module`: `{ id, kind, name, file, before, after, marks, removed }`.
+  `before` and `after` are the module resource's JSON text with the layer applied at `start` and at `tip`. Either is
+  null where the target names no module resource. `marks` and `removed` are those of `after`, as the
+  [module resource read](customization-layers.md#in-studio) answers them. An entry that is not a layer file has no `module`.
 - **AI status** _(planned for M35)_. `GET /api/studio/ai` takes the session and the author role and answers
   `{ aiConnected, mcp }`. `aiConnected` is true when the tenant's AI authoring setting is on and the person has
   stored a key, or when `Ai:DefaultBinding` needs none, see

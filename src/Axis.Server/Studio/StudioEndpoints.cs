@@ -314,11 +314,7 @@ internal static class StudioEndpoints
     internal static (ModuleFile? File, IResult? NotFound) FindModuleFile(
         CompilationResult compiled, ModuleCatalog modules, string module, string id)
     {
-        var pin = compiled.ModulePins.FirstOrDefault(pin => string.Equals(pin.Id, module, StringComparison.Ordinal));
-        var installed = pin is null
-            ? null
-            : modules.Modules.FirstOrDefault(item =>
-                item.Manifest.Id == pin.Id && item.Manifest.Version == pin.Version);
+        var installed = PinnedModule(compiled, modules, module);
         if (installed is null)
         {
             return (null, NotFound("The application uses no module with this id."));
@@ -329,31 +325,73 @@ internal static class StudioEndpoints
             return (null, NotFound(NoModuleResource));
         }
 
-        foreach (var file in installed.Files.Where(file => file.Path != ModuleCatalog.ManifestFileName))
-        {
-            try
-            {
-                using var document = JsonDocument.Parse(file.Content);
-                var root = document.RootElement;
-                if (root.ValueKind != JsonValueKind.Object
-                    || !root.TryGetProperty("kind", out var kind) || kind.ValueKind != JsonValueKind.String
-                    || !root.TryGetProperty("id", out var fileId) || fileId.ValueKind != JsonValueKind.String
-                    || !Guid.TryParseExact(fileId.GetString(), "D", out var fileGuid) || fileGuid != guid)
-                {
-                    continue;
-                }
+        return ModuleResources(installed).FirstOrDefault(file => file.Id == guid) is { } found
+            ? (found, null)
+            : (null, NotFound(NoModuleResource));
+    }
 
-                var name = root.TryGetProperty("name", out var nameProperty) && nameProperty.ValueKind == JsonValueKind.String
-                    ? nameProperty.GetString()
-                    : null;
-                return (new ModuleFile(guid, kind.GetString()!, name, file.Path, file.Content, root.Clone(), installed), null);
-            }
-            catch (JsonException)
-            {
-            }
+    /// <summary>
+    /// The module resource that a layer named by <paramref name="target"/>, <c>&lt;module id&gt;/&lt;name&gt;</c>, changes in the
+    /// module version <paramref name="compiled"/> pins: the one resource whose name matches ignoring letter case. Null when the
+    /// module is not pinned, no resource has the name, more than one kind has it, or it is a scenario, the same targets
+    /// <see cref="LayerChecker"/> rejects. See <c>docs/reference/authoring-requests.md#routes</c>.
+    /// </summary>
+    internal static ModuleFile? FindLayerTarget(CompilationResult compiled, ModuleCatalog modules, string target)
+    {
+        var slash = target.IndexOf('/', StringComparison.Ordinal);
+        if (slash < 0 || PinnedModule(compiled, modules, target[..slash]) is not { } installed)
+        {
+            return null;
         }
 
-        return (null, NotFound(NoModuleResource));
+        var name = target[(slash + 1)..];
+        var named = ModuleResources(installed)
+            .Where(file => string.Equals(file.Name, name, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var kinds = named.Select(file => file.Kind).Distinct(StringComparer.Ordinal).ToList();
+        return kinds is [var kind] && kind != ResourceKinds.Scenario ? named[0] : null;
+    }
+
+    // The installed module version that the compile pins for this module id, or null when the application uses no such module.
+    private static InstalledModule? PinnedModule(CompilationResult compiled, ModuleCatalog modules, string module)
+    {
+        var pin = compiled.ModulePins.FirstOrDefault(pin => string.Equals(pin.Id, module, StringComparison.Ordinal));
+        return pin is null
+            ? null
+            : modules.Modules.FirstOrDefault(item => item.Manifest.Id == pin.Id && item.Manifest.Version == pin.Version);
+    }
+
+    // The resource files of an installed module, in the order its files list them. The manifest is never a resource.
+    private static IEnumerable<ModuleFile> ModuleResources(InstalledModule installed) =>
+        installed.Files
+            .Where(file => file.Path != ModuleCatalog.ManifestFileName)
+            .Select(file => ModuleResource(installed, file))
+            .OfType<ModuleFile>();
+
+    // The file as a module resource, or null when its text is not a JSON object with a UUID id and a kind.
+    private static ModuleFile? ModuleResource(InstalledModule installed, ResourceContent file)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(file.Content);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object
+                || !root.TryGetProperty("kind", out var kind) || kind.ValueKind != JsonValueKind.String
+                || !root.TryGetProperty("id", out var fileId) || fileId.ValueKind != JsonValueKind.String
+                || !Guid.TryParseExact(fileId.GetString(), "D", out var fileGuid))
+            {
+                return null;
+            }
+
+            var name = root.TryGetProperty("name", out var nameProperty) && nameProperty.ValueKind == JsonValueKind.String
+                ? nameProperty.GetString()
+                : null;
+            return new ModuleFile(fileGuid, kind.GetString()!, name, file.Path, file.Content, root.Clone(), installed);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     private static async Task<IResult> ModuleResourceSaveAsync(

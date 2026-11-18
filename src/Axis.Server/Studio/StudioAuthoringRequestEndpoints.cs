@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using Axis.Configuration.Modules;
+using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Data.Profiles;
@@ -40,7 +42,8 @@ namespace Axis.Server.Studio;
 /// (404 for an <c>id</c> that is not a request of it). An <c>accepted</c> request answers the changes of the revision its accept made
 /// as <c>{ start, tip, resources, cursor }</c> with <c>titles</c> and a null <c>cursor</c>, and 400 for a cursor. Any other request that
 /// has a draft answers a page of the draft's diff, read as its author's draft, with the draft diff's 400 and 503. A request with neither
-/// answers 404. See <c>docs/reference/authoring-requests.md#routes</c>.
+/// answers 404. A layer file's entry also answers its <c>module</c>, the module resource with the layer applied before and after the change,
+/// and the marks of the after side. See <c>docs/reference/authoring-requests.md#routes</c>.
 /// </summary>
 internal static class StudioAuthoringRequestEndpoints
 {
@@ -269,6 +272,8 @@ internal static class StudioAuthoringRequestEndpoints
         HttpContext httpContext,
         StudioOptions options,
         IStudioWriteLock writeLock,
+        PackageCatalog packages,
+        ModuleCatalog modules,
         TenantDatabase database)
     {
         var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
@@ -313,7 +318,7 @@ internal static class StudioAuthoringRequestEndpoints
 
         if (state == "accepted")
         {
-            return await AcceptedDiffAsync(applicationId, draft, cursor, folder, httpContext, options, connection, cancellationToken);
+            return await AcceptedDiffAsync(applicationId, draft, cursor, folder, httpContext, options, connection, packages, modules, cancellationToken);
         }
 
         var names = await UserProfiles.FindDisplayNamesAsync(connection, [author], cancellationToken);
@@ -327,11 +332,48 @@ internal static class StudioAuthoringRequestEndpoints
         var outcome = await drafts.DiffAsync(draft.ToString("D"), cursor, cancellationToken);
         return outcome.Refusal switch
         {
-            null => Results.Ok(outcome.Value),
+            null => await DraftPageAsync(drafts, draft.ToString("D"), outcome.Value!, packages, modules, cancellationToken),
             StudioWriteRefusal.Unavailable => StudioEndpoints.Problem(StatusCodes.Status503ServiceUnavailable, StudioEndpoints.WriteLockUnavailable),
             StudioWriteRefusal.DoesNotApply => StudioEndpoints.Problem(StatusCodes.Status400BadRequest, StudioRevisionEndpoints.ForeignCursor),
             _ => StudioEndpoints.NotFound(NoChanges),
         };
+    }
+
+    // A page of the draft's diff. A layer file's entry also answers its module resource, from the draft's start commit and from the
+    // page's tip, so the files of both are read only when the page has a layer file.
+    private static async Task<IResult> DraftPageAsync(
+        StudioDrafts drafts,
+        string draft,
+        StudioDraftDiff page,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        CancellationToken cancellationToken)
+    {
+        if (!page.Resources.Any(change => change.Target is not null))
+        {
+            return Results.Ok(new AuthoringRequestDraftDiff(page.Start, page.Tip, [.. page.Resources.Select(change => DraftEntry(change, null))], page.Cursor));
+        }
+
+        var start = await drafts.FilesAsync(draft, page.Start, cancellationToken);
+        var tip = await drafts.FilesAsync(draft, page.Tip, cancellationToken);
+        if ((start.Refusal ?? tip.Refusal) is { } refusal)
+        {
+            return refusal == StudioWriteRefusal.Unavailable
+                ? StudioEndpoints.Problem(StatusCodes.Status503ServiceUnavailable, StudioEndpoints.WriteLockUnavailable)
+                : StudioEndpoints.NotFound(NoChanges);
+        }
+
+        var startSide = new StudioModuleSide(start.Value!, packages, modules);
+        var tipSide = new StudioModuleSide(tip.Value!, packages, modules);
+        return Results.Ok(new AuthoringRequestDraftDiff(
+            page.Start,
+            page.Tip,
+            [.. page.Resources.Select(change => DraftEntry(
+                change, change.Target is null ? null : StudioModuleLayers.Change(change.Target, startSide, tipSide, modules)))],
+            page.Cursor));
+
+        static AuthoringRequestDraftEntry DraftEntry(StudioRevisionChange change, AuthoringRequestLayerChange? module) =>
+            new(change.File, change.Change, change.Id, change.Kind, change.Name, change.Before, change.After, change.Target, module);
     }
 
     // The changes of the revision the draft's newest succeeded accept made, with the titles of each resource, in one page.
@@ -343,6 +385,8 @@ internal static class StudioAuthoringRequestEndpoints
         HttpContext httpContext,
         StudioOptions options,
         NpgsqlConnection connection,
+        PackageCatalog packages,
+        ModuleCatalog modules,
         CancellationToken cancellationToken)
     {
         if (cursor is not null)
@@ -386,10 +430,14 @@ internal static class StudioAuthoringRequestEndpoints
             return StudioEndpoints.NotFound(NoChanges);
         }
 
-        var tip = JsonFiles(revisions.Main(list[index].Id));
-        var parent = JsonFiles(revisions.Main(list[index + 1].Id));
+        var tipMain = revisions.Main(list[index].Id);
+        var parentMain = revisions.Main(list[index + 1].Id);
+        var tip = JsonFiles(tipMain);
+        var parent = JsonFiles(parentMain);
         var titles = StudioResourceTitles.Read(StudioFolder.Resources(tip));
         var removedTitles = StudioResourceTitles.Read(StudioFolder.Resources(parent));
+        var parentSide = new StudioModuleSide(parentMain?.Files ?? [], packages, modules);
+        var tipSide = new StudioModuleSide(tipMain?.Files ?? [], packages, modules);
         var resources = diff.Resources
             .Select(change =>
             {
@@ -399,7 +447,8 @@ internal static class StudioAuthoringRequestEndpoints
                     : null;
                 return new AuthoringRequestDiffEntry(
                     change.File, change.Change, change.Id, change.Kind, change.Name, change.Before, change.After, change.Target,
-                    entryTitles is { Count: > 0 } ? entryTitles : null);
+                    entryTitles is { Count: > 0 } ? entryTitles : null,
+                    change.Target is null ? null : StudioModuleLayers.Change(change.Target, parentSide, tipSide, modules));
             })
             .ToList();
         return Results.Ok(new AuthoringRequestRevisionDiff(list[index + 1].Id, list[index].Id, resources, null));
@@ -775,7 +824,7 @@ internal sealed record AuthoringRequestStepResponse(
 /// <summary>The newest requests of an application, newest first.</summary>
 internal sealed record AuthoringRequestListResponse(IReadOnlyList<AuthoringRequestResponse> Items);
 
-/// <summary>One file an accepted request's revision changed, as <see cref="StudioRevisionChange"/> gives it, with the resource's label in each locale, or null when it has none.</summary>
+/// <summary>One file an accepted request's revision changed, as <see cref="StudioRevisionChange"/> gives it, with the resource's label in each locale, or null when it has none, and its <c>module</c> when it is a layer file.</summary>
 internal sealed record AuthoringRequestDiffEntry(
     string File,
     string Change,
@@ -785,7 +834,38 @@ internal sealed record AuthoringRequestDiffEntry(
     string? Before,
     string? After,
     string? Target,
-    IReadOnlyDictionary<string, string>? Titles);
+    IReadOnlyDictionary<string, string>? Titles,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AuthoringRequestLayerChange? Module);
+
+/// <summary>One file a draft's diff changed, as <see cref="StudioRevisionChange"/> gives it, and its <c>module</c> when it is a layer file. It has no titles, as a ready request's diff has none.</summary>
+internal sealed record AuthoringRequestDraftEntry(
+    string File,
+    string Change,
+    string? Id,
+    string? Kind,
+    string? Name,
+    string? Before,
+    string? After,
+    string? Target,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] AuthoringRequestLayerChange? Module);
+
+/// <summary>A page of a draft's diff, as <see cref="StudioDraftDiff"/> gives it, with the entries of <see cref="AuthoringRequestDraftEntry"/>.</summary>
+internal sealed record AuthoringRequestDraftDiff(string Start, string Tip, IReadOnlyList<AuthoringRequestDraftEntry> Resources, string? Cursor);
+
+/// <summary>
+/// A layer file's module resource in a request's diff: its id, kind, name and file, its JSON text before and after the change
+/// with the layer applied on each side, and the marks and removed elements of the after side. A side is null where the layer's
+/// target names no module resource. See <c>docs/reference/authoring-requests.md#routes</c>.
+/// </summary>
+internal sealed record AuthoringRequestLayerChange(
+    string Id,
+    string Kind,
+    string? Name,
+    string File,
+    string? Before,
+    string? After,
+    IReadOnlyList<StudioMark> Marks,
+    IReadOnlyList<StudioRemovedElement> Removed);
 
 /// <summary>The changes of the revision an accepted request made: the commit before it as <c>Start</c>, the revision as <c>Tip</c>, and a null <c>Cursor</c>.</summary>
 internal sealed record AuthoringRequestRevisionDiff(string Start, string Tip, IReadOnlyList<AuthoringRequestDiffEntry> Resources, string? Cursor);
