@@ -542,7 +542,7 @@ its stored `error`. The codes are:
 - `writeRefused`: a write to a record was refused. The stored error is the refused-write text.
 
 **No stack traces.** _(planned)_ No page of an application shows a stack trace or an exception message,
-as [D161](../decisions/d161-connector-calls-run-on-bindings-and-secrets-keep-their-request-and-responses-for-inspection-and-a-steps-error-is-a-code.md) says.
+as [D161](../decisions/d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md) says.
 
 ### Inspection errors
 

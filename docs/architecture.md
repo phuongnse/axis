@@ -280,7 +280,7 @@ for a name the tenant lacks, or for a binding of the other kind, both throw an
 `InvalidOperationException` that names the binding and no value, so `Resolve` never hands out a plain
 secret. The kinds, where values live and the checks are in
 [deployment bindings](reference/integration-resources.md#deployment-bindings), and the reasons in
-[D161](decisions/d161-connector-calls-run-on-bindings-and-secrets-keep-their-request-and-responses-for-inspection-and-a-steps-error-is-a-code.md).
+[D161](decisions/d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md).
 
 #### Tenant directory
 

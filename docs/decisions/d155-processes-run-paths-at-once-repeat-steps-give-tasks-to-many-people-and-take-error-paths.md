@@ -60,7 +60,7 @@ puts this work first. This decision replaces D19 and D69 and keeps every part of
   names one for that kind of failure. Without one, the failure ends its path, a block whose path failed
   fails, and the instance fails, and only an operator retries it
   ([D35](d35-operator-retry-cancel-and-resolve.md)). A connector call
-  ([D161](d161-connector-calls-run-on-bindings-and-secrets-keep-their-request-and-responses-for-inspection-and-a-steps-error-is-a-code.md)) and a package operation
+  ([D161](d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md)) and a package operation
   ([D148](d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md))
   take that policy from their step.
 - **An operator may cancel one branch or one task** with a reason, as for an instance.

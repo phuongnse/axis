@@ -37,7 +37,7 @@ The detail is in [operator commands](../reference/process-operator-commands.md#o
 ## Consequences
 
 - An unknown call is never forgotten or sent blindly, so the promise of
-  [D161](d161-connector-calls-run-on-bindings-and-secrets-keep-their-request-and-responses-for-inspection-and-a-steps-error-is-a-code.md) and [D148](d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md) of no
+  [D161](d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md) and [D148](d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md) of no
   second effect holds through every command.
 - An operator's typing mistake in a resolve does not fail the instance.
 - Axis does not compensate, so a cancel leaves the effects of earlier steps in place.
