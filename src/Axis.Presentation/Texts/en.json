@@ -2781,7 +2781,6 @@
   "shell.stepRun.response": "Response",
   "shell.stepRun.noResponse": "No answer came back.",
   "shell.stepRun.truncated": "Cut at the size limit.",
-  "shell.stepRun.retry": "Up to {attempts} attempts, {backoff} apart",
   "shell.stepRun.attempt": "Attempt {number}",
   "shell.stepRun.lookup": "Lookup {number}",
   "shell.stepRun.httpStatus": "HTTP",

@@ -258,6 +258,10 @@ export function AxisTable<T extends object>({
   const locale = useContext(ConfigProvider.ConfigContext).locale?.locale ?? 'en'
   const query = view?.query
   const [draft, setDraft] = useState(query?.search ?? '')
+  // The rows with details that are open.
+  const [openRows, setOpenRows] = useState<string[]>([])
+  const toggleRow = (key: string) =>
+    setOpenRows((open) => (open.includes(key) ? open.filter((each) => each !== key) : [...open, key]))
   const [shownSearch, setShownSearch] = useState(query?.search)
   // A search from the address, such as after the back button, replaces the text in the box.
   if (shownSearch !== query?.search) {
@@ -410,8 +414,11 @@ export function AxisTable<T extends object>({
   // Proposed, see the reviews on #3263 and #3650: only a table with a group row folds rows, so every other table draws
   // its cells as they are.
   const grouped = (pageRows ?? []).some((row) => Array.isArray((row as { children?: unknown }).children))
+  // Proposed, see the review on #3650: a row that opens to its details folds as a group row does, so one fold opens a
+  // row in every table.
+  const folds = grouped || details !== undefined
   const foldRoom = tokens.spacing.xs / 2 + tokens.size.smallControl + tokens.spacing.xs / 2
-  // The fold of a group row hangs in the first column's padding; the fold of a row with details has a column of its own.
+  // The fold of a group row or of a row with details hangs in the first column's padding.
   const foldIcon: NonNullable<TableProps<T>['expandable']>['expandIcon'] = ({
     expandable,
     expanded,
@@ -433,15 +440,11 @@ export function AxisTable<T extends object>({
         }
         aria-expanded={expanded}
         icon={<FoldIcon open={expanded} />}
-        style={
-          grouped
-            ? {
-                marginInlineStart: -(foldRoom - tokens.spacing.xs / 2),
-                marginInlineEnd: tokens.spacing.xs / 2,
-                verticalAlign: 'top',
-              }
-            : { verticalAlign: 'top' }
-        }
+        style={{
+          marginInlineStart: -(foldRoom - tokens.spacing.xs / 2),
+          marginInlineEnd: tokens.spacing.xs / 2,
+          verticalAlign: 'top',
+        }}
         onClick={(event) => onExpand(record, event)}
       />
     ) : null
@@ -468,8 +471,8 @@ export function AxisTable<T extends object>({
           width,
           ...(freeText ? {} : { whiteSpace: 'nowrap' }),
           ...line,
-          // In a table with group rows, the first column's padding holds the fold with room on either side.
-          ...(grouped && position === 0 ? { paddingInlineStart: foldRoom } : {}),
+          // In a table whose rows fold, the first column's padding holds the fold with room on either side.
+          ...(folds && position === 0 ? { paddingInlineStart: foldRoom } : {}),
         }
         const sortable = view !== undefined && (Boolean(column.sorter) || sortValue !== undefined)
         const original = shown.find((candidate) => candidate.key === column.key)!
@@ -494,7 +497,7 @@ export function AxisTable<T extends object>({
             const content = contentOf(original, row, index)
             // The moved cells sit in the cell of the identifying column, so they stay in the row they belong to.
             const lines = position === 0 && !blankRow?.(row) ? movedLines(row, index) : []
-            const own =
+            const value =
               content === null ? (
                 blankRow?.(row) ? null : (
                   <EmptyDash />
@@ -502,8 +505,8 @@ export function AxisTable<T extends object>({
               ) : freeText ? (
                 <div
                   style={{
-                    // In a table with group rows, the first column's words sit beside the fold, not under it.
-                    ...(grouped && position === 0 ? { display: 'inline-block', verticalAlign: 'top' } : {}),
+                    // In a table whose rows fold, the first column's words sit beside the fold, not under it.
+                    ...(folds && position === 0 ? { display: 'inline-block', verticalAlign: 'top' } : {}),
                     minWidth: leastFreeText,
                     maxWidth: freeTextMaxWidth,
                     whiteSpace: 'normal',
@@ -514,6 +517,23 @@ export function AxisTable<T extends object>({
                 </div>
               ) : (
                 content
+              )
+            // Ant Design gives the fold of a row with details a column of its own, so the table draws it here, where a
+            // group row's is.
+            const own =
+              details !== undefined && !grouped && position === 0 ? (
+                <>
+                  {foldIcon({
+                    prefixCls: '',
+                    record: row,
+                    expandable: details(row) !== null,
+                    expanded: openRows.includes(rowKey(row)),
+                    onExpand: (record) => toggleRow(rowKey(record)),
+                  })}
+                  {value}
+                </>
+              ) : (
+                value
               )
             if (lines.length === 0) {
               return own
@@ -697,8 +717,8 @@ export function AxisTable<T extends object>({
                     ? {
                         expandedRowRender: (row) => details(row),
                         rowExpandable: (row) => details(row) !== null,
-                        expandIcon: foldIcon,
-                        columnWidth: foldRoom,
+                        showExpandColumn: false,
+                        expandedRowKeys: openRows,
                       }
                     : undefined
               }

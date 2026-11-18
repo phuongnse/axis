@@ -25,6 +25,8 @@ interface Row {
 
 const texts = {
   'shell.table.refresh': 'Refresh',
+  'shell.table.showDetails': 'Show the details',
+  'shell.table.hideDetails': 'Hide the details',
   'shell.table.rowActions': 'Actions',
   'shell.table.selected': '{count} selected',
   'shell.table.range': '{from}–{to} of {total}',
@@ -216,6 +218,24 @@ describe('AxisTable', () => {
 
     expect(screen.getAllByRole('row').filter((row) => within(row).queryAllByRole('cell').length > 0)).toHaveLength(25)
     expect(screen.queryByRole('list')).not.toBeInTheDocument()
+  })
+
+  it('folds a row open to its details from a fold in its first cell, as a group row does, with no column of its own', async () => {
+    renderTable({
+      pagination: false,
+      details: (row) => (row.id === '1' ? <p>Paper for the office</p> : null),
+    })
+    expect(screen.getAllByRole('columnheader')).toHaveLength(2)
+    const first = screen.getByRole('cell', { name: /Buy paper/ })
+    const fold = within(first).getByRole('button', { name: 'Show the details' })
+    expect(fold).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Paper for the office')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Show the details' })).toHaveLength(1)
+
+    await userEvent.click(fold)
+    expect(screen.getByText('Paper for the office')).toBeVisible()
+    await userEvent.click(within(first).getByRole('button', { name: 'Hide the details' }))
+    expect(screen.queryByText('Paper for the office')).not.toBeVisible()
   })
 
   describe('paging', () => {

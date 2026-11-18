@@ -23,20 +23,8 @@ import { TermList, type Term } from './TermList'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
-/** An ISO 8601 duration of days, hours, minutes and seconds, such as `P3D` or `PT30S`, in the reader's words. */
-function isoDurationText(value: unknown, locale: string): string | null {
-  const match = typeof value === 'string' ? /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(value) : null
-  if (match === null) {
-    return null
-  }
-  const [days, hours, minutes, seconds] = match.slice(1).map((part) => Number(part ?? 0))
-  const total = ((days * 24 + hours) * 60 + minutes) * 60 + seconds
-  return durationText(new Date(0).toISOString(), new Date(total * 1000).toISOString(), locale)
-}
-
 const record = (value: unknown): Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
-const words = (value: unknown): string => (typeof value === 'string' ? value : JSON.stringify(value))
 
 /** Whether a run made or changed anything its Output shows. */
 const hasOutput = (made: RunOutput | undefined) =>
@@ -576,17 +564,11 @@ export function StepRunPanel({
 
   // Proposed, see the review on #3650: the attempts of a call are one compact table, each row its number, result, HTTP
   // status and duration, and a row folds open to when it started, its error, trace ID and answer, as Stripe and GitHub
-  // list a webhook's deliveries.
+  // list a webhook's deliveries. The tab shows the attempts made, never the step's retry policy, which is the author's
+  // setting, as the agreed rule of no Definition tab says.
   const attempts = () => {
-    const retry = record(definition.retry)
     return (
       <Flex vertical gap={spacing.sm}>
-        {retry.attempts !== undefined &&
-          muted(
-            t('shell.stepRun.retry')
-              .replace('{attempts}', String(retry.attempts))
-              .replace('{backoff}', isoDurationText(retry.backoff, locale) ?? words(retry.backoff)),
-          )}
         {calls.map((call) => (
           <Flex key={call.id} vertical gap={spacing.xs}>
             {calls.length > 1 && <Typography.Text strong>{targetOf(call)}</Typography.Text>}

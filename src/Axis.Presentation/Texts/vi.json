@@ -2781,7 +2781,6 @@
   "shell.stepRun.response": "Phản hồi",
   "shell.stepRun.noResponse": "Không nhận được phản hồi.",
   "shell.stepRun.truncated": "Đã cắt bớt vì vượt giới hạn kích thước.",
-  "shell.stepRun.retry": "Tối đa {attempts} lần thử, cách nhau {backoff}",
   "shell.stepRun.attempt": "Lần thử {number}",
   "shell.stepRun.lookup": "Lần tra cứu {number}",
   "shell.stepRun.httpStatus": "HTTP",
