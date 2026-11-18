@@ -57,9 +57,8 @@ that holds it.
 - **Autopilot takes every open issue,** as
   [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) agrees. NexKit's
   [`autopilot`][nexkit-autopilot] setting is on with its scope set to every open issue, so no person
-  posts `/nexkit plan` or `/nexkit go`. Milestones group the work and do not order it: the issues of
-  several milestones run at once, and only *blocked by* marks make one issue wait for another, in the
-  same milestone or across milestones.
+  posts `/nexkit plan` or `/nexkit go`. Milestones group the work and do not order it, so the issues of
+  several milestones run at once. What makes one issue wait for another is in the bullets below.
 - **An issue's milestone follows one test, taken in these steps.** A milestone then holds only the
   work its "Done when" names, so its journey never waits for other work. As
   [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) agrees, a milestone groups work

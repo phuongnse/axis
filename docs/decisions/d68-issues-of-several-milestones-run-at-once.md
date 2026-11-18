@@ -10,10 +10,12 @@ so ordering by milestone adds a wait that the marks do not need.
 
 ## Decision
 
-- **Autopilot takes every open issue.** Milestones group the work and do not order it. Only
-  _blocked by_ marks make one issue wait for another, in the same milestone or across milestones. A
-  `bug` issue that autopilot opens for CI on `main` is in no milestone. The setting is in
-  [delivery](../delivery.md#decisions).
+- **Autopilot takes every open issue.** Milestones group the work and do not order it, so an issue
+  never waits for another milestone to close. An issue waits only for its _blocked by_ marks, in the
+  same milestone or across milestones, for the `journey` and `docs-sweep` waves that end its
+  milestone, and for the owner while an `on-hold` or `hand-made` label holds it. A `nexkit:ci` issue
+  that autopilot opens for CI on `main` is in no milestone. The settings are in
+  [delivery](../delivery.md#how-issues-run).
 - **Any number of milestones may have open issues.** Opening an issue starts it, so a milestone is
   broken down only when the owner asks and it passes the readiness check.
 - **A readiness check comes first.** Before a milestone is broken down, the local agent checks:
