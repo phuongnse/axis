@@ -10,7 +10,7 @@ The request panel is where an author asks AI for a change in words. Ask AI opens
 request opens its own page.
 
 - **Where.** Ask AI on the application's [band](studio-workspace.md#band) opens and closes the panel. The
-  panel is the shared [side panel](shell.md#layout) `StudioSidePanel`, which the Problems panel also uses.
+  panel is the shared [side panel](shell.md#layout), which the Problems panel also uses.
   It shows only when `studioAi` is true, the field that [`GET /api/me`](security.md#roles-and-the-current-user) answers.
 - **Sending.** The author writes what they want in words, in any language, and sends it. A check box,
   "Accept when checks and review pass", asks for auto-accept, and shows only when the application
@@ -40,7 +40,7 @@ request opens its own page.
     sentence of its words, cut at 80 characters with an ellipsis. It has no sort.
   - **State** is a [status tag](shared-widgets.md#which-widget) with the state's one word, as the
     [states table](#a-requests-page) gives it. A fix round reads as Working.
-  - **Sent by** is the author's name, or "You" for the reader's own requests.
+  - **Sent by** is the author's name, read as [a person's name](actions-and-controls.md#text) is.
   - **Sent** is the time the request was sent.
 
   The table has the full toolbar of a table whose rows grow: Search, which matches a request's name and
@@ -72,8 +72,8 @@ A request's page shows one request: its heading, [the feed](#the-feed) and [the 
   [the states](#the-states).
 - Under the name, `spacing-xs` apart, come the request's words in full. Then, in `textMuted`, comes the
   sender's line.
-- The sender's line reads "Sent by you on <time>" for the reader's own request, or "Sent by <name> on <time>"
-  for a request of another person.
+- **The sender's line** _(planned)_. It reads "Sent by <name> on <time>", the name read as
+  [a person's name](actions-and-controls.md#text) is, so the reader's own is followed by "(you)".
 - **Co-authors** _(planned for M35)_. The line ends with ", co-authored with <AIs>". The co-authors are the AIs
   that made the change, in the order they first worked. Axis's agent is named by the model its author's AI
   used. An outside app is named by the name it registered with. The line is one sentence with no full stop.
@@ -462,11 +462,13 @@ changed what and can undo it.
   its summary, author and time, and nothing is undone.
 - **Publishing.** The publish page lists every file that differs from the live release, under "`<n>` files
   changed since the live release". Each file shows "Changed by" and each person who changed it since the release,
-  in the order of their first change. The reader is "you", and an AI request is "the AI request “`<name>`”", a
+  in the order of their first change. An AI request is "the AI request “`<name>`”", a
   link to its page. A change the server recorded reads System, as it does in History. An AI request that cannot
   be read names the person who accepted it instead. A file that no revision changed since the release has no
   Changed by line. The list comes from the [live diff](authoring-revisions.md#live-diff). The page is described
   in [publishing](studio.md#publishing).
+- **The reader in Changed by** _(planned)_. Changed by names the reader as [a person's name](actions-and-controls.md#text)
+  is, followed by "(you)".
 
 ## Connected apps
 

@@ -328,6 +328,13 @@
       "status": "approved"
     },
     {
+      "concept": "Duration",
+      "en": "duration",
+      "vi": "thời lượng",
+      "status": "approved",
+      "note": "How long something took, such as a step of an AI request or a process step's run, as a column or a fact."
+    },
+    {
       "concept": "Transition (between two steps)",
       "en": "line",
       "vi": "đường nối",

@@ -58,13 +58,14 @@ their own controls where they expect them.
   workspace, with `spacing-md` round its content, compact sidebar entries and a compact band, see
   [Studio workspace](studio-workspace.md#workspace). The sidebar and its collapse button show even on a
   one-page site.
-- **A right column.** A page claims a column on the right by rendering `ShellAside`. The column is
-  `sidePanel` wide and runs from under the header to the footer.
-- **One side panel in Studio.** Studio shows one side panel at a time, such as the problems panel, in
-  `StudioSidePanel`, which draws it in `ShellAside`. By default the panel's head stays in place, its body scrolls on
-  its own, and the page keeps the browser's scroll.
-- **Opening one closes the other.** The Ask AI request panel is a side panel too, and opening one
-  panel closes the other.
+- **One side panel frame** _(planned)_. Every page draws its side panel in `SidePanel`, in a column on the right
+  from under the header to the footer. One shows at a time, so opening one, such as the problems panel or the Ask AI
+  request panel, closes the other. It holds details or tools for what is chosen, while the page stays in use. A task
+  to finish or cancel is a dialog, and what stands alone is a page. A handle on its edge, a `separator` that takes the
+  arrow keys, Home and End, sets its width from `sidePanel` to half the shell, and the browser keeps that width, so
+  every side panel opens at the width last chosen. Its title can carry a `status`, such as a `StatusTag`. Its head
+  stays in place and its body scrolls on its own, keeping room for its scrollbar, so its content keeps its width when
+  a scrollbar comes. The page keeps the browser's scroll.
 - **Collapsed sidebar.** The header's button collapses the sidebar to a narrow strip of the entries'
   icons, each centred and named by a tooltip, and opens it again. Collapsed, a group's title gives way
   to a thin rule. The button names what it does, "Collapse navigation" or "Expand navigation", and has

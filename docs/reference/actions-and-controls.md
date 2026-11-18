@@ -169,6 +169,23 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
   A state is a sentence, as in "Release 7 is live". Facts of different kinds take a column or a line
   of their own, such as when a release was published and by whom. A "·" glues facts of different
   kinds into one line with no order, and a screen reader may read it out.
+- **No dash between facts either** _(planned)_. Neither a middle dot nor a dash joins facts. A fact of a different
+  kind takes its own term or line, such as a run's Branch beside Went to, or Started via under Started by. What
+  qualifies one thing sits in parentheses, with peers in them joined by a comma, such as "(run 2)" or an
+  operation's "(ERP)".
+- **Names and values as a table** _(planned)_. Names and their values, such as a request's headers or a run's input,
+  are a table of two columns with no header row. A name in `textMuted` takes 5 of 12 columns and its value 7, so the
+  tables a view stacks line up at any width. A nested value is a row of its own, named by its path, such as
+  `lines[0].description`. A number keeps its source digits. A word written in place of a value, such as `null`, Empty,
+  a count of fields or items, or Hidden ("Đã ẩn") for a secret or a value the reader may not read, takes the
+  [empty value's](frontend.md#shown-values) style, as Not set does. The server's `[secret]` stays its placeholder in
+  logs, JSON and the API, and reads Hidden in the table. A value in the table has no copy button. A JSON body is a table
+  by default, with a Table and JSON switch. Other text shows as it is in the code font.
+- **A person by name** _(planned)_. A person is always named, so a page read by someone else, or seen in a screenshot,
+  still says who. The signed-in person's own name is followed by "(you)" ("(bạn)") in `textMuted`, and is never
+  replaced by You or Me. "Me" stays for the reader's own voice, such as a filter Assigned to me. A name is a link only
+  to a page about the person that the reader may open, such as a user's page for an administrator, and plain text for
+  anyone else.
 - **No value is a dash.** A table cell with no value shows the muted em dash, and a form or a detail
   shows "Not set", see the [empty values](frontend.md#shown-values). It never shows nothing, which
   cannot tell "not given" from "not loaded", and never N/A, which says "does not apply" and does not
@@ -300,6 +317,9 @@ be kept right.
 - **Rows.** Every row and the header are of the `tableRow` height, whatever they hold, icon buttons
   included: `spacing-xs` above and below a `smallControl` line. A row of more lines grows and reads
   from the same first line.
+- **Compact tables** _(planned)_. A table in a side panel is `compact`, with `spacing-sm` on each side of a cell.
+- **A table with no header row** _(planned)_. A table of names and values is `headless`, with no header row, see
+  [text](#text).
 - **Row actions.** An action on one row sits on the row. One whose meaning the platform knows, such as
   open, delete or activate a release, is an icon button, and one an author configured keeps its text.
   From three actions on, or at narrow width, they fold into one "…" menu of text entries.
@@ -349,6 +369,9 @@ be kept right.
   of the role `icon` with `FoldIcon`, named "Show the rows in it" or "Hide the rows in it". The fold sits in the
   first column's padding, every row's words start where the heading does, and each level of rows starts one fold
   further in. A table that groups rows uses this, and never a list inside a cell.
+- **A row's details** _(planned)_. A row with more to show than its columns, such as a call's attempt, folds open to
+  its details from a fold in its first cell, drawn as a group row's fold, named "Show the details", with no column of
+  its own. `AxisTable`'s `details` and its group rows open a row one way.
 
 The reasons for the table standard are in [D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md),
 and the reasons for each person's columns and saved views are in [D153](../decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md),
