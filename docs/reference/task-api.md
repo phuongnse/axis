@@ -1,7 +1,7 @@
 # Task API
 
 The task API lets the signed-in user list the tasks they may act on, read one task, ask what its form
-shows for a draft and complete it with an outcome. The user is the user of the
+shows for a draft, complete it with an outcome and save its form's changes without completing it. The user is the user of the
 [session](security.md#sign-in-and-the-session). The task states are in
 [process states](process-states.md#task-states), and claim, release, reassign, overdue tasks,
 escalations and deadlines are in [task deadlines and claims](task-deadlines.md).
@@ -12,6 +12,7 @@ escalations and deadlines are in [task deadlines and claims](task-deadlines.md).
 | `GET /api/apps/{app}/tasks/{id}`             | Reads one task, see [read one task](#read-one-task)                                               |
 | `POST /api/apps/{app}/tasks/{id}/form-state` | Answers what the task's form shows for a draft, see [form state of a task](#form-state-of-a-task) |
 | `POST /api/apps/{app}/tasks/{id}/complete`   | Completes a task with an outcome, see [completing a task](#completing-a-task)                     |
+| `POST /api/apps/{app}/tasks/{id}/save` _(planned)_ | Saves the changes to a task's subject record without completing the task, see [saving a task](#saving-a-task) |
 | `POST /api/apps/{app}/tasks/complete-many` _(planned for M43)_ | Decides several tasks with one outcome, see [deciding several tasks](#deciding-several-tasks) |
 
 ## Who may act
@@ -256,6 +257,40 @@ One transaction records the decision:
 
 The form, the outcomes and the record write all use the release the instance is pinned to. When any
 part fails, nothing is written. The worker then runs the next step as usual.
+
+## Saving a task
+
+_(planned)_
+
+`POST /api/apps/{app}/tasks/{id}/save` saves the changes to a task's subject record and leaves the task open:
+
+```http
+POST /api/apps/{app}/tasks/{id}/save
+Content-Type: application/json
+
+{ "values": { "decisionComments": "Fine for Q4." }, "version": 3 }
+```
+
+- `values` is required and holds at least one field. It is checked as a completion's `values` is: only fields
+  the task's form makes editable and the user may read, in the record API's
+  [value format](record-api.md#request-bodies-and-values).
+- `version` is required. It is the subject record's version, as the record API reads it.
+- The keys and messages of these checks are a completion's, with no `/outcome`, and the request needs the
+  [CSRF header](record-api.md#create-update-and-delete) and JSON, as completing does.
+- The response is `200` with `{ "version": 4 }`, the subject record's new version.
+
+One transaction saves the values:
+
+1. It locks the task row and checks that the task is `open`.
+2. It writes `values` through the record update command, so computed fields are recomputed and validations
+   run, and it writes the usual `record.updated` audit record, as the record API does.
+3. It changes nothing else. The task stays open, and its instance, its history rows and its work items are
+   untouched.
+
+The form and the record write use the release the instance is pinned to. When any part fails, nothing is
+written. A failure is answered as [Task API errors](#task-api-errors) says, in the same order: the CSRF
+header and a read-only tenant give `403` first, then `401`, `404`, `403`, `409` for a task that is not
+`open`, `415`, `400`, a stale `version` as `409`, and the other write failures.
 
 ## A task for several people
 

@@ -40,6 +40,10 @@ widget names a role, never an Ant Design button type.
   with a `borderSubtle` rule above it, folds the actions it names into one More actions menu through
   `AxisActionRow`'s `fold`, as a table's row actions fold at narrow width. A docked bar stays at the foot of the window across the
   content instead of at the foot of its page.
+- **Actions of equal weight are one group** _(planned)_. A screen keeps one main action. Actions of equal weight that
+  together are a region's main action, such as a task's outcomes, are one joined group in the `main` role, in the order
+  the process gives them. Each button of the group is as wide as the widest, stays a button of its own with no selected
+  state, and the group has a name for assistive technology. A group of one is a plain `main` button.
 - **Text or an icon, never both.** An action shows its text or its icon. An icon goes with text only
   where it does what text cannot: navigation that collapses to icons, a status or a severity, and the
   mark that identifies an application or a site.
@@ -133,6 +137,8 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
 - **One field to a row**. Two fields share a row only when they truly belong together,
   such as a range's minimum and maximum, through `AxisFieldRow`, and they stack at narrow width. A key and its
   value in one row of a titled list are one entry, so they share a row too.
+- **One fact to a row** _(planned)_. A list of facts, such as a page's first part through `TermList`, gives each fact
+  a row of its own. Two facts share a row only when they belong together, such as a start and an end date.
 - **Every required field is marked**. A platform field follows the form widget's
   [required mark](form-widget.md#field-look), in every form and dialog, even where every field is
   required, such as New resource. The sign-in pages mark none, since everyone knows their fields are needed.

@@ -148,8 +148,20 @@ below it. It says where the person is and what the page is.
 - **Actions stay with their widget.** A widget's actions stay in its own toolbar, because a page can
   hold several widgets and an action belongs to its widget, not to the page.
 - **A record's actions** _(planned)_. A form's actions on its record are the page's own and sit on the right of the
-  page's heading, on its row, see [start process actions](form-widget.md#start-process-actions). Other widgets'
-  actions stay with them.
+  page's heading, on its row, see [start process actions](form-widget.md#start-process-actions). A task page's
+  Release, Claim and Reassign… and its outcomes sit there too, see [task page](task-inbox-widget.md#task-page). Other
+  widgets' actions stay with them.
+- **A page that shows one thing** _(planned)_. The heading is the thing's name. The state the platform keeps of the
+  thing is a tag beside the name, such as a task's Overdue, a process instance's Running or a release's Live. The line
+  under the heading, in `textMuted`, is the thing's kind alone, such as Request or Task, and nothing more. A record has
+  no tag, as its status is a field the author defines and its form shows. A new record has no name yet, so it is headed
+  "New {entity}" ("{entity} mới", `shell.form.newRecord`), with the entity's label keeping its capitals, and it has no
+  line. This shape holds for every page of the shell that shows one thing: a saved or new record, a task, a process
+  instance, a Studio resource, release or revision, the user page and a cell's tenant page. One `PageHeading` draws
+  every one of them, filling `PageLayout`'s name, tags and line, see [which widget](shared-widgets.md#which-widget).
+- **Facts as the first part** _(planned)_. What else the platform keeps of the thing, and the page does not show
+  elsewhere, is the page's first part. It is a list of facts through `TermList`, one fact to a row, see
+  [fields](actions-and-controls.md#fields), above a `borderSubtle` rule. It never sits on the heading's line.
 - **Platform pages.** The platform home page has no band and no breadcrumb, and has its own headings,
   see the [platform home page](#platform-home-page). The Sessions page has the band "Axis › Your
   sessions", and the users page the band "Axis › Users".
