@@ -25,12 +25,6 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
 
     private const string ManifestFile = "application.json";
 
-    /// <summary>The most bytes a page of a diff holds, as the server serializes it. A single resource larger than this fills a page alone.</summary>
-    internal const int DiffPageBytes = 1024 * 1024;
-
-    // Room in a page for the start, the tip, the cursor and the braces around the resources.
-    private const int PageEnvelopeBytes = 1024;
-
     /// <summary>The drafts of the user on <paramref name="folder"/>, or null when <paramref name="revisionsPath"/> is null.</summary>
     public static StudioDrafts? For(string? revisionsPath, string folder, string userId, string displayName, IStudioWriteLock writeLock) =>
         StudioRevisions.RepositoryPath(revisionsPath, folder) is { } repository
@@ -85,7 +79,7 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
 
     /// <summary>
     /// The files the draft added, changed or removed since the <c>main</c> commit it started at, as a page of whole entries
-    /// that serializes to at most <see cref="DiffPageBytes"/>, or one larger entry alone. Without a <paramref name="cursor"/>
+    /// that serializes to at most <see cref="StudioDiffPages.PageBytes"/>, or one larger entry alone. Without a <paramref name="cursor"/>
     /// the page starts at the first entry and reads the branch tip. A cursor names the commit the first page was read at and
     /// the next entry, so later writes to the draft do not shift later pages. A cursor this draft did not give is refused as
     /// <see cref="StudioWriteRefusal.DoesNotApply"/>. Records no version.
@@ -97,7 +91,7 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
             var from = 0;
             if (cursor is not null)
             {
-                if (ReadCursor(cursor) is not var (sha, index) || OnBranch(draft, tip, sha) is not { } pinned)
+                if (StudioDiffPages.ReadCursor(cursor) is not var (sha, index) || OnBranch(draft, tip, sha) is not { } pinned)
                 {
                     return StudioDraftOutcome<StudioDraftDiff>.Refused(StudioWriteRefusal.DoesNotApply);
                 }
@@ -113,21 +107,8 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
                 return StudioDraftOutcome<StudioDraftDiff>.Refused(StudioWriteRefusal.DoesNotApply);
             }
 
-            var size = PageEnvelopeBytes;
-            var next = from;
-            while (next < entries.Count)
-            {
-                size += JsonSerializer.SerializeToUtf8Bytes(entries[next], JsonSerializerOptions.Web).Length + 1;
-                if (next > from && size > DiffPageBytes)
-                {
-                    break;
-                }
-
-                next++;
-            }
-
-            var after = next < entries.Count ? WriteCursor(at.Sha, next) : null;
-            return StudioDraftOutcome<StudioDraftDiff>.Of(new StudioDraftDiff(draft.Start, at.Sha, entries.GetRange(from, next - from), after));
+            var (page, after) = StudioDiffPages.Page(entries, from, at.Sha);
+            return StudioDraftOutcome<StudioDraftDiff>.Of(new StudioDraftDiff(draft.Start, at.Sha, page, after));
         }, ct);
 
     /// <summary>The resource as the draft holds it. The draft records the version the resource has on <c>main</c> on its first use.</summary>
@@ -434,30 +415,6 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
             return StudioDraftOutcome<StudioRevision>.Of(StudioRevisions.Describe(commit));
         });
 
-    // A cursor is the base64url of "<commit id>:<index of the next entry>". Null when it is not that, or the index is below 1.
-    private static (string Sha, int Index)? ReadCursor(string cursor)
-    {
-        try
-        {
-            var text = Encoding.UTF8.GetString(System.Buffers.Text.Base64Url.DecodeFromChars(cursor));
-            var parts = text.Split(':');
-            return parts.Length == 2
-                && parts[0].Length == 40
-                && parts[0].All(char.IsAsciiHexDigitLower)
-                && int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var index)
-                && index >= 1
-                    ? (parts[0], index)
-                    : null;
-        }
-        catch (Exception exception) when (exception is FormatException or ArgumentException)
-        {
-            return null;
-        }
-    }
-
-    private static string WriteCursor(string sha, int index) =>
-        System.Buffers.Text.Base64Url.EncodeToString(Encoding.UTF8.GetBytes(FormattableString.Invariant($"{sha}:{index}")));
-
     // The commit with this id on the draft's own branch, from the tip back to the start, or null.
     private static Commit? OnBranch(StudioDraft draft, Commit tip, string sha)
     {
@@ -684,7 +641,7 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
     }
 
     // The *.json files and the files under packages/ of a tree, as StudioFolder.Files lists them for a folder.
-    private static void Walk(Tree tree, string prefix, List<(string File, byte[] Bytes)> files)
+    internal static void Walk(Tree tree, string prefix, List<(string File, byte[] Bytes)> files)
     {
         foreach (var entry in tree)
         {

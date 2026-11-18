@@ -1,10 +1,11 @@
 # Revisions and drafts in the authoring API
 
 Three routes of the [authoring API](authoring.md) read and undo the history that
-[revisions](revisions-and-drafts.md#revisions) keep, and a fourth reads the diff of a
-[draft](revisions-and-drafts.md#drafts). A revision is named by its full 40-character commit id.
-A server with no `Studio:RevisionsPath`, or a folder with no history yet, lists no revisions, and the
-diff and the undo answer `404`.
+[revisions](revisions-and-drafts.md#revisions) keep, a fourth reads the diff of a
+[draft](revisions-and-drafts.md#drafts) and a fifth the diff from the live release. A revision is named by its
+full 40-character commit id. A server with no `Studio:RevisionsPath`, or a folder with no history yet, lists no
+revisions, and the diff and the undo answer `404`. The live diff answers `404` too, titled "The application has
+no revision history."
 
 | Route                                                                       | What it does                                                                       |
 | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -12,7 +13,7 @@ diff and the undo answer `404`.
 | `GET /api/studio/apps/{application}/revisions/{revision}`                   | Shows the files of one, see [the diff](#diff)                                      |
 | `POST /api/studio/apps/{application}/revisions/{revision}/undo`             | Undoes one, see [the undo](#undo)                                                  |
 | `GET /api/studio/apps/{application}/drafts/{draft}/diff`                    | Shows the changes of a draft, see [the draft diff](#draft-diff)                    |
-| `GET /api/studio/apps/{application}/releases/live/diff` _(planned for M35)_ | Shows the files that differ from the live release, see [the live diff](#live-diff) |
+| `GET /api/studio/apps/{application}/releases/live/diff`                     | Shows the files that differ from the live release, see [the live diff](#live-diff) |
 
 ## List
 
@@ -72,14 +73,29 @@ draft with this id." The write lock is taken to read, so a lock that cannot be t
 
 ## Live diff
 
-_(planned for M35)_
-
 `GET .../releases/live/diff` answers `200` with `{ release, resources, cursor }`: `release` is the live release's
 number, and `resources` are the files that differ between that release and the working folder, as entries of the
-[revision diff](#diff) with `titles` and `by`. `by` lists, newest first, the revisions made after the live release
-was published that changed the file, each as an item of [the list](#list) gives it. Paging and the `400` and `503`
-answers are as for the [draft diff](#draft-diff). With no live release it answers `404`, titled "The application has
-no live release."
+[revision diff](#diff) with `titles` and `by`, sorted by `file`. `before` is the release's text and `after` is the
+folder's. Paging and the `400` and `503` answers are as for the [draft diff](#draft-diff), and the `400` has the
+draft diff's title. With no live release it answers `404`, titled "The application has no live release."
+
+- **`titles`.** The resource's label by locale, as the [draft diff](#draft-diff) gives it, read from the folder, or
+  from the release for a removed file. It is `null` without a label text key.
+- **`by`.** The revisions that changed the file, newest first, each as an item of [the list](#list) with one more
+  field, `authoringRequest`. A revision counts when its time, to the second, is not earlier than the second of the
+  live release's first activation, because git keeps commit times to the second. A release that was activated again
+  still counts from its first activation. It lists every revision that could explain the difference, so a revision
+  made in the same second as the publish, or just before it, can be in it.
+- **`authoringRequest`.** The id of the AI request whose [accept](authoring-requests.md#accepting) made the
+  revision, and `null` for any other revision. The `request` of a revision names the accept's publish request. The
+  server finds the AI request through the draft that the publish request applied.
+- **The start of history.** It records the whole folder, so it touches every file. It is never in `by`.
+- **Outside changes.** The route takes the write lock and records any change made on disk outside the authoring
+  API before it compares, so the change shows as an "Outside change" revision in `by` and the tip of `main` equals
+  the folder.
+
+If another release goes live between two pages, the later pages compare with the new release, because the cursor
+names only the `main` commit. The server reads the folder's whole history for each request.
 
 ## Undo
 
@@ -97,12 +113,13 @@ An unknown revision answers `404`, titled "The application has no revision with 
 
 ## Order of checks
 
-After checks 2, 3 and 5 of the [authoring API](authoring.md#order-of-checks) for the list, the diff and the
-draft diff, and checks 1, 2, 3 and 5 for the undo, the first failure is the response:
+After checks 2, 3 and 5 of the [authoring API](authoring.md#order-of-checks) for the list, the diff, the
+draft diff and the live diff, and checks 1, 2, 3 and 5 for the undo, the first failure is the response:
 
 1. A `{revision}` that is not 40 hexadecimal characters, or not a commit on `main`, `404`. For the draft
-   diff, a `{draft}` that is not the user's draft, `404`.
-2. For the undo and the draft diff, the write lock cannot be taken, `503`.
+   diff, a `{draft}` that is not the user's draft, `404`. For the live diff, no live release `404`, then no
+   revision history `404`.
+2. For the undo, the draft diff and the live diff, the write lock cannot be taken, `503`.
 3. For the undo, under the lock: the start of history, or later revisions that changed the same files,
-   `409`, and a file of the revision that is not a safe path in the folder, `400`. For the draft diff, under
-   the lock: a cursor the draft did not give, `400`.
+   `409`, and a file of the revision that is not a safe path in the folder, `400`. For the draft diff and the live
+   diff, under the lock: a cursor the route did not give, `400`.

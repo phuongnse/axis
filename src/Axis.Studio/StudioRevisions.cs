@@ -173,6 +173,40 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
         return new StudioRevert(false, summary, tip.Sha, blockers, files);
     }
 
+    /// <summary>
+    /// The files of <c>main</c> at the commit <paramref name="at"/>, or at the tip when <paramref name="at"/> is null, and
+    /// the revisions from that commit back with the paths each changed, newest first. The start of history, which has no
+    /// parent and records the whole folder, is left out of the revisions. Null when the folder has no history or
+    /// <paramref name="at"/> is not a commit on <c>main</c>.
+    /// </summary>
+    internal StudioMain? Main(string? at)
+    {
+        if (!Repository.IsValid(repository))
+        {
+            return null;
+        }
+
+        using var git = new Repository(repository);
+        var chain = Chain(git).ToList();
+        var commit = at is null
+            ? chain.FirstOrDefault()
+            : chain.FirstOrDefault(candidate => string.Equals(candidate.Sha, at, StringComparison.OrdinalIgnoreCase));
+        if (commit is null)
+        {
+            return null;
+        }
+
+        var files = new List<(string File, byte[] Bytes)>();
+        StudioDrafts.Walk(commit.Tree, "", files);
+        var history = new List<(StudioRevision Revision, IReadOnlyList<string> Paths)>();
+        foreach (var revision in chain.SkipWhile(candidate => candidate.Sha != commit.Sha).Where(candidate => candidate.Parents.Any()))
+        {
+            history.Add((Describe(revision), [.. Changes(git, revision).Select(change => change.Path)]));
+        }
+
+        return new StudioMain(commit.Sha, files, history);
+    }
+
     // The commits of main from the tip along the first parent.
     private static IEnumerable<Commit> Chain(Repository git)
     {
@@ -198,22 +232,25 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
         var resources = new List<StudioRevisionChange>();
         foreach (var change in git.Diff.Compare<TreeChanges>(before, after, new CompareOptions { Similarity = SimilarityOptions.None }))
         {
-            var was = Text(before, change.Path);
-            var now = Text(after, change.Path);
-            var (resourceId, kind, name) = Identity(now ?? was);
-            resources.Add(new StudioRevisionChange(
+            resources.Add(Entry(
                 change.Path,
                 change.Status switch { ChangeKind.Added => "added", ChangeKind.Deleted => "removed", _ => "changed" },
-                resourceId,
-                kind,
-                name,
-                was,
-                now,
-                Target(change.Path)));
+                Text(before, change.Path),
+                Text(after, change.Path)));
         }
 
         resources.Sort((left, right) => string.CompareOrdinal(left.File, right.File));
         return resources;
+    }
+
+    /// <summary>
+    /// The entry of a file that differs: its change, its text on each side and the id, kind and name that the text
+    /// that exists reads, the later one first. A draft's diff, a revision's diff and the live diff build entries here.
+    /// </summary>
+    internal static StudioRevisionChange Entry(string file, string change, string? before, string? after)
+    {
+        var (resourceId, kind, name) = Identity(after ?? before);
+        return new StudioRevisionChange(file, change, resourceId, kind, name, before, after, Target(file));
     }
 
     // The module resource a layer file changes, <module id>/<name>, named by its path under customizations/.
@@ -336,6 +373,13 @@ internal sealed record StudioRevision(string Id, string Summary, string Author, 
 /// <c>Target</c> is the module resource a layer file changes, <c>&lt;module id&gt;/&lt;name&gt;</c>, and null for any other file.
 /// </summary>
 internal sealed record StudioRevisionChange(string File, string Change, string? Id, string? Kind, string? Name, string? Before, string? After, string? Target);
+
+/// <summary>
+/// <c>main</c> at one commit: its id, the <c>*.json</c> files and package files of its tree, and the revisions from it back,
+/// newest first, each with the paths it changed. The start of history is not among them.
+/// </summary>
+internal sealed record StudioMain(
+    string Sha, IReadOnlyList<(string File, byte[] Bytes)> Files, IReadOnlyList<(StudioRevision Revision, IReadOnlyList<string> Paths)> History);
 
 /// <summary>A revision and the files it changed, sorted by file.</summary>
 internal sealed record StudioRevisionDiff(StudioRevision Revision, IReadOnlyList<StudioRevisionChange> Resources);
