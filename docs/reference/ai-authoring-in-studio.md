@@ -152,6 +152,6 @@ _(planned for M35)_
 A tenant administrator manages outside MCP clients, see
 [client registration](mcp-server.md#client-registration). The request panel ends, under a rule, with
 **Use your own AI app**. Under it, in `textMuted`, comes the sentence "An AI app that supports MCP can work
-on your applications once your administrator allows it. Give it this address:". The address follows on its
-own line, in code style, `https://<tenant host>/mcp`, with a copy button. Before an author has connected
+on your applications once your administrator allows it. Give it this address:". The address, in code style,
+`https://<tenant host>/mcp`, with a copy button, ends that line, right after "Give it this address:". Before an author has connected
 their own AI, the panel shows this address once, in its second way, see [the request panel](#the-request-panel).
