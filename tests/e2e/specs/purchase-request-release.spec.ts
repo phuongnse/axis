@@ -117,12 +117,16 @@ async function openStudio(page: Page, serverUrl: string) {
   })
 }
 
-/** Opens the Releases page of the open application from the sidebar, where the release list is. */
+/**
+ * Opens the Releases page of the open application from the sidebar, where the release list is, and waits for the list.
+ * Publish… keeps the page it is clicked on, so it must not be clicked before the Releases page has shown.
+ */
 async function openReleases(page: Page) {
   await page
     .getByRole('navigation', { name: 'Menu', exact: true })
     .getByRole('link', { name: 'Releases', exact: true })
     .click()
+  await expect(page.getByTestId('studio-releases')).toBeVisible()
 }
 
 /** Sets the en and vi texts of the key `key` through Studio's text route, as the signed-in author. */
