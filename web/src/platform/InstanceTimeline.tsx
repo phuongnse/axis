@@ -61,6 +61,12 @@ interface InstanceTimelineProps {
  * request's history in Studio has, that opens to a row for each task, call and sub-process it started, in the same
  * columns, and a call opens to a row for each attempt, with its trace ID; a call's input and Resolve are in its row.
  */
+/** A text with what qualifies it in parentheses, peers joined with a comma, such as "Task (run 2, Legal)". */
+function qualified(text: string, qualifiers: readonly (string | null | undefined)[]): string {
+  const shown = qualifiers.filter((qualifier): qualifier is string => Boolean(qualifier))
+  return shown.length === 0 ? text : `${text} (${shown.join(', ')})`
+}
+
 export function InstanceTimeline({
   instance,
   instancesPath,
@@ -276,17 +282,12 @@ export function InstanceTimeline({
         ) : (
           stepLabel(run.step)
         ),
-        [
-          run.number > 1
-            ? t('shell.inspector.timeline.typeRun')
-                .replace('{type}', typeText(typeOf(run.step)))
-                .replace('{number}', String(run.number))
-            : typeText(typeOf(run.step)),
-          // Proposed, see D155 and the review on #3650: a run on a branch of a block names its branch.
+        // A run's kind, then what qualifies it in parentheses, its number and, proposed, see D155 and the review on #3650,
+        // the branch of a block it ran on, see docs/reference/actions-and-controls.md#text.
+        qualified(typeText(typeOf(run.step)), [
+          run.number > 1 ? t('shell.stepRun.runNumber').replace('{number}', String(run.number)) : null,
           branchOf(run.step),
-        ]
-          .filter(Boolean)
-          .join(' · '),
+        ]),
       ),
       what: summary(run),
       state: stateWords(

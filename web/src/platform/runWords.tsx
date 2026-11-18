@@ -63,8 +63,9 @@ export function useRunWords({
           person: completedName(task),
           outcome: outcomeLabel(step, task.outcome),
         })
-  // A package's version follows its name after a space, as the step run panel writes it, see `targetTerms`.
-  const targetOf = (call: InstanceCall) => `${call.connector ?? `${call.package} ${call.version}`} · ${call.operation}`
+  // An operation with what it is of in parentheses, a connector or a package with its version after a space, as the step
+  // run panel names them, see `targetTerms` and docs/reference/actions-and-controls.md#text.
+  const targetOf = (call: InstanceCall) => `${call.operation} (${call.connector ?? `${call.package} ${call.version}`})`
 
   const callSummary = (call: InstanceCall) => {
     const target = targetOf(call)

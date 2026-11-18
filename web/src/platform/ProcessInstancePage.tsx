@@ -308,6 +308,14 @@ export function InstanceDetailView({
   // view, as Camunda Operate, AWS Step Functions and Temporal head an instance: its record, when and by whom or what it
   // started, how long it has run, its release and its id, and its parent when it has one.
   const startedBy = instance.startedBy
+  const startedVia =
+    instance.parent !== null
+      ? t('shell.inspector.startedVia.parent')
+      : startedBy === undefined
+        ? null
+        : startedBy.kind === 'user'
+          ? (startedBy.via ?? null)
+          : t(`shell.inspector.startedVia.${startedBy.kind}`)
   const facts: Term[] = [
     ...(subject === null
       ? []
@@ -323,43 +331,34 @@ export function InstanceDetailView({
             width: 3,
           },
         ]),
-    // Proposed, see the review on #3650: who or what started the instance reads one way for every kind: its name,
-    // then how, muted: a person and the action they took, or a trigger, an endpoint, a schedule or the parent process,
-    // whose instance the name opens.
+    // Proposed, see the review on #3650: who or what started the instance and how are two facts, one shape for every
+    // kind: Started by, a person, a trigger, an endpoint, a schedule or the parent process, whose instance the name
+    // opens; Started via, the action the person took or the kind of what started it, see
+    // docs/reference/actions-and-controls.md#text.
     {
       key: 'startedBy',
       term: t('shell.inspector.startedBy'),
       value:
         instance.parent !== null ? (
-          <span>
-            {parentPage === undefined ? (
-              processTitle(t, instance.parent)
-            ) : (
-              <Link to={inspectorPath(sitePath, parentPage, instance.parent.id)} data-testid="inspector-parent-link">
-                {processTitle(t, instance.parent)}
-              </Link>
-            )}
-            <Typography.Text type="secondary"> · {t('shell.inspector.startedVia.parent')}</Typography.Text>
-          </span>
+          parentPage === undefined ? (
+            processTitle(t, instance.parent)
+          ) : (
+            <Link to={inspectorPath(sitePath, parentPage, instance.parent.id)} data-testid="inspector-parent-link">
+              {processTitle(t, instance.parent)}
+            </Link>
+          )
         ) : startedBy === undefined ? (
           <NotSet />
+        ) : startedBy.kind === 'user' ? (
+          <PersonName person={{ id: startedBy.id, name: startedBy.name }} />
         ) : (
-          <span>
-            {startedBy.kind === 'user' ? (
-              <PersonName person={{ id: startedBy.id, name: startedBy.name }} />
-            ) : (
-              startedBy.name
-            )}
-            {(startedBy.kind === 'user' ? startedBy.via : t(`shell.inspector.startedVia.${startedBy.kind}`)) && (
-              <Typography.Text type="secondary">
-                {' · '}
-                {startedBy.kind === 'user' ? startedBy.via : t(`shell.inspector.startedVia.${startedBy.kind}`)}
-              </Typography.Text>
-            )}
-          </span>
+          startedBy.name
         ),
       width: 2,
     },
+    ...(startedVia === null
+      ? []
+      : [{ key: 'startedVia', term: t('shell.inspector.startedVia'), value: startedVia, width: 2 }]),
     // What it is about and who started it come first, then its times in their order: started, ended, how long.
     { key: 'createdAt', term: t('shell.inspector.createdAt'), value: time('createdAt', instance.createdAt), width: 2 },
     // A fact the instance always has always shows, Not set while it has not ended, see the rule on #3650.

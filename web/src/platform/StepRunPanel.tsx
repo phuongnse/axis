@@ -139,7 +139,9 @@ export function StepRunPanel({
     .find((candidate) => candidate.name === graphStep?.inBlock?.block)
     ?.parallel?.branches.find((candidate) => candidate.name === graphStep?.inBlock?.branch)
   const branchText = branch === undefined ? null : branch.labelKey ? t(branch.labelKey) : branch.name
-  const kind = [typeText(graphStep?.type ?? ''), operationText, branchText].filter(Boolean).join(' · ')
+  // The line under the panel's title is the step's kind alone, its operation's when it has one, as a page that shows one
+  // thing reads; the branch of a block it sits in is a fact of its own, see docs/reference/actions-and-controls.md#text.
+  const kind = operationText ?? typeText(graphStep?.type ?? '')
   // A step a run names opens in the panel, as every reference opens what it names.
   const stepName = (name: unknown) =>
     typeof name === 'string' ? (
@@ -236,17 +238,15 @@ export function StepRunPanel({
     const before = runs.slice(0, index).findLast(along)
     const after = runs.slice(index + 1).find(along)
     const transition = graphStep?.transitions.find((candidate) => candidate.next === after?.step)
-    // Went to says why only in the author's words: a task's outcome, or a decision branch with its label; a branch with
-    // none is the step alone, as its name or Otherwise would say nothing to the reader.
-    const reason =
-      transition?.on == null || (graphStep?.type === 'decision' && !transition.labelKey)
-        ? null
-        : outcomeLabel(step, transition.on)
+    const branchTaken =
+      graphStep?.type === 'decision' && transition?.on != null && transition.labelKey
+        ? outcomeLabel(step, transition.on)
+        : null
     const runLink = (target: StepRun) => (
       <AxisButton role="link" inline onClick={() => onOpen(target.step, target.number)}>
         {stepLabel(target.step)}
         {runs.filter((candidate) => candidate.step === target.step).length > 1
-          ? ` · ${t('shell.stepRun.runNumber').replace('{number}', String(target.number))}`
+          ? ` (${t('shell.stepRun.runNumber').replace('{number}', String(target.number))})`
           : ''}
       </AxisButton>
     )
@@ -254,6 +254,7 @@ export function StepRunPanel({
       // A fact every run has always shows, Not set while it is empty; only what does not apply to the run is left out,
       // see the rule on #3650. Facts that belong together share a row: when it started and ended, when a wait gives up
       // and where it goes then, where the run came from and where it went; every other fact has its own.
+      ...(branchText === null ? [] : [{ key: 'inBranch', term: t('shell.stepRun.inBranch'), value: branchText }]),
       {
         key: 'started',
         term: t('shell.stepRun.started'),
@@ -338,23 +339,20 @@ export function StepRunPanel({
         value: before === undefined ? muted(t('shell.stepRun.start')) : runLink(before),
         width: 6,
       },
-      // The outcome or branch that chose the next step follows it on its line.
       {
         key: 'wentTo',
         term: t('shell.stepRun.wentTo'),
         width: 6,
         value:
-          shown.finishedAt === null ? (
-            notSet
-          ) : after === undefined ? (
-            muted(t('shell.stepRun.ended.instance'))
-          ) : (
-            <span>
-              {runLink(after)}
-              {reason !== null && muted(` — ${reason}`)}
-            </span>
-          ),
+          shown.finishedAt === null
+            ? notSet
+            : after === undefined
+              ? muted(t('shell.stepRun.ended.instance'))
+              : runLink(after),
       },
+      // Proposed, see the review on #3650: the branch a decision took is a fact of its own, named as its author labelled
+      // it; a task's outcome is its Outcome, and a wait that gave up says so in its own facts.
+      ...(branchTaken === null ? [] : [{ key: 'branch', term: t('shell.stepRun.branch'), value: branchTaken }]),
       { key: 'trace', term: t('shell.stepRun.traceId'), value: traceId(shown.traceId) },
     ]
     return <TermList terms={terms} />
@@ -646,9 +644,15 @@ export function StepRunPanel({
               key={call.id}
               kind="error"
               message={targetOf(call)}
-              description={[last?.httpStatus, last ? problemText(t, last.problem, last.error) : null]
-                .filter((part) => part != null)
-                .join(' · ')}
+              // The HTTP status and the problem are two facts, each on its own line.
+              description={
+                <Flex vertical>
+                  {last?.httpStatus != null && <span>{`${t('shell.stepRun.httpStatus')} ${last.httpStatus}`}</span>}
+                  {last && problemText(t, last.problem, last.error) !== null && (
+                    <span>{problemText(t, last.problem, last.error)}</span>
+                  )}
+                </Flex>
+              }
             />
           )
         })}

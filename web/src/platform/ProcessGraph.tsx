@@ -624,7 +624,7 @@ function FrameNodeView({ data }: NodeProps<FrameNode>) {
         }}
       >
         <span style={{ fontWeight: block ? 600 : 500 }}>{data.label}</span>
-        {data.note && <span style={{ color: colour.textMuted, marginInlineStart: spacing.xs }}>· {data.note}</span>}
+        {data.note && <span style={{ color: colour.textMuted, marginInlineStart: spacing.xs }}>({data.note})</span>}
       </div>
       <Handle type="source" position={Position.Right} isConnectable={false} style={{ visibility: 'hidden' }} />
     </>
