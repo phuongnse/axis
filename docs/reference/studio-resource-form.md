@@ -11,7 +11,7 @@ is in [Studio workspace](studio-workspace.md), and what each editor and designer
 
 The form puts a resource's root properties in sections, so that an author reads them in groups that
 each say what they hold. Each section is a part with no panel, with its
-heading in `heading5` and a line that says what it holds. The sections sit one above another, with a `divider` rule
+heading in `heading5` and a line that says what it holds. The sections sit one above another, with a rule
 before every one but the first, as [layout](shell.md#layout) says. An Overview block's heading has no line. The application's
 Settings, for example, has General (name, title, description and time zone), Modules, Packages and File
 storage. Its [auto-accept switch](ai-authoring-in-studio.md#auto-accept) is the last part, after File storage,

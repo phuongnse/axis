@@ -177,7 +177,7 @@ While the release history loads, Live and Changes both say so, and when it fails
 load. Once it has loaded, Live is left out when there is no live release. Live also says so while its sites load.
 
 Each block is a part, as a [resource form's sections](studio-resource-form.md#sections) are,
-with its title as its heading and no line under it. The blocks sit a `divider` rule apart. Outside the blocks, the page holds only the heading, the description and the gaps between the blocks.
+with its title as its heading and no line under it. The blocks sit a rule apart. Outside the blocks, the page holds only the heading, the description and the gaps between the blocks.
 
 ## Change list
 
@@ -262,7 +262,7 @@ Each table holds its rows, so it filters them itself and keeps its filter in the
 [tables](actions-and-controls.md#tables). The Modules and packages table uses the plain name `filter`, and
 Activations the `activations.` prefix, so a link opens the same rows in both.
 
-The parts from Details to Activations each have a `heading5` heading, with a `divider` rule between
+The parts from Details to Activations each have a `heading5` heading, with a rule between
 them and none before the first, through `SectionParts`. A part that the page leaves out, such as Relaxed
 points without a module, adds no rule.
 

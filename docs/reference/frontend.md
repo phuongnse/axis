@@ -48,6 +48,8 @@ component holds a number of its own.
   keyboard focus of every control. `onPrimary` colours text and icons on a `primary` fill.
 - **Contrast.** Every text colour reaches 4.5:1, and every border and focus ring 3:1, on `surface` and `canvas` in both
   modes. `onPrimary` reaches 4.5:1 on `primary` in both modes. [Each preview](widget-previews.md#the-spec) is checked.
+- **Rules on a flush page** _(planned)_. `borderSubtle` stands apart from `surface` about as much in light mode as in
+  dark, because on a flush page a rule is all that parts two areas. `border` stays for controls.
 - **A site's brand** _(planned for M42)_. A site's `brand.primary` is its main colour, see [sites](configuration.md#sites)
   and [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
   The compiler works out the light and dark `primary`, `primaryText`, `focusRing` and `onPrimary` from it, and the
