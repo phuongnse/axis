@@ -87,15 +87,19 @@ An author sends, lists, reads, approves, changes, drops and accepts requests thr
 routes. The shared answers are in [responses](authoring-responses.md). The accept route only asks for
 an accept, which [accepting](#accepting) describes.
 
-| Route                                                                     | What it does                                                                                            |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `POST /api/studio/apps/{application}/authoring-requests`                  | Stores a request in `planning` and answers `202` with it and a `Location` for the read route            |
-| `GET /api/studio/apps/{application}/authoring-requests`                   | Lists the newest 100 requests of the application, newest first                                          |
-| `GET /api/studio/apps/{application}/authoring-requests/{id}`              | Reads one request with its steps in order                                                               |
-| `POST /api/studio/apps/{application}/authoring-requests/{id}/approve`     | Moves a request from `awaitingApproval` to `working`                                                    |
-| `POST /api/studio/apps/{application}/authoring-requests/{id}/change-plan` | Moves a request from `awaitingApproval` back to `planning` and keeps the comment as a `planChange` step |
-| `POST /api/studio/apps/{application}/authoring-requests/{id}/drop`        | Moves a request to `dropped` from any state but `accepted` and `dropped`                                |
-| `POST /api/studio/apps/{application}/authoring-requests/{id}/accept`      | Stores an `accept` publish request for the draft of a `ready` request and answers `202` with it         |
+| Route                                                                                             | What it does                                                                                               |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `POST /api/studio/apps/{application}/authoring-requests`                                          | Stores a request in `planning` and answers `202` with it and a `Location` for the read route               |
+| `GET /api/studio/apps/{application}/authoring-requests`                                           | Lists the newest 100 requests of the application, newest first                                             |
+| `GET /api/studio/apps/{application}/authoring-requests/{id}`                                      | Reads one request with its steps in order                                                                  |
+| `POST /api/studio/apps/{application}/authoring-requests/{id}/approve`                             | Moves a request from `awaitingApproval` to `working`                                                       |
+| `POST /api/studio/apps/{application}/authoring-requests/{id}/change-plan`                         | Moves a request from `awaitingApproval` back to `planning` and keeps the comment as a `planChange` step    |
+| `POST /api/studio/apps/{application}/authoring-requests/{id}/drop`                                | Moves a request to `dropped` from any state but `accepted` and `dropped`                                   |
+| `POST /api/studio/apps/{application}/authoring-requests/{id}/accept`                              | Stores an `accept` publish request for the draft of a `ready` request and answers `202` with it            |
+| `POST /api/studio/apps/{application}/authoring-requests/{id}/request-changes` _(planned for M35)_ | Moves a request from `ready` back to `working` and keeps the comment as a `changeRequest` step             |
+| `GET /api/studio/apps/{application}/authoring-requests/{id}/diff` _(planned for M35)_             | Reads the diff of the request's draft, in the shape of the [draft diff](authoring-revisions.md#draft-diff) |
+| `GET /api/studio/ai` _(planned for M35)_                                                          | Tells the session's author whether their AI is connected, and the address of the MCP server                |
+| `POST /api/studio/apps/{application}/drafts/{draft}/preview` _(planned for M35)_                  | Tries the draft on the preview tenant, see [the draft preview](#routes)                                    |
 
 - **Order of checks.** A send checks the session (`401`), the author role (`403`), in a cell the
   tenant's [`authoringRequests` quota](tenant-quotas.md#refusals) (`403`), the application (`404`),
@@ -128,24 +132,54 @@ an accept, which [accepting](#accepting) describes.
   `round`, `tokens`, `autoAccept`, `sentAt`, `approvedAt` and `finishedAt`. The read route adds `steps`,
   each with its `kind`, `summary`, `outcome`, `tokens`, `startedAt`, `finishedAt` and `checks`, which is
   the results of a `check` step or the review of a `review` step, and null on any other step.
+- **Paging the list** _(planned for M35)_. The list route takes the record API's `page`, `pageSize`, `sort`, `search`
+  and `filter`, as [paging and sorting](record-api.md#paging-and-sorting) defines them. The columns are `title`,
+  `author` (the author's name) and `state`, which are text, and `sentAt`, which is a date. The order is newest
+  first unless `sort` says otherwise, and `search` keeps the requests whose `title` or `text` contains the text. It
+  answers `{ items, page, pageSize, totalCount }` through the [shared list query](shared-widgets.md#which-widget),
+  and a parameter that is invalid is `400`, as [the revision list](authoring-revisions.md#list) answers. It replaces
+  the newest 100.
+- **Requesting changes** _(planned for M35)_. Only the author of the request (`403` to anyone else) takes `{ comment }`
+  of 1 to 2,000 characters. The route answers `409` unless the request is `ready`. It keeps the draft, sets `round`
+  back to 0 and moves the request to `working`. `Ai:RequestTimeout` counts from the `changeRequest` step, and the
+  token budget goes on. Without a restart, a request that used up its rounds could never be changed, see
+  [D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
+- **The request diff** _(planned for M35)_. Any author reads the diff of the request's draft, in the shape and the
+  pages of the [draft diff](authoring-revisions.md#draft-diff). It answers `404` when the request has no draft,
+  an accepted request included.
+- **AI status** _(planned for M35)_. `GET /api/studio/ai` takes the session and the author role and answers
+  `{ aiConnected, mcp }`. `aiConnected` is true when the tenant's AI authoring setting is on and the person has
+  stored a key, or when `Ai:DefaultBinding` needs none, see
+  [a person's own key](model-bindings.md#a-persons-own-key). `mcp` is `https://<host>/mcp`.
+- **Draft preview** _(planned for M35)_. The route follows the rules of [preview](authoring.md#preview) and takes its
+  snapshot from the draft's tip. It answers `404` for a draft that is not the person's, and `409` when the tenant
+  has no preview tenant.
+- **New answer fields** _(planned for M35)_. A request answers `title` (at most 80 characters, from the plan, null
+  before it), `app` as `{ client, name }` (`studio` with a null name for a request sent in Studio), `coAuthors`
+  (the apps that wrote to the draft, in the shape of `app`, in order of first write), `aiConnected` (the AI status
+  rule, for the request's author, so the page can say that no review will run), `draft` (the draft's id, or null)
+  and `plan` as [the plan's shape](#states).
+- **Approving an outside app's request** _(planned for M35)_. The approve route also gets the agent host's
+  [token](#acting-for-the-author), as a send does and with the same refusals, so the agent host can run the checks
+  and the review for the author. The agent host runs no plan or change step of such a request.
 
 ## States
 
 A request follows the same loop as a change to the platform: a plan the author approves, the change,
 the checks, an independent review and fix rounds.
 
-| State              | What happens                                                                                                                            | Next                                                        |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `planning`         | The agent reads the application through the tools and writes a plan in plain words: what it will change and which scenarios it will add | `awaitingApproval`                                          |
-| `awaitingApproval` | The author reads the plan and approves it, or asks for another plan with a comment                                                      | `working`, or `planning` again                              |
-| `working`          | The agent creates the draft and makes the change through the tools                                                                      | `checking`                                                  |
+| State              | What happens                                                                                                                                      | Next                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `planning`         | The agent reads the application through the tools and writes a plan in plain words: what it will change and which scenarios it will add           | `awaitingApproval`                                          |
+| `awaitingApproval` | The author reads the plan and approves it, or asks for another plan with a comment                                                                | `working`, or `planning` again                              |
+| `working`          | The agent creates the draft and makes the change through the tools                                                                                | `checking`                                                  |
 | `checking`         | The compiler, the tests of each package the draft changed, the application's scenarios and the contract scenarios of its modules run on the draft | `reviewing`, or `fixing` on a failure                       |
-| `reviewing`        | A second agent session, with no memory of the first, reviews the draft against the request and the plan                                 | `ready`, or `fixing` on findings                            |
-| `fixing`           | The agent works on the failures and findings                                                                                            | `checking`                                                  |
-| `ready`            | The draft passed. The author accepts or drops it, or the agent accepts it, see [accepting](#accepting)                                  | `accepted`, `dropped`, `working` on a conflict, or `failed` |
-| `accepted`         | The draft is in the working folder as a revision                                                                                        | none                                                        |
-| `dropped`          | The author dropped the request at any state before `accepted`, and its draft is deleted                                                 | none                                                        |
-| `failed`           | A budget ran out, the token ended, or a step failed in a way a retry does not help. The draft is kept for the author                    | `dropped`                                                   |
+| `reviewing`        | A second agent session, with no memory of the first, reviews the draft against the request and the plan                                           | `ready`, or `fixing` on findings                            |
+| `fixing`           | The agent works on the failures and findings                                                                                                      | `checking`                                                  |
+| `ready`            | The draft passed. The author accepts or drops it, or the agent accepts it, see [accepting](#accepting)                                            | `accepted`, `dropped`, `working` on a conflict, or `failed` |
+| `accepted`         | The draft is in the working folder as a revision                                                                                                  | none                                                        |
+| `dropped`          | The author dropped the request at any state before `accepted`, and its draft is deleted                                                           | none                                                        |
+| `failed`           | A budget ran out, the token ended, or a step failed in a way a retry does not help. The draft is kept for the author                              | `dropped`                                                   |
 
 - **Built-in modules first.** When a request matches a built-in module, the plan declares the module
   and writes a [customization layer](customization-layers.md) over it instead of new resources, so the
@@ -225,6 +259,79 @@ the checks, an independent review and fix rounds.
 - **Disabled authors** _(planned for M35)_. Disabling a user stops each of their requests that is not `accepted`,
   `dropped` or `failed` as `failed`, with the outcome `authorDisabled`, and erases its refresh token. A stopped
   request sends no more model calls with the author's key.
+- **The frame** _(planned for M35)_. Every request, from Studio or from an outside app, follows the same six
+  steps: Plan (`planning`), Approval (`awaitingApproval`), Change (`working` and `fixing`), Checks (`checking`),
+  Review (`reviewing`) and Ready (`ready`). `accepted`, `dropped` or `failed` ends it.
+- **Requesting changes** _(planned for M35)_. A `ready` request goes back to `working` when its author requests
+  changes, see [routes](#routes). The next working step sees the open findings of the review and every
+  `changeRequest` comment, oldest first.
+- **The plan's shape** _(planned for M35)_. The plan is an object, and `title` is stored beside it:
+
+  ```
+  { summary, questions: [{ question, options, recommended }], changes: [text], decisions: [{ decision, reason }],
+    risks: [text], checks: [text], checklist: [{ item, how }], details: [text] }
+  ```
+
+  `summary` and `changes` are required. `checklist` has one entry for each item of Axis's checklist. The whole plan
+  is at most 64 KiB. The planning step ends by calling `propose_plan` for its own request, see
+  [tools](mcp-server.md#tools). A turn that ends without a valid call has no plan (`noPlan`). The author answers
+  `questions` with Change plan, or approves the recommended options.
+
+- **Axis's checklist** _(planned for M35)_. The plan answers it and the review checks it:
+  1. The draft does what the request and the approved plan say, and nothing more.
+  2. A change that a built-in module covers uses it, with a customization layer.
+  3. Each behaviour that the draft adds or changes has a scenario.
+  4. Every text the draft adds has each locale the application offers.
+- **The review's shape** _(planned for M35)_. The review model's last answer is
+  `{ outcome, findings: [{ severity, text, file }], criteria: [{ check, met, note }], checklist: [{ item, outcome, note }], open }`,
+  and the review step stores it as `checks.review`. `severity` is `blocking` or `suggestion`, and `criteria` has one
+  entry for each entry of the plan's `checks`. A checklist `outcome` is `met`, `notMet` or `notApplicable`. The
+  review's `outcome` is `passed` when no finding is blocking, and a suggestion never causes a fix round. `open`
+  holds the findings still open at `ready`: the suggestions, and the blocking findings when the fix rounds ran out,
+  which moves the request to `ready` instead of `failed`. An answer that does not fit the shape is `unfinished`.
+  The review runs with Axis's instructions and checklist, on the read-only tools of
+  [reviewing reads only](#states), for every request.
+- **Outside apps** _(planned for M35)_. A request that an outside MCP client proposes follows the frame, and the
+  app makes the change, as [D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md) gives the
+  app's own subscription as the reason.
+  - **Plan.** The app calls `propose_plan`. The request is stored in `awaitingApproval`, with `app` set to the client
+    and `autoAccept` as the call asked.
+  - **Approval.** The author approves on the request's page, which also gets the agent host's token, see
+    [routes](#routes).
+  - **Change.** The app writes through the write tools on the request. Its Change ends when a `validate_draft` that
+    it calls has no `error` diagnostic, or a `run_scenarios` run that it calls ends `passed`, on the request's draft
+    with at least one change. That call stores the `work` step, or the `fix` step in `fixing`, with no tokens and
+    moves the request to `checking`. `accept_draft` never ends a Change.
+  - **Checks.** The agent host runs the `check` step as for any request.
+  - **Review.** The agent host runs the `review` step as for any request, as a second AI on the author's own key,
+    with Axis's instructions, its checklist and the read-only tools. The app never reviews its own change. When the
+    author has not connected their AI, the step makes no model call, stores the outcome `notReviewed` and moves the
+    request to `ready`. The page says that no review ran, and only the author accepts the request on its page.
+  - **Fixing.** A failed check or a review with findings moves the request to `fixing` and adds 1 to `round`. The
+    app reads the results through `read_request` and fixes.
+  - **Claims.** The agent host claims no `planning`, `working` or `fixing` state of an outside app's request.
+  - **Budgets.** The fix rounds and `Ai:RequestTimeout` apply. The token budget applies, and `tokens` count only the
+    review's model calls on the author's key, because Axis cannot count the calls of the app's own model.
+
+### Steps
+
+_(planned for M35)_
+
+Each step of a request has a kind that belongs to one step of [the frame](#states).
+
+| Kind            | Frame step | Outcomes                                          | `checks`                           |
+| --------------- | ---------- | ------------------------------------------------- | ---------------------------------- |
+| `plan`          | Plan       | `noPlan`                                          | null                               |
+| `planChange`    | Approval   | none, the comment is in `input_summary`           | null                               |
+| `work`          | Change     | `unfinished`                                      | null                               |
+| `check`         | Checks     | `passed`, `failed`, `unfinished`                  | `{ compile, packages, scenarios }` |
+| `review`        | Review     | `passed`, `findings`, `notReviewed`, `unfinished` | `{ review }`                       |
+| `fix`           | Change     | `unfinished`                                      | null                               |
+| `changeRequest` | Ready      | none, the comment is in `input_summary`           | null                               |
+| `accept`        | Ready      | `accepted`, `refused`, `conflict`, `notAccepted`  | null                               |
+
+Any step may also end `interrupted`, `tokenEnded`, `overBudget`, `timedOut`, `keyRefused`, `noKey` or
+`authorDisabled`.
 
 ## Budgets
 
@@ -280,6 +387,17 @@ only [publishing](authoring.md#publishing) does.
 
   A refused call is a tool error that stores nothing. A call while an accept of the draft is queued or running
   answers that accept and stores no second one.
+
+- **Open blocking findings** _(planned for M35)_. `accept_draft` refuses with a tool error when the `open` findings of
+  the newest review hold a blocking finding, see [the review's shape](#states). The author's accept route does not
+  refuse, so the author stays the gate.
+- **The gate** _(planned for M35)_. When the rules above do not hold, `accept_draft` answers with the request page's
+  address as a URL elicitation, see [tools](mcp-server.md#tools), and the agent host's accept step records that as
+  `refused`.
+- **Outside apps** _(planned for M35)_. `accept_draft` from an outside app works under the rules of a Studio request:
+  the application allows auto-accept, the request asked for it when its plan was proposed, and the newest check and
+  review passed. A `notReviewed` review never passes. The agent host's accept step claims an outside app's `ready`
+  request as it claims any other.
 - **Through the publisher.** An accept is a [publish request](authoring.md#publishing) of the kind
   `accept`. The publisher runs the requests of one application one at a time, so two accepts never
   interleave. When an accept succeeds, the publisher moves the `ready` request of that draft to
