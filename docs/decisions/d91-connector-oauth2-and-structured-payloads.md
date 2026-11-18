@@ -4,7 +4,7 @@ Status: **Agreed**
 
 ## Context
 
-A connector of [D25](d25-connectors-deployment-bindings-and-secrets.md) authenticates with a fixed
+A connector of [D161](d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md) authenticates with a fixed
 token or header and sends a flat JSON body. Many systems accept only OAuth2 tokens, real APIs put ids
 in the path and filters in the query, and an order carries its lines.
 

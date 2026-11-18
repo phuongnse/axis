@@ -7,7 +7,7 @@ Status: **Agreed**
 A new tenant, a suspended tenant or a changed secret must take effect without editing the settings of
 the server and the worker and restarting them. Provisioning creates database roles with generated
 passwords that the hosts must read, and
-[D25](d25-connectors-deployment-bindings-and-secrets.md) has no secret store to keep them in.
+[D161](d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md) has no secret store to keep them in.
 
 ## Decision
 

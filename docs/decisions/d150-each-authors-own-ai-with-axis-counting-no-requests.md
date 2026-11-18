@@ -52,7 +52,7 @@ These parts still hold:
   ([D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)).
 - **No model is built in.** The agent host calls a model through an adapter, by a binding the
   installation names, as a connector's deployment binding names its system
-  ([D25](d25-connectors-deployment-bindings-and-secrets.md)). An authoring eval decides which models are
+  ([D161](d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md)). An authoring eval decides which models are
   supported, whoever makes them. See [model bindings](../reference/model-bindings.md).
 - **The tenant's records never reach a model.** The model sees the application's resources, its
   diagnostics, scenario results and the request.

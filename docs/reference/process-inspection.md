@@ -137,7 +137,8 @@ in any state. The body has these parts:
   `endedAt`, as in the list. `process` is the process name. `subjectId` is
   `null` for an instance of a process without a subject.
 - `timerDueAt` is the due time of the instance's `process.timer` work item while
-  the instance is `waiting` on a timer step, as a UTC time like `createdAt`. It
+  the instance is `waiting` on a timer step, or on a `waitEvent` step with a `timeout`, as a UTC time
+  like `createdAt`. It
   reads only the item of the instance's current revision, so a stale item from
   an earlier pass of a loop is not shown. It is `null` in every other case. It
   is the same for every user who may inspect the instance.
@@ -158,15 +159,15 @@ in any state. The body has these parts:
     when they open a child whose subject record they may not read.
 - `graph` is the graph of the release the instance is pinned to:
   `{ "start", "steps": [ { "name", "type", "labelKey", "transitions" } ] }`.
-  - `type` is the step type: `decision`, `task`, `operation`, `timer` or `end`.
+  - `type` is the step type: `decision`, `task`, `operation`, `timer`, `waitEvent` or `end`.
   - `labelKey` is the step's label text key, or `null` when it has none.
   - `transitions` is a list of `{ "next", "on" }`, one for each step the step
     can lead to. `on` is always text or `null`. It is the zero-based index of
     a decision branch as text, such as `"0"`, as in the history's `decision`,
     then `"otherwise"` for the fallback branch, the name of a task outcome, or
-    `null` for the `next` of an operation, a `subProcess` or a timer. An `end` step has none.
+    `null` for the `next` of an operation, a `subProcess`, a timer or a `waitEvent`. A `waitEvent`
+    step's timeout transition has `"timeout"`. An `end` step has none.
   - A `callConnector`, package, `raiseEvent` and `subProcess` step have type `operation`.
-  - `labelKey` is set only for a `task` step.
   - **Blocks.** _(planned for M38)_ The steps inside a block follow the block in list order, after it. Each step
     has `block`, the name of its block step, and `branch`, the name of its branch, or `null` in a repeat. A block's
     `type` is `parallel` or `repeat`, and its transition is `{ "next", "on": null }`. Each `onError` entry adds a
@@ -200,8 +201,8 @@ in any state. The body has these parts:
     `{ "kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "traceId" }`,
     with `kind` either `attempt` or `lookup`. `traceId` follows [Attempts](#attempts).
   - `input` and `inputHidden` follow [Values and masking](#values-and-masking).
-  - A call has no output. The engine writes the outputs of a call straight to
-    the subject record and stores no response body.
+  - **Output and response.** _(planned)_ A call has no output of its own. The engine writes the outputs
+    of a call straight to the subject record. Each attempt's `response` is kept, see [Attempts](#attempts).
   - `idempotent` is only on a package call. It is the value stored when the
     engine staged the call, for the inspector's retry warning.
   - `resolvable` is `true` when the user holds the `resolve` grant, the call
@@ -228,6 +229,35 @@ in any state. The body has these parts:
   - It does not run the other checks of a retry: another active instance for
     the record, or a destructive migration since the pinned release. A command
     in the list can still be refused with `409`.
+- **Process title.** _(planned)_ `processTitleKey` is the text key of the process's `title` on the
+  detail, on `parent` and on each `subProcesses` entry. It is `null` where the release gives no title.
+- **Labels.** _(planned)_ Each `graph` step's `labelKey` is the key of its `label`, or `null`. Each
+  transition's `labelKey` is the key of its outcome's or branch's `label`, or `null`. A `waitEvent` step
+  has `event`, the event's name, and `eventLabelKey`, the key of the event's `label`, or `null`.
+- **Who started it.** _(planned)_ `startedBy` is `{ "kind", "name", "id", "via" }`. `kind` is `person`,
+  `trigger`, `endpoint`, `schedule` or `parent`. `name` is the person's name, the resource's name for a
+  trigger, endpoint or schedule, or the parent process's name for `parent`. `id` is the user's id, or the
+  parent instance's id, and `null` otherwise. `via` is the text key of the action's label for a person,
+  and `null` otherwise.
+- **Input and result.** _(planned)_ `input` holds the parameters the instance started with, or `null`,
+  and follows [values and masking](#values-and-masking). `result` is `{ "step", "values" }` once the
+  instance completed, and `null` before. Its `values` follow the same rule.
+- **Studio.** _(planned)_ `studio` is `{ "app", "resource" }`, from which the SPA builds Studio's address
+  for the process. It is `null` for a reader who may not author the application.
+- **Tasks.** _(planned)_ Each task has `dueAt`, the time it is due as UTC like `createdAt`, or `null`
+  when its step has no `dueIn`. It has `assigneeId`, the id of a user assignee or of the person who
+  claimed it, else `null`, and `completedById`, the id of the person who completed it, else `null`.
+  `assignee` and `completedBy` hold a person's name, and a role assignee keeps its role's name.
+- **Runs.** _(planned)_ Each `path` entry has `read`, the values that a decision's conditions read, as
+  `[{ "name", "value", "hidden" }]`, and `made`, a `RunOutput`:
+  `{ "changes": [{ "field", "before", "after", "hidden" }], "event": { "name", "fields" }, "notified": { "to", "channels", "subject" }, "created": { "entity", "id" } }`.
+  Each part of `made` is `null` when the run did not make it.
+- **Calls.** _(planned)_ A connector call has `request`, `{ "method", "url", "query", "headers", "body", "truncated" }`,
+  and each of its `attempts` has `response`, `{ "status", "headers", "body", "truncated" }`. A package
+  call has `returned`, the values its operation returned. `request`, `response` and `returned` follow the
+  hiding rule of `input`.
+- **Errors.** _(planned)_ `problem` is `{ "code", "values" }` on a path entry and on an attempt, and
+  `null` with no error. Its codes are in [step errors](#step-errors-in-inspection).
 - **Paths.** _(planned for M38)_ `revision` is the revision of the root path, which is the instance
   itself. `paths` lists the paths that a block started, ordered by `createdAt`, then by `id`. Each is
   `{ "id", "parentPathId", "block", "branch", "pass", "state", "step", "revision", "createdAt", "endedAt", "commands" }`.
@@ -338,15 +368,18 @@ in any state. The body has these parts:
 ```
 
 The example shortens the lists. The graph, the path, the tasks and `timerDueAt` are the
-same for every user who may inspect the instance. Only a call's `input`,
+same for every user who may inspect the instance. A call's `input`,
 `commands`, `parent` and `subProcesses`, and each call's `resolvable` and `outputs` differ between users.
+
+**Values by user.** _(planned)_ `studio`, the values that the masking rule hides, and a call's `request`,
+`response` and `returned` also differ between users.
 
 **Paths and variables.** _(planned for M38)_ The `variables`, and the `commands` of each path and task,
 differ between users too. The rest of `paths` and `tasks` is the same for every user.
 
 ### Values and masking
 
-Inspection shows no stored field value except a call's `input`. The history's
+Inspection shows a stored field value only where this section says it does. The history's
 `input` and `output` hold only ids, versions, step names and outcomes, and a
 task row holds none, so they need no masking. A call's `input` is the
 evaluated input that the call sent, so it holds field values.
@@ -399,6 +432,10 @@ evaluated input that the call sent, so it holds field values.
   input only while the call is `pending` or `unknown`, and clears it when it
   settles, so inspection shows a settled package call with `input` `null` and
   `inputHidden` `false`.
+- **Kept values.** _(planned)_ A call's `request`, each attempt's `response` and a package call's `returned`
+  follow the hiding rule of the call's `input`. So do a run's `read` and `made`, and the instance's `input`
+  and `result`, each over the fields it came from. A hidden `read` or `made` value is `null` with `hidden`
+  `true`. No kept value is copied to history, audit records or logs.
 - **Variables.** _(planned for M38)_ A variable's `value` is shown only when the user may read every field
   that each expression setting the variable reads. Those expressions are the `set` entries of each
   `setVariables` step that sets it, and the `gather.value` of each repeat that gathers into it, both from
@@ -422,6 +459,11 @@ failed. The kept input lets inspection show what was sent. It is never copied
 to history, audit records or logs, and inspection
 shows it only under the [masking rule](#values-and-masking). A package call's input is cleared when
 the call settles, see [Staging a package call](process-execution.md#staging-a-package-call).
+
+**Request and responses.** _(planned)_ A connector call also keeps its request and each attempt's
+response. The body is kept as text, unchanged, up to a size limit. A longer body is cut and marked
+`truncated`. Every secret is kept as `[secret]`. They are kept for as long as the instance's history,
+never copied to history, audit records or logs, and shown only under the [masking rule](#values-and-masking).
 
 ### Attempts
 
@@ -462,8 +504,9 @@ earlier ones.
   stale, because the instance moved on, writes no row, and neither does a
   call whose release lacks the step before any attempt was counted.
 - **Content.** A row holds the times, the outcome, the HTTP status and a fixed
-  error text. It never holds a request or response body, an exception message
-  or a secret.
+  error text. It never holds an exception message or a secret's value.
+- **Response and problem.** _(planned)_ A row also holds the attempt's `response`, see
+  [Call input kept](#call-input-kept), and its `problem`, see [Step errors](#step-errors-in-inspection).
 
 ### Step errors in inspection
 
@@ -484,6 +527,22 @@ message can hold a value:
   the call's `last_error`.
 
 None of them holds a value, and inspection shows the error as it is stored.
+
+**Problem codes.** _(planned)_ A path entry and an attempt carry `problem`, a code with its values. The
+page words it through `shell.stepProblem.<code>` in the reader's language. A row with no `problem` shows
+its stored `error`. The codes are:
+
+- `unavailable`: the outside system could not be reached. The stored error is the attempt's fixed text.
+- `serverError`: the outside system answered with a server error. The stored error is the attempt's fixed text.
+- `refused`: the outside system refused the call. The stored error is the attempt's fixed text.
+- `timeout`: the outside system did not answer in time, with `seconds`, the wait that ran out. The stored error is the attempt's fixed text, such as a timeout.
+- `notSent`: a connector call could not be sent, or its success could not be recorded. The stored error ends with the exception type.
+- `exception`: any other failure. The stored error is the exception type.
+- `expressionFailed`: an expression of the step failed. The stored error is the fixed text that names the step, the part and the kind of expression error.
+- `writeRefused`: a write to a record was refused. The stored error is the refused-write text.
+
+**No stack traces.** _(planned)_ No page of an application shows a stack trace or an exception message,
+as [D161](../decisions/d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md) says.
 
 ### Inspection errors
 
