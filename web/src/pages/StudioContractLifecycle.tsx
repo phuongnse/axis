@@ -83,7 +83,8 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
   const t = useText()
   const { mode } = useThemeMode()
   const { colour } = useDesignTokens()
-  const edgeText = t('shell.studio.processGraph.to')
+  const edgeLabelText = t('shell.studio.contract.edgeLabel')
+  const edgeNameText = t('shell.studio.contract.edgeName')
   const guard = t('shell.studio.contract.guard')
   const noGuard = t('shell.studio.contract.noGuard')
 
@@ -107,13 +108,13 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
           (edge) => states.some((state) => state.name === edge.from) && states.some((state) => state.name === edge.to),
         )
         .map((edge): Edge => {
-          const label = `${edge.name}, ${edge.guard ? guard : noGuard}`
+          const label = fillText(edgeLabelText, { name: edge.name, guard: edge.guard ? guard : noGuard })
           return {
             id: edge.id,
             source: edge.from,
             target: edge.to,
             label,
-            ariaLabel: `${fillText(edgeText, { source: edge.from, target: edge.to })}, ${label}`,
+            ariaLabel: fillText(edgeNameText, { source: edge.from, target: edge.to, label }),
             style: { stroke: colour.textMuted },
             markerEnd: { type: MarkerType.ArrowClosed, color: colour.textMuted },
             labelStyle: { fill: colour.text },
@@ -121,7 +122,7 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
           }
         }),
     }
-  }, [states, edges, colour, edgeText, guard, noGuard])
+  }, [states, edges, colour, edgeLabelText, edgeNameText, guard, noGuard])
 
   return (
     <section

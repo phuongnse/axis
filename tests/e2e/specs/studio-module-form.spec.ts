@@ -74,7 +74,7 @@ test.describe("Studio edits a module form as a layer", () => {
     await expect(page.getByTestId("studio-saved")).toBeVisible();
     await expect(page.getByTestId("studio-module-layer")).toBeVisible();
     await expect(
-      page.getByRole("note", { name: "Changed amount", exact: true }),
+      page.getByRole("note", { name: "amount, changed by this application", exact: true }),
     ).toBeVisible();
     await expect(access(layerFile)).resolves.toBeUndefined();
   });

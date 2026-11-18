@@ -1,3 +1,4 @@
+import { fillText } from './fillText'
 import { getAt, unescapePointerSegment } from './jsonPatch'
 import { setOwn } from './ownProperty'
 import type { StudioModuleResource } from './studio'
@@ -131,4 +132,10 @@ export function layerMarks(
 /** The mark of the element with `key` in `list`, or `undefined` when the layer left it alone. */
 export function markOf(elements: LayerElement[], list: string, key: string): LayerMark | undefined {
   return elements.find((element) => element.list === list && element.key === key)?.mark
+}
+
+/** The accessible name of a mark on the element `name`, one text such as "{name}, added by this application". */
+export function markName(text: (key: string) => string, mark: LayerMark, name: string): string {
+  const key = mark === 'added' ? 'shell.studio.contract.addedName' : `shell.studio.module.${mark}Name`
+  return fillText(text(key), { name })
 }

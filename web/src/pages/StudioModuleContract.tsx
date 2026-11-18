@@ -5,8 +5,9 @@ import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
 import { AxisTable } from '../platform/AxisTable'
+import { fillText } from '../platform/fillText'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
-import { layerMarks, markOf } from '../platform/layerMarks'
+import { layerMarks, markName, markOf } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
 import { requiredMark } from '../platform/requiredMark'
 import {
@@ -154,7 +155,7 @@ function Point({ value }: { value: string }) {
       ) : (
         <>
           <Typography.Text type="secondary" data-testid={`studio-contract-relaxed-${value}`}>
-            {t('shell.studio.contract.relaxed')} {entry.reason}
+            {fillText(t('shell.studio.contract.relaxed'), { reason: entry.reason })}
           </Typography.Text>
           {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button size="small" data-testid={`studio-contract-undo-relax-${value}`} disabled={busy} onClick={undo}>
@@ -491,7 +492,7 @@ function AddTransitionDialog({
   )
 }
 
-/** A row's name, and when the application added the row, its Added tag and a Remove button named after it. */
+/** A row's name, and when the application added the row, its Added tag and a Delete button named after it. */
 function RowName({ name, added, onRemove }: { name: string; added: boolean; onRemove: () => void }) {
   const t = useText()
   if (!added) {
@@ -500,11 +501,11 @@ function RowName({ name, added, onRemove }: { name: string; added: boolean; onRe
   return (
     <Flex gap="small" align="center" wrap>
       {name}
-      <Tag role="note" aria-label={`${t('shell.studio.module.added')} ${name}`}>
+      <Tag role="note" aria-label={markName(t, 'added', name)}>
         {t('shell.studio.module.added')}
       </Tag>
       {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button size="small" aria-label={`${t('shell.studio.contract.remove')} ${name}`} onClick={onRemove}>
+      <Button size="small" aria-label={fillText(t('shell.studio.contract.removeName'), { name })} onClick={onRemove}>
         {t('shell.studio.contract.remove')}
       </Button>
     </Flex>
