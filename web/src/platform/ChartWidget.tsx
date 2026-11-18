@@ -1,12 +1,14 @@
-import { Card } from 'antd'
+import { Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { boundParameterQuery } from './boundParameters'
 import { Chart } from './Chart'
+import { Tile } from './Tile'
 import { formatValue, type FormatOptions } from './formatValue'
 import { fetchRecords, type RecordItem, type RecordValue } from './records'
 import type { DataSourceColumn, WidgetMetadata } from './site'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 import { visuallyHidden } from './visuallyHidden'
 
 interface ChartWidgetProps {
@@ -82,6 +84,7 @@ export function ChartWidget({ widget, locale, pageValues }: ChartWidgetProps) {
     return () => controller.abort()
   }, [rowsPath, query, requestUrl, name])
 
+  const { spacing } = useDesignTokens()
   const title = t(titleKey)
   const rows = useMemo(() => (loading ? [] : state.rows), [loading, state])
   const categoryColumn = columns.find((candidate) => candidate.name === category)
@@ -156,8 +159,12 @@ export function ChartWidget({ widget, locale, pageValues }: ChartWidgetProps) {
   }
 
   return (
-    <Card data-testid="chart-widget" title={title} aria-busy={loading}>
+    // Proposed, see the review on #3650: a chart is a `Tile`, its title a heading above the chart, as a card's was.
+    <Tile data-testid="chart-widget" aria-busy={loading}>
+      <Typography.Title level={5} style={{ marginTop: 0, marginBottom: spacing.sm }}>
+        {title}
+      </Typography.Title>
       {content}
-    </Card>
+    </Tile>
   )
 }

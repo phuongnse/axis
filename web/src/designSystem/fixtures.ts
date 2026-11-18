@@ -2050,6 +2050,8 @@ export const applicationSite: ApplicationSite = {
   navigation: [
     { page: 'Requests', labelKey: 'nav.requests', icon: 'list' },
     { page: 'Tasks', labelKey: 'nav.tasks', icon: 'tasks' },
+    // Proposed: the dashboard, see the review on #3650.
+    { page: 'Dashboard', labelKey: 'nav.dashboard', icon: 'dashboard' },
     // Proposed: the page that inspects vendor onboardings, so a purchase approval's sub-process opens, see the review
     // on #3650.
     { page: 'Onboardings', labelKey: 'nav.onboardings', icon: 'process' },
@@ -2058,6 +2060,54 @@ export const applicationSite: ApplicationSite = {
   // Proposed: a request opens on the Request page the site names, and a category, which has no page of its own, on the
   // default record page, see the review on #3650.
   recordPages: { Request: `/${sitePath}/request`, Category: `/${sitePath}/records/Category` },
+}
+
+/**
+ * Proposed, see the review on #3650: a dashboard as an author builds one, two KPIs over two charts in columns, so the
+ * `shell` preview shows its tiles on a flush page. The count opens the Requests page.
+ */
+const dashboardPage: PageMetadata = {
+  name: 'Dashboard',
+  titleKey: 'nav.dashboard',
+  parameters: [],
+  widgets: [
+    {
+      type: 'columns',
+      columns: [
+        { width: 6, widgets: [kpiWidget] },
+        {
+          width: 6,
+          widgets: [
+            {
+              ...kpiWidget,
+              kpi: {
+                measure: 'requests',
+                labelKey: 'kpi.requests',
+                comparison: null,
+                navigate: {
+                  type: 'navigate',
+                  page: 'Requests',
+                  labelKey: 'kpi.showRequests',
+                  parameters: {},
+                  record: null,
+                  opensForm: false,
+                  paths: {},
+                  visibleWhen: null,
+                },
+              },
+            },
+          ],
+        },
+      ],
+    },
+    {
+      type: 'columns',
+      columns: [
+        { width: 6, widgets: [chartWidget('bar')] },
+        { width: 6, widgets: [chartWidget('pie')] },
+      ],
+    },
+  ],
 }
 
 const requestsPage: PageMetadata = {
@@ -2576,6 +2626,8 @@ export const siteTexts: Record<string, string> = {
   'preview.error.unitPrice': 'Unit price cannot be negative.',
   'site.title': 'Purchase requests',
   'nav.requests': 'Requests',
+  'nav.dashboard': 'Dashboard',
+  'kpi.showRequests': 'Show the requests',
   'nav.tasks': 'Tasks',
   'request.outcome.approve': 'Approve',
   'request.outcome.reject': 'Reject',
@@ -2649,6 +2701,8 @@ export const routes: Record<string, () => unknown> = {
   [`${onboardingsPath}/${onboardingId}`]: () => onboardingDetail,
   [onboardingDeadLettersPath]: () => ({ items: [], page: 1, pageSize: 20, totalCount: 0 }),
   [`/api/sites/${sitePath}/pages/Onboardings`]: () => onboardingsPage,
+  [`/api/sites/${sitePath}/pages/Dashboard`]: () => dashboardPage,
+  [`/api/sites/${sitePath}/pages/dashboard`]: () => dashboardPage,
   [`/api/sites/${sitePath}/pages/onboardings`]: () => onboardingsPage,
   [`/api/sites/${sitePath}/texts/${locale}?release=${releaseId}`]: () => ({ texts: siteTexts }),
   [`/api/sites/${sitePath}/pages/instances`]: () => instancesPage,

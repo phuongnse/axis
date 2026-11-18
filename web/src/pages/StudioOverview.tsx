@@ -8,7 +8,7 @@ import { kindName, studioKinds } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
-import { HomeTileStyle } from './HomeTileStyle'
+import { TileFocusStyle } from '../platform/Tile'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { SiteTiles } from './SiteTiles'
 import { StudioChangeList } from './StudioChangeList'
@@ -55,7 +55,7 @@ export function StudioOverview({
 
   return (
     <Flex vertical gap={spacing.lg}>
-      <HomeTileStyle />
+      <TileFocusStyle />
       <StudioPageHeading title={title} line={description} />
       <SectionParts>
         {getStarted && (

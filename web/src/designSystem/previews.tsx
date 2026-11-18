@@ -255,6 +255,8 @@ export const previews: Record<string, readonly PreviewState[]> = {
   ),
   shell: [
     { caption: 'Application site', draw: () => <ShellPreview />, entry: '/sample/requests', frameHeight: 800 },
+    // Proposed: a dashboard's KPIs and charts as tiles on a flush page, see the review on #3650.
+    { caption: 'Dashboard', draw: () => <ShellPreview />, entry: '/sample/dashboard', frameHeight: 800 },
     {
       caption: 'Navigation collapsed',
       draw: () => (

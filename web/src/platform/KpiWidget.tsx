@@ -1,10 +1,10 @@
-import { Button, Card, Flex } from 'antd'
+import { Button, Flex } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link } from 'react-router'
 import { boundParameterQuery } from './boundParameters'
 import { useCanvasActions } from './canvasActions'
 import { formatValue } from './formatValue'
+import { Tile, TileFocusStyle } from './Tile'
 import { navigatePath } from './navigateAction'
 import { fetchRecords, type RecordItem, type RecordValue } from './records'
 import type { WidgetMetadata } from './site'
@@ -132,15 +132,24 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
             </Button>
           </div>
         )}
-        {navigate && !canvas.active && path && <div>{t(navigate.labelKey)}</div>}
+        {/* A link tile shows it by its link's words in `primaryText`, as every link; hover changes nothing. */}
+        {navigate && !canvas.active && path && <div style={{ color: colour.primaryText }}>{t(navigate.labelKey)}</div>}
       </Flex>
     )
   }
 
-  const tile = (
-    <Card data-testid="kpi-tile" aria-busy={loading} hoverable={Boolean(path)}>
+  // Proposed, see the review on #3650: a KPI is a `Tile`, which keeps its border on a flush page; with a navigate
+  // action the whole tile is the link.
+  return path && !canvas.active ? (
+    <>
+      <TileFocusStyle />
+      <Tile to={path} data-testid="kpi-tile" aria-busy={loading}>
+        {content}
+      </Tile>
+    </>
+  ) : (
+    <Tile data-testid="kpi-tile" aria-busy={loading}>
       {content}
-    </Card>
+    </Tile>
   )
-  return path && !canvas.active ? <Link to={path}>{tile}</Link> : tile
 }

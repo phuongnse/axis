@@ -1,8 +1,9 @@
 import { Button, Flex, Spin, Typography } from 'antd'
+import { Tile, TileFocusStyle } from '../platform/Tile'
 import { AxisAlert } from '../platform/AxisAlert'
 import { CardPage } from '../platform/CardPage'
 import { createElement, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
-import { Link, useLocation } from 'react-router'
+import { useLocation } from 'react-router'
 import { isSignInCardAddress, startSignIn } from '../platform/api'
 import { fetchCurrentUser, type CurrentUser } from '../platform/currentUser'
 import { EmptyState } from '../platform/EmptyState'
@@ -13,7 +14,6 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { usePlatform } from './context'
 import { useHomeGrid } from './homeGrid'
-import { HomeTileStyle } from './HomeTileStyle'
 import { SiteTiles } from './SiteTiles'
 
 /** What the page loaded. `null` means that the call answered 401, and `'failed'` that it failed otherwise. */
@@ -70,19 +70,7 @@ export function SignInCard({ state, onSignIn = startSignIn }: { state: SignInCar
 function ToolTile({ to, icon, title, description }: { to: string; icon: string; title: string; description: string }) {
   const { colour, spacing, radius } = useDesignTokens()
   return (
-    <Link
-      to={to}
-      data-home-tile
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: spacing.sm,
-        padding: spacing.md,
-        background: colour.surface,
-        border: `1px solid ${colour.borderSubtle}`,
-        borderRadius: radius.base,
-      }}
-    >
+    <Tile to={to} style={{ display: 'flex', alignItems: 'flex-start', gap: spacing.sm }}>
       <span
         data-testid="tool-icon"
         style={{
@@ -109,7 +97,7 @@ function ToolTile({ to, icon, title, description }: { to: string; icon: string; 
           {description}
         </Typography.Paragraph>
       </Flex>
-    </Link>
+    </Tile>
   )
 }
 
@@ -293,7 +281,7 @@ export function HomePage() {
 
   return (
     <Flex vertical gap={spacing.lg}>
-      <HomeTileStyle />
+      <TileFocusStyle />
       <Applications sites={loaded.sites} locale={locale} />
       {loaded.user !== 'failed' && <Tools user={loaded.user} />}
     </Flex>

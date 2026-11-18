@@ -31,7 +31,7 @@ export function SiteTiles({
           <Link
             key={site.path}
             to={siteAddress(site.path)}
-            data-home-tile
+            data-tile
             target={newTab ? '_blank' : undefined}
             rel={newTab ? 'noopener noreferrer' : undefined}
             aria-label={newTab ? t('shell.studio.overview.opensInNewTab').replace('{site}', title) : undefined}
