@@ -567,7 +567,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await createResource(page, 'process', 'TicketHandling')
     await openFormTab(page)
     await pick(page, 'studio-field-/entity', 'Ticket')
-    await page.getByTestId('studio-step-0').getByRole('button', { name: 'Remove step', exact: true }).click()
+    await page.getByTestId('studio-step-0').getByRole('button', { name: 'Delete', exact: true }).click()
 
     const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
     const steps: [name: string, type: string][] = [
@@ -640,7 +640,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       await pick(page, `studio-field-/steps/${index}/operation`, 'updateRecord')
       for (const [field, expression] of sets) {
         const row = page.getByTestId(`studio-field-/steps/${index}/set/${field}`)
-        await pickAction(stepCard(index).getByRole('combobox', { name: 'Add mapping Set', exact: true }), field, row)
+        await pickAction(stepCard(index).getByRole('combobox', { name: 'Add Set', exact: true }), field, row)
         await expect(row.locator('.cm-editor')).toBeVisible()
         await row.getByRole('textbox', { name: 'Expression', exact: true }).fill(expression)
       }
@@ -951,7 +951,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     // The page has a ticket parameter, so the mapping key is picked from its parameters.
     const row = page.getByTestId('studio-field-/steps/5/open/parameters/ticket')
     await pickAction(
-      page.getByRole('combobox', { name: 'Add mapping Page parameters', exact: true }),
+      page.getByRole('combobox', { name: 'Add Page parameters', exact: true }),
       'ticket',
       row,
     )
@@ -1086,7 +1086,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         await page.getByTestId(`studio-field-/parameters/${index}/name`).getByRole('textbox').fill(parameter)
         await pick(page, `studio-field-/parameters/${index}/type`, type)
       }
-      await stepCard(0).getByRole('button', { name: 'Remove step', exact: true }).click()
+      await stepCard(0).getByRole('button', { name: 'Delete', exact: true }).click()
       for (const [index, [stepName, type]] of [
         [step.name, 'operation'],
         ['done', 'end'],

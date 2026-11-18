@@ -104,7 +104,7 @@ describe('connectEdit', () => {
 })
 
 describe('choiceLabel', () => {
-  const t = (key: string) => key.split('.').at(-1) ?? key
+  const t = (key: string) => `${key.split('.').at(-1) ?? key} {number}`
 
   it('names a branch by its when and an outcome by its name', () => {
     expect(choiceLabel(steps[2], { kind: 'branch', index: 0 }, t)).toBe('totalAmount >= FinanceThreshold()')

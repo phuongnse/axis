@@ -850,9 +850,7 @@ describe('PageEditor navigate actions', () => {
   it('types the parameter name and writes its expression when the page is not in the names', async () => {
     const saved = renderStateful(page({ ...table, rowActions: [{ ...navigate, page: 'Unsaved' }] }))
 
-    await userEvent.click(
-      within(screen.getByTestId(`${rows}/0/parameters`)).getByRole('button', { name: 'Add mapping' }),
-    )
+    await userEvent.click(within(screen.getByTestId(`${rows}/0/parameters`)).getByRole('button', { name: 'Add row' }))
     await userEvent.type(
       within(screen.getByTestId(`${rows}/0/parameters/`)).getByRole('textbox', { name: 'Parameter' }),
       'item',
@@ -897,7 +895,9 @@ describe('PageEditor navigate actions', () => {
       platformEnglish['shell.studio.page.requiredParameterExpression.help'].replace('{type}', 'reference'),
     )
     expect(within(row).getByRole('textbox', { name: 'Expression' })).toHaveValue('')
-    expect(screen.queryByRole('button', { name: 'Add mapping' })).not.toBeInTheDocument()
+    expect(
+      within(screen.getByTestId(`${rows}/0/parameters`)).queryByRole('button', { name: 'Add row' }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows no parameter row for a page that declares none', () => {

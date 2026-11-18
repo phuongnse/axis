@@ -263,10 +263,10 @@ export async function addListRow(page: Page, list: string) {
   await page.getByTestId(`studio-field-${list}`).getByRole('button', { name: 'Add row', exact: true }).click()
 }
 
-/** Clicks Add mapping in `scope` once the expression editors are still. */
+/** Clicks Add row in `scope`, which adds a mapping row, once the expression editors are still. */
 export async function addMapping(scope: Locator) {
   await waitForExpressions(scope.page())
-  await scope.getByRole('button', { name: 'Add mapping', exact: true }).click()
+  await scope.getByRole('button', { name: 'Add row', exact: true }).click()
 }
 
 /**

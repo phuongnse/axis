@@ -1,6 +1,7 @@
 import { Button, Flex, Input, Select, Typography } from 'antd'
 import { useContext } from 'react'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { fillText } from '../platform/fillText'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { ExpressionField } from './ExpressionField'
@@ -137,7 +138,7 @@ export function MappingRows({
               </Button>
             ) : (
               <Select
-                aria-label={`${t('shell.studio.process.addMapping')} ${title}`}
+                aria-label={fillText(t('shell.studio.list.addTitle'), { name: title })}
                 placeholder={t('shell.studio.process.addMapping')}
                 style={{ minWidth: 240 }}
                 showSearch

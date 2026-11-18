@@ -1,3 +1,4 @@
+import { fillText } from '../platform/fillText'
 import { uniqueStepName } from './processPalette'
 
 export type ConnectChoice =
@@ -116,12 +117,12 @@ export function choiceLabel(step: unknown, choice: ConnectChoice, t: (key: strin
     case 'branch': {
       const branch = listOf(content.branches)[choice.index]
       const when = isContent(branch) && typeof branch.when === 'string' ? branch.when : ''
-      return when || `${t('shell.studio.process.branchNumber')} ${choice.index + 1}`
+      return when || fillText(t('shell.studio.process.branchNumber'), { number: choice.index + 1 })
     }
     case 'outcome': {
       const outcome = listOf(content.outcomes)[choice.index]
       const name = isContent(outcome) && typeof outcome.name === 'string' ? outcome.name : ''
-      return name || `${t('shell.studio.process.outcomeNumber')} ${choice.index + 1}`
+      return name || fillText(t('shell.studio.process.outcomeNumber'), { number: choice.index + 1 })
     }
   }
 }
