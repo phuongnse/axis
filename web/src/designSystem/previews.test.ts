@@ -143,7 +143,7 @@ describe('design-system previews', () => {
     }
   })
 
-  test('the studio preview has its fifteen states, each with a slug of its own and a frame', () => {
+  test('the studio preview has its sixteen states, each with a slug of its own and a frame', () => {
     const states = previews.studio
 
     expect(states.map(({ caption }) => caption)).toEqual([
@@ -157,6 +157,7 @@ describe('design-system previews', () => {
       'Overview with errors and changes not live',
       'Overview of a new application',
       'Entity',
+      'Entity with expressions',
       'Policy matrix',
       'Releases',
       'History',
@@ -174,6 +175,7 @@ describe('design-system previews', () => {
       'overview-with-errors-and-changes-not-live',
       'overview-of-a-new-application',
       'entity',
+      'entity-with-expressions',
       'policy-matrix',
       'releases',
       'history',

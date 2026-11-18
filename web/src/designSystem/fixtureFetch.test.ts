@@ -61,6 +61,17 @@ describe('installFixtureFetch', () => {
     expect(response.status).toBe(500)
   })
 
+  test("gives a route the request's method and body, so it can answer a POST by its body", async () => {
+    const route = vi.fn(() => ({ answered: true }))
+    installFixtureFetch({ '/api/apps/Sample/expressions/check': route }, scopes)
+    const init = { method: 'POST', body: '{"path":"/fields/2/expression"}' }
+
+    const response = await window.fetch('/api/apps/Sample/expressions/check', init)
+
+    expect(route).toHaveBeenCalledExactlyOnceWith(init)
+    expect(await response.json()).toEqual({ answered: true })
+  })
+
   test('keeps the fetch pending when the route never settles', async () => {
     installFixtureFetch({ '/api/apps/Sample/loading': () => new Promise<never>(() => {}) }, scopes)
     const settled = Symbol('settled')

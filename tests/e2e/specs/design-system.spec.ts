@@ -819,6 +819,7 @@ const framedPreviews: Record<
       "Overview with errors and changes not live",
       "Overview of a new application",
       "Entity",
+      "Entity with expressions",
       "Policy matrix",
       "Releases",
       "History",

@@ -1277,10 +1277,9 @@ const ValidationRow = memo(function ValidationRow({
         onPick={(next) => onChange(`${pointer}/field`, next ?? '')}
       />
       {readOnly ? null : (
-        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-        <Button danger onClick={() => onChange(pointer, undefined)}>
+        <AxisButton role="destructive" onClick={() => onChange(pointer, undefined)}>
           {t('shell.studio.entity.removeValidation')}
-        </Button>
+        </AxisButton>
       )}
     </Flex>
   )

@@ -1,13 +1,17 @@
+/** A fixture's answer. It is called with the request's `RequestInit`, which a route may ignore. */
+export type FixtureRoute = (init?: RequestInit) => unknown
+
 /**
  * Replaces `window.fetch` so a preview answers the widgets' API calls from fixtures. Only a request to
  * the page's own origin whose path starts with one of the scopes is a fixture's to answer. A route
  * matches the request path with its query, or the path alone. A scoped path with no route is logged as
  * a console error and answered with a 404, so a missing fixture fails the preview check. A route may
  * return a `Response`, which is the answer as it is, or a promise that never settles, which keeps the
- * request pending. Any other result is answered as JSON with status 200. Any other request goes to the
- * page's own `fetch`, unchanged, so a page that loads the bundle keeps working.
+ * request pending. Any other result is answered as JSON with status 200. A route is called with the request's
+ * `RequestInit`, so it can answer a POST by its body. Any other request goes to the page's own `fetch`,
+ * unchanged, so a page that loads the bundle keeps working.
  */
-export function installFixtureFetch(routes: Record<string, () => unknown>, scopes: readonly string[]): void {
+export function installFixtureFetch(routes: Record<string, FixtureRoute>, scopes: readonly string[]): void {
   const original = window.fetch
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const href = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
@@ -20,7 +24,7 @@ export function installFixtureFetch(routes: Record<string, () => unknown>, scope
       console.error('No design-system fixture for', href)
       return new Response(null, { status: 404 })
     }
-    const result = await route()
+    const result = await route(init)
     if (result instanceof Response) {
       return result
     }

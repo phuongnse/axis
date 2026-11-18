@@ -1,4 +1,6 @@
 import type {
+  ExpressionCheck,
+  ExpressionReading,
   ExpressionScope,
   StudioApplication,
   StudioBindings,
@@ -28,6 +30,7 @@ import {
   noTableChoices,
   tableWidget,
 } from './fixtures'
+import type { FixtureRoute } from './fixtureFetch'
 
 // The answers of the `studio` preview. Its states answer the same `/api/studio/apps` path, so each state brings its own
 // routes, and the preview shows one state at a time, see docs/reference/widget-previews.md#the-bundle.
@@ -698,7 +701,7 @@ function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers)
     [`${folderPath}/kinds/entity/resources`]: () => entityList(folder),
     [`${folderPath}/diagnostics`]: () =>
       ({ diagnostics: answers.diagnostics }) satisfies { diagnostics: StudioDiagnostic[] },
-    // A field's default has no field in scope, and no state types an expression, so the scope is empty.
+    // A field's default has no field in scope, so the scope is empty. Only the Entity with expressions state answers more.
     [`${folderPath}/expressions/scope`]: () => ({ type: null, fields: [], functions: [] }) satisfies ExpressionScope,
     [`${folderPath}/names`]: () => names(folder),
     '/api/studio/catalog': () => catalog,
@@ -807,9 +810,133 @@ export const typicalFormId = formId
 /** The id of the RequestApproval process of the Typical folder, which the process design card opens at `&resource=<id>`. */
 export const typicalProcessId = processId
 
+/** The body path of an expression request, which the expression routes answer by. */
+function expressionPath(init?: RequestInit): string | undefined {
+  if (typeof init?.body !== 'string') {
+    return undefined
+  }
+  return (JSON.parse(init.body) as { path?: string }).path
+}
+
+/** The Request entity of the Entity with expressions state: Typical's fields, a computed amount with tax and a validation. */
+function expressionEntityResource(): StudioResource {
+  const typical = entityResource(typicalFolder, 0)
+  return {
+    ...typical,
+    content: {
+      ...typical.content,
+      fields: [
+        ...(typical.content.fields as object[]),
+        {
+          name: 'amountWithTax',
+          type: 'decimal',
+          precision: 12,
+          scale: 2,
+          label: { textKey: 'request.amountWithTax' },
+          expression: 'amount * 1.1',
+        },
+      ],
+      validations: [
+        {
+          name: 'amountPositive',
+          expression: 'amount > 0 and title != null',
+          message: { textKey: 'request.amountPositive' },
+          field: 'amount',
+        },
+      ],
+    },
+  }
+}
+
+/** The names of the Entity with expressions state: Typical's, with the computed amount on Request and its texts. */
+function expressionNames(): StudioNames {
+  const own = names(typicalFolder)
+  return {
+    ...own,
+    entities: own.entities.map((entity) =>
+      entity.name === 'Request'
+        ? {
+            ...entity,
+            fields: [...entity.fields, { name: 'amountWithTax', type: 'decimal', target: null, values: null }],
+          }
+        : entity,
+    ),
+    texts: [
+      ...own.texts,
+      { key: 'request.amountWithTax', texts: { [locale]: 'Amount with tax' }, usedBy: 1 },
+      { key: 'request.amountPositive', texts: { [locale]: 'The amount must be more than zero.' }, usedBy: 1 },
+    ],
+  }
+}
+
+/** The reading of `amount * 1.1`, the computed field's expression, as the check answers it. */
+const amountWithTaxReading: ExpressionReading = {
+  kind: 'phrase',
+  words: 'multiply',
+  slots: [
+    [{ kind: 'name', name: 'amount', labelKey: 'request.amount' }],
+    [{ kind: 'value', type: 'decimal', value: 1.1, labelKey: null }],
+  ],
+}
+
+/** The reading of `amount > 0 and title != null`, the validation's expression, as the check answers it. */
+const amountPositiveReading: ExpressionReading = {
+  kind: 'all',
+  items: [
+    {
+      kind: 'phrase',
+      words: 'greater',
+      slots: [
+        [{ kind: 'name', name: 'amount', labelKey: 'request.amount' }],
+        [{ kind: 'value', type: 'decimal', value: 0, labelKey: null }],
+      ],
+    },
+    {
+      kind: 'phrase',
+      words: 'is-not-null',
+      slots: [[{ kind: 'name', name: 'title', labelKey: 'request.title' }]],
+    },
+  ],
+}
+
+/** The check's answer for each expression of the Entity with expressions state, by its path. */
+const expressionChecks: Partial<Record<string, ExpressionCheck>> = {
+  '/fields/2/expression': { type: 'decimal', diagnostics: [], reading: amountWithTaxReading },
+  '/validations/0/expression': { type: 'boolean', diagnostics: [], reading: amountPositiveReading },
+}
+
+/** The fields in scope at the computed field and at the validation. */
+const expressionFields: ExpressionScope['fields'] = [
+  { name: 'title', labelKey: 'request.title', type: 'text' },
+  { name: 'amount', labelKey: 'request.amount', type: 'decimal' },
+]
+
+/** The scope of the computed field, which gives a decimal, and of the validation, which gives yes or no. */
+const expressionScopes: Partial<Record<string, ExpressionScope>> = {
+  '/fields/2/expression': { type: 'decimal', fields: expressionFields, functions: [] },
+  '/validations/0/expression': { type: 'boolean', fields: expressionFields, functions: [] },
+}
+
+/**
+ * The routes of the Entity with expressions state: Typical's, with the Request entity, its names and the answers of the
+ * expression check and scope by the path in the body. A path with no expression has no type and no reading.
+ */
+const withExpressions: Record<string, FixtureRoute> = {
+  ...workspaceRoutes(typicalFolder),
+  [`${folderPath}/resources/${typicalEntityId}`]: () => expressionEntityResource(),
+  [`${folderPath}/names`]: () => expressionNames(),
+  [`${folderPath}/expressions/check`]: (init) =>
+    expressionChecks[expressionPath(init) ?? ''] ??
+    ({ type: null, diagnostics: [], reading: null } satisfies ExpressionCheck),
+  [`${folderPath}/expressions/scope`]: (init) =>
+    expressionScopes[expressionPath(init) ?? ''] ??
+    ({ type: null, fields: [], functions: [] } satisfies ExpressionScope),
+}
+
 /** The applications Studio lists in each state, with the routes of the open application where the state opens one. */
 export const studioFixtures = {
   typical: workspaceRoutes(typicalFolder),
+  withExpressions,
   empty: { [appsPath]: () => ({ items: [] }) satisfies { items: StudioApplication[] } },
   loading: { [appsPath]: () => new Promise<never>(() => {}) },
   failed: { [appsPath]: () => new Response(null, { status: 500 }) },
@@ -819,4 +946,4 @@ export const studioFixtures = {
   newApplication: workspaceRoutes(newFolder, unpublishedAnswers),
   releasePage: { ...workspaceRoutes(typicalFolder), [`${folderPath}/releases/2`]: () => typicalRelease },
   accessDenied: { [appsPath]: () => new Response(null, { status: 403 }) },
-} satisfies Record<string, Record<string, () => unknown>>
+} satisfies Record<string, Record<string, FixtureRoute>>
