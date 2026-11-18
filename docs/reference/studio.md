@@ -29,7 +29,7 @@ opens the same view.
   `&view=policies` the [policy matrix](#policy-matrix), `&view=publish` the [publish page](#publishing)
   and `&view=requests&request=<id>` one [AI request's page](ai-authoring-in-studio.md#a-requests-page).
 - **The AI requests table** _(planned for M35)_. `&view=requests` shows the [AI requests](ai-authoring-in-studio.md#the-request-panel) table.
-- **A field** _(planned for M33)_. `&field=<name>` opens a field's
+- **A field** _(planned)_. `&field=<name>` opens a field's
   [drawer](entity-designer.md#field-drawer) on an entity's page.
 - **Back is the browser's.** Studio has no Back or Next of its own and no breadcrumb.
   Every view has its own address and each move is a history entry, except that a search replaces its

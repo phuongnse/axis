@@ -29,6 +29,20 @@ describe('capability map', () => {
     assert.deepEqual(messages(), [])
   })
 
+  test('passes a row whose cell is only a planned marker with no milestone', () => {
+    writePage(['| Choose one path | [Steps](reference/processes.md#steps) |', '| Run later | _(planned)_ |'])
+
+    assert.deepEqual(messages(), [])
+  })
+
+  test('reports a planned marker with no milestone that shares its cell with other words', () => {
+    const text = writePage(['| Run later | Later, _(planned)_ |'])
+
+    assert.deepEqual(messages(), [
+      `${page}:${lineOf(text, 'Run later')}: 'Run later' has no home: link the doc section that holds its rule, or put a planned marker alone in the cell`,
+    ])
+  })
+
   test('passes when there is no capability map', () => {
     assert.deepEqual(messages(), [])
   })
@@ -37,7 +51,7 @@ describe('capability map', () => {
     const text = writePage(['| Run two paths at once | Missing |'])
 
     assert.deepEqual(messages(), [
-      `${page}:${lineOf(text, 'Run two')}: 'Run two paths at once' has no home: link the doc section that holds its rule, or put the planned marker of the milestone that builds it alone in the cell`,
+      `${page}:${lineOf(text, 'Run two')}: 'Run two paths at once' has no home: link the doc section that holds its rule, or put a planned marker alone in the cell`,
     ])
   })
 
@@ -53,7 +67,7 @@ describe('capability map', () => {
     assert.deepEqual(
       result.stderr.split('\n').filter((line) => line.startsWith(page)),
       [
-        `${page}:${lineOf(text, 'Run two')}: 'Run two paths at once' has no home: link the doc section that holds its rule, or put the planned marker of the milestone that builds it alone in the cell`,
+        `${page}:${lineOf(text, 'Run two')}: 'Run two paths at once' has no home: link the doc section that holds its rule, or put a planned marker alone in the cell`,
       ],
     )
   })

@@ -105,18 +105,26 @@ A reference page describes how Axis behaves, as it is, and the agreed work that 
 
 ### Planned work
 
-Work that is agreed but not built yet is marked `_(planned for Mx)_`, where Mx is the milestone that
-builds it, in one of three places: on a line of its own under the title of a page or the heading of a
-section that is planned as a whole, so that no anchor ever changes; right after the bold lead-in of a
-single planned rule in a list; or in the row of a table whose rows are items of their own. A marker never sits in the middle of a sentence, and nothing else on a page
-says what is built.
+Work that is agreed but not built yet carries a planned marker, in one of three places: on a line of
+its own under the title of a page or the heading of a section that is planned as a whole, so that no
+anchor ever changes; right after the bold lead-in of a single planned rule in a list; or in the row of
+a table whose rows are items of their own. A marker never sits in the middle of a sentence, and nothing
+else on a page says what is built.
+
+There are two markers:
+
+- `_(planned for Mx)_` marks work that the "Done when" of milestone Mx on the
+  [roadmap](roadmap.md#milestones) names.
+- `_(planned)_` marks agreed work that no milestone builds. It needs no open issue.
 
 A planned rule describes the agreed result. It does not also describe what Axis does until then: the
-issue that builds it knows the starting point. The docs sweep of the milestone removes the marker, or
-moves it to a later milestone when the work moved. A moved marker never names a milestone that has
-no open issue to build the rule. So a sweep that moves a marker links, in its pull request, the open
-issue in the new milestone that builds it. When there is none, the sweep opens one in that milestone
-before its pull request is ready, as [follow-ups](delivery.md#the-life-of-an-issue) say.
+issue that builds it knows the starting point. The docs sweep of a milestone removes each of its
+`_(planned for Mx)_` markers once the work is built. When the work is not built, the sweep moves the
+marker only to a later milestone whose "Done when" names the work. A moved marker has an open issue in
+its new milestone, which the sweep links in its pull request. When there is none, the sweep opens one
+in that milestone before its pull request is ready, as [follow-ups](delivery.md#the-life-of-an-issue)
+say. When no later "Done when" names the work, the sweep adds the work to that row's "Done when", or
+changes the marker to `_(planned)_`, and the issue that builds it leaves the milestone.
 
 ## References in the code
 

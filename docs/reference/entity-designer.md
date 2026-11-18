@@ -29,7 +29,7 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
 - **Row menu.** Each row's "…" menu, the table's [row actions](actions-and-controls.md#tables), has Move up,
   Move down and Remove. Move up is off on the first row and Move down on the last, and Remove is destructive.
   Each entry replaces the `fields` array. A read-only designer has no menu.
-- **Columns** _(planned for M33)_. Its columns are Name, Label, Type, Required, Unique and
+- **Columns** _(planned)_. Its columns are Name, Label, Type, Required, Unique and
   Properties. It has a search, and Add field sits in the section's heading. A field's name opens the
   [field drawer](#field-drawer), beside the table, so every field stays in sight however many settings it has.
 - **Filter.** The table has a Filter on Name, Label, Type, Required and Unique, and none on the settings or the
@@ -38,16 +38,16 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
   the setting counts as empty, as its cell shows nothing. The filter lives in the address as `fields.filter`. It only
   hides rows: every row shows on one page with no pager, and an edit to a hidden row stays in the draft. A field whose
   origin is new, one added since the last save, stays shown. The table has no search, sort or Columns.
-- **Type in words** _(planned for M33)_. The cell reads the type's name, and for a reference, references or child
+- **Type in words** _(planned)_. The cell reads the type's name, and for a reference, references or child
   collection the entity it points to, by its label, as "Reference to Department" or "Child collection
   of Line item". The name shows only where that entity has no label. Enum and every other type read as
   their name alone, with no count.
-- **The target is a link** _(planned for M33)_. In the Type cell the target's label is a link that opens the entity, and a
+- **The target is a link** _(planned)_. In the Type cell the target's label is a link that opens the entity, and a
   module's entity at its module view. The field's name stays the control that opens the drawer.
-- **Required and Unique read Yes or No** _(planned for M33)_, the words a record's boolean reads, as a No is a value and
+- **Required and Unique read Yes or No** _(planned)_, the words a record's boolean reads, as a No is a value and
   the dash means none. They are columns because every field has them and an author compares them down
   the table. A setting only some fields have is a tag under Properties.
-- **Properties** _(planned for M33)_. The tags say where a field's value comes from, at most one of Computed, Sequence,
+- **Properties** _(planned)_. The tags say where a field's value comes from, at most one of Computed, Sequence,
   Creator, Matched, User and Default, then Searchable and Sensitive.
 - **Types.** The type picker offers every
   [field type](resource-files.md#entity-field-types-and-constraints), `money`, `file` and `references`
@@ -64,7 +64,7 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
 
 ### The drawer and its groups
 
-_(planned for M33)_
+_(planned)_
 
 A field's settings open in a drawer of the `medium` width with the table still in sight, as
 Salesforce's Object Manager, Dataverse and Strapi have it. The drawer has an address, `&field=<name>`,
@@ -101,20 +101,20 @@ These settings take a control of their own:
 | Currency            | On a `money` field, a choice between a fixed `currency` code and a `currencyField`, picked from the entity's `enum` and `text` fields, through `AxisChoiceField`                           |
 | `valueLabels`       | On an `enum` field, rows of a value and its label, typed as [label texts](studio.md#label-texts)                                                                                          |
 
-- **The value comes from one choice** _(planned for M33)_. The compiler refuses two ways together (`AXC0013`), so the Value
+- **The value comes from one choice** _(planned)_. The compiler refuses two ways together (`AXC0013`), so the Value
   group is one `AxisChoiceField` of the ways the type takes, each with a line of help: Entered by people,
   Computed, Sequence, Creator, and Matched for a reference. Only the chosen way's settings follow: a
   `default` and Holds a user ([`userId`](resource-files.md#entity-field-types-and-constraints)) for an
   entered value, the `expression`, the `sequence`, or Find by and From for a
   [`match`](resource-files.md#matched-references). Required shows only for an entered value. Choosing a
   way rewrites the field once, dropping the other ways' keys and those only an entered value may have.
-- **Matched** _(planned for M33)_. Find by offers only the target entity's unique fields, from `unique` in the
+- **Matched** _(planned)_. Find by offers only the target entity's unique fields, from `unique` in the
   [names](authoring.md#names), and From only this entity's fields of the same type that the compiler
   allows (`AXC0362`).
-- **Maximum length is the type's** _(planned for M33)_. `maxLength` is the size of the stored text, which a value the server
+- **Maximum length is the type's** _(planned)_. `maxLength` is the size of the stored text, which a value the server
   sets keeps too, so it is under Text settings, as precision and scale are of a number. Validation holds
   only checks on an entered value.
-- **A validation at its field** _(planned for M33)_. A validation is a rule on the whole record, and its `field` only says
+- **A validation at its field** _(planned)_. A validation is a rule on the whole record, and its `field` only says
   where its message shows. The file stays as it is, and the designer shows it twice: the drawer's
   Validation group lists the validations at this field, each a box with its name, Delete validation, its
   expression and its message, typed as texts, and Add validation fills `field`. The entity's
@@ -127,7 +127,7 @@ These settings take a control of their own:
   Validate reports it (`AXC0242`).
 - **A key already in the file stays.** A `default`, `min`, `max` or `minLength` on a field with an
   `expression`, a `sequence` or `creator` stays in the file, hidden. Validate reports it.
-- **Its diagnostic** _(planned for M33)_. The key stays until the author changes the way, and the diagnostic
+- **Its diagnostic** _(planned)_. The key stays until the author changes the way, and the diagnostic
   opens at the field.
 - **Clearing removes the key.** Clearing a field's label, the display field, `maxLength`, `precision`,
   `scale`, `maxSize`, `accept`, `sequence`, `expression`, `default`, `min`, `max`, `minLength`, the last
@@ -165,7 +165,7 @@ letter case.
 Every input keeps its `studio-field-<pointer>` id, and each row has the id of its field, so a diagnostic
 opens at its input, or at the row when the row does not show the setting.
 
-- **Inside a field** _(planned for M33)_. A diagnostic inside a field opens the
+- **Inside a field** _(planned)_. A diagnostic inside a field opens the
   [field drawer](#field-drawer) at the setting.
 
 ## Migrations

@@ -1,14 +1,14 @@
 // - Every row of docs/capabilities.md, under its '| Capability | Where |' header, names a capability once in
 //   the page and says where it lives: a link to the doc section that holds its rule, or, alone in the cell,
-//   the planned marker of a milestone that docs/roadmap.md lists. So no capability is left without a home,
-//   see D154.
+//   a planned marker: '_(planned for Mx)_' for a milestone that docs/roadmap.md lists, or '_(planned)_'.
+//   So no capability is left without a home, see D154.
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { cellSeparator, lines } from './helpers.mjs'
 
 const header = '| Capability | Where |'
 const roadmapRowPattern = /^\| \*\*(M\d+)\*\* \|/
-const markerPattern = /^_\(planned for (M\d+(?:(?:, | and )M\d+)*)\)_$/
+const markerPattern = /^_\(planned(?: for (M\d+(?:(?:, | and )M\d+)*))?\)_$/
 const linkPattern = /\]\([^)\s]+\)/
 
 /** Checks that each capability of the capability map has one row, and that the row says where it lives. */
@@ -37,14 +37,14 @@ export function checkCapabilities(root, report) {
       else seen.set(key, line)
       const marker = markerPattern.exec(where ?? '')
       if (marker) {
-        for (const milestone of marker[1].match(/M\d+/g)) {
+        for (const milestone of marker[1]?.match(/M\d+/g) ?? []) {
           if (!milestones.has(milestone)) report(page, line, `'${capability}' is planned for ${milestone}, which the roadmap does not list`)
         }
       } else if (!linkPattern.test(where ?? '')) {
         report(
           page,
           line,
-          `'${capability}' has no home: link the doc section that holds its rule, or put the planned marker of the milestone that builds it alone in the cell`,
+          `'${capability}' has no home: link the doc section that holds its rule, or put a planned marker alone in the cell`,
         )
       }
     }
