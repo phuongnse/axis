@@ -113,6 +113,12 @@ validates.
   read-only child collection shows its rows with every cell read-only, and has no add or remove
   buttons. The widget sends only the editable fields it shows, and a server error on a field the form
   does not show appears above the form.
+- **Groups as parts** _(planned)_. A titled group of fields is a part of the page, as
+  [parts a rule apart](shell.md#layout) says. Its title is drawn by `SectionPart` as a level-2 heading at the
+  `heading5` size, with the part's spacing and no heading margin of its own. A `borderSubtle` rule sits above a
+  group drawn after another, and none above the first. A form with one untitled group, such as an `entity`
+  form, has no rule. A form too long for one page is split into [steps](form-widget-conditions.md#steps), which check
+  each step before the next.
 - **Conditions and steps.** The widget asks the server which fields to show, require and lock, and
   which messages to show, and shows `steps` as a wizard, see
   [form widget conditions](form-widget-conditions.md).
@@ -230,6 +236,10 @@ returns no label when the user may not read the target's display field.
 
 A child collection field shows its rows as a table under the field's label.
 
+- **Label on the toolbar** _(planned)_. An editable collection's label, its required mark and its help sit on the
+  left of its table's toolbar, on one row with Add row on the right. A read-only collection has no toolbar and keeps
+  its label above its table.
+
 - **Columns.** There is one column per child field, headed by its label or its name. Integer, decimal
   and money columns sit on the right, in the header and in every cell, in tabular figures, see the
   [shown values](frontend.md#shown-values).
@@ -297,6 +307,12 @@ The form sends only what changed, and shows the server's answer where it belongs
   `/{site}`, which opens the site's first page. Only an address inside the same site is used.
 - **Keys.** Enter in a date or date-time picker only confirms the picked value and never sends the
   form. Enter in a text input sends the form, as in any form.
+- **The save bar** _(planned)_. A site's form has no Save or Cancel row of its own. While the form has a change to
+  save, the [save bar](studio-resource-form.md#save-bar) shows Discard and Save. With no change it is not drawn, so a
+  new record's form shows it once the person types. Discard asks first, then puts every value back as the form
+  started. A form without the grant to save shows no bar. A person who leaves by the sidebar or the browser is asked
+  first, by [Leave without saving?](studio.md#editor), while there is a change. A wizard's Back and Next stay under
+  the step's fields, and the bar shows on its last step.
 
 ### Form drafts
 
@@ -349,6 +365,10 @@ A `form` widget can declare `startProcess` actions, which save the record and st
   [buttons](actions-and-controls.md#buttons). For a signed-in user, page metadata lists only the
   actions whose process the user holds a `start` grant on. A new record shows no action buttons, so a
   failed start never leaves a record behind on a form that still says new.
+- **On the page heading** _(planned)_. Each action on a saved record is the page's own: an outlined `main`
+  button on the right of the page's heading, on its row, through `PageActions`, with the `navigate` buttons
+  after the `startProcess` ones. A form drawn with no page heading, such as in a widget's preview, puts them at
+  its top, on the right.
 - **Compile checks.** The process must name the form's entity as its subject. An unknown process is
   `AXC0087`, and a process over another entity is `AXC0088`, both at
   `/widgets/{i}/actions/{j}/process`. `actions` on another widget type is `AXC0060`. The label joins
@@ -376,6 +396,9 @@ The form page of a saved record shows the record's history from the
 [history endpoint](record-audit.md#audit-records-and-history) in a panel below the form, newest first.
 A new record has no history panel.
 
+- **The form's last part** _(planned)_. The history is the last part of the form's page, titled History
+  ("Lịch sử"), drawn by `SectionPart` with a `borderSubtle` rule above it and no card. Its loading, empty, error
+  and paging states stay.
 - **Entry.** Each entry shows its action, who did it, its time and a short summary. The action is a
   platform text, such as "Updated" or "Task decided", and an action without a text shows as it is.
 - **Who.** Who did it is the `actorName` the history answers. Without one, it is "System" for

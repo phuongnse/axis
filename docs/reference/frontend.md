@@ -543,10 +543,18 @@ below answers `200`.
 - **Not found.** An unknown site shows the not-found page inside the platform shell, and an unknown page inside the
   site shell. An address with more than three segments, such as `/e2e/notes/42/edit`, matches no route and shows the
   not-found page inside the platform shell.
-- **Record and task ids.** A form page without `new` or an id, `new` or an id on a table page, an id that is not in the
-  hyphenated 8-4-4-4-12 hex form, and an id the entity has no record for show the not-found page inside the site
+- **Record and task ids.** A form page without `new` or an id, `new` or an id on a table page, an id that is not in
+  the hyphenated 8-4-4-4-12 hex form, and an id the entity has no record for show the not-found page inside the site
   shell. `new` on a task inbox page, a task id that is not in that form, and a well-formed task id that the task API
   answers `404` for show it too. An id or a task id in the wrong form is not requested.
+- **A missing record** _(planned)_. A form's or a detail's page that names a well-formed id the record API answers
+  `404` for, as it answers for a record the person cannot open, keeps its heading. Under it, one line of body text
+  with no illustration: "This record does not exist, or you cannot open it." ("Bản ghi này không tồn tại hoặc bạn
+  không có quyền mở.", `shell.record.notFound`). On the same line, one link "Go to {page}" ("Đi tới {page}",
+  `shell.record.goToList`), where `{page}` is the label of that list's navigation entry. The link opens the address the
+  page was opened from, with its table's search, sort and page, or else `/{site}`, which opens the first page. No save
+  bar and no record action shows. Such a page is mostly opened from an email, a bookmark or a shared link, so no entry
+  is marked, and at narrow width the sidebar is hidden, so the link stays.
 - **Inside a site.** The shell shows the site's title, navigation and locales in the [layout](shell.md#layout) of
   [shell and home page](shell.md). The page header, the app switcher and the language and theme menu work as they do
   on the platform site, see [page header](shell.md#page-header) and

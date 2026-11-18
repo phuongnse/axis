@@ -167,6 +167,12 @@ folds into the More actions menu, as an [action bar](actions-and-controls.md#but
   space or Format, shows no bar, because nothing can be saved.
 - **Every kind.** Every resource kind has the bar. What Undo, Redo and Discard do is in
   [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm).
+- **Its place** _(planned)_. The bar sits in the shell's content column between the page and the footer, as wide as
+  the content and touching the sidebar. It sticks to the window's foot while the page scrolls and rests right above
+  the footer at the page's end, so it never covers the footer, in Studio and on a site's form, see
+  [saving](form-widget.md#saving).
+- **Undo and Redo** _(planned)_. They show, as icons after the line, only where the editor gives them, so a site's
+  form has none.
 
 ## Form and JSON
 

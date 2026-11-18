@@ -29,12 +29,17 @@ A `detail` widget shows one record read-only, read through the record API, and w
   missing or malformed parameter, and a record that is missing or unreadable, show the not-found page inside the site
   shell. A `detail` inside `columns`, `tabs` or a `section` is drawn too, see
   [container widgets](container-widgets.md).
+- **A missing record** _(planned)_. A record that the record API answers `404` for, because it is missing or the
+  person cannot open it, keeps the page's heading and shows the missing-record line and its link, see
+  [routing](frontend.md#routing).
 - **Fields.** With a `form`, the widget shows its sections in order under their titles. Without one, it shows every
   readable field in declaration order. Every value is read-only and formatted as a table cell shows it. A `references`
   field shows its labels in order as tags, or a record's id where it has no label. An empty value, an empty set of
   references and a file that is not set among them, shows "Not set" in muted italics, see
   [shown values](frontend.md#shown-values). The widget ignores `visibleWhen`, `requiredWhen`, `readOnlyWhen` and
   `steps`.
+- **Sections as parts** _(planned)_. With a `form`, each titled section is a part, as a form's sections are: its
+  title is drawn by `SectionPart`, and a `borderSubtle` rule sits above a section drawn after another.
 - **Layout.** The fields are a description list (`dl`, `dt`, `dd`). Each label sits above its value, as a read-only
   form field reads, with `spacing-md` between fields, and values are in `text`. The labels and the values follow the
   field look of the [form widget](form-widget.md), and the fields follow the form sections' widths, as fields in

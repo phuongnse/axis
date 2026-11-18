@@ -93,7 +93,11 @@ their own controls where they expect them.
 - **Parts a rule apart** _(planned)_. A page's parts sit a `borderSubtle` rule apart, and each part's heading is an `h2`
   drawn at `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule.
 - **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area, just above the footer.
-- **No link back** _(planned)_. A page has no link back, because the navigation and the browser lead back.
+- **The bar slot** _(planned)_. The save bar draws in the shell's bar slot, `ShellBarSlot`, in the content column
+  right above the footer, and it sticks to the window's foot while the page scrolls. See the
+  [save bar](studio-resource-form.md#save-bar).
+- **No link back** _(planned)_. A page has no link back, because the navigation and the browser lead back. A record's
+  page whose record does not exist keeps one link to its list, see [routing](frontend.md#routing).
 - **Footer.** A slim footer on `surface` with a `borderSubtle` rule above it, with `spacing-xs`
   padding above and below and `spacing-lg` at its sides, and its text in `textMuted`. Without a
   sidebar it runs the full width under the page. Beside a sidebar it sits under the content column
@@ -143,6 +147,9 @@ below it. It says where the person is and what the page is.
   the header while the page scrolls, see [band](studio-workspace.md#band).
 - **Actions stay with their widget.** A widget's actions stay in its own toolbar, because a page can
   hold several widgets and an action belongs to its widget, not to the page.
+- **A record's actions** _(planned)_. A form's actions on its record are the page's own and sit on the right of the
+  page's heading, on its row, see [start process actions](form-widget.md#start-process-actions). Other widgets'
+  actions stay with them.
 - **Platform pages.** The platform home page has no band and no breadcrumb, and has its own headings,
   see the [platform home page](#platform-home-page). The Sessions page has the band "Axis › Your
   sessions", and the users page the band "Axis › Users".

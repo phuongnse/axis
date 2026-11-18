@@ -209,6 +209,8 @@ be kept right.
   list has no search. An action on the page as a whole, such as New entity… on a kind's list, sits on the
   [page heading](studio-workspace.md#page-heading), not the toolbar. A `table` widget keeps the toolbar
   actions its author configures.
+- **A title on the toolbar** _(planned)_. A table may have a `title` at the left end of its toolbar, before the view
+  controls, such as an editable child collection's label, required mark and help.
 - **Every control in one table.** `AxisTable` has every control below, and each view
   turns on what it needs. Search, filter, sort, page and columns live in the address, except in a dialog's
   table, which keeps them in the dialog. A view is only a
