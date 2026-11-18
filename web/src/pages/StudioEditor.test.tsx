@@ -705,7 +705,7 @@ describe('StudioEditor for a connector', () => {
     const { fetchMock } = stubResource(connectorItem, connectorContent)
     renderResource(connectorItem)
 
-    await userEvent.click(await screen.findByRole('combobox', { name: 'Auth type' }, slow))
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Authentication type' }, slow))
     await userEvent.click(await screen.findByTitle('header'))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
