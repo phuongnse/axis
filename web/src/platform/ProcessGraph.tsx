@@ -410,8 +410,8 @@ function RoutedEdge({ id, data, markerEnd, style, interactionWidth }: EdgeProps<
               lineHeight: '16px',
               whiteSpace: 'nowrap',
               color: colour.text,
-              // On the canvas's own colour, so the label cuts the line and sits on the graph's ground.
-              background: colour.canvas,
+              // On the graph's ground, `fillSubtle`, so the label cuts the line.
+              background: colour.fillSubtle,
               pointerEvents: 'none',
             }}
           >
@@ -521,7 +521,7 @@ function StepCard({ data, fill }: { data: ProcessGraphStep; fill: boolean }) {
             height: 24,
             borderRadius: radius.base,
             color: chosen ? colour.primaryText : colour.textMuted,
-            background: colour.canvas,
+            background: colour.fillSubtle,
           }}
         >
           <Icon />
@@ -916,9 +916,10 @@ export function ProcessGraphCanvas({
       aria-label={ariaLabel}
       // A graph with controls takes the focus, so its keys work; a designer's keeps its own order of Tab.
       tabIndex={controls ? 0 : undefined}
-      // The graph lies on the canvas colour, so its steps on the surface stand out with no pattern behind them, as
-      // Camunda Operate and Figma draw a diagram; in full screen it fills the screen the same way.
-      style={{ height, position: 'relative', background: colour.canvas, borderRadius: radius.base }}
+      // The graph lies on `fillSubtle`, set apart from the page in both modes, so its steps on the surface stand out with
+      // no pattern behind them, as Camunda Operate and Figma draw a diagram; in full screen it fills the screen the same
+      // way.
+      style={{ height, position: 'relative', background: colour.fillSubtle, borderRadius: radius.base }}
       onKeyDown={onKeyDown}
     >
       <FoundStep.Provider value={chosen}>
@@ -950,6 +951,8 @@ export function ProcessGraphCanvas({
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           colorMode={mode}
+          // React Flow's dark mode paints its own ground, which would hide `fillSubtle` under it.
+          style={{ background: 'transparent' }}
           minZoom={0.1}
           // A small process is drawn at its own size, never zoomed in past it, so its text keeps the body size.
           maxZoom={1}

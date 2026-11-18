@@ -42,7 +42,7 @@ describe('colour tokens', () => {
 describe.each(['light', 'dark'] as const)('colour contrast in %s mode', (mode) => {
   const names = Object.keys(colourTokens) as ColourName[]
   const textNames = ['text', 'textMuted', ...names.filter((name) => name.endsWith('Text'))] as ColourName[]
-  const backgrounds = ['surface', 'canvas'] as const
+  const backgrounds = ['surface', 'canvas', 'fillSubtle'] as const
 
   it('finds the text tokens in the token file', () => {
     expect(textNames.length).toBeGreaterThanOrEqual(7)

@@ -39,15 +39,16 @@ component holds a number of its own.
 - **The token file.** `web/src/platform/designTokens.ts` holds every colour, shadow, type, spacing, radius, size and
   breakpoint value of the theme.
 - **Colours.** The colours are `primary`, `success`, `warning`, `danger`, `info`, `primaryText`, `successText`,
-  `warningText`, `dangerText`, `infoText`, `canvas`, `surface`, `text`, `textMuted`, `border`, `borderSubtle`,
-  `divider`, `focusRing` and `onPrimary`, each with a light and a dark value. The first five are seeds, which colour
+  `warningText`, `dangerText`, `infoText`, `canvas`, `surface`, `fillSubtle`, `text`, `textMuted`, `border`,
+  `borderSubtle`, `divider`, `focusRing` and `onPrimary`, each with a light and a dark value. `fillSubtle` _(planned)_
+  is the ground of an area set apart from the surface it lies on, such as a process graph. The first five are seeds, which colour
   fills, icons and tints, except a message's icon. The `*Text` tokens colour text and a message's icon in that state
   colour: state text, links, the selected tab, the active navigation entry, form validation messages, the current page
   of a pagination, destructive menu entries and the text of outlined and danger buttons, see
   [buttons](actions-and-controls.md#buttons). `focusRing` colours the solid
   keyboard focus of every control. `onPrimary` colours text and icons on a `primary` fill.
-- **Contrast.** Every text colour reaches 4.5:1, and every border and focus ring 3:1, on `surface` and `canvas` in both
-  modes. `onPrimary` reaches 4.5:1 on `primary` in both modes. [Each preview](widget-previews.md#the-spec) is checked.
+- **Contrast.** Every text colour reaches 4.5:1, and every border and focus ring 3:1, on `surface`, `canvas` and
+  `fillSubtle` in both modes. `onPrimary` reaches 4.5:1 on `primary` in both modes. [Each preview](widget-previews.md#the-spec) is checked.
 - **A site's brand** _(planned for M42)_. A site's `brand.primary` is its main colour, see [sites](configuration.md#sites)
   and [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
   The compiler works out the light and dark `primary`, `primaryText`, `focusRing` and `onPrimary` from it, and the
@@ -184,7 +185,6 @@ tenant host.
   | ------------------------- | ------------------------------------------------------------------------------------------- |
   | `GET /api/site`           | The platform site's name, navigation and legal links, see [site endpoints](#site-endpoints) |
   | `GET /api/texts/{locale}` | The platform texts of one locale, see [site endpoints](#site-endpoints)                     |
-
   - `GET /api/site` returns the site name, its title key, the locales (default, fallback and available), the
     navigation items and `legal`, the tenant's `{ "privacyUrl", "termsUrl" }` or `null`, see
     [legal settings](legal.md#legal-settings). Navigation labels are text keys, never literal text, and each
@@ -194,21 +194,22 @@ tenant host.
   - The platform site offers English (`en`, default and fallback) and Vietnamese (`vi`). It stays beside the
     application sites, which never replace or merge into it. A test checks that every locale has exactly the same keys
     as English, and the placeholder and untranslated-text rules of [UI writing](ui-writing.md#checks).
+
 - **Application sites.** The sites of the tenant's active applications are found by path, not by application name,
   because the path is what users see and one application can have several sites. Four endpoints describe them, the page one has a second form for module pages, and a person's favourites and recent items have routes of their own.
 
-| Route                                         | Response                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/sites`                              | `{ "sites": [ { "path", "titleKey", "titles", "descriptions", "application": { "name", "titles", "descriptions" }, "legal" } ] }`, every site of every active application, in path order. `application.titles` holds the application's title for each locale it has texts for: the text of the `label` in its `application.json`, or its name when it has no label. `descriptions` holds the text of the `description` for each locale, the site's for its available locales and the application's for each locale it has texts for, or is `null` when there is no description, see [descriptions](shell.md#application-and-site-descriptions). |
-| `GET /api/sites/{path}`                       | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey", "icon" } ], "notificationsPath", "legal" }`. `icon` is an Axis icon name, or `null` for an entry with none. `legal` is `{ "privacyUrl", "termsUrl" }`, the site's own links or else its tenant's, or `null` when neither sets any, as in the list                                                                                                                                                                                                                                                                               |
-| `GET /api/sites/{path}/texts/{locale}`        | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `GET /api/sites/{path}/pages/{page}`          | the [page metadata](#page-metadata). The page of a module is `GET /api/sites/{path}/pages/{module id}/{name}`, two path segments as the record API writes a module entity. Its `name` is `{module id}/{name}` and its title and labels resolve from the module's texts                                                                                                                                                                                                                                                                                                                                                                          |
-| `GET /api/sites/{path}/pages/{module}/{page}` | the [page metadata](modules-and-templates.md#module-pages) of a module's page                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `GET /api/sites/{path}/favourites` _(planned for M42)_ | `{ "favourites": [ { "id", "page", "record", "label" } ] }`, newest first. `record` is `null` for a page alone, and `label` is the record's display field value, or `null` |
-| `POST /api/sites/{path}/favourites` _(planned for M42)_ | takes `{ "page", "record" }`, with `record` `null` for a page alone. Answers `201` with the favourite, or `200` with the one already kept |
-| `DELETE /api/sites/{path}/favourites/{id}` _(planned for M42)_ | `204`, for the person's own favourite |
-| `GET /api/sites/{path}/recent` _(planned for M42)_ | `{ "recent": [ { "page", "record", "label", "openedAt" } ] }`, latest first, at most 20 |
-| `POST /api/sites/{path}/recent` _(planned for M42)_ | takes `{ "page", "record" }` and notes it as opened now, `204` |
+| Route                                                          | Response                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/sites`                                               | `{ "sites": [ { "path", "titleKey", "titles", "descriptions", "application": { "name", "titles", "descriptions" }, "legal" } ] }`, every site of every active application, in path order. `application.titles` holds the application's title for each locale it has texts for: the text of the `label` in its `application.json`, or its name when it has no label. `descriptions` holds the text of the `description` for each locale, the site's for its available locales and the application's for each locale it has texts for, or is `null` when there is no description, see [descriptions](shell.md#application-and-site-descriptions). |
+| `GET /api/sites/{path}`                                        | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey", "icon" } ], "notificationsPath", "legal" }`. `icon` is an Axis icon name, or `null` for an entry with none. `legal` is `{ "privacyUrl", "termsUrl" }`, the site's own links or else its tenant's, or `null` when neither sets any, as in the list                                                                                                                                                                                                                                                                               |
+| `GET /api/sites/{path}/texts/{locale}`                         | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `GET /api/sites/{path}/pages/{page}`                           | the [page metadata](#page-metadata). The page of a module is `GET /api/sites/{path}/pages/{module id}/{name}`, two path segments as the record API writes a module entity. Its `name` is `{module id}/{name}` and its title and labels resolve from the module's texts                                                                                                                                                                                                                                                                                                                                                                          |
+| `GET /api/sites/{path}/pages/{module}/{page}`                  | the [page metadata](modules-and-templates.md#module-pages) of a module's page                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `GET /api/sites/{path}/favourites` _(planned for M42)_         | `{ "favourites": [ { "id", "page", "record", "label" } ] }`, newest first. `record` is `null` for a page alone, and `label` is the record's display field value, or `null`                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `POST /api/sites/{path}/favourites` _(planned for M42)_        | takes `{ "page", "record" }`, with `record` `null` for a page alone. Answers `201` with the favourite, or `200` with the one already kept                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `DELETE /api/sites/{path}/favourites/{id}` _(planned for M42)_ | `204`, for the person's own favourite                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `GET /api/sites/{path}/recent` _(planned for M42)_             | `{ "recent": [ { "page", "record", "label", "openedAt" } ] }`, latest first, at most 20                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `POST /api/sites/{path}/recent` _(planned for M42)_            | takes `{ "page", "record" }` and notes it as opened now, `204`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 - **Titles.** `titles` in the site list has one entry for each available locale of the site, from the locale as the
   site declares it to the title text, so the home page can show each site without one more request per site.
@@ -264,16 +265,47 @@ response looks like this:
         "recordsPath": "/api/apps/RecordsApp/entities/Item/records",
         "fields": [
           {
-            "name": "name", "type": "text", "labelKey": null,
-            "required": true, "unique": false, "computed": false, "sequence": false,
-            "creator": false, "maxLength": 100, "minLength": null,
-            "precision": null, "scale": null, "currency": null, "currencyField": null, "min": null, "max": null, "values": null, "valueLabelKeys": null, "target": null, "fields": null
+            "name": "name",
+            "type": "text",
+            "labelKey": null,
+            "required": true,
+            "unique": false,
+            "computed": false,
+            "sequence": false,
+            "creator": false,
+            "maxLength": 100,
+            "minLength": null,
+            "precision": null,
+            "scale": null,
+            "currency": null,
+            "currencyField": null,
+            "min": null,
+            "max": null,
+            "values": null,
+            "valueLabelKeys": null,
+            "target": null,
+            "fields": null
           },
           {
-            "name": "department", "type": "reference", "labelKey": "item.department",
-            "required": false, "unique": false, "computed": false, "sequence": false,
-            "creator": false, "maxLength": null, "minLength": null, "precision": null,
-            "scale": null, "currency": null, "currencyField": null, "min": null, "max": null, "values": null, "valueLabelKeys": null, "target": {
+            "name": "department",
+            "type": "reference",
+            "labelKey": "item.department",
+            "required": false,
+            "unique": false,
+            "computed": false,
+            "sequence": false,
+            "creator": false,
+            "maxLength": null,
+            "minLength": null,
+            "precision": null,
+            "scale": null,
+            "currency": null,
+            "currencyField": null,
+            "min": null,
+            "max": null,
+            "values": null,
+            "valueLabelKeys": null,
+            "target": {
               "entity": "Department",
               "displayField": "name",
               "recordsPath": "/api/apps/RecordsApp/entities/Department/records"
@@ -290,10 +322,28 @@ response looks like this:
       "deadLettersPath": null,
       "actions": [],
       "rowActions": [
-        { "type": "navigate", "page": "ItemForm", "labelKey": "items.open", "parameters": {}, "record": "id", "opensForm": true, "paths": {}, "visibleWhen": null }
+        {
+          "type": "navigate",
+          "page": "ItemForm",
+          "labelKey": "items.open",
+          "parameters": {},
+          "record": "id",
+          "opensForm": true,
+          "paths": {},
+          "visibleWhen": null
+        }
       ],
       "toolbarActions": [
-        { "type": "navigate", "page": "ItemForm", "labelKey": "items.new", "parameters": {}, "record": null, "opensForm": true, "paths": {}, "visibleWhen": null }
+        {
+          "type": "navigate",
+          "page": "ItemForm",
+          "labelKey": "items.new",
+          "parameters": {},
+          "record": null,
+          "opensForm": true,
+          "paths": {},
+          "visibleWhen": null
+        }
       ],
       "parameters": {},
       "priorities": {},
@@ -326,6 +376,7 @@ A leaf widget carries every key below, never left out. A key that does not apply
 
   A table sets exactly one of `entity` and `dataSource`. The [data source binding](table-widget.md#data-source-binding) describes
   `dataSource`, and `form` is described under form metadata in the [form widget](form-widget.md).
+
 - **`tasksPath`** is described under the [task inbox widget](task-inbox-widget.md), and **`process`, `instancesPath`
   and `deadLettersPath`** under the [process inspector widget](process-inspector-widget.md). They are `null` on every
   other widget.
@@ -365,7 +416,34 @@ columns, one holding a table and the other a section with a task inbox:
     {
       "type": "columns",
       "columns": [
-        { "width": 8, "widgets": [{ "type": "table", "entity": { "name": "PurchaseRequest", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "deadLettersPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "parameters": {}, "priorities": {}, "access": { "actions": ["read"], "createFields": [], "updateFields": [] } }] },
+        {
+          "width": 8,
+          "widgets": [
+            {
+              "type": "table",
+              "entity": {
+                "name": "PurchaseRequest",
+                "fields": [{ "name": "title", "type": "text" }]
+              },
+              "dataSource": null,
+              "form": null,
+              "tasksPath": null,
+              "process": null,
+              "instancesPath": null,
+              "deadLettersPath": null,
+              "actions": [],
+              "rowActions": [],
+              "toolbarActions": [],
+              "parameters": {},
+              "priorities": {},
+              "access": {
+                "actions": ["read"],
+                "createFields": [],
+                "updateFields": []
+              }
+            }
+          ]
+        },
         {
           "width": 4,
           "widgets": [
@@ -373,7 +451,24 @@ columns, one holding a table and the other a section with a task inbox:
               "type": "section",
               "titleKey": "pages.overview.tasks",
               "collapsed": false,
-              "widgets": [{ "type": "taskInbox", "entity": null, "dataSource": null, "form": null, "tasksPath": "/api/apps/PurchaseRequests/tasks", "process": null, "instancesPath": null, "deadLettersPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "parameters": {}, "priorities": {}, "access": null }]
+              "widgets": [
+                {
+                  "type": "taskInbox",
+                  "entity": null,
+                  "dataSource": null,
+                  "form": null,
+                  "tasksPath": "/api/apps/PurchaseRequests/tasks",
+                  "process": null,
+                  "instancesPath": null,
+                  "deadLettersPath": null,
+                  "actions": [],
+                  "rowActions": [],
+                  "toolbarActions": [],
+                  "parameters": {},
+                  "priorities": {},
+                  "access": null
+                }
+              ]
             }
           ]
         }
@@ -502,8 +597,8 @@ below answers `200`.
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/`                                    | the [platform home page](shell.md#platform-home-page): signed in, the launcher of the person's applications and tools, and with nobody signed in, sign-in at once with no screen drawn first, except at the addresses of [the sign-in card](shell.md#the-sign-in-card)                                                                                                                                                                                              |
 | `/licences`                            | the [open source licences](legal.md#open-source-licences) page, open without signing in                                                                                                                                                                                                                                                                                                                                                                             |
-| `/audit` _(planned for M41)_ | the [audit page](platform-pages.md#audit-page), for an administrator |
-| `/recycle-bin` _(planned for M41)_ | the [recycle bin page](platform-pages.md#recycle-bin-page), for anyone signed in |
+| `/audit` _(planned for M41)_           | the [audit page](platform-pages.md#audit-page), for an administrator                                                                                                                                                                                                                                                                                                                                                                                                |
+| `/recycle-bin` _(planned for M41)_     | the [recycle bin page](platform-pages.md#recycle-bin-page), for anyone signed in                                                                                                                                                                                                                                                                                                                                                                                    |
 | `/{site}`                              | the site's first navigation entry, by redirect                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `/{site}/{page}`                       | the page inside the site shell, with the page title. A table page also takes `?search=&page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on. A page of a module is `/{site}/{module id}/{name}`, listed in the navigation as `{module id}/{name}`, with `/new` and `/{id}` under it for a form page. A second segment that is no record id names a module page |
 | `/{site}/{page}?ticket=<id>`           | a page with parameters: the values sit in the query under the parameter names                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -556,14 +651,14 @@ A person's columns and saved views of a table are kept on the server for that pe
 browser. The address still wins, and [D153](../decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md)
 gives the reasons. The rules that a table follows are in [actions and controls](actions-and-controls.md#tables).
 
-| Route                                                        | What it does                                                                                                                              |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/me/tables/{key}` | Answers `{ "columns": [..] or null, "views": [{ "id", "name", "search", "filter", "sort" }] }`, with the views ordered by name           |
-| `PUT /api/me/tables/{key}/columns` | Keeps the columns of `{ "columns": [..] }`, the keys of the shown columns in order, and answers `204`                                    |
-| `DELETE /api/me/tables/{key}/columns` | Forgets the kept columns and answers `204`                                                                                                |
-| `POST /api/me/tables/{key}/views` | Saves a view of `{ name, search, filter, sort }` and answers `201` with the view                                                          |
-| `PUT /api/me/tables/{key}/views/{id}` | Replaces all four fields of one view and answers `204`                                                                                    |
-| `DELETE /api/me/tables/{key}/views/{id}` | Deletes one view and answers `204`                                                                                                        |
+| Route                                    | What it does                                                                                                                   |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/me/tables/{key}`               | Answers `{ "columns": [..] or null, "views": [{ "id", "name", "search", "filter", "sort" }] }`, with the views ordered by name |
+| `PUT /api/me/tables/{key}/columns`       | Keeps the columns of `{ "columns": [..] }`, the keys of the shown columns in order, and answers `204`                          |
+| `DELETE /api/me/tables/{key}/columns`    | Forgets the kept columns and answers `204`                                                                                     |
+| `POST /api/me/tables/{key}/views`        | Saves a view of `{ name, search, filter, sort }` and answers `201` with the view                                               |
+| `PUT /api/me/tables/{key}/views/{id}`    | Replaces all four fields of one view and answers `204`                                                                         |
+| `DELETE /api/me/tables/{key}/views/{id}` | Deletes one view and answers `204`                                                                                             |
 
 - **The table key.** A key is 1 to 200 characters, made of segments of letters, digits, `-` and `_` joined by `.`,
   and it is compared exactly. A `table` widget's key is `site.{site path}.{page name}` in lower case, with the `/` of
@@ -596,18 +691,18 @@ A page draws its whole tree of widgets. Each widget type has one shared componen
 [container widgets](container-widgets.md) `columns`, `tabs` and `section` hold other widgets, show them in file order
 and can nest.
 
-| Widget                       | What it does                                                                                                                      | Reference                                                    |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `table`                      | lists the records of an entity, or the rows of a [data source](data-sources.md)                                                   | [Table widget](table-widget.md)                              |
-| `form`                       | creates and edits one record through the record API, laid out by a `form` resource or the entity                                  | [Form widget](form-widget.md)                                |
-| `detail`                     | shows one record read-only                                                                                                        | [Detail, chart and KPI widgets](detail-chart-kpi-widgets.md) |
-| `chart`                      | draws the groups of a data source                                                                                                 | [Detail, chart and KPI widgets](detail-chart-kpi-widgets.md) |
-| `kpi`                        | shows one value of a data source                                                                                                  | [Detail, chart and KPI widgets](detail-chart-kpi-widgets.md) |
-| `taskInbox`                  | lists the signed-in user's open tasks, and opens one on the task page `/{site}/{inboxpage}/{taskId}`                              | [Task inbox widget](task-inbox-widget.md)                    |
-| `processInspector`           | lists the instances of one process and opens one                                                                                  | [Process inspector widget](process-inspector-widget.md)      |
-| `content` _(planned for M42)_ | shows fixed text, an image, a link or a note                                                                                     | [Content widget](content-widget.md)                          |
-| `calendar`, `board`, `cards`, `tree` _(planned for M42)_ | show an entity's records by a date, in groups, as tiles or under their parent                                       | [Calendar, board, cards and tree widgets](calendar-board-card-tree-widgets.md) |
-| `columns`, `tabs`, `section` | hold other widgets: `columns` stack at narrow width, `tabs` keep the selected tab in `?tab=`, and a `section` can start collapsed | [Container widgets](container-widgets.md)                    |
+| Widget                                                   | What it does                                                                                                                      | Reference                                                                      |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `table`                                                  | lists the records of an entity, or the rows of a [data source](data-sources.md)                                                   | [Table widget](table-widget.md)                                                |
+| `form`                                                   | creates and edits one record through the record API, laid out by a `form` resource or the entity                                  | [Form widget](form-widget.md)                                                  |
+| `detail`                                                 | shows one record read-only                                                                                                        | [Detail, chart and KPI widgets](detail-chart-kpi-widgets.md)                   |
+| `chart`                                                  | draws the groups of a data source                                                                                                 | [Detail, chart and KPI widgets](detail-chart-kpi-widgets.md)                   |
+| `kpi`                                                    | shows one value of a data source                                                                                                  | [Detail, chart and KPI widgets](detail-chart-kpi-widgets.md)                   |
+| `taskInbox`                                              | lists the signed-in user's open tasks, and opens one on the task page `/{site}/{inboxpage}/{taskId}`                              | [Task inbox widget](task-inbox-widget.md)                                      |
+| `processInspector`                                       | lists the instances of one process and opens one                                                                                  | [Process inspector widget](process-inspector-widget.md)                        |
+| `content` _(planned for M42)_                            | shows fixed text, an image, a link or a note                                                                                      | [Content widget](content-widget.md)                                            |
+| `calendar`, `board`, `cards`, `tree` _(planned for M42)_ | show an entity's records by a date, in groups, as tiles or under their parent                                                     | [Calendar, board, cards and tree widgets](calendar-board-card-tree-widgets.md) |
+| `columns`, `tabs`, `section`                             | hold other widgets: `columns` stack at narrow width, `tabs` keep the selected tab in `?tab=`, and a `section` can start collapsed | [Container widgets](container-widgets.md)                                      |
 
 A widget opens another page, and sets its parameters, through a `navigate` action. A table opens and creates records
 through its [navigate actions](table-widget.md#navigate).
@@ -642,8 +737,8 @@ _(planned for M43)_
 Some pages change while a person has them open, such as the bell, the task inbox and a list of records. The server
 tells the open page when the data changes, and the page reloads through its usual routes.
 
-| Route | What it does |
-| --- | --- |
+| Route                               | What it does                                         |
+| ----------------------------------- | ---------------------------------------------------- |
 | `GET /api/live` _(planned for M43)_ | Opens the live event stream of the signed-in session |
 
 - **Stream.** The SPA opens one stream for each browser tab. It uses server-sent events on the person's session, which

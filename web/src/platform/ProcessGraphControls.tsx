@@ -120,8 +120,8 @@ export function ProcessGraphControls({
         }}
         nodeStrokeWidth={0}
         nodeBorderRadius={4}
-        bgColor={colour.canvas}
-        maskColor={`${colour.canvas}99`}
+        bgColor={colour.fillSubtle}
+        maskColor={`${colour.fillSubtle}99`}
         maskStrokeColor={colour.primary}
         maskStrokeWidth={2}
         style={{ border: `1px solid ${colour.borderSubtle}`, borderRadius: radius.base }}

@@ -28,6 +28,9 @@ export const colourTokens = {
   infoText: { light: '#0969da', dark: '#54a3e7' },
   canvas: { light: '#f5f5f5', dark: '#000000' },
   surface: { light: '#ffffff', dark: '#141414' },
+  // Proposed, see the review on #3650: the ground of an area set apart from the surface it lies on, such as a process
+  // graph, a shade darker than `surface` in light mode and lighter in dark mode, where `canvas` is black.
+  fillSubtle: { light: '#f5f5f5', dark: '#1f1f1f' },
   text: { light: 'rgba(0,0,0,0.88)', dark: 'rgba(255,255,255,0.85)' },
   textMuted: { light: 'rgba(0,0,0,0.58)', dark: 'rgba(255,255,255,0.55)' },
   border: { light: '#8c8c8c', dark: '#6e6e6e' },
