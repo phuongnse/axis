@@ -157,7 +157,8 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * only when `GET /api/me` answers `studioCreate: true`. A created application joins the menu and is picked at once.
  * Validate, Ask AI and Publish… sit in the band. Ask AI shows only when `GET /api/me` answers `studioAi: true`, and opens the
  * request panel, `StudioAskAi`, which shares the one side panel with the Problems panel: opening one closes the other. Publish… shows only when `GET /api/me` answers
- * `studioPublisher: true`, and opens `&view=publish`, the `StudioPublishPage`, in place of the content, with no sidebar entry marked. The page keeps the
+ * `studioPublisher: true`, and opens `&view=publish`, the `StudioPublishPage`, in place of the content, with no sidebar entry marked. Under its release fields the page
+ * lists the files that differ from the live release, each with who changed it, see docs/reference/studio.md#publishing. The page keeps the
  * address Publish… was opened from in the navigation state, and its Publish and Cancel replace its entry with that address, or with the Overview when it was opened from a link.
  * Without `studioPublisher`, `&view=publish` shows the Overview, see docs/reference/studio.md#publishing. On the Releases view the release list shows the application's releases, with an Activate… button
  * for a publisher. A save, a text write or a delete loads the release history again, because the folder may now differ from the
@@ -615,6 +616,9 @@ function StudioWorkspace() {
                   <StudioPublishPage
                     history={history}
                     busy={requestBusy || reconnecting}
+                    application={application!}
+                    userId={userId}
+                    resources={resources}
                     onPublish={(details) => publishing.current?.publish(details)}
                     onLeave={leavePublish}
                   />

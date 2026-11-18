@@ -1591,6 +1591,50 @@ export async function fetchStudioRevision(
   return (await response.json()) as StudioRevisionDiff
 }
 
+/** A revision of a live diff's `by`: a revision with the AI request whose accept made it, or null. */
+export interface StudioLiveRevision extends StudioRevision {
+  authoringRequest: string | null
+}
+
+/** A file that differs from the live release, with the revisions made since then that changed it, newest first. */
+export interface StudioLiveDiffEntry extends StudioRevisionChange {
+  titles: Record<string, string> | null
+  by: StudioLiveRevision[]
+}
+
+/** The files that differ from the live release, of every page the route gave. */
+export interface StudioLiveDiff {
+  release: number
+  resources: StudioLiveDiffEntry[]
+}
+
+/**
+ * Loads every page of the files that differ from the live release, see docs/reference/authoring-revisions.md#live-diff. A
+ * 404 resolves to `null`, which means the application has no live release or no revision history. Any other failed status
+ * throws, and a 401 shows the sign-in prompt and throws as well.
+ */
+export async function fetchStudioLiveDiff(application: string, signal?: AbortSignal): Promise<StudioLiveDiff | null> {
+  const base = `/api/studio/apps/${encodeURIComponent(application)}/releases/live/diff`
+  const resources: StudioLiveDiffEntry[] = []
+  let release = 0
+  let cursor: string | null = null
+  do {
+    const path: string = cursor === null ? base : `${base}?cursor=${encodeURIComponent(cursor)}`
+    const response = await studioFetch(path, { signal })
+    if (response.status === 404) {
+      return null
+    }
+    if (!response.ok) {
+      throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+    }
+    const page = (await response.json()) as StudioLiveDiff & { cursor: string | null }
+    release = page.release
+    resources.push(...page.resources)
+    cursor = page.cursor
+  } while (cursor !== null)
+  return { release, resources }
+}
+
 /** The states of an authoring request, see docs/reference/authoring-requests.md#states. */
 export type AuthoringRequestState =
   | 'planning'
@@ -1678,6 +1722,51 @@ export async function undoStudioRevision(application: string, id: string): Promi
 /** Who made a revision: the author's name, or "System" for a revision the server made. */
 export function revisionAuthor(revision: StudioRevision, t: (key: string) => string): string {
   return revision.userId === null ? t('shell.studio.releases.system') : revision.author
+}
+
+/** Who changed a file since the live release: the reader, a person by name, the server, or an AI request, see changeAuthors. */
+export type StudioChangeAuthor =
+  | { type: 'you' }
+  | { type: 'person'; name: string }
+  | { type: 'system' }
+  | { type: 'request'; id: string; name: string }
+
+/**
+ * Who changed a file, in the order of their first change, each named once. `by` is newest first, so the walk starts at its
+ * end. A revision with an AI request whose name is in `requestNames` names that request, and any other names the person
+ * who made it: "System" for a revision the server made, "you" for the reader, else the person's name.
+ * See docs/reference/ai-authoring-in-studio.md#revisions.
+ */
+export function changeAuthors(
+  by: StudioLiveRevision[],
+  userId: string | null,
+  requestNames: ReadonlyMap<string, string>,
+): StudioChangeAuthor[] {
+  const seen = new Set<string>()
+  const authors: StudioChangeAuthor[] = []
+  for (const revision of [...by].reverse()) {
+    const requestName = revision.authoringRequest === null ? undefined : requestNames.get(revision.authoringRequest)
+    let key: string
+    let author: StudioChangeAuthor
+    if (revision.authoringRequest !== null && requestName !== undefined) {
+      key = `request:${revision.authoringRequest}`
+      author = { type: 'request', id: revision.authoringRequest, name: requestName }
+    } else if (revision.userId === null) {
+      key = 'system'
+      author = { type: 'system' }
+    } else if (revision.userId === userId) {
+      key = 'you'
+      author = { type: 'you' }
+    } else {
+      key = `user:${revision.userId}`
+      author = { type: 'person', name: revision.author }
+    }
+    if (!seen.has(key)) {
+      seen.add(key)
+      authors.push(author)
+    }
+  }
+  return authors
 }
 
 /** The client a revision came through: "Studio" for Studio, the client's own id for any other, and null for none. */

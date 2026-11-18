@@ -401,8 +401,6 @@ Auto-accept lets the agent accept its own drafts in an application, as an automa
 
 ## Revisions
 
-_(planned for M35)_
-
 Studio shows the application's [revisions](revisions-and-drafts.md#revisions), so an author sees who
 changed what and can undo it.
 
@@ -421,6 +419,7 @@ changed what and can undo it.
   kind, whether it was Added, Changed or Removed, and its line counts, such as "+8 −3", which assistive
   technology reads in full. A resource that only a draft adds takes the name its change carries. The file's
   summary in words comes under the header, then its diff. A file is open at first, unless its page folds it.
+  The publish page folds its files at first.
 - **A file's diff** _(planned for M35)_. The JSON is shown as one column of lines with line numbers. An added
   line is on an added tint with a mark in the gutter, a removed line on a removed tint with its own mark, and
   the changed words of a line on a deeper tint. The JSON is coloured as the code editor colours it. A run of
@@ -431,11 +430,13 @@ changed what and can undo it.
   [undo](revisions-and-drafts.md#undo). It runs at once, and the undo is itself a revision that can
   be undone. A revision that cannot be undone alone names the later revisions that block it, each with
   its summary, author and time, and nothing is undone.
-- **Publishing.** _(planned for M35)_ The publish page lists every file that differs from the live release,
-  under "`<n>` files changed since the live release". Each file is a block, folded at first, with "Changed by"
-  and each person who changed it since the release, in the order of their first change. The reader is "you",
-  and an AI request is "the AI request “`<name>`”", a link to its page. The list comes from the
-  [live diff](authoring-revisions.md#live-diff). The page is described in [publishing](studio.md#publishing).
+- **Publishing.** The publish page lists every file that differs from the live release, under "`<n>` files
+  changed since the live release". Each file shows "Changed by" and each person who changed it since the release,
+  in the order of their first change. The reader is "you", and an AI request is "the AI request “`<name>`”", a
+  link to its page. A change the server recorded reads System, as it does in History. An AI request that cannot
+  be read names the person who accepted it instead. A file that no revision changed since the release has no
+  Changed by line. The list comes from the [live diff](authoring-revisions.md#live-diff). The page is described
+  in [publishing](studio.md#publishing).
 
 ## Connected apps
 

@@ -1612,11 +1612,16 @@ describe('StudioPage publishing', () => {
     }
   }
 
-  /** `stubServer` where `/api/me` answers `me`, and the request routes answer in turn with `statuses`. */
+  /**
+   * `stubServer` where `/api/me` answers `me`, and the request routes answer in turn with `statuses`. The live diff answers
+   * `live` and an AI request answers `requestAnswers[id]`, both 404 unless given.
+   */
   function stubPublishing(
     me: () => Response,
     statuses: unknown[] = [],
     history: { folderContentHash: string; active: boolean } = { folderContentHash: 'hash-4', active: true },
+    live: () => Response = () => new Response(null, { status: 404 }),
+    requestAnswers: Record<string, () => Response> = {},
   ) {
     const fetchMock = stubServer()
     const base = fetchMock.getMockImplementation()!
@@ -1624,6 +1629,13 @@ describe('StudioPage publishing', () => {
     fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
       if (input === '/api/me') {
         return me()
+      }
+      if (input.startsWith(`${folder}/releases/live/diff`)) {
+        return live()
+      }
+      if (input.startsWith(`${folder}/authoring-requests/`)) {
+        const answer = requestAnswers[input.slice(`${folder}/authoring-requests/`.length)]
+        return answer ? answer() : new Response(null, { status: 404 })
       }
       if (input === `${folder}/publish` && init?.method === 'POST') {
         return json(request('queued'), 202)
@@ -1728,6 +1740,114 @@ describe('StudioPage publishing', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('Goes live as release 1')).toBeInTheDocument()
     expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled()
+  })
+
+  describe('the files changed since the live release', () => {
+    /** A file of the live diff, with the revisions made since the live release that changed it, newest first. */
+    function liveFile(file: string, change: 'added' | 'changed', name: string, by: unknown[]) {
+      return {
+        file,
+        change,
+        id: null,
+        kind: 'role',
+        name,
+        titles: null,
+        before: change === 'added' ? null : '{"label":"first"}',
+        after: '{"label":"second"}',
+        target: null,
+        by,
+      }
+    }
+
+    function revision(id: string, userId: string | null, author: string, authoringRequest: string | null = null) {
+      return {
+        id,
+        summary: 'Edit',
+        author,
+        userId,
+        client: userId === null ? null : 'studio',
+        request: null,
+        time: '2026-11-18T10:00:00Z',
+        authoringRequest,
+      }
+    }
+
+    const sectionOf = () => screen.getByTestId('studio-section-publish-changes')
+    const liveDiff = (resources: unknown[]) => () => json({ release: 3, resources, cursor: null })
+
+    it('lists the files that differ from the live release with who changed each, under a count', async () => {
+      const fetchMock = stubPublishing(
+        publisher,
+        [],
+        { folderContentHash: 'hash-4', active: true },
+        liveDiff([
+          liveFile('roles/buyer.json', 'changed', 'Buyer', [revision('b', 'author', 'Ana')]),
+          liveFile('roles/approver.json', 'added', 'Approver', [
+            revision('a2', 'author', 'Ana', 'r1'),
+            revision('a1', 'u2', 'Sam Lee'),
+          ]),
+        ]),
+        { r1: () => json({ id: 'r1', text: 'Add a field. Then a test.' }) },
+      )
+      renderPage('/studio?app=PurchaseRequests&view=publish')
+
+      expect(await screen.findByRole('heading', { name: '2 files changed since the live release' })).toBeVisible()
+      const section = sectionOf()
+      expect(within(section).getAllByTestId('studio-changes-file')).toHaveLength(2)
+      const buyer = within(section)
+        .getAllByTestId('studio-changes-file')
+        .find((file) => file.dataset.file === 'roles/buyer.json')!
+      expect(within(buyer).getByTestId('studio-changes-by')).toHaveTextContent(/^Changed by you$/)
+      const approver = within(section)
+        .getAllByTestId('studio-changes-file')
+        .find((file) => file.dataset.file === 'roles/approver.json')!
+      expect(within(approver).getByTestId('studio-changes-by')).toHaveTextContent(
+        'Changed by Sam Lee and the AI request “Add a field.”',
+      )
+      expect(within(approver).getByRole('link', { name: 'the AI request “Add a field.”' })).toHaveAttribute(
+        'href',
+        '/studio?app=PurchaseRequests&view=requests&request=r1',
+      )
+      expect(fetchMock.mock.calls.map(([input]) => input)).toContain(`${folder}/releases/live/diff`)
+    })
+
+    it('names the person who accepted an AI request that cannot be read', async () => {
+      stubPublishing(
+        publisher,
+        [],
+        { folderContentHash: 'hash-4', active: true },
+        liveDiff([liveFile('roles/approver.json', 'added', 'Approver', [revision('a1', 'u2', 'Sam Lee', 'r1')])]),
+        { r1: () => new Response(null, { status: 500 }) },
+      )
+      renderPage('/studio?app=PurchaseRequests&view=publish')
+
+      expect(await screen.findByRole('heading', { name: '1 file changed since the live release' })).toBeVisible()
+      const change = within(sectionOf()).getByTestId('studio-changes-by')
+      expect(change).toHaveTextContent(/^Changed by Sam Lee$/)
+      expect(within(change).queryByRole('link')).toBeNull()
+    })
+
+    it('asks for no live diff and shows no list when nothing is live yet', async () => {
+      const fetchMock = stubPublishing(publisher, [], { folderContentHash: 'hash-1', active: false }, liveDiff([]))
+      renderPage('/studio?app=PurchaseRequests&view=publish')
+
+      expect(
+        await screen.findByText('Nothing is live yet. Everything below goes live as the first release.'),
+      ).toBeVisible()
+      expect(screen.queryByTestId('studio-section-publish-changes')).toBeNull()
+      expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/releases/live/diff'))).toBe(false)
+    })
+
+    it('shows no list when the server has no revision history', async () => {
+      const fetchMock = stubPublishing(publisher)
+      renderPage('/studio?app=PurchaseRequests&view=publish')
+
+      expect(await screen.findByText('Goes live as release 4')).toBeVisible()
+      await waitFor(() =>
+        expect(fetchMock.mock.calls.map(([input]) => input)).toContain(`${folder}/releases/live/diff`),
+      )
+      expect(screen.queryByTestId('studio-section-publish-changes')).toBeNull()
+    })
   })
 
   it('shows the Overview at &view=publish without studioPublisher', async () => {

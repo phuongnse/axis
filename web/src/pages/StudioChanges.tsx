@@ -1,12 +1,16 @@
 import { Flex, Typography } from 'antd'
-import { useContext } from 'react'
+import { useContext, type ReactNode } from 'react'
+import { Link } from 'react-router'
 import { EmptyDash } from '../platform/EmptyValue'
+import { fillText } from '../platform/fillText'
 import {
   changeRows,
+  type StudioChangeAuthor,
   type StudioReleaseChange,
   type StudioResourceItem,
   type StudioRevisionChange,
 } from '../platform/studio'
+import { studioRequestAddress } from '../platform/studioAddress'
 import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -61,18 +65,59 @@ export function JsonDiff({ before, after }: { before: string | null; after: stri
   )
 }
 
+/** A file of {@link StudioChanges}: a revision's file, or a live diff's with its titles by locale, or null. */
+export type StudioChangedFile = StudioRevisionChange & { titles?: Record<string, string> | null }
+
+/**
+ * The line "Changed by" with each person who changed a file, in the order of their first change, each as a
+ * {@link StudioChangeAuthor}. The reader is "you", a server revision is "System", and an AI request is a link to its page.
+ */
+function ChangedBy({ application, authors }: { application: string; authors: StudioChangeAuthor[] }) {
+  const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const [before, after] = t('shell.studio.changes.changedBy').split('{authors}')
+  const nodes: ReactNode[] = authors.map((author) => {
+    switch (author.type) {
+      case 'you':
+        return t('shell.studio.changes.you')
+      case 'system':
+        return t('shell.studio.releases.system')
+      case 'person':
+        return author.name
+      case 'request':
+        return (
+          <Link key={author.id} to={studioRequestAddress(application, author.id)}>
+            {fillText(t('shell.studio.changes.aiRequest'), { name: author.name })}
+          </Link>
+        )
+    }
+  })
+  const list = new Intl.ListFormat(locale, { type: 'conjunction' }).formatToParts(authors.map((_, index) => `${index}`))
+  return (
+    <Typography.Text data-testid="studio-changes-by">
+      {before}
+      {list.map((part) => (part.type === 'element' ? nodes[Number(part.value)] : part.value))}
+      {after}
+    </Typography.Text>
+  )
+}
+
 /**
  * The files a revision or a draft changed, sorted by name: each shows its name, its kind (the em dash when it has none)
  * and Added, Changed or Removed, and under them its JSON before and after as a {@link JsonDiff}. `resources` are the
- * application's resources, which name a file's kind and title. See
- * docs/reference/shared-widgets.md#which-widget and docs/reference/ai-authoring-in-studio.md#revisions.
+ * application's resources, which name a file's kind and title. With `changedBy`, the publish page's files also show
+ * "Changed by" under their header, from `authors` of each file. See
+ * docs/reference/shared-widgets.md#which-widget, docs/reference/ai-authoring-in-studio.md#revisions and
+ * docs/reference/studio.md#publishing.
  */
-export function StudioChanges({
+export function StudioChanges<File extends StudioChangedFile>({
   files,
   resources,
+  changedBy,
 }: {
-  files: StudioRevisionChange[]
+  files: File[]
   resources: StudioResourceItem[]
+  changedBy?: { application: string; authors: (file: File) => StudioChangeAuthor[] }
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -82,7 +127,7 @@ export function StudioChanges({
     change: file.change,
     kind: file.kind,
     name: file.name,
-    titles: null,
+    titles: file.titles ?? null,
     locale: null,
   }))
   const byKey = new Map(files.map((file) => [`${file.change}:${file.file}`, file]))
@@ -90,6 +135,7 @@ export function StudioChanges({
     <Flex vertical gap="middle">
       {changeRows(changes, resources, locale, t).map((row) => {
         const file = byKey.get(row.key)
+        const authors = file && changedBy ? changedBy.authors(file) : []
         return (
           <section key={row.key} data-testid="studio-changes-file" data-file={file?.file}>
             <Flex vertical gap="small">
@@ -100,6 +146,7 @@ export function StudioChanges({
                 </Typography.Text>
                 <Typography.Text>{t(`shell.studio.overview.change.${row.change}`)}</Typography.Text>
               </Flex>
+              {changedBy && authors.length > 0 && <ChangedBy application={changedBy.application} authors={authors} />}
               <JsonDiff before={file?.before ?? null} after={file?.after ?? null} />
             </Flex>
           </section>
