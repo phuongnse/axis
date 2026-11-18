@@ -1047,6 +1047,39 @@ describe('StudioPage', () => {
     expect(screen.queryByTestId('studio-diagnostics')).not.toBeInTheDocument()
   })
 
+  it('shows an authoring request page in place of the content for &view=requests&request=<id>', async () => {
+    const fetchMock = stubServer()
+    const base = fetchMock.getMockImplementation()!
+    const requestPath = '/api/studio/apps/PurchaseRequests/authoring-requests/r1'
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input === '/api/me') {
+        return json({ id: 'author', studio: true, studioCreate: true })
+      }
+      if (input === requestPath) {
+        return json({
+          id: 'r1',
+          application: 'PurchaseRequests',
+          author: 'author',
+          authorName: null,
+          text: 'Add a supplier field.',
+          state: 'awaitingApproval',
+          plan: null,
+          round: 0,
+          tokens: 0,
+          autoAccept: false,
+          sentAt: '2026-11-18T09:30:00Z',
+          approvedAt: null,
+          finishedAt: null,
+        })
+      }
+      return base(input, init)
+    })
+    renderPage('/studio?app=PurchaseRequests&view=requests&request=r1')
+
+    expect(await screen.findByTestId('studio-ai-request-state')).toHaveTextContent('Awaiting approval')
+    expect(screen.getByTestId('studio-ai-request')).toHaveTextContent('Add a supplier field.')
+  })
+
   it('shows only the kind of the address in its list, and drops the kind when a resource is picked', async () => {
     stubServer()
     renderPage('/studio?app=PurchaseRequests&kind=entity')

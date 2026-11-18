@@ -1599,6 +1599,56 @@ export async function fetchStudioRevision(
   return (await response.json()) as StudioRevisionDiff
 }
 
+/** The states of an authoring request, see docs/reference/authoring-requests.md#states. */
+export type AuthoringRequestState =
+  | 'planning'
+  | 'awaitingApproval'
+  | 'working'
+  | 'checking'
+  | 'reviewing'
+  | 'fixing'
+  | 'ready'
+  | 'accepted'
+  | 'dropped'
+  | 'failed'
+
+/** An authoring request as the read route answers it. The page does not use its steps, so they are not listed. */
+export interface AuthoringRequest {
+  id: string
+  application: string
+  author: string
+  authorName: string | null
+  text: string
+  state: AuthoringRequestState
+  plan: string | null
+  round: number
+  tokens: number
+  autoAccept: boolean
+  sentAt: string
+  approvedAt: string | null
+  finishedAt: string | null
+}
+
+/**
+ * Loads one authoring request. A 404 resolves to `null`, which means the request does not exist for this application. Any
+ * other failed status throws, and a 401 shows the sign-in prompt and throws as well.
+ */
+export async function fetchAuthoringRequest(
+  application: string,
+  id: string,
+  signal?: AbortSignal,
+): Promise<AuthoringRequest | null> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests/${encodeURIComponent(id)}`
+  const response = await studioFetch(path, { signal })
+  if (response.status === 404) {
+    return null
+  }
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as AuthoringRequest
+}
+
 /**
  * The answer of an undo: `undone` with the new revision, `blocked` with the later revisions that changed the same files,
  * or `start` for the start of history, which nothing undoes.
