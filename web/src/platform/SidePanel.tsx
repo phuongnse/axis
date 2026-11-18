@@ -94,6 +94,9 @@ export function SidePanel({
             flex: '1 1 auto',
             minHeight: 0,
             overflowY: 'auto',
+            // Proposed, see the review on #3650: the body keeps room for its scrollbar while it fits, so its content
+            // is as wide when a scrollbar comes, and a table in it moves no column under its row as a row opens.
+            scrollbarGutter: 'stable',
             // A body that fits is no scroll of its own, so it must not hold the page's scroll.
             overscrollBehavior: overflows ? 'contain' : 'auto',
             padding: `${spacing.xs}px ${spacing.md}px ${spacing.md}px`,
