@@ -125,7 +125,7 @@ export async function remapAdmin(page: Page, name: string) {
   await expectNoErrors(page, name)
 }
 
-/** Opens Studio on the application `name` and confirms the Publish dialog, without waiting for the outcome. */
+/** Opens Studio on the application `name` and confirms on the publish page, without waiting for the outcome. */
 export async function startPublish(page: Page, name: string) {
   await page.goto(`${journeyURL}/studio?app=${name}&view=releases`)
   await page.getByRole('button', { name: 'Publish…', exact: true }).click()

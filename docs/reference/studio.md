@@ -230,7 +230,7 @@ its end.
   [release history](authoring.md#release-history). Publish sends the request with only the filled
   values. It and Cancel replace the page's history entry with the page Publish… was opened from, at its top, or
   the Overview after a link, and the status line follows the request there. Publish is off while a request runs,
-  the reconnect shows, the history loads or nothing is left to publish. A failed history drops `<n>` and the line.
+  the reconnect shows, the history loads or nothing is left to publish. A failed history drops `<n>` and the line, and a folder that is all live drops `<n>`.
 - **Preview** shows only when `GET /api/me` answers a `studioPreviewHost` that is not null, and needs
   no `studioPublisher`. It sends `POST .../preview` at once, with no dialog. A succeeded preview shows
   Previewed and a link to each of the application's sites on the preview host, built from the page's
