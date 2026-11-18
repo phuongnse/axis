@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { ShellAsideContext } from '../platform/shellAsideContext'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioDiagnostic } from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
@@ -16,15 +17,27 @@ const error: StudioDiagnostic = {
   resourceId: null,
 }
 
+let aside: HTMLDivElement | undefined
+
+/** Renders the panel with the shell's right column, which is `aside`. */
 function renderProblems(diagnostics: StudioDiagnostic[]) {
+  aside = document.createElement('div')
+  document.body.append(aside)
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioProblems diagnostics={diagnostics} onSelect={vi.fn()} onClose={vi.fn()} />
+        <ShellAsideContext.Provider value={{ target: aside, claim: () => () => {} }}>
+          <StudioProblems diagnostics={diagnostics} onSelect={vi.fn()} onClose={vi.fn()} />
+        </ShellAsideContext.Provider>
       </TextProvider>
     </ThemeModeProvider>,
   )
 }
+
+afterEach(() => {
+  aside?.remove()
+  aside = undefined
+})
 
 describe('StudioProblems', () => {
   it('says there are no problems when there is no diagnostic', () => {
@@ -43,6 +56,7 @@ describe('StudioProblems', () => {
   it('stops the panel at its end, so the page does not scroll', () => {
     renderProblems([error])
 
-    expect(screen.getByTestId('studio-diagnostics')).toHaveStyle({ overscrollBehavior: 'contain' })
+    const body = screen.getByText('AXIS-E101').closest('ul')!.parentElement!
+    expect(body).toHaveStyle({ overflowY: 'auto', overscrollBehavior: 'contain' })
   })
 })

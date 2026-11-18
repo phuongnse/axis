@@ -727,6 +727,7 @@ The values of the chart, with their defaults:
 | `secrets.scenarioServerConnection` | empty | Publisher and the cell restore-check CronJob. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. A cell whose tenants have Studio applications needs it set for the weekly restore check to pass. Create the role as in [the scenario role](#the-scenario-role). |
 | `studio.tests` | `false` | Server only. `true` renders `Studio__Tests`, which turns on `studioTest`. Set it together with `secrets.scenarioServerConnection`. |
 | `ai.allowTenantKeys` | `false` | Server and agent host. `true` renders `Ai__AllowTenantKeys` on both, so a tenant administrator can set the tenant's own model key and the agent host uses it. See [a tenant's own key](model-bindings.md#a-tenants-own-key). |
+| `ai.defaultBinding` | `""` | Server only. A value renders `Ai__DefaultBinding`, which turns on `studioAi`. The chart sets no `Ai:Bindings` on the agent host, so configure them yourself. |
 | `publisher.terminationGracePeriodSeconds` | 360 | Seconds the publisher gets to finish its running request on `SIGTERM`. Keep it longer than the five-minute lease. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
 | `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. Use the time span format `hh:mm:ss`, such as `00:00:30`. "30s" stops the hosts at start. |
@@ -889,12 +890,3 @@ ends TLS, so it must meet the rules for incoming traffic above, because the char
 versions or ciphers there. The chart also cannot make the Ingress connect over HTTPS and verify the
 server certificate. The chart sets a Kestrel HTTPS endpoint from the Secret in
 `secrets.serverCertificate`, probes it over HTTPS and names the Service port `https`.
-
-## Hardening checklist
-
-_(planned for M32)_
-
-The checklist lists every control that the [ASVS](asvs.md) tracking or the
-[threat model](threat-model.md) delegates to the operator, such as disk encryption, malware scanning
-of uploads and access to the logs, with how to meet each one and how to check it. Outside
-Development, the server and the worker warn at start about each item they can see is missing.

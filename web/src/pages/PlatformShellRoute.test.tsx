@@ -30,6 +30,7 @@ const user: CurrentUser = {
   studioCreate: false,
   studioPreviewHost: null,
   studioTest: false,
+  studioAi: false,
   console: false,
   users: true,
   tenantStatus: 'active',

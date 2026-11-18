@@ -234,6 +234,20 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(renderOk('--set', 'ai.allowTenantKeys=false'), /Ai__AllowTenantKeys/)
   })
 
+  test('ai.defaultBinding renders Ai__DefaultBinding on the server only', () => {
+    const output = renderOk()
+    assert.match(find(output, 'Deployment', 'axis-server'), /- name: Ai__DefaultBinding\n\s+value: "main"/)
+    for (const [kind, name] of [
+      ['Deployment', 'axis-agent'],
+      ['Deployment', 'axis-worker'],
+      ['Deployment', 'axis-publisher'],
+      ['Job', 'axis-migrate'],
+    ]) {
+      assert.doesNotMatch(find(output, kind, name), /Ai__DefaultBinding/, name)
+    }
+    assert.doesNotMatch(renderOk('--set', 'ai.defaultBinding='), /Ai__DefaultBinding/)
+  })
+
   test('the publisher grace period is a value', () => {
     const publisher = find(renderOk('--set', 'publisher.terminationGracePeriodSeconds=420'), 'Deployment', 'axis-publisher')
     assert.match(publisher, /terminationGracePeriodSeconds: 420\n/)

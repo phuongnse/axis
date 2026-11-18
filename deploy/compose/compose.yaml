@@ -61,6 +61,7 @@
 # Ai__AllowTenantKeys   Passes through from the shell to both servers and the agent host. The servers let an
 #                       administrator set a tenant's own model key and the agent host uses it, so give all three
 #                       the same value. It stays off without it.
+# Ai__DefaultBinding    Passes through from the shell to both servers, which then answer studioAi to authors.
 x-host: &host
   read_only: true
   tmpfs:
@@ -106,6 +107,8 @@ x-server: &server
     Studio__PublisherRole:
     # No value: this passes through from the shell, and the agent host takes the same value.
     Ai__AllowTenantKeys:
+    # No value: this passes through from the shell, and only the servers read it.
+    Ai__DefaultBinding:
   networks:
     default:
       aliases:

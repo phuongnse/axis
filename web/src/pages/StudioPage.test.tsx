@@ -8,6 +8,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
 import { isSignInNeeded } from '../platform/signInNeeded'
 import { assignLocation } from '../platform/navigation'
+import { ShellAsideContext } from '../platform/shellAsideContext'
 import { ShellSidebarContext } from '../platform/shellSidebarContext'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
@@ -328,23 +329,33 @@ function Location() {
 }
 
 let sidebar: HTMLDivElement | undefined
+let aside: HTMLDivElement | undefined
+
+/** Adds the shell's sidebar and right column to the document, as the page's tests draw them. */
+function addShellRegions() {
+  sidebar = document.createElement('div')
+  sidebar.dataset.testid = 'sidebar'
+  aside = document.createElement('div')
+  aside.dataset.testid = 'aside'
+  document.body.append(sidebar, aside)
+}
 
 /** Renders the page with a shell sidebar. The sidebar's content goes into `sidebar`, and the returned spy counts its claims. */
 function renderPage(entry = '/studio?app=PurchaseRequests', locale?: string) {
   const claim = vi.fn(() => () => {})
-  sidebar = document.createElement('div')
-  sidebar.dataset.testid = 'sidebar'
-  document.body.append(sidebar)
+  addShellRegions()
   const page = (
     // Without motion a closed dialog leaves the document at once, as jsdom runs no animations.
     <ConfigProvider theme={{ token: { motion: false } }}>
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <ShellSidebarContext.Provider value={{ target: sidebar, collapsed: false, claim }}>
-            <MemoryRouter initialEntries={[entry]}>
-              <StudioPage />
-              <Location />
-            </MemoryRouter>
+          <ShellSidebarContext.Provider value={{ target: sidebar!, collapsed: false, claim }}>
+            <ShellAsideContext.Provider value={{ target: aside!, claim: () => () => {} }}>
+              <MemoryRouter initialEntries={[entry]}>
+                <StudioPage />
+                <Location />
+              </MemoryRouter>
+            </ShellAsideContext.Provider>
           </ShellSidebarContext.Provider>
         </TextProvider>
       </ThemeModeProvider>
@@ -365,9 +376,7 @@ function renderPage(entry = '/studio?app=PurchaseRequests', locale?: string) {
  * last one open. A link to `/` stands for a link in the shell. Returns the router.
  */
 function renderGuardedPage(entries: string[]) {
-  sidebar = document.createElement('div')
-  sidebar.dataset.testid = 'sidebar'
-  document.body.append(sidebar)
+  addShellRegions()
   const router = createMemoryRouter(
     [
       {
@@ -376,13 +385,15 @@ function renderGuardedPage(entries: string[]) {
           <ConfigProvider theme={{ token: { motion: false } }}>
             <ThemeModeProvider>
               <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-                <ShellSidebarContext.Provider value={{ target: sidebar, collapsed: false, claim: () => () => {} }}>
-                  <UnsavedChangesGuard>
-                    <StudioPage />
-                    <Location />
-                    <Link to="/">Home</Link>
-                    <LeaveWithoutSaving />
-                  </UnsavedChangesGuard>
+                <ShellSidebarContext.Provider value={{ target: sidebar!, collapsed: false, claim: () => () => {} }}>
+                  <ShellAsideContext.Provider value={{ target: aside!, claim: () => () => {} }}>
+                    <UnsavedChangesGuard>
+                      <StudioPage />
+                      <Location />
+                      <Link to="/">Home</Link>
+                      <LeaveWithoutSaving />
+                    </UnsavedChangesGuard>
+                  </ShellAsideContext.Provider>
                 </ShellSidebarContext.Provider>
               </TextProvider>
             </ThemeModeProvider>
@@ -406,6 +417,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
   sidebar?.remove()
   sidebar = undefined
+  aside?.remove()
+  aside = undefined
 })
 
 describe('StudioPage', () => {
@@ -920,6 +933,7 @@ describe('StudioPage', () => {
 
       const panel = await openProblems()
       expect(button).toHaveAttribute('aria-expanded', 'true')
+      expect(within(screen.getByTestId('aside')).getByTestId('studio-diagnostics')).toBe(panel)
       const items = within(panel).getAllByRole('listitem')
       expect(items[0]).toHaveTextContent('AXC0101')
       expect(items[1]).toHaveTextContent('AXC0001')

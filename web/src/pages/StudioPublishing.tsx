@@ -84,7 +84,7 @@ async function findPreviewLinks(
  * The band of the open application, with the status of the request its buttons send and its release history. The
  * band holds the `newResource` button, Validate, Preview, Run tests and Publish. They keep one line: when they do not
  * fit, Validate, Preview and Run tests fold into one "…" menu, see `AxisActionRow`. On its left it shows the application's
- * state in words, see `StudioBand`: the problems of `diagnostics`, which `onToggleProblems` opens as the `problems`
+ * state in words, see `StudioBand`: the problems of `diagnostics`, which `onToggleProblems` opens as the Problems
  * panel beside the page, then the release state. The request status, test results and
  * preview links show at the top of the content, under the band, then `children`, which is called with the release history
  * when it is a function. The release list follows only on `releasesView`, under the page's heading. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
@@ -120,7 +120,6 @@ export function StudioPublishing({
   problemsOpen,
   onToggleProblems,
   newResource,
-  problems,
   releasesView,
   onDiagnostics,
   onOpenScenario,
@@ -138,7 +137,6 @@ export function StudioPublishing({
   problemsOpen: boolean
   onToggleProblems: () => void
   newResource: ReactNode
-  problems: ReactNode
   releasesView: boolean
   onDiagnostics: (diagnostics: StudioDiagnostic[]) => void
   onOpenScenario: (resourceId: string, path: string) => void
@@ -314,34 +312,31 @@ export function StudioPublishing({
           {newResource}
         </AxisActionRow>
       </StudioBand>
-      <Flex gap="middle" align="flex-start">
-        <Flex vertical gap="middle" style={{ flex: 1, minWidth: 0 }}>
-          {sendError !== null && <AxisAlert data-testid="studio-request-error" kind="error" message={sendError} />}
-          {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
-          {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (
-            <StudioTestResults request={request} onSelect={onOpenScenario} />
-          )}
-          {previewLinks.length > 0 && (
-            <Flex vertical gap={4}>
-              {previewLinks.map((link) => (
-                <a key={link} data-testid="studio-preview-link" href={link} target="_blank" rel="noreferrer">
-                  {link}
-                </a>
-              ))}
-            </Flex>
-          )}
-          {typeof children === 'function' ? children(history) : children}
-          {releasesView && history && history !== 'failed' && (
-            <StudioReleasesList
-              application={application}
-              history={history}
-              canActivate={canPublish}
-              busy={busy}
-              onActivate={(row: StudioReleaseListRow) => activateRelease(row.releaseId)}
-            />
-          )}
-        </Flex>
-        {problems}
+      <Flex vertical gap="middle" style={{ minWidth: 0 }}>
+        {sendError !== null && <AxisAlert data-testid="studio-request-error" kind="error" message={sendError} />}
+        {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
+        {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (
+          <StudioTestResults request={request} onSelect={onOpenScenario} />
+        )}
+        {previewLinks.length > 0 && (
+          <Flex vertical gap={4}>
+            {previewLinks.map((link) => (
+              <a key={link} data-testid="studio-preview-link" href={link} target="_blank" rel="noreferrer">
+                {link}
+              </a>
+            ))}
+          </Flex>
+        )}
+        {typeof children === 'function' ? children(history) : children}
+        {releasesView && history && history !== 'failed' && (
+          <StudioReleasesList
+            application={application}
+            history={history}
+            canActivate={canPublish}
+            busy={busy}
+            onActivate={(row: StudioReleaseListRow) => activateRelease(row.releaseId)}
+          />
+        )}
       </Flex>
       <Modal
         open={dialogOpen}

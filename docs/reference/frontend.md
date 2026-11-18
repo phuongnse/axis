@@ -59,10 +59,10 @@ component holds a number of its own.
 - **Type, spacing and radius.** Type has the body and code fonts and the font size, spacing runs from `spacing-xs` to
   `spacing-xl`, and radius has the base radius.
 - **Sizes.** The size group holds `bar`, the height of the shell's header, a page's band and Studio's application row,
-  `smallControl`, a small icon button and the line of text beside it, and `tableRow`, a table's row and header.
+  `smallControl`, a small icon button and the line of text beside it, `tableRow`, a table's row and header, and
+  `sidePanel`, the width of a side panel, see [layout](shell.md#layout).
 - **Dialog sizes.** The size group also holds `dialog`, the dialog widths `small` (400 px), `medium` (560 px) and
   `large` (880 px), see [dialogs](actions-and-controls.md#dialogs).
-- **Side panel width** _(planned for M35)_. The size group also holds `sidePanel`, the width of a side panel, see [layout](shell.md#layout).
 - **No value of its own.** No size, space, type, radius or colour is a number of its own in a component, and a layout
   technique, such as a column's 1 % width, takes its size from a token.
 - **Fonts.** The body font is IBM Plex Sans, a variable font for weights 100 to 700, and the code font is IBM Plex Mono

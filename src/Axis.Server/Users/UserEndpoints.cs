@@ -18,7 +18,8 @@ namespace Axis.Server.Users;
 /// The current user, from the session. With nobody signed in it is a 401 problem. It also says whether
 /// the user may use Studio (Studio is on and the user holds the author role) and may publish from it (the user also
 /// holds the publisher role). It also says whether Studio shows the test controls: the user may use Studio and
-/// <c>Studio:Tests</c> is on. For a user of Studio it also gives the host of the tenant's preview tenant, when the
+/// <c>Studio:Tests</c> is on, and whether it shows Ask AI: the user may use Studio and <c>Ai:DefaultBinding</c> has a value on the
+/// server, see <c>docs/reference/security.md#roles-and-the-current-user</c>. For a user of Studio it also gives the host of the tenant's preview tenant, when the
 /// server serves one. It also says whether the user may use the operator console: the user holds the role that
 /// <c>Console:OperatorRole</c> names. It also says whether the user may administer users: the user holds the role that
 /// <c>Users:AdministratorRole</c> names and the tenant is not a preview tenant, which has no users page. It also says the
@@ -207,6 +208,7 @@ internal static partial class UserEndpoints
                 studio.AllowsPublish(user.Roles),
                 studio.AllowsTests(user.Roles),
                 studio.AllowsCreate(user.Roles),
+                studio.AllowsAi(user.Roles),
                 PreviewHost(studio.Allows(user.Roles), catalog, tenants),
                 console.Allows(user.Roles),
                 users.Allows(user.Roles) && !IsPreview(catalog, tenants),
@@ -279,7 +281,8 @@ internal sealed record CurrentUserResponse(string Id, string DisplayName, IReadO
 /// <summary>
 /// The answer of <c>GET /api/me</c>: the current user, whether they may use Studio, publish from it, see its test controls and create applications in it, and the host of
 /// the tenant's preview tenant. <c>StudioPreviewHost</c> is <c>null</c> when the user may not use Studio or the tenant has
-/// no served preview tenant. <c>Console</c> is true when the user holds the operator console role.
+/// no served preview tenant. <c>StudioAi</c> is true when the user may use Studio and <c>Ai:DefaultBinding</c> has a value on the server.
+/// <c>Console</c> is true when the user holds the operator console role.
 /// <c>Users</c> is true when the user holds the administrator role and the tenant is not a preview tenant.
 /// <c>TenantStatus</c> is <c>readOnly</c> while the tenant is read-only, otherwise <c>active</c>. <c>BillingUrl</c> is the
 /// tenant's page in the billing portal, <c>https://account.{Cell:TenantDomain}/tenants/{tenant id}</c>, and is <c>null</c>
@@ -287,5 +290,5 @@ internal sealed record CurrentUserResponse(string Id, string DisplayName, IReadO
 /// holds the administrator role and the tenant is a cell tenant that is not a preview tenant, the tenants whose export routes answer.
 /// </summary>
 internal sealed record CurrentUserMeResponse(
-    string Id, string DisplayName, IReadOnlyList<string> Roles, bool Studio, bool StudioPublisher, bool StudioTest, bool StudioCreate, string? StudioPreviewHost, bool Console, bool Users,
+    string Id, string DisplayName, IReadOnlyList<string> Roles, bool Studio, bool StudioPublisher, bool StudioTest, bool StudioCreate, bool StudioAi, string? StudioPreviewHost, bool Console, bool Users,
     string TenantStatus, string? BillingUrl, bool TenantExports);

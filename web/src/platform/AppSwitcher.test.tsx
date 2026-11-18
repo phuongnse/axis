@@ -19,6 +19,7 @@ const requester: CurrentUser = {
   studioCreate: false,
   studioPreviewHost: null,
   studioTest: false,
+  studioAi: false,
   console: false,
   users: false,
   tenantStatus: 'active',
