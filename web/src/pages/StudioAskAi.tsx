@@ -6,6 +6,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
 import { requiredMark } from '../platform/requiredMark'
+import { studioRequestAddress } from '../platform/studioAddress'
 import { fetchStudioSettings, sendAuthoringRequest, ServerUnreachableError } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
@@ -63,7 +64,7 @@ export function StudioAskAi({ application, onClose }: { application: string; onC
         autoAccept: autoAcceptOn && values.autoAccept === true,
       })
       form.resetFields()
-      navigate(`/studio?${new URLSearchParams({ app: application, view: 'requests', request: sent.id })}`)
+      navigate(studioRequestAddress(application, sent.id))
     } catch (error) {
       if (error instanceof ServerUnreachableError) {
         lost()

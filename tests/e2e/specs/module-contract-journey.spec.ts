@@ -7,7 +7,7 @@ import { confirmDialog, waitForDialog } from '../dialogs'
 import { fieldLabel } from '../fields'
 import { journeyURL } from '../server-settings'
 import { useJourneySession } from '../sessions'
-import { createResource, openKind, openModuleResource, openTab } from '../studio-resources'
+import { confirmPublish, createResource, openKind, openModuleResource, openTab } from '../studio-resources'
 
 // The journey server is the second server of the run, and a publish request waits behind the ones that other
 // specs queue.
@@ -61,9 +61,7 @@ test.describe('an author publishes a module application on the journey tenant, a
     await page.goto(`${journeyURL}/studio?app=${name}&view=releases`)
     await expect(page.getByRole('button', { name: 'Publish…', exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Publish…', exact: true }).click()
-    const dialog = await waitForDialog(page)
-    await dialog.getByRole('textbox', { name: 'Label (optional)', exact: true }).fill(label)
-    await confirmDialog(page, 'Publish')
+    await confirmPublish(page, label)
   }
 
   async function start(page: Page, budgetId: string): Promise<string> {

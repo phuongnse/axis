@@ -69,8 +69,13 @@ the changes of every step.
   actions are on every step, because a navigate action uses the record as loaded and not the draft.
   After a failed save, the form opens the first step that has an error. The current step stays out of
   the URL, because a draft does not survive a reload.
+- **The last step's bar** _(planned)_. The save bar and the `startProcess` actions on the page heading show on the
+  last step, and the `navigate` actions on every step, as the [saving](form-widget.md#saving) and
+  [start process actions](form-widget.md#start-process-actions) rules say. Back and Next stay under the step's fields.
 - **Task page.** The task page shows the steps of the task's form the same way. The outcome buttons
   are on the last step, and Enter on the last step does nothing.
+- **The task's last step** _(planned)_. The outcomes group on the task's heading and the save bar show on the last
+  step, and Back and Next stay under the step's fields, see [task page](task-inbox-widget.md#task-page).
 
 ## Steps bar
 

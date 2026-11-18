@@ -21,10 +21,6 @@ export function StudioProblems({
   onClose: () => void
 }) {
   const t = useText()
-  const ordered = [
-    ...diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
-    ...diagnostics.filter((diagnostic) => diagnostic.severity !== 'error'),
-  ]
 
   return (
     <StudioSidePanel
@@ -35,28 +31,50 @@ export function StudioProblems({
       title={t('shell.studio.problems.title')}
       onClose={onClose}
     >
-      {ordered.length === 0 ? (
+      {diagnostics.length === 0 ? (
         <EmptyState text={t('shell.studio.problems.none')} />
       ) : (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-          {ordered.map((diagnostic, index) => (
-            <li key={index}>
-              <DiagnosticRow diagnostic={diagnostic} onSelect={onSelect} />
-            </li>
-          ))}
-        </ul>
+        <StudioProblemList diagnostics={diagnostics} onSelect={onSelect} />
       )}
     </StudioSidePanel>
   )
 }
 
-/** One problem: severity, code, message, file and path. It is a button when it names a resource. */
+/**
+ * The problems of a draft or a check, errors first, then warnings, each with its severity, code, message, file and path.
+ * A problem that names a resource is a button when `onSelect` is given, and `onSelect` opens that resource at the problem's
+ * path. Without `onSelect`, every problem is plain text. The list has no margin of its own, see
+ * docs/reference/shared-widgets.md#which-widget.
+ */
+export function StudioProblemList({
+  diagnostics,
+  onSelect,
+}: {
+  diagnostics: StudioDiagnostic[]
+  onSelect?: (resourceId: string, path: string) => void
+}) {
+  const ordered = [
+    ...diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
+    ...diagnostics.filter((diagnostic) => diagnostic.severity !== 'error'),
+  ]
+  return (
+    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      {ordered.map((diagnostic, index) => (
+        <li key={index}>
+          <DiagnosticRow diagnostic={diagnostic} onSelect={onSelect} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** One problem: severity, code, message, file and path. It is a button when it names a resource and `onSelect` is given. */
 function DiagnosticRow({
   diagnostic,
   onSelect,
 }: {
   diagnostic: StudioDiagnostic
-  onSelect: (resourceId: string, path: string) => void
+  onSelect?: (resourceId: string, path: string) => void
 }) {
   const t = useText()
   const content = (
@@ -73,7 +91,7 @@ function DiagnosticRow({
     </Flex>
   )
   const resourceId = diagnostic.resourceId
-  return resourceId === null ? (
+  return resourceId === null || onSelect === undefined ? (
     <div style={{ padding: '4px 15px' }}>{content}</div>
   ) : (
     // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.

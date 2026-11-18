@@ -3,18 +3,7 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
-import {
-  dataSourceKeyedLists,
-  entityKeyedLists,
-  formKeyedLists,
-  layerMarks,
-  pageListKey,
-  policyKeyedLists,
-  processKeyedLists,
-  seedKeyedLists,
-  textKeyedMaps,
-  type KeyedLists,
-} from '../platform/layerMarks'
+import { dataSourceKeyedLists, keyedListsOf, layerMarks } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
 import { SectionParts } from '../platform/SectionParts'
 import { savedRecordIds, seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../platform/seedValues'
@@ -389,14 +378,16 @@ export function StudioModuleEditor({
   }
 
   /** What the designer needs to mark the layer's elements, or nothing when the resource has no layer. */
-  function designerLayer(keyedLists: KeyedLists, maps: readonly string[] = []): DesignerLayer | undefined {
-    return loaded!.layer === null
-      ? undefined
-      : {
-          elements: layerMarks(loaded!.content, loaded!.marks, loaded!.removed, keyedLists, maps),
-          disabled: patch.length > 0 || saving || resetting || reconnecting || conflict,
-          onReset: (list, key) => void resetElement(list, key),
-        }
+  function designerLayer(): DesignerLayer | undefined {
+    if (loaded!.layer === null) {
+      return undefined
+    }
+    const { keyedLists, maps } = keyedListsOf(item.kind, loaded!.content)
+    return {
+      elements: layerMarks(loaded!.content, loaded!.marks, loaded!.removed, keyedLists, maps),
+      disabled: patch.length > 0 || saving || resetting || reconnecting || conflict,
+      onReset: (list, key) => void resetElement(list, key),
+    }
   }
 
   return (
@@ -423,7 +414,7 @@ export function StudioModuleEditor({
             selected={selected}
             onSelect={setSelected}
             onChange={change}
-            layer={designerLayer(processKeyedLists)}
+            layer={designerLayer()}
           />
         </Suspense>
       ) : item.kind === 'page' ? (
@@ -436,7 +427,7 @@ export function StudioModuleEditor({
             selected={pageSelected}
             onSelect={setPageSelected}
             onChange={change}
-            layer={designerLayer(pageListKey)}
+            layer={designerLayer()}
           />
         </Suspense>
       ) : item.kind === 'text' ? (
@@ -449,7 +440,7 @@ export function StudioModuleEditor({
               change(`/texts/${escapePointerSegment(key)}`, texts[String(draft.locale ?? '')] ?? '')
               return 'added'
             }}
-            layer={designerLayer({}, textKeyedMaps)}
+            layer={designerLayer()}
           />
         )
       ) : item.kind === 'form' ? (
@@ -462,7 +453,7 @@ export function StudioModuleEditor({
             selected={formPath}
             onSelect={setFormPath}
             onChange={change}
-            layer={designerLayer(formKeyedLists(loaded.content))}
+            layer={designerLayer()}
           />
         </Suspense>
       ) : item.kind === 'seed' && schema ? (
@@ -475,7 +466,7 @@ export function StudioModuleEditor({
               savedIds={savedSeedIds}
               problems={problems}
               onChange={update}
-              layer={designerLayer(seedKeyedLists)}
+              layer={designerLayer()}
             />
           </SectionParts>
         ) : (
@@ -487,7 +478,7 @@ export function StudioModuleEditor({
           value={draft}
           onChange={change}
           readOnlyNames={moduleReadOnlyNames}
-          layer={designerLayer(dataSourceKeyedLists)}
+          layer={designerLayer()}
           keyedLists={dataSourceKeyedLists}
         />
       ) : (item.kind === 'rule' || item.kind === 'sequence' || item.kind === 'event') && schema ? (
@@ -500,14 +491,9 @@ export function StudioModuleEditor({
           readOnlyNames={moduleReadOnlyNames}
         />
       ) : item.kind === 'policy' ? (
-        <StudioModulePolicy value={draft} onChange={change} layer={designerLayer(policyKeyedLists)} />
+        <StudioModulePolicy value={draft} onChange={change} layer={designerLayer()} />
       ) : (
-        <EntityDesigner
-          value={draft}
-          onChange={change}
-          origins={entityOrigins}
-          layer={designerLayer(entityKeyedLists)}
-        />
+        <EntityDesigner value={draft} onChange={change} origins={entityOrigins} layer={designerLayer()} />
       )}
       {conflict && (
         <AxisAlert

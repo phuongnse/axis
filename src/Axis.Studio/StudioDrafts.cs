@@ -70,12 +70,17 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
     /// holds them, so a compile reads the draft as it reads a folder. Records no version.
     /// </summary>
     public Task<StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>> FilesAsync(string id, CancellationToken ct) =>
-        InDraftAsync(id, (_, _, tip) =>
-        {
-            var files = new List<(string File, byte[] Bytes)>();
-            Walk(tip.Tree, "", files);
-            return StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>.Of(files);
-        }, ct);
+        InDraftAsync(id, (_, _, tip) => StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>.Of(FilesOf(tip)), ct);
+
+    /// <summary>
+    /// The files of the draft's branch at <paramref name="commit"/>, as <see cref="FilesAsync(string, CancellationToken)"/> gives
+    /// them for the tip. The commit is one from the draft's start to its tip, which is what a diff names. A commit the branch does
+    /// not hold is refused as <see cref="StudioWriteRefusal.DoesNotApply"/>. Records no version.
+    /// </summary>
+    public Task<StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>> FilesAsync(string id, string commit, CancellationToken ct) =>
+        InDraftAsync(id, (_, draft, tip) => OnBranch(draft, tip, commit) is { } at
+            ? StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>.Of(FilesOf(at))
+            : StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>.Refused(StudioWriteRefusal.DoesNotApply), ct);
 
     /// <summary>
     /// The files the draft added, changed or removed since the <c>main</c> commit it started at, as a page of whole entries
@@ -333,7 +338,8 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
     /// The resources the draft read or changed whose version on <c>main</c> now differs from the one it recorded, sorted by
     /// resource id, then the package files it used that differ the same way, sorted by path. Each comes with its version on
     /// <c>main</c>, or null when <c>main</c> no longer has it. A resource or a file recorded as absent that now exists is one
-    /// too. The caller holds the folder's write lock. Records no version.
+    /// too. Each also names the newest revision on <c>main</c> since the draft's start that changed it, see
+    /// <c>docs/reference/authoring-requests.md#accepting</c>. The caller holds the folder's write lock. Records no version.
     /// </summary>
     public StudioDraftOutcome<IReadOnlyList<StudioDraftConflict>> Conflicts(string id) =>
         InDraft(id, (git, draft, _) =>
@@ -341,12 +347,17 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
             var main = git.Refs[Main]?.ResolveToDirectReference().Target as Commit;
             var current = main is null ? [] : Resources(main);
             var conflicts = new List<StudioDraftConflict>();
+            IReadOnlyList<StudioFile>? atStart = null;
             foreach (var (resource, recorded) in draft.Versions)
             {
-                var version = current.FirstOrDefault(file => file.Id == resource)?.Version;
-                if (!string.Equals(version, recorded, StringComparison.Ordinal))
+                var file = current.FirstOrDefault(file => file.Id == resource);
+                if (!string.Equals(file?.Version, recorded, StringComparison.Ordinal))
                 {
-                    conflicts.Add(new StudioDraftConflict(resource, version));
+                    // A resource is found by its file on main now and by its file at the draft's start.
+                    atStart ??= git.Lookup<Commit>(draft.Start) is { } start ? Resources(start) : [];
+                    var paths = new[] { file?.File, atStart.FirstOrDefault(old => old.Id == resource)?.File }
+                        .OfType<string>().ToHashSet(StringComparer.Ordinal);
+                    conflicts.Add(new StudioDraftConflict(resource, file?.Version, Changed: StudioRevisions.LastChange(git, draft.Start, paths)));
                 }
             }
 
@@ -356,7 +367,7 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
                 var version = PackageFileVersion(main, file);
                 if (!string.Equals(version, recorded, StringComparison.Ordinal))
                 {
-                    conflicts.Add(new StudioDraftConflict(null, version, file));
+                    conflicts.Add(new StudioDraftConflict(null, version, file, StudioRevisions.LastChange(git, draft.Start, new HashSet<string>(StringComparer.Ordinal) { file })));
                 }
             }
 
@@ -633,6 +644,14 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
         return git.ObjectDatabase.CreateBlob(content);
     }
 
+    // The *.json files and the files under packages/ of a commit's tree, in the order Walk gives them.
+    private static List<(string File, byte[] Bytes)> FilesOf(Commit commit)
+    {
+        var files = new List<(string File, byte[] Bytes)>();
+        Walk(commit.Tree, "", files);
+        return files;
+    }
+
     private static IReadOnlyList<StudioFile> Resources(Commit commit)
     {
         var files = new List<(string File, byte[] Bytes)>();
@@ -700,9 +719,10 @@ internal sealed record StudioDraftDiff(string Start, string Tip, IReadOnlyList<S
 
 /// <summary>
 /// A resource or a package file a draft used whose version on <c>main</c> has changed: the id of the resource, or the path of the
-/// package file with no id, and the new version, null when <c>main</c> lacks it.
+/// package file with no id, and the new version, null when <c>main</c> lacks it. <c>Changed</c> is the newest revision on
+/// <c>main</c> since the draft's start that changed it, null when none is found.
 /// </summary>
-internal sealed record StudioDraftConflict(Guid? Id, string? Version, string? File = null);
+internal sealed record StudioDraftConflict(Guid? Id, string? Version, string? File = null, StudioRevision? Changed = null);
 
 /// <summary>The layer file a draft write left: its path and version, both null when the write left no layer.</summary>
 internal sealed record StudioDraftLayer(string? File, string? Version);

@@ -1,6 +1,6 @@
 import { Button, Flex, Tag, Typography } from 'antd'
 import { fillText } from '../platform/fillText'
-import { markName, markOf, type LayerElement } from '../platform/layerMarks'
+import { markName, markOf, type LayerElement, type LayerMark } from '../platform/layerMarks'
 import { useText } from '../platform/texts'
 
 /** What the designer needs to show a customization layer: its marked elements, and Reset to module for each. */
@@ -8,6 +8,27 @@ export interface DesignerLayer {
   elements: LayerElement[]
   disabled: boolean
   onReset: (list: string, key: string) => void
+}
+
+/**
+ * What the layer did to one element, as a tag with its accessible name, such as "supplier, added by this application".
+ * `data-testid` passes to the tag. It is the one tag that the designers and a request's diff draw for a mark.
+ */
+export function LayerMarkLabel({
+  mark,
+  name,
+  'data-testid': testId,
+}: {
+  mark: LayerMark
+  name: string
+  'data-testid'?: string
+}) {
+  const t = useText()
+  return (
+    <Tag role="note" aria-label={markName(t, mark, name)} data-testid={testId}>
+      {t(`shell.studio.module.${mark}`)}
+    </Tag>
+  )
 }
 
 /**
@@ -25,16 +46,13 @@ export function LayerMarkTag({
   index: number
   name: string
 }) {
-  const t = useText()
   const mark = markOf(layer.elements, list, name)
   if (mark === undefined || mark === 'removed') {
     return null
   }
   return (
     <Flex gap="small" align="center" wrap>
-      <Tag role="note" aria-label={markName(t, mark, name)} data-testid={`studio-layer-mark-${list}/${index}`}>
-        {t(`shell.studio.module.${mark}`)}
-      </Tag>
+      <LayerMarkLabel mark={mark} name={name} data-testid={`studio-layer-mark-${list}/${index}`} />
       <ResetElement layer={layer} list={list} name={name} />
     </Flex>
   )
@@ -58,7 +76,6 @@ function ResetElement({ layer, list, name }: { layer: DesignerLayer; list: strin
 
 /** The elements of `list` that the layer removed, as muted rows with Reset to module. They are not rows of the draft. */
 export function RemovedRows({ layer, list }: { layer: DesignerLayer | undefined; list: string }) {
-  const t = useText()
   const removed = (layer?.elements ?? []).filter((element) => element.list === list && element.mark === 'removed')
   if (layer === undefined || removed.length === 0) {
     return null
@@ -75,9 +92,7 @@ export function RemovedRows({ layer, list }: { layer: DesignerLayer | undefined;
           data-testid={`studio-layer-removed-${list}/${element.key}`}
         >
           <Typography.Text type="secondary">{element.key}</Typography.Text>
-          <Tag role="note" aria-label={markName(t, 'removed', element.key)}>
-            {t('shell.studio.module.removed')}
-          </Tag>
+          <LayerMarkLabel mark="removed" name={element.key} />
           <ResetElement layer={layer} list={list} name={element.key} />
         </Flex>
       ))}

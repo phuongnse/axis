@@ -119,4 +119,21 @@ describe.each(['light', 'dark'])('StudioRequestStatus in %s mode', (mode) => {
     expect(status).toHaveTextContent('Tests failed')
     expect(status).not.toHaveTextContent('Validation failed')
   })
+
+  it('shows a succeeded accept as accepted, without a release number', () => {
+    const status = renderStatus(request({ kind: 'accept', status: 'succeeded' }))
+
+    expect(status).toHaveAttribute('data-status', 'succeeded')
+    expect(status).toHaveTextContent(
+      'Accepted. The change is in the application and in History. It is not live until someone publishes.',
+    )
+    expect(screen.queryByTestId('studio-release-number')).not.toBeInTheDocument()
+  })
+
+  it('shows a failed accept as not accepted', () => {
+    const status = renderStatus(request({ kind: 'accept', status: 'failed' }))
+
+    expect(status).toHaveAttribute('data-status', 'failed')
+    expect(status).toHaveTextContent('Not accepted. Nothing in the application changed.')
+  })
 })

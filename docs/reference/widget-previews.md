@@ -20,9 +20,11 @@ UMD build.
 - **Mounting.** The bundle sets `window.Axis`. `window.Axis.<name>(element)` mounts one preview into an
   element. It draws every state of the preview in one card, each under its caption, and returns a
   function that unmounts them all. A preview whose states answer the same fixture paths draws one
-  state at a time, under a Fixtures control that picks it and wraps its captions onto more lines when they do
-  not fit, see
+  state at a time, see
   [D142](../decisions/d142-widget-previews-show-the-states-a-design-change-touches-one-at-a-time-where-they-share-fixtures.md).
+- **The State control** _(planned)_. `shell`, `signIn` and `identitySignIn`, whose states are screens in frames, draw one
+  state at a time under a State control instead of in one card. The control picks the state and wraps its captions onto
+  more lines when they do not fit, and `&state=<slug>` opens one. `studio`'s Fixtures control is named State too.
 - **Style sheets.** The bundle is one file, so the style sheet of a library it imports, such as React
   Flow's, becomes a style element that the script adds to the page.
 - **Theme.** A mounted widget follows `data-theme` on the root element of the page: `dark` is dark
@@ -81,7 +83,7 @@ on sideways scroll. It also proves that each card's states show, that the cards 
 that a mounted widget follows `data-theme` and `--primary` and a validation message `--dangerText`,
 that a form submits inside the sandbox, and that no fixture reaches the server's web root. It clicks
 through Studio's sidebar in the `studio` preview, opens a state with `&state=` and picks one in the
-Fixtures control. It also checks that the Fixtures control wraps its captions onto more lines in a 360 px frame.
+control that picks a state. It also checks that this control wraps its captions onto more lines in a 360 px frame.
 It proves that each framed state's frame is its height with the page scrolling inside it, and that a dialog
 opened in the scrolled Entity state of `studio` shows inside the frame. It also proves that the `studio` preview's
 Settings page and its Entity state draw no panel, and that each part of them has no background, border, padding or

@@ -83,9 +83,14 @@ flowchart LR
   worker, in a container for each runtime, see [images](reference/installation.md#images). The worker
   sends each attempt to a runner, and loads package code itself only in Development. An installation's package runs in runners
   that every tenant shares. See [package runners](reference/extension-packages.md#package-runners).
-- **Application runners and customer-hosted runners** _(planned for M37)_. An application's package runs
-  in runners that serve only its tenant, in their own `application-package-host` container under gVisor,
-  and a customer can host a runner in its own network. See
+- **The application package host.** The `application-package-host` container runs the `axis-package-host-node`
+  image under gVisor (`runsc`). It runs an application's own packages in runners that serve only its tenant.
+  Compose starts it behind the `application-packages` profile, and the chart does so with
+  `applicationPackageHost.enabled`. With `Extensions:ApplicationPackages` on, the worker checks at start that it runs under gVisor.
+  See [an application's packages](reference/extension-packages.md#an-applications-packages).
+- **Customer-hosted runners.** A package host image run with `connect` runs packages in the customer's own network.
+  It connects out to the installation with a credential that the tenant's administrator can revoke. See
+  [customer-hosted runners](reference/extension-packages.md#customer-hosted-runners) and
   [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md).
 - **Axis.Agent** is the agent host. It runs [AI authoring requests](reference/authoring-requests.md#the-agent-host).
   With AI authoring on, it reads its tenants as the worker does. Under `Tenancy:Source=directory` it reads
@@ -184,11 +189,13 @@ Axis ships as production images, as
 - `axis-server`, `axis-worker` and `axis-agent` run the hosts. They hold no sample and no development setting.
 - `axis-admin` runs `Axis.Admin` and the publisher, `axis-admin publisher`, and holds the
   PostgreSQL 18 client tools.
+- `axis-package-host-dotnet`, `axis-package-host-node` and `axis-package-host-python` build extension packages
+  and run package runners for their runtime, see [images](reference/installation.md#images).
 - `axis-controlplane` runs `Axis.ControlPlane` and also holds the operator's commands,
   `Axis.ControlPlane.Admin`. It is not part of an installation, and
   `deploy/helm/axis-controlplane/` installs it, see [control plane](reference/control-plane.md#image-and-chart).
-- `deploy/compose/` and `deploy/helm/axis/` install the four installation images on one machine and
-  on Kubernetes.
+- `deploy/compose/` and `deploy/helm/axis/` install the images that [images](reference/installation.md#images)
+  lists, on one machine and on Kubernetes.
 
 The steps, every setting and the upgrade order are in the
 [installation guide](reference/installation.md).
@@ -280,7 +287,7 @@ for a name the tenant lacks, or for a binding of the other kind, both throw an
 `InvalidOperationException` that names the binding and no value, so `Resolve` never hands out a plain
 secret. The kinds, where values live and the checks are in
 [deployment bindings](reference/integration-resources.md#deployment-bindings), and the reasons in
-[D25](decisions/d25-connectors-deployment-bindings-and-secrets.md).
+[D161](decisions/d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md).
 
 #### Tenant directory
 

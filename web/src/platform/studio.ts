@@ -1170,7 +1170,7 @@ export interface StudioSkippedScenarioResult {
 export interface StudioRequest {
   id: string
   application: string
-  kind: 'validate' | 'publish' | 'activate' | 'test'
+  kind: 'validate' | 'publish' | 'activate' | 'test' | 'accept'
   target: 'tenant' | 'preview'
   status: StudioRequestStatus
   label: string | null
@@ -1473,14 +1473,6 @@ export async function fetchStudioSettings(application: string, signal?: AbortSig
   return (await response.json()) as { autoAccept: boolean }
 }
 
-/** An authoring request the server answers after a send, see docs/reference/authoring-requests.md#states. */
-export interface AuthoringRequest {
-  id: string
-  state: string
-  text: string
-  autoAccept: boolean
-}
-
 /** Sends an authoring request for an application and answers it. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function sendAuthoringRequest(
   application: string,
@@ -1599,6 +1591,50 @@ export async function fetchStudioRevision(
   return (await response.json()) as StudioRevisionDiff
 }
 
+/** A revision of a live diff's `by`: a revision with the AI request whose accept made it, or null. */
+export interface StudioLiveRevision extends StudioRevision {
+  authoringRequest: string | null
+}
+
+/** A file that differs from the live release, with the revisions made since then that changed it, newest first. */
+export interface StudioLiveDiffEntry extends StudioRevisionChange {
+  titles: Record<string, string> | null
+  by: StudioLiveRevision[]
+}
+
+/** The files that differ from the live release, of every page the route gave. */
+export interface StudioLiveDiff {
+  release: number
+  resources: StudioLiveDiffEntry[]
+}
+
+/**
+ * Loads every page of the files that differ from the live release, see docs/reference/authoring-revisions.md#live-diff. A
+ * 404 resolves to `null`, which means the application has no live release or no revision history. Any other failed status
+ * throws, and a 401 shows the sign-in prompt and throws as well.
+ */
+export async function fetchStudioLiveDiff(application: string, signal?: AbortSignal): Promise<StudioLiveDiff | null> {
+  const base = `/api/studio/apps/${encodeURIComponent(application)}/releases/live/diff`
+  const resources: StudioLiveDiffEntry[] = []
+  let release = 0
+  let cursor: string | null = null
+  do {
+    const path: string = cursor === null ? base : `${base}?cursor=${encodeURIComponent(cursor)}`
+    const response = await studioFetch(path, { signal })
+    if (response.status === 404) {
+      return null
+    }
+    if (!response.ok) {
+      throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+    }
+    const page = (await response.json()) as StudioLiveDiff & { cursor: string | null }
+    release = page.release
+    resources.push(...page.resources)
+    cursor = page.cursor
+  } while (cursor !== null)
+  return { release, resources }
+}
+
 /** The states of an authoring request, see docs/reference/authoring-requests.md#states. */
 export type AuthoringRequestState =
   | 'planning'
@@ -1612,7 +1648,41 @@ export type AuthoringRequestState =
   | 'dropped'
   | 'failed'
 
-/** An authoring request as the read route answers it. The page does not use its steps, so they are not listed. */
+/**
+ * The checks of a `check` step, `{ compile, packages, scenarios }`. The compile's diagnostics are those of `validate_draft`,
+ * and the scenario items are those of `run_scenarios`. A `notRun` outcome means the step did not reach that check.
+ */
+export interface AuthoringRequestChecks {
+  compile: { outcome: 'passed' | 'failed'; diagnostics: StudioDiagnostic[] }
+  packages: { outcome: 'passed' | 'failed' | 'notRun'; items: unknown[] }
+  scenarios: {
+    outcome: 'passed' | 'failed' | 'notRun'
+    request: string | null
+    diagnostics: StudioDiagnostic[]
+    items: (StudioScenarioResult | StudioSkippedScenarioResult)[]
+  }
+}
+
+/** The checks of a `review` step: its verdict, and the review's text when it asked for changes. */
+export interface AuthoringRequestReviewChecks {
+  review: { outcome: 'passed' | 'findings'; findings: string | null }
+}
+
+/**
+ * One step of an authoring request, in order. `outcome` says how the step ended, and `checks` holds the checks of a `check`
+ * or `review` step, null on any other. See docs/reference/authoring-requests.md#states.
+ */
+export interface AuthoringRequestStep {
+  kind: string
+  summary: string | null
+  outcome: string | null
+  tokens: number
+  startedAt: string
+  finishedAt: string | null
+  checks: AuthoringRequestChecks | AuthoringRequestReviewChecks | null
+}
+
+/** An authoring request as the read route answers it. `steps` is set only by the read route, and the other routes leave it out. */
 export interface AuthoringRequest {
   id: string
   application: string
@@ -1627,6 +1697,7 @@ export interface AuthoringRequest {
   sentAt: string
   approvedAt: string | null
   finishedAt: string | null
+  steps?: AuthoringRequestStep[]
 }
 
 /**
@@ -1647,6 +1718,122 @@ export async function fetchAuthoringRequest(
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
   return (await response.json()) as AuthoringRequest
+}
+
+/**
+ * The module resource a layer file changes, as a request's diff gives it. `before` and `after` are its JSON text with the
+ * layer applied at the diff's `start` and `tip`, and null where the target names no module resource. `marks` and `removed`
+ * are those of `after`.
+ */
+export interface AuthoringRequestLayerChange {
+  id: string
+  kind: string
+  name: string | null
+  file: string
+  before: string | null
+  after: string | null
+  marks: StudioModuleResource['marks']
+  removed: StudioModuleResource['removed']
+}
+
+/**
+ * A file the request changes. `target` is the module resource a layer file changes, null for any other file. `module` is
+ * that resource with the layer applied, on a layer file only. `titles` is the resource's label by locale, which only an
+ * accepted request's diff gives.
+ */
+export interface AuthoringRequestDiffEntry extends StudioRevisionChange {
+  target: string | null
+  module?: AuthoringRequestLayerChange
+  titles?: Record<string, string> | null
+}
+
+/**
+ * The changes of one authoring request. A request with a draft answers one page of the draft's diff, and `cursor` names the
+ * next page, null on the last. An accepted request answers the changes of its accept's revision in one page, with `start`
+ * its parent, `tip` the revision and a null `cursor`.
+ */
+export interface AuthoringRequestDiff {
+  start: string
+  tip: string
+  resources: AuthoringRequestDiffEntry[]
+  cursor: string | null
+}
+
+/**
+ * Loads one page of the changes of an authoring request, the first without a `cursor` and the next with the one the page
+ * before gave. A 404 resolves to `null`, which means the request does not exist or has neither a draft nor an accept. Any
+ * other failed status throws, and a 401 shows the sign-in prompt and throws as well.
+ */
+export async function fetchAuthoringRequestDiff(
+  application: string,
+  id: string,
+  cursor?: string | null,
+  signal?: AbortSignal,
+): Promise<AuthoringRequestDiff | null> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests/${encodeURIComponent(id)}/diff${
+    cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
+  }`
+  const response = await studioFetch(path, { signal })
+  if (response.status === 404) {
+    return null
+  }
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as AuthoringRequestDiff
+}
+
+/**
+ * Posts an action on one authoring request, `approve`, `change-plan` or `drop`, and answers the request. A 401 shows the
+ * sign-in prompt and throws, as any other failed status does.
+ */
+async function postAuthoringRequestAction(
+  application: string,
+  id: string,
+  action: 'approve' | 'change-plan' | 'drop',
+  body?: { comment: string },
+): Promise<AuthoringRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests/${encodeURIComponent(id)}/${action}`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    ...(body === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as AuthoringRequest
+}
+
+/** Approves the plan of a request, which moves it to `working`, see docs/reference/authoring-requests.md#routes. */
+export function approveAuthoringRequest(application: string, id: string): Promise<AuthoringRequest> {
+  return postAuthoringRequestAction(application, id, 'approve')
+}
+
+/** Asks for another plan with the author's `comment` (1 to 2,000 characters), which moves the request back to `planning`. */
+export function changeAuthoringRequestPlan(
+  application: string,
+  id: string,
+  comment: string,
+): Promise<AuthoringRequest> {
+  return postAuthoringRequestAction(application, id, 'change-plan', { comment })
+}
+
+/** Drops a request, which ends it as `dropped`. */
+export function dropAuthoringRequest(application: string, id: string): Promise<AuthoringRequest> {
+  return postAuthoringRequestAction(application, id, 'drop')
+}
+
+/**
+ * Accepts the ready draft of a request, which queues an `accept` publish request and answers it with 202. A 403, a 409
+ * and any other failure throw, see docs/reference/authoring-requests.md#routes.
+ */
+export async function acceptAuthoringRequest(application: string, id: string): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests/${encodeURIComponent(id)}/accept`
+  const response = await studioFetch(path, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
 }
 
 /**
@@ -1688,6 +1875,51 @@ export function revisionAuthor(revision: StudioRevision, t: (key: string) => str
   return revision.userId === null ? t('shell.studio.releases.system') : revision.author
 }
 
+/** Who changed a file since the live release: the reader, a person by name, the server, or an AI request, see changeAuthors. */
+export type StudioChangeAuthor =
+  | { type: 'you' }
+  | { type: 'person'; name: string }
+  | { type: 'system' }
+  | { type: 'request'; id: string; name: string }
+
+/**
+ * Who changed a file, in the order of their first change, each named once. `by` is newest first, so the walk starts at its
+ * end. A revision with an AI request whose name is in `requestNames` names that request, and any other names the person
+ * who made it: "System" for a revision the server made, "you" for the reader, else the person's name.
+ * See docs/reference/ai-authoring-in-studio.md#revisions.
+ */
+export function changeAuthors(
+  by: StudioLiveRevision[],
+  userId: string | null,
+  requestNames: ReadonlyMap<string, string>,
+): StudioChangeAuthor[] {
+  const seen = new Set<string>()
+  const authors: StudioChangeAuthor[] = []
+  for (const revision of [...by].reverse()) {
+    const requestName = revision.authoringRequest === null ? undefined : requestNames.get(revision.authoringRequest)
+    let key: string
+    let author: StudioChangeAuthor
+    if (revision.authoringRequest !== null && requestName !== undefined) {
+      key = `request:${revision.authoringRequest}`
+      author = { type: 'request', id: revision.authoringRequest, name: requestName }
+    } else if (revision.userId === null) {
+      key = 'system'
+      author = { type: 'system' }
+    } else if (revision.userId === userId) {
+      key = 'you'
+      author = { type: 'you' }
+    } else {
+      key = `user:${revision.userId}`
+      author = { type: 'person', name: revision.author }
+    }
+    if (!seen.has(key)) {
+      seen.add(key)
+      authors.push(author)
+    }
+  }
+  return authors
+}
+
 /** The client a revision came through: "Studio" for Studio, the client's own id for any other, and null for none. */
 export function revisionClient(revision: StudioRevision, t: (key: string) => string): string | null {
   if (revision.client === null) {
@@ -1703,6 +1935,16 @@ export function folderDiffers(history: StudioReleases): boolean {
     history.folderContentHash !== null &&
     history.folderContentHash !== history.active.contentHash
   )
+}
+
+/**
+ * The number the next publish gets, see docs/reference/studio.md#publishing. The server keeps one release for each content
+ * hash, so a folder that matches an earlier release gets that release's number again. Otherwise it is the highest
+ * number plus one, or 1 for the first release.
+ */
+export function nextReleaseNumber(history: StudioReleases): number {
+  const same = history.items.find((item) => item.contentHash === history.folderContentHash)
+  return same?.number ?? Math.max(0, ...history.items.map((item) => item.number)) + 1
 }
 
 /** A row of the change list: its name, its kind when it has one, and the resource it opens, which a removed file lacks. */

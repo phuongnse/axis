@@ -24,8 +24,8 @@ such as documents made from templates, as utilities the platform owes its applic
   not left for each application to work round. The order follows what each gap blocks, not what is
   easiest.
 - **Every capability has a home.** [The capability map](../capabilities.md) lists every capability an
-  organization needs, by area. Each row links the doc section that holds its rule, or carries the
-  planned marker of the milestone that builds it. A row with neither fails `scripts/check-docs.mjs`,
+  organization needs, by area. Each row links the doc section that holds its rule, or carries a
+  planned marker. A row with neither fails `scripts/check-docs.mjs`,
   so no capability is left without a plan, and the marker rule of
   [writing the docs](../writing-docs.md#planned-work) keeps a row true once its milestone is done.
 - **The gaps become milestones in the existing phases**, as

@@ -5,7 +5,10 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
+using Axis.Configuration.Modules;
+using Axis.Configuration.Packages;
 using Axis.Configuration.Resources;
+using Axis.Server.Mcp;
 using Axis.Studio;
 
 namespace Axis.Server.Studio;
@@ -15,18 +18,26 @@ namespace Axis.Server.Studio;
 /// applied, which layer applied, and what it added, changed and removed. The marks and the removed elements come from
 /// <see cref="LayerDifference"/>, the code that saving will use, so they agree with the layer that is saved. A layer with
 /// errors of its own is applied as far as the merge gets, and no diagnostics are reported here. <see cref="Reset"/> puts
-/// one element of the layer's resource back as the module has it.
+/// one element of the layer's resource back as the module has it. <see cref="Change"/> reads a layer change of a request's
+/// diff the same way, from the files of a commit rather than a folder.
 /// </summary>
 internal static class StudioModuleLayers
 {
     private const string LayerFolderPrefix = "customizations/";
 
     /// <summary>The answer for <paramref name="found"/> in a module whose layer files are among those of <paramref name="folder"/>.</summary>
-    public static StudioModuleResourceResponse Read(string folder, string module, StudioEndpoints.ModuleFile found)
+    public static StudioModuleResourceResponse Read(string folder, string module, StudioEndpoints.ModuleFile found) =>
+        Read(StudioFolder.List(folder), module, found);
+
+    /// <summary>
+    /// The answer for <paramref name="found"/> in a module whose layer files are among <paramref name="files"/>, which may be the
+    /// resources of a commit that is not in a folder.
+    /// </summary>
+    public static StudioModuleResourceResponse Read(IReadOnlyList<StudioFile> files, string module, StudioEndpoints.ModuleFile found)
     {
         var file = $"modules/{module}/{found.Path}";
         var version = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(found.Text)));
-        if (Resolve(folder, module, found) is not { } state)
+        if (Resolve(files, module, found) is not { } state)
         {
             return Answer(found, file, version, found.Root, null, [], []);
         }
@@ -59,11 +70,48 @@ internal static class StudioModuleLayers
         return Answer(found, file, version, merged, layerInfo, marks, removed);
     }
 
+    /// <summary>
+    /// The module resource that a layer change of a request's diff names, with the layer applied on each side, as <c>module</c>
+    /// of the entry: <paramref name="before"/> is the side before the change and <paramref name="after"/> the side after it. The
+    /// marks and removed elements are those of the after side. A side is null where the target names no module resource, and
+    /// the whole answer is null when neither side has one. <paramref name="target"/> is <c>&lt;module id&gt;/&lt;name&gt;</c>.
+    /// See <c>docs/reference/authoring-requests.md#routes</c>.
+    /// </summary>
+    public static AuthoringRequestLayerChange? Change(string target, StudioModuleSide before, StudioModuleSide after, ModuleCatalog modules)
+    {
+        var slash = target.IndexOf('/', StringComparison.Ordinal);
+        if (slash < 0)
+        {
+            return null;
+        }
+
+        var module = target[..slash];
+        var beforeAnswer = SideAnswer(before, target, module, modules);
+        var afterAnswer = SideAnswer(after, target, module, modules);
+        if ((afterAnswer ?? beforeAnswer) is not { } identity)
+        {
+            return null;
+        }
+
+        return new AuthoringRequestLayerChange(
+            identity.Id,
+            identity.Kind,
+            identity.Name,
+            identity.File,
+            beforeAnswer is null ? null : JsonSerializer.Serialize(beforeAnswer.Content),
+            afterAnswer is null ? null : JsonSerializer.Serialize(afterAnswer.Content),
+            afterAnswer?.Marks ?? [],
+            afterAnswer?.Removed ?? []);
+    }
+
+    private static StudioModuleResourceResponse? SideAnswer(StudioModuleSide side, string target, string module, ModuleCatalog modules) =>
+        StudioEndpoints.FindLayerTarget(side.Compiled, modules, target) is { } found ? Read(side.Resources, module, found) : null;
+
     // The layer of the resource and the resource with it applied. Null when the resource has no layer, or its file cannot
     // be read as one. A layer that removes the whole resource leaves the module's resource as the merged one.
-    private static LayerState? Resolve(string folder, string module, StudioEndpoints.ModuleFile found)
+    private static LayerState? Resolve(IReadOnlyList<StudioFile> files, string module, StudioEndpoints.ModuleFile found)
     {
-        if (FindLayer(folder, module, found) is not { } layerFile || ReadLayer(layerFile) is not { } layer)
+        if (FindLayer(files, module, found) is not { } layerFile || ReadLayer(layerFile) is not { } layer)
         {
             return null;
         }
@@ -92,13 +140,14 @@ internal static class StudioModuleLayers
     public static StudioModuleReset Reset(
         string folder, string module, StudioEndpoints.ModuleFile found, string list, string key, string ifMatch)
     {
-        if (FindLayer(folder, module, found) is not { } layerFile
+        var files = StudioFolder.List(folder);
+        if (FindLayer(files, module, found) is not { } layerFile
             || !string.Equals(StudioWrites.Unquote(ifMatch), layerFile.Version, StringComparison.Ordinal))
         {
             return Refused(StudioModuleResetRefusal.Stale);
         }
 
-        if (Resolve(folder, module, found) is not { } state)
+        if (Resolve(files, module, found) is not { } state)
         {
             return Refused(StudioModuleResetRefusal.Unreadable);
         }
@@ -263,7 +312,7 @@ internal static class StudioModuleLayers
 
     // The layer file of the resource: customizations/<module>/<name>.json, ignoring letter case in the name. A scenario
     // has none, because compilation never applies a layer to a scenario.
-    private static StudioFile? FindLayer(string folder, string module, StudioEndpoints.ModuleFile found)
+    private static StudioFile? FindLayer(IReadOnlyList<StudioFile> files, string module, StudioEndpoints.ModuleFile found)
     {
         if (found.Name is null || found.Kind == ResourceKinds.Scenario)
         {
@@ -272,7 +321,7 @@ internal static class StudioModuleLayers
 
         var prefix = $"{LayerFolderPrefix}{module}/";
         var expected = $"{found.Name}.json";
-        return StudioFolder.List(folder).FirstOrDefault(file =>
+        return files.FirstOrDefault(file =>
             file.Kind == ResourceKinds.Layer
             && file.File.StartsWith(prefix, StringComparison.Ordinal)
             && string.Equals(file.File[prefix.Length..], expected, StringComparison.OrdinalIgnoreCase));
@@ -368,6 +417,25 @@ internal static class StudioModuleLayers
 
         return null;
     }
+}
+
+/// <summary>
+/// One side of a request's diff: the files of an application at one commit. It is compiled and read on first use, so a
+/// request with several layer entries compiles each side once.
+/// </summary>
+internal sealed class StudioModuleSide(IReadOnlyList<(string File, byte[] Bytes)> files, PackageCatalog packages, ModuleCatalog modules)
+{
+    private CompilationResult? _compiled;
+
+    private IReadOnlyList<StudioFile>? _resources;
+
+    /// <summary>The application compiled from the files, as <c>write_layer</c> compiles a draft.</summary>
+    public CompilationResult Compiled =>
+        _compiled ??= ApplicationCompiler.CompileFiles(McpReadTools.Contents(files), packages.Versions, modules.Modules);
+
+    /// <summary>The resources among the <c>*.json</c> files, which is what a layer is read from.</summary>
+    public IReadOnlyList<StudioFile> Resources =>
+        _resources ??= StudioFolder.Resources(files.Where(file => file.File.EndsWith(".json", StringComparison.Ordinal)));
 }
 
 /// <summary>Why a reset of one element cannot go ahead: the layer's version is stale or there is no layer, the layer removes the whole resource, the layer cannot be read back, or no element has the key.</summary>

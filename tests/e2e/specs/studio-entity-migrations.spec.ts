@@ -7,13 +7,7 @@ import { startServer } from "../activate";
 import { confirmDialog, waitForDialog } from "../dialogs";
 import { e2eApp } from "../server-settings";
 import { useSession } from "../sessions";
-import {
-  closeEntityField,
-  entityFieldAction,
-  openEntityField,
-  openKind,
-  openProblemsIfAny,
-} from "../studio-resources";
+import { closeEntityField, confirmPublish, entityFieldAction, openEntityField, openKind, openProblemsIfAny } from "../studio-resources";
 
 // Each journey starts a second server and publishes once, which takes a while.
 test.setTimeout(240_000);
@@ -70,7 +64,7 @@ async function publishedOrder(page: Page, testInfo: TestInfo, prefix: string) {
     await slowAnimations(page);
     await page.goto(`${server.url}/studio?app=${name}`);
     await page.getByRole("button", { name: "Publish…", exact: true }).click();
-    await confirmDialog(page, "Publish");
+    await confirmPublish(page);
     await expect(page.getByTestId("studio-request-status")).toHaveAttribute(
       "data-status",
       "succeeded",

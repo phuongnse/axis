@@ -728,7 +728,7 @@ The `connect` command reads these settings, as environment variables with the na
 An application's package sits in the application's folder, and the tenant's author brings it. It is not
 trusted code, so the platform gives it more limits than an installation's package gets.
 
-- **The sandbox** _(planned for M37)_. The runners run under gVisor (`runsc`), in their own container,
+- **The sandbox.** The runners run under gVisor (`runsc`), in their own container,
   `application-package-host`, beside the worker. The Helm chart sets that pod's `runtimeClassName` and
   Compose sets that service's `runtime`, so the `package-host-*` containers keep the plain runtime. Compose's
   service sits behind the `application-packages` profile, so an installation without gVisor runs the rest.
@@ -766,7 +766,7 @@ trusted code, so the platform gives it more limits than an installation's packag
   [package run time a day](tenant-quotas.md#package-run-time-a-day). A customer-hosted package counts for nothing there.
 - **Plans** _(planned for M37)_. In Axis SaaS only a paid plan allows an application's packages, see
   [the catalogue](plans.md#the-catalogue).
-- **Switched on by the tenant** _(planned for M37)_. The tenant's administrator turns them on, see
+- **Switched on by the tenant.** The tenant's administrator turns them on, see
   [application packages](user-administration.md#application-packages), and gives each author the
   `developer` role, see [roles](user-administration.md#roles).
 - **In the folder.** `packages/<id>/` holds the package's manifest, adapter, lock file and tests. No file

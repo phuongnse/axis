@@ -135,6 +135,13 @@
       "status": "proposed"
     },
     {
+      "concept": "Action: Overwrite",
+      "en": "Overwrite",
+      "vi": "Ghi đè",
+      "status": "proposed",
+      "note": "Replaces a saved view's search, filter and sort with the current ones."
+    },
+    {
       "concept": "Calendar",
       "en": "calendar",
       "vi": "lịch làm việc",
@@ -403,18 +410,25 @@
       "note": "What AI will change in an application, which its author approves. It is not the billing plan, which is \"gói dịch vụ\"."
     },
     {
+      "concept": "Action: Approve plan",
+      "en": "Approve plan",
+      "vi": "Duyệt kế hoạch",
+      "status": "proposed",
+      "note": "The author's action that starts the work of an AI request once its plan is read."
+    },
+    {
+      "concept": "Action: Drop (an AI request)",
+      "en": "Drop",
+      "vi": "Bỏ yêu cầu",
+      "status": "proposed",
+      "note": "Ends an AI request. The Vietnamese is not \"Hủy\", because the same dialog has Cancel."
+    },
+    {
       "concept": "Work (of an AI request)",
       "en": "Work",
       "vi": "Thực hiện",
       "status": "proposed",
       "note": "The step where AI makes its change, after its plan is approved. Shown as an item of a request's page."
-    },
-    {
-      "concept": "Duration",
-      "en": "duration",
-      "vi": "thời lượng",
-      "status": "proposed",
-      "note": "How long a step of an AI request took, as a column of its History table."
     },
     {
       "concept": "AI request state: Planning",

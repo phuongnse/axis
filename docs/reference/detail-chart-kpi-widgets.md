@@ -29,12 +29,21 @@ A `detail` widget shows one record read-only, read through the record API, and w
   missing or malformed parameter, and a record that is missing or unreadable, show the not-found page inside the site
   shell. A `detail` inside `columns`, `tabs` or a `section` is drawn too, see
   [container widgets](container-widgets.md).
+- **Record from the address** _(planned)_. On a page that a site names as a record page, the SPA reads `record` from the
+  address's `/{id}`, as [routing](frontend.md#routing) says.
+- **A missing record** _(planned)_. A record that the record API answers `404` for, because it is missing or the
+  person cannot open it, keeps the page's heading and shows the missing-record line and its link, see
+  [routing](frontend.md#routing).
 - **Fields.** With a `form`, the widget shows its sections in order under their titles. Without one, it shows every
   readable field in declaration order. Every value is read-only and formatted as a table cell shows it. A `references`
   field shows its labels in order as tags, or a record's id where it has no label. An empty value, an empty set of
   references and a file that is not set among them, shows "Not set" in muted italics, see
   [shown values](frontend.md#shown-values). The widget ignores `visibleWhen`, `requiredWhen`, `readOnlyWhen` and
   `steps`.
+- **Reference links** _(planned)_. A `reference` value is a link to its record page, and so is each entry of a
+  `references` field, see [opening things](actions-and-controls.md#opening-things).
+- **Sections as parts** _(planned)_. With a `form`, each titled section is a part, as a form's sections are: its
+  title is drawn by `SectionPart`, and a `borderSubtle` rule sits above a section drawn after another.
 - **Layout.** The fields are a description list (`dl`, `dt`, `dd`). Each label sits above its value, as a read-only
   form field reads, with `spacing-md` between fields, and values are in `text`. The labels and the values follow the
   field look of the [form widget](form-widget.md), and the fields follow the form sections' widths, as fields in
@@ -81,15 +90,19 @@ as the [widget binding](data-sources.md#widget-binding) says.
   category shows its label from `labels`, and a `null` category shows a platform text.
 - **Values.** Decimals arrive as [source text](table-widget.md#number-source-text). The SPA turns them into numbers only to
   draw, and the tooltip and the data table keep the source text.
-- **Look.** The widget draws a card with the chart's title above the chart. The shared chart component in
-  `web/src/platform/Chart.tsx` draws bar, line and pie charts from categories and labelled series, with series colours
-  from the theme tokens in light and dark mode.
+- **Look.** The shared chart component in `web/src/platform/Chart.tsx` draws bar, line and pie charts from categories
+  and labelled series, with series colours from the theme tokens in light and dark mode.
+- **A tile** _(planned)_. A chart is a tile: on `surface` with a `borderSubtle` border, `radius-base` corners and
+  `spacing-md` padding, as a home page tile is. Its title is a heading at the `heading5` size, `spacing-sm` above the
+  chart, with no header bar and no rule.
 - **Loading the library.** The SPA loads the chart library lazily in its own chunk, as it loads React Flow, so a page
   without a chart never loads it. `scripts/build.sh` prints the chunk's size and fails when the chunk is missing or
   part of the main bundle.
 - **Accessibility.** The title is the chart's accessible name. Screen readers get the data as a table that only they
   reach, with the category and each measure as columns. The loading, empty, error, null category and
   more-than-100-groups texts are platform texts.
+- **Hidden table** _(planned)_. The table that only screen readers reach hides in a `div` with `visuallyHidden`, never
+  on the table itself, because a table sizes to its rows and would spill out of its tile.
 
 ### Drill-down
 
@@ -153,6 +166,10 @@ A `kpi` widget shows one measure of a data source as a tile, with its label.
 - **Look.** The label sits above, in the field label style of the [form widget](form-widget.md)'s field look. The
   measure is below it, large and semibold, in tabular figures. The comparison sits under it at body size, with its
   label muted, no colon between the label and the value, and the value in tabular figures.
+- **A tile** _(planned)_. A KPI is a tile in the same way: on `surface` with a `borderSubtle` border, `radius-base`
+  corners and `spacing-md` padding. Tiles in `columns` sit `spacing-md` apart.
 - **Click and reading.** With a `navigate`, the tile is a link to the target page, and the navigate label is the tile's
   last line, inside the link. The tile reads as `<label>: <value>`, and a comparison adds
   `<comparison label>: <comparison value>`. Loading and error states use platform texts.
+- **A link tile** _(planned)_. With a `navigate`, the whole tile is the link. Its link words are in `primaryText`, hover
+  changes nothing, and keyboard focus draws the `focusRing` outline, as a home page tile does.

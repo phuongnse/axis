@@ -19,9 +19,9 @@ keeps every part of them that still holds.
 
 - **A tree of widgets.** The containers `columns`, `tabs` and `section` hold other widgets, nested to
   at most 4 levels, and column widths are twelfths that add up to 12.
-- **One owner for each part of the address.** A page may hold several tables, such as a record's
-  related lists, and each table owns its part of the address under a prefix of its own. A page holds
-  at most one of `form`, `taskInbox` and `processInspector`.
+- **One owner for each part of the address.** _(planned for M42)_ A page may hold several tables,
+  such as a record's related lists, and each table owns its part of the address under a prefix of
+  its own. A page holds at most one of `form`, `taskInbox` and `processInspector`.
 - **Policies prune the tree.** A widget the user cannot read is left out, and so is a container left
   empty. A page is readable when one of its widgets is.
 - **One breakpoint for the platform.** Below it, columns stack, tables scroll inside their widget and
@@ -33,9 +33,9 @@ keeps every part of them that still holds.
   is reserved.
 - **A name map binds them.** A table, a chart or a KPI binds a page parameter to a data source
   parameter by name, not by an expression.
-- **A page may have a filter bar.** Its inputs set the page's parameters, so every table, chart and
-  KPI bound to them follows, and a click on a chart's group opens a page with that group's value, for
-  a reader to drill down.
+- **A page may have a filter bar.** _(planned for M42)_ Its inputs set the page's parameters, so
+  every table, chart and KPI bound to them follows, and a click on a chart's group opens a page with
+  that group's value, for a reader to drill down.
 - **Navigate actions.** A `navigate` action names a target page and gives each of its parameters an
   expression over the row or the record, which may follow a short reference path. It sits in a
   table's row and toolbar actions ([D59](d59-table-row-and-toolbar-actions.md)) and in a form's
@@ -62,27 +62,30 @@ keeps every part of them that still holds.
 - **Apache ECharts is a detail of the SPA,** as
   [D58](d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md) requires of a specialised
   library, loaded lazily in its own chunk.
-- **Text may have several lines, or be rich.** A `text` field may be multi-line, and a `richText`
-  field keeps a cleaned subset of HTML, which a search reads as its plain words.
-- **Forms take their context.** A form groups its sections in tabs and folds a section. A field's
-  default may be the person signed in, today, or a value its page gives. A lookup lists only the
-  records a filter over the form's other fields allows, and the server checks the same filter on
-  save. A child collection keeps the order its rows are dragged into.
-- **A new record keeps a draft.** A form for a new record saves a draft on the server as the person
-  types, for that person only, until it is saved or 30 days pass.
-- **Tables act on many rows and edit in place.** A table may have bulk actions on the selected rows,
-  to start a process, set fields or delete, under the grants of each row and with a result for each
-  row. A cell may be edited where its field may be written. An application's table has the column
-  chooser of [D153](d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md).
-- **More views.** A calendar shows records by a date field and moves one by a drag where it may be
-  updated. A board groups records by an enum or a reference field and moves one between groups by a
-  drag, as a record write under every policy and contract. Cards show records as tiles, and a tree
-  shows records under the record they refer to. A content widget shows text, an image, a link or a
-  note, in each language of the site.
-- **Navigation and a person's own places.** A site's menu entries may sit under a parent. Each role
-  may have its own home page. Each person keeps favourites and recent records, on the server.
-- **Each site has its brand.** A site names its logo and its main colour, the other colours follow
-  from it, and the compiler refuses a colour whose text would not meet AA contrast.
+- **Text may have several lines, or be rich.** _(planned for M42)_ A `text` field may be multi-line,
+  and a `richText` field keeps a cleaned subset of HTML, which a search reads as its plain words.
+- **Forms take their context.** _(planned for M42)_ A form groups its sections in tabs and folds a
+  section. A field's default may be the person signed in, today, or a value its page gives. A lookup
+  lists only the records a filter over the form's other fields allows, and the server checks the
+  same filter on save. A child collection keeps the order its rows are dragged into.
+- **A new record keeps a draft.** _(planned for M42)_ A form for a new record saves a draft on the
+  server as the person types, for that person only, until it is saved or 30 days pass.
+- **Tables act on many rows and edit in place.** _(planned for M42)_ A table may have bulk actions
+  on the selected rows, to start a process, set fields or delete, under the grants of each row and
+  with a result for each row. A cell may be edited where its field may be written. An application's
+  table has the column chooser of
+  [D153](d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md).
+- **More views.** _(planned for M42)_ A calendar shows records by a date field and moves one by a
+  drag where it may be updated. A board groups records by an enum or a reference field and moves one
+  between groups by a drag, as a record write under every policy and contract. Cards show records as
+  tiles, and a tree shows records under the record they refer to. A content widget shows text, an
+  image, a link or a note, in each language of the site.
+- **Navigation and a person's own places.** _(planned for M42)_ A site's menu entries may sit under
+  a parent. Each role may have its own home page. Each person keeps favourites and recent records,
+  on the server.
+- **Each site has its brand.** _(planned for M42)_ A site names its logo and its main colour, the
+  other colours follow from it, and the compiler refuses a colour whose text would not meet AA
+  contrast.
 
 The shapes are in [resource files](../reference/resource-files.md#resource-file-shape), the drawing
 in [container widgets](../reference/container-widgets.md), the policies and the breakpoint in

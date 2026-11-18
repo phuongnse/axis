@@ -3,10 +3,14 @@ import {
   dataSourceKeyedLists,
   entityKeyedLists,
   formKeyedLists,
+  keyedListsOf,
   layerMarks,
   markName,
   markOf,
   pageListKey,
+  policyKeyedLists,
+  processKeyedLists,
+  seedKeyedLists,
   textKeyedMaps,
 } from './layerMarks'
 
@@ -262,5 +266,31 @@ describe('markName', () => {
     expect(markName(text, 'added', 'onHold')).toBe('onHold, added by this application')
     expect(markName(text, 'changed', 'amount')).toBe('amount, changed by this application')
     expect(markName(text, 'removed', 'old')).toBe('old, removed by this application')
+  })
+})
+
+describe('keyedListsOf', () => {
+  it.each([
+    ['entity', entityKeyedLists],
+    ['process', processKeyedLists],
+    ['seed', seedKeyedLists],
+    ['dataSource', dataSourceKeyedLists],
+    ['policy', policyKeyedLists],
+  ] as const)('keys the lists of a %s as its editor does', (kind, keyedLists) => {
+    expect(keyedListsOf(kind, null)).toEqual({ keyedLists, maps: [] })
+  })
+
+  it('keys a page by name at any depth, and a text by its map', () => {
+    expect(keyedListsOf('page', null).keyedLists).toBe(pageListKey)
+    expect(keyedListsOf('text', null)).toEqual({ keyedLists: {}, maps: textKeyedMaps })
+  })
+
+  it('keys a form by the sections of its content', () => {
+    const content = { sections: [{ name: 'main', fields: [] }] }
+    expect(keyedListsOf('form', content).keyedLists).toEqual(formKeyedLists(content))
+  })
+
+  it('keys no list of a kind that has none', () => {
+    expect(keyedListsOf('rule', null)).toEqual({ keyedLists: {}, maps: [] })
   })
 })

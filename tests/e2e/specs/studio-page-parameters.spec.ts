@@ -5,11 +5,11 @@ import path from "node:path";
 import { expect, test } from "../test";
 import type { Page } from "@playwright/test";
 import { startServer } from "../activate";
-import { confirmDialog, waitForDialog } from "../dialogs";
+import { waitForDialog } from "../dialogs";
 import { pickAction, pickOption } from "../select";
 import { e2eApp } from "../server-settings";
 import { useSession } from "../sessions";
-import { createResource, openFormTab, openNewApplication, writeLabel } from "../studio-resources";
+import { confirmPublish, createResource, openFormTab, openNewApplication, writeLabel } from "../studio-resources";
 
 // A second server starts in beforeAll, and the journey creates an application and publishes it. Publishing Approvals
 // runs the contract scenarios of both built-in modules, which takes longer than the other Studio journeys.
@@ -220,7 +220,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     expect(list.widgets[1].rowActions?.[0].parameters).toEqual({ department: "id" });
 
     await page.getByRole("button", { name: "Publish…", exact: true }).click();
-    await confirmDialog(page, "Publish");
+    await confirmPublish(page);
     await expect(page.getByTestId("studio-request-status")).toHaveAttribute(
       "data-status",
       "succeeded",

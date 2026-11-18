@@ -207,8 +207,19 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
         return new StudioMain(commit.Sha, files, history);
     }
 
+    /// <summary>
+    /// The newest revision on <c>main</c> after the commit <paramref name="since"/> that changed any of <paramref name="paths"/>,
+    /// or null when none did. A draft's conflict names it, see
+    /// <c>docs/reference/authoring-requests.md#accepting</c>.
+    /// </summary>
+    internal static StudioRevision? LastChange(Repository git, string since, IReadOnlySet<string> paths) =>
+        Chain(git).TakeWhile(commit => commit.Sha != since)
+            .Where(commit => Changes(git, commit).Any(change => paths.Contains(change.Path)))
+            .Select(Describe)
+            .FirstOrDefault();
+
     // The commits of main from the tip along the first parent.
-    private static IEnumerable<Commit> Chain(Repository git)
+    internal static IEnumerable<Commit> Chain(Repository git)
     {
         for (var commit = git.Refs[Branch]?.ResolveToDirectReference().Target as Commit; commit is not null; commit = commit.Parents.FirstOrDefault())
         {
@@ -220,7 +231,7 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
         Chain(git).FirstOrDefault(commit => string.Equals(commit.Sha, id, StringComparison.OrdinalIgnoreCase));
 
     // Rename detection is off, so a moved file is one removed and one added.
-    private static TreeChanges Changes(Repository git, Commit commit) =>
+    internal static TreeChanges Changes(Repository git, Commit commit) =>
         git.Diff.Compare<TreeChanges>(commit.Parents.FirstOrDefault()?.Tree, commit.Tree, new CompareOptions { Similarity = SimilarityOptions.None });
 
     /// <summary>

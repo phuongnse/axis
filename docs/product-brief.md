@@ -83,8 +83,9 @@ They need:
 What sets Axis apart for them is that they change a standard process anywhere, keep its upgrades,
 and its core rules still hold on every write.
 
-- **Changes described in words** _(planned for M35)_. An author describes a change in words, and an
-  agent makes it under the same rules.
+- **Changes described in words.** An author describes a change in words in Studio, and an agent makes
+  it as a draft under the same rules. The author reviews the draft and accepts it, see
+  [AI authoring in Studio](reference/ai-authoring-in-studio.md).
 - **What large organizations, banks and government ask for** _(planned for M32)_. Conformance runs,
   signed images and alert rules for their own operations teams.
 

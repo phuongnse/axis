@@ -70,7 +70,7 @@ Each kind of text has its own shape, the same on every screen:
 
 | Kind                      | How it reads                                                                  | Example (en)                                                                  |
 | ------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Button, menu item         | A verb and its object, no period. A button that opens a dialog ends with "…". | Add field, New entity…, Publish…                                              |
+| Button, menu item         | A verb and its object, no period. A button that opens a dialog or a page where the person confirms ends with "…". | Add field, New entity…, Publish…                                              |
 | Dialog title              | The question or the task, as the finish button names it.                      | Delete the role?                                                              |
 | Field label               | A noun phrase, no period, no colon.                                           | Display field                                                                 |
 | Help text                 | One sentence that says what the field is for or what to enter, with a period. | The field that names a record in lists and pickers.                           |

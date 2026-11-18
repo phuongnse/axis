@@ -1,13 +1,13 @@
 // - No '(planned for Mx)' marker under docs/ names a milestone that docs/roadmap.md calls Done, and each
-//   marker '_(planned for Mx)_' sits on a line of its own under a heading, right after a bold lead-in,
-//   or in a table row, never in the middle of a sentence.
+//   marker '_(planned for Mx)_' or '_(planned)_' sits on a line of its own under a heading, right after a
+//   bold lead-in, or in a table row, never in the middle of a sentence.
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { lines, markdownFiles } from './helpers.mjs'
 
 const roadmapRowPattern = /^\| \*\*(M\d+)\*\* \| [^|]+\| ([^|]+?) \|/
 const plannedPattern = /planned for (M\d+(?:(?:, | and )M\d+)*)/g
-const plannedMarkerPattern = /_\(planned for M\d+(?:(?:, | and )M\d+)*\)_/g
+const plannedMarkerPattern = /_\(planned(?: for M\d+(?:(?:, | and )M\d+)*)?\)_/g
 
 /** Reports the planned markers that name a Done milestone, and those that do not sit where a marker belongs. */
 export function checkPlannedMarkers(root, report) {

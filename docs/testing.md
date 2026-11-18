@@ -161,7 +161,7 @@ fails when the table and the specs differ.
 | `studio-module-pickers`, `studio-module-policy`, `studio-module-process`, `studio-module-process-policy` and `studio-module-text`                                                                                                                                                                                                                       | A temporary copy of `tests/e2e/fixtures/module-app`, and a temporary `Modules:Path` with the sample modules and the fixture module `checklists`                                                                                                                                                                                                               |
 | `studio-module-contract`                                                                                                                                                                                                                                                                                                                                | A temporary copy of `tests/e2e/fixtures/approvals-app`                                                                                                                                                                                                                                                                                                        |
 | `studio-new-application`, `studio-page-containers`, `studio-page-dashboard` and `studio-page-parameters`                                                                                                                                                                                                                                                | A temporary `Studio:ApplicationsPath`                                                                                                                                                                                                                                                                                                                         |
-| `studio-entity-migrations` and `purchase-request-release`                                                                                                                                                                                                                                                                                               | Folders under the test's output path                                                                                                                                                                                                                                                                                                                          |
+| `studio-entity-migrations` and `purchase-request-release`                                                                                                                                                                                                                                                                                               | Folders under the test's output path, and for `purchase-request-release` a `Studio:RevisionsPath` there too                                                                                                                                                                                                                                                   |
 
 The specs on the journey server, such as `service-desk-journey`, do not start their own server over a Studio
 folder, so the table does not list them. Each builds its own application under the journey server's
@@ -214,13 +214,43 @@ directory. The server listens on https at `AXIS_E2E_TENANT_HTTPS_PORT`, with a c
 on the tenant host with no port in the address. No redirect address is added by hand: only
 `tenant create` writes them.
 
+**The Ask AI agent spec** plans a request for real. It runs `tenant create` for `ask-ai-agent`, on the host
+`ask-ai-agent.eval.localhost`, and gives an author of that realm the author role and the agent client's roles mapper. Its
+server starts on offset 9, from the directory, with Ask AI on through the scripted binding. The spec makes its own
+certificate for `*.eval.localhost` with an authority of its own, not the run's `*.localhost` certificate, because
+OpenSSL in the agent host refuses a wildcard with one label after it. A CONNECT proxy opens the tunnel from
+`ask-ai-agent.eval.localhost:443` to the server's https port, so the agent host calls the tenant's `/mcp` at its own
+address. The agent host is `Axis.Agent` in `Testing`, with `tests/e2e/agent-host.ts` and the scripted answers of a plan
+per request: the first request's plan, a second request's plan and its new plan. A second author of the tenant, `colleague`,
+has the author role too. The spec starts the agent host only after the request's page shows Planning, because a running
+host could plan the request before the page's first read. The page then shows Awaiting approval with the plan. The
+colleague opens that request and sees the plan with no actions. The author asks for another plan with a comment on the
+second request, sees the new plan and drops it. The spec stops the agent host before the author approves the first
+request, because a running host would carry it past Working, and the page then shows Working. A request whose compile
+check fails in every fix round ends Failed, with its reason, its checks and its draft's diff. The layer test makes a
+second application, `AskAiApprovals`, from the `approvals` template, which pins the organization module. The scripted
+answers are a plan, a `write_layer` that adds a text field `costCentre` to the module's Department entity, the end of
+work and the review `PASSED`. The author approves the plan, and the request reaches Ready with Checks Passed. Its diff
+lists Department with `costCentre` marked Added, and the request stays Ready, for the browser tests that accept it. The
+check runs the request's scenarios as a `test` publish request, so the spec starts a publisher of its own, with the
+server's Studio settings, the scenario role, `AXIS_E2E_SCENARIO_DATABASE`, and the runtime role, `AXIS_E2E_DATABASE`, for
+the accept's write lock, from just before it approves the plan until the request reads Ready, and again from just
+before the author's Accept until the accept ends, because the publisher runs the accept too. That publisher serves
+every directory tenant, so `startPublisher` holds a PostgreSQL advisory lock for each publisher's life: this one takes
+it exclusively, and the publishers of the cell specs share it. The colleague then opens that ready request and sees its
+diff and 'Waiting for its author to accept', with no Accept or Drop…. The accept test runs after that one. The author
+clicks Accept, sees Accepted, and finds the accept's revision first in History, as 'Accept draft' through Studio. The
+author signs in once, because a code cannot be used twice within its period. The spec stops the publisher, the proxy,
+its browser and its server when the test ends.
+
 **The cell console spec** starts a server of its own in `Testing`, on the next port offset, with the
 `Cell:*` settings of a cell, `Cell:ConsoleHost` set to `console.localhost` and the secret of the
 `axis-cell-console` client. The spec's browser maps `console.localhost` and the tenant host on
 port 443 to that server. The operator signs in through the `axis-operators` realm with a password and
 a code, and a user of the tenant it creates is refused on the console host. Its server and publisher get the
 `Cell:ExportStorage` settings of the MinIO that `scripts/e2e.sh` starts, and the spec exports a tenant and downloads
-the ZIP after the warning. Both cell specs start their server, publisher and browser through `tests/e2e/cell.ts`.
+the ZIP after the warning. Both cell specs start their server, publisher and browser through `tests/e2e/cell.ts`. Their publishers take the publisher lock shared, so a cell spec waits while the Ask AI
+agent spec's publisher runs, and the two cell specs run side by side.
 
 **The cell quota journey** runs a cell on the port offset after the cell console spec's, with a server that reads the
 tenant directory every 2 seconds, so a new tenant and a changed quota take effect within seconds. It signs in as an

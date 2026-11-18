@@ -191,6 +191,8 @@ runs Playwright in Chromium. It:
 - starts MinIO with the bucket `axis-exports` and a KMS key, which the export job's encrypted upload needs, and
   gives Playwright its five `AXIS_E2E_EXPORT_STORAGE_*` values. Only the cell specs pass them on, as the
   `Cell:ExportStorage` settings of their server and their publisher;
+- gives Playwright the connection string of the scenario role as `AXIS_E2E_SCENARIO_DATABASE`, which the publisher of the
+  Ask AI agent spec passes on as its `Scenarios:ServerConnectionString`;
 - creates the `journey` tenant for Studio journeys, with its own database `axis_journey`, its roles
   `axis_journey_schema` and `axis_journey_runtime`, and its server on `127.0.0.2`, which the worker
   and the publisher serve too;
@@ -199,7 +201,9 @@ runs Playwright in Chromium. It:
 - starts the control plane with its databases `axis_controlplane` and `axis_directory`, which sends its emails
   to that Mailpit, see [the E2E stack](testing.md#the-e2e-stack);
 - makes a throwaway TLS certificate for the run, which the https server of each spec that runs `tenant create`
-  uses, on `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283) and the ports after it, one offset for each spec;
+  uses, on `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283) and the ports after it, one offset for each spec. The Ask AI
+  agent spec is the exception: it makes its own certificate for `*.eval.localhost`, see
+  [the E2E stack](testing.md#the-e2e-stack);
 - builds and checks the design-system bundle in `artifacts/design-system` for its spec, see
   [widget previews](reference/widget-previews.md).
 
@@ -323,9 +327,8 @@ These workflows run on `main`, and none of them gates a NexKit merge.
 
 - **CodeQL**, `.github/workflows/codeql.yml`, scans C# and TypeScript on hand-made pull requests to
   `main` and on `main`. Its alerts go to GitHub code scanning, and its check fails on a new high or
-  critical alert. It does not scan NexKit's pull requests: GitHub gives each one a run that waits for
-  approval and runs no job, and ends it as failed when the pull request merges, so a failed CodeQL run
-  on a `nexkit/` branch is not an alert. NexKit starts the scan on `main` every few merges, see
+  critical alert. A NexKit pull request gets a CodeQL run whose job is skipped, because the scan on
+  `main` covers NexKit's work. NexKit starts the scan on `main` every few merges, see
   [delivery](delivery.md#decisions).
 - **Performance**, `.github/workflows/performance.yml`, runs `scripts/performance.sh` on `main` when
   NexKit starts it, and on demand. NexKit watches it as it watches CI, so a failure that repeats opens
@@ -744,13 +747,17 @@ The realm `axis-operators`, from `samples/keycloak/axis-operators-realm.json`, i
 
 Development, Compose, `scripts/dev.sh` and E2E give the `default` tenant these bindings:
 
-| Binding                                | Value                                                  | Read by                                          |
-| -------------------------------------- | ------------------------------------------------------ | ------------------------------------------------ |
-| `CompanyIssuer`                        | The `company` realm's issuer URL                       | The purchase request sample's `company` provider |
-| `CompanyClientId`                      | `axis-broker`                                          | The same                                         |
-| `CompanyClientSecret`                  | `axis-broker-development-secret`                       | The same                                         |
-| `PurchaseRequestApprovedWebhookUrl`    | The stub's `/webhooks/purchase-request-approved` route | The purchase request sample's approval webhook   |
-| `PurchaseRequestApprovedWebhookSecret` | The stub's default webhook secret                      | The same                                         |
+| Binding                                | Value                                                  | Read by                                                    |
+| -------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------- |
+| `CompanyIssuer`                        | The `company` realm's issuer URL                       | The purchase request sample's `company` provider           |
+| `CompanyClientId`                      | `axis-broker`                                          | The same                                                   |
+| `CompanyClientSecret`                  | `axis-broker-development-secret`                       | The same                                                   |
+| `PurchasingSystemUrl`                  | The stub's base URL                                    | The purchase request sample's `PurchasingSystem` connector |
+| `PurchasingSystemTokenUrl`             | The stub's `/oauth/token` route                        | The same                                                   |
+| `PurchasingSystemClientId`             | `axis-purchasing`                                      | The same                                                   |
+| `PurchasingSystemClientSecret`         | `axis-development-purchasing-secret`                   | The same                                                   |
+| `PurchaseRequestApprovedWebhookUrl`    | The stub's `/webhooks/purchase-request-approved` route | The purchase request sample's approval webhook             |
+| `PurchaseRequestApprovedWebhookSecret` | The stub's default webhook secret                      | The same                                                   |
 
 ### The samples and their users
 
@@ -802,6 +809,10 @@ The run's shared publisher reads the `Tenants` section, so it runs no provisioni
 jobs, such as the cell console spec and the cell quota journey, starts its own publisher with `startPublisher` of the
 same file, which reads the tenant directory with a cell's settings and runs the jobs. Both start it, with their server
 and browser, through `startCell` of `tests/e2e/cell.ts`, see [the E2E stack](testing.md#the-e2e-stack).
+The Ask AI agent spec starts a publisher too, with the server's Studio settings, for the scenarios of its request's
+checks and of its accept. A publisher claims the work of every directory tenant, so `startPublisher` holds a PostgreSQL
+advisory lock for the publisher's whole life. The Ask AI agent spec's publisher takes it alone, and the cell specs'
+publishers share it.
 
 ## Widget previews
 

@@ -43,6 +43,10 @@ their own controls where they expect them.
   `borderSubtle` rule on its right. An open entry shows its label alone, and a collapsed entry its icon
   alone, see [navigation icons](#navigation-icons). No entry shows a count. The entry of the current
   page is drawn in `primaryText` on a `primary` tint and marked `aria-current`.
+- **Where a page is opened from** _(planned)_. The entry whose path is the page's path or a parent of it is marked, as
+  before. A page that matches no entry, such as a form at `/<site>/request/new` opened from a table, marks the entry of
+  the address it was opened from, its `from`, which a table or a record link passes in history state. A page opened with no `from`,
+  such as in a new tab, marks no entry.
 - **Parent entries** _(planned for M35)_. A `ShellNavigation` entry that holds entries is a parent entry, drawn as Ant
   Design's inline submenu.
 - **Menu groups** _(planned for M42)_. A site's navigation entry with `entries` is a parent entry, as
@@ -54,13 +58,14 @@ their own controls where they expect them.
   workspace, with `spacing-md` round its content, compact sidebar entries and a compact band, see
   [Studio workspace](studio-workspace.md#workspace). The sidebar and its collapse button show even on a
   one-page site.
-- **A right column.** A page claims a column on the right by rendering `ShellAside`. The column is
-  `sidePanel` wide and runs from under the header to the footer.
-- **One side panel in Studio.** Studio shows one side panel at a time, such as the problems panel, in
-  `StudioSidePanel`, which draws it in `ShellAside`. By default the panel's head stays in place, its body scrolls on
-  its own, and the page keeps the browser's scroll.
-- **Opening one closes the other.** The Ask AI request panel is a side panel too, and opening one
-  panel closes the other.
+- **One side panel frame** _(planned)_. Every page draws its side panel in `SidePanel`, in a column on the right
+  from under the header to the footer. One shows at a time, so opening one, such as the problems panel or the Ask AI
+  request panel, closes the other. It holds details or tools for what is chosen, while the page stays in use. A task
+  to finish or cancel is a dialog, and what stands alone is a page. A handle on its edge, a `separator` that takes the
+  arrow keys, Home and End, sets its width from `sidePanel` to half the shell, and the browser keeps that width, so
+  every side panel opens at the width last chosen. Its title can carry a `status`, such as a `StatusTag`. Its head
+  stays in place and its body scrolls on its own, keeping room for its scrollbar, so its content keeps its width when
+  a scrollbar comes. The page keeps the browser's scroll.
 - **Collapsed sidebar.** The header's button collapses the sidebar to a narrow strip of the entries'
   icons, each centred and named by a tooltip, and opens it again. Collapsed, a group's title gives way
   to a thin rule. The button names what it does, "Collapse navigation" or "Expand navigation", and has
@@ -82,10 +87,18 @@ their own controls where they expect them.
   page. The page declares its colour scheme, so every scrollbar, the page's and the sidebar's, follows the mode.
 - **Flush page area.** Pages draw on `surface`, flush with the frame, with `spacing-lg` padding. A wide table
   scrolls inside its widget, so the page never scrolls sideways.
-- **Parts a rule apart.** A page's parts sit a `divider` rule apart, and each part's heading is an `h2` drawn at
-  `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule.
-- **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area, just above the footer. It
-  has no link back, because the navigation and the breadcrumb lead back.
+- **Flush page area for sites** _(planned)_. An application site's pages draw on the same flush page area, with no
+  `canvas` under or between the header, the sidebar and the page. A list page's table sits straight under the heading.
+  A small block that stands for one thing, such as a home page tile or a dashboard's KPI or chart, keeps its own
+  `borderSubtle` border and `radius-base` corners.
+- **Parts a rule apart** _(planned)_. A page's parts sit a `borderSubtle` rule apart, and each part's heading is an `h2`
+  drawn at `heading5`. Each part draws the rule above itself, so a part that shows nothing leaves no rule.
+- **Action bar** _(planned for M35)_. A page's action bar sits at the foot of the page area, just above the footer.
+- **The bar slot** _(planned)_. The save bar draws in the shell's bar slot, `ShellBarSlot`, in the content column
+  right above the footer, and it sticks to the window's foot while the page scrolls. See the
+  [save bar](studio-resource-form.md#save-bar).
+- **No link back** _(planned)_. A page has no link back, because the navigation and the browser lead back. A record's
+  page whose record does not exist keeps one link to its list, see [routing](frontend.md#routing).
 - **Footer.** A slim footer on `surface` with a `borderSubtle` rule above it, with `spacing-xs`
   padding above and below and `spacing-lg` at its sides, and its text in `textMuted`. Without a
   sidebar it runs the full width under the page. Beside a sidebar it sits under the content column
@@ -119,22 +132,37 @@ application never depends on the UI library.
 
 ## Page header
 
-Every page of a site starts with a header band on `surface` across the page area, with a
-`borderSubtle` rule below it, over the page's widgets. It says where the person is and what
-the page is.
+A page with a band starts with a header band on `surface` across the page area, with a `borderSubtle` rule
+below it. It says where the person is and what the page is.
 
-- **Regular band.** The band holds the breadcrumb, then the page title in `heading4`. It has
-  `spacing-lg` padding above and at its sides, `spacing-md` below the title, and `spacing-xs` between
-  the breadcrumb and the title.
-- **Breadcrumb.** The breadcrumb starts at the site and ends at the page: "Purchase requests ›
-  Requests". A form page opened from a table names that table's navigation page between them,
-  "Purchase requests › Requests › New request", and its link returns to the table with its paging and
-  sorting. Every step but the last is a link, and the last is marked `aria-current`.
+- **Regular band.** The band of a platform page that keeps one, the Sessions and Users pages, holds the breadcrumb,
+  then the page title in `heading4`. It has `spacing-lg` padding above and at its sides, `spacing-md` below the title,
+  and `spacing-xs` between the breadcrumb and the title.
+- **Breadcrumb.** The breadcrumb starts at the site and ends at the page: "Axis › Your sessions". Every step but the
+  last is a link, and the last is marked `aria-current`.
+- **Site pages** _(planned)_. A page of an application site starts with its title in `heading4` as the page's
+  level-one heading, with no breadcrumb and no band of its own. The sidebar marks where the person is, and the browser
+  goes back, with a table's search, sort and page kept in the address.
 - **Compact band.** A workspace page, such as every page of Studio, draws its band as one row of the
   `bar` height: the page's state first, then its own actions. It has no breadcrumb, and it stays under
   the header while the page scrolls, see [band](studio-workspace.md#band).
 - **Actions stay with their widget.** A widget's actions stay in its own toolbar, because a page can
   hold several widgets and an action belongs to its widget, not to the page.
+- **A record's actions** _(planned)_. A form's actions on its record are the page's own and sit on the right of the
+  page's heading, on its row, see [start process actions](form-widget.md#start-process-actions). A task page's
+  Release, Claim and Reassign… and its outcomes sit there too, see [task page](task-inbox-widget.md#task-page). Other
+  widgets' actions stay with them.
+- **A page that shows one thing** _(planned)_. The heading is the thing's name. The state the platform keeps of the
+  thing is a tag beside the name, such as a task's Overdue, a process instance's Running or a release's Live. The line
+  under the heading, in `textMuted`, is the thing's kind alone, such as Request or Task, and nothing more. A record has
+  no tag, as its status is a field the author defines and its form shows. A new record has no name yet, so it is headed
+  "New {entity}" ("{entity} mới", `shell.form.newRecord`), with the entity's label keeping its capitals, and it has no
+  line. This shape holds for every page of the shell that shows one thing: a saved or new record, a task, a process
+  instance, a Studio resource, release or revision, the user page and a cell's tenant page. One `PageHeading` draws
+  every one of them, filling `PageLayout`'s name, tags and line, see [which widget](shared-widgets.md#which-widget).
+- **Facts as the first part** _(planned)_. What else the platform keeps of the thing, and the page does not show
+  elsewhere, is the page's first part. It is a list of facts through `TermList`, one fact to a row, see
+  [fields](actions-and-controls.md#fields), above a `borderSubtle` rule. It never sits on the heading's line.
 - **Platform pages.** The platform home page has no band and no breadcrumb, and has its own headings,
   see the [platform home page](#platform-home-page). The Sessions page has the band "Axis › Your
   sessions", and the users page the band "Axis › Users".
@@ -229,6 +257,8 @@ The page has two parts, each under a `heading5` title with no count beside it: "
 - **A tile** is a panel on `surface` with a `borderSubtle` border, `radius-base` corners and
   `spacing-md` padding, its mark and its text `spacing-sm` apart. A title with no description under it
   is centred on its mark. Applications are `spacing-md` apart.
+- **Every tile is a `Tile`** _(planned)_. The home page's applications and tools, Studio's application tiles, and a
+  dashboard's KPI and chart are all drawn through one shared tile, so they keep one look.
 - **A tile that is a link** shows it only by its title in `primaryText`, as every link: hover changes
   nothing, and keyboard focus draws the `focusRing` outline.
 - **The home grid** holds the tools, and the sites inside an application. It takes as many columns as
@@ -370,6 +400,8 @@ to the frame shows in every state. How previews work is in
   verification to Error are the same components that the theme draws.
 - **A frame is a screen.** A shell preview draws the shell in a frame exactly as tall as its height, and
   the page scrolls inside it as in a window, so a dialog opens in the middle of what shows.
+- **The State control** _(planned)_. `shell`, `signIn` and `identitySignIn` show one state at a time under a State
+  control, as `studio` does, and `&state=<slug>` opens one.
 - **The Studio group** is the eighth group of cards, after Shell. Its `studio` preview draws Studio
   through the shell over fixtures of the purchase request sample, in sixteen states: Typical, Empty,
   Loading, Failed, Many rows, Long names, Access denied, Overview with errors and changes not live,

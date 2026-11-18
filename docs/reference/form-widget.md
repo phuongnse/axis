@@ -113,6 +113,12 @@ validates.
   read-only child collection shows its rows with every cell read-only, and has no add or remove
   buttons. The widget sends only the editable fields it shows, and a server error on a field the form
   does not show appears above the form.
+- **Groups as parts** _(planned)_. A titled group of fields is a part of the page, as
+  [parts a rule apart](shell.md#layout) says. Its title is drawn by `SectionPart` as a level-2 heading at the
+  `heading5` size, with the part's spacing and no heading margin of its own. A `borderSubtle` rule sits above a
+  group drawn after another, and none above the first. A form with one untitled group, such as an `entity`
+  form, has no rule. A form too long for one page is split into [steps](form-widget-conditions.md#steps), which check
+  each step before the next.
 - **Conditions and steps.** The widget asks the server which fields to show, require and lock, and
   which messages to show, and shows `steps` as a wizard, see
   [form widget conditions](form-widget-conditions.md).
@@ -138,7 +144,7 @@ A required field's label is marked, but the mark blocks nothing: the server stil
 | `reference`                                                                                                           | The label of the chosen record, read-only, with a choose button that opens the [lookup](#lookup), and a clear button when the field is not required and is set. Choose and Clear are icon buttons, a search and a close icon, with their names as tooltips on hover and on keyboard focus. They are bordered buttons joined to the input on its right, in the input's border colour, with the corner radius only on the outer corners |
 | `references`                                                                                                          | A list of the chosen records' labels in their order, each with a remove button, and an add button that opens the lookup, see [set of references](#set-of-references)                                                                                                                                                                                                                                                                  |
 | `child-collection`                                                                                                    | A table of its rows, see [child collections](#child-collections)                                                                                                                                                                                                                                                                                                                                                                      |
-| Any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | The value the server returned, formatted as a table cell shows it, as plain text, see [field look](#field-look). An empty value shows "Not set" in muted italics. It changes only when the record is saved and loaded again                                                                                                                                                                                                           |
+| Any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | The value the server returned, formatted as a table cell shows it, see [field look](#field-look). An empty value shows "Not set" in muted italics. It changes only when the record is saved and loaded again                                                                                                                                                                                                           |
 
 - **Sequence fields.** Page metadata marks a field that names a
   [sequence](entity-logic-and-sequences.md#sequences), so the form shows it read-only. It is empty on a new record,
@@ -146,6 +152,11 @@ A required field's label is marked, but the mark blocks nothing: the server stil
 - **Creator fields.** Page metadata marks a field that declares
   [`creator`](roles-and-policies.md#record-creator), so the form shows it read-only. It is empty on a
   new record, shows the creating user's id once saved, and the form never sends it.
+- **Open a reference** _(planned)_. A `reference` field whose chosen record the person can open has an Open icon button
+  with `ExportOutlined`, joined after Choose and before Clear. It is named "Open {label}" ("Mở {label}"), where Open is
+  the text `shell.form.openRecord`, and it is a real link to the record's page. A read-only reference is a link too,
+  see [opening things](actions-and-controls.md#opening-things). The unsaved changes guard asks before a link leaves a
+  form with a change. A record the person cannot open is plain text, with no Open button.
 
 ## Field look
 
@@ -223,12 +234,17 @@ returns no label when the user may not read the target's display field.
   empty set, and an empty set that was never changed stays out of the create body.
 - **Messages.** A required set that is empty gets the server's message on the field. The form does not
   check the limit of 1,000 ids, and the server's message shows on the field.
-- **Read-only.** A set that the form makes read-only shows its labels joined by a comma as plain text,
+- **Read-only.** A set that the form makes read-only shows its labels joined by a comma,
   or "Not set" when it is empty, with no add or remove button.
+- **Links** _(planned)_. Each entry's label is a link to its record page, and so is each label of a read-only set.
 
 ## Child collections
 
 A child collection field shows its rows as a table under the field's label.
+
+- **Label on the toolbar** _(planned)_. An editable collection's label, its required mark and its help sit on the
+  left of its table's toolbar, on one row with Add row on the right. A read-only collection has no toolbar and keeps
+  its label above its table.
 
 - **Columns.** There is one column per child field, headed by its label or its name. Integer, decimal
   and money columns sit on the right, in the header and in every cell, in tabular figures, see the
@@ -238,9 +254,11 @@ A child collection field shows its rows as a table under the field's label.
   the one-based row number, such as `Quantity 2`. A file cell is the file input, and its Upload button
   is named like `Upload File 2`.
 - **Read-only cells.** A computed child field's cell, and every cell of a read-only collection, shows
-  the row's value as plain text, not an input, formatted as a table cell shows it. It keeps an input's
+  the row's value, not an input, formatted as a table cell shows it. It keeps an input's
   height, so it lines up with the inputs beside it. An empty read-only or computed cell shows a muted
   italic "—". A read-only file cell shows its download link, or a dash when it has no file.
+- **References in cells** _(planned)_. A reference cell has the same Open button as a reference field, and a read-only
+  reference cell is a link to its record page.
 - **Table.** The table is the shared table, see [tables](actions-and-controls.md#tables). A reference
   cell's input keeps at least 240px and the other inputs at least 160px.
 - **Rows.** Delete row is the row's icon action: a trash icon button in `dangerText`, with its name as
@@ -297,6 +315,12 @@ The form sends only what changed, and shows the server's answer where it belongs
   `/{site}`, which opens the site's first page. Only an address inside the same site is used.
 - **Keys.** Enter in a date or date-time picker only confirms the picked value and never sends the
   form. Enter in a text input sends the form, as in any form.
+- **The save bar** _(planned)_. A site's form has no Save or Cancel row of its own. While the form has a change to
+  save, the [save bar](studio-resource-form.md#save-bar) shows Discard and Save. With no change it is not drawn, so a
+  new record's form shows it once the person types. Discard asks first, then puts every value back as the form
+  started. A form without the grant to save shows no bar. A person who leaves by the sidebar or the browser is asked
+  first, by [Leave without saving?](studio.md#editor), while there is a change. A wizard's Back and Next stay under
+  the step's fields, and the bar shows on its last step.
 
 ### Form drafts
 
@@ -349,6 +373,10 @@ A `form` widget can declare `startProcess` actions, which save the record and st
   [buttons](actions-and-controls.md#buttons). For a signed-in user, page metadata lists only the
   actions whose process the user holds a `start` grant on. A new record shows no action buttons, so a
   failed start never leaves a record behind on a form that still says new.
+- **On the page heading** _(planned)_. Each action on a saved record is the page's own: an outlined `main`
+  button on the right of the page's heading, on its row, through `PageActions`, with the `navigate` buttons
+  after the `startProcess` ones. A form drawn with no page heading, such as in a widget's preview, puts them at
+  its top, on the right.
 - **Compile checks.** The process must name the form's entity as its subject. An unknown process is
   `AXC0087`, and a process over another entity is `AXC0088`, both at
   `/widgets/{i}/actions/{j}/process`. `actions` on another widget type is `AXC0060`. The label joins
@@ -376,6 +404,9 @@ The form page of a saved record shows the record's history from the
 [history endpoint](record-audit.md#audit-records-and-history) in a panel below the form, newest first.
 A new record has no history panel.
 
+- **The form's last part** _(planned)_. The history is the last part of the form's page, titled History
+  ("Lịch sử"), drawn by `SectionPart` with a `borderSubtle` rule above it and no card. Its loading, empty, error
+  and paging states stay.
 - **Entry.** Each entry shows its action, who did it, its time and a short summary. The action is a
   platform text, such as "Updated" or "Task decided", and an action without a text shows as it is.
 - **Who.** Who did it is the `actorName` the history answers. Without one, it is "System" for

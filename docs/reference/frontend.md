@@ -48,6 +48,8 @@ component holds a number of its own.
   keyboard focus of every control. `onPrimary` colours text and icons on a `primary` fill.
 - **Contrast.** Every text colour reaches 4.5:1, and every border and focus ring 3:1, on `surface` and `canvas` in both
   modes. `onPrimary` reaches 4.5:1 on `primary` in both modes. [Each preview](widget-previews.md#the-spec) is checked.
+- **Rules on a flush page** _(planned)_. `borderSubtle` stands apart from `surface` about as much in light mode as in
+  dark, because on a flush page a rule is all that parts two areas. `border` stays for controls.
 - **A site's brand** _(planned for M42)_. A site's `brand.primary` is its main colour, see [sites](configuration.md#sites)
   and [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
   The compiler works out the light and dark `primary`, `primaryText`, `focusRing` and `onPrimary` from it, and the
@@ -133,7 +135,15 @@ A value reads the same in every widget: in an input, a read-only field, a table 
   KPI's dash carries a visually hidden `shell.kpi.empty` ("No value") for assistive technology. Words go where fields
   are read one by one, and a dash where values are read at a glance or compared. What tells an empty value from a
   typed one is the styling, in which no value is ever drawn, never the words.
-- **No identifiers.** No widget shows a GUID to a user.
+- **When something happened** _(planned)_. A record in time, such as a timeline's run, a history's entry or a
+  notification, reads within a week as how long ago, in the locale's words, such as "5 minutes ago". Its exact date and
+  time is its tooltip, read after the words, and the words move on once a minute. After a week it reads its date and
+  time, as above. A date or a time that is data, such as a field, a due date or an instance's Started, keeps its format.
+- **A duration under a second** _(planned)_. It reads "< 1 sec" ("< 1 giây").
+- **No identifiers.** No widget shows a whole GUID to a user. Only a copyable id shows part of one.
+- **A copyable id** _(planned)_. Where a person needs an id to quote, such as a process instance's ID or a run's trace
+  ID, the id shows its first 8 characters in the code font and copies the whole id, see
+  [which widget](shared-widgets.md#which-widget).
 
 ## Text resolution
 
@@ -242,6 +252,11 @@ tenant host.
   with its `entries`. It adds `homePage`, the name of the person's home page, and `brand`, which is
   `{ "logo", "colours" }` with the logo's address and the light and dark colours, or `null`. See
   [sites](configuration.md#sites).
+- **Record pages** _(planned)_. `GET /api/sites/{path}` adds `"recordPages": { "<entity>": "/{site}/{page}" }`, the
+  address of each entity's record page: the named page, or else the default record page, as [routing](#routing) says. A
+  module page is `/{site}/{module id}/{name}`. It lists only the entities whose `read` the person's grants allow, see
+  [access](#access), so the SPA links only what the person can open. The rule is
+  [D162](../decisions/d162-each-entitys-records-open-on-one-record-page-in-each-site.md).
 
 ## Page metadata
 
@@ -509,6 +524,7 @@ below answers `200`.
 | `/{site}/{page}?ticket=<id>`           | a page with parameters: the values sit in the query under the parameter names                                                                                                                                                                                                                                                                                                                                                                                       |
 | `/{site}/{page}/new`                   | the form of a form page, to create a record                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `/{site}/{page}/{id}`                  | the form of a form page, to edit the record with that id                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `/{site}/records/{entity}/{id}` _(planned)_ | the default record page of an entity that the site names no record page for, shown as the form of the record |
 | `/{site}/{inboxpage}/{taskId}`         | the task page of the task with that id, under the page of a task inbox                                                                                                                                                                                                                                                                                                                                                                                              |
 | `/{site}/{inspectorpage}/{instanceId}` | the instance page of the process instance with that id, under the page of a process inspector                                                                                                                                                                                                                                                                                                                                                                       |
 
@@ -529,8 +545,9 @@ below answers `200`.
   `taskInbox` or `processInspector`, and the compiler checks this. `/new` and `/{id}` belong to its `form`.
   `/{taskId}` and `/{instanceId}` belong to its `taskInbox` or `processInspector`. The instance list of a
   `processInspector` and the task list of a `taskInbox` also read `search`, `filter`, `columns`, `sort`, `page` and
-  `pageSize`. A `kpi`, a `detail`, a `chart`, a `content` widget and a `tree` own no part of the address and read only
-  page parameters, so they do not count.
+  `pageSize`. A `kpi`, a `chart`, a `content` widget and a `tree` own no part of the address and read only
+  page parameters, so they do not count. A `detail` owns no part of the address, except `/{id}` on a page that a site
+  names as a record page, as [a detail as a record page](#routing) says.
 - **Letter case.** `{site}` is the site path, and `{page}` is the page name in lower case, as navigation links write
   it. The server matches both ignoring letter case.
 - **Page parameters.** A required page parameter that is missing from the URL, or has the wrong form, shows the
@@ -541,10 +558,29 @@ below answers `200`.
 - **Not found.** An unknown site shows the not-found page inside the platform shell, and an unknown page inside the
   site shell. An address with more than three segments, such as `/e2e/notes/42/edit`, matches no route and shows the
   not-found page inside the platform shell.
-- **Record and task ids.** A form page without `new` or an id, `new` or an id on a table page, an id that is not in the
-  hyphenated 8-4-4-4-12 hex form, and an id the entity has no record for show the not-found page inside the site
+- **Record and task ids.** A form page without `new` or an id, `new` or an id on a table page, an id that is not in
+  the hyphenated 8-4-4-4-12 hex form, and an id the entity has no record for show the not-found page inside the site
   shell. `new` on a task inbox page, a task id that is not in that form, and a well-formed task id that the task API
   answers `404` for show it too. An id or a task id in the wrong form is not requested.
+- **A missing record** _(planned)_. A form's or a detail's page that names a well-formed id the record API answers
+  `404` for, as it answers for a record the person cannot open, keeps its heading. Under it, one line of body text
+  with no illustration: "This record does not exist, or you cannot open it." ("Bản ghi này không tồn tại hoặc bạn
+  không có quyền mở.", `shell.record.notFound`). On the same line, one link "Go to {page}" ("Đi tới {page}",
+  `shell.record.goToList`), where `{page}` is the label of that list's navigation entry. The link opens the address the
+  page was opened from, with its table's search, sort and page, or else `/{site}`, which opens the first page. No save
+  bar and no record action shows. Such a page is mostly opened from an email, a bookmark or a shared link, so no entry
+  is marked, and at narrow width the sidebar is hidden, so the link stays. A task page whose well-formed task id the
+  task API answers `404` for shows the same line under its inbox page's heading, see
+  [task page](task-inbox-widget.md#task-page).
+- **The default record page** _(planned)_. `/{site}/records/{entity}/{id}` shows the entity's form over every field, in
+  declaration order, as an `entity` form does. It has the heading, the save bar, the history and a missing record's
+  line, as any record's page does, and the person's write grants decide which fields are read-only. A module entity's
+  address is `/{site}/records/{module id}/{name}/{id}`. The not-found rule above does not catch these two addresses,
+  because each matches its own route. A reference opens its entity's record page, with the record's id after the
+  page's address, see [opening things](actions-and-controls.md#opening-things).
+- **A detail as a record page** _(planned)_. A detail page that a site names as a record page opens its record at
+  `/{site}/{page}/{id}`, and that segment fills the detail's `record` parameter. The page's other parameters still sit
+  in the query, as on any page with parameters.
 - **Inside a site.** The shell shows the site's title, navigation and locales in the [layout](shell.md#layout) of
   [shell and home page](shell.md). The page header, the app switcher and the language and theme menu work as they do
   on the platform site, see [page header](shell.md#page-header) and

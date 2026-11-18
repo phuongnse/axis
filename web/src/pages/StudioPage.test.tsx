@@ -1612,14 +1612,30 @@ describe('StudioPage publishing', () => {
     }
   }
 
-  /** `stubServer` where `/api/me` answers `me`, and the request routes answer in turn with `statuses`. */
-  function stubPublishing(me: () => Response, statuses: unknown[] = []) {
+  /**
+   * `stubServer` where `/api/me` answers `me`, and the request routes answer in turn with `statuses`. The live diff answers
+   * `live` and an AI request answers `requestAnswers[id]`, both 404 unless given.
+   */
+  function stubPublishing(
+    me: () => Response,
+    statuses: unknown[] = [],
+    history: { folderContentHash: string; active: boolean } = { folderContentHash: 'hash-4', active: true },
+    live: () => Response = () => new Response(null, { status: 404 }),
+    requestAnswers: Record<string, () => Response> = {},
+  ) {
     const fetchMock = stubServer()
     const base = fetchMock.getMockImplementation()!
     const answers = [...statuses]
     fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
       if (input === '/api/me') {
         return me()
+      }
+      if (input.startsWith(`${folder}/releases/live/diff`)) {
+        return live()
+      }
+      if (input.startsWith(`${folder}/authoring-requests/`)) {
+        const answer = requestAnswers[input.slice(`${folder}/authoring-requests/`.length)]
+        return answer ? answer() : new Response(null, { status: 404 })
       }
       if (input === `${folder}/publish` && init?.method === 'POST') {
         return json(request('queued'), 202)
@@ -1657,10 +1673,12 @@ describe('StudioPage publishing', () => {
       }
       if (input === `${folder}/releases`) {
         return json({
-          active: { releaseId, number: 3, contentHash: 'hash-3' },
-          folderContentHash: 'hash-3',
+          active: history.active ? { releaseId, number: 3, contentHash: 'hash-3' } : null,
+          folderContentHash: history.folderContentHash,
           changes: [],
-          items: [row(releaseId, 3, '2026-05-02T10:00:00Z'), row('older', 2, '2026-05-01T10:00:00Z')],
+          items: history.active
+            ? [row(releaseId, 3, '2026-05-02T10:00:00Z'), row('older', 2, '2026-05-01T10:00:00Z')]
+            : [],
         })
       }
       return base(input, init)
@@ -1688,13 +1706,228 @@ describe('StudioPage publishing', () => {
     await waitFor(() => expect(screen.queryAllByRole('button', { name: 'Publish…' })).toHaveLength(shown ? 1 : 0))
   })
 
-  it('opens the publish dialog from Publish… and confirms with its own Publish button', async () => {
+  it('opens the publish page from Publish… with its heading, line, fields and action bar', async () => {
     stubPublishing(publisher)
     renderPage()
 
     await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
 
-    expect(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Publish' })).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests&view=publish')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Publish this application' })).toBeInTheDocument()
+    expect(
+      await screen.findByText('Everything below goes live as a new release, in place of release 3.'),
+    ).toBeInTheDocument()
+    const group = screen.getByRole('group', { name: 'The release' })
+    expect(within(group).getByRole('textbox', { name: 'Label' })).toHaveAttribute('maxlength', '100')
+    expect(within(group).getByRole('textbox', { name: 'Note' })).toHaveAttribute('maxlength', '2000')
+    expect(within(group).getByText('A short name for the release, such as Spring update.')).toBeInTheDocument()
+    expect(within(group).getByText('What changed and why, for whoever reads the release list.')).toBeInTheDocument()
+    expect(await screen.findByText('Goes live as release 4')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
+    expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled()
+    expect(screen.queryByTestId('studio-publish')).not.toBeInTheDocument()
+    // The page marks no sidebar entry.
+    expect(document.querySelector('[aria-current="page"]')).toBeNull()
+  })
+
+  it('opens the publish page from a link and shows the first-release line when nothing is live', async () => {
+    stubPublishing(publisher, [], { folderContentHash: 'hash-1', active: false })
+    renderPage('/studio?app=PurchaseRequests&view=publish')
+
+    expect(
+      await screen.findByText('Nothing is live yet. Everything below goes live as the first release.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Goes live as release 1')).toBeInTheDocument()
+    expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled()
+  })
+
+  describe('the files changed since the live release', () => {
+    /** A file of the live diff, with the revisions made since the live release that changed it, newest first. */
+    function liveFile(file: string, change: 'added' | 'changed', name: string, by: unknown[]) {
+      return {
+        file,
+        change,
+        id: null,
+        kind: 'role',
+        name,
+        titles: null,
+        before: change === 'added' ? null : '{"label":"first"}',
+        after: '{"label":"second"}',
+        target: null,
+        by,
+      }
+    }
+
+    function revision(id: string, userId: string | null, author: string, authoringRequest: string | null = null) {
+      return {
+        id,
+        summary: 'Edit',
+        author,
+        userId,
+        client: userId === null ? null : 'studio',
+        request: null,
+        time: '2026-11-18T10:00:00Z',
+        authoringRequest,
+      }
+    }
+
+    const sectionOf = () => screen.getByTestId('studio-section-publish-changes')
+    const liveDiff = (resources: unknown[]) => () => json({ release: 3, resources, cursor: null })
+
+    it('lists the files that differ from the live release with who changed each, under a count', async () => {
+      const fetchMock = stubPublishing(
+        publisher,
+        [],
+        { folderContentHash: 'hash-4', active: true },
+        liveDiff([
+          liveFile('roles/buyer.json', 'changed', 'Buyer', [revision('b', 'author', 'Ana')]),
+          liveFile('roles/approver.json', 'added', 'Approver', [
+            revision('a2', 'author', 'Ana', 'r1'),
+            revision('a1', 'u2', 'Sam Lee'),
+          ]),
+        ]),
+        { r1: () => json({ id: 'r1', text: 'Add a field. Then a test.' }) },
+      )
+      renderPage('/studio?app=PurchaseRequests&view=publish')
+
+      expect(await screen.findByRole('heading', { name: '2 files changed since the live release' })).toBeVisible()
+      const section = sectionOf()
+      expect(within(section).getAllByTestId('studio-changes-file')).toHaveLength(2)
+      const buyer = within(section)
+        .getAllByTestId('studio-changes-file')
+        .find((file) => file.dataset.file === 'roles/buyer.json')!
+      expect(within(buyer).getByTestId('studio-changes-by')).toHaveTextContent(/^Changed by you$/)
+      const approver = within(section)
+        .getAllByTestId('studio-changes-file')
+        .find((file) => file.dataset.file === 'roles/approver.json')!
+      expect(within(approver).getByTestId('studio-changes-by')).toHaveTextContent(
+        'Changed by Sam Lee and the AI request “Add a field.”',
+      )
+      expect(within(approver).getByRole('link', { name: 'the AI request “Add a field.”' })).toHaveAttribute(
+        'href',
+        '/studio?app=PurchaseRequests&view=requests&request=r1',
+      )
+      expect(fetchMock.mock.calls.map(([input]) => input)).toContain(`${folder}/releases/live/diff`)
+    })
+
+    it('names the person who accepted an AI request that cannot be read', async () => {
+      stubPublishing(
+        publisher,
+        [],
+        { folderContentHash: 'hash-4', active: true },
+        liveDiff([liveFile('roles/approver.json', 'added', 'Approver', [revision('a1', 'u2', 'Sam Lee', 'r1')])]),
+        { r1: () => new Response(null, { status: 500 }) },
+      )
+      renderPage('/studio?app=PurchaseRequests&view=publish')
+
+      expect(await screen.findByRole('heading', { name: '1 file changed since the live release' })).toBeVisible()
+      const change = within(sectionOf()).getByTestId('studio-changes-by')
+      expect(change).toHaveTextContent(/^Changed by Sam Lee$/)
+      expect(within(change).queryByRole('link')).toBeNull()
+    })
+
+    it('asks for no live diff and shows no list when nothing is live yet', async () => {
+      const fetchMock = stubPublishing(publisher, [], { folderContentHash: 'hash-1', active: false }, liveDiff([]))
+      renderPage('/studio?app=PurchaseRequests&view=publish')
+
+      expect(
+        await screen.findByText('Nothing is live yet. Everything below goes live as the first release.'),
+      ).toBeVisible()
+      expect(screen.queryByTestId('studio-section-publish-changes')).toBeNull()
+      expect(fetchMock.mock.calls.some(([input]) => String(input).includes('/releases/live/diff'))).toBe(false)
+    })
+
+    it('shows no list when the server has no revision history', async () => {
+      const fetchMock = stubPublishing(publisher)
+      renderPage('/studio?app=PurchaseRequests&view=publish')
+
+      expect(await screen.findByText('Goes live as release 4')).toBeVisible()
+      await waitFor(() =>
+        expect(fetchMock.mock.calls.map(([input]) => input)).toContain(`${folder}/releases/live/diff`),
+      )
+      expect(screen.queryByTestId('studio-section-publish-changes')).toBeNull()
+    })
+  })
+
+  it('shows the Overview at &view=publish without studioPublisher', async () => {
+    stubPublishing(() => json({ id: 'author', studio: true, studioPublisher: false }))
+    renderPage('/studio?app=PurchaseRequests&view=publish')
+
+    expect(await screen.findByRole('button', { name: 'Validate' })).toBeEnabled()
+    expect(screen.queryByRole('heading', { name: 'Publish this application' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('studio-publish-confirm')).not.toBeInTheDocument()
+  })
+
+  it('says everything is live and turns Publish off when the folder is the live release', async () => {
+    stubPublishing(publisher, [], { folderContentHash: 'hash-3', active: true })
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
+
+    expect(await screen.findByText('Everything is live, so there is nothing to publish.')).toBeInTheDocument()
+    expect(screen.getByTestId('studio-publish-confirm')).toBeDisabled()
+    expect(screen.queryByText(/Goes live as release/)).not.toBeInTheDocument()
+  })
+
+  it('reloads the release history when the publish page opens', async () => {
+    const fetchMock = stubPublishing(publisher, [], { folderContentHash: 'hash-3', active: true })
+    renderPage('/studio?app=PurchaseRequests&view=releases')
+    const publish = await screen.findByRole('button', { name: 'Publish…' })
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => input === `${folder}/releases`)).toBe(true))
+
+    const loaded = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input === `${folder}/releases`) {
+        const answer = await (await loaded(input, init)).json()
+        return json({ ...answer, folderContentHash: 'hash-4' })
+      }
+      return loaded(input, init)
+    })
+    await userEvent.click(publish)
+
+    expect(await screen.findByText('Goes live as release 4')).toBeInTheDocument()
+    expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled()
+  })
+
+  it('goes back to where Publish… was opened when Cancel is chosen, and sends nothing', async () => {
+    const fetchMock = stubPublishing(publisher)
+    renderPage('/studio?app=PurchaseRequests&view=releases')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests&view=releases$/)
+    expect(fetchMock.mock.calls.some(([input, init]) => input === `${folder}/publish` && init?.method === 'POST')).toBe(
+      false,
+    )
+  })
+
+  it('goes to the Overview from Cancel on a publish page opened from a link', async () => {
+    stubPublishing(publisher)
+    renderPage('/studio?app=PurchaseRequests&view=publish')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/)
+  })
+
+  it('sends only the filled values, goes back and shows the status there', async () => {
+    const fetchMock = stubPublishing(publisher)
+    renderPage('/studio?app=PurchaseRequests&view=releases')
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Note' }), 'Added the approval step')
+    await userEvent.click(await screen.findByText('Goes live as release 4'))
+    await userEvent.click(screen.getByTestId('studio-publish-confirm'))
+
+    expect(await screen.findByTestId('studio-request-status')).toHaveAttribute('data-status', 'queued')
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests&view=releases$/)
+    expect(screen.queryByRole('heading', { name: 'Publish this application' })).not.toBeInTheDocument()
+    const posts = fetchMock.mock.calls.filter(
+      ([input, init]) => input === `${folder}/publish` && init?.method === 'POST',
+    )
+    expect(posts).toHaveLength(1)
+    expect(JSON.parse(posts[0][1]!.body as string)).toEqual({ note: 'Added the approval step' })
   })
 
   it("heads the band's actions with New resource… and ends them with Publish…", async () => {
@@ -1719,8 +1952,10 @@ describe('StudioPage publishing', () => {
     ])
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
-    await userEvent.type(screen.getByRole('textbox', { name: 'Label (optional)' }), 'May')
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'Label' }), 'May')
+    await userEvent.click(await screen.findByText('Goes live as release 4'))
+    await userEvent.click(screen.getByTestId('studio-publish-confirm'))
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/)
 
     const status = await screen.findByTestId('studio-request-status')
     expect(status).toHaveAttribute('data-status', 'queued')
@@ -1759,7 +1994,7 @@ describe('StudioPage publishing', () => {
       if (input === `${folder}/releases` && !sent) {
         return json({
           active: { releaseId: 'older', number: 2, contentHash: 'hash-2' },
-          folderContentHash: 'hash-2',
+          folderContentHash: 'hash-3',
           changes: [],
           items: [row('older', 2, '2026-05-01T10:00:00Z')],
         })
@@ -1772,7 +2007,8 @@ describe('StudioPage publishing', () => {
     ).toHaveLength(1)
 
     await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
+    await userEvent.click(await screen.findByText('Goes live as release 3'))
+    await userEvent.click(screen.getByTestId('studio-publish-confirm'))
 
     await vi.advanceTimersByTimeAsync(1000)
     await vi.advanceTimersByTimeAsync(1000)
@@ -1863,7 +2099,8 @@ describe('StudioPage publishing', () => {
     )
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
-    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
+    await userEvent.click(await screen.findByText('Goes live as release 4'))
+    await userEvent.click(screen.getByTestId('studio-publish-confirm'))
 
     expect(await screen.findByTestId('studio-request-error')).toHaveTextContent(
       'This tenant has reached its storage quota.',

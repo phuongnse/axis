@@ -22,6 +22,8 @@ widget names a role, never an Ant Design button type.
 | Link        | Text in `primaryText` with no border        | An action that reads as a link but goes to no address, such as the first cell of a [list of objects](studio-resource-form.md#lists-of-objects)                                   |
 | Destructive | `dangerText` at any level                   | Actions that remove, such as Delete row and Delete                                                                                                                               |
 
+- **An inline link** _(planned)_. An `AxisButton` link with `inline` takes the height of a line of text and no padding,
+  for a link inside a value, such as a reference in a table cell.
 - **Text colours, not fill colours.** Ant Design writes the text of text, outlined and danger buttons
   in the fill colours `primary` and `danger`, which fail contrast on a dark surface, so Axis writes
   them in `primaryText` and `dangerText`.
@@ -36,12 +38,17 @@ widget names a role, never an Ant Design button type.
   keeping its disabled state. They are buttons again when the room comes back. A row without `fold` wraps.
 - **An action bar folds into More.** An `ActionBar`, a bar of actions at the foot of a page on `surface`
   with a `borderSubtle` rule above it, folds the actions it names into one More actions menu through
-  `AxisActionRow`'s `fold`, as a table's row actions fold at narrow width.
+  `AxisActionRow`'s `fold`, as a table's row actions fold at narrow width. A docked bar stays at the foot of the window across the
+  content instead of at the foot of its page.
+- **Actions of equal weight are one group** _(planned)_. A screen keeps one main action. Actions of equal weight that
+  together are a region's main action, such as a task's outcomes, are one joined group in the `main` role, in the order
+  the process gives them. Each button of the group is as wide as the widest, stays a button of its own with no selected
+  state, and the group has a name for assistive technology. A group of one is a plain `main` button.
 - **Text or an icon, never both.** An action shows its text or its icon. An icon goes with text only
   where it does what text cannot: navigation that collapses to icons, a status or a severity, and the
   mark that identifies an application or a site.
 - **An action that asks for more ends in an ellipsis,** such as New application…, New resource…,
-  Publish…, Import…, Invite…, Reassign… and Choose…, so the person knows a dialog follows. The
+  Publish…, Import…, Invite…, Reassign… and Choose…, so the person knows a dialog or a page follows. The
   dialog's own button keeps the bare verb, such as Invite.
 - **Icon-only buttons** are only for actions repeated on every row, or where space is tight, and main
   toolbar actions keep their text. Every icon-only button shows its name as a tooltip on hover and on
@@ -130,6 +137,8 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
 - **One field to a row**. Two fields share a row only when they truly belong together,
   such as a range's minimum and maximum, through `AxisFieldRow`, and they stack at narrow width. A key and its
   value in one row of a titled list are one entry, so they share a row too.
+- **One fact to a row** _(planned)_. A list of facts, such as a page's first part through `TermList`, gives each fact
+  a row of its own. Two facts share a row only when they belong together, such as a start and an end date.
 - **Every required field is marked**. A platform field follows the form widget's
   [required mark](form-widget.md#field-look), in every form and dialog, even where every field is
   required, such as New resource. The sign-in pages mark none, since everyone knows their fields are needed.
@@ -160,6 +169,23 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
   A state is a sentence, as in "Release 7 is live". Facts of different kinds take a column or a line
   of their own, such as when a release was published and by whom. A "·" glues facts of different
   kinds into one line with no order, and a screen reader may read it out.
+- **No dash between facts either** _(planned)_. Neither a middle dot nor a dash joins facts. A fact of a different
+  kind takes its own term or line, such as a run's Branch beside Went to, or Started via under Started by. What
+  qualifies one thing sits in parentheses, with peers in them joined by a comma, such as "(run 2)" or an
+  operation's "(ERP)".
+- **Names and values as a table** _(planned)_. Names and their values, such as a request's headers or a run's input,
+  are a table of two columns with no header row. A name in `textMuted` takes 5 of 12 columns and its value 7, so the
+  tables a view stacks line up at any width. A nested value is a row of its own, named by its path, such as
+  `lines[0].description`. A number keeps its source digits. A word written in place of a value, such as `null`, Empty,
+  a count of fields or items, or Hidden ("Đã ẩn") for a secret or a value the reader may not read, takes the
+  [empty value's](frontend.md#shown-values) style, as Not set does. The server's `[secret]` stays its placeholder in
+  logs, JSON and the API, and reads Hidden in the table. A value in the table has no copy button. A JSON body is a table
+  by default, with a Table and JSON switch. Other text shows as it is in the code font.
+- **A person by name** _(planned)_. A person is always named, so a page read by someone else, or seen in a screenshot,
+  still says who. The signed-in person's own name is followed by "(you)" ("(bạn)") in `textMuted`, and is never
+  replaced by You or Me. "Me" stays for the reader's own voice, such as a filter Assigned to me. A name is a link only
+  to a page about the person that the reader may open, such as a user's page for an administrator, and plain text for
+  anyone else.
 - **No value is a dash.** A table cell with no value shows the muted em dash, and a form or a detail
   shows "Not set", see the [empty values](frontend.md#shown-values). It never shows nothing, which
   cannot tell "not given" from "not loaded", and never N/A, which says "does not apply" and does not
@@ -208,6 +234,8 @@ be kept right.
   list has no search. An action on the page as a whole, such as New entity… on a kind's list, sits on the
   [page heading](studio-workspace.md#page-heading), not the toolbar. A `table` widget keeps the toolbar
   actions its author configures.
+- **A title on the toolbar** _(planned)_. A table may have a `title` at the left end of its toolbar, before the view
+  controls, such as an editable child collection's label, required mark and help.
 - **Every control in one table.** `AxisTable` has every control below, and each view
   turns on what it needs. Search, filter, sort, page and columns live in the address, except in a dialog's
   table, which keeps them in the dialog. A view is only a
@@ -262,8 +290,8 @@ be kept right.
 - **Saved views.** A person saves a table's search, filter and sort under a name, and the view is kept on the server
   for that person and table. Views is an icon button after Columns, and it shows once the person's views have
   loaded. It opens a dialog that lists the person's views of the table by name, in the page language's collation,
-  with a Name field and Save view. A view's name opens it. A view is renamed in its own line, and deleted in its own
-  line after a question, so the dialog opens no dialog of its own.
+  with a Name field and Save view. A view's name opens it. A view is renamed in its own line, overwritten and
+  deleted in its own line after a question, so the dialog opens no dialog of its own.
 - **Opening a view.** It writes the view's search, filter and sort into the address at page 1, with a history entry,
   so Back returns. The columns, the page size and the data source values stay. An empty part of the view clears that
   part. The values are checked as the address's are, so a filter that names a field the table no longer has is
@@ -271,7 +299,11 @@ be kept right.
 - **A refused save.** A name that is empty or that another of the person's views has, ignoring letter case, is
   refused before anything is sent. Any other save the server refuses leaves the dialog open with "The view could not
   be saved.", and the address and the list stay as they were.
-- **Overwrite a view** _(planned for M33)_. A person replaces a view's search, filter and sort with the current ones.
+- **Overwrite a view.** Overwrite replaces a view's search, filter and sort with the address's current ones, after
+  the question "Overwrite the view {name} with the current search, filter and sort?" in the view's own line. The
+  view keeps its name and its place in the list. The columns, the page size and the data source values stay out, as
+  they do on Save view. After the overwrite the line shows the view again and the dialog stays open. A write the
+  server refuses leaves the dialog open with "The view could not be overwritten.", and the list stays as it was.
 - **Which tables keep a choice.** A table whose view `useTableView` keeps in the address, and that
   has a key, keeps its columns and views on the server. A table in a dialog keeps its view in the dialog and keeps
   nothing. The cell console's tables pass no key, because its host has no tenant database. Studio's page canvas
@@ -285,6 +317,9 @@ be kept right.
 - **Rows.** Every row and the header are of the `tableRow` height, whatever they hold, icon buttons
   included: `spacing-xs` above and below a `smallControl` line. A row of more lines grows and reads
   from the same first line.
+- **Compact tables** _(planned)_. A table in a side panel is `compact`, with `spacing-sm` on each side of a cell.
+- **A table with no header row** _(planned)_. A table of names and values is `headless`, with no header row, see
+  [text](#text).
 - **Row actions.** An action on one row sits on the row. One whose meaning the platform knows, such as
   open, delete or activate a release, is an icon button, and one an author configured keeps its text.
   From three actions on, or at narrow width, they fold into one "…" menu of text entries.
@@ -334,6 +369,9 @@ be kept right.
   of the role `icon` with `FoldIcon`, named "Show the rows in it" or "Hide the rows in it". The fold sits in the
   first column's padding, every row's words start where the heading does, and each level of rows starts one fold
   further in. A table that groups rows uses this, and never a list inside a cell.
+- **A row's details** _(planned)_. A row with more to show than its columns, such as a call's attempt, folds open to
+  its details from a fold in its first cell, drawn as a group row's fold, named "Show the details", with no column of
+  its own. `AxisTable`'s `details` and its group rows open a row one way.
 
 The reasons for the table standard are in [D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md),
 and the reasons for each person's columns and saved views are in [D153](../decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md),
@@ -353,6 +391,16 @@ A thing opens at one of three levels, chosen by what the person does, never by t
   or Delete…, asking for a little, such as a reason, a name or an invitation, or choosing one thing. It
   never holds a record's detail or a long form, and never opens a dialog of its own. What needs much
   scrolling, or to be come back to, is a page.
+- **A reference opens what it names** _(planned)_. A record's label, shown read-only, is a real link to its record page,
+  with an `href` so Ctrl+click opens a new tab. The link passes the page it leaves as `from`, see
+  [shell layout](shell.md#layout). It never opens a dialog. A record the person cannot open is plain text.
+- **A link in a value opens in the same site** _(planned)_. A reference in a value is an inline link only when the
+  thing it names opens in the same site, such as a record, an instance, a sub-process or a step's run. A thing in
+  another site, such as Studio, opens only from a button named for it, such as Open in Studio. So a call's connector
+  and operation are plain text.
+- **Studio's and the platform's references** _(planned)_. A user, a tenant, an application or a release that a Studio
+  or platform page names is a link to its page where the reader may open it, and plain text otherwise. A Studio
+  reference picker whose chosen resource exists has an Open button joined to it, which opens that resource in Studio.
 
 ## Dialogs
 

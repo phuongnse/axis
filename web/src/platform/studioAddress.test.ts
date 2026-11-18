@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { studioResourceAddress } from './studioAddress'
+import { studioRequestAddress, studioResourceAddress } from './studioAddress'
 
 describe('studioResourceAddress', () => {
   it('builds the address of a resource', () => {
@@ -19,6 +19,12 @@ describe('studioResourceAddress', () => {
 
   it('encodes a name with a space', () => {
     expect(studioResourceAddress('Leave Requests', 'a&b')).toBe('/studio?app=Leave+Requests&resource=a%26b')
+  })
+})
+
+describe('studioRequestAddress', () => {
+  it('builds the address of an AI request', () => {
+    expect(studioRequestAddress('PurchaseRequests', 'r1')).toBe('/studio?app=PurchaseRequests&view=requests&request=r1')
   })
 })
 

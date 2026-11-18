@@ -36,7 +36,7 @@ the files agree, title and status included.
 | [D22](decisions/d22-current-time-and-time-zones.md) | Current time and time zones | **Agreed** |
 | [D23](decisions/d23-sign-in-through-oidc-and-the-bff-session.md) | Sign-in through OIDC and the BFF session | **Agreed** |
 | [D24](decisions/d24-roles-and-policies.md) | Roles and policies | **Agreed** |
-| [D25](decisions/d25-connectors-deployment-bindings-and-secrets.md) | Connectors, deployment bindings and secrets | **Agreed** |
+| D25 | Connectors, deployment bindings and secrets | Superseded by [D161](decisions/d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md), [last text](https://github.com/phuongnse/axis/blob/befe7e94283f56e55d1cd16c3242010e14a987cf/docs/decisions/d25-connectors-deployment-bindings-and-secrets.md) |
 | [D26](decisions/d26-events-and-triggers.md) | Events and triggers | **Agreed** |
 | [D27](decisions/d27-inbound-endpoints.md) | Inbound endpoints | **Agreed** |
 | D28 | Extension packages | Superseded by [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md), [last text](https://github.com/phuongnse/axis/blob/bce8153e05dd8e5bc81b846a4bad04714759bc58/docs/decisions/d28-extension-packages.md) |
@@ -45,7 +45,7 @@ the files agree, title and status included.
 | [D31](decisions/d31-separate-database-roles.md) | Separate database roles | **Agreed** |
 | [D32](decisions/d32-test-scenarios.md) | Test scenarios | **Agreed** |
 | [D33](decisions/d33-recomputing-stored-computed-fields.md) | Recomputing stored computed fields | **Agreed** |
-| [D34](decisions/d34-process-inspection.md) | Process inspection | **Agreed** |
+| D34 | Process inspection | Superseded by [D161](decisions/d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md), [last text](https://github.com/phuongnse/axis/blob/9fe6eb5cf7ea55388f27e9a6519aea2d41b42b52/docs/decisions/d34-process-inspection.md) |
 | [D35](decisions/d35-operator-retry-cancel-and-resolve.md) | Operator retry, cancel and resolve | **Agreed** |
 | [D36](decisions/d36-correlated-logs-metrics-and-traces.md) | Correlated logs, metrics and traces | **Agreed** |
 | [D37](decisions/d37-health-checks-for-the-server-and-the-worker.md) | Health checks for the server and the worker | **Agreed** |
@@ -172,3 +172,5 @@ the files agree, title and status included.
 | [D158](decisions/d158-history-keeps-old-and-new-values-a-deleted-record-waits-in-a-recycle-bin-and-every-record-has-system-fields.md) | History keeps old and new values, a deleted record waits in a recycle bin, and every record has system fields | **Agreed** |
 | [D159](decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) | Pages show related lists, boards and calendars, forms take context and drafts, and each site has its brand | **Agreed** |
 | [D160](decisions/d160-people-work-together-on-records-and-tasks-and-work-reaches-the-right-person-when-they-are-away.md) | People work together on records and tasks, and work reaches the right person when they are away | **Agreed** |
+| [D161](decisions/d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md) | Connector calls run on bindings and secrets, and process inspection keeps what a run sent and answered, with step errors as codes | **Agreed** |
+| [D162](decisions/d162-each-entitys-records-open-on-one-record-page-in-each-site.md) | Each entity's records open on one record page in each site | **Agreed** |

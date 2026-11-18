@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test } from '../test'
 import type { Locator, Page } from '@playwright/test'
-import { confirmDialog, waitForDialog } from '../dialogs'
+import { waitForDialog } from '../dialogs'
 import { dragTo, waitForCanvas } from '../design-drag'
 import { compareApplicationFolders, textEditorKeys } from '../folder-comparison'
 import { pickerLabel } from '../picker-labels'
@@ -16,6 +16,7 @@ import {
   addListItem,
   addMapping,
   closeEntityField,
+  confirmPublish,
   createResource,
   deleteResource,
   doneListItem,
@@ -1224,7 +1225,7 @@ test.describe('the author builds the asset management application with Studio on
     await page.goto(`${journeyURL}/studio?app=AssetManagement&view=releases`)
 
     await page.getByRole('button', { name: 'Publish…', exact: true }).click()
-    await confirmDialog(page, 'Publish')
+    await confirmPublish(page)
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
       timeout: 120_000,
     })

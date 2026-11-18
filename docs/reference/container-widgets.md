@@ -14,12 +14,14 @@ that fails to load does not affect the widgets next to it.
 ## Columns
 
 A `columns` widget shows its columns side by side, each as wide as its `width` in twelfths. At
-[narrow width](frontend.md#narrow-width) the columns stack in file order.
+[narrow width](frontend.md#narrow-width) the columns stack in file order. The columns sit `spacing-md` apart, with no
+rule between them, and a columns widget has no heading, so it is not a part.
 
 ## Tabs
 
 A `tabs` widget shows one header per tab with its label, and keeps the selected tab in the URL, so a reload, a shared
-link and the back button keep it.
+link and the back button keep it. The tab bar sits straight on `surface`, with its line in `borderSubtle`. A tabs
+widget has no heading, so it is not a part, and no rule sits above it.
 
 - **The parameter.** The selected tab is kept in the URL as `?tab=<n>`, counted from 1. The second `tabs` widget of a
   page, in document order, uses `tab2`, the third `tab3`, and so on. A `tabs` widget inside a tab counts whether or not
@@ -33,9 +35,18 @@ link and the back button keep it.
 
 ## Sections
 
-A `section` shows its title above its widgets, as a region named by the title. A section marked `collapsed` starts
-closed, and the user can open and close it. The open state is not in the URL, so a reload resets it to the file's
-`collapsed` value.
+_(planned)_
+
+A `section` is a part of the page, as [shell layout](shell.md#layout) sets out. Its title is a heading drawn at the
+`heading5` size, straight on `surface`, with its widgets under it, and no panel, border or Ant Design `Collapse`. The
+section is a region named by its title. A `borderSubtle` rule sits above a section that follows another widget in the
+same list, and none above the first.
+
+A section that is not `collapsed` always shows its widgets and has no fold. A section marked `collapsed` starts closed,
+and its fold sits before its title: an icon button drawn with `FoldIcon`, named "Show section {title}" or "Hide section
+{title}", with the texts `shell.section.show` and `shell.section.hide` ("Hiện phần {title}" and "Ẩn phần {title}" in
+Vietnamese). The button has `aria-expanded` and `aria-controls`. A closed section draws none of its widgets. The open
+state is not in the URL, so a reload resets it to the file's `collapsed` value.
 
 ## Lazy loading
 

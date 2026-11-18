@@ -23,7 +23,7 @@ schedule triggers need no binding and no inbound surface.
   application as customized.
 - **Connector slots stand for connectors.** `module.json` declares connector slots, each with the
   operations the module needs and their typed inputs and outputs, as a
-  [connector operation](d25-connectors-deployment-bindings-and-secrets.md) has them. A module process
+  [connector operation](d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md) has them. A module process
   calls a slot with a `callConnector` step. The application's `modules` entry maps each slot to one
   of its connectors, which must have every operation of the slot with matching fields, or the
   compile fails. A depending module maps the slots of a module it depends on to its own, as it maps

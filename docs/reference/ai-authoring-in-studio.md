@@ -10,17 +10,19 @@ The request panel is where an author asks AI for a change in words. Ask AI opens
 request opens its own page.
 
 - **Where.** Ask AI on the application's [band](studio-workspace.md#band) opens and closes the panel. The
-  panel is the shared [side panel](shell.md#layout) `StudioSidePanel`, which the Problems panel also uses.
+  panel is the shared [side panel](shell.md#layout), which the Problems panel also uses.
   It shows only when `studioAi` is true, the field that [`GET /api/me`](security.md#roles-and-the-current-user) answers.
 - **Sending.** The author writes what they want in words, in any language, and sends it. A check box,
   "Accept when checks and review pass", asks for auto-accept, and shows only when the application
-  [allows it](#auto-accept). Send has no count beside it, because Axis counts no requests, see
+  [allows it](#auto-accept). Send has no count beside it.
+- **Axis counts no requests** _(planned for M35)_. That is why Send has no count, see
   [D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
 - **After a send.** The main area opens the request's address,
   `/studio?app=<application>&view=requests&request=<id>`. The panel stays open and empty for the next request.
-- **The request's page** _(planned for M35)_. The plan shows there once AI has written it. The notices of AI
-  requests open the same address, see [tenant notices](notifications.md#tenant-notices). What the page shows is
-  in [a request's page](#a-requests-page).
+- **The request's page.** The plan shows there once AI has written it. What the page shows is in
+  [a request's page](#a-requests-page).
+- **Notices** _(planned for M35)_. The notices of AI requests open the same address, see
+  [tenant notices](notifications.md#tenant-notices).
 - **The panel lists no requests.** The panel has no list.
 - **The bell and the sidebar** _(planned for M35)_. The [bell](notifications.md#the-bell) tells an author when a
   request of theirs waits for them or ends, and the sidebar's AI requests entry, below, leads to every request.
@@ -38,7 +40,7 @@ request opens its own page.
     sentence of its words, cut at 80 characters with an ellipsis. It has no sort.
   - **State** is a [status tag](shared-widgets.md#which-widget) with the state's one word, as the
     [states table](#a-requests-page) gives it. A fix round reads as Working.
-  - **Sent by** is the author's name, or "You" for the reader's own requests.
+  - **Sent by** is the author's name, read as [a person's name](actions-and-controls.md#text) is.
   - **Sent** is the time the request was sent.
 
   The table has the full toolbar of a table whose rows grow: Search, which matches a request's name and
@@ -70,8 +72,8 @@ A request's page shows one request: its heading, [the feed](#the-feed) and [the 
   [the states](#the-states).
 - Under the name, `spacing-xs` apart, come the request's words in full. Then, in `textMuted`, comes the
   sender's line.
-- The sender's line reads "Sent by you on <time>" for the reader's own request, or "Sent by <name> on <time>"
-  for a request of another person.
+- **The sender's line** _(planned)_. It reads "Sent by <name> on <time>", the name read as
+  [a person's name](actions-and-controls.md#text) is, so the reader's own is followed by "(you)".
 - **Co-authors** _(planned for M35)_. The line ends with ", co-authored with <AIs>". The co-authors are the AIs
   that made the change, in the order they first worked. Axis's agent is named by the model its author's AI
   used. An outside app is named by the name it registered with. The line is one sentence with no full stop.
@@ -80,8 +82,9 @@ A request's page shows one request: its heading, [the feed](#the-feed) and [the 
 - An unknown request shows "This request does not exist."
 - **The link to the request panel** _(planned for M35)_. The unknown request's line also has an Ask AI link,
   which opens [the request panel](#the-request-panel).
-- **A failed action** _(planned for M35)_. A failed action shows "That did not work. Try again." in an
-  [alert](shared-widgets.md#which-widget) above the feed.
+- A failed action shows "That did not work. Try again." in an
+  [alert](shared-widgets.md#which-widget) above the plan. A failed reply shows it inside its dialog instead, see
+  [replies](#replies).
 
 ### The states
 
@@ -167,49 +170,46 @@ Result, Started and Duration.
 
 ### The guide
 
-_(planned for M35)_
-
 The bar at the foot of the window guides the author in every state. It is an
 [action bar](actions-and-controls.md#buttons) with a few words of where the request stands, at most one main
 action, and the other actions before it. Actions that do not fit fold into More, and
 [what comes next](actions-and-controls.md#what-comes-next) gives the rule for every screen. Drop… sits in the
-bar, never in the heading.
+bar, never in the heading. Only the request's author sees its actions.
 
 | State                                         | Words                                                    | Main action                                                                                                       | Others                                                              |
 | --------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | AI writes the plan                            | AI is writing the plan                                   | none                                                                                                              | Drop…                                                               |
 | The plan waits, for its author                | Plan ready for your approval                             | Approve plan                                                                                                      | Drop…, Change the plan…                                             |
-| The plan waits with questions, for its author | "1 question to answer", or "<n> questions to answer"     | Answer…, which opens the reply as "Your answers"                                                                  | Drop…                                                               |
+| The plan waits with questions, for its author _(planned for M35)_ | "1 question to answer", or "<n> questions to answer"     | Answer…, which opens the reply as "Your answers"                                                                  | Drop…                                                               |
 | The plan waits, for anyone else               | Waiting for its author's approval                        | none                                                                                                              | none                                                                |
 | AI works, checks or reviews                   | AI is working on it                                      | none                                                                                                              | Drop…                                                               |
-| AI waits for an outside app                   | The app's line, as [below](#an-outside-apps-request) gives it | none                                                                                                         | Drop…                                                               |
-| Ready, a finding must change                  | "1 blocking finding", or "<n> blocking findings"         | Ask AI to fix it, which asks for changes with "Fix what the review found must change:" and each blocking finding as the comment | Drop…, Ask for other changes…, Accept anyway…, see [the diff](#the-diff) |
-| Ready, passed                                 | Checks and review passed                                 | Accept                                                                                                            | Drop…, Ask for other changes…                                       |
-| Ready, an accept met a conflict               | Resources changed since AI read them                     | Make the change again                                                                                             | Drop…                                                               |
-| Ready, for anyone else                        | Waiting for its author to accept                         | none                                                                                                              | none                                                                |
-| Accepting                                     | Accepting the draft                                      | none                                                                                                              | none                                                                |
-| Failed, for its author                        | AI could not finish                                      | Send again, which sends its words as a new request and opens it                                                   | Drop…                                                               |
+| AI waits for an outside app _(planned for M35)_ | The app's line, as [below](#an-outside-apps-request) gives it | none                                                                                                         | Drop…                                                               |
+| Ready, a finding must change _(planned for M35)_ | "1 blocking finding", or "<n> blocking findings"         | Ask AI to fix it, which asks for changes with "Fix what the review found must change:" and each blocking finding as the comment | Drop…, Ask for other changes…, Accept anyway…, see [the diff](#the-diff) |
+| Ready, passed | Checks and review passed                                 | Accept                                                                                                            | Drop…, Ask for other changes… _(planned for M35)_                   |
+| Ready, an accept met a conflict _(planned for M35)_ | Resources changed since AI read them                     | Make the change again                                                                                             | Drop…                                                               |
+| Ready, for anyone else | Waiting for its author to accept                         | none                                                                                                              | none                                                                |
+| Accepting | Accepting the draft                                      | none                                                                                                              | none                                                                |
+| Failed, for its author _(planned for M35)_ | AI could not finish                                      | Send again, which sends its words as a new request and opens it                                                   | Drop…                                                               |
 | Accepted                                      | Accepted. Live once published                            | none                                                                                                              | none                                                                |
 | Dropped                                       | Dropped. Nothing changed                                 | none                                                                                                              | none                                                                |
 
 ### Replies
 
-_(planned for M35)_
-
-Each reply opens a dialog drawn by [`ReasonDialog`](shared-widgets.md#which-widget). A reply takes up to
-2,000 characters, and its dialog has Cancel. A failure shows inside the dialog.
+A reply that asks for words opens a dialog drawn by [`ReasonDialog`](shared-widgets.md#which-widget). It takes up
+to 2,000 characters, and its dialog has Cancel. A failure shows inside the dialog.
 
 - **Change the plan…** is a secondary action for a plan that waits with no questions. Its `medium` dialog,
   "Change the plan", asks "What should the plan do differently?", and its button is **Ask for a new plan**.
-- **Answer…** is the main action while the plan has questions. Its `medium` dialog, "Answer the plan's
+- **Answer…** _(planned for M35)_ is the main action while the plan has questions. Its `medium` dialog, "Answer the plan's
   questions", asks for "Your answers". Its help says "AI writes the plan again with your answers, and you
   approve it." Its button is **Ask for a new plan**, and it sends the answers as a change of plan.
-- **Ask for other changes…** is a secondary action for a ready draft with no conflict. Its `medium` dialog,
+- **Ask for other changes…** _(planned for M35)_ is a secondary action for a ready draft with no conflict. Its `medium` dialog,
   "Ask for other changes", asks "What should AI change?". Its help says "AI works on the same draft with your
   comment, then the checks and the review run again." Its button is **Ask AI to change it**.
 - **Drop…** is a secondary action that opens a `small` dialog, "Drop this request?". It says that AI stops
-  working on the request and that its draft is deleted. Its button is **Drop**, in the destructive role.
-- **Send again** is the main action of a failed request. It sends the request's words as a new request and
+  working on the request and that its draft is deleted. It has Cancel and no field, and its button is **Drop**, in the
+  destructive role. A failed drop shows in [the page's alert](#the-heading).
+- **Send again** _(planned for M35)_ is the main action of a failed request. It sends the request's words as a new request and
   opens that request's page.
 
 ### An outside app's request
@@ -226,22 +226,37 @@ These lines are the bar's words and the Work item's line.
 
 ## The plan
 
-_(planned for M35)_
-
 A request waits for its author's approval of the plan before any change is made. The plan says what the
-application will change, so its author can decide. The page shows it as the Plan item of [the feed](#the-feed).
+application will change, so its author can decide. The page shows it as a part titled Plan, under the heading.
 
-The Plan item shows the plan in each of its states.
+The Plan part shows the plan in each of its states.
 
 - While AI writes the plan, a spinner and "AI is reading the application and writing a plan. Nothing changes
   until the plan is approved."
 - While the plan waits for its author, nothing sits beside its title, and the plan is open.
-- Once the plan is approved, the item reads "Approved on <time>", and the plan is folded under its summary.
-- The summary is under the title in every state once AI has written the plan. **Show the plan** or
-  **Hide the plan** follows it on the same line.
-- The author's comments that asked for another plan come first, oldest first, as "Asked for another plan:
-  “…”", in the text colour.
-- A request that failed before its plan was approved stops here, with its failure.
+- **Once the plan is approved** _(planned for M35)_. The item reads "Approved on <time>", and the plan is folded
+  under its summary.
+- **The summary** _(planned for M35)_. The summary is under the title in every state once AI has written the
+  plan. **Show the plan** or **Hide the plan** follows it on the same line.
+- **Earlier comments** _(planned for M35)_. The author's comments that asked for another plan come first, oldest
+  first, as "Asked for another plan: “…”", in the text colour.
+- **A failure before approval** _(planned for M35)_. A request that failed before its plan was approved stops
+  here, with its failure.
+
+The bar offers the author these actions while the plan waits.
+
+- **Approve plan** starts the work.
+- **Change the plan…** asks for another plan with the author's comment.
+- **Drop…** ends the request.
+
+Only the author of the request approves its plan.
+
+### The plan's groups
+
+_(planned for M35)_
+
+A plan with questions waits for its author's answers. While it has questions, the page offers **Answer…**
+and no **Approve plan**.
 
 The groups of the plan follow in this order. Each has a bold heading in the text colour, and it shows only
 when it has something to show.
@@ -258,34 +273,25 @@ when it has something to show.
 
 A question is one that AI leaves to its author. A decision is a choice that AI made, which its author may undo.
 
-A plan with questions waits for its author's answers. While it has questions, the page offers **Answer…**
-and no **Approve plan**. Without questions, the bar offers the author these actions.
-
-- **Approve plan** starts the work.
-- **Change the plan…** asks for another plan with the author's comment.
-- **Drop…** ends the request.
-
-Only the author of the request approves its plan.
-
 ## The diff
 
-_(planned for M35)_
-
-The Result item shows what the request changes and how its checks and review went, so its author can decide.
-Its parts come in this order: the checks and the review, what changes, Preview the draft while the request
-is ready, then the accept's status or a conflict.
+The Result part shows after the Plan, on a ready, failed or accepted request that has checks, so its author can
+decide. It shows what the request changes and how its checks and review went. Its parts come in this order: the
+checks and the review, then what changes. [Preview the draft](#preview-the-draft) and the accept's status, with
+[a conflict](#accepting), come after them.
 
 ### Checks and review
 
-Two lines open the Result item, Checks and Review. Each has its name in bold and its verdict as a
+Two lines open the Result part, Checks and Review. Each has its name in bold and its verdict as a
 [status tag](shared-widgets.md#which-widget). The verdicts start in one column, so the tags line up. Each
 line's summary sits under it, across the columns and flush with the name.
 
 - **Checks** reads Passed (`success`) or Failed (`danger`). Its summary reads "All scenarios pass" with no
-  count, "1 of 2 scenarios pass", or a compile's problems, such as "It does not compile: 2 problems".
-  **Show the checks**, or **Hide the checks** once it shows, ends the summary's line.
-- **Review** reads Changes requested (`attention`) while an open finding blocks the draft. It reads No changes
-  requested (`success`) otherwise, or Not reviewed (`muted`) when no review ran. Its summary is the review's own.
+  count, "1 of 2 scenarios pass", "The scenario fails." for one scenario, "The scenario run failed." when the
+  run failed with no failed scenario, "Package tests fail", or a compile's problems, such as "It does not compile: 2 problems". **Show the checks**, or **Hide the checks** once it shows, ends the summary's line.
+- **Review** reads Changes requested (`attention`) when the review asked for changes. It reads No changes requested
+  (`success`) when the review passed, or Not reviewed (`muted`) when a ready or accepted request had no review. A review
+  that asked for changes has its own text as its summary. A passed review stores no text, so it shows no summary.
   When Not reviewed, the author reads "Connect your AI to have a second AI review changes.", and anyone else
   reads "No second AI reviewed this change, as its author has not connected their AI."
 - The review never reads Approved. Only the author approves a change, by accepting it.
@@ -293,12 +299,14 @@ line's summary sits under it, across the columns and flush with the name.
 
 The checks' detail folds in under its line, inside it and indented `spacing-md`. It shows the compile's
 problems through [`StudioProblemList`](shared-widgets.md#which-widget), then the results of the scenarios,
-see [scenario results](#scenario-results). `spacing-xs` parts the lines of one group, and `spacing-sm` parts
-the review from the checks.
+see [scenario results](#scenario-results). The problems and the scenarios are plain rows for now.
+`spacing-xs` parts the lines of one group, and `spacing-sm` parts the review from the checks.
 
 ### What the review found
 
-The review's findings sit under its summary, `spacing-sm` below it and indented `spacing-md` inside the Review
+_(planned for M35)_
+
+Changes requested, as the Review line shows it, is for an open blocking finding. The review's findings sit under its summary, `spacing-sm` below it and indented `spacing-md` inside the Review
 line. Three groups follow, `spacing-md` apart. Each has a bold heading and shows only when it has something to show.
 
 - **Things to look at** lists the review's open findings in one flat list, blocking findings first. Each is a
@@ -328,21 +336,26 @@ icon is hidden from assistive technology, which reads the word. Each item keeps 
 
 ### What changes
 
-[`StudioChanges`](shared-widgets.md#which-widget) draws the request's diff folded, as the publish page does. Each
-resource is a block under its name, its kind, its change and its line counts, with the summary its request wrote
-under it. The block opens to its JSON diff, see [revisions](#revisions).
+[`StudioChanges`](shared-widgets.md#which-widget) draws the request's diff folded. Each resource is a block under its
+name, its kind and its change. The block starts closed behind **Show the diff** and opens to its JSON diff, see
+[revisions](#revisions).
 
+- **Line counts and summary** _(planned for M35)_. Each block shows its line counts, such as "+8 −3", and the summary its
+  request wrote under it.
 - The name is no link, because the resource in the application is the version before the draft.
-- A module resource shows the layer applied, marked as the [customization layers](customization-layers.md#in-studio)
-  editor marks it.
+- A layer file is named by the module resource it changes, with the layer applied. The elements the layer added,
+  changed or removed are listed under the name, each with its mark. A mark has the accessible name that the
+  [customization layers](customization-layers.md#in-studio) editor gives it. The page offers no Reset to module.
 - The diff comes from [the request diff](authoring-requests.md#routes). The page reads it again when the request
   moves on.
-- A pointer to a resource that only the draft adds reads by its name and kind, as the diff names it. A test result,
-  a finding, a plan's implementation note or a History row can point to one. The pointer is a link that opens the
-  resource's block and scrolls to it. The page gives its diff to `DraftResourcesContext`, which
+- **Pointers** _(planned for M35)_. A pointer to a resource that only the draft adds reads by its name and kind, as the
+  diff names it. A test result, a finding, a plan's implementation note or a History row can point to one. The pointer is a
+  link that opens the resource's block and scrolls to it. The page gives its diff to `DraftResourcesContext`, which
   [`ResourceReference`](shared-widgets.md#which-widget) reads.
 
 ### Scenario results
+
+_(planned for M35)_
 
 Each scenario result has its outcome as a status tag in a column of its own: Passed (`success`), Failed (`danger`)
 or Skipped (`muted`). Then come its name, its kind and its time. The name is a link, and the kind and the time are
@@ -355,6 +368,8 @@ muted, each `spacing-xs` from the last.
 - The band's Run tests draws its results the same way, see [Studio](studio.md#running-tests).
 
 ### Preview the draft
+
+_(planned for M35)_
 
 **Preview the draft** is a `secondary` button after the diff. It shows while the request is ready, to its author,
 and only when the deployment has a preview host, `studioPreviewHost` in [`GET /api/me`](security.md#roles-and-the-current-user).
@@ -369,21 +384,36 @@ and only when the deployment has a preview host, `studioPreviewHost` in [`GET /a
 - **Accept** sends the accept and shows its status: "Accepted. The change is in the application and in History. It is
   not live until someone publishes." or "Not accepted. Nothing in the application changed." When it succeeds, the page
   reads the request again.
-- **Accept anyway…** shows while an open blocking finding remains. It opens a `medium` dialog, "Accept without these
-  changes?", which says "AI's review asked for these changes. The draft goes into the application without them." The
-  dialog lists only the open blocking findings, drawn as [Things to look at](#what-the-review-found) draws them, with no
-  suggestions. Its buttons are **Accept anyway** and Cancel, and it sends the same accept route. The reason is that the
-  reviewer is an AI and may be wrong, and the author answers for the change.
-- **A conflict** shows a warning alert, "Someone changed these resources after AI read them, so nothing was accepted:",
-  with one bullet for each resource: its [`ResourceReference`](shared-widgets.md#which-widget), who changed it and when.
-  **Make the change again**, in the bar (see [the guide](#the-guide)), sends the [retry](authoring-requests.md#routes)
-  route. AI makes the change on a new draft from the folder as it is now, and the checks and the review run again.
-- **A failure** leaves the Result item idle. It shows the request's checks and its diff. Why it failed shows in
-  [the Work item](#the-work-item).
+- **Accept anyway…** _(planned for M35)_ shows while an open blocking finding remains. It opens a `medium` dialog,
+  "Accept without these changes?", which says "AI's review asked for these changes. The draft goes into the
+  application without them." The dialog lists only the open blocking findings, drawn as
+  [Things to look at](#what-the-review-found) draws them, with no suggestions. Its buttons are **Accept anyway** and
+  Cancel, and it sends the same accept route. The reason is that the reviewer is an AI and may be wrong, and the author
+  answers for the change.
+- **A conflict** _(planned for M35)_ shows a warning alert, "Someone changed these resources after AI read them, so
+  nothing was accepted:", with one bullet for each resource: its
+  [`ResourceReference`](shared-widgets.md#which-widget), who changed it and when. **Make the change again**, in the bar
+  (see [the guide](#the-guide)), sends the [retry](authoring-requests.md#routes) route. AI makes the change on a new
+  draft from the folder as it is now, and the checks and the review run again.
+
+### A failure
+
+A failed request shows the alert "AI could not finish this request." after the Plan. Its message is the reason the
+request failed, in words. The checks and the diff follow, as above. The reason comes from the newest step that
+ended, by its kind and its outcome:
+
+| Newest step                       | Reason                                                       |
+| --------------------------------- | ------------------------------------------------------------ |
+| A check that failed               | The checks still failed after the last fix round.            |
+| A review that asked for changes   | The review still asked for changes after the last fix round. |
+| Outcome `overBudget`              | The request used up its token budget.                        |
+| Outcome `timedOut`                | The request ran out of time.                                 |
+| Outcome `tokenEnded`              | Its author's sign-in ended before AI finished.               |
+| Outcome `noPlan`                  | AI did not write a plan.                                     |
+| Outcome `notAccepted`             | The draft could not be accepted.                             |
+| Any other outcome                 | A step did not finish.                                       |
 
 ## Auto-accept
-
-_(planned for M35)_
 
 Auto-accept lets the agent accept its own drafts in an application, as an automatic merge does.
 
@@ -400,8 +430,6 @@ Auto-accept lets the agent accept its own drafts in an application, as an automa
   publishes.
 
 ## Revisions
-
-_(planned for M35)_
 
 Studio shows the application's [revisions](revisions-and-drafts.md#revisions), so an author sees who
 changed what and can undo it.
@@ -421,6 +449,7 @@ changed what and can undo it.
   kind, whether it was Added, Changed or Removed, and its line counts, such as "+8 −3", which assistive
   technology reads in full. A resource that only a draft adds takes the name its change carries. The file's
   summary in words comes under the header, then its diff. A file is open at first, unless its page folds it.
+  The publish page folds its files at first.
 - **A file's diff** _(planned for M35)_. The JSON is shown as one column of lines with line numbers. An added
   line is on an added tint with a mark in the gutter, a removed line on a removed tint with its own mark, and
   the changed words of a line on a deeper tint. The JSON is coloured as the code editor colours it. A run of
@@ -431,11 +460,15 @@ changed what and can undo it.
   [undo](revisions-and-drafts.md#undo). It runs at once, and the undo is itself a revision that can
   be undone. A revision that cannot be undone alone names the later revisions that block it, each with
   its summary, author and time, and nothing is undone.
-- **Publishing.** _(planned for M35)_ The publish page lists every file that differs from the live release,
-  under "`<n>` files changed since the live release". Each file is a block, folded at first, with "Changed by"
-  and each person who changed it since the release, in the order of their first change. The reader is "you",
-  and an AI request is "the AI request “`<name>`”", a link to its page. The list comes from the
-  [live diff](authoring-revisions.md#live-diff). The page is described in [publishing](studio.md#publishing).
+- **Publishing.** The publish page lists every file that differs from the live release, under "`<n>` files
+  changed since the live release". Each file shows "Changed by" and each person who changed it since the release,
+  in the order of their first change. An AI request is "the AI request “`<name>`”", a
+  link to its page. A change the server recorded reads System, as it does in History. An AI request that cannot
+  be read names the person who accepted it instead. A file that no revision changed since the release has no
+  Changed by line. The list comes from the [live diff](authoring-revisions.md#live-diff). The page is described
+  in [publishing](studio.md#publishing).
+- **The reader in Changed by** _(planned)_. Changed by names the reader as [a person's name](actions-and-controls.md#text)
+  is, followed by "(you)".
 
 ## Connected apps
 

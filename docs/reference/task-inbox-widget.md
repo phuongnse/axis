@@ -36,9 +36,11 @@ A page whose widget is a `taskInbox` lists the signed-in user's open tasks in th
   `releaseId`, once per release, so tasks from several releases each show their own release's labels.
   The table stays loading until those texts have arrived, and a failed load shows the inbox's load
   error.
-- **Tags.** An overdue task shows a red "Overdue" tag beside its due date. A task with `claimedBy` set
+- **Tags.** An overdue task shows an "Overdue" tag beside its due date. A task with `claimedBy` set
   shows a "Claimed by you" tag beside its label. The task list returns a claimed task only to its
   claimer, so the signed-in user is always the claimer, and the inbox does not fetch the user.
+- **Tags as statuses** _(planned)_. Overdue is a `StatusTag` in `attention`, and Claimed by you a `StatusTag` in
+  `neutral`, see [which widget](shared-widgets.md#which-widget).
 - **At risk** _(planned for M39)_. A task with `atRisk` that is not overdue shows an "At risk" tag in the
   warning tone beside its due date. It is a `StatusTag`, see [shared widgets](shared-widgets.md). "Overdue"
   stays the tag of a past due time.
@@ -50,6 +52,9 @@ A page whose widget is a `taskInbox` lists the signed-in user's open tasks in th
   shows under the toolbar.
 - **Links.** Each row opens the task page at `/{site}/{inboxpage}/{taskId}`, with the inbox page name
   in lower case.
+- **Record links** _(planned)_. The Record column, which shows the subject's label, links to the subject's record page.
+  The link is built from the row's `subject.entity` and `subject.id`, see [list my tasks](task-api.md#list-my-tasks).
+  It is plain text when the person cannot open the record.
 - **Signed out.** With nobody signed in, the task API answers `401`, and the widget shows the sign-in
   prompt like any other call.
 - **Texts.** The platform texts `shell.tasks.*` hold the column headers, the empty text, the load error
@@ -90,6 +95,21 @@ form of its step over the subject record and a button for each outcome.
   "Overdue" tag as the inbox when the task is overdue, and the form's sections over the subject record.
   The layout and the field types come from the task read's `form`, and the values from the subject
   record, read through the record API. The task page has no history panel.
+- **Heading** _(planned)_. The heading is the step's label, with the Overdue tag beside it when the task is overdue.
+  Its line is "Task" ("Công việc", `shell.task.kind`), as [a page that shows one thing](shell.md#page-header) says.
+- **Facts** _(planned)_. The first part of the page is two facts, one to a row: Record ("Bản ghi", the inbox's column
+  name), which is the subject record as a link, see [opening things](actions-and-controls.md#opening-things), and Due,
+  when the step has a `dueIn`. Neither is a read-only field of the form below, because the form belongs to the step.
+- **Actions on the heading** _(planned)_. Release, Claim and Reassign… are secondary buttons on the heading's right.
+  The outcomes follow them as one group named Decision ("Quyết định", `shell.task.outcomes`), see
+  [buttons](actions-and-controls.md#buttons). A group of one is a plain `main` button.
+- **Saving** _(planned)_. A change to the form saves through the [save bar](studio-resource-form.md#save-bar), which
+  sends the changed values to [saving a task](task-api.md#saving-a-task). That leaves the task open. A wizard's Back
+  and Next stay under the step's fields, through `AxisActionRow`.
+- **A missing task** _(planned)_. A task the person cannot open, or that does not exist, shows under the inbox page's
+  heading "This task does not exist, or you cannot open it." ("Công việc này không tồn tại hoặc bạn không có quyền
+  mở.", `shell.task.notFound`), and one link, Go to Tasks (`shell.record.goToList`). `RecordNotFound` draws it and
+  takes the text key, so the task page and a record's page share one mechanism.
 - **Due time and At risk** _(planned for M39)_. The due date shows in its `dueTimeZone` with the working
   time left, and an "At risk" tag shows as in the inbox.
 - **Conditions and steps.** The form follows the form widget's conditions, see

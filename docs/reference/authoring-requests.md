@@ -98,7 +98,7 @@ an accept, which [accepting](#accepting) describes.
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/accept`                              | Stores an `accept` publish request for the draft of a `ready` request and answers `202` with it            |
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/retry` _(planned for M35)_           | Moves a `ready` request whose accept met a conflict back to `working` with no draft                        |
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/request-changes` _(planned for M35)_ | Moves a request from `ready` back to `working` and keeps the comment as a `changeRequest` step             |
-| `GET /api/studio/apps/{application}/authoring-requests/{id}/diff` _(planned for M35)_             | Reads the changes of the request, as the [draft diff](authoring-revisions.md#draft-diff) shows them        |
+| `GET /api/studio/apps/{application}/authoring-requests/{id}/diff`                                 | Reads the changes of the request, as the [draft diff](authoring-revisions.md#draft-diff) shows them        |
 | `GET /api/studio/ai` _(planned for M35)_                                                          | Tells the session's author whether their AI is connected, and the address of the MCP server                |
 | `POST /api/studio/apps/{application}/drafts/{draft}/preview` _(planned for M35)_                  | Tries the draft on the preview tenant, see [the draft preview](#routes)                                    |
 
@@ -151,11 +151,18 @@ an accept, which [accepting](#accepting) describes.
   retry, and the token budget goes on, as requesting changes does above. Without that restart, the time limit of a
   request that waited a long time for its author would stop it as `timedOut` before its next step. The agent's own
   retry keeps its round and its time limit, see [retrying a conflict](#accepting). It answers the request as it now is.
-- **The request diff** _(planned for M35)_. Any author reads the changes of the request. A `ready` or `failed` request
-  answers the changes of its draft, in the shape and the pages of the [draft diff](authoring-revisions.md#draft-diff).
-  Once `accepted`, it answers the changes of the revision its accept made, as the
-  [revision diff](authoring-revisions.md#diff) gives them, with `titles`, in one page with a null `cursor`. A request
-  with neither a draft nor an accept answers `404`.
+- **The request diff.** Any author reads the changes of the request. A request with a draft that is not
+  `accepted`, such as a `ready` or `failed` one, answers the changes of its draft, in the shape and the pages of the
+  [draft diff](authoring-revisions.md#draft-diff), read as its author's draft, with `module` as below. A cursor the draft did not give
+  answers `400` and a write lock that cannot be taken `503`, as the draft diff does. Once `accepted`, it answers the
+  changes of the revision its accept made, as the [revision diff](authoring-revisions.md#diff) gives them, with `titles`,
+  in one page as `{ start, tip, resources, cursor }`. `start` is the parent of that revision, `tip` is the revision
+  and `cursor` is null, and a cursor answers `400`. A request with neither a draft nor an accept answers `404` with
+  the title "The request has no draft and no accept."
+  A layer file's entry, one with a `target`, also has `module`: `{ id, kind, name, file, before, after, marks, removed }`.
+  `before` and `after` are the module resource's JSON text with the layer applied at `start` and at `tip`. Either is
+  null where the target names no module resource. `marks` and `removed` are those of `after`, as the
+  [module resource read](customization-layers.md#in-studio) answers them. An entry that is not a layer file has no `module`.
 - **AI status** _(planned for M35)_. `GET /api/studio/ai` takes the session and the author role and answers
   `{ aiConnected, mcp }`. `aiConnected` is true when the tenant's AI authoring setting is on and the person has
   stored a key, or when `Ai:DefaultBinding` needs none, see
@@ -431,8 +438,11 @@ only [publishing](authoring.md#publishing) does.
 - **Conflicts.** A resource or a package file that changed since the draft recorded it is a conflict, and the
   accept answers it with one `AXC0377` diagnostic for each, naming the resource, its file and its
   new version, or the package file's path and its new version.
-- **Who changed it** _(planned for M35)_. Each `AXC0377` diagnostic also names who made the revision that changed the
-  resource, and when.
+- **Who changed it.** Each `AXC0377` diagnostic of an accept also carries `changedBy`, the author name of the newest
+  revision on `main` since the draft's start that changed the resource or the package file, and `changedAt`, that
+  revision's time as ISO 8601. The name is the one the revision stored, and a change made outside Studio is
+  named `Axis`. Both are null when no such revision is found, for example for a resource moved to a third path.
+  `GET .../requests/{id}` answers both on the accept's publish request, and no other diagnostic carries them.
 - **Retrying a conflict.** When the agent's accept meets a conflict, the request goes back to `working` with no
   draft. The agent reads the folder again, makes the change on a new draft and runs the checks and the review
   again, within the request's budgets: the request keeps its `round`, tokens and time limit. The conflicted draft

@@ -161,7 +161,7 @@ does not publish anything at this step.
 
 ## 10. Publish the application
 
-Choose **Publish…**, then confirm. Studio freezes the application as release 1 and makes it the active
+Choose **Publish…**, then choose **Publish** on the publish page. Studio freezes the application as release 1 and makes it the active
 release. The release history shows one row, marked as active.
 
 A release is an immutable copy of the application. Changing the application later does not change release

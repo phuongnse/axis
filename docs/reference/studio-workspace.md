@@ -91,6 +91,8 @@ comes first, so it is never next to Publish….
   fold into one "…" icon menu, More actions, in that order, and New resource… and Publish… stay. They unfold when the
   room comes back.
 
+- **On the publish page.** Publish… is hidden on the [publish page](studio.md#publishing), whose action bar has
+  the Publish button, so the screen has one solid button.
 - **Ask AI.** Ask AI is a text button just before Publish…. It shows when
   [`studioAi`](security.md#roles-and-the-current-user) is true, whether or not the author has connected their
   own AI, and it opens and closes the request panel of [AI authoring in Studio](ai-authoring-in-studio.md#the-request-panel).
@@ -103,8 +105,8 @@ with its message and where it is. Opening one opens its resource at the place it
 panel open, so an author can fix one problem after another. The panel scrolls on its own and stops at its
 end, as [scroll areas](actions-and-controls.md#scroll-areas) say.
 
-- **The shared frame.** The panel is drawn in `StudioSidePanel`, Studio's one side panel frame, see
-  [layout](shell.md#layout).
+- **The shared frame** _(planned)_. The panel is drawn in `SidePanel`, the one side panel frame of every page, at the
+  width the person last chose, see [layout](shell.md#layout).
 
 ## Page heading
 
@@ -117,6 +119,10 @@ An optional line under the heading, in `textMuted`, says more: the application's
 Overview, or the module an open resource comes from. It never names a file or a path, which only the
 JSON view shows. The page's own actions, such as a scenario's Run scenario and a kind's New entity…, sit on
 the heading's right, and so does a resource's "…" menu with [Delete…](studio.md#delete).
+
+**A page that shows one thing** _(planned)_. An open resource, a release and a revision are headed as
+[a page that shows one thing](shell.md#page-header) says. Their line is the kind alone, and a resource's module, or a
+revision's author and time, is a fact of the page's first part, see [facts as the first part](shell.md#page-header).
 
 ## Names
 
@@ -175,7 +181,7 @@ While the release history loads, Live and Changes both say so, and when it fails
 load. Once it has loaded, Live is left out when there is no live release. Live also says so while its sites load.
 
 Each block is a part, as a [resource form's sections](studio-resource-form.md#sections) are,
-with its title as its heading and no line under it. The blocks sit a `divider` rule apart. Outside the blocks, the page holds only the heading, the description and the gaps between the blocks.
+with its title as its heading and no line under it. The blocks sit a rule apart. Outside the blocks, the page holds only the heading, the description and the gaps between the blocks.
 
 ## Change list
 
@@ -260,7 +266,7 @@ Each table holds its rows, so it filters them itself and keeps its filter in the
 [tables](actions-and-controls.md#tables). The Modules and packages table uses the plain name `filter`, and
 Activations the `activations.` prefix, so a link opens the same rows in both.
 
-The parts from Details to Activations each have a `heading5` heading, with a `divider` rule between
+The parts from Details to Activations each have a `heading5` heading, with a rule between
 them and none before the first, through `SectionParts`. A part that the page leaves out, such as Relaxed
 points without a module, adds no rule.
 

@@ -1,8 +1,9 @@
 # Capabilities
 
 What an organization needs from a platform to run its work on it, by area, and where each capability
-lives in Axis. A row links the doc section that holds its rule, or carries the planned marker of the
-milestone that builds it, as [D154](decisions/d154-every-capability-an-organization-needs-has-a-home-and-a-capability-map-keeps-it-so.md)
+lives in Axis. A row links the doc section that holds its rule, or carries a
+[planned marker](writing-docs.md#planned-work), as
+[D154](decisions/d154-every-capability-an-organization-needs-has-a-home-and-a-capability-map-keeps-it-so.md)
 agrees. A row that links a decision names something Axis keeps out on purpose, for the reason that
 decision gives.
 
@@ -222,7 +223,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Filter on every column of every table | [Tables](reference/actions-and-controls.md#tables) |
 | Search the text of a list | [Paging and sorting](reference/record-api.md#paging-and-sorting) |
 | Search across every kind of record at once | _(planned for M53)_ |
-| Replace a saved view with the current search, filter and sort | _(planned for M33)_ |
+| Replace a saved view with the current search, filter and sort | [Tables](reference/actions-and-controls.md#tables) |
 
 ### Reports and dashboards
 
@@ -297,7 +298,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Sort and page a table | [Paging and sorting](reference/table-widget.md#paging-and-sorting) |
 | Filter a table on its columns | [Filter](reference/table-widget.md#filter) |
 | Save a table's search, filter and sort as a named view | [Tables](reference/actions-and-controls.md#tables) |
-| Overwrite a saved view | _(planned for M33)_ |
+| Overwrite a saved view | [Tables](reference/actions-and-controls.md#tables) |
 | Keep each person's columns of a table | [Table views and columns](reference/frontend.md#table-views-and-columns) |
 | Choose the columns of an application's table | [Column chooser](reference/table-widget.md#column-chooser) _(planned for M42)_ |
 | Act on one row, or from the toolbar | [Row and toolbar actions](reference/table-widget.md#row-and-toolbar-actions) |
@@ -502,7 +503,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Capability | Where |
 | --- | --- |
 | An agent changes an application through an MCP server | [Tools](reference/mcp-server.md#tools) |
-| Describe a change in words in Studio and review its plan and diff | _(planned for M35)_ |
+| Describe a change in words in Studio and review its plan and diff | [The request panel](reference/ai-authoring-in-studio.md#the-request-panel) |
 | An agent builds a whole application or module | _(planned for M36)_ |
 | Choose the model the agent uses | [Bindings](reference/model-bindings.md#bindings) |
 | Use models through Amazon Bedrock or Google Vertex AI | _(planned for M35)_ |

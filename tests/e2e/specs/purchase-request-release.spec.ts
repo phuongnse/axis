@@ -14,7 +14,7 @@ import { guardStep } from '../hang-guard'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
 import { previewURL, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { addMapping, openKind, openModuleResource, openProblems, openTab } from '../studio-resources'
+import { addMapping, confirmPublish, openKind, openModuleResource, openProblems, openTab } from '../studio-resources'
 import { chooseTheme } from '../shell'
 import { logInAtKeycloak } from '../keycloak'
 
@@ -52,9 +52,11 @@ async function releaseB(testInfo: TestInfo) {
  */
 async function studioServer(testInfo: TestInfo) {
   const folder = testInfo.outputPath('studio-publish')
+  const revisions = testInfo.outputPath('studio-revisions')
   await rm(folder, { recursive: true, force: true })
+  await rm(revisions, { recursive: true, force: true })
   await cp(purchaseRequests, folder, { recursive: true })
-  const server = await startServer({ Studio__Folders__0: folder })
+  const server = await startServer({ Studio__Folders__0: folder, Studio__RevisionsPath: revisions })
   return { server, folder }
 }
 
@@ -115,12 +117,16 @@ async function openStudio(page: Page, serverUrl: string) {
   })
 }
 
-/** Opens the Releases page of the open application from the sidebar, where the release list is. */
+/**
+ * Opens the Releases page of the open application from the sidebar, where the release list is, and waits for the list.
+ * Publish… keeps the page it is clicked on, so it must not be clicked before the Releases page has shown.
+ */
 async function openReleases(page: Page) {
   await page
     .getByRole('navigation', { name: 'Menu', exact: true })
     .getByRole('link', { name: 'Releases', exact: true })
     .click()
+  await expect(page.getByTestId('studio-releases')).toBeVisible()
 }
 
 /** Sets the en and vi texts of the key `key` through Studio's text route, as the signed-in author. */
@@ -148,12 +154,10 @@ async function signInToPreview(browser: Browser, baseURL: string, user: string) 
   return { context, page }
 }
 
-/** Clicks Publish, fills the dialog's label and confirms. */
+/** Clicks Publish…, fills the publish page's label and confirms. */
 async function publishWithLabel(page: Page, label: string) {
   await page.getByRole('button', { name: 'Publish…', exact: true }).click()
-  const dialog = await waitForDialog(page)
-  await dialog.getByRole('textbox', { name: 'Label (optional)', exact: true }).fill(label)
-  await confirmDialog(page, 'Publish')
+  await confirmPublish(page, label)
 }
 
 /**
@@ -793,7 +797,18 @@ test.describe('the active release of the purchase request sample changes', () =>
 
       await useSession(page, 'author')
       await page.goto(`${server.url}/studio?app=PurchaseRequests&view=releases`)
-      await publishWithLabel(page, label)
+      await page.getByRole('button', { name: 'Publish…', exact: true }).click()
+      await expect(page).toHaveURL(/view=publish/)
+      await expect(page.getByRole('heading', { name: 'Publish this application', exact: true })).toBeVisible()
+      await expect(page.getByText(`Goes live as release ${maxNumber + 1}`, { exact: true })).toBeVisible()
+      // The hand save is the only change since the live release, and the author made it.
+      await expect(page.getByRole('heading', { name: '1 file changed since the live release', exact: true })).toBeVisible()
+      const changed = page.getByTestId('studio-changes-file')
+      await expect(changed).toHaveCount(1)
+      await expect(changed).toHaveAttribute('data-file', 'texts/en.json')
+      await expect(changed.getByTestId('studio-changes-by')).toHaveText('Changed by you')
+      await confirmPublish(page, label)
+      await expect(page).toHaveURL(/view=releases/)
       await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
       const published = page.getByTestId('studio-release-row').filter({ hasText: label })
       await expect(published).toHaveAttribute('data-number', String(maxNumber + 1))

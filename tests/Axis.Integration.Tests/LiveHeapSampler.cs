@@ -2,7 +2,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// Measures how far the managed heap grows while it runs, counting only live memory, because a full collection runs
-/// before each reading. A collection pauses the whole process, so the sampler waits at least four times as long as
+/// before each real reading. A collection pauses the whole process, so the sampler waits at least four times as long as
 /// its last collection took, and never less than 100 ms. It collects at most about a fifth of the time, so the work
 /// that it measures runs close to normal speed even when the heap is large and a collection is slow.
 /// </summary>
@@ -14,14 +14,19 @@ internal sealed class LiveHeapSampler : IDisposable
     internal const int CollectionShare = 4;
 
     private readonly Thread _thread;
+    private readonly Func<long> _measure;
     private readonly long _baseline;
     private readonly ManualResetEventSlim _stopped = new();
     private long _peak;
 
-    public LiveHeapSampler()
+    public LiveHeapSampler() : this(GC.GetTotalMemory(true), CollectAndMeasure) { }
+
+    /// <summary>Starts sampling from <paramref name="baseline"/>, taking each reading with <paramref name="measure"/>.</summary>
+    internal LiveHeapSampler(long baseline, Func<long> measure)
     {
-        _baseline = GC.GetTotalMemory(true);
-        _peak = _baseline;
+        _measure = measure;
+        _baseline = baseline;
+        _peak = baseline;
         _thread = new Thread(Sample) { IsBackground = true };
         _thread.Start();
     }
@@ -54,13 +59,20 @@ internal sealed class LiveHeapSampler : IDisposable
         while (!stopped);
     }
 
-    /// <summary>Collects, takes a reading and returns how long the collection took.</summary>
+    /// <summary>Takes a reading and returns how long it took.</summary>
     private TimeSpan Read()
     {
         var start = DateTime.UtcNow;
-        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
+        var size = _measure();
         var took = DateTime.UtcNow - start;
-        _peak = Math.Max(_peak, GC.GetTotalMemory(false));
+        _peak = Math.Max(_peak, size);
         return took;
+    }
+
+    /// <summary>Runs a full blocking collection and returns the live heap size.</summary>
+    private static long CollectAndMeasure()
+    {
+        GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true);
+        return GC.GetTotalMemory(false);
     }
 }

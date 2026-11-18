@@ -6,12 +6,15 @@ import { QuotaRefusedError } from './quota'
 import {
   changeRows,
   checkStudioExpression,
+  fetchAuthoringRequestDiff,
   fetchStudioExpressionScope,
+  fetchStudioLiveDiff,
   fetchStudioPolicyMatrix,
   fetchStudioRelease,
   fetchStudioResource,
   filterResources,
   folderDiffers,
+  nextReleaseNumber,
   groupByKind,
   moduleResources,
   previewSiteUrl,
@@ -86,6 +89,72 @@ describe('fetchStudioRelease', () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain('/api/studio/apps/Purchase%20Requests/releases/3')
     expect(await fetchStudioRelease('Purchase Requests', '99')).toBeNull()
     await expect(fetchStudioRelease('Purchase Requests', '3')).rejects.toBeInstanceOf(Error)
+  })
+})
+
+describe('fetchStudioLiveDiff', () => {
+  const entry = (file: string) => ({
+    file,
+    change: 'changed',
+    id: null,
+    kind: null,
+    name: null,
+    before: null,
+    after: null,
+    titles: null,
+    by: [],
+  })
+
+  it('loads every page of the live diff, following the cursor', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(json({ release: 3, resources: [entry('a.json')], cursor: 'next' }))
+      .mockResolvedValueOnce(json({ release: 3, resources: [entry('b.json')], cursor: null }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await fetchStudioLiveDiff('Purchase Requests')).toEqual({
+      release: 3,
+      resources: [entry('a.json'), entry('b.json')],
+    })
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/studio/apps/Purchase%20Requests/releases/live/diff')
+    expect(String(fetchMock.mock.calls[1][0])).toBe(
+      '/api/studio/apps/Purchase%20Requests/releases/live/diff?cursor=next',
+    )
+  })
+
+  it('answers null for a 404 and throws for any other failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response(null, { status: 404 }))
+        .mockResolvedValueOnce(new Response(null, { status: 500 })),
+    )
+
+    expect(await fetchStudioLiveDiff('PurchaseRequests')).toBeNull()
+    await expect(fetchStudioLiveDiff('PurchaseRequests')).rejects.toBeInstanceOf(Error)
+  })
+})
+
+describe('fetchAuthoringRequestDiff', () => {
+  it('loads a page with its cursor, answers null for a 404 and throws on a 500', async () => {
+    const page = { start: 'a', tip: 'b', resources: [], cursor: 'next page' }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(json(page))
+      .mockResolvedValueOnce(json({ ...page, cursor: null }))
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await fetchAuthoringRequestDiff('Purchase Requests', 'r1')).toEqual(page)
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/studio/apps/Purchase%20Requests/authoring-requests/r1/diff')
+    await fetchAuthoringRequestDiff('Purchase Requests', 'r1', 'next page')
+    expect(String(fetchMock.mock.calls[1][0])).toBe(
+      '/api/studio/apps/Purchase%20Requests/authoring-requests/r1/diff?cursor=next%20page',
+    )
+    expect(await fetchAuthoringRequestDiff('Purchase Requests', 'gone')).toBeNull()
+    await expect(fetchAuthoringRequestDiff('Purchase Requests', 'r1')).rejects.toBeInstanceOf(Error)
   })
 })
 
@@ -579,6 +648,29 @@ describe('folderDiffers', () => {
   it('is false when no release is active, or the folder has errors', () => {
     expect(folderDiffers(history({ active: null, folderContentHash: 'other' }))).toBe(false)
     expect(folderDiffers(history({ folderContentHash: null }))).toBe(false)
+  })
+})
+
+describe('nextReleaseNumber', () => {
+  const item = (number: number) => ({ number, contentHash: `hash-${number}` }) as StudioReleases['items'][number]
+  const history = (folderContentHash: string | null, numbers: number[]): StudioReleases => ({
+    active: null,
+    folderContentHash,
+    changes: null,
+    partChanges: null,
+    items: numbers.map(item),
+  })
+
+  it('is 1 when there is no release', () => {
+    expect(nextReleaseNumber(history('hash-1', []))).toBe(1)
+  })
+
+  it('is the highest number plus one for new content', () => {
+    expect(nextReleaseNumber(history('new', [3, 2, 5]))).toBe(6)
+  })
+
+  it('is the number of an earlier release that has the content', () => {
+    expect(nextReleaseNumber(history('hash-2', [3, 2, 5]))).toBe(2)
   })
 })
 
