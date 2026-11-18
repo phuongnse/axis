@@ -189,7 +189,7 @@ A tool with an optional draft reads the working folder without it and the person
   the Change, see [outside apps](authoring-requests.md#states). `accept_draft` acts only in Ready, under
   [accepting](authoring-requests.md#accepting).
 - **The page's address** _(planned for M35)_. Each answer about a request carries `address`, which is
-  `https://<host>/studio?app=<name>&request=<id>`, see
+  `https://<host>/studio?app=<name>&view=requests&request=<id>`, see
   [the request panel](ai-authoring-in-studio.md#the-request-panel).
 - **Gates** _(planned for M35)_. No tool approves a plan. A write on a request in `awaitingApproval`, and an
   `accept_draft` that the rules refuse, answer the JSON-RPC error `-32042` (`URLElicitationRequiredError` of

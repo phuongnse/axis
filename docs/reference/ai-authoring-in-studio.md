@@ -8,20 +8,57 @@ lets an agent accept, and how revisions show. The rest of Studio is in [Studio](
 
 _(planned for M35)_
 
-The request panel is where an author sends requests and follows them.
+The request panel is where an author asks AI for a change in words. Ask AI opens the panel, and each sent
+request opens its own page.
 
-- **Where.** An Ask AI button on the application's [band](studio-workspace.md#band) opens a panel
-  beside the editor. It shows only when `studioAi` is true, the field that
-  [`GET /api/me`](security.md#roles-and-the-current-user) answers.
+- **Where.** Ask AI on the application's [band](studio-workspace.md#band) opens and closes the panel. The
+  panel is the shared [side panel](shell.md#layout) `StudioSidePanel`, which the Problems panel also uses.
+  It shows only when `studioAi` is true, the field that [`GET /api/me`](security.md#roles-and-the-current-user) answers.
 - **Sending.** The author writes what they want in words, in any language, and sends it. A check box,
   "Accept when checks and review pass", asks for auto-accept, and shows only when the application
-  [allows it](#auto-accept).
-- **The list.** The panel lists the application's requests, newest first, with their author, state and
-  time. Each opens its page in the panel.
-- **Address.** A Studio address with `app` and `request`, such as `/studio?app=<name>&request=<id>`, opens that request's page in the panel. The notices of AI requests use it, see [tenant notices](notifications.md#tenant-notices).
+  [allows it](#auto-accept). Send has no count beside it, because Axis counts no requests, see
+  [D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
+- **The request's page.** After a send, the main area opens the request's page at
+  `/studio?app=<application>&view=requests&request=<id>`, and the plan shows there once AI has written it.
+  The panel stays open and empty for the next request. The notices of AI requests open the same address,
+  see [tenant notices](notifications.md#tenant-notices).
+- **No list.** The panel lists no requests. The [bell](notifications.md#the-bell) tells an author when a
+  request of theirs waits for them or ends, and the sidebar's AI requests entry, below, leads to every request.
+- **Before a key.** Until the author has connected their own AI, the panel shows two ways to ask AI, in
+  place of the form. Whether the author has connected one comes from the [AI status](authoring-requests.md#routes) route.
+  - **With your own API key.** "Add your AI provider's API key, and the requests you send here run on it.
+    Your account pays for what you ask." The key works as [a person's own key](model-bindings.md#a-persons-own-key)
+    describes. "Connect your AI" opens the [account page](platform-pages.md#account-page).
+  - **With an AI app you already pay for.** The second way follows under a rule. "An AI app that supports
+    MCP works on your applications with its own subscription, once your administrator allows it. Give it
+    this address:" The [address](#connected-apps) follows, with its copy button.
 - **Progress.** A request's page shows its state in words, as
   [authoring requests](authoring-requests.md#states) name the states, with the current step and the fix
   round. It updates by polling, as the publish status does.
+- **The AI requests page** _(planned for M35)_. The page lists every request of the application, newest
+  first, in one [table](actions-and-controls.md#tables) with four columns:
+  - **Request** is the request's name, as the link to its page. Until AI names it, the name is the first
+    sentence of its words, cut at 80 characters with an ellipsis. It has no sort.
+  - **State** is a [status tag](shared-widgets.md#which-widget) with the state's one word, as
+    [authoring requests](authoring-requests.md#states) names them. A fix round reads as Working.
+  - **Sent by** is the author's name, or "You" for the reader's own requests.
+  - **Sent** is the time the request was sent.
+
+  The table has the full toolbar of a table whose rows grow: Search, which matches a request's name and
+  words; Filter on State, Sent by and Sent; Columns; a sort on State, Sent by and Sent, where State sorts in
+  the order a request goes through its states; paging such as "1–7 of 7", with a page size; and Refresh.
+  Search, filters, sort and paging all live in the address. The page has no control of its own, so Ask AI
+  stays on the band.
+- **The sidebar's AI requests entry** _(planned for M35)_. AI requests is a parent entry in the sidebar,
+  right after History, which opens and folds. Under it are two views of the same table, each a filter kept
+  in the address:
+  - **All requests** shows every request.
+  - **Needs action** shows the requests that wait for the reader: Sent by is you and State is Awaiting
+    approval or Ready. The table shows this filter as chips, which the reader may change.
+
+  The sidebar marks Needs action only while the table shows exactly that filter, and All requests otherwise,
+  a request's page included. The entry opens by itself while one of its views is open, and a person's choice
+  to open or fold it holds until the page changes.
 
 ## The plan
 
@@ -86,18 +123,35 @@ changed what and can undo it.
   each resource the revision changed with **Added**, **Changed** or **Removed**, and its JSON before
   and after side by side. A loaded revision has no link back, because the sidebar's marked History
   entry and the browser's Back lead back. A revision that does not exist shows one line with a link to History.
+- **One diff** _(planned for M35)_. Every diff in Studio is one changes view, whether it is a revision's,
+  a request's draft or the publish page's. Each file is a block with its own border. Its header holds a fold
+  button, named "Hide changes" or "Show changes" with the file's name, then the resource's name in bold, its
+  kind, whether it was Added, Changed or Removed, and its line counts, such as "+8 −3", which assistive
+  technology reads in full. A resource that only a draft adds takes the name its change carries. The file's
+  summary in words comes under the header, then its diff. A file is open at first, unless its page folds it.
+- **A file's diff** _(planned for M35)_. The JSON is shown as one column of lines with line numbers. An added
+  line is on an added tint with a mark in the gutter, a removed line on a removed tint with its own mark, and
+  the changed words of a line on a deeper tint. The JSON is coloured as the code editor colours it. A run of
+  unchanged lines beyond three lines of context folds to "Show `<n>` unchanged lines". An added file is all
+  added, and a removed file is all removed. The view is read-only.
 - **Undo.** Each revision but the start of history, which the server names on every page and under any
   filter, has **Undo**, under the rules of
   [undo](revisions-and-drafts.md#undo). It runs at once, and the undo is itself a revision that can
   be undone. A revision that cannot be undone alone names the later revisions that block it, each with
   its summary, author and time, and nothing is undone.
-- **Publishing.** _(planned for M35)_ The publish dialog shows the whole diff from the live release,
-  with each change marked by the request or the person that made it.
+- **Publishing.** _(planned for M35)_ The publish page lists every file that differs from the live release,
+  under "`<n>` files changed since the live release". Each file is a block, folded at first, with "Changed by"
+  and each person who changed it since the release, in the order of their first change. The reader is "you",
+  and an AI request is "the AI request “`<name>`”", a link to its page. The list comes from the
+  [live diff](authoring-revisions.md#live-diff). The page is described in [publishing](studio.md#publishing).
 
 ## Connected apps
 
 _(planned for M35)_
 
 A tenant administrator manages outside MCP clients, see
-[client registration](mcp-server.md#client-registration). Studio shows authors the address of the MCP
-server, `https://<tenant host>/mcp`, so they can connect a client when the administrator allows it.
+[client registration](mcp-server.md#client-registration). The request panel ends, under a rule, with
+**Use your own AI app**. Under it, in `textMuted`, comes the sentence "An AI app that supports MCP can work
+on your applications once your administrator allows it. Give it this address:". The address follows on its
+own line, in code style, `https://<tenant host>/mcp`, with a copy button. Before an author has connected
+their own AI, the panel shows this address once, in its second way, see [the request panel](#the-request-panel).

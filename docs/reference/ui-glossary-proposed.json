@@ -373,6 +373,27 @@
       "vi": "bản tổng hợp",
       "status": "proposed",
       "note": "One email that lists the emails a person chose to receive together, once a day."
+    },
+    {
+      "concept": "AI request",
+      "en": "AI request",
+      "vi": "yêu cầu AI",
+      "status": "proposed",
+      "note": "A change that AI makes to an application, asked for in Studio or by an outside AI app."
+    },
+    {
+      "concept": "Action: Ask AI",
+      "en": "Ask AI",
+      "vi": "Hỏi AI",
+      "status": "proposed",
+      "note": "The band's button that opens the panel to ask AI for a change."
+    },
+    {
+      "concept": "Needs action",
+      "en": "Needs action",
+      "vi": "Cần xử lý",
+      "status": "proposed",
+      "note": "The filter of notices and AI requests that wait for their reader to act."
     }
   ]
 }

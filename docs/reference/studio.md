@@ -27,6 +27,9 @@ opens the same view.
 - **A view.** `&kind=<kind>` shows that kind's list, `&view=releases` the Releases entry,
   `&view=release&release=<number>` a [release page](studio-workspace.md#release-page) under it and
   `&view=policies` the [policy matrix](#policy-matrix).
+- **The AI requests and publish views** _(planned for M35)_. `&view=requests` shows the
+  [AI requests](ai-authoring-in-studio.md#the-request-panel) table, `&view=requests&request=<id>` one
+  request's page, and `&view=publish` the [publish page](#publishing).
 - **A field** _(planned for M33)_. `&field=<name>` opens a field's
   [drawer](entity-designer.md#field-drawer) on an entity's page.
 - **Back is the browser's.** Studio has no Back or Next of its own and no breadcrumb.
@@ -217,6 +220,17 @@ its end.
 - **Publish…** shows only when `GET /api/me` answers `studioPublisher: true`, and not when it answers
   `false` or fails. Its dialog asks for an optional label, up to 100 characters, and an optional note,
   up to 2,000, and leaves empty values out of the body. Confirming sends the publish request.
+- **The publish page** _(planned for M35)_. Publish… opens `/studio?app=<application>&view=publish` in place
+  of the dialog, and the page marks no sidebar entry. Its heading is "Publish this application", with the line
+  "Everything below goes live as a new release, in place of release `<n>`." or, with no release live, "Nothing
+  is live yet. Everything below goes live as the first release." When a release is live, the page lists the
+  [changed files](ai-authoring-in-studio.md#revisions) under the line; with none live, it lists no files.
+  Under them, "The release" holds Label, up to 100 characters, with the help "A short name for the release,
+  such as Spring update.", and Note, up to 2,000 characters, with the help "What changed and why, for whoever
+  reads the release list." Both are optional. The action bar says "Goes live as release `<n>`" and holds Cancel
+  and Publish. Publish sends the publish request, then goes back to the page Publish… was opened from, at its
+  top, and the status line follows it. With nothing to publish, the page says that everything is live, and
+  Publish is off.
 - **Preview** shows only when `GET /api/me` answers a `studioPreviewHost` that is not null, and needs
   no `studioPublisher`. It sends `POST .../preview` at once, with no dialog. A succeeded preview shows
   Previewed and a link to each of the application's sites on the preview host, built from the page's

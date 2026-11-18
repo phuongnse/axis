@@ -199,7 +199,7 @@ recipient kind `platformRole`, and no application lists it.
 
   The values are `application`, the application's name, and `request`. The states are in [authoring requests](authoring-requests.md#states).
 - **Read and done** _(planned for M35)_. A notice is read when its person opens it from the bell or marks it read. An `action` notice is done when its request leaves the state it waits on, whether it is read or not. Plan ready waits on `awaitingApproval`, and draft ready waits on `ready`.
-- **Open** _(planned for M35)_. An AI request notice opens its request in Studio, with `{ "page": "studio", "parameters": { "app", "request" } }`. The bell opens `/studio?app=<name>&request=<id>`, see [AI authoring in Studio](ai-authoring-in-studio.md#the-request-panel).
+- **Open** _(planned for M35)_. An AI request notice opens its request in Studio, with `{ "page": "studio", "parameters": { "app", "view", "request" } }`. The bell opens `/studio?app=<name>&view=requests&request=<id>`, see [AI authoring in Studio](ai-authoring-in-studio.md#the-request-panel).
 
 ### The bell
 

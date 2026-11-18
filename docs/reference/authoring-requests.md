@@ -133,8 +133,8 @@ an accept, which [accepting](#accepting) describes.
   each with its `kind`, `summary`, `outcome`, `tokens`, `startedAt`, `finishedAt` and `checks`, which is
   the results of a `check` step or the review of a `review` step, and null on any other step.
 - **Paging the list** _(planned for M35)_. The list route takes the record API's `page`, `pageSize`, `sort`, `search`
-  and `filter`, as [paging and sorting](record-api.md#paging-and-sorting) defines them. The columns are `title`,
-  `author` (the author's name) and `state`, which are text, and `sentAt`, which is a date. The order is newest
+  and `filter`, as [paging and sorting](record-api.md#paging-and-sorting) defines them. The columns are `title` and
+  `author` (the author's name), which are text, `sentAt`, which is a date, and `state`, an enum column whose values are the state names. `state` sorts in the order a request goes through its states. The order is newest
   first unless `sort` says otherwise, and `search` keeps the requests whose `title` or `text` contains the text. It
   answers `{ items, page, pageSize, totalCount }` through the [shared list query](shared-widgets.md#which-widget),
   and a parameter that is invalid is `400`, as [the revision list](authoring-revisions.md#list) answers. It replaces
