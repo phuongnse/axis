@@ -1,5 +1,7 @@
 import { Button, Card, Flex, Input, Select, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisButton } from '../platform/AxisButton'
+import { fillText } from '../platform/fillText'
 import type { ReactNode } from 'react'
 import { useContext, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
@@ -129,10 +131,9 @@ export function KeyValueRows({
               value={literalText(values[key])}
               onChange={(event) => onChange(`${pointer}/${pointerSegment(key)}`, parseLiteral(event.target.value))}
             />
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange(`${pointer}/${pointerSegment(key)}`, undefined)}>
+            <AxisButton role="destructive" onClick={() => onChange(`${pointer}/${pointerSegment(key)}`, undefined)}>
               {t('shell.studio.scenario.remove')}
-            </Button>
+            </AxisButton>
           </Flex>
         ))}
         <div>
@@ -284,7 +285,7 @@ export function ScenarioStep({
               <div key={field.name} data-testid={`studio-field-${at(`values/${pointerSegment(field.name)}`)}`}>
                 <AxisField
                   label={field.name}
-                  help={t('shell.studio.scenario.value.help').replace('{type}', field.type)}
+                  help={fillText(t('shell.studio.scenario.value.help'), { type: field.type })}
                 >
                   <FieldCell
                     field={toSeedField(field)}
@@ -529,7 +530,7 @@ export function ScenarioStep({
       <Card
         size="small"
         data-testid="studio-scenario-step"
-        title={`${t('shell.studio.scenario.step')} ${index + 1}`}
+        title={fillText(t('shell.studio.scenario.step'), { number: index + 1 })}
         extra={
           <Flex gap="small">
             {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
@@ -540,8 +541,9 @@ export function ScenarioStep({
             <Button disabled={index === steps.length - 1} onClick={() => swap(index + 1)}>
               {t('shell.studio.scenario.moveDown')}
             </Button>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange(pointer, undefined)}>{t('shell.studio.scenario.remove')}</Button>
+            <AxisButton role="destructive" onClick={() => onChange(pointer, undefined)}>
+              {t('shell.studio.scenario.remove')}
+            </AxisButton>
           </Flex>
         }
       >

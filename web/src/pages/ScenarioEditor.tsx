@@ -1,4 +1,4 @@
-import { Button, Flex, Input, Select } from 'antd'
+import { Flex, Input, Select } from 'antd'
 import { useContext, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
@@ -121,8 +121,9 @@ function StubCard({
             />
           )}
           <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange(pointer, undefined)}>{t('shell.studio.scenario.remove')}</Button>
+            <AxisButton role="destructive" onClick={() => onChange(pointer, undefined)}>
+              {t('shell.studio.scenario.remove')}
+            </AxisButton>
           </div>
         </Flex>
       </div>
@@ -216,8 +217,9 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
                       onChange={(next: string[]) => onChange(pointer, next)}
                     />
                   </AxisField>
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button onClick={() => onChange(pointer, undefined)}>{t('shell.studio.scenario.remove')}</Button>
+                  <AxisButton role="destructive" onClick={() => onChange(pointer, undefined)}>
+                    {t('shell.studio.scenario.remove')}
+                  </AxisButton>
                 </Flex>
               </div>
             )
