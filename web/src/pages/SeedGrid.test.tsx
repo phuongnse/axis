@@ -114,7 +114,7 @@ describe.each(['light', 'dark'])('SeedGrid in %s mode', (mode) => {
     const grid = screen.getByTestId('studio-seed-grid')
     expect(grid.closest(`[data-theme-mode=${mode}]`)).not.toBeNull()
     expect(grid).toBeVisible()
-    for (const name of ['Id', 'code', 'size', 'price', 'active', 'status', 'due', 'closedAt', 'manager']) {
+    for (const name of ['ID', 'code', 'size', 'price', 'active', 'status', 'due', 'closedAt', 'manager']) {
       expect(within(grid).getByRole('columnheader', { name })).toBeVisible()
     }
     const rows = screen.getAllByTestId('studio-seed-row')
@@ -158,7 +158,7 @@ describe('SeedGrid', () => {
     renderGrid(vi.fn(), [{ id: 'a', values: {} }])
 
     const cell = screen.getByTestId('studio-field-/records/0/values/code')
-    expect(within(cell).getByTestId('studio-seed-problem')).toHaveTextContent('A value is required.')
+    expect(within(cell).getByTestId('studio-seed-problem')).toHaveTextContent('Enter a value.')
   })
 
   it('removes the key when a cell is cleared and sets a typed number', async () => {
@@ -175,7 +175,7 @@ describe('SeedGrid', () => {
     expect(onChange).toHaveBeenLastCalledWith('/records/0/values/due', 'x')
   })
 
-  it('adds a record with a new id and removes a record by its index', async () => {
+  it('adds a record with a new id and deletes a record by its index', async () => {
     const onChange = renderGrid()
 
     await userEvent.click(screen.getByRole('button', { name: 'Add record' }))
@@ -186,7 +186,7 @@ describe('SeedGrid', () => {
     expect(next[2].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     expect(next[2].values).toEqual({})
 
-    await userEvent.click(within(screen.getAllByTestId('studio-seed-row')[1]).getByRole('button', { name: 'Remove' }))
+    await userEvent.click(within(screen.getAllByTestId('studio-seed-row')[1]).getByRole('button', { name: 'Delete' }))
     expect(onChange).toHaveBeenLastCalledWith('/records/1', undefined)
   })
 
@@ -194,13 +194,13 @@ describe('SeedGrid', () => {
     const shownCodes = () =>
       screen.getAllByTestId('studio-seed-row').map((row) => within(row).getByRole('textbox', { name: 'code' }))
 
-    it('offers the Id and every column that a seed may set, each by its kind of value', async () => {
+    it('offers the ID and every column that a seed may set, each by its kind of value', async () => {
       renderEditing()
 
       await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
       await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
       const offered = optionTexts()
-      expect(offered).toEqual(['Id', 'code', 'size', 'price', 'cost', 'active', 'status', 'due', 'closedAt', 'manager'])
+      expect(offered).toEqual(['ID', 'code', 'size', 'price', 'cost', 'active', 'status', 'due', 'closedAt', 'manager'])
       await chooseOption('status')
       await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Value' }))
       expect(optionTexts()).toContain('Closed')

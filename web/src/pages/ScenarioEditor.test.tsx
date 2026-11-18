@@ -4,6 +4,7 @@ import { type ReactNode, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
+import { fillText } from '../platform/fillText'
 import { setAt } from '../platform/jsonPatch'
 import type { StudioNames } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
@@ -406,10 +407,10 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     renderEditor(scenario([{ ...fixtures.createRecord, values: { code: 'A1', size: 2, other: 'x' } }]))
 
     expect(screen.getByLabelText('code')).toHaveAccessibleDescription(
-      english['shell.studio.scenario.value.help'].replace('{type}', 'text'),
+      fillText(english['shell.studio.scenario.value.help'], { type: 'text' }),
     )
     expect(screen.getByLabelText('size')).toHaveAccessibleDescription(
-      english['shell.studio.scenario.value.help'].replace('{type}', 'integer'),
+      fillText(english['shell.studio.scenario.value.help'], { type: 'integer' }),
     )
     expect(screen.getByLabelText('other')).toHaveAccessibleDescription(
       english['shell.studio.scenario.unnamedValue.help'],
@@ -530,6 +531,21 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/by', 'PT1H0')
   })
 
+  it('titles the second step "Step 2" and deletes that step with its Delete button', async () => {
+    const { onChange } = renderHarness(scenario([fixtures.advanceTime, fixtures.expectRecord]))
+
+    const cards = screen.getAllByTestId('studio-scenario-step')
+    expect(cards).toHaveLength(2)
+    expect(cards[1]).toHaveTextContent('Step 2')
+    await userEvent.click(within(cards[1]).getByRole('button', { name: 'Delete' }))
+
+    expect(onChange).toHaveBeenLastCalledWith('/steps/1', undefined)
+    const remaining = screen.getAllByTestId('studio-scenario-step')
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0]).toHaveTextContent('Step 1')
+    expect(screen.getByRole('textbox', { name: 'Moves time by' })).toHaveValue('PT1H')
+  })
+
   it('adds an advanceTime step at the end', async () => {
     const { onChange } = renderEditor(scenario([fixtures.advanceTime]))
 
@@ -561,7 +577,7 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     expect(input).toHaveValue('author')
   })
 
-  it('stacks a user ID and its roles, with Remove under them', () => {
+  it('stacks a user ID and its roles, with Delete under them', () => {
     renderEditor(scenario([fixtures.advanceTime]))
 
     const row = screen.getByTestId('studio-field-/users/author')
@@ -570,7 +586,7 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     expect(stack).toHaveClass('ant-flex-vertical')
     expect(stack.children[0]).toContainElement(id)
     expect(stack.children[1]).toContainElement(within(row).getByRole('combobox', { name: 'Roles' }))
-    expect(stack.lastElementChild).toContainElement(within(row).getByRole('button', { name: 'Remove' }))
+    expect(stack.lastElementChild).toContainElement(within(row).getByRole('button', { name: 'Delete' }))
   })
 
   it('stacks the connector name and the operation of a stub', () => {

@@ -1,6 +1,7 @@
 import { Button, Flex, Input, Select, Typography } from 'antd'
 import type { HTMLAttributes } from 'react'
 import { useEffect, useMemo, useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { SectionPart } from '../platform/SectionParts'
 import { parseNumberText, seedColumns, seedValuePointer, type SeedField } from '../platform/seedValues'
@@ -317,10 +318,9 @@ export function SeedGrid({
                 key: 'remove',
                 kind: 'fixed',
                 render: (_, row) => (
-                  // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                  <Button onClick={() => onChange(`/records/${row.index}`, undefined)}>
+                  <AxisButton role="destructive" onClick={() => onChange(`/records/${row.index}`, undefined)}>
                     {t('shell.studio.seed.removeRecord')}
-                  </Button>
+                  </AxisButton>
                 ),
               },
             ]}
