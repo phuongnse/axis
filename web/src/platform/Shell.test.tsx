@@ -8,10 +8,11 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyDescription } from '../test/antd'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
-import { designTokensFor } from './designTokens'
+import { designTokensFor, sizeTokens } from './designTokens'
 import { PreferencesMenu } from './PreferencesMenu'
 import { Shell } from './Shell'
 import { ShellNavigation } from './ShellNavigation'
+import { ShellAside } from './shellAside'
 import { ShellSidebar } from './shellSidebar'
 import { useShellSidebar } from './shellSidebarContext'
 import { TextProvider } from './TextProvider'
@@ -530,6 +531,51 @@ describe('Shell sidebar claimed by a page', () => {
     renderShell('en', ['/'], notesNavigation.slice(0, 1), <Counted />)
 
     await screen.findByRole('link', { name: 'Entities' })
+
+    expect(mounts).toBe(1)
+  })
+})
+
+describe('Shell right column claimed by a page', () => {
+  it('draws the children of a page in a column as wide as a side panel, and removes the column with the page', async () => {
+    const view = renderShell(
+      'en',
+      ['/'],
+      notesNavigation.slice(0, 1),
+      <ShellAside>
+        <p>Side</p>
+      </ShellAside>,
+    )
+
+    const column = await waitFor(() => {
+      const found = document.getElementById('shell-aside')
+      expect(found).not.toBeNull()
+      return found!
+    })
+    expect(column).toContainElement(await screen.findByText('Side'))
+    expect(column).toHaveStyle({ width: `${sizeTokens.sidePanel}px` })
+
+    view.rerender(shellFor(notesNavigation.slice(0, 1), <p>No claim</p>))
+
+    expect(document.getElementById('shell-aside')).toBeNull()
+    expect(screen.queryByText('Side')).toBeNull()
+  })
+
+  it('mounts a page that claims the right column once', async () => {
+    let mounts = 0
+    function Counted() {
+      useEffect(() => {
+        mounts += 1
+      }, [])
+      return (
+        <ShellAside>
+          <p>Side</p>
+        </ShellAside>
+      )
+    }
+    renderShell('en', ['/'], notesNavigation.slice(0, 1), <Counted />)
+
+    await screen.findByText('Side')
 
     expect(mounts).toBe(1)
   })

@@ -12,6 +12,7 @@ import { PreferencesMenu } from './PreferencesMenu'
 import { sizeTokens } from './designTokens'
 import { ShellFooter } from './ShellFooter'
 import { ShellNavigation } from './ShellNavigation'
+import { ShellAsideContext } from './shellAsideContext'
 import { ShellSidebarContext } from './shellSidebarContext'
 import { SiteMark } from './SiteMark'
 import type { NavigationItem, SiteLegal } from './site'
@@ -25,6 +26,17 @@ const headerHeight = sizeTokens.bar
 // Never undefined: Ant Design wraps its children only when a theme is given, so a switch would remount the page.
 const claimedTheme: ThemeConfig = { components: { Menu: { itemHeight: 32 } } }
 const siteTheme: ThemeConfig = {}
+
+/** What a page that claims a region of the shell needs: whether it is claimed, the element that holds its content, and how to claim it. */
+function useRegionClaim() {
+  const [claims, setClaims] = useState(0)
+  const [target, setTarget] = useState<HTMLElement | null>(null)
+  const claim = useCallback(() => {
+    setClaims((count) => count + 1)
+    return () => setClaims((count) => count - 1)
+  }, [])
+  return { claimed: claims > 0, target, setTarget, claim }
+}
 
 interface ShellProps {
   titleKey: string
@@ -66,6 +78,7 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * and the sidebar's navigation stays under it with a scroll of its own. A site with two or more navigation entries
  * has a sidebar of labels that collapses to a strip of icons. A page can claim the sidebar with `ShellSidebar` and
  * draw its own navigation there, even on a one-page site, and then the page gets the tighter workspace padding.
+ * A page can claim a column on the right with `ShellAside`, `sidePanel` wide, beside the content column, from under the header to the footer.
  * A footer runs under the page, with the copyright at the start and the legal links at the end. Without a sidebar it
  * runs across the bottom. Beside one it runs under the content column only, so the sidebar reaches the bottom of the window.
  * The page area draws on `surface`, flush with the frame, see docs/reference/shell.md#layout.
@@ -89,7 +102,7 @@ export function Shell({
   const t = useText()
   const { mode } = useThemeMode()
   const { pathname } = useLocation()
-  const { colour, spacing } = useDesignTokens()
+  const { colour, size, spacing } = useDesignTokens()
   const activeKey = activeNavigationKey(navigation, pathname)
   const narrow = useNarrowWidth()
   // The panel is open for the path it was opened on, so following a link or leaving narrow width closes it.
@@ -99,17 +112,14 @@ export function Shell({
   // The sidebar stays collapsed or open while the person moves between pages, as the shell stays mounted.
   const [collapsed, setCollapsed] = useState(false)
   // A page claims the sidebar by rendering ShellSidebar, which draws its content into `target`.
-  const [claims, setClaims] = useState(0)
-  const [target, setTarget] = useState<HTMLElement | null>(null)
-  const claim = useCallback(() => {
-    setClaims((count) => count + 1)
-    return () => setClaims((count) => count - 1)
-  }, [])
-  const claimed = claims > 0
+  const { claimed, target, setTarget, claim } = useRegionClaim()
+  // A page claims the right column by rendering ShellAside, in the same way.
+  const { claimed: asideClaimed, target: asideTarget, setTarget: setAsideTarget, claim: claimAside } = useRegionClaim()
   const sidebarContext = useMemo(
     () => ({ target, collapsed: collapsed && !narrow, claim }),
     [target, collapsed, narrow, claim],
   )
+  const asideContext = useMemo(() => ({ target: asideTarget, claim: claimAside }), [asideTarget, claimAside])
   const hasSidebar = claimed || navigation.length > 1
   const sidebar = hasSidebar && !narrow
   const home = navigation[0]?.path ?? '/'
@@ -247,10 +257,30 @@ export function Shell({
               </Layout.Sider>
             )}
             <Layout>
-              {!hasAccount && <ReadOnlyBanner />}
-              <Layout.Content style={{ background: colour.surface, padding: claimed ? spacing.md : spacing.lg }}>
-                <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
-              </Layout.Content>
+              {/* The row always wraps the content and the column, so claiming the column never remounts the page. */}
+              <Layout hasSider style={{ minWidth: 0 }}>
+                <Layout style={{ minWidth: 0 }}>
+                  {!hasAccount && <ReadOnlyBanner />}
+                  <Layout.Content style={{ background: colour.surface, padding: claimed ? spacing.md : spacing.lg }}>
+                    <ShellSidebarContext.Provider value={sidebarContext}>
+                      <ShellAsideContext.Provider value={asideContext}>{children}</ShellAsideContext.Provider>
+                    </ShellSidebarContext.Provider>
+                  </Layout.Content>
+                </Layout>
+                {asideClaimed && (
+                  <div
+                    id="shell-aside"
+                    style={{
+                      flex: 'none',
+                      width: size.sidePanel,
+                      background: colour.surface,
+                      borderInlineStart: `1px solid ${colour.borderSubtle}`,
+                    }}
+                  >
+                    <div ref={setAsideTarget} style={{ position: 'sticky', top: headerHeight }} />
+                  </div>
+                )}
+              </Layout>
               {sidebar && <ShellFooter legal={legal} />}
             </Layout>
           </Layout>
