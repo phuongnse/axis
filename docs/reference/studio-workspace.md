@@ -97,13 +97,13 @@ comes first, so it is never next to Publish….
 
 ## Problems panel
 
-The band's errors and warnings open a Problems panel on the right, under the header and the band. It is
+The band's errors and warnings open a Problems panel on the right, under the header. It is
 not modal, so the page stays usable while it is open. It lists every error and then every warning, each
 with its message and where it is. Opening one opens its resource at the place it names and leaves the
 panel open, so an author can fix one problem after another. The panel scrolls on its own and stops at its
 end, as [scroll areas](actions-and-controls.md#scroll-areas) say.
 
-- **The shared frame** _(planned for M35)_. The panel is drawn in `StudioSidePanel`, Studio's one side panel frame, see
+- **The shared frame.** The panel is drawn in `StudioSidePanel`, Studio's one side panel frame, see
   [layout](shell.md#layout).
 
 ## Page heading
