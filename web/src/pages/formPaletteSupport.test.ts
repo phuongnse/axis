@@ -3,6 +3,7 @@ import { dropOnForm } from './formPaletteSupport'
 
 const words: Record<string, string> = {
   'shell.studio.palette.moved': 'Moved {name} to {place}, position {position}.',
+  'shell.studio.palette.movedTo': 'Moved {name} to position {position}.',
 }
 const t = (key: string) => words[key] ?? key
 

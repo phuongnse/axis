@@ -14,13 +14,14 @@ import { productionTargets, stageText } from './lib/images.mjs'
 // `docker save -o`. `saved` names files to put in the cache folder before the run, with the placeholder HASH for
 // the hash of the admin-tools stage.
 const root = fileURLToPath(new URL('..', import.meta.url))
-// The test files of each suite: ai-eval runs two, one at a time.
+// The test files of each suite: ai-eval-pass runs two, one at a time.
 const suites = {
   'dev-script': ['dev'],
   compose: ['compose'],
   images: ['images'],
   onprem: ['onprem'],
-  'ai-eval': ['ai-eval-stack', 'ai-eval-run'],
+  'ai-eval-pass': ['ai-eval-stack', 'ai-eval-run'],
+  'ai-eval-refusal': ['ai-eval-refusal'],
 }
 const hash = createHash('sha256').update(stageText(root, 'admin-tools')).digest('hex').slice(0, 12)
 
@@ -51,7 +52,7 @@ function runSmoke({ changed, failing = [], saved = [], dockerFails = '', env: ex
     }
     writeFileSync(
       join(dir, 'scripts/smoke-durations.json'),
-      JSON.stringify({ 'dev-script': 360, compose: 150, images: 150, onprem: 180, 'ai-eval': 120 }),
+      JSON.stringify({ 'dev-script': 360, compose: 150, images: 150, onprem: 180, 'ai-eval-pass': 60, 'ai-eval-refusal': 60 }),
     )
     mkdirSync(join(dir, 'samples/modules/department-budgets'), { recursive: true })
     writeFileSync(join(dir, 'samples/modules/department-budgets/module.json'), '{"id":"department-budgets","version":"1.2.0"}')
@@ -258,11 +259,11 @@ describe('scripts/smoke.sh runs one shard with AXIS_SMOKE_SHARD or NEXKIT_SHARD'
     assert.deepEqual(builds(run), [], run.docker.join('\n'))
   })
 
-  test('shard 2 of 3 runs onprem and ai-eval and builds each production image once, then removes them', () => {
+  test('shard 2 of 3 runs onprem and both ai-eval tests and builds each production image once, then removes them', () => {
     const run = runSmoke({ env: { AXIS_SMOKE_SHARD: '2/3' } })
 
     assert.equal(run.status, 0, run.stdout + run.stderr)
-    assert.deepEqual(run.written, ['onprem', 'ai-eval'])
+    assert.deepEqual(run.written, ['onprem', 'ai-eval-pass', 'ai-eval-refusal'])
     assert.deepEqual(builds(run).map(targetOf).sort(), allBuilds, run.docker.join('\n'))
     for (const target of production) assert.ok(run.docker.some((line) => line.startsWith(`rmi -f ${target}:`)), run.docker.join('\n'))
   })
@@ -284,7 +285,7 @@ describe('scripts/smoke.sh runs one shard with AXIS_SMOKE_SHARD or NEXKIT_SHARD'
   })
 
   test('NEXKIT_SHARD runs a shard, and AXIS_SMOKE_SHARD wins when both are set', () => {
-    assert.deepEqual(runSmoke({ env: { NEXKIT_SHARD: '2/3' } }).written, ['onprem', 'ai-eval'])
+    assert.deepEqual(runSmoke({ env: { NEXKIT_SHARD: '2/3' } }).written, ['onprem', 'ai-eval-pass', 'ai-eval-refusal'])
     assert.deepEqual(runSmoke({ env: { NEXKIT_SHARD: '1/3', AXIS_SMOKE_SHARD: '3/3' } }).written, ['compose', 'images'])
   })
 
@@ -301,10 +302,10 @@ describe('scripts/smoke.sh runs one shard with AXIS_SMOKE_SHARD or NEXKIT_SHARD'
   })
 
   test('a shard past the smoke suites exits with code 2 and names the fault', () => {
-    const run = runSmoke({ env: { AXIS_SMOKE_SHARD: '6/6' } })
+    const run = runSmoke({ env: { AXIS_SMOKE_SHARD: '7/7' } })
 
     assert.equal(run.status, 2, run.stdout + run.stderr)
-    assert.match(run.stderr, /Shard 6\/6 has no smoke suite\. Use fewer shards\./)
+    assert.match(run.stderr, /Shard 7\/7 has no smoke suite\. Use fewer shards\./)
     assert.deepEqual(run.written, [])
   })
 })

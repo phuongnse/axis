@@ -90,8 +90,11 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     );
     await expect(chart).toHaveAttribute("data-marked", "true");
     await expect(chart.getByTestId("studio-canvas-placeholder")).toContainText(
-      "This widget does not compile: chart",
+      "This widget has errors",
     );
+    await expect(
+      chart.getByTestId("studio-canvas-placeholder-type"),
+    ).toHaveText("chart");
     await expect(
       chart.getByTestId("studio-canvas-placeholder-diagnostic"),
     ).toContainText("The data source 'MissingSource' was not found.");
@@ -139,7 +142,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     );
 
     await expect(page.getByTestId("studio-palette-announcement")).toContainText(
-      "Inserted table",
+      "Inserted table in",
     );
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
@@ -191,7 +194,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     await page.keyboard.press("Enter");
 
     await expect(page.getByTestId("studio-palette-announcement")).toContainText(
-      "Inserted table",
+      "Inserted table in",
     );
     const table = page.locator(
       '[data-testid="studio-canvas-widget"][data-path="/widgets/1"]',
@@ -229,7 +232,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     await expect(page.getByTestId("studio-binding-choice")).toBeHidden();
     await waitForCanvas(page);
     await expect(page.getByTestId("studio-palette-announcement")).toContainText(
-      "Inserted chart",
+      "Inserted chart in",
     );
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
@@ -275,7 +278,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     await dragTo(page, "studio-page-design", table, chart, 0.75);
 
     await expect(page.getByTestId("studio-palette-announcement")).toContainText(
-      "Moved table",
+      "Moved table to",
     );
     await page.getByRole("button", { name: "Save", exact: true }).click();
 
@@ -356,7 +359,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       0.75,
     );
     await expect(page.getByTestId("studio-palette-announcement")).toContainText(
-      "Inserted section",
+      "Inserted section in",
     );
     const save = page.getByRole("button", { name: "Save", exact: true });
     await save.click();

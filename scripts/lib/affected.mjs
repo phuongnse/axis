@@ -26,7 +26,8 @@ export const suiteScripts = {
   compose: 'scripts/smoke.sh',
   images: 'scripts/smoke.sh',
   onprem: 'scripts/smoke.sh',
-  'ai-eval': 'scripts/smoke.sh',
+  'ai-eval-pass': 'scripts/smoke.sh',
+  'ai-eval-refusal': 'scripts/smoke.sh',
 }
 
 // NexKit's commits, in the order a check prefers them: the head on which this check last passed with

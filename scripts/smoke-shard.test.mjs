@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { budgetSeconds, maxShards } from './lib/shards.mjs'
 import { count, junitDurations, main, readSuites, split, suites } from './lib/smoke-shard.mjs'
 
-const real = { 'dev-script': 360, compose: 150, images: 150, onprem: 180, 'ai-eval': 120 }
+const real = { 'dev-script': 360, compose: 150, images: 150, onprem: 180, 'ai-eval-pass': 60, 'ai-eval-refusal': 60 }
 const list = (durations) => Object.entries(durations).map(([name, seconds]) => ({ name, seconds }))
 
 // Runs the test with a durations file holding `durations`, and removes the folder after it.
@@ -69,8 +69,8 @@ describe('split', () => {
   })
 
   test('gives the heaviest suite a shard of its own, then the next heaviest to the lightest shard', () => {
-    assert.deepEqual(split(list(real), 3), [['dev-script'], ['ai-eval', 'onprem'], ['compose', 'images']])
-    assert.deepEqual(split(list(real), 4), [['dev-script'], ['onprem'], ['ai-eval', 'compose'], ['images']])
+    assert.deepEqual(split(list(real), 3), [['dev-script'], ['ai-eval-pass', 'ai-eval-refusal', 'onprem'], ['compose', 'images']])
+    assert.deepEqual(split(list(real), 4), [['dev-script'], ['onprem'], ['ai-eval-pass', 'compose'], ['ai-eval-refusal', 'images']])
   })
 
   test('keeps every suite in one shard when there is one shard', () => {
@@ -79,7 +79,7 @@ describe('split', () => {
 })
 
 describe('count', () => {
-  test('prints 1 when the five suites, 960 s in all, fit the budget', () => {
+  test('prints 1 when the six suites, 960 s in all, fit the budget', () => {
     assert.deepEqual(count(list(real), 1000), { total: 1, overBudget: [] })
   })
 
@@ -104,7 +104,8 @@ describe('readSuites', () => {
         { name: 'compose', seconds: 150 },
         { name: 'images', seconds: 180 },
         { name: 'onprem', seconds: 180 },
-        { name: 'ai-eval', seconds: 180 },
+        { name: 'ai-eval-pass', seconds: 180 },
+        { name: 'ai-eval-refusal', seconds: 180 },
       ])
     })
   })
@@ -113,7 +114,7 @@ describe('readSuites', () => {
     withDurations({}, (file) => {
       assert.deepEqual(
         readSuites(file).map((suite) => suite.seconds),
-        [1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1],
       )
     })
   })
@@ -163,14 +164,14 @@ describe('main', () => {
   test('K/N prints the suites of shard K, one per line', () => {
     withDurations(real, (file) => {
       assert.equal(main(['1/3'], file), 'dev-script')
-      assert.equal(main(['2/3'], file), 'ai-eval\nonprem')
+      assert.equal(main(['2/3'], file), 'ai-eval-pass\nai-eval-refusal\nonprem')
       assert.equal(main(['3/3'], file), 'compose\nimages')
     })
   })
 
   test('a shard with no suite throws, naming the fault', () => {
     withDurations(real, (file) => {
-      assert.throws(() => main(['6/6'], file), /Shard 6\/6 has no smoke suite\. Use fewer shards\./)
+      assert.throws(() => main(['7/7'], file), /Shard 7\/7 has no smoke suite\. Use fewer shards\./)
     })
   })
 
@@ -185,13 +186,14 @@ describe('main', () => {
   test('--durations rewrites the suites measured from JUnit files and keeps the others', () => {
     withDurations(real, (file, dir) => {
       const junit = writeJunit(dir, 'dev-script', '<testcase name="top" time="400.2" classname="test"/>')
-      assert.equal(main(['--durations', junit], file), `1 suites measured, 5 kept in ${file}.`)
+      assert.equal(main(['--durations', junit], file), `1 suites measured, 6 kept in ${file}.`)
       assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), {
         compose: 150,
         'dev-script': 400,
         images: 150,
         onprem: 180,
-        'ai-eval': 120,
+        'ai-eval-pass': 60,
+        'ai-eval-refusal': 60,
       })
     })
   })

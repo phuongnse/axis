@@ -463,10 +463,12 @@ function PlaceholderBox({
   const lists = isContent(draftWidget) ? childLists(draftWidget, widget.path) : []
   return (
     <Card size="small" data-testid="studio-canvas-placeholder" data-path={widget.path}>
-      <Typography.Text type="secondary">
-        {t('shell.studio.design.placeholder')}
-        {widget.type === null ? '' : `: ${widget.type}`}
-      </Typography.Text>
+      <Typography.Paragraph type="secondary">{t('shell.studio.design.placeholder')}</Typography.Paragraph>
+      {widget.type === null ? null : (
+        <Typography.Text code data-testid="studio-canvas-placeholder-type">
+          {widget.type}
+        </Typography.Text>
+      )}
       <ul>
         {diagnostics.map((diagnostic, index) => (
           <li key={index} data-testid="studio-canvas-placeholder-diagnostic">

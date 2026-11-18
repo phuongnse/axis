@@ -3,6 +3,7 @@ import { Button, Flex, Modal, Typography } from 'antd'
 import { useContext } from 'react'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { EmptyState } from '../platform/EmptyState'
+import { fillText } from '../platform/fillText'
 import { bindingTypes, paletteLimit, type DataBinding } from '../platform/pageWidgets'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
@@ -122,7 +123,7 @@ export function BindingChoice({
     <Modal
       open={binding !== undefined}
       width={size.dialog.medium}
-      title={binding === undefined ? '' : `${t('shell.studio.data.bind')} ${binding.name}`}
+      title={binding === undefined ? '' : fillText(t('shell.studio.data.bindTitle'), { name: binding.name })}
       // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
       footer={<Button onClick={onCancel}>{t('shell.studio.data.cancel')}</Button>}
       onCancel={onCancel}

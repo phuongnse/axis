@@ -275,28 +275,28 @@ describe('IdentityProviderEditor', () => {
       finance: 'finance-reviewer',
     })
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add role' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add claim value' }))
     expect(onChange).toHaveBeenLastCalledWith('/roles/values', {
       managers: 'department-manager',
       finance: 'finance-reviewer',
       value3: '',
     })
 
-    await userEvent.click(within(screen.getByTestId('studio-role-row-0')).getByRole('button', { name: 'Remove' }))
+    await userEvent.click(within(screen.getByTestId('studio-role-row-0')).getByRole('button', { name: 'Delete' }))
     expect(onChange).toHaveBeenLastCalledWith('/roles/values', { finance: 'finance-reviewer' })
   })
 
   it('removes values, and roles when nothing else is left, with the last role row', async () => {
     const onChange = renderEditor({ ...oidc, roles: { claim: 'groups', values: { managers: 'department-manager' } } })
 
-    await userEvent.click(within(screen.getByTestId('studio-role-row-0')).getByRole('button', { name: 'Remove' }))
+    await userEvent.click(within(screen.getByTestId('studio-role-row-0')).getByRole('button', { name: 'Delete' }))
     expect(onChange).toHaveBeenLastCalledWith('/roles/values', undefined)
   })
 
   it('removes roles with the last role row when it holds nothing else', async () => {
     const onChange = renderEditor({ ...oidc, roles: { values: { managers: 'department-manager' } }, acr: undefined })
 
-    await userEvent.click(within(screen.getByTestId('studio-role-row-0')).getByRole('button', { name: 'Remove' }))
+    await userEvent.click(within(screen.getByTestId('studio-role-row-0')).getByRole('button', { name: 'Delete' }))
 
     expect(onChange).toHaveBeenLastCalledWith('/roles', undefined)
   })
@@ -329,7 +329,7 @@ describe('IdentityProviderEditor', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add assurance level' }))
     expect(onChange).toHaveBeenLastCalledWith('/acr', ['urn:level2', ''])
 
-    await userEvent.click(within(screen.getByTestId('studio-field-/acr/0')).getByRole('button', { name: 'Remove' }))
+    await userEvent.click(within(screen.getByTestId('studio-field-/acr/0')).getByRole('button', { name: 'Delete' }))
     expect(onChange).toHaveBeenLastCalledWith('/acr', undefined)
   })
 
@@ -414,7 +414,7 @@ describe('draws every field through AxisField with its label and help', () => {
 
     expect(screen.queryByText(/Only the name is stored/)).toBeNull()
     expect(screen.queryByText(/URL binding\)|Secret binding\)/)).toBeNull()
-    expect(field('issuer')).toHaveAccessibleDescription(/Only the binding's name is stored/)
+    expect(field('issuer')).toHaveAccessibleDescription(/The file keeps only the binding's name/)
   })
 })
 

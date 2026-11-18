@@ -636,6 +636,28 @@ flowchart LR
     Model -->|answers as tool calls| Adapter
 ```
 
+**Gates** _(planned for M35)_
+
+```mermaid
+flowchart LR
+    subgraph app [Outside app]
+        Ai[App and its AI]
+    end
+    subgraph server [Server]
+        Mcp[MCP server: propose_plan, accept_draft]
+        Routes[Approve and accept routes]
+    end
+    subgraph person [Person]
+        Browser[Person's own browser]
+        Page[Studio request page]
+    end
+    Ai -->|calls a tool| Mcp
+    Mcp -->|URL elicitation with the page's address| Ai
+    Ai -->|the client opens the address| Browser
+    Browser -->|session of the person| Page
+    Page -->|approve or accept| Routes
+```
+
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
 | P117 | A token for another resource or tenant is accepted. | Outside client and MCP server | Spoofing | Critical | **Mitigated** | `McpServerTests` shows that a token without the `/mcp` audience, and a token for another tenant's `/mcp` URL sent to a host, answer `401` with a challenge that points to the metadata, and that a session opens only for a token whose audience is that host's URL. See [sign-in](mcp-server.md#sign-in). |
@@ -666,3 +688,7 @@ flowchart LR
 Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
 
 - (Information disclosure, High) a model binding's endpoint may be a plain `http` address, which sends the key and the configuration without encryption.
+- (Elevation of privilege, High) an AI approves its own plan or accepts its own draft by answering a gate in its client, see [tools](mcp-server.md#tools).
+- (Elevation of privilege, High) an AI writes before its author approves the plan.
+- (Elevation of privilege, Medium) `accept_draft` accepts a draft with an open blocking finding or no review, see [accepting](authoring-requests.md#accepting).
+- (Spoofing, Medium) a gate's address leads the person off the tenant's host.

@@ -662,8 +662,8 @@ panel, its undo and its drag and drop.
   a widget inside it has one, even in a closed section or an inactive tab. A marked widget has a border
   in the `danger` colour, its text label, and `data-marked`. The marks follow the
   route's latest answer, and so the unsaved draft.
-- **Marked names.** A marked widget's text label reads "{name}, has problems", where the name is
-  its frame's name: the widget's type and the name it binds.
+- **Marked names.** A marked widget's text label reads "{name}, has problems", where the name is its frame's
+  name: the widget's type and the name it binds, so a marked table reads "table, PurchaseRequestList, has problems".
 - **Selection.** A click on the canvas or a pick in the widget tree selects a widget in both. A click
   selects the innermost widget under the pointer, and a click on the empty area of a container selects
   the container. The selected widget has `aria-current` and an outline in the primary colour. Every
@@ -717,9 +717,10 @@ panel, its undo and its drag and drop.
   flagged while it is dragged: the drag overlay and the live region give the reason, and a drop there
   changes nothing. A drop on the widget itself changes nothing either. A move keeps all the widget's
   keys.
-- **What the live region says.** After an insert, a drop or a move the new or moved widget is selected,
-  and a live region names the list and the position where it landed, says "Moved" with the type, or
-  says that it cannot move further. The drag and drop library's own spoken messages are off, so the
+- **What the live region says.** After an insert, a drop or a move the new or moved widget is selected, and a live
+  region reads one sentence of the agreed texts, with the type, the list and the position filled in, such as
+  "Inserted table in Page, position 2." or "Moved kpi to Page › section 2, position 1." A move that cannot go
+  further says "The widget cannot move further." The drag and drop library's own spoken messages are off, so the
   live region is the only voice.
 - **Width switch.** It draws the canvas at desktop width, which fills the canvas area, or at phone
   width, where the columns stack to full width and tables use their narrow layout, even in a wide
@@ -805,7 +806,7 @@ The connector editor's Form tab shows the connector's fields in the four
 each field with its label and [help](frontend.md#platform-field-help). Add operation sits on the
 Operations heading, and the JSON view stays as the second view of the same draft.
 
-- **No values.** A binding is a name, named by what it holds, and its help says which kind it is. No
+- **No values.** A binding is a name, and its help says what it holds and that the file keeps only its name. No
   value of a binding is shown or stored: the editor reads the resource and schema routes and the
   binding names, and writes only the resource, and the values stay in tenant settings.
 - **Bindings from the tenant.** A binding is chosen from the tenant's names of the kind it needs, see
@@ -817,14 +818,14 @@ Operations heading, and the JSON view stays as the second view of the same draft
 - **Operations.** A card per operation shows its name, method, path and `lookup`, which is picked from
   the connector's other operations. Its input and output fields are rows of name, type and required,
   one field to a line, and the schema's required keys carry the shared required mark. Operations and rows
-  can be added and removed. A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
-- **Placement and nesting.** A scalar input has a Placement choice of `body`, `path`, `query` or
+  can be added and deleted. A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
+- **Placement and nesting.** A scalar input has a Sent in choice of `body`, `path`, `query` or
   `header`, which shows `body` when the file has no `in` key and removes the key when `body` is chosen.
   `object` and `list` inputs show nested field rows instead, down to four levels with the input as
   level 1. Choosing one adds `fields` and removes `in`, and a scalar type removes `fields`. The compiler
   reports placement and path errors after the save, see
   [structured payloads](integration-resources.md#structured-payloads).
-- **Read from.** _(planned for M35)_ An optional Source box holds a JSON Pointer into the response, and an empty box
+- **Read from.** An optional Read from box holds a JSON Pointer into the response, and an empty box
   removes `source`.
 - **Unknown keys.** A key the editor does not show, in the file, in an operation or in `auth`, is saved
   unchanged.
@@ -840,17 +841,17 @@ the Assurance heading, and the JSON view stays as the second view of the same dr
 
 - **Type.** Choosing `accounts`, `oidc` or `saml` removes the keys the new type forbids and adds the
   bindings it requires, with an empty name. An `accounts` provider shows only General, Roles and Assurance.
-- **Bindings.** A binding is a name box, and its help says which kind it is and that only the name is
+- **Bindings.** A binding is a name box, and its help says what it holds and that only the name is
   stored. No value is shown or stored. `oidc` shows the issuer, the client ID, and a choice of client
   credential: a client secret, or a client key for `private_key_jwt`, each option with its own help.
   `saml` shows the metadata. Name and Type carry the shared required mark.
-- **Label.** _(planned for M35)_ The "Name on the sign-in button" field sits in Sign-in, after the bindings, and has its texts in every locale, see [label texts](#label-texts).
+- **Label.** The "Name on the sign-in button" field sits in Sign-in, after the bindings, and has its texts in every locale, see [label texts](#label-texts).
 - **Claims.** The display name, email and locale claims are name boxes that show their defaults,
   `name`, `email` and `locale`, until the author types another name.
 - **Roles.** The roles claim is a name box that shows `roles` by default. `values` are rows of a claim
-  value and a role picked from the application's roles, one field to a line, with add and remove. With no rows, a claim
+  value and a role picked from the application's roles, one field to a line, with Add claim value and Delete. With no rows, a claim
   value gives the role of the same name, and the editor says so.
-- **Assurance.** _(planned for M35)_ `acr` is a list of text rows, each with Delete below, and with none the key is removed.
+- **Assurance.** `acr` is a list of text rows, each with Delete below, and with none the key is removed.
 - **Unknown keys.** A key the editor does not show is saved unchanged.
 
 ### A site's sign-in

@@ -705,7 +705,7 @@ describe('StudioEditor for a connector', () => {
     const { fetchMock } = stubResource(connectorItem, connectorContent)
     renderResource(connectorItem)
 
-    await userEvent.click(await screen.findByRole('combobox', { name: 'Auth type' }, slow))
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Authentication type' }, slow))
     await userEvent.click(await screen.findByTitle('header'))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -1790,7 +1790,7 @@ describe('StudioEditor for a page', () => {
 
       await screen.findByTestId('studio-widget-/widgets/1', {}, slow)
       await userEvent.click(
-        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Remove widget' }),
+        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Delete' }),
       )
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()

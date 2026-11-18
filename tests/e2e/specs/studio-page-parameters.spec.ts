@@ -198,7 +198,10 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     const parameter = page.getByTestId(`${action}/parameters/department`);
     await expect(parameter.getByText("department", { exact: true })).toBeVisible();
     await expect(
-      parameter.getByText("An expression of type reference, which the page requires.", { exact: true }),
+      parameter.getByText(
+        "An expression of type reference. The page needs this parameter, so it cannot be left empty.",
+        { exact: true },
+      ),
     ).toBeVisible();
     await parameter.getByRole("textbox", { name: "Expression", exact: true }).fill("id");
     await save(page);

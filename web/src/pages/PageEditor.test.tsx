@@ -1248,7 +1248,7 @@ describe('PageEditor widget tree', () => {
       }),
     )
 
-    expect(screen.getByText('Column 2, 6')).toBeVisible()
+    expect(screen.getByText('Column 2, width 6 (of 12)')).toBeVisible()
     expect(screen.getByText('Tab 1')).toBeVisible()
     expect(screen.getByTestId('studio-widget-/widgets/1/tabs/0/widgets/0')).toBeVisible()
     expect(screen.getByTestId('studio-widget-/widgets/2/widgets/0')).toBeVisible()
@@ -1272,9 +1272,9 @@ describe('PageEditor widget tree', () => {
     expect(onChange).toHaveBeenLastCalledWith('/widgets', [inbox, columns])
     await userEvent.click(row('/widgets/1').getByRole('button', { name: 'Move up' }))
     expect(onChange).toHaveBeenLastCalledWith('/widgets', [inbox, columns])
-    await userEvent.click(row('/widgets/1').getByRole('button', { name: 'Remove widget' }))
+    await userEvent.click(row('/widgets/1').getByRole('button', { name: 'Delete' }))
     expect(onChange).toHaveBeenLastCalledWith('/widgets', [columns])
-    await userEvent.click(row('/widgets/0/columns/1/widgets/0').getByRole('button', { name: 'Remove widget' }))
+    await userEvent.click(row('/widgets/0/columns/1/widgets/0').getByRole('button', { name: 'Delete' }))
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/columns/1/widgets', [])
   })
 

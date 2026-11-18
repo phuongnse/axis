@@ -6,12 +6,13 @@ Three routes of the [authoring API](authoring.md) read and undo the history that
 A server with no `Studio:RevisionsPath`, or a folder with no history yet, lists no revisions, and the
 diff and the undo answer `404`.
 
-| Route                                                           | What it does                                                    |
-| --------------------------------------------------------------- | --------------------------------------------------------------- |
-| `GET /api/studio/apps/{application}/revisions`                  | Lists the revisions, see [the list](#list)                      |
-| `GET /api/studio/apps/{application}/revisions/{revision}`       | Shows the files of one, see [the diff](#diff)                   |
-| `POST /api/studio/apps/{application}/revisions/{revision}/undo` | Undoes one, see [the undo](#undo)                               |
-| `GET /api/studio/apps/{application}/drafts/{draft}/diff`        | Shows the changes of a draft, see [the draft diff](#draft-diff) |
+| Route                                                                       | What it does                                                                       |
+| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `GET /api/studio/apps/{application}/revisions`                              | Lists the revisions, see [the list](#list)                                         |
+| `GET /api/studio/apps/{application}/revisions/{revision}`                   | Shows the files of one, see [the diff](#diff)                                      |
+| `POST /api/studio/apps/{application}/revisions/{revision}/undo`             | Undoes one, see [the undo](#undo)                                                  |
+| `GET /api/studio/apps/{application}/drafts/{draft}/diff`                    | Shows the changes of a draft, see [the draft diff](#draft-diff)                    |
+| `GET /api/studio/apps/{application}/releases/live/diff` _(planned for M35)_ | Shows the files that differ from the live release, see [the live diff](#live-diff) |
 
 ## List
 
@@ -64,6 +65,21 @@ read the next page.
 A cursor that is not one this draft gave answers `400`, titled "The cursor is not one this draft gave."
 A draft that does not exist, or that is another person's, answers `404`, titled "The application has no
 draft with this id." The write lock is taken to read, so a lock that cannot be taken answers `503`.
+
+- **Titles** _(planned for M35)_. Each entry of `resources` also carries `titles`: the resource's label by locale, as
+  `GET .../resources` gives it, see [release history](authoring.md#release-history) for `changes`. It is null
+  without a label text key.
+
+## Live diff
+
+_(planned for M35)_
+
+`GET .../releases/live/diff` answers `200` with `{ release, resources, cursor }`: `release` is the live release's
+number, and `resources` are the files that differ between that release and the working folder, as entries of the
+[revision diff](#diff) with `titles` and `by`. `by` lists, newest first, the revisions made after the live release
+was published that changed the file, each as an item of [the list](#list) gives it. Paging and the `400` and `503`
+answers are as for the [draft diff](#draft-diff). With no live release it answers `404`, titled "The application has
+no live release."
 
 ## Undo
 

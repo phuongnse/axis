@@ -17,7 +17,9 @@ export function usePartLabel() {
     if (part.kind === 'section') {
       return undefined
     }
-    return `${t(part.kind === 'column' ? 'shell.studio.page.column' : 'shell.studio.page.tab')} ${part.index + 1}`
+    return fillText(t(part.kind === 'column' ? 'shell.studio.page.column' : 'shell.studio.page.tab'), {
+      number: part.index + 1,
+    })
   }
 }
 

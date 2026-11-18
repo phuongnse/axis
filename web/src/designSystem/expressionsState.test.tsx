@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { installFixtureFetch } from './fixtureFetch'
 import { fixtureScopes, routes } from './fixtures'
@@ -22,8 +22,9 @@ describe('the design-system Entity with expressions state', () => {
 
     render(<Preview states={[state]} />)
 
-    const readings = await screen.findAllByTestId('studio-expression-reading', {}, { timeout: 15000 })
-    expect(readings).toHaveLength(2)
+    // Each expression box checks on its own, so the second reading can arrive after the first. Wait for both.
+    await waitFor(() => expect(screen.getAllByTestId('studio-expression-reading')).toHaveLength(2), { timeout: 15000 })
+    const readings = screen.getAllByTestId('studio-expression-reading')
     const [computed, validation] = readings
     expect(computed).toHaveTextContent('In words: Amount × 1.1')
     expect(validation).toHaveTextContent('In words: Amount is greater than 0 and Title has a value')

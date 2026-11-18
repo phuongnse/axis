@@ -44,7 +44,7 @@ export function SiteSignIn({
                   onChange('/signIn', rest.length > 0 ? rest : undefined)
                 }}
               >
-                {t('shell.studio.identityProvider.remove')}
+                {t('shell.studio.site.removeProvider')}
               </Button>
             </Flex>
           ))}

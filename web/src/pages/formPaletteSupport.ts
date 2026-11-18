@@ -138,19 +138,17 @@ export function moveSectionTo(
   const textKey = (step?.title as { textKey?: unknown } | undefined)?.textKey
   const named = step === undefined || !Array.isArray(step.sections) ? [] : (step.sections as unknown[])
   const position = step === undefined ? result.index : named.findIndex((name) => name === label)
+  const stepTitle =
+    to.step === null ? undefined : typeof textKey === 'string' && textKey !== '' ? t(textKey) : `/steps/${to.step}`
   onChange('/sections', result.sections)
   if (result.steps !== undefined) {
     onChange('/steps', result.steps)
   }
   onSelect(`/sections/${result.index}`)
   onAnnounce(
-    to.step === null
+    stepTitle === undefined
       ? fillText(t('shell.studio.palette.movedTo'), { name: label, position: position + 1 })
-      : fillText(t('shell.studio.palette.moved'), {
-          name: label,
-          place: typeof textKey === 'string' && textKey !== '' ? t(textKey) : `/steps/${to.step}`,
-          position: position + 1,
-        }),
+      : fillText(t('shell.studio.palette.moved'), { name: label, place: stepTitle, position: position + 1 }),
   )
 }
 
