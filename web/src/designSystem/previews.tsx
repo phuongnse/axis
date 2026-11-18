@@ -13,6 +13,7 @@ import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { WidgetTree } from '../platform/WidgetTree'
 import { FieldPreview } from './FieldPreview'
+import type { FixtureRoute } from './fixtureFetch'
 import { IdentitySignIn } from './IdentitySignIn'
 import { SignUpPreview } from './SignUpPreview'
 import { SubmittedOnMount } from './SubmittedOnMount'
@@ -93,9 +94,9 @@ function renderLeaf(widget: WidgetMetadata): ReactNode {
 export interface PreviewState {
   caption: string
   draw: () => ReactNode
-  routes?: Record<string, () => unknown>
+  routes?: Record<string, FixtureRoute>
   /** Answers on paths the preview's other states answer too, so the state shows alone. */
-  fixtures?: Record<string, () => unknown>
+  fixtures?: Record<string, FixtureRoute>
   /** The address the state starts at. */
   entry?: InitialEntry
   /** The height of the screen the state draws in. A taller page scrolls inside it. */
@@ -314,6 +315,11 @@ export const previews: Record<string, readonly PreviewState[]> = {
       fixtures: studioFixtures.typical,
       entry: `/studio?app=${application}&resource=${typicalEntityId}`,
     },
+    {
+      caption: 'Entity with expressions',
+      fixtures: studioFixtures.withExpressions,
+      entry: `/studio?app=${application}&resource=${typicalEntityId}`,
+    },
     { caption: 'Policy matrix', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=policies` },
     { caption: 'Releases', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=releases` },
     { caption: 'History', fixtures: studioFixtures.typical, entry: `/studio?app=${application}&view=history` },
@@ -414,14 +420,14 @@ export const previews: Record<string, readonly PreviewState[]> = {
 }
 
 /** The fixture answers that the states of the previews bring, in one record. */
-export function stateRoutes(all: Record<string, readonly PreviewState[]>): Record<string, () => unknown> {
+export function stateRoutes(all: Record<string, readonly PreviewState[]>): Record<string, FixtureRoute> {
   return Object.fromEntries(
     Object.values(all).flatMap((states) => states.flatMap((state) => Object.entries(state.routes ?? {}))),
   )
 }
 
 /** The answers of the state that the preview shows. */
-let chosen: Record<string, () => unknown> = {}
+let chosen: Record<string, FixtureRoute> = {}
 
 /** Makes `state` the one whose `fixtures` answer, before it is drawn. */
 export function chooseFixtures(state: PreviewState): void {
@@ -432,15 +438,15 @@ export function chooseFixtures(state: PreviewState): void {
  * The fixture paths that states answer for themselves, each answered by the chosen state. A path the chosen state lacks
  * is logged as a missing fixture and answered with a 404, as a path with no route is.
  */
-export function chosenRoutes(all: Record<string, readonly PreviewState[]>): Record<string, () => unknown> {
+export function chosenRoutes(all: Record<string, readonly PreviewState[]>): Record<string, FixtureRoute> {
   const paths = Object.values(all).flatMap((states) => states.flatMap((state) => Object.keys(state.fixtures ?? {})))
   return Object.fromEntries(
     paths.map((path) => [
       path,
-      () => {
+      (init) => {
         const answer = chosen[path]
         if (answer) {
-          return answer()
+          return answer(init)
         }
         console.error('No design-system fixture for', path)
         return new Response(null, { status: 404 })
