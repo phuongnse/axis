@@ -122,15 +122,12 @@ function EntryList({
   onPick: (text: string, cursorInside: boolean) => void
 }) {
   const t = useText()
-  const { colour, spacing, type, size } = useDesignTokens()
+  const { colour, spacing, type } = useDesignTokens()
   if (entries.length === 0) {
     return <EmptyState text={t('shell.studio.expression.noMatch')} />
   }
   return (
-    <ul
-      aria-label={label}
-      style={{ listStyle: 'none', margin: 0, padding: 0, maxHeight: size.tableRow * 7, overflowY: 'auto' }}
-    >
+    <ul aria-label={label} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
       {entries.map((entry, index) => (
         <li
           key={`${entry.kind}:${entry.name}:${index}`}

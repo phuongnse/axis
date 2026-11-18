@@ -756,6 +756,17 @@ describe('ExpressionEditor expand', () => {
     expect(names(within(dialog).getByRole('list', { name: 'Functions' }))).toEqual(['toDate()', 'refund()'])
   })
 
+  it('gives the lists no height and no scroll of their own, so the dialog body scrolls them', async () => {
+    const { user, dialog } = await openDialog()
+
+    for (const name of ['Fields', 'Operators', 'Functions']) {
+      await user.click(within(dialog).getByRole('tab', { name }))
+      const list = await within(dialog).findByRole('list', { name })
+      expect(list.style.maxHeight).toBe('')
+      expect(list.style.overflowY).toBe('')
+    }
+  })
+
   it('shows that nothing matches', async () => {
     const { user, dialog } = await openDialog()
 

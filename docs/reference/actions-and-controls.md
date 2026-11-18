@@ -365,7 +365,8 @@ These rules hold for every dialog, through the shared `ConfigProvider`.
   token that a dialog names, never a width of its own. A Vitest test fails on a dialog that names no
   size token.
 - **Its place and height.** A dialog opens centred in the window and is as tall as its content, at
-  most the window less its `spacing-xl` margins. Its body scrolls while its title and buttons stay.
+  most the window less its `spacing-xl` margins. Its body scrolls while its title and buttons stay, and it
+  stops at its end, as a [scroll area](#scroll-areas) does.
 - **Its body scrolls at its edge.** The body reaches the frame's edges and keeps the padding inside
   it, so the thin scrollbar runs at the dialog's right edge and a field's focus ring has room at its
   sides.
@@ -375,6 +376,18 @@ These rules hold for every dialog, through the shared `ConfigProvider`.
   as the cell leads to where it is edited, so each thing is seen in one place and edited in one place.
 - **It draws on `surface`,** as panels do, so everything inside sits on the colour it was made for,
   and the mask behind sets it apart from the page.
+
+## Scroll areas
+
+A scroll area is a part of a screen that scrolls on its own, such as a dialog's body, the shell's
+navigation or a code editor. The page keeps the browser's own scroll, and each scroll area shares the
+wheel with the page under two rules.
+
+- **It stops at its end.** A scroll area passes no scroll on to the page. Otherwise the browser moves the
+  page as soon as the area reaches its end, so a person who only meant to scroll a list loses their place.
+- **One scroll area in each direction.** A scroll area never sits inside another that scrolls the same
+  way, because two areas would share one wheel. So a list in a dialog grows, and the dialog's body scrolls
+  it. A wide table may still scroll sideways inside a page or dialog that scrolls down.
 
 ## Showing what is empty
 
