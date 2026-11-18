@@ -105,6 +105,23 @@ export function stepRuns(instance: InstanceDetail): StepRun[] {
   return runs
 }
 
+/**
+ * Proposed, see the review on #3650: the milliseconds of an ISO 8601 duration of days, hours, minutes and seconds, such
+ * as a wait's timeout `P30D`, or `null` for anything else.
+ */
+export function isoDurationMs(value: unknown): number | null {
+  const match = typeof value === 'string' ? /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(value) : null
+  if (match === null) return null
+  const [days, hours, minutes, seconds] = match.slice(1).map((part) => Number(part ?? 0))
+  return (((days * 24 + hours) * 60 + minutes) * 60 + seconds) * 1000
+}
+
+/** Proposed, see the review on #3650: an ISO 8601 duration in the words `durationText` uses, or `null`. */
+export function isoDurationText(value: unknown, locale: string): string | null {
+  const ms = isoDurationMs(value)
+  return ms === null ? null : durationText(new Date(0).toISOString(), new Date(ms).toISOString(), locale)
+}
+
 /** A span of time in its two largest units, such as "1 day 5 hr", in the locale's words for them. */
 export function durationText(from: string, to: string, locale: string): string {
   const seconds = Math.max(0, Math.floor((Date.parse(to) - Date.parse(from)) / 1000))

@@ -2852,6 +2852,7 @@
   "shell.inspector.tab.history": "Lịch sử",
   "shell.inspector.tab.data": "Dữ liệu",
   "shell.inspector.startedBy": "Khởi chạy bởi",
+  "shell.inspector.transition.timeout": "Sau {duration}",
   "shell.inspector.duration": "Thời lượng",
   "shell.inspector.instanceId": "ID lượt chạy",
   "shell.inspector.notEnded": "Lượt chạy chưa kết thúc.",

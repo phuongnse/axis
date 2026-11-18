@@ -2852,6 +2852,7 @@
   "shell.inspector.tab.history": "History",
   "shell.inspector.tab.data": "Data",
   "shell.inspector.startedBy": "Started by",
+  "shell.inspector.transition.timeout": "After {duration}",
   "shell.inspector.duration": "Duration",
   "shell.inspector.instanceId": "Instance ID",
   "shell.inspector.notEnded": "The instance has not ended yet.",

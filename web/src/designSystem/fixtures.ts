@@ -1158,11 +1158,11 @@ const instanceDetail: InstanceDetail = {
         transitions: [
           {
             next: 'threeWayMatch',
-            on: 'received',
+            on: null,
           },
           {
             next: 'remindReceipt',
-            on: 'after 30 days',
+            on: 'timeout',
           },
         ],
       },

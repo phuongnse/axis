@@ -18,7 +18,7 @@ import {
   type RunOutput,
   type StepDefinition,
 } from './inspection'
-import { durationText, stepRuns, type StepRun } from './instanceRuns'
+import { durationText, isoDurationMs, stepRuns, type StepRun } from './instanceRuns'
 import { RecordLink } from './RecordLink'
 import { useMinuteClock } from './relativeTime'
 import { useRunWords } from './runWords'
@@ -196,13 +196,8 @@ export function StepRunPanel({
   const waitTerms = (shown: StepRun): Term[] => {
     const terms: Term[] = []
     const after = (value: unknown) => {
-      const match =
-        typeof value === 'string' ? /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(value) : null
-      if (match === null) return null
-      const [days, hours, minutes, seconds] = match.slice(1).map((part) => Number(part ?? 0))
-      return new Date(
-        Date.parse(shown.startedAt) + (((days * 24 + hours) * 60 + minutes) * 60 + seconds) * 1000,
-      ).toISOString()
+      const ms = isoDurationMs(value)
+      return ms === null ? null : new Date(Date.parse(shown.startedAt) + ms).toISOString()
     }
     if (typeof definition.event === 'string') {
       terms.push({

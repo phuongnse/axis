@@ -20,7 +20,8 @@ import {
 } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { InstanceTimeline } from './InstanceTimeline'
-import { durationText, instanceTone, stepRuns } from './instanceRuns'
+import { durationText, instanceTone, isoDurationText, stepRuns } from './instanceRuns'
+import { fillText } from './fillText'
 import { useMinuteClock } from './relativeTime'
 import { StatusTag } from './StatusTag'
 import { useInstanceStatus } from './instanceStatus'
@@ -235,6 +236,12 @@ export function InstanceDetailView({
     const labelKey = graphStep?.transitions.find((candidate) => candidate.on === name)?.labelKey
     if (labelKey) {
       return t(labelKey)
+    }
+    // Proposed, see the review on #3650: a wait that gives up goes on after its timeout, said in the platform's words.
+    if (graphStep?.type === 'waitEvent' && name === 'timeout') {
+      const timeout = graphStep.definition?.timeout as { after?: unknown } | undefined
+      const duration = isoDurationText(timeout?.after, locale)
+      return duration === null ? name : fillText(t('shell.inspector.transition.timeout'), { duration })
     }
     if (graphStep?.type !== 'decision') {
       return name
@@ -528,6 +535,18 @@ export function InstanceDetailView({
       },
     ]
   })
+  // Proposed, see the review on #3650: what a transition's line says on the graph: its words, or on a wait's line for
+  // the event, the event it waits for; nothing on the next of an operation, a sub-process or a timer.
+  const transitionLabel = (step: InstanceDetail['graph']['steps'][number], on: string | null) => {
+    if (on !== null) {
+      return outcomeLabel(step.name, on)
+    }
+    if (step.type !== 'waitEvent' || stepNames) {
+      return ''
+    }
+    const { event, eventLabelKey } = step.definition ?? {}
+    return typeof eventLabelKey === 'string' ? t(eventLabelKey) : typeof event === 'string' ? event : ''
+  }
   const graphTransitions = instance.graph.steps.flatMap((step) =>
     step.transitions.map((transition): ProcessGraphTransitionView => {
       const took =
@@ -537,8 +556,8 @@ export function InstanceDetailView({
         id: `${step.name}>${transition.next}|${transition.on ?? ''}`,
         source: step.name,
         target: transition.next,
-        label: transition.on === null ? '' : outcomeLabel(step.name, transition.on),
-        ariaLabel: `${stepLabel(step.name)} ${to} ${stepLabel(transition.next)}${transition.on === null ? '' : `, ${outcomeLabel(step.name, transition.on)}`}`,
+        label: transitionLabel(step, transition.on),
+        ariaLabel: `${stepLabel(step.name)} ${to} ${stepLabel(transition.next)}${transitionLabel(step, transition.on) === '' ? '' : `, ${transitionLabel(step, transition.on)}`}`,
         tone: took ? 'taken' : 'idle',
       }
     }),
