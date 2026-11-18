@@ -86,6 +86,7 @@ from a secret store of the platform, never from a committed file.
 | none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of a restored tenant that keeps the archive's sign-in, which a restore under a new realm does not need. `tenant restore` reads it. `tenant create` does not. |
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | publisher, `cell restore-check` | yes | Optional. A database role with `CREATEDB`, not a superuser, that owns no tenant database. It lets the publisher run `test` requests and the contract scenarios of `publish` and `validate` requests, and `cell restore-check` run the scenarios of a restored application. Empty by default, and a `test` request, or a `publish` or `validate` with contract scenarios, then fails with `AXC0217`, which names the setting. See [the scenario role](#the-scenario-role). |
 | `Studio:Tests` | `Studio__Tests` | server | no | Optional. `true` turns on `studioTest`, which shows the test controls in Studio. Off by default. Turn it on together with the publisher's `Scenarios:ServerConnectionString`. |
+| `Ai:DefaultBinding` | `Ai__DefaultBinding` | server | no | Optional. A value turns on `studioAi`, which shows Ask AI to authors in Studio. The server reads only that it has a value. The agent host reads the binding's name and its `Ai:Bindings`, see [AI settings](host-settings.md#ai-settings). |
 | `Extensions:Path` | `Extensions__Path` | server, worker, admin | no | Set to `/extensions`. |
 | `Modules:Path` | `Modules__Path` | server, worker, admin | no | Set to `/modules`. |
 | `Templates:Path` | `Templates__Path` | server, publisher | no | Optional. Unset in production, so Studio lists no application templates. In a cell the publisher reads it for the create job, which fails without it. The folder holds `<id>/<version>/` template folders, and a folder that does not exist stops the server. See [application templates](modules-and-templates.md#application-templates). |
@@ -727,6 +728,7 @@ The values of the chart, with their defaults:
 | `secrets.scenarioServerConnection` | empty | Publisher and the cell restore-check CronJob. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. A cell whose tenants have Studio applications needs it set for the weekly restore check to pass. Create the role as in [the scenario role](#the-scenario-role). |
 | `studio.tests` | `false` | Server only. `true` renders `Studio__Tests`, which turns on `studioTest`. Set it together with `secrets.scenarioServerConnection`. |
 | `ai.allowTenantKeys` | `false` | Server and agent host. `true` renders `Ai__AllowTenantKeys` on both, so a tenant administrator can set the tenant's own model key and the agent host uses it. See [a tenant's own key](model-bindings.md#a-tenants-own-key). |
+| `ai.defaultBinding` | `""` | Server only. A value renders `Ai__DefaultBinding`, which turns on `studioAi`. The chart sets no `Ai:Bindings` on the agent host, so configure them yourself. |
 | `publisher.terminationGracePeriodSeconds` | 360 | Seconds the publisher gets to finish its running request on `SIGTERM`. Keep it longer than the five-minute lease. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
 | `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. Use the time span format `hh:mm:ss`, such as `00:00:30`. "30s" stops the hosts at start. |
@@ -889,12 +891,3 @@ ends TLS, so it must meet the rules for incoming traffic above, because the char
 versions or ciphers there. The chart also cannot make the Ingress connect over HTTPS and verify the
 server certificate. The chart sets a Kestrel HTTPS endpoint from the Secret in
 `secrets.serverCertificate`, probes it over HTTPS and names the Service port `https`.
-
-## Hardening checklist
-
-_(planned for M32)_
-
-The checklist lists every control that the [ASVS](asvs.md) tracking or the
-[threat model](threat-model.md) delegates to the operator, such as disk encryption, malware scanning
-of uploads and access to the logs, with how to meet each one and how to check it. Outside
-Development, the server and the worker warn at start about each item they can see is missing.

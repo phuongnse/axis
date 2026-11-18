@@ -12,6 +12,8 @@ studio:
   persistence:
     persistentVolumeClaim:
       claimName: axis-studio
+ai:
+  defaultBinding: main
 forwardedHeaders:
   knownProxies:
     - 10.0.0.10

@@ -19,7 +19,7 @@ turned them into work an operator can do and check.
   the worker can see writes a warning and sets a metric, but does not stop the start, because the
   operator may meet it in a way Axis cannot see.
 
-The detail is in the [hardening checklist](../reference/installation.md#hardening-checklist).
+The detail is in the [hardening checklist](../reference/hardening-checklist.md).
 
 ## Consequences
 

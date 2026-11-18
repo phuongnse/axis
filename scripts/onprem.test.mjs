@@ -464,6 +464,20 @@ describe('the tenant model key setting', () => {
   })
 })
 
+describe('the default model binding setting', () => {
+  test('both servers take Ai__DefaultBinding from the shell, and no other service does', () => {
+    const { services } = render()
+    for (const name of ['server', 'server-2']) {
+      assert.ok(Object.hasOwn(services[name].environment, 'Ai__DefaultBinding'), `${name} has no Ai__DefaultBinding`)
+      const value = services[name].environment.Ai__DefaultBinding
+      assert.ok(value === null || value === undefined || value === '', `${name} sets Ai__DefaultBinding`)
+    }
+    for (const name of ['agent', 'worker', 'publisher', 'admin']) {
+      assert.equal(services[name].environment?.Ai__DefaultBinding, undefined, `${name} has Ai__DefaultBinding`)
+    }
+  })
+})
+
 describe('the package hosts', () => {
   // See docs/reference/extension-packages.md#package-runners and the threats P151 and P152 in docs/reference/threat-model-product.md.
   for (const [name, host] of Object.entries(packageHosts)) {
