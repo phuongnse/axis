@@ -67,6 +67,10 @@ public sealed class PackageOperationContext(
     public static string RefusedMessage(string operation, string package, string what) =>
         string.Create(CultureInfo.InvariantCulture, $"The operation '{operation}' of the package '{package}' {what}");
 
+    /// <summary>The sentence of a runner's <c>failure</c> that names <paramref name="binding"/>, one text for the worker and the <c>connect</c> command.</summary>
+    public static string BindingRefusedMessage(string operation, string package, string binding) =>
+        RefusedMessage(operation, package, $"went beyond its declared capabilities with the binding '{binding}'.");
+
     /// <summary>Keeps the first violation and returns the exception that refuses it.</summary>
     private InvalidOperationException Refuse(string binding, string what)
     {

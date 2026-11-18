@@ -23,6 +23,7 @@
   <ItemGroup>
     <Compile Include="..\Axis.Configuration.Tests\TemporaryFolder.cs" Link="TemporaryFolder.cs" />
     <Compile Include="..\Axis.Configuration.Tests\TestPackages.cs" Link="TestPackages.cs" />
+    <Compile Include="..\Axis.Integration.Tests\Polling.cs" Link="Polling.cs" />
   </ItemGroup>
 
   <ItemGroup>

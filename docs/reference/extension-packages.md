@@ -667,27 +667,32 @@ never leave the customer, see [D148](../decisions/d148-packages-in-c-typescript-
   keeps no copy of the secret.
 - **The contract stays with Axis.** The worker reads `idempotent` and `timeout` from the manifest, and checks a
   posted result against `output`.
-- **The program.** _(planned for M37)_ The customer runs `docker run ... axis-package-host-<language> connect`, Axis's own
+- **The program.** The customer runs `docker run ... axis-package-host-<language> connect`, Axis's own
   [runner image](installation.md#images) with the `connect` command. It reads the built packages from
   `Extensions:Path`, where `build` writes them, and the customer builds each package with the same `build`
   command, which scans its dependencies, see [building a package](#building-a-package). An instance runs one
-  call at a time. Several instances may share one credential, because each take is its own lease.
-- **Registering.** The runner sends the manifest of each package it runs. The server compares its `id`,
-  `version` and `operations` as JSON values with the manifest pinned by every release that is active or has a
-  running or waiting instance. A difference, or no such release that pins the version as customer-hosted,
-  answers `409` naming the package and the version, and the instance exits with code 1. So a mismatch shows
-  when the runner starts, and not at a call. The author publishes first, and the calls wait `pending` until
-  the runner starts.
+  call at a time. Several instances may share one credential, because each take is its own lease. A missing or
+  malformed setting, also one of a binding that an installed operation declares, stops it with exit code 2 and a
+  message that names the setting. `http` is allowed only in Development.
+- **Registering.** The runner sends the manifest of every installed version. The server compares its `id`, `version` and
+  `operations` as JSON values with the manifest pinned by every release that is active or has a running or waiting
+  instance. A difference, or no such release that pins the version as customer-hosted, answers `409` naming the package
+  and the version, and the instance prints that and exits with code 1. So a mismatch shows when the runner starts, and
+  not at a call. The author publishes first, and the calls wait `pending` until the runner starts.
 - **Upgrades.** _(planned for M37)_ During an upgrade the customer runs both versions side by side until the old instances end.
-- **Calls out only.** _(planned for M37)_ The runner connects to the tenant's host over HTTPS. No connection goes from Axis
-  into the customer's network.
-- **Taking a call and posting its result.** _(planned for M37)_ The runner takes a call under a lease and posts the result, see
-  [staging a package call](process-execution.md#staging-a-package-call) for the lease and the outcomes. It
-  takes only calls of its tenant to a package it registered and to the exact version whose manifest the
-  release pins.
-- **Its own secrets.** _(planned for M37)_ The take carries no binding value. The SDK answers `GetHttpClient` and `GetSecret`
-  from the runner's own settings, `Connect:Urls:<binding>` and `Connect:Secrets:<binding>`, by the binding
-  names that the manifest declares.
+- **Calls out only.** The runner connects to the tenant's host over HTTPS, and no connection goes from Axis into the
+  customer's network. It gets its token from `Connect:TokenUrl` with the client credentials grant and keeps it until a
+  minute before it expires. A `401` gets one fresh token and one retry, and a second `401` exits with code 1. It sends no
+  DPoP proof, so a tenant under `fapi2` answers its requests `401`.
+- **Taking a call and posting its result.** The runner takes a call under a lease and posts the result, see
+  [staging a package call](process-execution.md#staging-a-package-call) for the lease and the outcomes. It takes only
+  calls of its tenant to a package it registered and to the exact version whose manifest the release pins, and waits
+  2 seconds after a take that gives no call. It runs the call in the runner of the manifest's language, one for each
+  version, with no proxy variables, and posts `result` as `succeeded`, `retryable` as `retryable` and `failure` as
+  `failed`. A runner still running at the end of the lease, or one that exits, is killed and no result is posted.
+- **Its own secrets.** The take carries no binding value. A `run` carries only the `url` and `secret` bindings that the
+  operation declares, answered by `GetHttpClient` and `GetSecret` from the runner's own settings, `Connect:Urls:<binding>`
+  and `Connect:Secrets:<binding>`. A `failure` that names a binding posts the error text that the worker records.
 - **Revoked.** Every runner request reads the runner's row, so the next request of a revoked runner answers
   `401`, even with a token that has not expired.
 
@@ -695,11 +700,12 @@ The `connect` command reads these settings, as environment variables with the na
 
 | Setting | Environment variable | Default | Meaning |
 | --- | --- | --- | --- |
-| `Connect:Url` _(planned for M37)_ | `Connect__Url` | none | The tenant's `https` address |
-| `Connect:ClientId` _(planned for M37)_ | `Connect__ClientId` | none | The client id of the runner's credential |
-| `Connect:ClientSecret` _(planned for M37)_ | `Connect__ClientSecret` | none | The client secret of the runner's credential |
-| `Connect:Urls:<binding>` _(planned for M37)_ | `Connect__Urls__<binding>` | none | The base address of the `url` binding with that name |
-| `Connect:Secrets:<binding>` _(planned for M37)_ | `Connect__Secrets__<binding>` | none | The value of the `secret` binding with that name |
+| `Connect:Url` | `Connect__Url` | none | The tenant's `https` address |
+| `Connect:TokenUrl` | `Connect__TokenUrl` | none | The `https` token endpoint of the tenant's realm |
+| `Connect:ClientId` | `Connect__ClientId` | none | The client id of the runner's credential |
+| `Connect:ClientSecret` | `Connect__ClientSecret` | none | The client secret of the runner's credential |
+| `Connect:Urls:<binding>` | `Connect__Urls__<binding>` | none | The base address of the `url` binding with that name |
+| `Connect:Secrets:<binding>` | `Connect__Secrets__<binding>` | none | The value of the `secret` binding with that name |
 
 #### Routes
 

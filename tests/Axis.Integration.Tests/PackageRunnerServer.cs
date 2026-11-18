@@ -100,7 +100,11 @@ internal sealed class PackageRunnerServer(PostgreSqlFixture database, KeycloakFi
     public static HttpClient Client(WebApplicationFactory<Program> factory, string id) =>
         factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri($"http://{id}.vn.example.test"), AllowAutoRedirect = false });
 
-    public WebApplicationFactory<Program> Start()
+    /// <summary>
+    /// Starts the server. With <paramref name="extensionsPath"/> it loads the installed packages of that folder, which the registration
+    /// check and the release compiler read.
+    /// </summary>
+    public WebApplicationFactory<Program> Start(string? extensionsPath = null)
     {
         var platform = _platform;
         var authority = new Uri(_baseAddress, "realms/axis");
@@ -117,6 +121,11 @@ internal sealed class PackageRunnerServer(PostgreSqlFixture database, KeycloakFi
             builder.UseSetting("Cell:OperatorRole", "cell-operator");
             builder.UseSetting("IdentityProvider:Url", authority.ToString());
             builder.UseSetting("Users:AdministratorRole", AdministratorRole);
+            if (extensionsPath is not null)
+            {
+                builder.UseSetting(PackageCatalog.PathSetting, extensionsPath);
+            }
+
             builder.UseTestAuthentication(new TestIdentity("admin", "Admin", AdministratorRole) { SignedInAgo = TimeSpan.Zero });
             builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(Clock));
         });
@@ -156,15 +165,19 @@ internal sealed class PackageRunnerServer(PostgreSqlFixture database, KeycloakFi
     }
 
     // Runs the next due package.call item of the tenant on a worker that holds no package, as the worker does. Returns null when no item is due.
-    public static async Task<WorkItemOutcome?> RunPackageCallItemAsync(string tenantId, string tenantDatabase)
+    public static Task<WorkItemOutcome?> RunPackageCallItemAsync(string tenantId, string tenantDatabase) =>
+        RunItemAsync(tenantId, tenantDatabase, ProcessStarts.PackageCallWorkItemKind);
+
+    // Runs the next due item of the kind on a worker that holds the packages of extensionsPath, or none when it is null. Returns null when no item is due.
+    public static async Task<WorkItemOutcome?> RunItemAsync(string tenantId, string tenantDatabase, string kind, string? extensionsPath = null)
     {
         var runtime = PostgreSqlServer.RuntimeConnectionString(tenantDatabase);
-        using var packages = new TemporaryFolder();
+        using var empty = new TemporaryFolder();
         var settings = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             [$"Tenants:{tenantId}:Hosts:0"] = $"{tenantId}.vn.example.test",
             [$"Tenants:{tenantId}:ConnectionString"] = runtime,
-            [PackageCatalog.PathSetting] = packages.Path,
+            [PackageCatalog.PathSetting] = extensionsPath ?? empty.Path,
             [PackageIsolation.IsolationSetting] = "inProcess",
         }).Build();
         await using var worker = new ServiceCollection()
@@ -173,19 +186,27 @@ internal sealed class PackageRunnerServer(PostgreSqlFixture database, KeycloakFi
             .BuildServiceProvider();
         await using var connection = new NpgsqlConnection(runtime);
         await connection.OpenAsync(CancellationToken);
-        var item = await WorkItemQueue.ClaimAsync(connection, tenantId, [ProcessStarts.PackageCallWorkItemKind], TimeSpan.FromSeconds(30), CancellationToken);
+        var item = await WorkItemQueue.ClaimAsync(connection, tenantId, [kind], TimeSpan.FromSeconds(30), CancellationToken);
         return item is null ? null : await worker.GetRequiredService<WorkItemRunner>().ExecuteAsync(item, CancellationToken);
+    }
+
+    /// <summary>The token endpoint of the tenant's realm, which a runner signs in at.</summary>
+    public Uri TokenUrl(string realm) => new(_baseAddress, $"realms/{realm}/protocol/openid-connect/token");
+
+    // Creates a runner as the tenant's administrator. The client's secret is shown only once, so it is returned here.
+    public static async Task<RunnerClient> CreateRunnerClientAsync(HttpClient admin)
+    {
+        using var created = await SendAsync(admin, HttpMethod.Post, Runners, csrf: true, new { name = "Plant" });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var body = await created.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        return new RunnerClient(body.GetProperty("id").GetGuid(), body.GetProperty("clientId").GetString()!, body.GetProperty("clientSecret").GetString()!);
     }
 
     // Creates a runner as the tenant's administrator, and signs in as its client.
     public async Task<RunnerCredential> CreateRunnerAsync(HttpClient admin, string realm)
     {
-        using var created = await SendAsync(admin, HttpMethod.Post, Runners, csrf: true, new { name = "Plant" });
-        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        var body = await created.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
-        var clientId = body.GetProperty("clientId").GetString()!;
-        var token = await TokenAsync(realm, clientId, body.GetProperty("clientSecret").GetString()!);
-        return new RunnerCredential(body.GetProperty("id").GetGuid(), token);
+        var client = await CreateRunnerClientAsync(admin);
+        return new RunnerCredential(client.Id, await TokenAsync(realm, client.ClientId, client.Secret));
     }
 
     public async Task<string> TokenAsync(string realm, string clientId, string secret)
@@ -196,7 +217,7 @@ internal sealed class PackageRunnerServer(PostgreSqlFixture database, KeycloakFi
             ["client_id"] = clientId,
             ["client_secret"] = secret,
         });
-        using var response = await _http.PostAsync(new Uri(_baseAddress, $"realms/{realm}/protocol/openid-connect/token"), content, CancellationToken);
+        using var response = await _http.PostAsync(TokenUrl(realm), content, CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return (await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("access_token").GetString()!;
     }
@@ -260,6 +281,9 @@ internal sealed class PackageRunnerServer(PostgreSqlFixture database, KeycloakFi
     }
 
     public sealed record RunnerCredential(Guid Id, string Token);
+
+    /// <summary>A runner's client in the tenant's realm: the runner's id, and the client id and secret that it signs in with.</summary>
+    public sealed record RunnerClient(Guid Id, string ClientId, string Secret);
 
     /// <summary>The system clock moved by <see cref="Advance"/>, so real tokens are valid until it moves forward.</summary>
     public sealed class TestClock : TimeProvider

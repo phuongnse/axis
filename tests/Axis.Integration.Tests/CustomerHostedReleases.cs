@@ -16,6 +16,7 @@ namespace Axis.Integration.Tests;
 /// the registration check and the take in <c>docs/reference/extension-packages.md#customer-hosted-runners</c>. A release can also hold a process whose
 /// step calls the package, and a call that staging would leave for it, see <c>docs/reference/process-execution.md#staging-a-package-call</c>.
 /// A release can also hold the entity <c>Order</c> and the process <c>OrderSum</c>, whose subject is an order that the step writes its output to.
+/// A release can also pin the installed package <c>test-package</c> as customer-hosted, with the entity <c>Probe</c> and the process <c>ProbeCall</c>.
 /// </summary>
 internal sealed class CustomerHostedReleases
 {
@@ -107,24 +108,89 @@ internal sealed class CustomerHostedReleases
         }
         """;
 
+    /// <summary>The id of the entity <c>Probe</c>, which names its table.</summary>
+    public static Guid ProbeEntityId { get; } = Guid.Parse("7d2e4a60-9b13-4c85-a1f7-2e6c8b0d5f39");
+
+    private static readonly Guid _probeCallProcessId = Guid.Parse("c8f0a2d4-6b31-4e97-8a52-1d9e3b7c5f60");
+
+    private static readonly string _probeEntity =
+        $$"""
+        {
+          "id": "{{ProbeEntityId}}",
+          "kind": "entity",
+          "name": "Probe",
+          "formatVersion": 1,
+          "fields": [
+            { "name": "mode", "type": "text" },
+            { "name": "status", "type": "integer" }
+          ]
+        }
+        """;
+
+    // A process whose subject is a probe: the step passes its mode to the package's probe and writes the status it gets to the record.
+    private static readonly string _probeProcess =
+        $$"""
+        {
+          "id": "{{_probeCallProcessId}}",
+          "kind": "process",
+          "name": "ProbeCall",
+          "formatVersion": 1,
+          "entity": "Probe",
+          "start": "probe",
+          "steps": [
+            { "name": "probe", "type": "operation", "operation": "test-package/probe", "input": { "mode": "mode" }, "output": { "status": "status" }, "next": "done" },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
+
     /// <summary>
     /// Compiles the application with the own package files, the entity <c>Order</c> and the process <c>OrderSum</c>, and activates it with the
     /// release activator, so the table of <c>Order</c> exists. The caller grants the runtime role again, to reach the table.
     /// </summary>
-    public async Task<Guid> ActivateOwnWithOrderProcessAsync(string connectionString, string tenantId, string manifest, CancellationToken cancellationToken)
-    {
-        var resources = Resources(
+    public Task<Guid> ActivateOwnWithOrderProcessAsync(string connectionString, string tenantId, string manifest, CancellationToken cancellationToken) =>
+        ActivateWithTablesAsync(
+            connectionString,
+            tenantId,
+            [],
             "[]",
+            cancellationToken,
             ("packages/tools/axis-package.json", manifest),
             ("entities/order.json", _orderEntity),
             ("processes/order-sum.json", _orderSumProcess));
 
-        // The activation enlists both contexts in one transaction, so they share a connection.
+    /// <summary>
+    /// Compiles the application with the installed package <c>test-package</c> 1.0.0 of <paramref name="catalog"/>, pinned as customer-hosted,
+    /// the entity <c>Probe</c> and the process <c>ProbeCall</c>, whose step <c>probe</c> runs <c>test-package/probe</c> with the record's <c>mode</c>
+    /// and writes its <c>status</c> to the record. It activates the release with the release activator, so the table of <c>Probe</c> exists. The caller
+    /// grants the runtime role again, to reach the table.
+    /// </summary>
+    public Task<Guid> ActivateInstalledProbeAsync(string connectionString, string tenantId, PackageCatalog catalog, CancellationToken cancellationToken) =>
+        ActivateWithTablesAsync(
+            connectionString,
+            tenantId,
+            catalog.Versions,
+            """[{ "id": "test-package", "version": "1.0.0", "runner": "customer" }]""",
+            cancellationToken,
+            ("entities/probe.json", _probeEntity),
+            ("processes/probe-call.json", _probeProcess));
+
+    // Compiles the application and activates it with the release activator, which makes the tables of its entities. The activation enlists both
+    // contexts in one transaction, so they share a connection.
+    private async Task<Guid> ActivateWithTablesAsync(
+        string connectionString,
+        string tenantId,
+        IReadOnlyCollection<PackageVersion> versions,
+        string packages,
+        CancellationToken cancellationToken,
+        params (string Path, string Content)[] files)
+    {
+        var resources = Resources(packages, files);
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
         await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
         await using var data = DataDatabaseFixture.CreateContext(connection);
-        var compiled = await ReleaseCompiler.CompileAsync(resources, configuration, [], [], cancellationToken);
+        var compiled = await ReleaseCompiler.CompileAsync(resources, configuration, versions, [], cancellationToken);
         Assert.Empty(compiled.Diagnostics);
         var activated = await ReleaseActivator.ActivateAsync(
             compiled,
@@ -157,8 +223,34 @@ internal sealed class CustomerHostedReleases
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        var (callId, instanceId) = await StageCallAsync(connectionString, releaseId, version, _orderSumProcessId, OrderEntityId, orderId, cancellationToken);
+        var (callId, instanceId) = await StageCallAsync(
+            connectionString, releaseId, _orderSumProcessId, OrderEntityId, orderId, "tools", version, "sum", """{ "a": 2, "b": 3 }""", idempotent: true, cancellationToken);
         return (callId, instanceId, orderId);
+    }
+
+    /// <summary>
+    /// Leaves the state that staging leaves for a call of <c>ProbeCall</c> at <paramref name="releaseId"/>: a probe with <c>mode</c> <c>declared</c> and no
+    /// <c>status</c>, an instance <c>waiting</c> on <c>probe</c> with the probe as its subject, and a <c>pending</c> call of <c>test-package/probe</c> with
+    /// the input <c>{ "mode": "declared" }</c> and no work item. Returns the call's id, the instance's id and the probe's id.
+    /// </summary>
+    public async Task<(Guid CallId, Guid InstanceId, Guid ProbeId)> StageProbeCallAsync(
+        string connectionString, Guid releaseId, CancellationToken cancellationToken)
+    {
+        var probeId = Guid.NewGuid();
+        var table = EntityNaming.QualifiedTable(EntityNaming.Table(ProbeEntityId));
+        await using (var connection = new NpgsqlConnection(connectionString))
+        {
+            await connection.OpenAsync(cancellationToken);
+            await using var insert = new NpgsqlCommand(
+                $"INSERT INTO {table} ({EntityNaming.Quote(EntityNaming.IdColumn)}, {EntityNaming.Quote(EntityNaming.Column("mode"))}) VALUES (@id, 'declared')",
+                connection);
+            insert.Parameters.AddWithValue("id", probeId);
+            await insert.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var (callId, instanceId) = await StageCallAsync(
+            connectionString, releaseId, _probeCallProcessId, ProbeEntityId, probeId, "test-package", "1.0.0", "probe", """{ "mode": "declared" }""", idempotent: false, cancellationToken);
+        return (callId, instanceId, probeId);
     }
 
     /// <summary>Compiles and activates the application with the own package files and the process <c>ToolsSum</c>, which runs <c>tools/sum</c> in its step <c>sum</c>.</summary>
@@ -176,15 +268,21 @@ internal sealed class CustomerHostedReleases
     /// and a <c>pending</c> call with the input <c>{ "a": 2, "b": 3 }</c> and no work item. Returns the call's id.
     /// </summary>
     public async Task<Guid> StageToolsSumCallAsync(string connectionString, Guid releaseId, string version, CancellationToken cancellationToken) =>
-        (await StageCallAsync(connectionString, releaseId, version, _toolsSumProcessId, null, null, cancellationToken)).CallId;
+        (await StageCallAsync(
+            connectionString, releaseId, _toolsSumProcessId, null, null, "tools", version, "sum", """{ "a": 2, "b": 3 }""", idempotent: true, cancellationToken)).CallId;
 
+    // The step and the operation of the call have one name, which the processes of this class share.
     private async Task<(Guid CallId, Guid InstanceId)> StageCallAsync(
         string connectionString,
         Guid releaseId,
-        string version,
         Guid processId,
         Guid? subjectEntityId,
         Guid? subjectId,
+        string package,
+        string version,
+        string operation,
+        string input,
+        bool idempotent,
         CancellationToken cancellationToken)
     {
         await using var context = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connectionString).Options);
@@ -200,25 +298,25 @@ internal sealed class CustomerHostedReleases
             ReleaseId = releaseId,
             State = ProcessStarts.Waiting,
             Revision = 2,
-            Step = "sum",
+            Step = operation,
         });
         await context.SaveChangesAsync(cancellationToken);
         context.Add(new PackageCallRow
         {
             Id = callId,
             ProcessInstanceId = instanceId,
-            Step = "sum",
+            Step = operation,
             StagedRevision = 2,
             ReleaseId = releaseId,
-            Package = "tools",
+            Package = package,
             Version = version,
-            Operation = "sum",
+            Operation = operation,
             State = "pending",
             Attempts = 0,
             RetryAttempts = 3,
             RetryBackoff = TimeSpan.FromSeconds(30),
-            Idempotent = true,
-            Input = """{ "a": 2, "b": 3 }""",
+            Idempotent = idempotent,
+            Input = input,
         });
         await context.SaveChangesAsync(cancellationToken);
         return (callId, instanceId);
