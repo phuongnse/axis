@@ -49,6 +49,7 @@ import { StudioOverview } from './StudioOverview'
 import { StudioPageHeading } from './StudioPageHeading'
 import { StudioReleasePage } from './StudioReleasePage'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
+import { StudioAskAi } from './StudioAskAi'
 import { StudioProblems } from './StudioProblems'
 import { StudioResourceMenu } from './StudioResourceMenu'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
@@ -105,7 +106,7 @@ function StudioApplicationTiles({ apps }: { apps: StudioApplication[] }) {
 
 /** The applications Studio may edit, or why they could not be listed. */
 /** The side panel Studio shows, one at a time. */
-type StudioPanel = 'problems'
+type StudioPanel = 'problems' | 'askAi'
 
 type AppsState = StudioApplication[] | typeof forbidden | 'failed'
 
@@ -145,7 +146,8 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * joins its kind's list, the Problems panel shows the diagnostics of the create, and the editor opens the resource.
  * A New application… item ends the application row's menu in the sidebar, and a button also sits on the list. Both show
  * only when `GET /api/me` answers `studioCreate: true`. A created application joins the menu and is picked at once.
- * Validate and Publish sit in the band, and Publish shows only when `GET /api/me` answers
+ * Validate, Ask AI and Publish sit in the band. Ask AI shows only when `GET /api/me` answers `studioAi: true`, and opens the
+ * request panel, `StudioAskAi`, which shares the one side panel with the Problems panel: opening one closes the other. Publish shows only when `GET /api/me` answers
  * `studioPublisher: true`. On the Releases view the release list shows the application's releases, with an Activate… button
  * for a publisher. A save, a text write or a delete loads the release history again, because the folder may now differ from the
  * active release. The Problems panel shows the diagnostics of a request that ended. When the server does not
@@ -229,6 +231,7 @@ function StudioWorkspace() {
   const [canPublish, setCanPublish] = useState(false)
   const [canCreate, setCanCreate] = useState(false)
   const [canTest, setCanTest] = useState(false)
+  const [canAskAi, setCanAskAi] = useState(false)
   const [previewHost, setPreviewHost] = useState<string | null>(null)
   const [folderRevision, setFolderRevision] = useState(0)
   const [namesState, setNamesState] = useState<NamesState>()
@@ -248,6 +251,7 @@ function StudioWorkspace() {
         setCanPublish(user?.studioPublisher === true)
         setCanCreate(user?.studioCreate === true)
         setCanTest(user?.studioTest === true)
+        setCanAskAi(user?.studioAi === true)
         setPreviewHost(user?.studioPreviewHost ?? null)
       },
       () => {
@@ -255,6 +259,7 @@ function StudioWorkspace() {
           setCanPublish(false)
           setCanCreate(false)
           setCanTest(false)
+          setCanAskAi(false)
           setPreviewHost(null)
         }
       },
@@ -552,6 +557,9 @@ function StudioWorkspace() {
               sites={resources.filter((item) => item.kind === 'site')}
               folderRevision={folderRevision}
               diagnostics={loaded.diagnostics}
+              canAskAi={canAskAi}
+              askAiOpen={openPanel === 'askAi'}
+              onToggleAskAi={() => setOpenPanel((open) => (open === 'askAi' ? null : 'askAi'))}
               problemsOpen={openPanel === 'problems'}
               onToggleProblems={() => setOpenPanel((open) => (open === 'problems' ? null : 'problems'))}
               newResource={<StudioNewResource application={application!} resources={resources} onCreated={onCreated} />}
@@ -753,6 +761,9 @@ function StudioWorkspace() {
                 onSelect={selectDiagnostic}
                 onClose={() => setOpenPanel(null)}
               />
+            )}
+            {openPanel === 'askAi' && (
+              <StudioAskAi key={application} application={application!} onClose={() => setOpenPanel(null)} />
             )}
           </>
         )}

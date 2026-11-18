@@ -24,6 +24,7 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useFollowJob } from '../platform/useFollowJob'
+import { askAiPanelId } from './StudioAskAi'
 import { StudioBand } from './StudioBand'
 import { StudioReleasesList } from './StudioReleases'
 import { StudioRequestStatus } from './StudioRequestStatus'
@@ -82,7 +83,8 @@ async function findPreviewLinks(
 
 /**
  * The band of the open application, with the status of the request its buttons send and its release history. The
- * band holds the `newResource` button, Validate, Preview, Run tests and Publish. They keep one line: when they do not
+ * band holds the `newResource` button, Validate, Preview, Run tests, Ask AI and Publish. Ask AI shows only when `canAskAi`, sits just
+ * before Publish and never folds, and `onToggleAskAi` opens and closes the request panel, see `StudioAskAi`, with `askAiOpen` saying whether it is open. They keep one line: when they do not
  * fit, Validate, Preview and Run tests fold into one "…" menu, see `AxisActionRow`. On its left it shows the application's
  * state in words, see `StudioBand`: the problems of `diagnostics`, which `onToggleProblems` opens as the Problems
  * panel beside the page, then the release state. The request status, test results and
@@ -119,6 +121,9 @@ export function StudioPublishing({
   diagnostics,
   problemsOpen,
   onToggleProblems,
+  canAskAi,
+  askAiOpen,
+  onToggleAskAi,
   newResource,
   releasesView,
   onDiagnostics,
@@ -136,6 +141,9 @@ export function StudioPublishing({
   diagnostics: StudioDiagnostic[]
   problemsOpen: boolean
   onToggleProblems: () => void
+  canAskAi: boolean
+  askAiOpen: boolean
+  onToggleAskAi: () => void
   newResource: ReactNode
   releasesView: boolean
   onDiagnostics: (diagnostics: StudioDiagnostic[]) => void
@@ -297,16 +305,29 @@ export function StudioPublishing({
               : []),
           ]}
           end={
-            canPublish && (
-              <AxisButton
-                role="finish"
-                data-testid="studio-publish"
-                disabled={busy}
-                onClick={() => setDialogOpen(true)}
-              >
-                {t('shell.studio.publish')}
-              </AxisButton>
-            )
+            <>
+              {canAskAi && (
+                <AxisButton
+                  role="secondary"
+                  data-testid="studio-ask-ai"
+                  aria-expanded={askAiOpen}
+                  aria-controls={askAiPanelId}
+                  onClick={onToggleAskAi}
+                >
+                  {t('shell.studio.askAi')}
+                </AxisButton>
+              )}
+              {canPublish && (
+                <AxisButton
+                  role="finish"
+                  data-testid="studio-publish"
+                  disabled={busy}
+                  onClick={() => setDialogOpen(true)}
+                >
+                  {t('shell.studio.publish')}
+                </AxisButton>
+              )}
+            </>
           }
         >
           {newResource}

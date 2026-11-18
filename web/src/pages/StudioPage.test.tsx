@@ -306,6 +306,9 @@ function stubServer(
     if (input === '/api/studio/catalog') {
       return json({ modules: [], packages: [], timeZones: [] })
     }
+    if (input === `${folder}/settings`) {
+      return json({ autoAccept: false })
+    }
     if (input === `${folder}/policy-matrix`) {
       return json({ targets: [], roles: [] })
     }
@@ -922,6 +925,46 @@ describe('StudioPage', () => {
   })
 
   describe('band, Problems panel and page heading', () => {
+    it('shows no Ask AI unless /api/me answers studioAi', async () => {
+      stubServer()
+      renderPage()
+
+      await screen.findByTestId('studio-problems')
+      expect(screen.queryByTestId('studio-ask-ai')).not.toBeInTheDocument()
+    })
+
+    it('opens the Ask AI panel from the band, one side panel at a time with Problems', async () => {
+      const fetchMock = stubServer()
+      const base = fetchMock.getMockImplementation()!
+      fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+        input === '/api/me' ? json({ id: 'author', studio: true, studioAi: true }) : base(input, init),
+      )
+      renderPage()
+
+      const askAi = await screen.findByTestId('studio-ask-ai')
+      expect(askAi).toHaveTextContent('Ask AI')
+      expect(askAi).toHaveAttribute('aria-expanded', 'false')
+
+      await openProblems()
+      await userEvent.click(askAi)
+
+      expect(askAi).toHaveAttribute('aria-expanded', 'true')
+      expect(askAi).toHaveAttribute('aria-controls', screen.getByTestId('studio-ask-ai-panel').id)
+      expect(within(screen.getByTestId('aside')).getByTestId('studio-ask-ai-panel')).toBeInTheDocument()
+      expect(screen.queryByTestId('studio-diagnostics')).not.toBeInTheDocument()
+
+      await userEvent.click(screen.getByTestId('studio-problems'))
+
+      expect(screen.getByTestId('studio-diagnostics')).toBeInTheDocument()
+      expect(screen.queryByTestId('studio-ask-ai-panel')).not.toBeInTheDocument()
+      expect(askAi).toHaveAttribute('aria-expanded', 'false')
+
+      await userEvent.click(askAi)
+      await userEvent.click(askAi)
+
+      expect(screen.queryByTestId('studio-ask-ai-panel')).not.toBeInTheDocument()
+    })
+
     it('opens the Problems panel from the band and keeps it open while problems are opened', async () => {
       stubServer()
       renderPage()

@@ -1473,6 +1473,31 @@ export async function fetchStudioSettings(application: string, signal?: AbortSig
   return (await response.json()) as { autoAccept: boolean }
 }
 
+/** An authoring request the server answers after a send, see docs/reference/authoring-requests.md#states. */
+export interface AuthoringRequest {
+  id: string
+  state: string
+  text: string
+  autoAccept: boolean
+}
+
+/** Sends an authoring request for an application and answers it. A 401 shows the sign-in prompt and throws, as any other failure does. */
+export async function sendAuthoringRequest(
+  application: string,
+  body: { text: string; autoAccept: boolean },
+): Promise<AuthoringRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as AuthoringRequest
+}
+
 /** Sets "Let AI accept its own drafts" for an application and answers the saved value. Only a publisher may. */
 export async function saveStudioSettings(application: string, autoAccept: boolean): Promise<{ autoAccept: boolean }> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/settings`
