@@ -31,8 +31,13 @@ row and the band stay in place while the page scrolls, and only the sidebar's en
 the row. Where the footer sits beside the sidebar is in [layout](shell.md#layout).
 
 Under the row come Overview, Releases, History and Settings, which concern the whole application.
-History lists the application's revisions, see [revisions](ai-authoring-in-studio.md#revisions). Then
-come the resource kinds in groups by what an author does with them:
+History lists the application's revisions, see [revisions](ai-authoring-in-studio.md#revisions).
+
+- **AI requests** _(planned for M35)_. A parent entry right after History, shown to a person who may ask AI.
+  Its two views, All requests and Needs action, are filters of the [AI requests](ai-authoring-in-studio.md#the-request-panel)
+  table.
+
+Then come the resource kinds in groups by what an author does with them:
 
 | Group       | Kinds                                                  |
 | ----------- | ------------------------------------------------------ |
@@ -86,8 +91,9 @@ comes first, so it is never next to Publish….
   fold into one "…" icon menu, More actions, in that order, and New resource… and Publish… stay. They unfold when the
   room comes back.
 
-- **Ask AI** _(planned for M35)_. Ask AI is a text button just before Publish…, and it opens the
-  request panel of [AI authoring in Studio](ai-authoring-in-studio.md).
+- **Ask AI** _(planned for M35)_. Ask AI is a text button just before Publish…. It shows when
+  [`studioAi`](security.md#roles-and-the-current-user) is true, whether or not the author has connected their
+  own AI, and it opens and closes the request panel of [AI authoring in Studio](ai-authoring-in-studio.md#the-request-panel).
 
 ## Problems panel
 
