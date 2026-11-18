@@ -82,7 +82,7 @@ describe('FormProperties section', () => {
     expect(draft.steps[1].sections).toEqual(['a'])
     expect(draft.sections.map((section: { name: string }) => section.name)).toEqual(['b', 'a'])
     expect(screen.getByTestId('selected')).toHaveTextContent('/sections/1')
-    expect(screen.getByTestId('announcement')).toHaveTextContent('Moved a, steps.two, position 1')
+    expect(screen.getByTestId('announcement')).toHaveTextContent('Moved a to steps.two, position 1')
   })
 
   it('names the name, the title and the visibility of a section by their labels and describes them by their help', () => {

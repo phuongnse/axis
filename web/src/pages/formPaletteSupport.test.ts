@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { dropOnForm } from './formPaletteSupport'
 
 const words: Record<string, string> = {
-  'shell.studio.palette.moved': 'Moved',
-  'shell.studio.palette.position': 'position',
+  'shell.studio.palette.moved': 'Moved {name} to {place}, position {position}.',
+  'shell.studio.palette.movedTo': 'Moved {name} to position {position}.',
 }
 const t = (key: string) => words[key] ?? key
 
@@ -31,7 +31,7 @@ describe('dropOnForm', () => {
       { title: { textKey: 'steps.two' }, sections: ['a'] },
     ])
     expect(onSelect).toHaveBeenCalledWith('/sections/0')
-    expect(onAnnounce).toHaveBeenCalledWith('Moved b, steps.one, position 1')
+    expect(onAnnounce).toHaveBeenCalledWith('Moved b to steps.one, position 1.')
   })
 
   it('refuses an unnamed section dropped on a step and changes nothing', () => {

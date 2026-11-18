@@ -108,7 +108,7 @@ describe('FormPalette', () => {
     expect(sections[0].fields).toHaveLength(1)
     expect(screen.queryByTestId('studio-form-palette-notes')).toBeNull()
     expect(screen.getByTestId('studio-form-palette-announcement')).toHaveTextContent(
-      'Inserted notes, details, position 2',
+      'Inserted notes in details, position 2',
     )
   })
 

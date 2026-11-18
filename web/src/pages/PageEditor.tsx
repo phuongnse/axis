@@ -5,6 +5,7 @@ import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField, type AxisFieldProps } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { EmptyState } from '../platform/EmptyState'
+import { fillText } from '../platform/fillText'
 import { getAt } from '../platform/jsonPatch'
 import {
   actionKeyOf,
@@ -428,7 +429,9 @@ function WidgetRow({
     const name = partLabel(list.part)
     if (name !== undefined && list.part.kind === 'column' && Array.isArray(container?.columns)) {
       const column = container.columns[list.part.index]
-      return isContent(column) && typeof column.width === 'number' ? `${name}, ${column.width}` : name
+      return isContent(column) && typeof column.width === 'number'
+        ? fillText(t('shell.studio.page.columnWidth'), { number: list.part.index + 1, width: column.width })
+        : name
     }
     return name
   }
@@ -468,7 +471,7 @@ function WidgetRow({
               )
             }
           >
-            {t('shell.studio.page.removeWidget')}
+            {t('shell.studio.delete')}
           </Button>
           <Select
             aria-label={t('shell.studio.page.moveTo')}
@@ -854,7 +857,7 @@ function ParameterBindings({
             <div key={parameter.name} data-testid={`studio-field-${rowPointer}`}>
               <AxisField
                 label={parameter.name}
-                help={t('shell.studio.page.parameterBinding.help').replace('{type}', parameter.type)}
+                help={fillText(t('shell.studio.page.parameterBinding.help'), { type: parameter.type })}
               >
                 <ReferencePicker
                   name={parameter.name}
@@ -1205,7 +1208,7 @@ function ColumnsPanel({
       {columns.map((column, index) => (
         <Card size="small" key={index} data-testid={`studio-column-${index}`}>
           <Flex vertical gap="small">
-            <Typography.Text>{`${t('shell.studio.page.column')} ${index + 1}`}</Typography.Text>
+            <Typography.Text>{fillText(t('shell.studio.page.column'), { number: index + 1 })}</Typography.Text>
             {layer !== undefined && isContent(column) && typeof column.name === 'string' && (
               <LayerMarkTag layer={layer} list={`${base}/columns`} index={index} name={column.name} />
             )}
@@ -1277,7 +1280,7 @@ function TabsPanel({
       {tabs.map((tab, index) => (
         <Card size="small" key={index} data-testid={`studio-tab-${index}`}>
           <Flex vertical gap="small">
-            <Typography.Text>{`${t('shell.studio.page.tab')} ${index + 1}`}</Typography.Text>
+            <Typography.Text>{fillText(t('shell.studio.page.tab'), { number: index + 1 })}</Typography.Text>
             {layer !== undefined && isContent(tab) && typeof tab.name === 'string' && (
               <LayerMarkTag layer={layer} list={`${base}/tabs`} index={index} name={tab.name} />
             )}
@@ -1449,11 +1452,14 @@ function ParameterExpressions({
             entries.find(([name]) => name.toLowerCase() === parameter.name.toLowerCase())?.[0] ?? parameter.name
           const rowPointer = `${pointer}/${escapeSegment(key)}`
           const current = value?.[key]
-          const help = t(
-            parameter.required
-              ? 'shell.studio.page.requiredParameterExpression.help'
-              : 'shell.studio.page.parameterExpression.help',
-          ).replace('{type}', parameter.type)
+          const help = fillText(
+            t(
+              parameter.required
+                ? 'shell.studio.page.requiredParameterExpression.help'
+                : 'shell.studio.page.parameterExpression.help',
+            ),
+            { type: parameter.type },
+          )
           return (
             <div key={parameter.name} data-testid={`studio-field-${rowPointer}`}>
               <AxisField label={parameter.name} help={help}>
