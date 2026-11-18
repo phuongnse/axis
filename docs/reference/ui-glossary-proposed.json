@@ -394,6 +394,90 @@
       "vi": "Cần xử lý",
       "status": "proposed",
       "note": "The filter of notices and AI requests that wait for their reader to act."
+    },
+    {
+      "concept": "Plan (of an AI request)",
+      "en": "plan",
+      "vi": "kế hoạch",
+      "status": "proposed",
+      "note": "What AI will change in an application, which its author approves. It is not the billing plan, which is \"gói dịch vụ\"."
+    },
+    {
+      "concept": "Work (of an AI request)",
+      "en": "Work",
+      "vi": "Thực hiện",
+      "status": "proposed",
+      "note": "The step where AI makes its change, after its plan is approved. Shown as an item of a request's page."
+    },
+    {
+      "concept": "Duration",
+      "en": "duration",
+      "vi": "thời lượng",
+      "status": "proposed",
+      "note": "How long a step of an AI request took, as a column of its History table."
+    },
+    {
+      "concept": "AI request state: Planning",
+      "en": "Planning",
+      "vi": "Đang lập kế hoạch",
+      "status": "proposed",
+      "note": "The state of an AI request while AI writes its plan."
+    },
+    {
+      "concept": "AI request state: Awaiting approval",
+      "en": "Awaiting approval",
+      "vi": "Chờ duyệt",
+      "status": "proposed",
+      "note": "The state of an AI request whose plan waits for its author's approval."
+    },
+    {
+      "concept": "AI request state: Working",
+      "en": "Working",
+      "vi": "Đang làm",
+      "status": "proposed",
+      "note": "The state of an AI request while AI makes its change, including a fix round."
+    },
+    {
+      "concept": "AI request state: Checking",
+      "en": "Checking",
+      "vi": "Đang kiểm tra",
+      "status": "proposed",
+      "note": "The state of an AI request while the checks run on its draft."
+    },
+    {
+      "concept": "AI request state: Reviewing",
+      "en": "Reviewing",
+      "vi": "Đang rà soát",
+      "status": "proposed",
+      "note": "The state of an AI request while a second AI reviews its draft."
+    },
+    {
+      "concept": "AI request state: Ready",
+      "en": "Ready",
+      "vi": "Sẵn sàng",
+      "status": "proposed",
+      "note": "The state of an AI request whose draft passed, and waits for its author to accept it."
+    },
+    {
+      "concept": "AI request state: Accepted",
+      "en": "Accepted",
+      "vi": "Đã chấp nhận",
+      "status": "proposed",
+      "note": "The state of an AI request whose draft is in the application."
+    },
+    {
+      "concept": "AI request state: Dropped",
+      "en": "Dropped",
+      "vi": "Đã hủy",
+      "status": "proposed",
+      "note": "The state of an AI request its author dropped, whose draft is deleted."
+    },
+    {
+      "concept": "AI request state: Failed",
+      "en": "Failed",
+      "vi": "Thất bại",
+      "status": "proposed",
+      "note": "The state of an AI request that AI could not finish."
     }
   ]
 }

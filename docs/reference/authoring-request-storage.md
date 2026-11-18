@@ -58,6 +58,8 @@ _(planned for M35)_
 - **`axis.authoring_requests`.** `title` (`text`, null), `client` (`text`, `studio` or the outside client id),
   `co_authors` (`text[]`) and `plan` as `jsonb` of [the plan's shape](authoring-requests.md#states).
 - **`axis.authoring_request_steps`.** The `changeRequest` step kind holds the author's comment in `input_summary`.
+  A `write` step holds the resource it wrote in a `resource` column, `jsonb` of `{ kind, id, name }`, which is null on
+  every other step.
   A `review` step has the new outcome `notReviewed`, and its `checks` holds the review's shape, see
   [the review's shape](authoring-requests.md#states).
 - **Outside apps.** An outside app's request has its refresh token stored at approval, not at send, because
