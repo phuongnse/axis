@@ -89,7 +89,7 @@ form of its step over the subject record and a button for each outcome.
 - **What it shows.** The page shows the step's label, the subject's label, the due date, with the same
   "Overdue" tag as the inbox when the task is overdue, and the form's sections over the subject record.
   The layout and the field types come from the task read's `form`, and the values from the subject
-  record, read through the record API. The task page has no history.
+  record, read through the record API. The task page has no history panel.
 - **Due time and At risk** _(planned for M39)_. The due date shows in its `dueTimeZone` with the working
   time left, and an "At risk" tag shows as in the inbox.
 - **Conditions and steps.** The form follows the form widget's conditions, see
