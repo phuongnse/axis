@@ -24,8 +24,8 @@ owner holds the copyright of all the code, so the licence can still be chosen fr
   package a custom widget builds on, holds its own `LICENSE` file.
 - **An application belongs to its author.** An application's own resources, and a business's
   customization layer, are the business's, whatever the platform's licence.
-- **Contributors sign a contributor licence agreement** before their first contribution is merged,
-  so that the owner can keep selling the commercial licence.
+- **Contributors sign a contributor licence agreement** _(planned)_. They sign it before their first
+  contribution is merged, so that the owner can keep selling the commercial licence.
 - **NexKit stays under the MIT licence.**
 
 How Axis shows its licence and offers its source is in
