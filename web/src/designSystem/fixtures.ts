@@ -929,11 +929,29 @@ const instanceDetail: InstanceDetail = {
         transitions: [
           {
             next: 'autoApprove',
-            on: 'catalog item under 1,000',
+            on: '0',
+            reading: {
+              kind: 'all',
+              items: [
+                {
+                  kind: 'phrase',
+                  words: 'is-true',
+                  slots: [[{ kind: 'name', name: 'catalogItem', labelKey: 'request.field.catalogItem' }]],
+                },
+                {
+                  kind: 'phrase',
+                  words: 'less',
+                  slots: [
+                    [{ kind: 'name', name: 'totalAmount', labelKey: 'request.field.totalAmount' }],
+                    [{ kind: 'value', type: 'decimal', value: 1000, labelKey: null }],
+                  ],
+                },
+              ],
+            },
           },
           {
             next: 'budgetCheck',
-            on: null,
+            on: 'otherwise',
           },
         ],
       },
@@ -966,11 +984,16 @@ const instanceDetail: InstanceDetail = {
         transitions: [
           {
             next: 'managerApproval',
-            on: 'within budget',
+            on: '0',
+            reading: {
+              kind: 'phrase',
+              words: 'is-true',
+              slots: [[{ kind: 'name', name: 'withinBudget', labelKey: 'request.field.withinBudget' }]],
+            },
           },
           {
             next: 'budgetException',
-            on: 'over budget',
+            on: 'otherwise',
           },
         ],
       },
@@ -1037,15 +1060,31 @@ const instanceDetail: InstanceDetail = {
         transitions: [
           {
             next: 'cfoApproval',
-            on: 'over 50,000',
+            on: '0',
+            reading: {
+              kind: 'phrase',
+              words: 'greater',
+              slots: [
+                [{ kind: 'name', name: 'totalAmount', labelKey: 'request.field.totalAmount' }],
+                [{ kind: 'value', type: 'decimal', value: 50000, labelKey: null }],
+              ],
+            },
           },
           {
             next: 'financeApproval',
-            on: 'over 10,000',
+            on: '1',
+            reading: {
+              kind: 'phrase',
+              words: 'greater',
+              slots: [
+                [{ kind: 'name', name: 'totalAmount', labelKey: 'request.field.totalAmount' }],
+                [{ kind: 'value', type: 'decimal', value: 10000, labelKey: null }],
+              ],
+            },
           },
           {
             next: 'vendorRisk',
-            on: null,
+            on: 'otherwise',
           },
         ],
       },
@@ -1101,11 +1140,19 @@ const instanceDetail: InstanceDetail = {
         transitions: [
           {
             next: 'createPurchaseOrder',
-            on: 'approved vendor',
+            on: '0',
+            reading: {
+              kind: 'phrase',
+              words: 'equal',
+              slots: [
+                [{ kind: 'name', name: 'vendorStatus', labelKey: 'request.field.vendorStatus' }],
+                [{ kind: 'value', type: 'text', value: 'approved', labelKey: null }],
+              ],
+            },
           },
           {
             next: 'onboardVendor',
-            on: 'new vendor',
+            on: 'otherwise',
           },
         ],
       },
@@ -1215,7 +1262,7 @@ const instanceDetail: InstanceDetail = {
       step: 'checkPolicy',
       startedAt: '2026-03-02T09:00:00.000000Z',
       finishedAt: '2026-03-02T09:00:00.000000Z',
-      decision: 'budgetCheck',
+      decision: 'otherwise',
       output: null,
       error: null,
       traceId: '4bf92f3577b34da6a3ce929d0e0e4736',
@@ -1239,7 +1286,7 @@ const instanceDetail: InstanceDetail = {
       step: 'checkBudget',
       startedAt: '2026-03-02T09:00:34.000000Z',
       finishedAt: '2026-03-02T09:00:34.000000Z',
-      decision: 'managerApproval',
+      decision: '0',
       output: null,
       error: null,
       read: [{ field: 'withinBudget', labelKey: 'request.field.withinBudget', value: 'Yes' }],
@@ -1277,7 +1324,7 @@ const instanceDetail: InstanceDetail = {
       step: 'checkPolicy',
       startedAt: '2026-03-03T16:45:00.000000Z',
       finishedAt: '2026-03-03T16:45:00.000000Z',
-      decision: 'budgetCheck',
+      decision: 'otherwise',
       output: null,
       error: null,
       traceId: '3d4e5f60718293a4b5c6d7e8f9011223',
@@ -1295,7 +1342,7 @@ const instanceDetail: InstanceDetail = {
       step: 'checkBudget',
       startedAt: '2026-03-03T16:45:01.000000Z',
       finishedAt: '2026-03-03T16:45:01.000000Z',
-      decision: 'managerApproval',
+      decision: '0',
       output: null,
       error: null,
       read: [{ field: 'withinBudget', labelKey: 'request.field.withinBudget', value: 'Yes' }],
@@ -1324,7 +1371,7 @@ const instanceDetail: InstanceDetail = {
       step: 'routeByAmount',
       startedAt: '2026-03-05T10:02:00.000000Z',
       finishedAt: '2026-03-05T10:02:00.000000Z',
-      decision: 'financeApproval',
+      decision: '1',
       output: null,
       error: null,
       read: [{ field: 'amount', labelKey: 'request.amount', value: '18500' }],
@@ -1358,7 +1405,7 @@ const instanceDetail: InstanceDetail = {
       step: 'vendorCheck',
       startedAt: '2026-03-06T11:30:02.000000Z',
       finishedAt: '2026-03-06T11:30:02.000000Z',
-      decision: 'onboardVendor',
+      decision: 'otherwise',
       output: null,
       error: null,
       traceId: '60718293a4b5c6d7e8f9011223344556',
@@ -2499,6 +2546,8 @@ export const siteTexts: Record<string, string> = {
   'event.goodsReceived': 'Goods received',
   'request.field.budgetRemaining': 'Budget remaining',
   'request.field.withinBudget': 'Within budget',
+  'request.field.totalAmount': 'Total amount',
+  'request.field.catalogItem': 'Catalog item',
   'request.field.vendorRiskScore': 'Vendor risk score',
   'request.field.vendorStatus': 'Vendor status',
   'request.field.purchaseOrderNumber': 'Purchase order number',

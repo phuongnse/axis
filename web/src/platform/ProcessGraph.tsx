@@ -152,8 +152,17 @@ interface Layout {
 
 const elk = new ELK()
 
-/** The width a label of `text` takes at the 12px of an edge label, with room on either side. */
-const labelWidth = (text: string) => Math.ceil(text.length * 7 + 8)
+/** The width a label of `text` takes on one line at the 12px of an edge label, with room on either side. */
+const lineWidth = (text: string) => Math.ceil(text.length * 7 + 8)
+/**
+ * Proposed, see the review on #3650: an edge label, such as a decision branch's condition in words, is at most 240px
+ * wide and wraps to two lines of 16px, past which it ends in an ellipsis with the whole label in a tooltip, as a step's
+ * card does.
+ */
+const labelMaxWidth = 240
+const labelLines = (text: string) => Math.min(2, Math.ceil(lineWidth(text) / labelMaxWidth))
+const labelWidth = (text: string) => Math.min(labelMaxWidth, lineWidth(text))
+const labelCut = (text: string) => lineWidth(text) > 2 * labelMaxWidth
 
 /**
  * Proposed, see the review on #3650: lays a process out from left to right, as process diagrams read, with ELK's
@@ -232,7 +241,9 @@ async function layOut(
         id: transition.id,
         sources: [transition.source],
         targets: [transition.target],
-        labels: transition.label ? [{ text: transition.label, width: labelWidth(transition.label), height: 16 }] : [],
+        labels: transition.label
+          ? [{ text: transition.label, width: labelWidth(transition.label), height: 16 * labelLines(transition.label) }]
+          : [],
       })),
   }
   const laid = await elk.layout(graph)
@@ -395,23 +406,32 @@ function RoutedEdge({ id, data, markerEnd, style, interactionWidth }: EdgeProps<
       />
       {data.label !== null && data.text !== '' && (
         <EdgeLabelRenderer>
-          <div
-            aria-hidden
-            style={{
-              position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${data.label.x}px, ${data.label.y}px)`,
-              padding: '0 4px',
-              fontSize: 12,
-              lineHeight: '16px',
-              whiteSpace: 'nowrap',
-              color: colour.text,
-              // On the canvas's own colour, so the label cuts the line and sits on the graph's ground.
-              background: colour.canvas,
-              pointerEvents: 'none',
-            }}
-          >
-            {data.text}
-          </div>
+          <Tooltip title={labelCut(data.text) ? data.text : undefined}>
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                transform: `translate(-50%, -50%) translate(${data.label.x}px, ${data.label.y}px)`,
+                padding: '0 4px',
+                maxWidth: labelMaxWidth,
+                fontSize: 12,
+                lineHeight: '16px',
+                textAlign: 'center',
+                overflowWrap: 'anywhere',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                color: colour.text,
+                // On the canvas's own colour, so the label cuts the line and sits on the graph's ground.
+                background: colour.canvas,
+                // Only a cut label takes the pointer, for its tooltip; any other lets a click through to its line.
+                pointerEvents: labelCut(data.text) ? 'auto' : 'none',
+              }}
+            >
+              {data.text}
+            </div>
+          </Tooltip>
         </EdgeLabelRenderer>
       )}
       {Adornment && <Adornment id={id} x={middle.x} y={middle.y} />}

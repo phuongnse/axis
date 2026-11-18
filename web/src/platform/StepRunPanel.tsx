@@ -241,8 +241,7 @@ export function StepRunPanel({
     const before = runs.slice(0, index).findLast(along)
     const after = runs.slice(index + 1).find(along)
     const transition = graphStep?.transitions.find((candidate) => candidate.next === after?.step)
-    const reason =
-      transition?.on == null ? null : graphStep?.type === 'task' ? outcomeLabel(step, transition.on) : transition.on
+    const reason = transition?.on == null ? null : outcomeLabel(step, transition.on)
     const runLink = (target: StepRun) => (
       <AxisButton role="link" inline onClick={() => onOpen(target.step, target.number)}>
         {stepLabel(target.step)}
