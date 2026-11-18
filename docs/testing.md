@@ -227,17 +227,21 @@ host could plan the request before the page's first read. The page then shows Aw
 colleague opens that request and sees the plan with no actions. The author asks for another plan with a comment on the
 second request, sees the new plan and drops it. The spec stops the agent host before the author approves the first
 request, because a running host would carry it past Working, and the page then shows Working. A request whose compile
-check fails in every fix round ends Failed, with its reason, its checks and its draft's diff. The last test makes a
+check fails in every fix round ends Failed, with its reason, its checks and its draft's diff. The layer test makes a
 second application, `AskAiApprovals`, from the `approvals` template, which pins the organization module. The scripted
 answers are a plan, a `write_layer` that adds a text field `costCentre` to the module's Department entity, the end of
 work and the review `PASSED`. The author approves the plan, and the request reaches Ready with Checks Passed. Its diff
 lists Department with `costCentre` marked Added, and the request stays Ready, for the browser tests that accept it. The
 check runs the request's scenarios as a `test` publish request, so the spec starts a publisher of its own, with the
-server's Studio settings and the scenario role, `AXIS_E2E_SCENARIO_DATABASE`, from just before it approves the plan until
-the request reads Ready. That publisher serves every directory tenant, so `startPublisher` holds a PostgreSQL advisory
-lock for each publisher's life: this one takes it exclusively, and the publishers of the cell specs share it. The author
-signs in once, because a code cannot be used twice within its period. The spec stops the publisher, the proxy, its
-browser and its server when the test ends.
+server's Studio settings, the scenario role, `AXIS_E2E_SCENARIO_DATABASE`, and the runtime role, `AXIS_E2E_DATABASE`, for
+the accept's write lock, from just before it approves the plan until the request reads Ready, and again from just
+before the author's Accept until the accept ends, because the publisher runs the accept too. That publisher serves
+every directory tenant, so `startPublisher` holds a PostgreSQL advisory lock for each publisher's life: this one takes
+it exclusively, and the publishers of the cell specs share it. The colleague then opens that ready request and sees its
+diff and 'Waiting for its author to accept', with no Accept or Drop…. The accept test runs after that one. The author
+clicks Accept, sees Accepted, and finds the accept's revision first in History, as 'Accept draft' through Studio. The
+author signs in once, because a code cannot be used twice within its period. The spec stops the publisher, the proxy,
+its browser and its server when the test ends.
 
 **The cell console spec** starts a server of its own in `Testing`, on the next port offset, with the
 `Cell:*` settings of a cell, `Cell:ConsoleHost` set to `console.localhost` and the secret of the
