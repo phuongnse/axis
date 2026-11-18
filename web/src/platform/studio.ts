@@ -1170,7 +1170,7 @@ export interface StudioSkippedScenarioResult {
 export interface StudioRequest {
   id: string
   application: string
-  kind: 'validate' | 'publish' | 'activate' | 'test'
+  kind: 'validate' | 'publish' | 'activate' | 'test' | 'accept'
   target: 'tenant' | 'preview'
   status: StudioRequestStatus
   label: string | null
@@ -1821,6 +1821,19 @@ export function changeAuthoringRequestPlan(
 /** Drops a request, which ends it as `dropped`. */
 export function dropAuthoringRequest(application: string, id: string): Promise<AuthoringRequest> {
   return postAuthoringRequestAction(application, id, 'drop')
+}
+
+/**
+ * Accepts the ready draft of a request, which queues an `accept` publish request and answers it with 202. A 403, a 409
+ * and any other failure throw, see docs/reference/authoring-requests.md#routes.
+ */
+export async function acceptAuthoringRequest(application: string, id: string): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests/${encodeURIComponent(id)}/accept`
+  const response = await studioFetch(path, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
 }
 
 /**

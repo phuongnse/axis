@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -9,6 +9,8 @@ import type {
   AuthoringRequestState,
   AuthoringRequestStep,
   StudioDiagnostic,
+  StudioRequest,
+  StudioRequestStatus,
 } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
@@ -131,6 +133,26 @@ const diff: AuthoringRequestDiff = {
   ],
 }
 
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+}
+
+/** The accept's publish request, as the accept route and the request read route answer it. */
+function acceptRequest(status: StudioRequestStatus): StudioRequest {
+  return {
+    id: 'p1',
+    application,
+    kind: 'accept',
+    target: 'tenant',
+    status,
+    label: null,
+    note: null,
+    releaseId: null,
+    diagnostics: [],
+    scenarios: null,
+  }
+}
+
 /**
  * A server that answers by URL and method: a read answers the request as `server.current` holds it, and each action
  * answers with the request in the state it moves to, or with a 500 when `refuse` names it. `calls` lists the actions.
@@ -138,18 +160,32 @@ const diff: AuthoringRequestDiff = {
 function serverOf(current: AuthoringRequest, refuse: string[] = []) {
   const server = {
     current,
+    /** The statuses that reads of the accept's publish request answer in turn, the last one for every read after. */
+    accept: ['queued'] as StudioRequestStatus[],
     calls: [] as { action: string; body: unknown }[],
     fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const action = String(input).split('/').pop() ?? ''
       if (init?.method !== 'POST') {
         // The changes of the request answer the diff, in one page.
-        return String(input).endsWith('/diff')
-          ? new Response(JSON.stringify(diff), { headers: { 'Content-Type': 'application/json' } })
-          : answer(server.current)
+        if (String(input).endsWith('/diff')) {
+          return new Response(JSON.stringify(diff), { headers: { 'Content-Type': 'application/json' } })
+        }
+        // The accept's publish request. Once it reads succeeded, the request reads accepted, as the publisher moves it.
+        if (String(input).endsWith('/requests/p1')) {
+          const status = server.accept.length > 1 ? server.accept.shift()! : server.accept[0]
+          if (status === 'succeeded') {
+            server.current = { ...server.current, state: 'accepted' }
+          }
+          return json(acceptRequest(status))
+        }
+        return answer(server.current)
       }
       server.calls.push({ action, body: init.body === undefined ? undefined : JSON.parse(String(init.body)) })
       if (refuse.includes(action)) {
         return new Response(null, { status: 500 })
+      }
+      if (action === 'accept') {
+        return json(acceptRequest('queued'), 202)
       }
       const next = { approve: 'working', 'change-plan': 'planning', drop: 'dropped' }[action] as AuthoringRequestState
       server.current = { ...server.current, state: next }
@@ -321,8 +357,8 @@ describe('the plan and the guide', () => {
     expect(button('Drop…') !== null).toBe(drop)
   })
 
-  it('draws no guide yet for a ready or a failed request', async () => {
-    vi.stubGlobal('fetch', serverOf(request({ author: 'u1', state: 'ready', plan })).fetch)
+  it('draws no guide yet for a failed request', async () => {
+    vi.stubGlobal('fetch', serverOf(request({ author: 'u1', state: 'failed', plan })).fetch)
     renderPage()
 
     await screen.findByTestId('studio-ai-request-state')
@@ -529,5 +565,101 @@ describe('StudioAuthoringRequestPage Result part', () => {
     const detail = screen.getByTestId('studio-ai-request-checks-detail')
     expect(within(detail).getByText('AXIS-E101')).toBeVisible()
     expect(within(detail).getByText('AXIS-E102')).toBeVisible()
+  })
+})
+
+describe('accepting a ready request', () => {
+  const ready = (overrides: Partial<AuthoringRequest> = {}) =>
+    request({
+      state: 'ready',
+      author: 'u1',
+      plan: 'Add a field.',
+      steps: [checkStep(passedChecks, 'passed')],
+      ...overrides,
+    })
+  const accept = () => screen.findByRole('button', { name: 'Accept' })
+
+  it('gives its author Accept and Drop… with the words "Checks and review passed"', async () => {
+    vi.stubGlobal('fetch', serverOf(ready()).fetch)
+    renderPage()
+
+    const guide = await screen.findByTestId('studio-ai-request-guide')
+    expect(within(guide).getByText('Checks and review passed')).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Accept' })).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Drop…' })).toBeVisible()
+  })
+
+  it('tells another reader that it waits for its author, with no buttons', async () => {
+    vi.stubGlobal('fetch', serverOf(ready({ author: 'u2' })).fetch)
+    renderPage()
+
+    const guide = await screen.findByTestId('studio-ai-request-guide')
+    expect(within(guide).getByText('Waiting for its author to accept')).toBeVisible()
+    expect(within(guide).queryByRole('button')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull()
+  })
+
+  it('shows "Accepting the draft" with no buttons while the accept is queued', async () => {
+    const server = serverOf(ready())
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await accept())
+
+    const guide = screen.getByTestId('studio-ai-request-guide')
+    expect(await within(guide).findByText('Accepting the draft')).toBeVisible()
+    expect(within(guide).queryByRole('button')).toBeNull()
+    expect(await screen.findByTestId('studio-request-status')).toHaveAttribute('data-status', 'queued')
+    expect(server.calls).toEqual([{ action: 'accept', body: undefined }])
+  })
+
+  it('shows "Not accepted" when the accept fails, keeps the request Ready and shows Accept again', async () => {
+    const server = serverOf(ready())
+    server.accept = ['queued', 'failed']
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await accept())
+
+    const status = await screen.findByText('Not accepted. Nothing in the application changed.', undefined, {
+      timeout: 4000,
+    })
+    expect(status).toBeVisible()
+    expect(screen.getByTestId('studio-ai-request-state')).toHaveTextContent('Ready')
+    expect(await accept()).toBeVisible()
+    expect(screen.getByText('Checks and review passed')).toBeVisible()
+  })
+
+  it('shows "Accepted" and the state Accepted when the accept succeeds', async () => {
+    const server = serverOf(ready())
+    server.accept = ['queued', 'succeeded']
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await accept())
+
+    expect(
+      await screen.findByText(
+        'Accepted. The change is in the application and in History. It is not live until someone publishes.',
+        undefined,
+        { timeout: 4000 },
+      ),
+    ).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('studio-ai-request-state')).toHaveTextContent('Accepted'))
+    expect(screen.queryByRole('button', { name: 'Accept' })).toBeNull()
+  })
+
+  it('shows "That did not work. Try again." when the accept is refused', async () => {
+    const server = serverOf(ready(), ['accept'])
+    vi.stubGlobal('fetch', server.fetch)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    renderPage()
+
+    await userEvent.click(await accept())
+
+    expect(await screen.findByTestId('studio-ai-request-error')).toHaveTextContent('That did not work. Try again.')
+    expect(screen.queryByTestId('studio-request-status')).toBeNull()
+    expect(screen.getByTestId('studio-ai-request-state')).toHaveTextContent('Ready')
+    expect(await accept()).toBeVisible()
   })
 })
