@@ -694,7 +694,7 @@ never leave the customer, see [D148](../decisions/d148-packages-in-c-typescript-
   operation declares, answered by `GetHttpClient` and `GetSecret` from the runner's own settings, `Connect:Urls:<binding>`
   and `Connect:Secrets:<binding>`. A `failure` that names a binding posts the error text that the worker records.
 - **Revoked.** Every runner request reads the runner's row, so the next request of a revoked runner answers
-  `401`, even with a token that has not expired.
+  `401`, even with a token that has not expired, and every instance that shares the credential exits with code 1.
 
 The `connect` command reads these settings, as environment variables with the names in the table:
 
