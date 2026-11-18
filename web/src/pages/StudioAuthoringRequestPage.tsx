@@ -9,13 +9,16 @@ import { ReasonDialog } from '../platform/ReasonDialog'
 import { StatusTag } from '../platform/StatusTag'
 import { useStudioConnection } from '../platform/studioConnection'
 import {
+  acceptAuthoringRequest,
   approveAuthoringRequest,
   type AuthoringRequest,
   type AuthoringRequestState,
   changeAuthoringRequestPlan,
   dropAuthoringRequest,
   fetchAuthoringRequest,
+  fetchStudioRequest,
   ServerUnreachableError,
+  type StudioRequest,
 } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -29,6 +32,7 @@ import {
 } from './studioAuthoringRequest'
 import { StudioAuthoringRequestResult } from './StudioAuthoringRequestResult'
 import { StudioPageHeading } from './StudioPageHeading'
+import { StudioRequestStatus } from './StudioRequestStatus'
 
 const workingStates: ReadonlySet<AuthoringRequestState> = new Set<AuthoringRequestState>([
   'working',
@@ -39,9 +43,10 @@ const workingStates: ReadonlySet<AuthoringRequestState> = new Set<AuthoringReque
 
 /**
  * The words of the guide bar for a state, or `null` while the bar is not built for it yet, see
- * docs/reference/ai-authoring-in-studio.md#the-guide.
+ * docs/reference/ai-authoring-in-studio.md#the-guide. `accepting` is true while the author's accept is queued or running,
+ * or has succeeded and the request still reads ready.
  */
-function guideWords(state: AuthoringRequestState, isAuthor: boolean): string | null {
+function guideWords(state: AuthoringRequestState, isAuthor: boolean, accepting: boolean): string | null {
   if (state === 'planning') return 'shell.studio.aiRequest.guide.planning'
   if (state === 'awaitingApproval') {
     return isAuthor
@@ -49,6 +54,13 @@ function guideWords(state: AuthoringRequestState, isAuthor: boolean): string | n
       : 'shell.studio.aiRequest.guide.awaitingApprovalOther'
   }
   if (workingStates.has(state)) return 'shell.studio.aiRequest.guide.working'
+  if (state === 'ready') {
+    return accepting
+      ? 'shell.studio.aiRequest.guide.accepting'
+      : isAuthor
+        ? 'shell.studio.aiRequest.guide.ready'
+        : 'shell.studio.aiRequest.guide.readyOther'
+  }
   if (state === 'accepted') return 'shell.studio.aiRequest.guide.accepted'
   if (state === 'dropped') return 'shell.studio.aiRequest.guide.dropped'
   return null
@@ -57,11 +69,13 @@ function guideWords(state: AuthoringRequestState, isAuthor: boolean): string | n
 /**
  * One authoring request, from its name to its state. The heading shows the name, the state as a status tag and the words
  * in full, then the sender's line. Under it come the plan, then the failure alert of a failed request and the Result part
- * of a ready, failed or accepted request, and the guide bar at the foot of the window, which gives the request's author
- * Approve plan, Change the plan… and Drop…. Until the request waits for its author or ends, the page asks for it every
+ * of a ready, failed or accepted request, then the status of the accept that the page follows, and the guide bar at the
+ * foot of the window, which gives the request's author Approve plan, Change the plan… and Drop…, and Accept and Drop… on
+ * a ready request. Accept sends the accept route and follows its publish request with `fetchStudioRequest`, kept in
+ * memory for this visit, and reads the request again when the accept ends. Until the request waits for its author or ends, the page asks for it every
  * second and keeps the last answer when a read fails. A request that does not exist shows its line and, when `onAskAi` is
  * given, an Ask AI link that opens the request panel. See docs/reference/ai-authoring-in-studio.md#the-heading, #the-plan,
- * #the-diff and #the-guide.
+ * #the-diff, #accepting and #the-guide.
  */
 export function StudioAuthoringRequestPage({
   application,
@@ -85,6 +99,10 @@ export function StudioAuthoringRequestPage({
   const [changePlanOpen, setChangePlanOpen] = useState(false)
   const [dropOpen, setDropOpen] = useState(false)
   const [acting, setActing] = useState(false)
+  // The accept that the author sent in this visit, which the page follows to its end. It is never read back from the server.
+  const [accept, setAccept] = useState<{ requestId: string; value: StudioRequest }>()
+  const followed = accept?.requestId === requestId ? accept.value : null
+  const pending = followed !== null && (followed.status === 'queued' || followed.status === 'running')
 
   useFollowJob(`${application}/${requestId}/${generation}/${round}`, {
     read: (signal) => fetchAuthoringRequest(application, requestId, signal),
@@ -98,6 +116,26 @@ export function StudioAuthoringRequestPage({
         return 'stop'
       }
       console.warn(`Reading the authoring request '${requestId}' of '${application}' failed`, error)
+      return 'retry'
+    },
+  })
+
+  useFollowJob(pending ? `${application}/${followed.id}/${generation}` : null, {
+    read: (signal) => fetchStudioRequest(application, followed!.id, signal),
+    ends: (answer) => answer.status !== 'queued' && answer.status !== 'running',
+    interval: 1000,
+    waitFirst: true,
+    onAnswer: (value) => setAccept({ requestId, value }),
+    onEnd: (value) => {
+      setAccept({ requestId, value })
+      setRound((current) => current + 1)
+    },
+    onError: (error) => {
+      if (error instanceof ServerUnreachableError) {
+        lost()
+        return 'stop'
+      }
+      console.warn(`Reading the accept '${followed?.id}' of the authoring request '${requestId}' failed`, error)
       return 'retry'
     },
   })
@@ -121,7 +159,9 @@ export function StudioAuthoringRequestPage({
 
   const state = authoringRequestStates[request.state]
   const isAuthor = request.author === userId
-  const words = guideWords(request.state, isAuthor)
+  const accepting =
+    isAuthor && request.state === 'ready' && followed !== null && (pending || followed.status === 'succeeded')
+  const words = guideWords(request.state, isAuthor, accepting)
   const result = requestResult(request, isAuthor)
   const showResult =
     request.state === 'accepted' ||
@@ -137,12 +177,12 @@ export function StudioAuthoringRequestPage({
     setLoaded({ requestId, value: answered })
     setRound((current) => current + 1)
   }
-  /** Runs an action of the request's author. A failure shows the page's alert above the plan. */
-  const act = async (action: () => Promise<AuthoringRequest>) => {
+  /** Runs an action of the request's author and keeps its answer. A failure shows the page's alert above the plan. */
+  const act = async <T,>(action: () => Promise<T>, then: (answer: T) => void) => {
     setActionError(false)
     setActing(true)
     try {
-      adopt(await action())
+      then(await action())
     } catch (failure) {
       console.warn(`An action on the authoring request '${requestId}' of '${application}' failed`, failure)
       setActionError(true)
@@ -161,7 +201,10 @@ export function StudioAuthoringRequestPage({
   }
   if (
     isAuthor &&
-    (request.state === 'planning' || request.state === 'awaitingApproval' || workingStates.has(request.state))
+    (request.state === 'planning' ||
+      request.state === 'awaitingApproval' ||
+      workingStates.has(request.state) ||
+      (request.state === 'ready' && !accepting))
   ) {
     fold.push({
       key: 'drop',
@@ -208,6 +251,7 @@ export function StudioAuthoringRequestPage({
         />
       )}
       {showResult && <StudioAuthoringRequestResult application={application} request={request} isAuthor={isAuthor} />}
+      {followed !== null && <StudioRequestStatus request={followed} releaseNumber={null} />}
       {words !== null && (
         <ActionBar
           docked
@@ -220,9 +264,23 @@ export function StudioAuthoringRequestPage({
                 role="finish"
                 data-testid="studio-ai-request-approve"
                 disabled={acting}
-                onClick={() => void act(() => approveAuthoringRequest(application, requestId))}
+                onClick={() => void act(() => approveAuthoringRequest(application, requestId), adopt)}
               >
                 {t('shell.studio.aiRequest.approve')}
+              </AxisButton>
+            ) : isAuthor && request.state === 'ready' && !accepting ? (
+              <AxisButton
+                role="finish"
+                data-testid="studio-ai-request-accept"
+                disabled={acting}
+                onClick={() =>
+                  void act(
+                    () => acceptAuthoringRequest(application, requestId),
+                    (sent) => setAccept({ requestId, value: sent }),
+                  )
+                }
+              >
+                {t('shell.studio.aiRequest.accept')}
               </AxisButton>
             ) : undefined
           }
@@ -257,7 +315,7 @@ export function StudioAuthoringRequestPage({
         cancelText={t('shell.studio.cancel')}
         onOk={() => {
           setDropOpen(false)
-          void act(() => dropAuthoringRequest(application, requestId))
+          void act(() => dropAuthoringRequest(application, requestId), adopt)
         }}
         onCancel={() => setDropOpen(false)}
       >

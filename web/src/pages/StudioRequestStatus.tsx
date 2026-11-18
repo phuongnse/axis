@@ -7,8 +7,10 @@ import { useText } from '../platform/texts'
  * The status line of a Studio request. A queued or running request shows the info icon, with a spinner beside its
  * text. A succeeded one shows its outcome, and a failed one shows an error. A succeeded publish or activate names its
  * release number once it is known. A preview, which is a publish request with target `preview`, has its own texts and
- * shows no release number. A test has its own texts too, and shows no release number. A failed one never shows one,
- * even when the request names a release, so a failure never looks like a success.
+ * shows no release number. A test has its own texts too, and shows no release number. An accept, which is an `accept`
+ * publish request, says whether the change is in the application, and shows no release number, see
+ * docs/reference/ai-authoring-in-studio.md#accepting. A failed one never shows one, even when the request names a
+ * release, so a failure never looks like a success.
  */
 export function StudioRequestStatus({
   request,
@@ -30,7 +32,9 @@ export function StudioRequestStatus({
       break
     case 'succeeded':
       message =
-        kind === 'validate' ? (
+        kind === 'accept' ? (
+          t('shell.studio.request.accepted')
+        ) : kind === 'validate' ? (
           t('shell.studio.request.validated')
         ) : kind === 'test' ? (
           t('shell.studio.request.tested')
@@ -50,15 +54,17 @@ export function StudioRequestStatus({
       break
     case 'failed':
       message = t(
-        preview
-          ? 'shell.studio.request.previewFailed'
-          : kind === 'publish'
-            ? 'shell.studio.request.publishFailed'
-            : kind === 'activate'
-              ? 'shell.studio.request.activationFailed'
-              : kind === 'test'
-                ? 'shell.studio.request.testFailed'
-                : 'shell.studio.request.validateFailed',
+        kind === 'accept'
+          ? 'shell.studio.request.acceptFailed'
+          : preview
+            ? 'shell.studio.request.previewFailed'
+            : kind === 'publish'
+              ? 'shell.studio.request.publishFailed'
+              : kind === 'activate'
+                ? 'shell.studio.request.activationFailed'
+                : kind === 'test'
+                  ? 'shell.studio.request.testFailed'
+                  : 'shell.studio.request.validateFailed',
       )
       break
   }
