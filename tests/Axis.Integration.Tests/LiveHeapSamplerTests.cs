@@ -4,7 +4,9 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The live heap sampler ignores garbage that the collector has not freed yet and still reports memory that is held.
-/// The class runs alone, so no other test allocates beside it.
+/// The garbage tests read the real heap, so the class runs alone and no other test allocates beside it. The held-memory
+/// tests feed the sampler fixed readings, because the real heap covers the whole process and memory that other code
+/// frees would hide the held memory.
 /// </summary>
 [Collection(PerformanceTiming.Name)]
 public sealed class LiveHeapSamplerTests
@@ -40,17 +42,29 @@ public sealed class LiveHeapSamplerTests
     [Fact]
     public void Memory_that_is_held_counts_as_heap_growth()
     {
-        var sampler = new LiveHeapSampler();
-        var held = new List<byte[]>();
-        for (var allocated = 0L; allocated < Allocated; allocated += ChunkSize)
+        var sampler = new LiveHeapSampler(0, () => Allocated);
+
+        Assert.Equal(Allocated, sampler.Stop());
+    }
+
+    [Fact]
+    public void Memory_released_before_the_sampler_stops_still_counts_as_heap_growth()
+    {
+        var readings = 0;
+        using var held = new ManualResetEventSlim();
+        var sampler = new LiveHeapSampler(0, () =>
         {
-            held.Add(new byte[ChunkSize]);
-        }
+            if (Interlocked.Increment(ref readings) > 1)
+            {
+                return 0;
+            }
 
-        var growth = sampler.Stop();
-        GC.KeepAlive(held);
+            held.Set();
+            return Allocated;
+        });
 
-        Assert.True(growth >= Limit, $"The sampler reported {growth:N0} bytes of growth for held memory.");
+        Assert.True(held.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken), "The sampler did not take its first reading.");
+        Assert.Equal(Allocated, sampler.Stop());
     }
 
     [Fact]

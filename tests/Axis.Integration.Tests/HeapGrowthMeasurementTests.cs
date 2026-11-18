@@ -3,8 +3,8 @@ using System.Runtime;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The heap measurement behind the export test counts memory that is still in use and ignores garbage that the
-/// collector has not freed yet. The class runs alone, so no other test holds memory during a measurement.
+/// The heap measurement behind the export test ignores garbage that the collector has not freed yet. The class runs
+/// alone, so no other test allocates during a measurement.
 /// </summary>
 [Collection(PerformanceTiming.Name)]
 public sealed class HeapGrowthMeasurementTests
@@ -38,21 +38,5 @@ public sealed class HeapGrowthMeasurementTests
         }
 
         Assert.True(growth < Limit, $"Dropped garbage counted as {growth:N0} bytes of growth.");
-    }
-
-    [Fact]
-    public void Memory_held_during_the_measurement_counts_as_growth()
-    {
-        var sampler = new LiveHeapSampler();
-        var held = new List<byte[]>();
-        for (long total = 0; total < Allocated; total += ArraySize)
-        {
-            held.Add(new byte[ArraySize]);
-        }
-
-        var growth = sampler.Stop();
-        GC.KeepAlive(held);
-
-        Assert.True(growth >= Limit, $"Held memory counted as only {growth:N0} bytes of growth.");
     }
 }
