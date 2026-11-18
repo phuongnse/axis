@@ -1,10 +1,12 @@
 import { Button, Checkbox, Flex, Select, Tag, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisButton } from '../platform/AxisButton'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyState } from '../platform/EmptyState'
+import { fillText } from '../platform/fillText'
 import { diffPatch, setAt } from '../platform/jsonPatch'
 import {
   createStudioResource,
@@ -160,7 +162,7 @@ export function StudioPolicyMatrixTable({
 function RoleHeader({ role }: { role: StudioMatrixRole }) {
   const t = useText()
   const reasonKey = `shell.studio.matrix.reason.${role.readOnlyReason}`
-  const reasonText = t(reasonKey) === reasonKey ? role.readOnlyReason : t(reasonKey)
+  const reasonText = t(reasonKey) === reasonKey ? (role.readOnlyReason ?? '') : t(reasonKey)
   return (
     <Flex vertical align="flex-start">
       <span>
@@ -173,8 +175,7 @@ function RoleHeader({ role }: { role: StudioMatrixRole }) {
       </span>
       {!role.editable && role.readOnlyReason !== null && (
         <Typography.Text type="secondary" data-testid={`studio-matrix-readonly-${role.name}`}>
-          {reasonText}
-          {role.readOnlyReason === 'accessPolicyShared' && ` ${role.accessPolicy.name}`}
+          {fillText(reasonText, { policy: role.accessPolicy.name })}
         </Typography.Text>
       )}
     </Flex>
@@ -212,7 +213,7 @@ function MatrixCell({
         {cell.missingEntityRead !== null && (
           // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
           <Tag color="warning" style={{ marginInlineEnd: 0 }} data-testid="studio-matrix-missing-read">
-            {t('shell.studio.matrix.missingEntityRead')} {cell.missingEntityRead}
+            {fillText(t('shell.studio.matrix.missingEntityRead'), { entity: cell.missingEntityRead })}
           </Tag>
         )}
       </Flex>
@@ -240,11 +241,12 @@ function GrantPanel({
   onWritten: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem) => void
 }) {
   const t = useText()
+  const headingId = useId()
   const readOnlyGrants = role.editable ? cell.grants.filter((grant) => grant.shared) : cell.grants
   return (
-    <section data-testid="studio-matrix-grants">
-      <Typography.Title level={5}>
-        {t('shell.studio.matrix.grants')} {role.name}, {target.name}
+    <section data-testid="studio-matrix-grants" aria-labelledby={headingId}>
+      <Typography.Title level={5} id={headingId}>
+        {fillText(t('shell.studio.matrix.grants'), { role: role.name, target: target.name })}
       </Typography.Title>
       {!role.editable && cell.grants.length === 0 && <EmptyState text={t('shell.studio.matrix.noGrants')} />}
       <Flex vertical gap="small">
@@ -403,7 +405,12 @@ function OwnGrants({
   )
 
   if (state === 'failed') {
-    return <AxisAlert kind="error" message={t('shell.studio.matrix.loadFailed')} />
+    return (
+      <AxisAlert
+        kind="error"
+        message={fillText(t('shell.studio.matrix.policyLoadFailed'), { policy: role.accessPolicy.name })}
+      />
+    )
   }
   if (state === undefined) {
     return (
@@ -515,10 +522,14 @@ function OwnGrants({
                   {grant.name}
                 </Typography.Text>
               )}
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button size="small" disabled={grants.length === 1} onClick={() => edit(`/grants/${index}`, undefined)}>
+              <AxisButton
+                role="destructive"
+                size="small"
+                disabled={grants.length === 1}
+                onClick={() => edit(`/grants/${index}`, undefined)}
+              >
                 {t('shell.studio.matrix.removeGrant')}
-              </Button>
+              </AxisButton>
             </Flex>
             {/* The actions are one group with its help, see docs/reference/actions-and-controls.md#fields. */}
             <AxisFieldGroup title={t('shell.studio.matrix.actions')} help={t('shell.studio.matrix.actions.help')}>
@@ -533,7 +544,7 @@ function OwnGrants({
                 {unaccepted.map((action) => (
                   // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
                   <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
-                    {t('shell.studio.matrix.unacceptedAction')} {action}
+                    {fillText(t('shell.studio.matrix.unacceptedAction'), { action })}
                   </Tag>
                 ))}
               </Flex>

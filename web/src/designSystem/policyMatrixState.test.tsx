@@ -38,7 +38,7 @@ describe('the design-system Policy matrix state', () => {
     expect(grants).toHaveLength(1)
     expect(within(grants[0]).getByText('RequesterPolicy')).toBeInTheDocument()
     expect(within(grants[0]).getByText('Shared')).toBeInTheDocument()
-    expect(screen.queryByText('No grant.')).not.toBeInTheDocument()
+    expect(screen.queryByText('This role has no grant here.')).not.toBeInTheDocument()
 
     const requester = matrix.roles.find((role) => role.name === 'Requester')!
     const [grant] = requester.cells.find((cell) => cell.target === 'Request')!.grants
