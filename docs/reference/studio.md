@@ -25,11 +25,11 @@ opens the same view.
   not one of the folder's own resources.
 - **A path.** A Used by entry or a diagnostic that opens a resource at a path adds `&path=<path>`.
 - **A view.** `&kind=<kind>` shows that kind's list, `&view=releases` the Releases entry,
-  `&view=release&release=<number>` a [release page](studio-workspace.md#release-page) under it and
-  `&view=policies` the [policy matrix](#policy-matrix).
-- **The AI requests and publish views** _(planned for M35)_. `&view=requests` shows the
-  [AI requests](ai-authoring-in-studio.md#the-request-panel) table, `&view=requests&request=<id>` one
-  request's page, and `&view=publish` the [publish page](#publishing).
+  `&view=release&release=<number>` a [release page](studio-workspace.md#release-page) under it,
+  `&view=policies` the [policy matrix](#policy-matrix) and `&view=requests&request=<id>` one
+  [AI request's page](ai-authoring-in-studio.md#a-requests-page).
+- **The AI requests table and the publish view** _(planned for M35)_. `&view=requests` shows the
+  [AI requests](ai-authoring-in-studio.md#the-request-panel) table and `&view=publish` the [publish page](#publishing).
 - **A field** _(planned for M33)_. `&field=<name>` opens a field's
   [drawer](entity-designer.md#field-drawer) on an entity's page.
 - **Back is the browser's.** Studio has no Back or Next of its own and no breadcrumb.

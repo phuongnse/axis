@@ -39,6 +39,7 @@ import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import { useHomeGrid } from './homeGrid'
 import { HomeTileStyle } from './HomeTileStyle'
+import { StudioAuthoringRequestPage } from './StudioAuthoringRequestPage'
 import { StudioEditor, type StudioEditorHandle } from './StudioEditor'
 import { StudioHistory, StudioRevisionPage } from './StudioHistory'
 import { StudioKindList } from './StudioKindList'
@@ -160,6 +161,7 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * its Open policy link opens the policy in the Resources view. The band and the Problems panel show in every view.
  * `&view=releases` shows only the Releases heading and the release list. `&view=release&release=<number>` shows that
  * release's `StudioReleasePage` in place of the list, under the Releases entry, and its Activate… sends the same request as the list's.
+ * `&view=requests&request=<id>` shows that authoring request's page in place of the content, and no sidebar entry is marked for it.
  * Run tests sits beside Validate and shows only when `GET /api/me` answers `studioTest: true`. A selected scenario
  * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
  * reconnect message shows. A failed scenario in the test results opens at its failing step, as a diagnostic does.
@@ -226,6 +228,8 @@ function StudioWorkspace() {
   const releasePage = releaseView && releaseNumber !== null
   const historyView = params.get('view') === 'history'
   const revisionId = params.get('revision')
+  const requestsView = params.get('view') === 'requests'
+  const requestId = params.get('request')
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
   const [canPublish, setCanPublish] = useState(false)
@@ -233,6 +237,7 @@ function StudioWorkspace() {
   const [canTest, setCanTest] = useState(false)
   const [canAskAi, setCanAskAi] = useState(false)
   const [previewHost, setPreviewHost] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const [folderRevision, setFolderRevision] = useState(0)
   const [namesState, setNamesState] = useState<NamesState>()
   const [activityState, setActivityState] = useState<ActivityState>()
@@ -253,6 +258,7 @@ function StudioWorkspace() {
         setCanTest(user?.studioTest === true)
         setCanAskAi(user?.studioAi === true)
         setPreviewHost(user?.studioPreviewHost ?? null)
+        setUserId(user?.id ?? null)
       },
       () => {
         if (!controller.signal.aborted) {
@@ -261,6 +267,7 @@ function StudioWorkspace() {
           setCanTest(false)
           setCanAskAi(false)
           setPreviewHost(null)
+          setUserId(null)
         }
       },
     )
@@ -588,6 +595,8 @@ function StudioWorkspace() {
                   />
                 ) : releasesView ? (
                   <StudioPageHeading title={t('shell.studio.releases')} />
+                ) : requestsView && requestId !== null ? (
+                  <StudioAuthoringRequestPage application={application!} requestId={requestId} userId={userId} />
                 ) : historyView ? (
                   revisionId !== null ? (
                     <StudioRevisionPage application={application!} revisionId={revisionId} resources={resources} />
