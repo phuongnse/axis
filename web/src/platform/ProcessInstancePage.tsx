@@ -11,6 +11,7 @@ import {
   fetchInstance,
   forbidden,
   instanceCommands,
+  processTitle,
   retryWarns,
   sendCommand,
   stateText,
@@ -310,10 +311,10 @@ export function InstanceDetailView({
         instance.parent !== null ? (
           <span>
             {parentPage === undefined ? (
-              instance.parent.process
+              processTitle(t, instance.parent)
             ) : (
               <Link to={inspectorPath(sitePath, parentPage, instance.parent.id)} data-testid="inspector-parent-link">
-                {instance.parent.process}
+                {processTitle(t, instance.parent)}
               </Link>
             )}
             <Typography.Text type="secondary"> · {t('shell.inspector.startedVia.parent')}</Typography.Text>
@@ -533,7 +534,7 @@ export function InstanceDetailView({
     <div data-testid="inspector-instance">
       <PageHeading
         // Proposed: a process is named by its title in each language, see the review on #3650.
-        title={instance.processTitleKey ? t(instance.processTitleKey) : instance.process}
+        title={processTitle(t, instance)}
         line={t('shell.inspector.process')}
         tags={<StatusTag tone={instanceTone(instance)}>{stateText(t, instance.state)}</StatusTag>}
       />

@@ -5,7 +5,14 @@ import { AxisButton } from './AxisButton'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { tablePageSizes, type TableQuery } from './tableQuery'
 import { inspectorPath } from './inspectorPages'
-import type { CallAttempt, InstanceCall, InstanceDetail, InstanceTask, SubProcess } from './inspection'
+import {
+  processTitle,
+  type CallAttempt,
+  type InstanceCall,
+  type InstanceDetail,
+  type InstanceTask,
+  type SubProcess,
+} from './inspection'
 import { durationText, stepRuns, type StepRun } from './instanceRuns'
 import { ResolveDialog } from './ResolveDialog'
 import { useMinuteClock } from './relativeTime'
@@ -215,13 +222,13 @@ export function InstanceTimeline({
       step: child.step,
       stepText: stepLabel(child.step),
       stateKey: child.endedAt === null ? 'running' : child.state === 'failed' ? 'failed' : 'done',
-      words: `${child.process} ${child.state}`,
+      words: `${processTitle(t, child)} ${child.state}`,
       name: named(
         page === undefined ? (
-          child.process
+          processTitle(t, child)
         ) : (
           <Link to={inspectorPath(sitePath, page, child.id)} data-testid={`inspector-subprocess-${child.id}`}>
-            {child.process}
+            {processTitle(t, child)}
           </Link>
         ),
         t('shell.inspector.stepType.subProcess'),

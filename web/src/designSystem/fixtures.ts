@@ -721,6 +721,8 @@ const instancePage: InstancePage = {
 
 /** A request's approval waiting at its review task, which the `shell` preview opens from the Instances page. */
 export const instanceId = 'be6b7f80-92a3-4eb5-bfc6-e708192a3b4c'
+/** Proposed, see the review on #3650: the vendor onboarding that the purchase approval started as a sub-process. */
+const onboardingId = '0192f5d4-5f60-7b71-8c2d-4e5f6a7b8c9d'
 
 /** The body the ERP call sent for the purchase request. */
 const purchaseOrderBody = {
@@ -1670,8 +1672,9 @@ const instanceDetail: InstanceDetail = {
   parent: null,
   subProcesses: [
     {
-      id: '0192f5d4-5f60-7b71-8c2d-4e5f6a7b8c9d',
+      id: onboardingId,
       process: 'VendorOnboarding',
+      processTitleKey: 'process.onboarding.title',
       step: 'onboardVendor',
       state: 'completed',
       createdAt: '2026-03-06T11:30:02.000000Z',
@@ -1847,6 +1850,116 @@ const parallelInstanceDetail: InstanceDetail = {
   commands: ['cancel'],
 }
 
+/**
+ * Proposed, see the review on #3650: the new vendor's onboarding that the purchase approval started as a sub-process,
+ * which the site inspects on its Vendor onboarding page, so the parent's Sub-process opens it.
+ */
+const onboardingsPath = `${apiPath}/processes/VendorOnboarding/instances`
+const onboardingDeadLettersPath = `${apiPath}/processes/VendorOnboarding/dead-letters`
+const onboardingInspectorWidget: WidgetMetadata = {
+  ...processInspectorWidget,
+  process: 'VendorOnboarding',
+  instancesPath: onboardingsPath,
+  deadLettersPath: onboardingDeadLettersPath,
+}
+const onboardingsPage: PageMetadata = {
+  name: 'Onboardings',
+  titleKey: 'nav.onboardings',
+  parameters: [],
+  widgets: [onboardingInspectorWidget],
+}
+const onboardingDetail: InstanceDetail = {
+  id: onboardingId,
+  process: 'VendorOnboarding',
+  processTitleKey: 'process.onboarding.title',
+  startedBy: { kind: 'parent', name: 'PurchaseApproval', via: null },
+  input: null,
+  result: { step: 'onboarded', values: {} },
+  subjectId: null,
+  subject: null,
+  releaseId,
+  releaseNumber: 3,
+  state: 'completed',
+  step: 'onboarded',
+  createdAt: '2026-03-06T11:30:02.000000Z',
+  endedAt: '2026-03-09T15:00:00.000000Z',
+  graph: {
+    start: 'recordVendor',
+    steps: [
+      {
+        name: 'recordVendor',
+        type: 'operation',
+        labelKey: 'onboarding.step.record',
+        transitions: [{ next: 'activateVendor', on: null }],
+      },
+      {
+        name: 'activateVendor',
+        type: 'operation',
+        labelKey: 'onboarding.step.activate',
+        transitions: [{ next: 'onboarded', on: null }],
+      },
+      { name: 'onboarded', type: 'end', labelKey: 'onboarding.step.onboarded', transitions: [] },
+    ],
+  },
+  path: [
+    {
+      step: 'recordVendor',
+      startedAt: '2026-03-06T11:30:02.000000Z',
+      finishedAt: '2026-03-06T11:30:03.000000Z',
+      decision: null,
+      output: null,
+      error: null,
+      traceId: '92a3b4c5d6e7f8091a2b3c4d5e6f7081',
+    },
+    {
+      step: 'activateVendor',
+      startedAt: '2026-03-09T14:59:58.000000Z',
+      finishedAt: '2026-03-09T15:00:00.000000Z',
+      decision: null,
+      output: null,
+      error: null,
+      traceId: 'a3b4c5d6e7f8091a2b3c4d5e6f708192',
+    },
+    {
+      step: 'onboarded',
+      startedAt: '2026-03-09T15:00:00.000000Z',
+      finishedAt: '2026-03-09T15:00:00.000000Z',
+      decision: null,
+      output: null,
+      error: null,
+      traceId: null,
+    },
+  ],
+  tasks: [],
+  calls: [],
+  parent: {
+    id: instanceId,
+    process: 'PurchaseApproval',
+    processTitleKey: 'process.approve.title',
+    step: 'onboardVendor',
+  },
+  subProcesses: [],
+  commands: [],
+}
+const onboardingPage: InstancePage = {
+  items: [
+    {
+      id: onboardingId,
+      subjectId: null,
+      subjectLabel: null,
+      state: 'completed',
+      step: 'onboarded',
+      releaseId,
+      releaseNumber: 3,
+      createdAt: '2026-03-06T11:30:02.000000Z',
+      endedAt: '2026-03-09T15:00:00.000000Z',
+    },
+  ],
+  page: 1,
+  pageSize: 20,
+  totalCount: 1,
+}
+
 const deadLetterPage: DeadLetterPage = {
   items: [
     {
@@ -1928,6 +2041,9 @@ export const applicationSite: ApplicationSite = {
   navigation: [
     { page: 'Requests', labelKey: 'nav.requests', icon: 'list' },
     { page: 'Tasks', labelKey: 'nav.tasks', icon: 'tasks' },
+    // Proposed: the page that inspects vendor onboardings, so a purchase approval's sub-process opens, see the review
+    // on #3650.
+    { page: 'Onboardings', labelKey: 'nav.onboardings', icon: 'process' },
   ],
   notificationsPath,
   // Proposed: a request opens on the Request page the site names, and a category, which has no page of its own, on the
@@ -2375,6 +2491,11 @@ export const siteTexts: Record<string, string> = {
   'request.task.review': 'Review the request',
   'process.approve.title': 'Purchase request approval',
   'process.contract.title': 'Contract review',
+  'process.onboarding.title': 'Vendor onboarding',
+  'nav.onboardings': 'Vendor onboarding',
+  'onboarding.step.record': 'Record the vendor',
+  'onboarding.step.activate': 'Activate the vendor',
+  'onboarding.step.onboarded': 'Onboarded',
   'event.goodsReceived': 'Goods received',
   'request.field.budgetRemaining': 'Budget remaining',
   'request.field.withinBudget': 'Within budget',
@@ -2506,6 +2627,11 @@ export const routes: Record<string, () => unknown> = {
   [instancesPath]: () => instancePage,
   [`${instancesPath}/${instanceId}`]: () => instanceDetail,
   [`${instancesPath}/${parallelInstanceId}`]: () => parallelInstanceDetail,
+  [onboardingsPath]: () => onboardingPage,
+  [`${onboardingsPath}/${onboardingId}`]: () => onboardingDetail,
+  [onboardingDeadLettersPath]: () => ({ items: [], page: 1, pageSize: 20, totalCount: 0 }),
+  [`/api/sites/${sitePath}/pages/Onboardings`]: () => onboardingsPage,
+  [`/api/sites/${sitePath}/pages/onboardings`]: () => onboardingsPage,
   [`/api/sites/${sitePath}/texts/${locale}?release=${releaseId}`]: () => ({ texts: siteTexts }),
   [`/api/sites/${sitePath}/pages/instances`]: () => instancesPage,
   [deadLettersPath]: () => deadLetterPage,

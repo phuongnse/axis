@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { inspectTarget } from './inspection'
+import { inspectTarget, processTitle } from './inspection'
 
 describe('inspectTarget', () => {
   it('reads the process and the instance of an instance detail path', () => {
@@ -19,5 +19,20 @@ describe('inspectTarget', () => {
   it('returns null for a path that is not an instance detail path', () => {
     expect(inspectTarget('/api/apps/StepApp/processes/Submit/instances')).toBeNull()
     expect(inspectTarget('/api/apps/StepApp/entities/Request/records/abc')).toBeNull()
+  })
+})
+
+describe('processTitle', () => {
+  const t = (key: string) => (key === 'process.onboarding.title' ? 'Vendor onboarding' : key)
+
+  it("names a process by its title in the reader's language, for an instance, its parent and a sub-process alike", () => {
+    expect(processTitle(t, { process: 'VendorOnboarding', processTitleKey: 'process.onboarding.title' })).toBe(
+      'Vendor onboarding',
+    )
+  })
+
+  it('names a process by its name when its release gives no title', () => {
+    expect(processTitle(t, { process: 'VendorOnboarding', processTitleKey: null })).toBe('VendorOnboarding')
+    expect(processTitle(t, { process: 'VendorOnboarding' })).toBe('VendorOnboarding')
   })
 })

@@ -10,7 +10,14 @@ import { EmptyDash, NotSet } from './EmptyValue'
 import { EventTime } from './EventTime'
 import { formatValue } from './formatValue'
 import { inspectorPath } from './inspectorPages'
-import type { CallAttempt, InstanceCall, InstanceDetail, RunOutput, StepDefinition } from './inspection'
+import {
+  processTitle,
+  type CallAttempt,
+  type InstanceCall,
+  type InstanceDetail,
+  type RunOutput,
+  type StepDefinition,
+} from './inspection'
 import { durationText, stepRuns, type StepRun } from './instanceRuns'
 import { RecordLink } from './RecordLink'
 import { useMinuteClock } from './relativeTime'
@@ -293,9 +300,11 @@ export function StepRunPanel({
         value: (
           <Flex align="center" gap="small" wrap>
             {inspectors?.get(child.process) === undefined ? (
-              child.process
+              processTitle(t, child)
             ) : (
-              <Link to={inspectorPath(sitePath, inspectors.get(child.process) ?? '', child.id)}>{child.process}</Link>
+              <Link to={inspectorPath(sitePath, inspectors.get(child.process) ?? '', child.id)}>
+                {processTitle(t, child)}
+              </Link>
             )}
             <StatusTag tone={childTones[child.state] ?? 'neutral'}>
               {t(`shell.inspector.states.${child.state}`)}

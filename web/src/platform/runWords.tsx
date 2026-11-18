@@ -2,7 +2,7 @@ import { Flex } from 'antd'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { inspectorPath } from './inspectorPages'
-import type { InstanceCall, InstanceDetail, InstanceTask } from './inspection'
+import { processTitle, type InstanceCall, type InstanceDetail, type InstanceTask } from './inspection'
 import type { StepRun } from './instanceRuns'
 import { filled } from './instanceStatus'
 import { StatusTag } from './StatusTag'
@@ -91,10 +91,10 @@ export function useRunWords({
       const page = inspectors?.get(child.process)
       const name =
         page === undefined ? (
-          child.process
+          processTitle(t, child)
         ) : (
           <Link to={inspectorPath(sitePath, page, child.id)} data-testid={`inspector-subprocess-${child.id}`}>
-            {child.process}
+            {processTitle(t, child)}
           </Link>
         )
       const key = `shell.inspector.states.${child.state}`

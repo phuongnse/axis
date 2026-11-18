@@ -242,6 +242,8 @@ export interface InstanceCall {
 export interface InstanceParent {
   id: string
   process: string
+  /** Proposed, see the review on #3650: the text key of the parent's process title, as an instance's own. */
+  processTitleKey?: string | null
   step: string
 }
 
@@ -249,11 +251,24 @@ export interface InstanceParent {
 export interface SubProcess {
   id: string
   process: string
+  /** Proposed, see the review on #3650: the text key of the child's process title, as an instance's own. */
+  processTitleKey?: string | null
   /** The sub-process step of this instance that started the child. */
   step: string
   state: string
   createdAt: string
   endedAt: string | null
+}
+
+/**
+ * Proposed, see the review on #3650: what names a process to a reader, its title in the reader's language, or its name
+ * when the release gives no title, for an instance, its parent and its sub-processes alike.
+ */
+export function processTitle(
+  t: (key: string) => string,
+  of: { process: string; processTitleKey?: string | null },
+): string {
+  return of.processTitleKey ? t(of.processTitleKey) : of.process
 }
 
 /**
