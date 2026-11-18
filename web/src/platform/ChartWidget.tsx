@@ -124,36 +124,40 @@ export function ChartWidget({ widget, locale, pageValues }: ChartWidgetProps) {
         {state.totalCount > maxGroups && (
           <AxisAlert data-testid="chart-truncated" kind="info" message={t('shell.chart.truncated')} />
         )}
-        <table style={visuallyHidden}>
-          <caption>{title}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{categoryColumn?.labelKey ? t(categoryColumn.labelKey) : category}</th>
-              {measures.map((measure) => (
-                <th key={measure.name} scope="col">
-                  {t(measure.labelKey)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((item, index) => (
-              <tr key={index}>
-                <th scope="row">{categories[index]}</th>
+        {/* A table sizes to its rows whatever its height, so it hides in a box that keeps to 1 px, or it would spill
+            out of its tile and scroll the column it sits in. */}
+        <div style={visuallyHidden}>
+          <table>
+            <caption>{title}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{categoryColumn?.labelKey ? t(categoryColumn.labelKey) : category}</th>
                 {measures.map((measure) => (
-                  <td key={measure.name}>
-                    {cellText(
-                      columns.find((candidate) => candidate.name === measure.name),
-                      item,
-                      measure.name,
-                      { locale, text: t },
-                    )}
-                  </td>
+                  <th key={measure.name} scope="col">
+                    {t(measure.labelKey)}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((item, index) => (
+                <tr key={index}>
+                  <th scope="row">{categories[index]}</th>
+                  {measures.map((measure) => (
+                    <td key={measure.name}>
+                      {cellText(
+                        columns.find((candidate) => candidate.name === measure.name),
+                        item,
+                        measure.name,
+                        { locale, text: t },
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </>
     )
   }
