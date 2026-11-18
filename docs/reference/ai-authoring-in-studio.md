@@ -59,10 +59,8 @@ request opens its own page.
 
 ## A request's page
 
-_(planned for M35)_
-
-A request's page shows one request from its name to its end. It is one feed of items, read from the top,
-with a bar at its foot for the actions. The author sees where the request stands and what to do next.
+A request's page shows one request. Only its heading is built so far. [The feed](#the-feed) and
+[the guide](#the-guide) are planned for M35.
 
 ### The heading
 
@@ -71,14 +69,18 @@ with a bar at its foot for the actions. The author sees where the request stands
 - The state sits beside the name as a [status tag](shared-widgets.md#which-widget), with its word from
   [the states](#the-states).
 - Under the name, `spacing-xs` apart, come the request's words in full. Then, in `textMuted`, comes the
-  sender's line: "Sent by you on <time>, co-authored with Claude Sonnet 5.5", or "Sent by <name> on <time>"
+  sender's line.
+- The sender's line reads "Sent by you on <time>" for the reader's own request, or "Sent by <name> on <time>"
   for a request of another person.
-- The co-authors are the AIs that made the change, in the order they first worked. Axis's agent is named
-  by the model its author's AI used. An outside app is named by the name it registered with. The line is
-  one sentence with no full stop. Nothing else on the page names an AI.
+- **Co-authors** _(planned for M35)_. The line ends with ", co-authored with <AIs>". The co-authors are the AIs
+  that made the change, in the order they first worked. Axis's agent is named by the model its author's AI
+  used. An outside app is named by the name it registered with. The line is one sentence with no full stop.
+  Nothing else on the page names an AI.
 - The page checks the request every second until it waits for its author or ends.
-- An unknown request shows "This request does not exist.", with a link to
-  [the request panel](#the-request-panel). A failed action shows "That did not work. Try again." in an
+- An unknown request shows "This request does not exist.".
+- **The link to the request panel** _(planned for M35)_. The unknown request's line also has an Ask AI link,
+  which opens [the request panel](#the-request-panel).
+- **A failed action** _(planned for M35)_. A failed action shows "That did not work. Try again." in an
   [alert](shared-widgets.md#which-widget) above the feed.
 
 ### The states
@@ -99,9 +101,11 @@ The page shows one word for the state of a request, the same for every reader. T
 | `dropped`          | Dropped           | `muted`     |
 | `failed`           | Failed            | `danger`    |
 
-A fix round reads as Working too. The Work item shows its number.
+A fix round reads as Working too.
 
 ### The feed
+
+_(planned for M35)_
 
 The page is one ordered list of items: Plan, Work, Result and Dropped. An item shows once it has something
 to show. The page has no tabs and no stages bar.
@@ -124,6 +128,8 @@ to show. The page has no tabs and no stages bar.
 
 ### The Work item
 
+_(planned for M35)_
+
 The Work item shows once the plan is approved. Its standing is "Fix round <n>" while AI fixes, and nothing
 else. Its line says what the work is doing or did.
 
@@ -136,6 +142,8 @@ else. Its line says what the work is doing or did.
 The line ends with **Show the steps** or **Hide the steps**, which folds the History in and out.
 
 ### The History
+
+_(planned for M35)_
 
 Under Show the steps comes the request's History, a table of its steps, newest first. Its columns are Step,
 Result, Started and Duration.
@@ -158,6 +166,8 @@ Result, Started and Duration.
   with [`ResourceReference`](shared-widgets.md#which-widget), so the name is the only link and the kind is muted.
 
 ### The guide
+
+_(planned for M35)_
 
 The bar at the foot of the window guides the author in every state. It is an
 [action bar](actions-and-controls.md#buttons) with a few words of where the request stands, at most one main
@@ -184,6 +194,8 @@ bar, never in the heading.
 
 ### Replies
 
+_(planned for M35)_
+
 Each reply opens a dialog drawn by [`ReasonDialog`](shared-widgets.md#which-widget). A reply takes up to
 2,000 characters, and its dialog has Cancel. A failure shows inside the dialog.
 
@@ -201,6 +213,8 @@ Each reply opens a dialog drawn by [`ReasonDialog`](shared-widgets.md#which-widg
   opens that request's page.
 
 ### An outside app's request
+
+_(planned for M35)_
 
 Axis's agent never works on a request that an outside app is working on. The app goes on with its own
 request, also after a reply on the web, see [states](authoring-requests.md#states). A reply on the web is kept
