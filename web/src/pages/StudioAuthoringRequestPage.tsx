@@ -385,7 +385,7 @@ function AcceptConflict({ conflicts, resources }: { conflicts: StudioDiagnostic[
                   <FilledText
                     text={t('shell.studio.aiRequest.conflict.item')}
                     parts={{
-                      resource: name,
+                      name,
                       author: conflict.changedBy,
                       time: <time dateTime={conflict.changedAt ?? undefined}>{time}</time>,
                     }}

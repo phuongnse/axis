@@ -40,6 +40,9 @@ public sealed partial class RouteTableDocTests
             "## `DELETE /api/x/{id}`",
             "_(planned for later)_",
             "",
+            "## `PUT /api/x/{id}`",
+            "_(planned)_",
+            "",
             "  | Group | Route |",
             "  | ----- | ----- |",
             "  | Items | `POST /api/y?page=` |",
@@ -51,6 +54,7 @@ public sealed partial class RouteTableDocTests
             "| Route | What it does |",
             "| ----- | ------------ |",
             "| `GET /api/planned` _(planned for later)_ | Not mapped yet. |",
+            "| `POST /api/bare` _(planned)_ | Agreed, not built by any milestone. |",
             "| `GET /api/z/` | Trailing slash is dropped. |",
             "| Create application | Plain text. |",
         ];
@@ -99,7 +103,7 @@ public sealed partial class RouteTableDocTests
                 continue;
             }
 
-            if (rowInTable == 1 || routeColumn < 0 || line.Contains("_(planned for ", StringComparison.Ordinal))
+            if (rowInTable == 1 || routeColumn < 0 || PlannedMarker().IsMatch(line))
             {
                 continue;
             }
@@ -140,7 +144,7 @@ public sealed partial class RouteTableDocTests
             next++;
         }
 
-        return next < lines.Count && lines[next].Contains("_(planned for ", StringComparison.Ordinal);
+        return next < lines.Count && PlannedMarker().IsMatch(lines[next]);
     }
 
     private static string RepositoryRoot()
@@ -161,6 +165,10 @@ public sealed partial class RouteTableDocTests
     // A backticked route in a Route cell, such as "`GET /api/studio/catalog`".
     [GeneratedRegex(@"`(?<method>GET|POST|PUT|PATCH|DELETE|HEAD) (?<path>/\S*)`")]
     private static partial Regex RouteSpan();
+
+    // A planned marker, for a milestone or bare, see docs/writing-docs.md#planned-work.
+    [GeneratedRegex(@"_\(planned(?: for [^)]+)?\)_")]
+    private static partial Regex PlannedMarker();
 
     // A parameter such as {exportId:guid} or {*path} is written {} on both sides of the comparison.
     [GeneratedRegex(@"\{[^}]*\}")]

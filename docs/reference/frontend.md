@@ -554,7 +554,8 @@ below answers `200`.
   `shell.record.goToList`), where `{page}` is the label of that list's navigation entry. The link opens the address the
   page was opened from, with its table's search, sort and page, or else `/{site}`, which opens the first page. No save
   bar and no record action shows. Such a page is mostly opened from an email, a bookmark or a shared link, so no entry
-  is marked, and at narrow width the sidebar is hidden, so the link stays.
+  is marked, and at narrow width the sidebar is hidden, so the link stays. A task page whose well-formed task id the
+  task API answers `404` for shows the same line under its inbox page's heading, see [task page](task-inbox-widget.md#task-page).
 - **Inside a site.** The shell shows the site's title, navigation and locales in the [layout](shell.md#layout) of
   [shell and home page](shell.md). The page header, the app switcher and the language and theme menu work as they do
   on the platform site, see [page header](shell.md#page-header) and

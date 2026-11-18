@@ -2370,7 +2370,7 @@
   "shell.studio.aiRequest.guide.accepting": "Đang chấp nhận bản nháp",
   "shell.studio.aiRequest.guide.conflict": "Có tài nguyên đã thay đổi sau khi AI đọc",
   "shell.studio.aiRequest.conflict": "Có người đã thay đổi các tài nguyên này sau khi AI đọc, nên chưa có gì được chấp nhận:",
-  "shell.studio.aiRequest.conflict.item": "{resource}: {author} thay đổi lúc {time}",
+  "shell.studio.aiRequest.conflict.item": "{name}: {author} thay đổi lúc {time}",
   "shell.studio.aiRequest.accept": "Chấp nhận",
   "shell.studio.aiRequest.changePlan": "Đổi kế hoạch…",
   "shell.studio.aiRequest.changePlan.title": "Đổi kế hoạch",
