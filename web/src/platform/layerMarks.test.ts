@@ -4,6 +4,7 @@ import {
   entityKeyedLists,
   formKeyedLists,
   layerMarks,
+  markName,
   markOf,
   pageListKey,
   textKeyedMaps,
@@ -246,5 +247,20 @@ describe('markOf', () => {
     expect(markOf(elements, '/fields', 'title')).toBe('added')
     expect(markOf(elements, '/indexes', 'title')).toBeUndefined()
     expect(markOf(elements, '/fields', 'other')).toBeUndefined()
+  })
+})
+
+describe('markName', () => {
+  it('names a mark on an element in one text, in the wording of its mark', () => {
+    const texts: Record<string, string> = {
+      'shell.studio.contract.addedName': '{name}, added by this application',
+      'shell.studio.module.changedName': '{name}, changed by this application',
+      'shell.studio.module.removedName': '{name}, removed by this application',
+    }
+    const text = (key: string) => texts[key] ?? key
+
+    expect(markName(text, 'added', 'onHold')).toBe('onHold, added by this application')
+    expect(markName(text, 'changed', 'amount')).toBe('amount, changed by this application')
+    expect(markName(text, 'removed', 'old')).toBe('old, removed by this application')
   })
 })

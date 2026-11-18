@@ -267,7 +267,9 @@ describe('a module process with a customization layer', () => {
       screen.getByTestId('studio-graph-node-2'),
     )
     expect(screen.getByRole('button', { name: 'submit, operation' })).toBeInTheDocument()
-    expect(within(screen.getByTestId('studio-step-2')).getByRole('note', { name: 'Changed check' })).toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('studio-step-2')).getByRole('note', { name: 'check, changed by this application' }),
+    ).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Reset to module check' }))
 
     expect(onReset).toHaveBeenCalledWith('/steps', 'check')
@@ -278,7 +280,7 @@ describe('a module process with a customization layer', () => {
 
     const row = await screen.findByTestId('studio-layer-removed-/steps/review', undefined, slow)
     expect(row).toHaveAttribute('data-muted')
-    expect(within(row).getByRole('note', { name: 'Removed review' })).toBeInTheDocument()
+    expect(within(row).getByRole('note', { name: 'review, removed by this application' })).toBeInTheDocument()
     await userEvent.click(within(row).getByRole('button', { name: 'Reset to module review' }))
 
     expect(onReset).toHaveBeenCalledWith('/steps', 'review')

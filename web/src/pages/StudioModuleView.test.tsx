@@ -96,7 +96,7 @@ describe('ModuleResourceView', () => {
       expect(screen.queryByTestId('studio-module-read-only'), kind).toBeNull()
       expect(screen.queryByTestId('studio-module-content'), kind).toBeNull()
       if (kind === 'contract') {
-        expect(screen.getByRole('note', { name: 'Added onHold' }), kind).toBeInTheDocument()
+        expect(screen.getByRole('note', { name: 'onHold, added by this application' }), kind).toBeInTheDocument()
       } else {
         expect(screen.getByTestId('studio-module-layer'), kind).toBeInTheDocument()
       }

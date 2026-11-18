@@ -1,5 +1,6 @@
 import { Button, Flex, Tag, Typography } from 'antd'
-import { markOf, type LayerElement } from '../platform/layerMarks'
+import { fillText } from '../platform/fillText'
+import { markName, markOf, type LayerElement } from '../platform/layerMarks'
 import { useText } from '../platform/texts'
 
 /** What the designer needs to show a customization layer: its marked elements, and Reset to module for each. */
@@ -31,11 +32,7 @@ export function LayerMarkTag({
   }
   return (
     <Flex gap="small" align="center" wrap>
-      <Tag
-        role="note"
-        aria-label={`${t(`shell.studio.module.${mark}`)} ${name}`}
-        data-testid={`studio-layer-mark-${list}/${index}`}
-      >
+      <Tag role="note" aria-label={markName(t, mark, name)} data-testid={`studio-layer-mark-${list}/${index}`}>
         {t(`shell.studio.module.${mark}`)}
       </Tag>
       <ResetElement layer={layer} list={list} name={name} />
@@ -50,7 +47,7 @@ function ResetElement({ layer, list, name }: { layer: DesignerLayer; list: strin
     // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
     <Button
       size="small"
-      aria-label={`${t('shell.studio.module.resetElement')} ${name}`}
+      aria-label={fillText(t('shell.studio.module.resetElementName'), { name })}
       disabled={layer.disabled}
       onClick={() => layer.onReset(list, name)}
     >
@@ -78,7 +75,7 @@ export function RemovedRows({ layer, list }: { layer: DesignerLayer | undefined;
           data-testid={`studio-layer-removed-${list}/${element.key}`}
         >
           <Typography.Text type="secondary">{element.key}</Typography.Text>
-          <Tag role="note" aria-label={`${t('shell.studio.module.removed')} ${element.key}`}>
+          <Tag role="note" aria-label={markName(t, 'removed', element.key)}>
             {t('shell.studio.module.removed')}
           </Tag>
           <ResetElement layer={layer} list={list} name={element.key} />

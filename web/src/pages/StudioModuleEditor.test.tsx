@@ -233,8 +233,8 @@ describe('StudioModuleEditor', () => {
       return reset ? read(null) : read(layer, entity, marks)
     })
 
-    expect(await screen.findAllByRole('note', { name: /^(Added|Changed) / })).toHaveLength(1)
-    expect(screen.getByRole('note', { name: 'Added title' })).toBeInTheDocument()
+    expect(await screen.findAllByRole('note', { name: /, (added|changed) by this application$/ })).toHaveLength(1)
+    expect(screen.getByRole('note', { name: 'title, added by this application' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Reset to module title' }))
 
     await waitFor(() => expect(screen.queryByTestId('studio-module-layer')).toBeNull())
@@ -347,12 +347,12 @@ describe('StudioModuleEditor', () => {
     expect(await screen.findByTestId('studio-page-design', undefined, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.getByTestId('studio-module-reset-all')).toBeInTheDocument()
     expect(screen.getByTestId('studio-save')).toBeDisabled()
-    expect(screen.getByRole('note', { name: 'Changed list' })).toBeInTheDocument()
-    expect(screen.getByRole('note', { name: 'Changed main' })).toBeInTheDocument()
+    expect(screen.getByRole('note', { name: 'list, changed by this application' })).toBeInTheDocument()
+    expect(screen.getByRole('note', { name: 'main, changed by this application' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reset to module list' })).toBeEnabled()
     const removed = screen.getByTestId('studio-layer-removed-/widgets/0/widgets/old')
     expect(removed).toHaveAttribute('data-muted')
-    expect(within(removed).getByRole('note', { name: 'Removed old' })).toBeInTheDocument()
+    expect(within(removed).getByRole('note', { name: 'old, removed by this application' })).toBeInTheDocument()
 
     await userEvent.click(within(removed).getByRole('button', { name: 'Reset to module old' }))
 
@@ -384,8 +384,8 @@ describe('StudioModuleEditor', () => {
     )
 
     expect(await screen.findByTestId('studio-text-table')).toBeInTheDocument()
-    expect(screen.getByRole('note', { name: 'Changed a.label' })).toBeInTheDocument()
-    expect(screen.queryByRole('note', { name: 'Changed a.name' })).toBeNull()
+    expect(screen.getByRole('note', { name: 'a.label, changed by this application' })).toBeInTheDocument()
+    expect(screen.queryByRole('note', { name: 'a.name, changed by this application' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Reset to module a.label' }))
 
     await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
@@ -426,10 +426,12 @@ describe('StudioModuleEditor', () => {
       )
 
       expect(await screen.findByTestId('studio-module-policy-grant-1')).toBeInTheDocument()
-      expect(screen.getByRole('note', { name: 'Added checklistsRead' })).toBeInTheDocument()
-      expect(screen.queryByRole('note', { name: 'Added checklistRead' })).toBeNull()
+      expect(screen.getByRole('note', { name: 'checklistsRead, added by this application' })).toBeInTheDocument()
+      expect(screen.queryByRole('note', { name: 'checklistRead, added by this application' })).toBeNull()
       const removed = screen.getByTestId('studio-layer-removed-/grants/checklistsExport')
-      expect(within(removed).getByRole('note', { name: 'Removed checklistsExport' })).toBeInTheDocument()
+      expect(
+        within(removed).getByRole('note', { name: 'checklistsExport, removed by this application' }),
+      ).toBeInTheDocument()
       expect(within(removed).getByRole('button', { name: 'Reset to module checklistsExport' })).toBeEnabled()
     })
 
@@ -528,8 +530,8 @@ describe('StudioModuleEditor', () => {
       expect(await screen.findByTestId('studio-form-design', undefined, { timeout: 5000 })).toBeInTheDocument()
       expect(screen.getByTestId('studio-module-layer')).toBeInTheDocument()
       expect(screen.queryByTestId('studio-form-used-on')).toBeNull()
-      expect(screen.getByRole('note', { name: 'Changed amount' })).toBeInTheDocument()
-      expect(screen.queryByRole('note', { name: 'Changed name' })).toBeNull()
+      expect(screen.getByRole('note', { name: 'amount, changed by this application' })).toBeInTheDocument()
+      expect(screen.queryByRole('note', { name: 'name, changed by this application' })).toBeNull()
       await userEvent.click(screen.getByRole('button', { name: 'Reset to module amount' }))
 
       await waitFor(() => expect(screen.queryByRole('note')).toBeNull())
@@ -557,9 +559,9 @@ describe('StudioModuleEditor', () => {
       )
 
       expect(await screen.findByTestId('studio-form-design', undefined, { timeout: 5000 })).toBeInTheDocument()
-      expect(screen.getByRole('note', { name: 'Changed main' })).toBeInTheDocument()
+      expect(screen.getByRole('note', { name: 'main, changed by this application' })).toBeInTheDocument()
       const removed = screen.getByTestId('studio-layer-removed-/sections/0/fields/code')
-      expect(within(removed).getByRole('note', { name: 'Removed code' })).toBeInTheDocument()
+      expect(within(removed).getByRole('note', { name: 'code, removed by this application' })).toBeInTheDocument()
       expect(within(removed).getByRole('button', { name: 'Reset to module code' })).toBeEnabled()
       expect(resets(fetchMock)).toEqual([])
     })
@@ -622,7 +624,7 @@ describe('StudioModuleEditor', () => {
         dataSourceItem,
       )
 
-      expect(await screen.findByRole('note', { name: 'Changed title' })).toBeInTheDocument()
+      expect(await screen.findByRole('note', { name: 'title, changed by this application' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Reset to module title' })).toBeEnabled()
       expect(screen.getByTestId('studio-module-layer')).toBeInTheDocument()
     })
@@ -646,7 +648,7 @@ describe('StudioModuleEditor', () => {
         expect(node.style.getPropertyValue('border')).toBe('')
         expect(node.style.getPropertyValue('background')).toBe('')
       }
-      expect(within(part).getByRole('note', { name: 'Changed title' })).toBeInTheDocument()
+      expect(within(part).getByRole('note', { name: 'title, changed by this application' })).toBeInTheDocument()
     })
 
     it('marks an added record Added in the seed grid', async () => {
@@ -670,7 +672,7 @@ describe('StudioModuleEditor', () => {
       )
 
       const rows = await screen.findAllByTestId('studio-seed-row')
-      expect(within(rows[1]).getByRole('note', { name: 'Added r2' })).toBeInTheDocument()
+      expect(within(rows[1]).getByRole('note', { name: 'r2, added by this application' })).toBeInTheDocument()
       expect(within(rows[0]).queryByRole('note')).toBeNull()
     })
 
@@ -698,7 +700,7 @@ describe('StudioModuleEditor', () => {
       expect(part).toHaveAttribute('data-testid', 'studio-section-records')
       expect(within(part).getByTestId('studio-field-/records')).toBeInTheDocument()
       expect(part.previousElementSibling).toHaveAttribute('role', 'separator')
-      expect(within(part).getByRole('note', { name: 'Added r2' })).toBeInTheDocument()
+      expect(within(part).getByRole('note', { name: 'r2, added by this application' })).toBeInTheDocument()
       expect(screen.getByTestId('studio-section-rest')).toBeInTheDocument()
     })
 
