@@ -7,8 +7,6 @@ import { requiredMark } from './requiredMark'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
-const reasonMaxLength = 500
-
 interface ReasonDialogProps {
   title: string
   /** Sends the command with the reason the user typed. */
@@ -18,13 +16,48 @@ interface ReasonDialogProps {
   onChanged: () => void
   /** What the dialog shows above the reason, such as a warning. */
   children?: ReactNode
+  /** The field's label. Defaults to the operator's "Reason". */
+  label?: string
+  /** The field's help. Defaults to the operator's help. */
+  help?: string
+  /** The words of the send button. Defaults to the operator's "Send". */
+  okText?: string
+  /** The words of the button that closes the dialog. Defaults to the operator's "Close". */
+  cancelText?: string
+  /** What the field says when it is empty. */
+  requiredMessage?: string
+  /** What the field says when the text is longer than `maxLength`. */
+  tooLongMessage?: string
+  /** The most characters the text takes. Defaults to 500. */
+  maxLength?: number
+  /** The width of the dialog, as a size token of the dialog. Defaults to `small`. */
+  size?: 'small' | 'medium'
+  /** What the dialog shows when the command fails with no answer from the server. */
+  failedText?: string
 }
 
 /**
- * The dialog that asks for the reason of an operator command and sends it. A refusal shows the
- * server's problem title, and any other failure shows a generic text.
+ * The dialog that asks for one required text, such as the reason of an operator command, and sends it. A refusal shows
+ * the server's problem title, and any other failure shows a generic text, inside the dialog. Without its optional
+ * props it asks for an operator's reason, and a reply on a request's page gives its own words, see
+ * docs/reference/ai-authoring-in-studio.md#replies.
  */
-export function ReasonDialog({ title, onSend, onClose, onChanged, children }: ReasonDialogProps) {
+export function ReasonDialog({
+  title,
+  onSend,
+  onClose,
+  onChanged,
+  children,
+  label,
+  help,
+  okText,
+  cancelText,
+  requiredMessage,
+  tooLongMessage,
+  maxLength = 500,
+  size: dialogSize = 'small',
+  failedText,
+}: ReasonDialogProps) {
   const t = useText()
   const { size } = useDesignTokens()
   const [form] = Form.useForm<{ reason: string }>()
@@ -45,7 +78,7 @@ export function ReasonDialog({ title, onSend, onClose, onChanged, children }: Re
       }
     } catch (failure) {
       console.warn(`Sending '${title}' failed`, failure)
-      setError(t('shell.inspector.commands.failed'))
+      setError(failedText ?? t('shell.inspector.commands.failed'))
     } finally {
       setSending(false)
     }
@@ -54,10 +87,10 @@ export function ReasonDialog({ title, onSend, onClose, onChanged, children }: Re
   return (
     <Modal
       open
-      width={size.dialog.small}
+      width={dialogSize === 'medium' ? size.dialog.medium : size.dialog.small}
       title={title}
-      okText={t('shell.inspector.commands.send')}
-      cancelText={t('shell.inspector.commands.close')}
+      okText={okText ?? t('shell.inspector.commands.send')}
+      cancelText={cancelText ?? t('shell.inspector.commands.close')}
       confirmLoading={sending}
       onOk={() => void send().catch(() => undefined)}
       onCancel={onClose}
@@ -68,12 +101,12 @@ export function ReasonDialog({ title, onSend, onClose, onChanged, children }: Re
         <Form form={form} layout="vertical" requiredMark={requiredMark}>
           <AxisField
             name="reason"
-            label={t('shell.inspector.commands.reason')}
-            help={t('shell.inspector.commands.reason.help')}
-            requiredMessage={t('shell.inspector.commands.reasonRequired')}
-            rules={[{ max: reasonMaxLength, message: t('shell.inspector.commands.reasonTooLong') }]}
+            label={label ?? t('shell.inspector.commands.reason')}
+            help={help ?? t('shell.inspector.commands.reason.help')}
+            requiredMessage={requiredMessage ?? t('shell.inspector.commands.reasonRequired')}
+            rules={[{ max: maxLength, message: tooLongMessage ?? t('shell.inspector.commands.reasonTooLong') }]}
           >
-            <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
+            <Input.TextArea rows={3} showCount maxLength={maxLength} />
           </AxisField>
         </Form>
         {error !== undefined && <AxisAlert data-testid="inspector-command-error" kind="error" message={error} />}

@@ -36,7 +36,8 @@ widget names a role, never an Ant Design button type.
   keeping its disabled state. They are buttons again when the room comes back. A row without `fold` wraps.
 - **An action bar folds into More.** An `ActionBar`, a bar of actions at the foot of a page on `surface`
   with a `borderSubtle` rule above it, folds the actions it names into one More actions menu through
-  `AxisActionRow`'s `fold`, as a table's row actions fold at narrow width.
+  `AxisActionRow`'s `fold`, as a table's row actions fold at narrow width. A docked bar stays at the foot of the window across the
+  content instead of at the foot of its page.
 - **Text or an icon, never both.** An action shows its text or its icon. An icon goes with text only
   where it does what text cannot: navigation that collapses to icons, a status or a severity, and the
   mark that identifies an application or a site.

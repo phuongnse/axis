@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -38,11 +38,41 @@ function answer(body: AuthoringRequest | null) {
     : new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } })
 }
 
-function renderPage(props: { onAskAi?: () => void } = {}) {
+/**
+ * A server that answers by URL and method: a read answers the request as `server.current` holds it, and each action
+ * answers with the request in the state it moves to, or with a 500 when `refuse` names it. `calls` lists the actions.
+ */
+function serverOf(current: AuthoringRequest, refuse: string[] = []) {
+  const server = {
+    current,
+    calls: [] as { action: string; body: unknown }[],
+    fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const action = String(input).split('/').pop() ?? ''
+      if (init?.method !== 'POST') {
+        return answer(server.current)
+      }
+      server.calls.push({ action, body: init.body === undefined ? undefined : JSON.parse(String(init.body)) })
+      if (refuse.includes(action)) {
+        return new Response(null, { status: 500 })
+      }
+      const next = { approve: 'working', 'change-plan': 'planning', drop: 'dropped' }[action] as AuthoringRequestState
+      server.current = { ...server.current, state: next }
+      return answer(server.current)
+    }),
+  }
+  return server
+}
+
+function renderPage(props: { onAskAi?: () => void; userId?: string } = {}) {
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioAuthoringRequestPage application={application} requestId="r1" userId="u1" onAskAi={props.onAskAi} />
+        <StudioAuthoringRequestPage
+          application={application}
+          requestId="r1"
+          userId={props.userId ?? 'u1'}
+          onAskAi={props.onAskAi}
+        />
       </TextProvider>
     </ThemeModeProvider>,
   )
@@ -137,6 +167,176 @@ describe('StudioAuthoringRequestPage', () => {
 
     const time = formatValue({ name: 'sentAt', type: 'date-time' }, sentAt, {}, { locale: 'en', text: (key) => key })
     expect(await screen.findByText(`Sent by you on ${time}`)).toBeVisible()
+  })
+})
+
+describe('the plan and the guide', () => {
+  const plan = 'Add a supplier text field to the Request entity.\nShow it on the form.'
+  const waiting = () => request({ author: 'u1', state: 'awaitingApproval', plan })
+  const button = (name: string) => screen.queryByRole('button', { name })
+
+  it('shows its author the plan, where the request stands and the three actions', async () => {
+    vi.stubGlobal('fetch', serverOf(waiting()).fetch)
+    renderPage()
+
+    expect(await screen.findByText(/Add a supplier text field to the Request entity\./)).toBeVisible()
+    const guide = screen.getByTestId('studio-ai-request-guide')
+    expect(within(guide).getByText('Plan ready for your approval')).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Approve plan' })).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Change the plan…' })).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Drop…' })).toBeVisible()
+  })
+
+  it('shows another reader the plan and who it waits for, with no actions', async () => {
+    vi.stubGlobal('fetch', serverOf(request({ author: 'u2', state: 'awaitingApproval', plan })).fetch)
+    renderPage()
+
+    expect(await screen.findByText(/Add a supplier text field to the Request entity\./)).toBeVisible()
+    expect(screen.getByText("Waiting for its author's approval")).toBeVisible()
+    expect(button('Approve plan')).toBeNull()
+    expect(button('Change the plan…')).toBeNull()
+    expect(button('Drop…')).toBeNull()
+  })
+
+  it('shows that AI writes the plan, with Drop… for its author only', async () => {
+    vi.stubGlobal('fetch', serverOf(request({ author: 'u1', state: 'planning' })).fetch)
+    renderPage()
+
+    expect(
+      await screen.findByText(
+        'AI is reading the application and writing a plan. Nothing changes until the plan is approved.',
+      ),
+    ).toBeVisible()
+    expect(screen.getByText('AI is writing the plan')).toBeVisible()
+    expect(button('Drop…')).not.toBeNull()
+    expect(button('Approve plan')).toBeNull()
+    expect(button('Change the plan…')).toBeNull()
+  })
+
+  it.each([
+    ['working', 'AI is working on it', true],
+    ['accepted', 'Accepted. Live once published', false],
+    ['dropped', 'Dropped. Nothing changed', false],
+  ] as const)('says "%s" in the guide as "%s", with Drop… only while AI works', async (state, words, drop) => {
+    vi.stubGlobal('fetch', serverOf(request({ author: 'u1', state, plan })).fetch)
+    renderPage()
+
+    expect(await screen.findByText(words)).toBeVisible()
+    expect(button('Drop…') !== null).toBe(drop)
+  })
+
+  it('draws no guide yet for a ready or a failed request', async () => {
+    vi.stubGlobal('fetch', serverOf(request({ author: 'u1', state: 'ready', plan })).fetch)
+    renderPage()
+
+    await screen.findByTestId('studio-ai-request-state')
+    expect(screen.queryByTestId('studio-ai-request-guide')).toBeNull()
+  })
+
+  it('approves the plan and shows the request as Working', async () => {
+    const server = serverOf(waiting())
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve plan' }))
+
+    expect(await screen.findByText('AI is working on it')).toBeVisible()
+    expect(screen.getByTestId('studio-ai-request-state')).toHaveTextContent('Working')
+    expect(server.calls).toEqual([{ action: 'approve', body: undefined }])
+    expect(screen.queryByTestId('studio-ai-request-error')).toBeNull()
+  })
+
+  it('shows "That did not work. Try again." above the plan when Approve plan is refused', async () => {
+    const server = serverOf(waiting(), ['approve'])
+    vi.stubGlobal('fetch', server.fetch)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Approve plan' }))
+
+    const alert = await screen.findByTestId('studio-ai-request-error')
+    expect(alert).toHaveTextContent('That did not work. Try again.')
+    const planPart = screen.getByTestId('studio-ai-request-plan')
+    expect(alert.compareDocumentPosition(planPart) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByTestId('studio-ai-request-state')).toHaveTextContent('Awaiting approval')
+  })
+
+  it('asks for a new plan with a comment and shows the request as Planning', async () => {
+    const server = serverOf(waiting())
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Change the plan…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Change the plan' })
+    await userEvent.type(
+      within(dialog).getByRole('textbox', { name: 'What should the plan do differently?' }),
+      'Use a list',
+    )
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ask for a new plan' }))
+
+    expect(await screen.findByText('AI is writing the plan')).toBeVisible()
+    expect(screen.getByTestId('studio-ai-request-state')).toHaveTextContent('Planning')
+    expect(server.calls).toEqual([{ action: 'change-plan', body: { comment: 'Use a list' } }])
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('asks for the comment before it sends a change of plan', async () => {
+    const server = serverOf(waiting())
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Change the plan…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Change the plan' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ask for a new plan' }))
+
+    expect(await within(dialog).findByText('Write what the plan should do differently.')).toBeInTheDocument()
+    expect(server.calls).toEqual([])
+  })
+
+  it('shows "That did not work. Try again." inside the dialog when a change of plan is refused', async () => {
+    const server = serverOf(waiting(), ['change-plan'])
+    vi.stubGlobal('fetch', server.fetch)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Change the plan…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Change the plan' })
+    await userEvent.type(within(dialog).getByRole('textbox'), 'Use a list')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ask for a new plan' }))
+
+    expect(await within(dialog).findByText('That did not work. Try again.')).toBeVisible()
+    expect(screen.queryByTestId('studio-ai-request-error')).toBeNull()
+    expect(screen.getByTestId('studio-ai-request-state')).toHaveTextContent('Awaiting approval')
+  })
+
+  it('drops the request after a confirmation and shows it as Dropped', async () => {
+    const server = serverOf(waiting())
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Drop…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Drop this request?' })
+    expect(within(dialog).getByText('AI stops working on this request, and its draft is deleted.')).toBeVisible()
+    expect(server.calls).toEqual([])
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Drop' }))
+
+    expect(await screen.findByText('Dropped. Nothing changed')).toBeVisible()
+    expect(screen.getByTestId('studio-ai-request-state')).toHaveTextContent('Dropped')
+    expect(server.calls).toEqual([{ action: 'drop', body: undefined }])
+  })
+
+  it('shows "That did not work. Try again." when a drop is refused', async () => {
+    const server = serverOf(waiting(), ['drop'])
+    vi.stubGlobal('fetch', server.fetch)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    renderPage()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Drop…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Drop this request?' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Drop' }))
+
+    expect(await screen.findByTestId('studio-ai-request-error')).toHaveTextContent('That did not work. Try again.')
+    expect(screen.getByTestId('studio-ai-request-state')).toHaveTextContent('Awaiting approval')
   })
 })
 
