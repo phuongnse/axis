@@ -1,8 +1,13 @@
 import { Flex, Typography } from 'antd'
-import { useContext } from 'react'
+import { useContext, useState } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { EmptyDash } from '../platform/EmptyValue'
+import { fillText } from '../platform/fillText'
+import { keyedListsOf, layerMarks } from '../platform/layerMarks'
 import {
+  type AuthoringRequestLayerChange,
   changeRows,
+  type StudioChangeRow,
   type StudioReleaseChange,
   type StudioResourceItem,
   type StudioRevisionChange,
@@ -11,6 +16,7 @@ import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
+import { LayerMarkLabel } from './LayerMarkViews'
 
 /** The JSON text of one side of a change, indented when it parses, and as it is when it does not. */
 function prettyJson(text: string): string {
@@ -18,6 +24,18 @@ function prettyJson(text: string): string {
     return JSON.stringify(JSON.parse(text), null, 2)
   } catch {
     return text
+  }
+}
+
+/** The JSON value of a text, or null when it is no text or does not parse. */
+function parsedJson(text: string | null): unknown {
+  if (text === null) {
+    return null
+  }
+  try {
+    return JSON.parse(text)
+  } catch {
+    return null
   }
 }
 
@@ -61,50 +79,121 @@ export function JsonDiff({ before, after }: { before: string | null; after: stri
   )
 }
 
+/** A changed file of a diff. `module` is the module resource a layer file changes, with the layer applied, on a layer file only. */
+export type StudioChangeFile = StudioRevisionChange & { module?: AuthoringRequestLayerChange }
+
+/**
+ * The marks of a module resource that a layer changed, each element as its key and a tag with its accessible name, such as
+ * "supplier, added by this application". Removed elements show muted, as the layer editor shows them.
+ */
+function LayerMarks({ module }: { module: AuthoringRequestLayerChange }) {
+  const { colour, spacing } = useDesignTokens()
+  const content = parsedJson(module.after)
+  const { keyedLists, maps } = keyedListsOf(module.kind, content)
+  const elements = layerMarks(content, module.marks, module.removed, keyedLists, maps)
+  if (elements.length === 0) {
+    return null
+  }
+  return (
+    <Flex vertical gap={spacing.xs}>
+      {elements.map((element, index) => (
+        <Flex key={index} gap="small" align="center" wrap data-testid="studio-changes-mark">
+          <Typography.Text style={element.mark === 'removed' ? { color: colour.textMuted } : undefined}>
+            {element.key}
+          </Typography.Text>
+          <LayerMarkLabel mark={element.mark} name={element.key} />
+        </Flex>
+      ))}
+    </Flex>
+  )
+}
+
+/**
+ * One changed file: its name, its kind, its change and, when `folded`, a Show the diff link that opens its JSON. A layer
+ * file is named by the module resource it changes and shows that resource's JSON and its marks.
+ */
+function ChangeFile({
+  row,
+  file,
+  folded,
+}: {
+  row: StudioChangeRow
+  file: StudioChangeFile | undefined
+  folded: boolean
+}) {
+  const t = useText()
+  const { colour } = useDesignTokens()
+  const [open, setOpen] = useState(false)
+  const module = file?.module
+  return (
+    <section data-testid="studio-changes-file" data-file={file?.file}>
+      <Flex vertical gap="small">
+        <Flex wrap gap="small" align="baseline">
+          <Typography.Text strong>{row.name}</Typography.Text>
+          <Typography.Text style={{ color: colour.textMuted }}>
+            {row.kind === null ? <EmptyDash /> : kindSingular(row.kind, t)}
+          </Typography.Text>
+          <Typography.Text>{t(`shell.studio.overview.change.${row.change}`)}</Typography.Text>
+          {folded && (
+            <AxisButton
+              role="link"
+              aria-expanded={open}
+              aria-label={fillText(
+                t(open ? 'shell.studio.changes.hideDiffName' : 'shell.studio.changes.showDiffName'),
+                {
+                  name: row.name,
+                },
+              )}
+              onClick={() => setOpen((current) => !current)}
+            >
+              {t(open ? 'shell.studio.changes.hideDiff' : 'shell.studio.changes.showDiff')}
+            </AxisButton>
+          )}
+        </Flex>
+        {module !== undefined && <LayerMarks module={module} />}
+        {(!folded || open) && (
+          <JsonDiff
+            before={module ? module.before : (file?.before ?? null)}
+            after={module ? module.after : (file?.after ?? null)}
+          />
+        )}
+      </Flex>
+    </section>
+  )
+}
+
 /**
  * The files a revision or a draft changed, sorted by name: each shows its name, its kind (the em dash when it has none)
  * and Added, Changed or Removed, and under them its JSON before and after as a {@link JsonDiff}. `resources` are the
- * application's resources, which name a file's kind and title. See
+ * application's resources, which name a file's kind and title. With `folded`, each file starts closed behind Show the
+ * diff, and a layer file is named by its module resource, with the layer's marks under it. See
  * docs/reference/shared-widgets.md#which-widget and docs/reference/ai-authoring-in-studio.md#revisions.
  */
 export function StudioChanges({
   files,
   resources,
+  folded = false,
 }: {
-  files: StudioRevisionChange[]
+  files: StudioChangeFile[]
   resources: StudioResourceItem[]
+  folded?: boolean
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const { colour } = useDesignTokens()
   const changes = files.map((file): StudioReleaseChange => ({
     path: file.file,
     change: file.change,
-    kind: file.kind,
-    name: file.name,
+    kind: file.module?.kind ?? file.kind,
+    name: file.module ? (file.module.name ?? file.module.id) : file.name,
     titles: null,
     locale: null,
   }))
   const byKey = new Map(files.map((file) => [`${file.change}:${file.file}`, file]))
   return (
     <Flex vertical gap="middle">
-      {changeRows(changes, resources, locale, t).map((row) => {
-        const file = byKey.get(row.key)
-        return (
-          <section key={row.key} data-testid="studio-changes-file" data-file={file?.file}>
-            <Flex vertical gap="small">
-              <Flex wrap gap="small" align="baseline">
-                <Typography.Text strong>{row.name}</Typography.Text>
-                <Typography.Text style={{ color: colour.textMuted }}>
-                  {row.kind === null ? <EmptyDash /> : kindSingular(row.kind, t)}
-                </Typography.Text>
-                <Typography.Text>{t(`shell.studio.overview.change.${row.change}`)}</Typography.Text>
-              </Flex>
-              <JsonDiff before={file?.before ?? null} after={file?.after ?? null} />
-            </Flex>
-          </section>
-        )
-      })}
+      {changeRows(changes, resources, locale, t).map((row) => (
+        <ChangeFile key={row.key} row={row} file={byKey.get(row.key)} folded={folded} />
+      ))}
     </Flex>
   )
 }

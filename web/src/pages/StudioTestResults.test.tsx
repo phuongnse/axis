@@ -130,3 +130,20 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     expect(screen.queryAllByTestId('studio-test-result')).toHaveLength(0)
   })
 })
+
+describe('StudioTestResults without onSelect', () => {
+  it('shows a failed scenario as plain text, with no button to open it', () => {
+    render(
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioTestResults request={request({ status: 'failed', scenarios: [approval, finance] })} />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    const failed = screen.getAllByTestId('studio-test-result').find((row) => row.dataset.outcome === 'failed')!
+    expect(within(failed).getByText('ApprovalBelowThreshold')).toBeVisible()
+    expect(within(failed).getByText('The record status is approved, not rejected.')).toBeVisible()
+    expect(within(failed).queryByRole('button')).not.toBeInTheDocument()
+  })
+})
