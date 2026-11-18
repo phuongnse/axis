@@ -144,7 +144,7 @@ A required field's label is marked, but the mark blocks nothing: the server stil
 | `reference`                                                                                                           | The label of the chosen record, read-only, with a choose button that opens the [lookup](#lookup), and a clear button when the field is not required and is set. Choose and Clear are icon buttons, a search and a close icon, with their names as tooltips on hover and on keyboard focus. They are bordered buttons joined to the input on its right, in the input's border colour, with the corner radius only on the outer corners |
 | `references`                                                                                                          | A list of the chosen records' labels in their order, each with a remove button, and an add button that opens the lookup, see [set of references](#set-of-references)                                                                                                                                                                                                                                                                  |
 | `child-collection`                                                                                                    | A table of its rows, see [child collections](#child-collections)                                                                                                                                                                                                                                                                                                                                                                      |
-| Any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | The value the server returned, formatted as a table cell shows it, as plain text, see [field look](#field-look). An empty value shows "Not set" in muted italics. It changes only when the record is saved and loaded again                                                                                                                                                                                                           |
+| Any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | The value the server returned, formatted as a table cell shows it, as plain text, see [field look](#field-look). A read-only `reference` is a link _(planned)_, see [open a reference](#inputs). An empty value shows "Not set" in muted italics. It changes only when the record is saved and loaded again                                                                                                                                                                                                           |
 
 - **Sequence fields.** Page metadata marks a field that names a
   [sequence](entity-logic-and-sequences.md#sequences), so the form shows it read-only. It is empty on a new record,
@@ -152,6 +152,11 @@ A required field's label is marked, but the mark blocks nothing: the server stil
 - **Creator fields.** Page metadata marks a field that declares
   [`creator`](roles-and-policies.md#record-creator), so the form shows it read-only. It is empty on a
   new record, shows the creating user's id once saved, and the form never sends it.
+- **Open a reference** _(planned)_. A `reference` field whose chosen record the person can open has an Open icon button
+  with `ExportOutlined`, joined after Choose and before Clear. It is named "Open {label}" ("Mở {label}"), where Open is
+  the text `shell.form.openRecord`, and it is a real link to the record's page. A read-only reference is a link too,
+  see [opening things](actions-and-controls.md#opening-things). The unsaved changes guard asks before a link leaves a
+  form with a change. A record the person cannot open is plain text, with no Open button.
 
 ## Field look
 
@@ -229,8 +234,9 @@ returns no label when the user may not read the target's display field.
   empty set, and an empty set that was never changed stays out of the create body.
 - **Messages.** A required set that is empty gets the server's message on the field. The form does not
   check the limit of 1,000 ids, and the server's message shows on the field.
-- **Read-only.** A set that the form makes read-only shows its labels joined by a comma as plain text,
+- **Read-only.** A set that the form makes read-only shows its labels joined by a comma,
   or "Not set" when it is empty, with no add or remove button.
+- **Links** _(planned)_. Each entry's label is a link to its record page, and so is each label of a read-only set.
 
 ## Child collections
 
@@ -248,9 +254,12 @@ A child collection field shows its rows as a table under the field's label.
   the one-based row number, such as `Quantity 2`. A file cell is the file input, and its Upload button
   is named like `Upload File 2`.
 - **Read-only cells.** A computed child field's cell, and every cell of a read-only collection, shows
-  the row's value as plain text, not an input, formatted as a table cell shows it. It keeps an input's
+  the row's value as plain text, not an input, formatted as a table cell shows it, except a reference cell, see
+  [references in cells](#child-collections). It keeps an input's
   height, so it lines up with the inputs beside it. An empty read-only or computed cell shows a muted
   italic "—". A read-only file cell shows its download link, or a dash when it has no file.
+- **References in cells** _(planned)_. A reference cell has the same Open button as a reference field, and a read-only
+  reference cell is a link to its record page.
 - **Table.** The table is the shared table, see [tables](actions-and-controls.md#tables). A reference
   cell's input keeps at least 240px and the other inputs at least 160px.
 - **Rows.** Delete row is the row's icon action: a trash icon button in `dangerText`, with its name as

@@ -244,6 +244,11 @@ tenant host.
   with its `entries`. It adds `homePage`, the name of the person's home page, and `brand`, which is
   `{ "logo", "colours" }` with the logo's address and the light and dark colours, or `null`. See
   [sites](configuration.md#sites).
+- **Record pages** _(planned)_. `GET /api/sites/{path}` adds `"recordPages": { "<entity>": "/{site}/{page}" }`, the
+  address of each entity's record page: the named page, or else the default record page, as [routing](#routing) says. A
+  module page is `/{site}/{module id}/{name}`. It lists only the entities whose `read` the person's grants allow, see
+  [access](#access), so the SPA links only what the person can open. The rule is
+  [D162](../decisions/d162-each-entitys-records-open-on-one-record-page-in-each-site.md).
 
 ## Page metadata
 
@@ -511,6 +516,7 @@ below answers `200`.
 | `/{site}/{page}?ticket=<id>`           | a page with parameters: the values sit in the query under the parameter names                                                                                                                                                                                                                                                                                                                                                                                       |
 | `/{site}/{page}/new`                   | the form of a form page, to create a record                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `/{site}/{page}/{id}`                  | the form of a form page, to edit the record with that id                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `/{site}/records/{entity}/{id}` _(planned)_ | the default record page of an entity that the site names no record page for, shown as the form of the record |
 | `/{site}/{inboxpage}/{taskId}`         | the task page of the task with that id, under the page of a task inbox                                                                                                                                                                                                                                                                                                                                                                                              |
 | `/{site}/{inspectorpage}/{instanceId}` | the instance page of the process instance with that id, under the page of a process inspector                                                                                                                                                                                                                                                                                                                                                                       |
 
@@ -531,8 +537,9 @@ below answers `200`.
   `taskInbox` or `processInspector`, and the compiler checks this. `/new` and `/{id}` belong to its `form`.
   `/{taskId}` and `/{instanceId}` belong to its `taskInbox` or `processInspector`. The instance list of a
   `processInspector` and the task list of a `taskInbox` also read `search`, `filter`, `columns`, `sort`, `page` and
-  `pageSize`. A `kpi`, a `detail`, a `chart`, a `content` widget and a `tree` own no part of the address and read only
-  page parameters, so they do not count.
+  `pageSize`. A `kpi`, a `chart`, a `content` widget and a `tree` own no part of the address and read only
+  page parameters, so they do not count. A `detail` owns no part of the address, except `/{id}` on a page that a site
+  names as a record page, as [a detail as a record page](#routing) says.
 - **Letter case.** `{site}` is the site path, and `{page}` is the page name in lower case, as navigation links write
   it. The server matches both ignoring letter case.
 - **Page parameters.** A required page parameter that is missing from the URL, or has the wrong form, shows the
@@ -555,6 +562,15 @@ below answers `200`.
   page was opened from, with its table's search, sort and page, or else `/{site}`, which opens the first page. No save
   bar and no record action shows. Such a page is mostly opened from an email, a bookmark or a shared link, so no entry
   is marked, and at narrow width the sidebar is hidden, so the link stays.
+- **The default record page** _(planned)_. `/{site}/records/{entity}/{id}` shows the entity's form over every field, in
+  declaration order, as an `entity` form does. It has the heading, the save bar, the history and a missing record's
+  line, as any record's page does, and the person's write grants decide which fields are read-only. A module entity's
+  address is `/{site}/records/{module id}/{name}/{id}`. The not-found rule above does not catch these two addresses,
+  because each matches its own route. A reference opens its entity's record page, with the record's id after the
+  page's address, see [opening things](actions-and-controls.md#opening-things).
+- **A detail as a record page** _(planned)_. A detail page that a site names as a record page opens its record at
+  `/{site}/{page}/{id}`, and that segment fills the detail's `record` parameter. The page's other parameters still sit
+  in the query, as on any page with parameters.
 - **Inside a site.** The shell shows the site's title, navigation and locales in the [layout](shell.md#layout) of
   [shell and home page](shell.md). The page header, the app switcher and the language and theme menu work as they do
   on the platform site, see [page header](shell.md#page-header) and
