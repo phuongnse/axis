@@ -134,8 +134,8 @@ against any model.
   approves the plan, accepts a `ready` draft and judges the outcome. A case that cannot run is reported
   as `not run`, and its error goes to stderr. The script writes `artifacts/ai-eval/report.json`, or
   `report.json` in the folder that `AXIS_AI_EVAL_REPORT_DIR` names. The report holds the pass bar result
-  and, for each case, whether it passed, the reasons, its tokens and its `durationMs`. The smoke test
-  runs the script against a stand-in model, so no paid model is called.
+  and, for each case, whether it passed, the reasons, its tokens and its `durationMs`. The smoke tests
+  `ai-eval-pass` and `ai-eval-refusal` run the script against a stand-in model, so no paid model is called.
 - **Pass bar.** A model is supported when it passes every `refusal` case and at least 90% of the
   `change` cases. The script exits with 0 at or above the bar and 1 below it, and with 1 when the
   stack does not start. It exits with 2 for a wrong argument or a binding with no settings, and then
