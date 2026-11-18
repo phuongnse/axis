@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ConfigProvider } from 'antd'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -18,22 +19,30 @@ function ThemeRoot({ children }: { children: ReactNode }) {
   return <div data-theme-mode={useThemeMode().mode}>{children}</div>
 }
 
-function renderValues(data: unknown = values, onChange = vi.fn(), known: string[] | null = fields) {
+function renderValues(data: unknown = values, onChange = vi.fn(), known: string[] | null = fields, readOnly = false) {
   render(
-    <ThemeModeProvider>
-      <ThemeRoot>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <ExpressionCheckContext.Provider
-            value={{ application: 'Shop', resourceId: 'bc241668', kind: 'endpoint', draft: () => ({}), names: null }}
-          >
-            <EndpointValues fields={known ?? undefined} values={data} onChange={onChange} />
-          </ExpressionCheckContext.Provider>
-        </TextProvider>
-      </ThemeRoot>
-    </ThemeModeProvider>,
+    <ConfigProvider componentDisabled={readOnly}>
+      <ThemeModeProvider>
+        <ThemeRoot>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <ExpressionCheckContext.Provider
+              value={{ application: 'Shop', resourceId: 'bc241668', kind: 'endpoint', draft: () => ({}), names: null }}
+            >
+              <EndpointValues fields={known ?? undefined} values={data} onChange={onChange} />
+            </ExpressionCheckContext.Provider>
+          </TextProvider>
+        </ThemeRoot>
+      </ThemeModeProvider>
+    </ConfigProvider>,
   )
   return onChange
 }
+
+/** Add mapping is a picker while the entity's fields are known, and a plain button while they are not. */
+const addMapping = [
+  { when: 'known', known: fields, role: 'combobox' as const },
+  { when: 'unknown', known: null, role: 'button' as const },
+]
 
 beforeEach(() =>
   vi.stubGlobal(
@@ -84,7 +93,7 @@ describe('EndpointValues', () => {
     expect(within(region).getByText(platformEnglish['shell.studio.field.endpoint.values.help'])).toBeVisible()
   })
 
-  it('says there are no values above Add mapping when the endpoint has none', () => {
+  it('says there are no values when the endpoint has none', () => {
     renderValues({})
 
     expect(screen.getByRole('region', part)).toContainElement(
@@ -92,6 +101,31 @@ describe('EndpointValues', () => {
     )
     expect(screen.getByRole('combobox', { name: 'Add mapping' })).toBeVisible()
   })
+
+  it.each(addMapping)(
+    'puts Add mapping on the right of the heading and nowhere else in the part while the fields are $when',
+    ({ known, role }) => {
+      renderValues(values, vi.fn(), known)
+
+      const part = screen.getByTestId('studio-section-values')
+      const body = screen.getByTestId('studio-field-/values')
+      expect(within(part).getAllByRole(role, { name: 'Add mapping' })).toHaveLength(1)
+      expect(within(body).queryByRole(role, { name: 'Add mapping' })).toBeNull()
+      expect(
+        within(part).getByRole(role, { name: 'Add mapping' }).compareDocumentPosition(body) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+    },
+  )
+
+  it.each(addMapping)(
+    'keeps Add mapping off when the editor is read-only and the fields are $when',
+    ({ known, role }) => {
+      renderValues(values, vi.fn(), known, true)
+
+      expect(screen.getByRole(role, { name: 'Add mapping' })).toBeDisabled()
+    },
+  )
 
   it('removes a mapping by its key', async () => {
     const onChange = renderValues()

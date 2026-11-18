@@ -1,4 +1,4 @@
-import { Button, Flex, Input, Select, Typography } from 'antd'
+import { Flex, Input, Select, Typography } from 'antd'
 import type { HTMLAttributes } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
@@ -223,7 +223,8 @@ export function FieldCell(props: CellProps) {
  * tag with Reset to module, and the records it removed show as muted rows below the grid. The grid has a Filter on the
  * Id and every field column, kept in the address under `records.`. A filter only hides rows: every row shows on one page,
  * an edit to a hidden row stays in the draft, and a record whose id is not among `savedIds`, the ids as last saved, stays
- * shown, see docs/reference/studio-form-editors.md#seed-editor.
+ * shown, see docs/reference/studio-form-editors.md#seed-editor. Its Add record sits on the right of the part's heading, see
+ * docs/reference/studio-resource-form.md#sections.
  */
 export function SeedGrid({
   fields,
@@ -258,6 +259,11 @@ export function SeedGrid({
     <SectionPart
       testName="records"
       heading={{ title: t('shell.studio.field.seed.records'), line: t('shell.studio.field.seed.records.help') }}
+      action={
+        <AxisButton role="secondary" onClick={() => onChange('/records', [...list, { id: newUuid(), values: {} }])}>
+          {t('shell.studio.seed.addRecord')}
+        </AxisButton>
+      }
     >
       <div data-testid="studio-field-/records">
         <Flex vertical gap="small" data-testid="studio-seed-grid">
@@ -326,12 +332,6 @@ export function SeedGrid({
             ]}
           />
           <RemovedRows layer={layer} list="/records" />
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange('/records', [...list, { id: newUuid(), values: {} }])}>
-              {t('shell.studio.seed.addRecord')}
-            </Button>
-          </div>
         </Flex>
       </div>
     </SectionPart>

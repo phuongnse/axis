@@ -37,8 +37,8 @@ seed's `entity`, and the JSON view stays as the second view of the same draft.
 
 An endpoint keeps the generic form for its entity, process, input and output, and shows its `values`
 as rows of a field and an expression in the [expression editor](studio.md#expression-editor). The rows sit in a
-part headed Values, with help that says what they are. An endpoint with no values says so in one line, above
-Add mapping. Its `event` sits in a part headed Event, below the values.
+part headed Values, with help that says what they are. An endpoint with no values says so in one line. Its `event`
+sits in a part headed Event, below the values.
 
 The field is picked from the fields of the endpoint's entity, found by name among the application's
 names, and is typed while those are unknown. Add mapping lists the fields that have no row. Renaming a
