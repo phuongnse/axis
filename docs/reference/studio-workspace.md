@@ -33,9 +33,9 @@ the row. Where the footer sits beside the sidebar is in [layout](shell.md#layout
 Under the row come Overview, Releases, History and Settings, which concern the whole application.
 History lists the application's revisions, see [revisions](ai-authoring-in-studio.md#revisions).
 
-**AI requests** _(planned for M35)_. A parent entry right after History, shown to a person who may ask AI.
-Its two views, All requests and Needs action, are filters of the [AI requests](ai-authoring-in-studio.md#the-request-panel)
-table.
+- **AI requests** _(planned for M35)_. A parent entry right after History, shown to a person who may ask AI.
+  Its two views, All requests and Needs action, are filters of the [AI requests](ai-authoring-in-studio.md#the-request-panel)
+  table.
 
 Then come the resource kinds in groups by what an author does with them:
 

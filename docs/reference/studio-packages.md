@@ -43,9 +43,10 @@ _(planned for M37)_
 A change to a package's files shows as text, line by line, because a package file is code and not a
 resource's JSON.
 
-- **Where.** A revision's diff, a draft's diff and the publish dialog show each changed package file as
+- **Where.** A revision's diff, a draft's diff and the publish page show each changed package file as
   Added, Changed or Removed, with its text before and after, line by line, see
-  [revisions](ai-authoring-in-studio.md#revisions) and [the diff](ai-authoring-in-studio.md#the-diff).
+  [revisions](ai-authoring-in-studio.md#revisions), [the diff](ai-authoring-in-studio.md#the-diff) and
+  [publishing](studio.md#publishing).
 - **The same rules.** The summary, the markers and the order follow those of a resource's diff. Only a
   changed file's text is drawn differently.
 
