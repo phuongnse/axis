@@ -65,11 +65,11 @@ const tablePath = (key: string) => `/api/me/tables/${encodeURIComponent(key)}`
 export type SavedTableViewFields = Omit<SavedTableView, 'id'>
 
 /**
- * A person's kept choices for the table `key`, and the means to keep or forget its columns and to save, rename and
+ * A person's kept choices for the table `key`, and the means to keep or forget its columns and to save, replace and
  * delete its views, see docs/reference/frontend.md#table-views-and-columns. It asks the server once for each key.
  * `choices` stays undefined until they arrive, and for good when the request fails or the session has ended: the table
  * then works as it did without them, and the sign-in prompt stays hidden. `keepColumns` sends the shown columns, or
- * forgets the choice for `undefined`, and a failure is only logged. `saveView`, `renameView` and `deleteView` answer
+ * forgets the choice for `undefined`, and a failure is only logged. `saveView`, `replaceView` and `deleteView` answer
  * whether the server took the write, and change the views in `choices` only then. A failure is logged. Without a key
  * they do nothing and answer false.
  */
@@ -77,7 +77,7 @@ export function useTableChoices(key: string | undefined): {
   choices: TableChoices | undefined
   keepColumns: (columns: string[] | undefined) => void
   saveView: (fields: SavedTableViewFields) => Promise<boolean>
-  renameView: (view: SavedTableView, name: string) => Promise<boolean>
+  replaceView: (view: SavedTableView) => Promise<boolean>
   deleteView: (view: SavedTableView) => Promise<boolean>
 } {
   // The key the choices belong to, so the choices of an earlier key never show for a new one.
@@ -180,14 +180,15 @@ export function useTableChoices(key: string | undefined): {
     [writeView],
   )
 
-  const renameView = useCallback(
-    (view: SavedTableView, name: string) => {
+  /** Replaces the saved view with the same id by `view`, whole: its name, search, filter and sort. */
+  const replaceView = useCallback(
+    (view: SavedTableView) => {
       const { id, ...fields } = view
       return writeView(
         `/${encodeURIComponent(id)}`,
-        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...fields, name }) },
+        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) },
         204,
-        (views) => views.map((other) => (other.id === id ? { ...other, name } : other)),
+        (views) => views.map((other) => (other.id === id ? view : other)),
       )
     },
     [writeView],
@@ -205,7 +206,7 @@ export function useTableChoices(key: string | undefined): {
     choices: loaded !== undefined && loaded.key === key ? loaded.choices : undefined,
     keepColumns,
     saveView,
-    renameView,
+    replaceView,
     deleteView,
   }
 }

@@ -1,4 +1,4 @@
-import { DeleteOutlined, EditOutlined, FolderOpenOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, FolderOpenOutlined, SaveOutlined } from '@ant-design/icons'
 import { ConfigProvider, Flex, Form, Input, Modal } from 'antd'
 import { useContext, useState } from 'react'
 import { AxisAlert } from './AxisAlert'
@@ -19,10 +19,10 @@ const nameLength = 80
 const nameTaken = (views: readonly SavedTableView[], name: string, own?: SavedTableView): boolean =>
   views.some((view) => view !== own && view.name.trim().toLowerCase() === name.trim().toLowerCase())
 
-/** What one line of the dialog is doing: showing its view, or asking for a new name or whether to delete it. */
-type Mode = 'show' | 'rename' | 'delete'
+/** What one line of the dialog is doing: showing its view, or asking for a new name or whether to overwrite or delete it. */
+type Mode = 'show' | 'rename' | 'overwrite' | 'delete'
 
-/** One view in the dialog: its name, which opens it, and the Rename and Delete actions that work in this line. */
+/** One view in the dialog: its name, which opens it, and the Rename, Overwrite and Delete actions that work in this line. */
 function ViewLine({
   view,
   views,
@@ -66,6 +66,16 @@ function ViewLine({
       setFailure(t('shell.table.viewsRenameFailed'))
     }
   }
+  const overwrite = async () => {
+    setWorking(true)
+    const overwritten = await saved.overwrite(view)
+    setWorking(false)
+    if (overwritten) {
+      show()
+    } else {
+      setFailure(t('shell.table.viewsOverwriteFailed'))
+    }
+  }
   const remove = async () => {
     setWorking(true)
     const removed = await saved.remove(view)
@@ -92,6 +102,13 @@ function ViewLine({
                 setName(view.name)
                 setMode('rename')
               }}
+            />
+            <AxisButton
+              role="icon"
+              nameKey="shell.table.viewsOverwrite"
+              nameSuffix={view.name}
+              icon={<SaveOutlined />}
+              onClick={() => setMode('overwrite')}
             />
             <AxisButton
               role="icon"
@@ -125,6 +142,19 @@ function ViewLine({
           {problem && <span style={{ color: colour.dangerText }}>{problem}</span>}
         </Flex>
       )}
+      {mode === 'overwrite' && (
+        <Flex align="center" justify="space-between" gap="small" wrap>
+          <span>{t('shell.table.viewsOverwriteConfirm').replace('{name}', view.name)}</span>
+          <Flex gap="small">
+            <AxisButton role="main" disabled={working} onClick={() => void overwrite()}>
+              {t('shell.table.viewsOverwrite')}
+            </AxisButton>
+            <AxisButton role="secondary" onClick={show}>
+              {t('shell.form.cancel')}
+            </AxisButton>
+          </Flex>
+        </Flex>
+      )}
       {mode === 'delete' && (
         <Flex align="center" justify="space-between" gap="small" wrap>
           <span>{t('shell.table.viewsDeleteConfirm').replace('{name}', view.name)}</span>
@@ -145,8 +175,8 @@ function ViewLine({
 
 /**
  * The Views button of a table with a key and the dialog it opens, see docs/reference/actions-and-controls.md#tables.
- * The dialog lists the person's views by name in the page language's collation. A name opens its view, and Rename and
- * Delete work in the view's own line, Delete after a question, so the dialog opens no dialog of its own. The Name field
+ * The dialog lists the person's views by name in the page language's collation. A name opens its view, and Rename,
+ * Overwrite and Delete work in the view's own line, Overwrite and Delete after a question, so the dialog opens no dialog of its own. The Name field
  * and Save view save the table's current search, filter and sort. A save the server refuses keeps the dialog open
  * and says so.
  */

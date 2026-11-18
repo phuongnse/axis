@@ -46,6 +46,9 @@ const texts = {
   'shell.table.viewsSaveFailed': 'The view could not be saved.',
   'shell.table.viewsRename': 'Rename',
   'shell.table.viewsRenameFailed': 'The view could not be renamed.',
+  'shell.table.viewsOverwrite': 'Overwrite',
+  'shell.table.viewsOverwriteConfirm': 'Overwrite the view {name} with the current search, filter and sort?',
+  'shell.table.viewsOverwriteFailed': 'The view could not be overwritten.',
   'shell.table.viewsDelete': 'Delete',
   'shell.table.viewsDeleteConfirm': 'Delete the view {name}?',
   'shell.table.viewsDeleteFailed': 'The view could not be deleted.',
@@ -930,9 +933,9 @@ describe('AxisTable', () => {
         sort: string | null
       }
 
-      /** A server that keeps the views of one table. `saveStatus` is what a POST answers. */
+      /** A server that keeps the views of one table. `saveStatus` is what a POST answers and `replaceStatus` what a PUT answers. */
       function serveViews(views: Stored[], saveStatus = 201) {
-        const server = { views, saveStatus }
+        const server = { views, saveStatus, replaceStatus: 204 }
         const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
           const method = init?.method ?? 'GET'
           if (url === tableUrl && method === 'GET') {
@@ -945,6 +948,9 @@ describe('AxisTable', () => {
             const saved = { id: 'new', ...(JSON.parse(String(init?.body)) as Omit<Stored, 'id'>) }
             server.views = [...server.views, saved]
             return Response.json(saved, { status: 201 })
+          }
+          if (url.startsWith(`${tableUrl}/views/`) && method === 'PUT') {
+            return new Response(null, { status: server.replaceStatus })
           }
           return new Response(null, { status: 204 })
         })
@@ -1062,7 +1068,7 @@ describe('AxisTable', () => {
         expect(viewsDialog()).toBe(dialog)
         expect(screen.getByTestId('address')).toHaveTextContent('?search=pen')
         expect(screen.getByTestId('navigation')).toHaveTextContent('POP')
-        expect(within(dialog).getAllByRole('button', { name: /^(Rename|Delete) / })).toHaveLength(2)
+        expect(within(dialog).getAllByRole('button', { name: /^(Rename|Overwrite|Delete) / })).toHaveLength(3)
         expect(server.views).toHaveLength(1)
       })
 
@@ -1096,6 +1102,76 @@ describe('AxisTable', () => {
         expect(init?.method).toBe('PUT')
         expect(JSON.parse(String(init?.body))).toEqual({ name: 'New', search: 'pen', filter: null, sort: '-amount' })
         expect(within(dialog).queryByRole('button', { name: 'Old' })).not.toBeInTheDocument()
+      })
+
+      const viewNames = (dialog: HTMLElement) =>
+        within(dialog)
+          .getAllByRole('button')
+          .map((button) => button.textContent)
+          .filter((name) => name === 'Mine' || name === 'Zed')
+
+      it('overwrites a view in its own line with the current search, filter and sort', async () => {
+        const { fetchMock } = serveViews([
+          { id: 'a b', name: 'Mine', search: null, filter: null, sort: null },
+          { id: 'c', name: 'Zed', search: null, filter: null, sort: null },
+        ])
+        open(`/?search=pen&filter=${encodeURIComponent(filter)}&sort=-amount`)
+
+        const dialog = await openViews()
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Overwrite Mine' }))
+        expect(
+          within(dialog).getByText('Overwrite the view Mine with the current search, filter and sort?'),
+        ).toBeInTheDocument()
+        expect(mutations(fetchMock)).toHaveLength(0)
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Overwrite' }))
+
+        expect(await within(dialog).findByRole('button', { name: 'Overwrite Mine' })).toBeInTheDocument()
+        expect(mutations(fetchMock)).toHaveLength(1)
+        const [url, init] = mutations(fetchMock)[0]
+        expect(url).toBe(`${tableUrl}/views/a%20b`)
+        expect(init?.method).toBe('PUT')
+        expect(JSON.parse(String(init?.body))).toEqual({ name: 'Mine', search: 'pen', filter, sort: '-amount' })
+        expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
+        expect(viewsDialog()).toBe(dialog)
+        expect(viewNames(dialog)).toEqual(['Mine', 'Zed'])
+        expect(address().get('search')).toBe('pen')
+        expect(address().get('sort')).toBe('-amount')
+      })
+
+      it('sends nothing and shows the view again when Cancel answers the overwrite question', async () => {
+        const { fetchMock } = serveViews([{ id: 'a', name: 'Mine', search: null, filter: null, sort: null }])
+        open('/?search=pen')
+
+        const dialog = await openViews()
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Overwrite Mine' }))
+        // The line's Cancel comes before the dialog's own.
+        await userEvent.click(within(dialog).getAllByRole('button', { name: 'Cancel' })[0])
+
+        expect(within(dialog).getByRole('button', { name: 'Overwrite Mine' })).toBeInTheDocument()
+        expect(mutations(fetchMock)).toHaveLength(0)
+      })
+
+      it('keeps the dialog open and the list as it was when the server refuses an overwrite', async () => {
+        const { server } = serveViews([
+          { id: 'a', name: 'Mine', search: null, filter: null, sort: null },
+          { id: 'c', name: 'Zed', search: null, filter: null, sort: null },
+        ])
+        server.replaceStatus = 409
+        open('/?search=pen')
+
+        const dialog = await openViews()
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Overwrite Mine' }))
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Overwrite' }))
+
+        expect(await within(dialog).findByText('The view could not be overwritten.')).toBeInTheDocument()
+        expect(viewsDialog()).toBe(dialog)
+        // The line keeps asking, so the person can try again, and the list has the same views.
+        expect(
+          within(dialog).getByText('Overwrite the view Mine with the current search, filter and sort?'),
+        ).toBeInTheDocument()
+        expect(viewNames(dialog)).toEqual(['Zed'])
+        await userEvent.click(within(dialog).getAllByRole('button', { name: 'Cancel' })[0])
+        expect(viewNames(dialog)).toEqual(['Mine', 'Zed'])
       })
 
       it('deletes a view in its own line after the question, and keeps it when Cancel answers', async () => {
