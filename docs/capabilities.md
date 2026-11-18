@@ -503,7 +503,7 @@ change. What each milestone holds is in [the roadmap](roadmap.md#milestones).
 | Capability | Where |
 | --- | --- |
 | An agent changes an application through an MCP server | [Tools](reference/mcp-server.md#tools) |
-| Describe a change in words in Studio and review its plan and diff | _(planned for M35)_ |
+| Describe a change in words in Studio and review its plan and diff | [The request panel](reference/ai-authoring-in-studio.md#the-request-panel) |
 | An agent builds a whole application or module | _(planned for M36)_ |
 | Choose the model the agent uses | [Bindings](reference/model-bindings.md#bindings) |
 | Use models through Amazon Bedrock or Google Vertex AI | _(planned for M35)_ |
