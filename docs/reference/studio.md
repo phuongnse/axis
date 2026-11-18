@@ -473,7 +473,7 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
     help says an empty list grants every field, so clearing it removes the `fields` key.
   - Add grant adds a grant named after the cell's target with the first free number in the policy,
     ignoring letter case, such as `purchaseRequest1`. A grant shows its name read-only.
-  - **Delete grant.** _(planned for M35)_ It deletes a grant, but not the policy's last one.
+  - **Delete grant.** It deletes a grant, but not the policy's last one.
 - **Saving.** Save is off while nothing changed. A click with a grant that has no ticked action says so under its
   actions, focuses them and sends nothing. It writes one file, with one patch that carries the version the panel
   loaded and changes only what the author edited. A stale version shows a conflict message, keeps the draft and offers
