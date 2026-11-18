@@ -85,6 +85,8 @@
 # with the console host console.localhost, and signs the development operator in to the cell console through that realm.
 # The cell quota journey serves a cell on the offset 4 and signs in an operator account of its own. Both start their cell
 # through tests/e2e/cell.ts.
+# The Ask AI agent spec serves its directory tenant on the offset 9. It makes its own certificate for `*.eval.localhost`
+# and starts its own agent host and tunnel proxy, and stops them when it ends, see docs/testing.md.
 # Before the first container starts, scripts/lib/docker-images.mjs loads the container images that setup saved in
 # ~/.cache/axis-docker, so the run pulls none that the cache holds, see docs/development.md#end-to-end-tests.
 # Playwright and the services it starts are skipped when every path changed since NexKit's commit is in the
