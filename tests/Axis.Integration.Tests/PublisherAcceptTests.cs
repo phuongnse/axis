@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Tests;
+using Axis.Server.Studio;
 using Axis.Server.Tests;
 using Axis.Studio;
 using Axis.Tenancy.Platform;
@@ -98,6 +99,8 @@ public sealed class PublisherAcceptTests(PostgreSqlFixture database) : IClassFix
         Assert.Equal(DiagnosticCodes.AcceptConflict, diagnostic["code"]!.GetValue<string>());
         Assert.Equal(_orderId.ToString("D"), diagnostic["resourceId"]!.GetValue<string>());
         Assert.Equal("entities/order.json", diagnostic["file"]!.GetValue<string>());
+        // A change made outside Studio is recorded by the server, which is named Axis.
+        Assert.Equal("Axis", diagnostic["changedBy"]!.GetValue<string>());
         Assert.Contains(version, diagnostic["message"]!.GetValue<string>(), StringComparison.Ordinal);
         Assert.Contains(result.Output, line => line.StartsWith($"{tenant} draft failed: {DiagnosticCodes.AcceptConflict} ", StringComparison.Ordinal));
         Assert.Equal(folderBefore, Snapshot(folder.Path));
@@ -135,6 +138,62 @@ public sealed class PublisherAcceptTests(PostgreSqlFixture database) : IClassFix
         Assert.Equal(folderBefore, Snapshot(folder.Path));
         Assert.Equal(tip, MainTip(revisions.Path, folder.Path));
         Assert.True(DraftExists(revisions.Path, folder.Path, draft));
+    }
+
+    [Fact]
+    public async Task An_accept_conflict_names_the_author_and_time_of_the_newest_revision_that_changed_the_resource()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        using var folder = Application().With("entities/order.json", Order());
+        using var revisions = new TemporaryFolder();
+        var author = NewAuthor(scenario, folder.Path, revisions.Path, "author");
+        var draft = await NewDraftAsync(author);
+        Assert.Null((await author.Drafts.ReadAsync(draft, _orderId, CancellationToken)).Refusal);
+        Written(await author.Drafts.WriteAsync(draft, Entity(Guid.NewGuid(), "Invoice"), CancellationToken));
+        var other = NewAuthor(scenario, folder.Path, revisions.Path, "other", "Other Author");
+        folder.With("entities/order.json", Order("remark"));
+        other.Revisions.Record("Update Order");
+        var saved = other.Revisions.List()[0];
+        // A later revision changes a different file, so the tip is not the one that conflicts.
+        folder.With("entities/shipment.json", Entity(Guid.NewGuid(), "Shipment").ToJsonString());
+        author.Revisions.Record("Add Shipment");
+        var request = await QueueAsync(scenario, tenant, draft, "author");
+
+        await RunPublisherAsync(scenario, tenant, revisions.Path, folder.Path, request);
+
+        Assert.Equal("failed", await StatusAsync(scenario, tenant, request));
+        var diagnostic = Assert.Single(await AnswerAsync(scenario, tenant, request))!;
+        Assert.Equal(DiagnosticCodes.AcceptConflict, diagnostic["code"]!.GetValue<string>());
+        Assert.Equal("Other Author", diagnostic["changedBy"]!.GetValue<string>());
+        Assert.Equal(saved.Time, DateTimeOffset.Parse(diagnostic["changedAt"]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
+    public async Task An_accept_conflict_on_a_package_file_names_the_author_and_time_of_its_change()
+    {
+        const string adapter = "packages/x/adapter.py";
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        using var folder = Application().With("entities/order.json", Order()).With(adapter, "print('v1')\n");
+        using var revisions = new TemporaryFolder();
+        var author = NewAuthor(scenario, folder.Path, revisions.Path, "author");
+        var draft = await NewDraftAsync(author);
+        Assert.Null((await author.Drafts.ReadPackageFileAsync(draft, adapter, CancellationToken)).Refusal);
+        var other = NewAuthor(scenario, folder.Path, revisions.Path, "other", "Other Author");
+        folder.With(adapter, "print('v2')\n");
+        other.Revisions.Record("Update the adapter");
+        var saved = other.Revisions.List()[0];
+        var request = await QueueAsync(scenario, tenant, draft, "author");
+
+        await RunPublisherAsync(scenario, tenant, revisions.Path, folder.Path, request);
+
+        Assert.Equal("failed", await StatusAsync(scenario, tenant, request));
+        var diagnostic = Assert.Single(await AnswerAsync(scenario, tenant, request))!;
+        Assert.Equal(DiagnosticCodes.AcceptConflict, diagnostic["code"]!.GetValue<string>());
+        Assert.Equal(adapter, diagnostic["file"]!.GetValue<string>());
+        Assert.Equal("Other Author", diagnostic["changedBy"]!.GetValue<string>());
+        Assert.Equal(saved.Time, DateTimeOffset.Parse(diagnostic["changedAt"]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture));
     }
 
     [Fact]
@@ -393,12 +452,12 @@ public sealed class PublisherAcceptTests(PostgreSqlFixture database) : IClassFix
         return tenant;
     }
 
-    private static Author NewAuthor(AdminScenario scenario, string folder, string revisionsPath, string userId)
+    private static Author NewAuthor(AdminScenario scenario, string folder, string revisionsPath, string userId, string displayName = "Author User")
     {
         var writeLock = new PlatformStudioWriteLock(NpgsqlDataSource.Create(scenario.Platform), NullLogger<PlatformStudioWriteLock>.Instance);
         return new Author(
-            StudioDrafts.For(revisionsPath, folder, userId, "Author User", writeLock)!,
-            StudioRevisions.For(revisionsPath, folder, userId, "Author User", NullLogger<StudioRevisions>.Instance)!);
+            StudioDrafts.For(revisionsPath, folder, userId, displayName, writeLock)!,
+            StudioRevisions.For(revisionsPath, folder, userId, displayName, NullLogger<StudioRevisions>.Instance)!);
     }
 
     private static async Task<string> NewDraftAsync(Author author)
@@ -414,13 +473,28 @@ public sealed class PublisherAcceptTests(PostgreSqlFixture database) : IClassFix
         return outcome.Value!;
     }
 
-    // Stores the request over the runtime role, as the server does.
-    private async Task<Guid> QueueAsync(AdminScenario scenario, string tenant, string draft, string requestedBy, string client = "agent")
+    // The runtime role's connection, as the server reads and stores requests.
+    private static async Task<NpgsqlConnection> OpenRuntimeAsync(AdminScenario scenario, string tenant)
     {
         var row = await scenario.RowAsync(tenant);
         var password = AdminScenario.Cipher.Decrypt(tenant, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
-        await using var connection = new NpgsqlConnection(scenario.TenantConnectionString(tenant, row.RuntimeUser, password));
+        var connection = new NpgsqlConnection(scenario.TenantConnectionString(tenant, row.RuntimeUser, password));
         await connection.OpenAsync(CancellationToken);
+        return connection;
+    }
+
+    // The diagnostics that GET .../requests/{id} answers for the request.
+    private async Task<JsonArray> AnswerAsync(AdminScenario scenario, string tenant, Guid request)
+    {
+        await using var connection = await OpenRuntimeAsync(scenario, tenant);
+        var response = await StudioPublishEndpoints.ReadResponseAsync(connection, _applicationId, request, _name, CancellationToken);
+        return JsonNode.Parse(response!.Diagnostics.GetRawText())!.AsArray();
+    }
+
+    // Stores the request over the runtime role, as the server does.
+    private async Task<Guid> QueueAsync(AdminScenario scenario, string tenant, string draft, string requestedBy, string client = "agent")
+    {
+        await using var connection = await OpenRuntimeAsync(scenario, tenant);
         var id = Guid.CreateVersion7();
         await using var command = new NpgsqlCommand(
             """

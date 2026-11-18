@@ -114,7 +114,9 @@ lock from the first step to the last, so Studio writes to that folder wait.
 4. It compares each version the draft recorded with the version on `main` now. Each resource that
    differs is a conflict, answered as one `AXC0377` diagnostic with the resource id, its file and its
    new version, and nothing is written. A package file that differs, or that `main` gained or lost
-   since, is answered the same way, with its path as the file and no resource id.
+   since, is answered the same way, with its path as the file and no resource id. Each also says who
+   changed it and when, as `changedBy` and `changedAt`: the author and time of the newest revision on
+   `main` since the draft's start that changed the file, see [who changed it](authoring-requests.md#accepting).
 5. It applies the draft's changes to the folder's files in memory and runs the steps of a validate on
    the result: the compiler, the contract scenarios and every activation check, rolled back. After the
    validate passes, the application's own test scenarios run on the result as for a
