@@ -10,12 +10,14 @@ itself cannot be shared or reloaded either, because nothing in the address shows
 
 ## Decision
 
-- A table whose rows grow has the full standard toolbar, as
-  [actions and controls](../reference/actions-and-controls.md#tables) draws it.
-- A table that is part of one thing, such as the lines of a child collection on a form, is the named
-  exception. Its rows belong to that one thing, so a search or a filter of its own would split it.
-- A table has no control of its own for a view. A view is a filter kept in the address, so a link opens
-  the same rows for anyone who follows it.
+- **A table whose rows grow has the full toolbar** _(planned for M35)_. Its toolbar is the full standard
+  one, as [actions and controls](../reference/actions-and-controls.md#tables) draws it.
+- **A table that is part of one thing is the exception** _(planned for M35)_. Its rows belong to that
+  one thing, such as the lines of a child collection on a form, so a search or a filter of its own
+  would split it.
+- **A view is a filter kept in the address.** A table has no control of its own for a view, so a link
+  opens the same rows for anyone who follows it. A table in a dialog keeps its view in the dialog
+  instead, because a dialog has no address of its own to share.
 
 ## Consequences
 
@@ -23,7 +25,7 @@ itself cannot be shared or reloaded either, because nothing in the address shows
   of them.
 - A new table whose rows grow uses the shared toolbar. A table that is part of one thing needs its
   reason written down.
-- A table's view can be shared and reloaded, because it lives in the address.
+- The view of a table on a page can be shared and reloaded, because it lives in the address.
 
 ## Alternatives
 
