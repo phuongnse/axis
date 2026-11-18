@@ -36,6 +36,11 @@ namespace Axis.Server.Studio;
 /// for the draft with the client <c>studio</c> and answers 202 with that request and a <c>Location</c> for <c>GET .../requests/{id}</c>. The accept writes the draft as a revision, so over the <c>storage</c> quota it is refused before any of these checks, as a save is, see
 /// <c>docs/reference/tenant-quotas.md#refusals</c>. It changes no authoring request:
 /// the publisher moves it to <c>accepted</c> when the accept succeeds, see <c>docs/reference/authoring-requests.md#accepting</c>.
+/// <c>GET .../{id}/diff?cursor=</c> lets any author read what the request changes, after the session and role checks and the application
+/// (404 for an <c>id</c> that is not a request of it). An <c>accepted</c> request answers the changes of the revision its accept made
+/// as <c>{ start, tip, resources, cursor }</c> with <c>titles</c> and a null <c>cursor</c>, and 400 for a cursor. Any other request that
+/// has a draft answers a page of the draft's diff, read as its author's draft, with the draft diff's 400 and 503. A request with neither
+/// answers 404. See <c>docs/reference/authoring-requests.md#routes</c>.
 /// </summary>
 internal static class StudioAuthoringRequestEndpoints
 {
@@ -49,6 +54,8 @@ internal static class StudioAuthoringRequestEndpoints
     private const long SendLockKey = 0x4158_4953_4155_5448; // "AXISAUTH" in ASCII.
 
     private const string NotTheAuthor = "Only the author of the request may do this.";
+
+    private const string NoChanges = "The request has no draft and no accept.";
 
     private const string Columns =
         "id, author, text, state, plan, round, tokens, auto_accept, sent_at, approved_at, finished_at";
@@ -66,6 +73,7 @@ internal static class StudioAuthoringRequestEndpoints
         endpoints.MapPost("/api/studio/apps/{application}/authoring-requests", SendAsync);
         endpoints.MapGet("/api/studio/apps/{application}/authoring-requests", ListAsync);
         endpoints.MapGet("/api/studio/apps/{application}/authoring-requests/{id}", GetAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/authoring-requests/{id}/diff", DiffAsync);
         endpoints.MapPost("/api/studio/apps/{application}/authoring-requests/{id}/approve",
             (string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database) =>
                 ChangeAsync(Action.Approve, application, id, httpContext, options, database));
@@ -253,6 +261,152 @@ internal static class StudioAuthoringRequestEndpoints
             ? Results.Ok(response)
             : NoRequest();
     }
+
+    private static async Task<IResult> DiffAsync(
+        string application,
+        string id,
+        string? cursor,
+        HttpContext httpContext,
+        StudioOptions options,
+        IStudioWriteLock writeLock,
+        TenantDatabase database)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var cancellationToken = httpContext.RequestAborted;
+        if (!Guid.TryParseExact(id, "D", out var requestId) || StudioFolder.ReadManifest(folder) is not { Id: { } applicationId })
+        {
+            return NoRequest();
+        }
+
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        string? author = null;
+        string? state = null;
+        Guid? draftId = null;
+        await using (var find = new NpgsqlCommand(
+            "SELECT author, state, draft_id FROM axis.authoring_requests WHERE id = @id AND application_id = @application", connection))
+        {
+            find.Parameters.AddWithValue("id", requestId);
+            find.Parameters.AddWithValue("application", applicationId);
+            await using var reader = await find.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                author = reader.GetString(0);
+                state = reader.GetString(1);
+                draftId = reader.IsDBNull(2) ? null : reader.GetGuid(2);
+            }
+        }
+
+        if (author is null)
+        {
+            return NoRequest();
+        }
+
+        if (draftId is not { } draft)
+        {
+            return StudioEndpoints.NotFound(NoChanges);
+        }
+
+        if (state == "accepted")
+        {
+            return await AcceptedDiffAsync(applicationId, draft, cursor, folder, httpContext, options, connection, cancellationToken);
+        }
+
+        var names = await UserProfiles.FindDisplayNamesAsync(connection, [author], cancellationToken);
+        var drafts = StudioDrafts.For(
+            StudioEndpoints.ForRequest(httpContext, options).RevisionsPath, folder, author, names.GetValueOrDefault(author) ?? author, writeLock);
+        if (drafts is null)
+        {
+            return StudioEndpoints.NotFound(NoChanges);
+        }
+
+        var outcome = await drafts.DiffAsync(draft.ToString("D"), cursor, cancellationToken);
+        return outcome.Refusal switch
+        {
+            null => Results.Ok(outcome.Value),
+            StudioWriteRefusal.Unavailable => StudioEndpoints.Problem(StatusCodes.Status503ServiceUnavailable, StudioEndpoints.WriteLockUnavailable),
+            StudioWriteRefusal.DoesNotApply => StudioEndpoints.Problem(StatusCodes.Status400BadRequest, StudioRevisionEndpoints.ForeignCursor),
+            _ => StudioEndpoints.NotFound(NoChanges),
+        };
+    }
+
+    // The changes of the revision the draft's newest succeeded accept made, with the titles of each resource, in one page.
+    private static async Task<IResult> AcceptedDiffAsync(
+        Guid applicationId,
+        Guid draftId,
+        string? cursor,
+        string folder,
+        HttpContext httpContext,
+        StudioOptions options,
+        NpgsqlConnection connection,
+        CancellationToken cancellationToken)
+    {
+        if (cursor is not null)
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, StudioRevisionEndpoints.ForeignCursor);
+        }
+
+        Guid? accept;
+        await using (var find = new NpgsqlCommand(
+            """
+            SELECT id FROM axis.publish_requests
+            WHERE application_id = @application AND kind = 'accept' AND draft_id = @draft AND status = 'succeeded'
+            ORDER BY finished_at DESC NULLS LAST LIMIT 1
+            """,
+            connection))
+        {
+            find.Parameters.AddWithValue("application", applicationId);
+            find.Parameters.AddWithValue("draft", draftId);
+            accept = await find.ExecuteScalarAsync(cancellationToken) as Guid?;
+        }
+
+        if (accept is not { } acceptId || await StudioEndpoints.RevisionsAsync(httpContext, options, folder) is not { } revisions)
+        {
+            return StudioEndpoints.NotFound(NoChanges);
+        }
+
+        var list = revisions.List();
+        var request = acceptId.ToString("D");
+        var index = -1;
+        for (var i = 0; i < list.Count; i++)
+        {
+            if (string.Equals(list[i].Request, request, StringComparison.Ordinal))
+            {
+                index = i;
+                break;
+            }
+        }
+
+        if (index < 0 || index + 1 >= list.Count || revisions.Diff(list[index].Id) is not { } diff)
+        {
+            return StudioEndpoints.NotFound(NoChanges);
+        }
+
+        var tip = JsonFiles(revisions.Main(list[index].Id));
+        var parent = JsonFiles(revisions.Main(list[index + 1].Id));
+        var titles = StudioResourceTitles.Read(StudioFolder.Resources(tip));
+        var removedTitles = StudioResourceTitles.Read(StudioFolder.Resources(parent));
+        var resources = diff.Resources
+            .Select(change =>
+            {
+                var read = change.Change == "removed" ? removedTitles : titles;
+                var entryTitles = Guid.TryParseExact(change.Id, "D", out var resourceId) && read.TryGetValue(resourceId, out var found)
+                    ? found.Titles
+                    : null;
+                return new AuthoringRequestDiffEntry(
+                    change.File, change.Change, change.Id, change.Kind, change.Name, change.Before, change.After, change.Target,
+                    entryTitles is { Count: > 0 } ? entryTitles : null);
+            })
+            .ToList();
+        return Results.Ok(new AuthoringRequestRevisionDiff(list[index + 1].Id, list[index].Id, resources, null));
+    }
+
+    private static IReadOnlyList<(string File, byte[] Bytes)> JsonFiles(StudioMain? main) =>
+        [.. (main?.Files ?? []).Where(file => file.File.EndsWith(".json", StringComparison.Ordinal))];
 
     // The author's checks come before the body and the state, so a person who may not act learns nothing about either.
     private static async Task<IResult> ChangeAsync(
@@ -620,3 +774,18 @@ internal sealed record AuthoringRequestStepResponse(
 
 /// <summary>The newest requests of an application, newest first.</summary>
 internal sealed record AuthoringRequestListResponse(IReadOnlyList<AuthoringRequestResponse> Items);
+
+/// <summary>One file an accepted request's revision changed, as <see cref="StudioRevisionChange"/> gives it, with the resource's label in each locale, or null when it has none.</summary>
+internal sealed record AuthoringRequestDiffEntry(
+    string File,
+    string Change,
+    string? Id,
+    string? Kind,
+    string? Name,
+    string? Before,
+    string? After,
+    string? Target,
+    IReadOnlyDictionary<string, string>? Titles);
+
+/// <summary>The changes of the revision an accepted request made: the commit before it as <c>Start</c>, the revision as <c>Tip</c>, and a null <c>Cursor</c>.</summary>
+internal sealed record AuthoringRequestRevisionDiff(string Start, string Tip, IReadOnlyList<AuthoringRequestDiffEntry> Resources, string? Cursor);
