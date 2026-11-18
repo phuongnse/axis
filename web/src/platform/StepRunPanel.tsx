@@ -352,8 +352,9 @@ export function StepRunPanel({
     body === null ? muted(t('shell.stepRun.noBody')) : <BodyView label={t('shell.stepRun.body')} text={body} />
 
   // Proposed, see the review on #3650: Input and Output are terms, as the instance's Data tab is, each name above its
-  // value, since a value is a table: the request on one line, its method then its address, as the developer tools show
-  // it, its query parameters, headers and body; a package call's input; the values a decision's conditions read.
+  // value, since a value is a table: the request on one line, its method then its address `spacing-xs` apart, as the
+  // developer tools show it, its query parameters, headers and body; a package call's input; the values a decision's
+  // conditions read.
   const input = () => (
     <Flex vertical gap={spacing.lg}>
       {calls.map((call) => {
@@ -369,7 +370,11 @@ export function StepRunPanel({
             term: t('shell.stepRun.request'),
             value: (
               <span style={{ overflowWrap: 'anywhere' }}>
-                <Typography.Text strong>{method}</Typography.Text> {url.split('?', 1)[0]}
+                {/* The method stands `spacing-xs` apart from its address, past the space that keeps them two words. */}
+                <Typography.Text strong style={{ marginInlineEnd: spacing.xs }}>
+                  {method}
+                </Typography.Text>{' '}
+                {url.split('?', 1)[0]}
               </span>
             ),
           })
