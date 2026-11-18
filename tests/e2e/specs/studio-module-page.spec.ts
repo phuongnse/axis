@@ -79,7 +79,7 @@ test.describe("Studio edits a module page as a layer", () => {
     await expect(page.getByTestId("studio-saved")).toBeVisible();
     await expect(page.getByTestId("studio-module-layer")).toBeVisible();
     await expect(
-      page.getByRole("note", { name: "Changed budgetForm", exact: true }),
+      page.getByRole("note", { name: "budgetForm, changed by this application", exact: true }),
     ).toBeVisible();
     await expect(access(layerFile)).resolves.toBeUndefined();
 
@@ -88,7 +88,7 @@ test.describe("Studio edits a module page as a layer", () => {
 
     await expect(page.getByTestId("studio-module-layer")).toHaveCount(0);
     await expect(
-      page.getByRole("note", { name: /^(Added|Changed) / }),
+      page.getByRole("note", { name: /, (added|changed) by this application$/ }),
     ).toHaveCount(0);
     await expect(access(layerFile)).rejects.toMatchObject({ code: "ENOENT" });
   });

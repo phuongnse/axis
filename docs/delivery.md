@@ -4,12 +4,12 @@ Axis is built through NexKit. NexKit runs one issue per agent session, and its a
 on by itself, from plan to merge. How NexKit works, what each setting does, and what a person does
 where NexKit stops are in NexKit's own docs and skills, at the version that
 `.github/workflows/nexkit.yml` pins: [how it works][nexkit-how], [configuration][nexkit-config],
-[troubleshooting][nexkit-troubleshooting], and the [`request`][nexkit-request] and
-[`drive`][nexkit-drive] skills. This page holds only what is Axis's own: who decides what, the
-settings Axis chooses and why, its rules for issues and milestones, design changes, and writing on
-GitHub. The reasons for the workflow are in [D13](decisions/d13-delivery-workflow.md). Values that
-NexKit or the repository settings own, such as protected paths, required checks and the profiles'
-models, are not copied here: look them up where they live.
+[troubleshooting][nexkit-troubleshooting], and the [`request`][nexkit-request] skill. This page
+holds only what is Axis's own: who decides what, the settings Axis chooses and why, its rules for
+issues and milestones, design changes, and writing on GitHub. The reasons for the workflow are in
+[D13](decisions/d13-delivery-workflow.md). Values that NexKit or the repository settings own, such
+as protected paths, required checks and the profiles' models, are not copied here: look them up
+where they live.
 
 ## Who does what
 
@@ -486,7 +486,6 @@ issues, pull requests and sub-issues.
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md
 [nexkit-troubleshooting]: https://github.com/phuongnse/nexkit/blob/main/docs/troubleshooting.md
 [nexkit-request]: https://github.com/phuongnse/nexkit/blob/main/skills/request/SKILL.md
-[nexkit-drive]: https://github.com/phuongnse/nexkit/blob/main/skills/drive/SKILL.md
 [nexkit-profiles]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#profiles
 [nexkit-auto-merge]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#automatic-merge
 [nexkit-caches]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#caches

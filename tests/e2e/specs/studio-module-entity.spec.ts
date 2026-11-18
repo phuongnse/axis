@@ -111,7 +111,7 @@ test.describe("Studio edits a module entity as a layer", () => {
 
     await expect(page.getByTestId("studio-saved")).toBeVisible();
     await expect(
-      page.getByRole("note", { name: "Added costCentre", exact: true }),
+      page.getByRole("note", { name: "costCentre, added by this application", exact: true }),
     ).toBeVisible();
 
     await page

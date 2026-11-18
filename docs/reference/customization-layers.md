@@ -272,7 +272,7 @@ module ([kind lists](studio.md#kind-lists-and-module-resources)), and each opens
   a Customized tag and **Reset all**.
 - **Names.** In the schema form editors `name` shows as text, because the save route refuses a renamed
   module resource.
-- **Module policies.** The module editor edits a grant's actions and removes grants, and shows a
+- **Module policies.** The module editor edits a grant's actions and deletes grants, and shows a
   grant's filter and fields read-only. It does not add a grant. A grant past the module contract's
   ceiling (`AXC0334`) shows in the Problems panel after the save.
 - **Module pages.** A module page opens in the page designer with every input on and a Save

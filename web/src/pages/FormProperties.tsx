@@ -37,8 +37,8 @@ function groupTexts(t: (key: string) => string, path: string) {
 
 /**
  * The properties of the element that is selected on the form canvas, found by its JSON Pointer in the draft. A field
- * has `readOnly`, its three conditions and a Remove field button, a section its name, title, `visibleWhen`, a Remove
- * section button and, on a form with steps, a Step picker, and a step its title and a Remove step button. A field the
+ * has `readOnly`, its three conditions and a Remove field button, a section its name, title, `visibleWhen`, a Delete
+ * section button and, on a form with steps, a Step picker, and a step its title and a Delete step button. A field the
  * entity marks required has no `visibleWhen` (AXC0226). A computed, sequence or creator field is always read-only. A selection that finds no object
  * in the draft shows a hint, so no edit goes to a stale pointer.
  */

@@ -82,7 +82,7 @@ describe('FormProperties section', () => {
     expect(draft.steps[1].sections).toEqual(['a'])
     expect(draft.sections.map((section: { name: string }) => section.name)).toEqual(['b', 'a'])
     expect(screen.getByTestId('selected')).toHaveTextContent('/sections/1')
-    expect(screen.getByTestId('announcement')).toHaveTextContent('Moved a to steps.two, position 1')
+    expect(screen.getByTestId('announcement')).toHaveTextContent('Moved a to steps.two, position 1.')
   })
 
   it('names the name, the title and the visibility of a section by their labels and describes them by their help', () => {
@@ -146,7 +146,7 @@ describe('FormProperties section', () => {
     await userEvent.tab()
 
     expect(screen.getByTestId('draft').textContent).toBe(before)
-    expect(screen.getByText('A section needs a name.')).toBeInTheDocument()
+    expect(screen.getByText('Enter a name for the section.')).toBeInTheDocument()
   })
 })
 
@@ -154,19 +154,19 @@ describe('FormProperties removal', () => {
   it('removes a section from sections and from the step that lists it, and selects that step', async () => {
     renderHarness(stepped, '/sections/0')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove section' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete section' }))
 
     const draft = JSON.parse(screen.getByTestId('draft').textContent ?? '')
     expect(draft.sections.map((section: { name: string }) => section.name)).toEqual(['b'])
     expect(draft.steps[0].sections).toEqual(['b'])
     expect(screen.getByTestId('selected')).toHaveTextContent('/steps/0')
-    expect(screen.getByTestId('announcement')).toHaveTextContent('Removed a')
+    expect(screen.getByTestId('announcement')).toHaveTextContent('Removed a.')
   })
 
   it('removes a section of a form without steps and selects nothing', async () => {
     renderHarness({ sections: [{ name: 'a', fields: [] }] }, '/sections/0')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove section' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete section' }))
 
     const draft = JSON.parse(screen.getByTestId('draft').textContent ?? '')
     expect(draft).toEqual({ sections: [] })
@@ -176,19 +176,19 @@ describe('FormProperties removal', () => {
   it('removes a step and keeps sections, then selects nothing', async () => {
     renderHarness(stepped, '/steps/0')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove step' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete step' }))
 
     const draft = JSON.parse(screen.getByTestId('draft').textContent ?? '')
     expect(draft.sections).toEqual(stepped.sections)
     expect(draft.steps).toEqual([{ title: { textKey: 'steps.two' }, sections: [] }])
     expect(screen.getByTestId('studio-design-hint')).toBeInTheDocument()
-    expect(screen.getByTestId('announcement')).toHaveTextContent('Removed steps.one')
+    expect(screen.getByTestId('announcement')).toHaveTextContent('Removed steps.one.')
   })
 
   it('removes the last step and leaves the draft without steps', async () => {
     renderHarness({ sections: stepped.sections, steps: [stepped.steps[0]] }, '/steps/0')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove step' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Delete step' }))
 
     const draft = JSON.parse(screen.getByTestId('draft').textContent ?? '')
     expect(draft).not.toHaveProperty('steps')
@@ -208,7 +208,7 @@ describe('FormProperties field', () => {
     const draft = JSON.parse(screen.getByTestId('draft').textContent ?? '')
     expect(draft.sections[1].fields).toEqual([{ field: 'q' }])
     expect(screen.getByTestId('selected')).toHaveTextContent('/sections/1')
-    expect(screen.getByTestId('announcement')).toHaveTextContent('Removed p, Section 2')
+    expect(screen.getByTestId('announcement')).toHaveTextContent('Removed p from Section 2.')
   })
 
   it('names the read-only checkbox and the conditions of a field by their labels and describes them by their help', () => {

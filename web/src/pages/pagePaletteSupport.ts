@@ -32,7 +32,7 @@ export function stepLabels(step: PathStep, partLabel: (part: ListPart) => string
 /**
  * What the live region says after a widget of `type` is inserted or moved to `index` of `list`: the list by its path
  * from the page, and the position counted from 1. `widgets` are the page's widgets before the insert, or after the
- * move. `verbKey` is the text key of the verb.
+ * move. `verbKey` is the text key of the announcement, which takes `{name}`, `{place}` and `{position}`.
  */
 export function landedText(
   t: (key: string) => string,

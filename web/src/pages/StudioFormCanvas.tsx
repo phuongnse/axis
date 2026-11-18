@@ -2,12 +2,12 @@ import { useDndContext, useDroppable } from '@dnd-kit/core'
 import { Flex, Segmented, Tag } from 'antd'
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { useLocation } from 'react-router'
+import { fillText } from '../platform/fillText'
 import { FormCanvasContext, type FormCanvas } from '../platform/formCanvas'
 import { FormWidget } from '../platform/FormWidget'
 import { getAt } from '../platform/jsonPatch'
 import { placeholderApi, placeholderId } from '../platform/placeholderApi'
 import { setApiGuard } from '../platform/api'
-import { fillText } from '../platform/fillText'
 import {
   fetchStudioFormMetadata,
   fetchStudioModuleFormMetadata,
@@ -393,7 +393,7 @@ function FormElementFrame({
     >
       {texts.map(({ key, text }) => (
         <Tag key={key} data-testid="studio-condition-mark" data-condition={key}>
-          {`${t(`shell.studio.design.${key}`)}: ${text}`}
+          {fillText(t('shell.studio.design.conditionMark'), { condition: t(`shell.studio.design.${key}`), text })}
         </Tag>
       ))}
       {children}

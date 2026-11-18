@@ -36,7 +36,7 @@ function sectionNames(sections: unknown): string[] {
 }
 
 /**
- * The `steps` of a form as cards: a title, the sections the step shows, and buttons to move or remove it. The section
+ * The `steps` of a form as cards: a title, the sections the step shows, and buttons to move or delete it. The section
  * picker lists the named sections of the form, so the author picks names and does not type them. Removing the last step
  * removes `steps`, which turns the form back into one page. The cards sit in a part headed with the steps' title and
  * help, and edit the draft through `onChange`. A `steps` that is not a list is left to the JSON view.

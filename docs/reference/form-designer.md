@@ -59,16 +59,16 @@ form, and a drop never copies one.
   land.
 - **Remove field.** The Remove field button in a field's property panel takes the field out of its
   section. The field returns to the palette, and the section stays selected. A live region says
-  "Removed" with the field and its section. A field with no name is named by its pointer, such as
+  "Removed status from details." with the field and its section. A field with no name is named by its pointer, such as
   `/sections/0/fields/0`. One Undo puts the field back. Conditions that name the removed field are not
   rewritten, and the diagnostics flag them.
-- **The announcement joins with a comma**. The field and its section join as peers,
-  as in "Removed priority, Section 2", see [text](actions-and-controls.md#text).
+- **An announcement is one text.** The live region fills one sentence with its values, such as
+  "Removed priority from Section 2.", see [text](actions-and-controls.md#text).
 
 ## Layout outline
 
 The layout outline lists the steps, sections and fields of the draft, and a click selects a row. A
-section is named by its `name`, or `Section N`, because its title loads only inside the canvas.
+section is named by its `name`, or `Section {number}`, because its title loads only inside the canvas.
 
 ## Moves
 
@@ -96,8 +96,8 @@ and the moved element keeps all its keys and stays selected.
 ## Sections and steps
 
 The palette's Add section and Add step build the form's structure, and each section's and step's panel
-can remove it. Each add or remove is one Undo step, and a live region names what was added, or says
-"Removed" with the section's name or the step's title.
+can delete it. Each add or delete is one Undo step, and a live region names what was added, or says
+"Removed {name}." with the section's name or the step's title.
 
 - **Add section** appends a section named with the lowest unused `section{n}`, ignoring letter case, and
   a new title key, such as `forms.ticketResolution.sections.1.title`, which its panel's label editor
@@ -108,10 +108,10 @@ can remove it. Each add or remove is one Undo step, and a live region names what
   first one included, gets the first free name `step1`, `step2` and so on, ignoring letter case.
 - **A new part draws once it holds something.** Until a field goes into an empty section or step and its
   texts are written, the canvas shows its cannot-be-drawn notice.
-- **Delete section,** _(planned for M35)_ in a section's panel, takes it out of `sections` and of every step that lists it,
+- **Delete section,** in a section's panel, takes it out of `sections` and of every step that lists it,
   and its fields return to the palette. The step that listed it is selected. Conditions that name the
   removed section's fields are not rewritten.
-- **Delete step,** _(planned for M35)_ in a step's panel, keeps the step's sections in `sections`. No step then lists them,
+- **Delete step,** in a step's panel, keeps the step's sections in `sections`. No step then lists them,
   which the diagnostics flag (`AXC0230`), and nothing stays selected. Removing the last step removes
   `steps`, so the form goes back to one page.
 
@@ -125,8 +125,8 @@ The selection is kept across the Design, Form and JSON tabs while the resource s
 | Element | The panel shows                                                                                                                                                                                                 |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Field   | `readOnly`, its three conditions in the expression editor, its `width` and a Remove field button. The width is a whole number from 1 to 12, and the canvas draws the fields in their [columns](form-widget.md). |
-| Section | _(planned for M35)_ Its name, title and `visibleWhen`, a Delete section button and, on a form with steps, the Step picker                                                                                       |
-| Step    | _(planned for M35)_ Its title and a Delete step button                                                                                                                                                          |
+| Section | Its name, title and `visibleWhen`, a Delete section button and, on a form with steps, the Step picker                                                                                                           |
+| Step    | Its title and a Delete step button                                                                                                                                                                              |
 
 - **Conditions offer the form's fields.** The expression editor of a condition offers only the fields
   that the form lists, because a condition reads only those.

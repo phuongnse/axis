@@ -369,7 +369,7 @@ describe('the Design tab of a form', () => {
     await openDesign()
 
     expect(await screen.findByTestId('studio-canvas-cannot-draw', {}, slow)).toHaveTextContent(
-      'The form cannot be drawn until its errors are fixed.',
+      'The form cannot show until its errors are fixed.',
     )
     expect(screen.queryByTestId('studio-form-steps')).not.toBeInTheDocument()
   })
@@ -556,7 +556,7 @@ describe('the Design tab of a form', () => {
     const checkbox = within(screen.getByTestId('studio-design-panel')).getByRole('checkbox', { name: 'Read-only' })
     expect(checkbox).toBeChecked()
     expect(checkbox).toBeDisabled()
-    expect(screen.getByTestId('studio-design-panel')).toHaveTextContent('The server sets this field')
+    expect(screen.getByTestId('studio-design-panel')).toHaveTextContent('Axis fills this field')
   })
 
   it('selects a step in the switch, shows its title and shows its sections', async () => {

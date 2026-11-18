@@ -1361,9 +1361,9 @@ describe('EntityDesigner with a customization layer', () => {
       ],
     )
 
-    expect(screen.getByRole('note', { name: 'Added note' })).toHaveTextContent('Added')
-    expect(screen.getByRole('note', { name: 'Changed positive' })).toHaveTextContent('Changed')
-    expect(screen.getByRole('note', { name: 'Added byCode' })).toBeInTheDocument()
+    expect(screen.getByRole('note', { name: 'note, added by this application' })).toHaveTextContent('Added')
+    expect(screen.getByRole('note', { name: 'positive, changed by this application' })).toHaveTextContent('Changed')
+    expect(screen.getByRole('note', { name: 'byCode, added by this application' })).toBeInTheDocument()
     expect(screen.getByTestId('studio-layer-mark-/fields/2')).toBeInTheDocument()
     expect(screen.queryByRole('note', { name: /total/ })).toBeNull()
     expect(screen.getAllByRole('button', { name: /^Reset to module/ })).toHaveLength(3)
@@ -1381,7 +1381,7 @@ describe('EntityDesigner with a customization layer', () => {
     const row = screen.getByTestId('studio-layer-removed-/fields/code')
     expect(row).toHaveTextContent('code')
     expect(row).toHaveAttribute('data-muted')
-    expect(within(row).getByRole('note', { name: 'Removed code' })).toBeInTheDocument()
+    expect(within(row).getByRole('note', { name: 'code, removed by this application' })).toBeInTheDocument()
 
     await userEvent.click(within(row).getByRole('button', { name: 'Reset to module code' }))
 
