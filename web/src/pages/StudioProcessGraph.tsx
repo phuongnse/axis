@@ -16,6 +16,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { type KeyboardEvent, useMemo, useRef } from 'react'
+import { fillText } from '../platform/fillText'
 import { ReactFlowAttributionStyle } from '../platform/ReactFlowAttributionStyle'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
@@ -66,7 +67,7 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
       <button
         type="button"
         data-testid={`studio-graph-node-${data.index}`}
-        aria-label={data.marked ? `${label}, ${t('shell.studio.processGraph.hasDiagnostics')}` : label}
+        aria-label={data.marked ? fillText(t('shell.studio.processGraph.hasDiagnostics'), { step: label }) : label}
         aria-current={data.current ? 'true' : undefined}
         data-marked={data.marked ? 'true' : undefined}
         style={{
@@ -185,7 +186,7 @@ const edgeTestIdPrefix = 'rf__edge-'
 /**
  * The graph of the draft's steps and transitions, laid out again after every edit. A node selects its step, and an
  * edge selects itself and the step it leaves. The selected step is the node marked current, and the selected edge is
- * drawn in the primary colour. A step that a diagnostic path names has an error-coloured border and "has diagnostics"
+ * drawn in the primary colour. A step that a diagnostic path names has an error-coloured border and "has problems"
  * in its label. Tab reaches the edges, which come before the nodes, and each edge is named by its two steps and its
  * branch or outcome. Enter or Space on an edge selects it. Delete or Backspace in the canvas calls `onRemove`. The
  * canvas and the midpoint of each edge are drop targets of the process designer's palette: the canvas for `/steps`, and
@@ -220,7 +221,7 @@ export default function StudioProcessGraph({
   const t = useText()
   const { mode } = useThemeMode()
   const { colour } = useDesignTokens()
-  const to = t('shell.studio.processGraph.to')
+  const edgeText = t('shell.studio.processGraph.to')
   const section = useRef<HTMLElement>(null)
   const { setNodeRef } = useDroppable({ id: 'process-canvas', data: { pointer: '/steps' } })
 
@@ -264,7 +265,7 @@ export default function StudioProcessGraph({
           source: String(transition.source),
           target: String(transition.target),
           label: transition.label ?? transition.kind,
-          ariaLabel: transitionName(graph, transition, to),
+          ariaLabel: transitionName(graph, transition, edgeText),
           ariaRole: 'button',
           domAttributes: current ? { 'aria-current': 'true' } : undefined,
           style: { stroke, strokeWidth: current ? 2 : undefined },
@@ -274,7 +275,7 @@ export default function StudioProcessGraph({
         }
       }),
     }
-  }, [graph, selected, selectedEdge, colour, to, readOnly, layerMarks])
+  }, [graph, selected, selectedEdge, colour, edgeText, readOnly, layerMarks])
 
   // A drag ends on a node when React Flow snaps to its handle, and anywhere else on the node otherwise, so the node
   // under the pointer is the target. `onConnect` is not set, or React Flow would report a snapped drag twice.

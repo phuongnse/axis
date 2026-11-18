@@ -1096,7 +1096,7 @@ test.describe('the author builds the asset management application with Studio on
     await openFormTab(page)
     // The subject of a new process is an entity, so only the entity is picked.
     await pick(page, 'studio-field-/entity', 'Asset')
-    await stepCard(0).getByRole('button', { name: 'Remove step', exact: true }).click()
+    await stepCard(0).getByRole('button', { name: 'Delete', exact: true }).click()
     for (const [index, [stepName, type]] of [
       ['remind', 'operation'],
       ['done', 'end'],
@@ -1146,7 +1146,7 @@ test.describe('the author builds the asset management application with Studio on
     await pickAction(
       page
         .getByTestId('studio-field-/steps/0/open/parameters')
-        .getByRole('combobox', { name: 'Add mapping Page parameters', exact: true }),
+        .getByRole('combobox', { name: 'Add Page parameters', exact: true }),
       'asset',
       page.getByTestId('studio-field-/steps/0/open/parameters/asset'),
     )

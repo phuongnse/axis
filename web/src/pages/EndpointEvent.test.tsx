@@ -118,7 +118,7 @@ describe('EndpointEvent', () => {
   it('lists the payload fields that have no row as the add choices', async () => {
     renderEvent({ name: 'PaymentReceived', fields: { amount: 'a' } })
 
-    await userEvent.click(screen.getByRole('combobox', { name: 'Add mapping Event fields' }))
+    await userEvent.click(screen.getByRole('combobox', { name: 'Add Event fields' }))
     await openDropdown()
 
     expect(optionTexts()).toEqual(['reference', 'note'])
@@ -127,7 +127,7 @@ describe('EndpointEvent', () => {
   it('adds a row for a payload field with an empty expression', async () => {
     const onChange = renderEvent({ name: 'PaymentReceived', fields: { amount: 'a' } })
 
-    await userEvent.click(screen.getByRole('combobox', { name: 'Add mapping Event fields' }))
+    await userEvent.click(screen.getByRole('combobox', { name: 'Add Event fields' }))
     await chooseOption('reference')
 
     expect(onChange).toHaveBeenLastCalledWith('/event/fields/reference', '')

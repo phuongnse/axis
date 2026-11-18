@@ -2,6 +2,7 @@ import dagre from '@dagrejs/dagre'
 import { type Edge, Handle, MarkerType, type Node, type NodeProps, Position, ReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useMemo } from 'react'
+import { fillText } from '../platform/fillText'
 import { ReactFlowAttributionStyle } from '../platform/ReactFlowAttributionStyle'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
@@ -82,7 +83,7 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
   const t = useText()
   const { mode } = useThemeMode()
   const { colour } = useDesignTokens()
-  const to = t('shell.studio.processGraph.to')
+  const edgeText = t('shell.studio.processGraph.to')
   const guard = t('shell.studio.contract.guard')
   const noGuard = t('shell.studio.contract.noGuard')
 
@@ -112,7 +113,7 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
             source: edge.from,
             target: edge.to,
             label,
-            ariaLabel: `${edge.from} ${to} ${edge.to}, ${label}`,
+            ariaLabel: `${fillText(edgeText, { source: edge.from, target: edge.to })}, ${label}`,
             style: { stroke: colour.textMuted },
             markerEnd: { type: MarkerType.ArrowClosed, color: colour.textMuted },
             labelStyle: { fill: colour.text },
@@ -120,7 +121,7 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
           }
         }),
     }
-  }, [states, edges, colour, to, guard, noGuard])
+  }, [states, edges, colour, edgeText, guard, noGuard])
 
   return (
     <section

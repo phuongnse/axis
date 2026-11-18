@@ -340,7 +340,7 @@ function Step({
             </Button>
             {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button danger onClick={onRemove}>
-              {t('shell.studio.process.removeStep')}
+              {t('shell.studio.delete')}
             </Button>
           </Flex>
         }

@@ -121,7 +121,7 @@ empty, and its branch or outcome stays. A transition left naming a missing step 
 graph draws no edge for it. The designer never invents a step or a transition, and one Undo reverses each
 removal.
 
-- **A step** is removed by its panel's Remove step button, or by Delete or Backspace in the canvas.
+- **A step** is removed by its panel's Delete button, or by Delete or Backspace in the canvas.
   Removing the selected step clears the selection.
 - **An edge.** _(planned for M35)_ With an edge selected, the panel shows a Remove line button above the step's panel,
   and Delete or Backspace in the canvas clears that transition instead of removing the step.
@@ -315,12 +315,12 @@ Every add, move and remove has a keyboard way, and a hidden live region says wha
   and nodes in step order. Enter selects a node's step and opens its panel, and Enter or Space on an edge
   selects that edge. Delete or Backspace removes the selection.
 - **Edge names.** Each edge has a name made of its two steps and its branch or outcome.
-- **What the live region says.** _(planned for M35)_ "Removed step remind.", "Removed the line financeCheck to
-  markApproved.", "Added step remind after resolve.", or "Added step remind." for an unconnected step, "An end step
-  cannot go on a line.", and "submit now goes to done.". A choice from the transition menu also names its branch or
-  outcome. A move names the step now before the moved step, such as "Moved step financeCheck after submit.", and a
-  step moved to the first place in `steps` says "Moved step financeCheck to the start.". That place is the top of
-  the list, not the process's `start` step.
+- **What the live region says.** "Removed step remind.", "Removed the line financeCheck to markApproved, otherwise.",
+  "Added step remind after resolve.", or "Added step remind." for an unconnected step, "An end step cannot go on a
+  line.", and "submit now goes to done.". A choice from the transition menu also names its branch or outcome. A move
+  names the step now before the moved step, such as "Moved step financeCheck after submit.", and a step moved to the
+  first place in `steps` says "Moved step financeCheck to the start.". That place is the top of the list, not the
+  process's `start` step.
 - **Parts of a name join with a comma**. A node's name and type, an edge's steps and
   its branch or outcome, and a transition menu's choice join as peers, as in "financeCheck to
   markApproved, otherwise" and "managerApproval, approve now goes to done", see
@@ -339,7 +339,7 @@ or a path inside it. A marked node has an error-coloured border, its text label,
 `data-marked`. The marks come from the Problems panel's last loaded list, so they change on a load, a
 save or a request, not on every edit.
 
-- **The text label.** _(planned for M35)_ A marked node's text label reads "{step}, has problems", with the step's name.
+- **The text label.** A marked node's text label reads "{step}, has problems", with the step's name.
 
 - **Nested steps.** _(planned for M38)_ A diagnostic at a path inside a nested step marks that nested node, and not
   the frame around it. A diagnostic at a block's own path marks the frame, and not the steps inside it.
