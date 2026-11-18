@@ -635,7 +635,12 @@ function StudioWorkspace() {
                 ) : releasesView ? (
                   <StudioPageHeading title={t('shell.studio.releases')} />
                 ) : requestsView && requestId !== null ? (
-                  <StudioAuthoringRequestPage application={application!} requestId={requestId} userId={userId} />
+                  <StudioAuthoringRequestPage
+                    application={application!}
+                    requestId={requestId}
+                    userId={userId}
+                    resources={resources}
+                  />
                 ) : historyView ? (
                   revisionId !== null ? (
                     <StudioRevisionPage application={application!} revisionId={revisionId} resources={resources} />

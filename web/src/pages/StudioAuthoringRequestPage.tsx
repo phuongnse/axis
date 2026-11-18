@@ -3,6 +3,7 @@ import { useContext, useState } from 'react'
 import { ActionBar } from '../platform/ActionBar'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton, type AxisFoldAction } from '../platform/AxisButton'
+import { FilledText } from '../platform/FilledText'
 import { fillText } from '../platform/fillText'
 import { formatValue } from '../platform/formatValue'
 import { ReasonDialog } from '../platform/ReasonDialog'
@@ -17,8 +18,11 @@ import {
   dropAuthoringRequest,
   fetchAuthoringRequest,
   fetchStudioRequest,
+  resourceTitle,
   ServerUnreachableError,
+  type StudioDiagnostic,
   type StudioRequest,
+  type StudioResourceItem,
 } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -42,11 +46,22 @@ const workingStates: ReadonlySet<AuthoringRequestState> = new Set<AuthoringReque
 ])
 
 /**
+ * The code of an accept's diagnostic that says a resource changed since AI read it, see
+ * docs/reference/ai-authoring-in-studio.md#accepting.
+ */
+const acceptConflict = 'AXC0377'
+
+/**
  * The words of the guide bar for a state, or `null` while the bar is not built for it yet, see
  * docs/reference/ai-authoring-in-studio.md#the-guide. `accepting` is true while the author's accept is queued or running,
- * or has succeeded and the request still reads ready.
+ * or has succeeded and the request still reads ready. `conflicted` is true when the accept the page follows met a conflict.
  */
-function guideWords(state: AuthoringRequestState, isAuthor: boolean, accepting: boolean): string | null {
+function guideWords(
+  state: AuthoringRequestState,
+  isAuthor: boolean,
+  accepting: boolean,
+  conflicted: boolean,
+): string | null {
   if (state === 'planning') return 'shell.studio.aiRequest.guide.planning'
   if (state === 'awaitingApproval') {
     return isAuthor
@@ -55,11 +70,9 @@ function guideWords(state: AuthoringRequestState, isAuthor: boolean, accepting: 
   }
   if (workingStates.has(state)) return 'shell.studio.aiRequest.guide.working'
   if (state === 'ready') {
-    return accepting
-      ? 'shell.studio.aiRequest.guide.accepting'
-      : isAuthor
-        ? 'shell.studio.aiRequest.guide.ready'
-        : 'shell.studio.aiRequest.guide.readyOther'
+    if (accepting) return 'shell.studio.aiRequest.guide.accepting'
+    if (!isAuthor) return 'shell.studio.aiRequest.guide.readyOther'
+    return conflicted ? 'shell.studio.aiRequest.guide.conflict' : 'shell.studio.aiRequest.guide.ready'
   }
   if (state === 'accepted') return 'shell.studio.aiRequest.guide.accepted'
   if (state === 'dropped') return 'shell.studio.aiRequest.guide.dropped'
@@ -72,21 +85,25 @@ function guideWords(state: AuthoringRequestState, isAuthor: boolean, accepting: 
  * of a ready, failed or accepted request, then the status of the accept that the page follows, and the guide bar at the
  * foot of the window, which gives the request's author Approve plan, Change the plan… and Drop…, and Accept and Drop… on
  * a ready request. Accept sends the accept route and follows its publish request with `fetchStudioRequest`, kept in
- * memory for this visit, and reads the request again when the accept ends. Until the request waits for its author or ends, the page asks for it every
- * second and keeps the last answer when a read fails. A request that does not exist shows its line and, when `onAskAi` is
- * given, an Ask AI link that opens the request panel. See docs/reference/ai-authoring-in-studio.md#the-heading, #the-plan,
- * #the-diff, #accepting and #the-guide.
+ * memory for this visit, and reads the request again when the accept ends. An accept that met conflicts shows a warning
+ * in place of its status, which names each changed resource with who changed it and when, and the bar offers Drop… only.
+ * Until the request waits for its author or ends, the page asks for it every second and keeps the last answer when a read
+ * fails. A request that does not exist shows its line and, when `onAskAi` is given, an Ask AI link that opens the request
+ * panel. `resources` is the application's resource list, which names the resources of a conflict. See
+ * docs/reference/ai-authoring-in-studio.md#the-heading, #the-plan, #the-diff, #accepting and #the-guide.
  */
 export function StudioAuthoringRequestPage({
   application,
   requestId,
   userId,
   onAskAi,
+  resources = [],
 }: {
   application: string
   requestId: string
   userId: string | null
   onAskAi?: () => void
+  resources?: StudioResourceItem[]
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -161,7 +178,14 @@ export function StudioAuthoringRequestPage({
   const isAuthor = request.author === userId
   const accepting =
     isAuthor && request.state === 'ready' && followed !== null && (pending || followed.status === 'succeeded')
-  const words = guideWords(request.state, isAuthor, accepting)
+  // The conflicts of the accept the page follows, which only the author sees. The bar then offers no Accept until the
+  // retry route exists, see docs/reference/ai-authoring-in-studio.md#accepting.
+  const conflicts =
+    isAuthor && request.state === 'ready' && followed?.status === 'failed'
+      ? followed.diagnostics.filter((diagnostic) => diagnostic.code === acceptConflict)
+      : []
+  const conflicted = conflicts.length > 0
+  const words = guideWords(request.state, isAuthor, accepting, conflicted)
   const result = requestResult(request, isAuthor)
   const showResult =
     request.state === 'accepted' ||
@@ -251,7 +275,12 @@ export function StudioAuthoringRequestPage({
         />
       )}
       {showResult && <StudioAuthoringRequestResult application={application} request={request} isAuthor={isAuthor} />}
-      {followed !== null && <StudioRequestStatus request={followed} releaseNumber={null} />}
+      {followed !== null &&
+        (conflicted ? (
+          <AcceptConflict conflicts={conflicts} resources={resources} />
+        ) : (
+          <StudioRequestStatus request={followed} releaseNumber={null} />
+        ))}
       {words !== null && (
         <ActionBar
           docked
@@ -268,7 +297,7 @@ export function StudioAuthoringRequestPage({
               >
                 {t('shell.studio.aiRequest.approve')}
               </AxisButton>
-            ) : isAuthor && request.state === 'ready' && !accepting ? (
+            ) : isAuthor && request.state === 'ready' && !accepting && !conflicted ? (
               <AxisButton
                 role="finish"
                 data-testid="studio-ai-request-accept"
@@ -322,5 +351,53 @@ export function StudioAuthoringRequestPage({
         {t('shell.studio.aiRequest.drop.body')}
       </Modal>
     </Flex>
+  )
+}
+
+/**
+ * The warning that stands in place of "Not accepted" when the accept the page follows met conflicts, see
+ * docs/reference/ai-authoring-in-studio.md#accepting. Each conflict is one bullet: the resource's title, then who changed
+ * it and when, or only the title when no change is found. A resource the list does not hold yet is named by its file.
+ */
+function AcceptConflict({ conflicts, resources }: { conflicts: StudioDiagnostic[]; resources: StudioResourceItem[] }) {
+  const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  return (
+    <AxisAlert
+      kind="warning"
+      data-testid="studio-ai-request-conflict"
+      message={t('shell.studio.aiRequest.conflict')}
+      description={
+        <ul style={{ margin: 0 }}>
+          {conflicts.map((conflict) => {
+            const resource = resources.find((item) => item.id === conflict.resourceId)
+            const name =
+              resource !== undefined ? resourceTitle(resource, locale, t) : conflict.file || conflict.resourceId || ''
+            const time = formatValue(
+              { name: 'changedAt', type: 'date-time' },
+              conflict.changedAt ?? null,
+              {},
+              { locale, text: t },
+            )
+            return (
+              <li key={`${conflict.resourceId ?? ''}|${conflict.file}`} data-testid="studio-ai-request-conflict-item">
+                {conflict.changedBy ? (
+                  <FilledText
+                    text={t('shell.studio.aiRequest.conflict.item')}
+                    parts={{
+                      resource: name,
+                      author: conflict.changedBy,
+                      time: <time dateTime={conflict.changedAt ?? undefined}>{time}</time>,
+                    }}
+                  />
+                ) : (
+                  name
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      }
+    />
   )
 }
