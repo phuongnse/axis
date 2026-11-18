@@ -504,7 +504,9 @@ The server reads them, and a bad value stops the start.
 
 The agent host reads the `Ai` settings: the model bindings, the default and review bindings, the
 [budgets of a request](authoring-requests.md#budgets) and the file of scripted answers of the tests. Their table is in [model bindings](model-bindings.md#bindings). The server and the agent host read
-`Ai:AllowTenantKeys`, see [a tenant's own key](model-bindings.md#a-tenants-own-key).
+`Ai:AllowTenantKeys`, see [a tenant's own key](model-bindings.md#a-tenants-own-key). The server also reads
+`Ai:DefaultBinding`, only to know whether it has a value, for `studioAi`, see
+[roles and the current user](security.md#roles-and-the-current-user). It never checks the name against a binding.
 
 With `Ai:DefaultBinding` set, the agent host also reads its tenants, as the worker does under
 [tenancy settings](#tenancy-settings). With it unset, AI authoring is off and the agent host starts

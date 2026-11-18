@@ -63,6 +63,10 @@ spec:
             - name: Ai__AllowTenantKeys
               value: "true"
             {{- end }}
+            {{- with .Values.ai.defaultBinding }}
+            - name: Ai__DefaultBinding
+              value: {{ . | quote }}
+            {{- end }}
             {{- range $i, $proxy := .Values.forwardedHeaders.knownProxies }}
             - name: ForwardedHeaders__KnownProxies__{{ $i }}
               value: {{ $proxy | quote }}

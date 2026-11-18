@@ -12,6 +12,8 @@ namespace Axis.Studio;
 /// <c>Studio:PublisherRole</c> is the roles claim value that may also publish. With no value, nobody may.
 /// <c>Studio:DeveloperRole</c> is the roles claim value that a developer holds. With no value, the developer role gives nothing.
 /// <c>Studio:Tests</c> shows the test controls to the users of Studio. It is off by default and grants no right.
+/// <c>Ai:DefaultBinding</c> is read only to know whether it has a value, which turns on Ask AI for the users of Studio,
+/// see <c>docs/reference/security.md#roles-and-the-current-user</c>.
 /// <c>Studio:RevisionsPath</c> is the folder that holds the git repository of each application folder, outside the folder.
 /// It defaults to <c>.revisions</c> under <c>Studio:ApplicationsPath</c>, and with neither path no revisions are kept.
 /// In a cell, <c>Studio:Folders</c> and <c>Studio:RevisionsPath</c> must be empty and <see cref="PerTenant"/> is on, so a
@@ -25,7 +27,8 @@ internal sealed record StudioOptions(
     string? ApplicationsPath = null,
     bool PerTenant = false,
     string? RevisionsPath = null,
-    string? DeveloperRole = null)
+    string? DeveloperRole = null,
+    bool Ai = false)
 {
     public const string SectionName = "Studio";
 
@@ -83,7 +86,8 @@ internal sealed record StudioOptions(
             applications,
             cell.IsCell,
             revisions,
-            string.IsNullOrWhiteSpace(developerRole) ? null : developerRole);
+            string.IsNullOrWhiteSpace(developerRole) ? null : developerRole,
+            Ai: !string.IsNullOrWhiteSpace(configuration["Ai:DefaultBinding"]));
     }
 
     /// <summary>
@@ -149,4 +153,7 @@ internal sealed record StudioOptions(
 
     /// <summary>True when <see cref="Allows"/> holds and <c>Studio:Tests</c> is on.</summary>
     public bool AllowsTests(IReadOnlyList<string> roles) => Allows(roles) && Tests;
+
+    /// <summary>True when <see cref="Allows"/> holds and <c>Ai:DefaultBinding</c> has a value.</summary>
+    public bool AllowsAi(IReadOnlyList<string> roles) => Allows(roles) && Ai;
 }

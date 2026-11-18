@@ -99,6 +99,7 @@ const administrator = {
   studioCreate: false,
   studioPreviewHost: null,
   studioTest: false,
+  studioAi: false,
   console: false,
   users: true,
 }

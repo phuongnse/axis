@@ -15,6 +15,8 @@ export interface CurrentUser {
   studioPreviewHost: string | null
   /** Whether the user sees the test controls in Studio: true for an author when the server's `Studio:Tests` is on. */
   studioTest: boolean
+  /** Whether Studio shows Ask AI: true for an author when the server's `Ai:DefaultBinding` is set. */
+  studioAi: boolean
   /** Whether the user may use the operator console: the user holds the role that the server's `Console:OperatorRole` names. */
   console: boolean
   /** Whether the user may administer users: the user holds the role that the server's `Users:AdministratorRole` names, and the tenant is not a preview tenant. */

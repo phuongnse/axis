@@ -245,9 +245,12 @@ studio:
 
 # AI authoring, on the server and the agent host. allowTenantKeys renders Ai__AllowTenantKeys on both, so they
 # agree: the server lets a tenant administrator set the tenant's own model key, and the agent host uses it in
-# place of the installation's key on that tenant's model calls.
+# place of the installation's key on that tenant's model calls. defaultBinding renders Ai__DefaultBinding on the
+# server only, which turns on studioAi for authors, so Studio shows Ask AI. The chart sets no binding on the agent
+# host, so configure its Ai:Bindings yourself.
 ai:
   allowTenantKeys: false
+  defaultBinding: ""
 
 # Axis's identity provider: one Keycloak pod, always on, with the Axis theme and the breached-password
 # list. It listens on HTTPS only, with the certificate of secrets.identityCertificate. Its database

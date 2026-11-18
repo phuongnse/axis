@@ -237,7 +237,8 @@
     "ai": {
       "type": "object",
       "properties": {
-        "allowTenantKeys": { "type": "boolean" }
+        "allowTenantKeys": { "type": "boolean" },
+        "defaultBinding": { "type": "string" }
       }
     },
     "identity": {
