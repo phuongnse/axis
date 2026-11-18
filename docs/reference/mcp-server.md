@@ -161,6 +161,9 @@ A tool with an optional draft reads the working folder without it and the person
 | `write_package_file` | application, draft, package, `path`, `content` | Creates or replaces a package file in the draft, as a Studio save does, with the draft's diagnostics. It needs the developer role and the tenant's application packages switch on |
 | `delete_package_file` | application, draft, package, `path` | Removes a package file from the draft, with the draft's diagnostics. It needs the developer role and the tenant's application packages switch on |
 | `test_package` | application, draft, package, optional `request` | Without `request`, a `test` request of the package in the draft stored for the publisher, as `{ request, status, diagnostics, tests }`. With `request`, the same for that request of this draft, package and person, see [a package's tests](authoring.md#test). It needs the developer role and the tenant's application packages switch on |
+| `propose_plan` _(planned for M35)_ | application, `title`, `plan`, optional `text`, optional `autoAccept`, optional `authoringRequest` | Without `authoringRequest`, stores a new authoring request of the person in `awaitingApproval` through this client, with `text` and `autoAccept`. With it, stores the plan of the person's request in `planning`. Answers the request with its `address` |
+| `read_request` _(planned for M35)_ | application, `authoringRequest` | The read route's answer for the request, see [routes](authoring-requests.md#routes), plus its `address` |
+| `request_changes` _(planned for M35)_ | application, `authoringRequest`, `comment` | Works as the request-changes route does, only on a `ready` request and only for its author. From an outside app, the comment records what the person asked in the app |
 
 - **No other tool.** No tool publishes, activates a release, reads a record, a secret or a file other than
   a resource file or a package file, runs a command or opens a connection. A resource never holds a binding value, so no tool returns one.
@@ -176,6 +179,24 @@ A tool with an optional draft reads the working folder without it and the person
   and nothing an outside client read elsewhere, gives an agent more than its tools allow.
 - **Errors.** A refused call answers a tool error with the authoring API's problem title and
   diagnostics, never a stack trace or a path on disk.
+- **Plans first** _(planned for M35)_. `propose_plan` replaces `create_draft`, which goes. The first write on an
+  approved request makes its draft.
+- **Write tools take the request** _(planned for M35)_. `write_resource`, `write_layer`, `delete_resource`,
+  `write_package_file`, `delete_package_file`, `validate_draft`, `run_scenarios` and `accept_draft` take
+  `authoringRequest` in place of `draft`. The input is not named `request`, which already names a publish request in
+  `accept_draft`, `run_scenarios` and `test_package`. A write acts only on that request's draft, only for its author
+  and only in Change. On an outside app's own request in Change, a passing `validate_draft` or `run_scenarios` ends
+  the Change, see [outside apps](authoring-requests.md#states). `accept_draft` acts only in Ready, under
+  [accepting](authoring-requests.md#accepting).
+- **The page's address** _(planned for M35)_. Each answer about a request carries `address`, which is
+  `https://<host>/studio?app=<name>&request=<id>`, see
+  [the request panel](ai-authoring-in-studio.md#the-request-panel).
+- **Gates** _(planned for M35)_. No tool approves a plan. A write on a request in `awaitingApproval`, and an
+  `accept_draft` that the rules refuse, answer the JSON-RPC error `-32042` (`URLElicitationRequiredError` of
+  [the pinned version](#route-and-transport)) whose `data.elicitations` holds one elicitation of the mode `url`, with an `elicitationId`, a
+  `message` and the page's address as its `url`. A gate never uses form mode, because
+  an AI drives the answer in form mode, while a URL opens Axis in the person's own browser session. A client that
+  did not declare `elicitation.url` at `initialize` gets a tool error that names the address.
 
 ### Reference topics
 

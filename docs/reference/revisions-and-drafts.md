@@ -88,6 +88,12 @@ from every other draft.
   module resource it changes. A diff over 1 MiB comes in pages of whole entries. Each page ends with a
   cursor that keeps the draft commit the first page was read at, so a later write does not shift the
   pages. The route is in [the authoring API](authoring-revisions.md#draft-diff).
+- **Made for a request** _(planned for M35)_. The first write on an approved
+  [authoring request](authoring-requests.md#states) makes the draft, and its record also holds the request id.
+- **Preview** _(planned for M35)_. A draft is tried on the preview tenant by the draft preview route, see
+  [routes](authoring-requests.md#routes).
+- **Titles** _(planned for M35)_. The entries of a draft's diff carry `titles`, see
+  [the draft diff](authoring-revisions.md#draft-diff).
 - **Dropping.** Dropping a draft deletes its branch and its record.
 - **Ending by accept.** An accepted draft's branch and record are deleted, and its accept stays
   as a revision.

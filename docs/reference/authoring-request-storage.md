@@ -50,3 +50,16 @@ when the author approves, changes the plan or drops it. The publisher moves a `r
   no `checks`. A `conflict` clears the request's `draft_id` in the commit that moves it to `working`. The publisher
   keeps `claimed_by` and `claimed_until` when it moves a request to `accepted`, so the host's own commit of its `accept`
   step finds its claim, and a step never moves an `accepted` request.
+
+### New columns
+
+_(planned for M35)_
+
+- **`axis.authoring_requests`.** `title` (`text`, null), `client` (`text`, `studio` or the outside client id),
+  `co_authors` (`text[]`) and `plan` as `jsonb` of [the plan's shape](authoring-requests.md#states).
+- **`axis.authoring_request_steps`.** The `changeRequest` step kind holds the author's comment in `input_summary`.
+  A `review` step has the new outcome `notReviewed`, and its `checks` holds the review's shape, see
+  [the review's shape](authoring-requests.md#states).
+- **Outside apps.** An outside app's request has its refresh token stored at approval, not at send, because
+  approval is the first moment its author has a Studio session for it, see
+  [outside apps](authoring-requests.md#states).
