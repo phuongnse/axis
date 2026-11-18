@@ -330,6 +330,10 @@ be kept right.
   which keeps its own width.
 - **Group rows.** A row that heads a group shows its heading and leaves its other cells blank, with no dash,
   as `AxisTable`'s `blankRow` draws them.
+- **Folding group rows** _(planned for M35)_. A row with children folds, closed at first, behind an `AxisButton`
+  of the role `icon` with `FoldIcon`, named "Show the rows in it" or "Hide the rows in it". The fold sits in the
+  first column's padding, every row's words start where the heading does, and each level of rows starts one fold
+  further in. A table that groups rows uses this, and never a list inside a cell.
 
 The reasons for the table standard are in [D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md),
 and the reasons for each person's columns and saved views are in [D153](../decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md),

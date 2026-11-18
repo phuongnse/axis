@@ -158,7 +158,8 @@ an accept, which [accepting](#accepting) describes.
   before it), `app` as `{ client, name }` (`studio` with a null name for a request sent in Studio), `coAuthors`
   (the apps that wrote to the draft, in the shape of `app`, in order of first write), `aiConnected` (the AI status
   rule, for the request's author, so the page can say that no review will run), `draft` (the draft's id, or null)
-  and `plan` as [the plan's shape](#states).
+  and `plan` as [the plan's shape](#states). Each step answers `resource`, `{ kind, id, name }` on a `write` step
+  and null on the others.
 - **Approving an outside app's request** _(planned for M35)_. The approve route also gets the agent host's
   [token](#acting-for-the-author), as a send does and with the same refusals, so the agent host can run the checks
   and the review for the author. The agent host runs no plan or change step of such a request.
@@ -275,7 +276,7 @@ the checks, an independent review and fix rounds.
   `summary` and `changes` are required. `checklist` has one entry for each item of Axis's checklist. The whole plan
   is at most 64 KiB. The planning step ends by calling `propose_plan` for its own request, see
   [tools](mcp-server.md#tools). A turn that ends without a valid call has no plan (`noPlan`). The author answers
-  `questions` with Change plan, or approves the recommended options.
+  `questions` through a change of plan. The page offers no approval while the plan has questions.
 
 - **Axis's checklist** _(planned for M35)_. The plan answers it and the review checks it:
   1. The draft does what the request and the approved plan say, and nothing more.
@@ -324,11 +325,14 @@ Each step of a request has a kind that belongs to one step of [the frame](#state
 | `plan`          | Plan       | `noPlan`                                          | null                               |
 | `planChange`    | Approval   | none, the comment is in `input_summary`           | null                               |
 | `work`          | Change     | `unfinished`                                      | null                               |
+| `write`         | Change     | `saved`, `refused`                                | null                               |
 | `check`         | Checks     | `passed`, `failed`, `unfinished`                  | `{ compile, packages, scenarios }` |
 | `review`        | Review     | `passed`, `findings`, `notReviewed`, `unfinished` | `{ review }`                       |
 | `fix`           | Change     | `unfinished`                                      | null                               |
 | `changeRequest` | Ready      | none, the comment is in `input_summary`           | null                               |
 | `accept`        | Ready      | `accepted`, `refused`, `conflict`, `notAccepted`  | null                               |
+
+Each write tool call of an outside app stores a `write` step, with its `resource` as `{ kind, id, name }`.
 
 Any step may also end `interrupted`, `tokenEnded`, `overBudget`, `timedOut`, `keyRefused`, `noKey` or
 `authorDisabled`.
