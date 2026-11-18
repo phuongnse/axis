@@ -438,11 +438,9 @@ export function StepRunPanel({
                   {
                     key: 'status',
                     term: t('shell.stepRun.status'),
-                    value: (
-                      <StatusTag tone={attempt.response.status < 400 ? 'success' : 'danger'}>
-                        {String(attempt.response.status)}
-                      </StatusTag>
-                    ),
+                    // Proposed, see the review on #3650: the HTTP status is a value the system called answered, as
+                    // the attempts' HTTP column shows it; a `StatusTag` is for a state Axis keeps, beside what it is of.
+                    value: String(attempt.response.status),
                   },
                 ]),
             {
