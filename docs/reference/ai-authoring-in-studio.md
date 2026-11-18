@@ -14,7 +14,8 @@ request opens its own page.
   It shows only when `studioAi` is true, the field that [`GET /api/me`](security.md#roles-and-the-current-user) answers.
 - **Sending.** The author writes what they want in words, in any language, and sends it. A check box,
   "Accept when checks and review pass", asks for auto-accept, and shows only when the application
-  [allows it](#auto-accept). Send has no count beside it, because Axis counts no requests, see
+  [allows it](#auto-accept). Send has no count beside it.
+- **Axis counts no requests** _(planned for M35)_. That is why Send has no count, see
   [D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
 - **After a send.** The main area opens the request's address,
   `/studio?app=<application>&view=requests&request=<id>`. The panel stays open and empty for the next request.
@@ -184,7 +185,7 @@ bar, never in the heading. Only the request's author sees its actions.
 | AI works, checks or reviews                   | AI is working on it                                      | none                                                                                                              | Drop…                                                               |
 | AI waits for an outside app _(planned for M35)_ | The app's line, as [below](#an-outside-apps-request) gives it | none                                                                                                         | Drop…                                                               |
 | Ready, a finding must change _(planned for M35)_ | "1 blocking finding", or "<n> blocking findings"         | Ask AI to fix it, which asks for changes with "Fix what the review found must change:" and each blocking finding as the comment | Drop…, Ask for other changes…, Accept anyway…, see [the diff](#the-diff) |
-| Ready, passed | Checks and review passed                                 | Accept                                                                                                            | Drop…, Ask for other changes…                                       |
+| Ready, passed | Checks and review passed                                 | Accept                                                                                                            | Drop…, Ask for other changes… _(planned for M35)_                   |
 | Ready, an accept met a conflict _(planned for M35)_ | Resources changed since AI read them                     | Make the change again                                                                                             | Drop…                                                               |
 | Ready, for anyone else | Waiting for its author to accept                         | none                                                                                                              | none                                                                |
 | Accepting | Accepting the draft                                      | none                                                                                                              | none                                                                |
@@ -286,8 +287,8 @@ Two lines open the Result part, Checks and Review. Each has its name in bold and
 line's summary sits under it, across the columns and flush with the name.
 
 - **Checks** reads Passed (`success`) or Failed (`danger`). Its summary reads "All scenarios pass" with no
-  count, "1 of 2 scenarios pass", "The scenario fails." for one scenario, "Package tests fail", or a compile's
-  problems, such as "It does not compile: 2 problems". **Show the checks**, or **Hide the checks** once it shows, ends the summary's line.
+  count, "1 of 2 scenarios pass", "The scenario fails." for one scenario, "The scenario run failed." when the
+  run failed with no failed scenario, "Package tests fail", or a compile's problems, such as "It does not compile: 2 problems". **Show the checks**, or **Hide the checks** once it shows, ends the summary's line.
 - **Review** reads Changes requested (`attention`) when the review asked for changes. It reads No changes requested
   (`success`) when the review passed, or Not reviewed (`muted`) when a ready or accepted request had no review. A review
   that asked for changes has its own text as its summary. A passed review stores no text, so it shows no summary.
@@ -413,8 +414,6 @@ ended, by its kind and its outcome:
 | Any other outcome                 | A step did not finish.                                       |
 
 ## Auto-accept
-
-_(planned for M35)_
 
 Auto-accept lets the agent accept its own drafts in an application, as an automatic merge does.
 
