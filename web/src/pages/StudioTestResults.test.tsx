@@ -90,7 +90,7 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     const failed = rows[1]
     expect(failed).toHaveAttribute('data-outcome', 'failed')
     expect(failed).toHaveTextContent('ApprovalBelowThreshold')
-    expect(failed).toHaveTextContent('Step 6')
+    expect(within(failed).getByText('Step 6')).toBeInTheDocument()
     expect(failed).toHaveTextContent('The record status is approved, not rejected.')
 
     await userEvent.click(within(failed).getByRole('button'))
@@ -115,7 +115,7 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     expect(rows[0]).toHaveAttribute('data-outcome', 'skipped')
     expect(rows[0]).toHaveTextContent('skipped')
     expect(rows[0]).toHaveTextContent('department-budgets/ApprovalRecordsDecision')
-    expect(rows[0]).toHaveTextContent('Relaxed point Budget/effects/decisionRecorded')
+    expect(within(rows[0]).getByText('Relaxed point: Budget/effects/decisionRecorded')).toBeInTheDocument()
     expect(within(rows[0]).queryByRole('button')).not.toBeInTheDocument()
 
     await userEvent.click(rows[0])

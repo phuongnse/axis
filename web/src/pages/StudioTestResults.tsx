@@ -1,5 +1,6 @@
 import { Button, Flex, Tag, Typography } from 'antd'
 import { EmptyState } from '../platform/EmptyState'
+import { fillText } from '../platform/fillText'
 import type { StudioRequest, StudioScenarioResult, StudioSkippedScenarioResult } from '../platform/studio'
 import { useText } from '../platform/texts'
 
@@ -58,7 +59,9 @@ function ScenarioRow({
             <Tag>{t('shell.studio.tests.skipped')}</Tag>
             <strong>{scenario.name}</strong>
           </span>
-          <Typography.Text type="secondary">{`${t('shell.studio.tests.relaxedPoint')} ${scenario.point}`}</Typography.Text>
+          <Typography.Text type="secondary">
+            {fillText(t('shell.studio.tests.relaxedPoint'), { point: scenario.point })}
+          </Typography.Text>
         </Flex>
       </div>
     )
@@ -75,7 +78,7 @@ function ScenarioRow({
         <Typography.Text type="secondary">{`${scenario.durationMs} ms`}</Typography.Text>
       </span>
       {failed && scenario.step !== null && (
-        <Typography.Text>{`${t('shell.studio.tests.step')} ${scenario.step + 1}`}</Typography.Text>
+        <Typography.Text>{fillText(t('shell.studio.tests.step'), { number: scenario.step + 1 })}</Typography.Text>
       )}
       {failed && scenario.message !== null && <Typography.Text type="danger">{scenario.message}</Typography.Text>}
     </Flex>
