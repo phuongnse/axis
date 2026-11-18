@@ -127,6 +127,10 @@ Values are formatted for display and never changed. The rules of [shown values](
 | `file`               | the file's name as a download link to `downloadPath` and the file's id. A data source row holds a file as its bare id, so a data source column shows the id and no link                                                                                                                                                                                                                                                                            |
 | `null`               | a muted italic "—". A group row of a data source stays blank                                                                                                                                                                                                                                                                                                                                                                                       |
 
+- **Reference cells** _(planned)_. A `reference` cell is a link to its record page, see
+  [opening things](actions-and-controls.md#opening-things). In the identifying column the link stays the row's link,
+  as [opening a row](#opening-a-row) says, because a link cannot hold a link.
+
 ### Number source text
 
 The SPA parses record responses with the source text of each JSON number, so `values` holds integers and decimals as

@@ -45,7 +45,7 @@ their own controls where they expect them.
   page is drawn in `primaryText` on a `primary` tint and marked `aria-current`.
 - **Where a page is opened from** _(planned)_. The entry whose path is the page's path or a parent of it is marked, as
   before. A page that matches no entry, such as a form at `/<site>/request/new` opened from a table, marks the entry of
-  the address it was opened from, its `from`, which the table passes in history state. A page opened with no `from`,
+  the address it was opened from, its `from`, which a table or a record link passes in history state. A page opened with no `from`,
   such as in a new tab, marks no entry.
 - **Parent entries** _(planned for M35)_. A `ShellNavigation` entry that holds entries is a parent entry, drawn as Ant
   Design's inline submenu.

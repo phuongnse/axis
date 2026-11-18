@@ -22,6 +22,8 @@ widget names a role, never an Ant Design button type.
 | Link        | Text in `primaryText` with no border        | An action that reads as a link but goes to no address, such as the first cell of a [list of objects](studio-resource-form.md#lists-of-objects)                                   |
 | Destructive | `dangerText` at any level                   | Actions that remove, such as Delete row and Delete                                                                                                                               |
 
+- **An inline link** _(planned)_. An `AxisButton` link with `inline` takes the height of a line of text and no padding,
+  for a link inside a value, such as a reference in a table cell.
 - **Text colours, not fill colours.** Ant Design writes the text of text, outlined and danger buttons
   in the fill colours `primary` and `danger`, which fail contrast on a dark surface, so Axis writes
   them in `primaryText` and `dangerText`.
@@ -366,6 +368,16 @@ A thing opens at one of three levels, chosen by what the person does, never by t
   or Delete…, asking for a little, such as a reason, a name or an invitation, or choosing one thing. It
   never holds a record's detail or a long form, and never opens a dialog of its own. What needs much
   scrolling, or to be come back to, is a page.
+- **A reference opens what it names** _(planned)_. A record's label, shown read-only, is a real link to its record page,
+  with an `href` so Ctrl+click opens a new tab. The link passes the page it leaves as `from`, see
+  [shell layout](shell.md#layout). It never opens a dialog. A record the person cannot open is plain text.
+- **A link in a value opens in the same site** _(planned)_. A reference in a value is an inline link only when the
+  thing it names opens in the same site, such as a record, an instance, a sub-process or a step's run. A thing in
+  another site, such as Studio, opens only from a button named for it, such as Open in Studio. So a call's connector
+  and operation are plain text.
+- **Studio's and the platform's references** _(planned)_. A user, a tenant, an application or a release that a Studio
+  or platform page names is a link to its page where the reader may open it, and plain text otherwise. A Studio
+  reference picker whose chosen resource exists has an Open button joined to it, which opens that resource in Studio.
 
 ## Dialogs
 

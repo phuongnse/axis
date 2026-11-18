@@ -175,6 +175,11 @@ A page holds one or more widgets. A leaf widget's `type` is `table`, `form`, `ta
   [content widget](content-widget.md#content-widget) image. The `primary` is the site's main colour, and the compiler derives the other colours from it, see
   [design tokens](frontend.md#design-tokens-and-previews). The rule is
   [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
+- **Record pages** _(planned)_. A site's `recordPages` maps an entity to the page that opens its records, in the shape
+  `"recordPages": { "<entity>": "<page>" }`, such as `{ "PurchaseRequest": "PurchaseRequestForm" }`. An entity with no
+  entry opens on the [default record page](frontend.md#routing). The rule is
+  [D162](../decisions/d162-each-entitys-records-open-on-one-record-page-in-each-site.md), and its checks are in
+  [sites](configuration.md#sites).
 
 ### Page parameters and navigate actions
 
