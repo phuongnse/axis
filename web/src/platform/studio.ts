@@ -1642,6 +1642,51 @@ export async function fetchAuthoringRequest(
 }
 
 /**
+ * A file the request changes. `target` is the module resource a layer file changes, null for any other file. `titles` is
+ * the resource's label by locale, which only an accepted request's diff gives.
+ */
+export interface AuthoringRequestDiffEntry extends StudioRevisionChange {
+  target: string | null
+  titles?: Record<string, string> | null
+}
+
+/**
+ * The changes of one authoring request. A request with a draft answers one page of the draft's diff, and `cursor` names the
+ * next page, null on the last. An accepted request answers the changes of its accept's revision in one page, with `start`
+ * its parent, `tip` the revision and a null `cursor`.
+ */
+export interface AuthoringRequestDiff {
+  start: string
+  tip: string
+  resources: AuthoringRequestDiffEntry[]
+  cursor: string | null
+}
+
+/**
+ * Loads one page of the changes of an authoring request, the first without a `cursor` and the next with the one the page
+ * before gave. A 404 resolves to `null`, which means the request does not exist or has neither a draft nor an accept. Any
+ * other failed status throws, and a 401 shows the sign-in prompt and throws as well.
+ */
+export async function fetchAuthoringRequestDiff(
+  application: string,
+  id: string,
+  cursor?: string | null,
+  signal?: AbortSignal,
+): Promise<AuthoringRequestDiff | null> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests/${encodeURIComponent(id)}/diff${
+    cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''
+  }`
+  const response = await studioFetch(path, { signal })
+  if (response.status === 404) {
+    return null
+  }
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as AuthoringRequestDiff
+}
+
+/**
  * Posts an action on one authoring request, `approve`, `change-plan` or `drop`, and answers the request. A 401 shows the
  * sign-in prompt and throws, as any other failed status does.
  */
