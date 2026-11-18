@@ -38,8 +38,8 @@ never leaves an instance half moved.
 - **Restarts.** An instance that waits on a task has no work item, so it needs no running worker. One
   that waits on a connector call has the call's `connector.call` item, one that waits on a package
   call its `package.call` item, and one that waits on a timer, or on a `waitEvent` step with a
-  `timeout`, its `process.timer` item. One that waits on a call to a customer-hosted package has no
-  item, so a worker restart leaves it as it is. A task decision is accepted while no worker runs: it queues the
+  `timeout`, its `process.timer` item. One that waits on a call to a customer-hosted package has a
+  `package.call` item only while a runner's lease runs or a retry waits, and otherwise needs no worker. A task decision is accepted while no worker runs: it queues the
   next step's work item, and the next worker to start runs that step. A step that a worker never
   committed leaves no trace, and the worker that claims it after the lease runs it once.
 - **History.** Every step occurrence records its input, its output, the decision taken and any error.
@@ -55,7 +55,7 @@ work item that processes queue are described with their step:
 | `process.step`       | Runs the current step of its instance                                                   | This section                                                                                                       |
 | `process.timer`      | Resumes an instance that waits on a `timer` step, or on a `waitEvent` step at its `timeout` | This section, [Timer step](process-flow.md#timer-step) and [Wait for event step](process-flow.md#wait-for-event-step) |
 | `connector.call`     | Sends the call that a `callConnector` step staged                                       | [Staging and the call](#staging-and-the-call)                                                                      |
-| `package.call`       | Runs the operation that a package operation step staged                                 | [Staging a package call](#staging-a-package-call)                                                                  |
+| `package.call`       | Runs the operation that a package operation step staged, and ends a runner's lease      | [Staging a package call](#staging-a-package-call)                                                                  |
 | `process.resume`     | Resumes the parent of a `subProcess` step when its child completes                      | [Sub-process step](process-flow.md#sub-process-step)                                                               |
 | `event.deliver`      | Delivers an event to its `async` triggers and wakes the `waitEvent` steps that wait for it | [Event delivery](process-events.md#event-delivery)                                                                 |
 | `notification.email` | Sends one email that a `notify` step staged                                             | [Email](notifications.md#email)                                                                                    |
@@ -665,19 +665,21 @@ operation in place of the HTTP request:
   `application-package-host`, see [an application's packages](extension-packages.md#an-applications-packages). The
   worker reads the package's built files from the call's release in the mark transaction and sends them with the call's
   tenant when it starts the runner. Without `Extensions:Runners:Application`, the attempt is retryable and names the setting.
-- **Run in a customer-hosted runner** _(planned for M37)_. A call to a customer-hosted package, whether
+- **Run in a customer-hosted runner**. A call to a customer-hosted package, whether
   the application's own package or an installation's package that the application
   [declares](declaring-packages.md#declaring-packages-in-an-application) with `runner: customer`, see
   [customer-hosted runners](extension-packages.md#customer-hosted-runners), waits `pending`, its retry due, until a
   [customer-hosted runner](extension-packages.md#customer-hosted-runners) that registers the package and
   version takes it, and the runner receives no binding value.
   - **The take is the Mark step.** It marks the call `sending`, counts the attempt and gives a lease that
-    lasts the operation's `timeout`.
+    lasts the operation's `timeout`. It also queues a `package.call` item that is due when the lease ends,
+    and the posted result deletes it.
   - **The posted result is the Record step.** `succeeded` is checked against the manifest as an output that
     fits, `retryable` counts as a `RetryableException`, and `failed` counts as any other exception, keeping
     only the exception type.
-  - **A lease that ends with no result is a timeout.** The worker records an unknown outcome, as
-    [package call outcomes](#package-call-outcomes) says.
+  - **A lease that ends with no result is a timeout.** When the lease's item comes due and the call is still
+    `sending`, the worker records an unknown outcome with the timeout's error, as
+    [package call outcomes](#package-call-outcomes) says. A result that arrives after it answers `409`.
   - **A call that no runner takes** stays `pending`, and the instance stays `waiting`.
 - **Record.** An outcome transaction records the result, as for a connector call. On success it
   writes the output fields with the record update rules, sets the instance to `running` on `next`,
