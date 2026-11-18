@@ -478,6 +478,97 @@
       "vi": "Thất bại",
       "status": "proposed",
       "note": "The state of an AI request that AI could not finish."
+    },
+    {
+      "concept": "Review (of an AI request)",
+      "en": "Review",
+      "vi": "Rà soát",
+      "status": "proposed",
+      "note": "A second AI's read of an AI request's draft, with Axis's checklist. It is not a person's review."
+    },
+    {
+      "concept": "Finding (of a review)",
+      "en": "Finding",
+      "vi": "Nhận xét",
+      "status": "proposed",
+      "note": "One point that a review makes about a resource, at its path."
+    },
+    {
+      "concept": "Result (of an AI request)",
+      "en": "Result",
+      "vi": "Kết quả",
+      "status": "proposed",
+      "note": "The item of an AI request's page that shows what the request changes and how its checks and review went."
+    },
+    {
+      "concept": "Finding kind: Blocking",
+      "en": "Blocking",
+      "vi": "Bắt buộc sửa",
+      "status": "proposed",
+      "note": "A finding that must change before the draft goes live."
+    },
+    {
+      "concept": "Finding kind: Suggestion",
+      "en": "Suggestion",
+      "vi": "Góp ý",
+      "status": "proposed",
+      "note": "A finding that does not block the draft."
+    },
+    {
+      "concept": "Review outcome: Met",
+      "en": "Met",
+      "vi": "Đạt",
+      "status": "proposed",
+      "note": "The review found that a criterion or a checklist item is met."
+    },
+    {
+      "concept": "Review outcome: Not met",
+      "en": "Not met",
+      "vi": "Không đạt",
+      "status": "proposed",
+      "note": "The review found that a criterion or a checklist item is not met."
+    },
+    {
+      "concept": "Review outcome: Skipped",
+      "en": "Skipped",
+      "vi": "Bỏ qua",
+      "status": "proposed",
+      "note": "The review could not check a criterion or a checklist item."
+    },
+    {
+      "concept": "Review verdict: Changes requested",
+      "en": "Changes requested",
+      "vi": "Yêu cầu sửa",
+      "status": "proposed",
+      "note": "The review's verdict while an open blocking finding remains."
+    },
+    {
+      "concept": "Review verdict: No changes requested",
+      "en": "No changes requested",
+      "vi": "Không yêu cầu sửa",
+      "status": "proposed",
+      "note": "The review's verdict when no open finding blocks the draft."
+    },
+    {
+      "concept": "Review verdict: Not reviewed",
+      "en": "Not reviewed",
+      "vi": "Chưa rà soát",
+      "status": "proposed",
+      "note": "The review's verdict when no review ran, such as when the author has no AI connected."
+    },
+    {
+      "concept": "Action: Accept (a draft)",
+      "en": "Accept",
+      "vi": "Chấp nhận",
+      "status": "proposed",
+      "note": "The author's action that accepts an AI request's draft into the application."
+    },
+    {
+      "concept": "Action: Accept anyway",
+      "en": "Accept anyway",
+      "vi": "Vẫn chấp nhận",
+      "status": "proposed",
+      "note": "The action that accepts a draft while an open blocking finding remains."
     }
   ]
 }

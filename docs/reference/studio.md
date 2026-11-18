@@ -239,6 +239,8 @@ its end.
   protocol, and a site renamed after the request was sent can give a wrong link. A failed preview shows
   Preview failed. A preview shows no release number and leaves the Releases list as it is, because its
   release belongs to the preview tenant's own history.
+- **Preview's status line** _(planned for M35)_. Its status line ends with "The preview is ready. Open <site>" and a link
+  for each site, as [Preview the draft](ai-authoring-in-studio.md#preview-the-draft) does.
 - **The status line.** Studio checks `GET .../requests/{id}` every second, with no time limit, until
   the status is `succeeded` or `failed`, and shows queued or running meanwhile. It shows the outcome
   only once the publisher has finished the request.
@@ -284,10 +286,10 @@ Studio runs the application's [test scenarios](test-scenarios.md) through the
   answers `false` or fails. They are off while a request runs and while the reconnect message shows.
 - **The status line** shows queued, running and the outcome, as for Validate: Tests passed or Tests
   failed, and never a release number.
-- **Test results.** The list shows each scenario of the request's `scenarios` field, with passed or
-  failed, its time and, for a failure, the failing step and its message. Steps count from 1, as the
-  scenario editor's step cards do. Opening a failure opens the scenario at the item's `path`, as a
-  diagnostic does.
+- **Test results.** _(planned for M35)_ Each result reads as [a scenario's result](ai-authoring-in-studio.md#scenario-results)
+  does. The list shows each scenario of the request's `scenarios` field, with passed or failed, its time and, for a
+  failure, the failing step and its message. Steps count from 1, as the scenario editor's step cards do. Opening a
+  failure opens the scenario at the item's `path`, as a diagnostic does.
 - **No empty pass.** While the request is queued or running, the list shows a note instead of rows, so
   an empty list never reads as a pass. A failed run with no results says that no scenario ran and
   points to the diagnostics: compile errors, a missing setting and an unknown scenario name fail a run

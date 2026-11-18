@@ -96,8 +96,9 @@ an accept, which [accepting](#accepting) describes.
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/change-plan`                         | Moves a request from `awaitingApproval` back to `planning` and keeps the comment as a `planChange` step    |
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/drop`                                | Moves a request to `dropped` from any state but `accepted` and `dropped`                                   |
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/accept`                              | Stores an `accept` publish request for the draft of a `ready` request and answers `202` with it            |
+| `POST /api/studio/apps/{application}/authoring-requests/{id}/retry` _(planned for M35)_           | Moves a `ready` request whose accept met a conflict back to `working` with no draft                        |
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/request-changes` _(planned for M35)_ | Moves a request from `ready` back to `working` and keeps the comment as a `changeRequest` step             |
-| `GET /api/studio/apps/{application}/authoring-requests/{id}/diff` _(planned for M35)_             | Reads the diff of the request's draft, in the shape of the [draft diff](authoring-revisions.md#draft-diff) |
+| `GET /api/studio/apps/{application}/authoring-requests/{id}/diff` _(planned for M35)_             | Reads the changes of the request, as the [draft diff](authoring-revisions.md#draft-diff) shows them        |
 | `GET /api/studio/ai` _(planned for M35)_                                                          | Tells the session's author whether their AI is connected, and the address of the MCP server                |
 | `POST /api/studio/apps/{application}/drafts/{draft}/preview` _(planned for M35)_                  | Tries the draft on the preview tenant, see [the draft preview](#routes)                                    |
 
@@ -144,9 +145,17 @@ an accept, which [accepting](#accepting) describes.
   back to 0 and moves the request to `working`. `Ai:RequestTimeout` counts from the `changeRequest` step, and the
   token budget goes on. Without a restart, a request that used up its rounds could never be changed, see
   [D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
-- **The request diff** _(planned for M35)_. Any author reads the diff of the request's draft, in the shape and the
-  pages of the [draft diff](authoring-revisions.md#draft-diff). It answers `404` when the request has no draft,
-  an accepted request included.
+- **Retrying a conflict as the author** _(planned for M35)_. Only the author of the request (`403` to anyone else)
+  retries it. The route answers `409` unless the request is `ready` and its latest accept failed with `AXC0377`. It
+  clears the draft, sets `round` back to 0 and moves the request to `working`. `Ai:RequestTimeout` counts from the
+  retry, and the token budget goes on, as requesting changes does above. Without that restart, the time limit of a
+  request that waited a long time for its author would stop it as `timedOut` before its next step. The agent's own
+  retry keeps its round and its time limit, see [retrying a conflict](#accepting). It answers the request as it now is.
+- **The request diff** _(planned for M35)_. Any author reads the changes of the request. A `ready` or `failed` request
+  answers the changes of its draft, in the shape and the pages of the [draft diff](authoring-revisions.md#draft-diff).
+  Once `accepted`, it answers the changes of the revision its accept made, as the
+  [revision diff](authoring-revisions.md#diff) gives them, with `titles`, in one page with a null `cursor`. A request
+  with neither a draft nor an accept answers `404`.
 - **AI status** _(planned for M35)_. `GET /api/studio/ai` takes the session and the author role and answers
   `{ aiConnected, mcp }`. `aiConnected` is true when the tenant's AI authoring setting is on and the person has
   stored a key, or when `Ai:DefaultBinding` needs none, see
@@ -284,10 +293,12 @@ the checks, an independent review and fix rounds.
   3. Each behaviour that the draft adds or changes has a scenario.
   4. Every text the draft adds has each locale the application offers.
 - **The review's shape** _(planned for M35)_. The review model's last answer is
-  `{ outcome, findings: [{ severity, text, file }], criteria: [{ check, met, note }], checklist: [{ item, outcome, note }], open }`,
-  and the review step stores it as `checks.review`. `severity` is `blocking` or `suggestion`, and `criteria` has one
-  entry for each entry of the plan's `checks`. A checklist `outcome` is `met`, `notMet` or `notApplicable`. The
-  review's `outcome` is `passed` when no finding is blocking, and a suggestion never causes a fix round. `open`
+  `{ outcome, summary, findings: [{ severity, text, file, path }], criteria: [{ check, outcome, note }], checklist: [{ item, outcome, note }], open }`,
+  and the review step stores it as `checks.review`. `summary` is a sentence or two. `severity` is `blocking` or
+  `suggestion`. `path` is the place in `file` that the finding is about. `criteria` has one entry for each entry of the
+  plan's `checks`. A criterion's or a checklist item's `outcome` is `met`, `notMet` or `skipped`, where `skipped` means
+  the review could not check it. `note` is the reviewer's short reason for an outcome that is `notMet` or `skipped`, and
+  null otherwise. The review's `outcome` is `passed` when no finding is blocking, and a suggestion never causes a fix round. `open`
   holds the findings still open at `ready`: the suggestions, and the blocking findings when the fix rounds ran out,
   which moves the request to `ready` instead of `failed`. An answer that does not fit the shape is `unfinished`.
   The review runs with Axis's instructions and checklist, on the read-only tools of
@@ -420,6 +431,8 @@ only [publishing](authoring.md#publishing) does.
 - **Conflicts.** A resource or a package file that changed since the draft recorded it is a conflict, and the
   accept answers it with one `AXC0377` diagnostic for each, naming the resource, its file and its
   new version, or the package file's path and its new version.
+- **Who changed it** _(planned for M35)_. Each `AXC0377` diagnostic also names who made the revision that changed the
+  resource, and when.
 - **Retrying a conflict.** When the agent's accept meets a conflict, the request goes back to `working` with no
   draft. The agent reads the folder again, makes the change on a new draft and runs the checks and the review
   again, within the request's budgets: the request keeps its `round`, tokens and time limit. The conflicted draft
