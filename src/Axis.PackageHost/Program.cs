@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Axis.Configuration.Packages;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,7 +10,8 @@ namespace Axis.PackageHost;
 /// <summary>
 /// The command line entry point. A named class keeps it from clashing with other projects' <c>Program</c>.
 /// <c>host</c> listens for runner protocol connections and starts a runner for each, <c>runner</c> runs one
-/// installed package version, and any other arguments are the <c>build</c> command.
+/// installed package version, <c>connect</c> runs the installed packages as a customer-hosted runner, and any other arguments are the
+/// <c>build</c> command.
 /// </summary>
 internal static class PackageHostProgram
 {
@@ -19,6 +21,8 @@ internal static class PackageHostProgram
         {
             case ["host", ..]:
                 return await RunHostAsync(args[1..]);
+            case ["connect", ..]:
+                return await ConnectAsync(args[1..]);
             case ["runner", var root, var id, var version]:
                 return await Runner.RunAsync(root, id, version);
             default:
@@ -37,6 +41,31 @@ internal static class PackageHostProgram
 
         var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
         return await PackageBuildCommand.RunAsync(args, configuration, Console.Out, cancellation.Token);
+    }
+
+    /// <summary>
+    /// Runs the <c>connect</c> command until Ctrl+C or SIGTERM, with the settings of <c>Connect:*</c> and <c>Extensions:Path</c>, see
+    /// docs/reference/extension-packages.md#customer-hosted-runners.
+    /// </summary>
+    private static async Task<int> ConnectAsync(string[] args)
+    {
+        var builder = Host.CreateApplicationBuilder(args);
+        using var host = builder.Build();
+        var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(ConnectCommand).FullName!);
+        using var cancellation = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            cancellation.Cancel();
+        };
+        using var terminate = PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
+        {
+            context.Cancel = true;
+            cancellation.Cancel();
+        });
+
+        return await ConnectCommand.RunAsync(
+            builder.Configuration, builder.Environment.IsDevelopment(), RunnerCommands.ForThisProgram(), Console.Error, logger, cancellation.Token);
     }
 
     /// <summary>

@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Collections.Concurrent;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Net;
@@ -485,76 +484,26 @@ internal sealed partial class RunnerHost(
     }
 
     /// <summary>
-    /// Starts the runner of <paramref name="language"/>. Returns <see langword="null"/> when the language has no runner
-    /// or the runner's program is not installed, so that no runner starts.
+    /// Starts the runner of <paramref name="language"/> with the worker's egress proxy as its one route to the network, whose credentials
+    /// are the runner's token. No NO_PROXY is set, so a request to a loopback address goes through the proxy too. Node.js makes its own
+    /// HTTP calls through these variables only when it is told to. Returns <see langword="null"/> when the language has no runner or the
+    /// runner's program is not installed, so that no runner starts.
     /// </summary>
     private Process? TryStartRunner(string root, StartMessage start, PackageLanguage language)
     {
-        var command = language switch
-        {
-            PackageLanguage.CSharp => commands.CSharp,
-            PackageLanguage.Node => commands.Node,
-            PackageLanguage.Python => commands.Python,
-            _ => null,
-        };
-        if (command is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            return StartRunner(command, root, start, language);
-        }
-        catch (Win32Exception)
-        {
-            return null;
-        }
-    }
-
-    private static Process StartRunner(RunnerCommand command, string root, StartMessage start, PackageLanguage language)
-    {
-        var info = new ProcessStartInfo(command.FileName)
-        {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-        };
-        foreach (var argument in command.Arguments)
-        {
-            info.ArgumentList.Add(argument);
-        }
-
-        if (language == PackageLanguage.Python)
-        {
-            info.ArgumentList.Add(Path.Combine(root, start.Package, start.Version));
-        }
-        else
-        {
-            info.ArgumentList.Add("runner");
-            info.ArgumentList.Add(root);
-            info.ArgumentList.Add(start.Package);
-            info.ArgumentList.Add(start.Version);
-        }
-
-        info.Environment.Clear();
-
-        // The runner's one route to the network is the worker's egress proxy, whose credentials are the runner's token.
-        // No NO_PROXY is set, so a request to a loopback address goes through the proxy too.
         var proxy = $"http://axis:{start.ProxyToken}@{start.Proxy}";
+        var environment = new Dictionary<string, string>();
         foreach (var name in new[] { "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy" })
         {
-            info.Environment[name] = proxy;
+            environment[name] = proxy;
         }
 
-        // Node.js makes its own HTTP calls through these variables only when it is told to.
         if (language == PackageLanguage.Node)
         {
-            info.Environment["NODE_USE_ENV_PROXY"] = "1";
+            environment["NODE_USE_ENV_PROXY"] = "1";
         }
 
-        return Process.Start(info) ?? throw new InvalidOperationException("The runner did not start.");
+        return RunnerProcess.TryStart(commands, root, start.Package, start.Version, language, environment);
     }
 
     /// <summary>
@@ -593,7 +542,7 @@ internal sealed partial class RunnerHost(
         finally
         {
             // Killing the runner ends both copies, and closing the socket ends the one that waits on it.
-            await KillAsync(runner);
+            await RunnerProcess.KillAsync(runner);
             socket.Close();
             await Task.WhenAll(Settled(toRunner), Settled(fromRunner));
             if (runnerOutput is not null)
@@ -708,20 +657,6 @@ internal sealed partial class RunnerHost(
                 return null;
             }
         }
-    }
-
-    private static async Task KillAsync(Process runner)
-    {
-        try
-        {
-            runner.Kill(entireProcessTree: true);
-        }
-        catch (InvalidOperationException)
-        {
-            // The runner has already exited.
-        }
-
-        await runner.WaitForExitAsync();
     }
 
     /// <summary>Waits for a copy to end. A copy that fails because its stream was closed has ended too.</summary>

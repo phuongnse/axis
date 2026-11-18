@@ -675,7 +675,7 @@ internal sealed partial class PackageCallHandler(
             case FailureMessage { Binding: { } binding }:
                 return new Run(
                     null,
-                    PackageOperationContext.RefusedMessage(target.Operation.Name, target.Manifest.Id, $"went beyond its declared capabilities with the binding '{binding}'."));
+                    PackageOperationContext.BindingRefusedMessage(target.Operation.Name, target.Manifest.Id, binding));
             case FailureMessage failure:
                 return new Run(null, null, Error: failure.Error ?? nameof(FailureMessage));
             default:
