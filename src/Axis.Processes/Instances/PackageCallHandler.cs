@@ -128,6 +128,22 @@ internal sealed partial class PackageCallHandler(
         await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             var call = item.PackageCallId is { } callId ? await PackageCalls.LoadAsync(transaction, callId, cancellationToken) : null;
+            if (call is { State: PackageCalls.Pending, RunnerId: not null })
+            {
+                // A customer-hosted runner took the call and its result set it back to pending, see
+                // docs/reference/process-execution.md#package-call-outcomes. The item only held the call back until its backoff
+                // passed, so it is deleted and the next take of a runner makes the next attempt.
+                if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    LogLostClaim(item.Id, item.PackageCallId);
+                    return WorkItemOutcome.LostClaim;
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+                return WorkItemOutcome.Completed;
+            }
+
             var instance = call is null ? null : await ProcessSteps.LoadAsync(transaction, call.ProcessInstanceId, cancellationToken);
             if (call is not { State: PackageCalls.Pending or PackageCalls.Sending }
                 || instance is not { State: ProcessStarts.Waiting }
@@ -750,7 +766,7 @@ internal sealed partial class PackageCallHandler(
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
-        var attemptsLeft = attempt.Attempts < call.Retry.Attempts;
+        var delay = PackageCallRecords.RetryDelay(attempt);
         var row = counted
             ? PackageCallRecords.AttemptRow(
                 attempt,
@@ -764,10 +780,8 @@ internal sealed partial class PackageCallHandler(
             : null;
         return errorClass switch
         {
-            ErrorClass.Retryable when attemptsLeft =>
-                RetryAsync(item, connection, attempt, error, ConnectorCallHandler.Backoff(call.Retry, attempt.Attempts), row, cancellationToken),
-            ErrorClass.Unknown when attemptsLeft && call.Idempotent =>
-                RetryAsync(item, connection, attempt, error, ConnectorCallHandler.Backoff(call.Retry, attempt.Attempts), row, cancellationToken),
+            ErrorClass.Retryable when delay is { } wait => RetryAsync(item, connection, attempt, error, wait, row, cancellationToken),
+            ErrorClass.Unknown when delay is { } wait && call.Idempotent => RetryAsync(item, connection, attempt, error, wait, row, cancellationToken),
             ErrorClass.Unknown => LeaveUnknownAsync(item, connection, attempt, error, row, cancellationToken),
             _ => FailAsync(item, connection, attempt, error, row, cancellationToken),
         };
@@ -804,8 +818,7 @@ internal sealed partial class PackageCallHandler(
             return WorkItemOutcome.Completed;
         }
 
-        await PackageCalls.RetryAsync(transaction, call.Id, error, cancellationToken);
-        await PackageCallRecords.InsertAttemptAsync(transaction, Tags(item, attempt), call, row, cancellationToken);
+        await PackageCallRecords.WriteRetryAsync(transaction, item.TenantId, attempt, error, row, cancellationToken);
         if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
         {
             await transaction.RollbackAsync(cancellationToken);

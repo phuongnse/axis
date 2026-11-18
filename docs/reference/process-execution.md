@@ -718,7 +718,11 @@ input under the same operation identity.
   backoff doubled for each attempt made, so after `backoff` × 2^(n−1) for attempt n, and at most an
   hour. A retry writes no history row and no audit record. A call with a missing version counts the
   attempt without marking the call `sending`, because the operation never ran. A release without the
-  step, or an installed manifest without the operation, is not retried, since a retry cannot fix it.
+  step, or an installed manifest without the operation, is not retried, since a retry cannot fix it. A
+  `retryable` result of a [customer-hosted runner](extension-packages.md#customer-hosted-runners) queues a
+  `package.call` item due after the same backoff. A runner can take the call only once that item is gone,
+  and the worker deletes it when it is due, with no other write, because the call is `pending` and a runner took
+  it before. The next take gives the same operation identity.
 - **Left unknown.** A call whose operation is not `idempotent`, or whose attempts ran out after an
   unknown outcome, stays `unknown`, and the instance stays `waiting`. The operation may have acted, so
   the platform neither runs it again nor fails the instance. A history row with output

@@ -3,12 +3,13 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.Data.Naming;
+using Axis.Processes.Work;
 using Axis.Server.Tests;
 
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// A customer-hosted runner posts the <c>succeeded</c> result of a call it took at <c>POST /api/package-runner/leases/{leaseId}/result</c>, see
+/// A customer-hosted runner posts the <c>succeeded</c>, <c>retryable</c> or <c>failed</c> result of a call it took at <c>POST /api/package-runner/leases/{leaseId}/result</c>, see
 /// <c>docs/reference/extension-packages.md#routes</c>, with real PostgreSQL and Keycloak. The calls are left as staging leaves them, and the runner
 /// takes each one first. The denied cases of the token and the body are in <see cref="PackageRunnerRegistrationTests"/>. Each test makes the
 /// realm of its tenant with a unique name and deletes it at the end.
@@ -193,6 +194,162 @@ public sealed class PackageRunnerResultTests(PostgreSqlFixture database, Keycloa
         {
             await _server.DeleteRealmAsync(id);
         }
+    }
+
+    [Fact]
+    public async Task A_retryable_result_sets_the_call_back_to_pending_and_a_runner_takes_it_again_after_the_backoff()
+    {
+        await _server.PrepareAsync();
+        var (id, tenantDatabase) = await _server.AddTenantAsync();
+        try
+        {
+            var releases = new CustomerHostedReleases();
+            var releaseId = await releases.ActivateOwnWithProcessAsync(tenantDatabase, _sumManifest, CancellationToken);
+            var callId = await releases.StageToolsSumCallAsync(tenantDatabase, releaseId, "1.0.0", CancellationToken);
+            await using var factory = _server.Start();
+            using var admin = PackageRunnerServer.Client(factory, id).SignedInAs("admin");
+            var runner = await _server.CreateRunnerAsync(admin, id);
+            using var client = PackageRunnerServer.Client(factory, id);
+            var lease = await RegisterAndTakeAsync(client, runner);
+            var items = $"SELECT count(*) FROM axis.process_work_items WHERE package_call_id = '{callId}' AND kind = 'package.call'";
+
+            using (var response = await PackageRunnerServer.PostAsync(client, ResultPath(lease), runner.Token, """{ "outcome": "retryable" }"""))
+            {
+                Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+            }
+
+            Assert.Equal("pending", await CallAsync(tenantDatabase, callId, "state"));
+            Assert.Equal("1", await CallAsync(tenantDatabase, callId, "attempts"));
+            Assert.Equal("Axis.Extensions.RetryableException", await CallAsync(tenantDatabase, callId, "last_error"));
+            Assert.Equal(1L, await CountAsync(tenantDatabase, items));
+            Assert.Equal(1L, await CountAsync(tenantDatabase, $"{items} AND due_at > now() + interval '20 seconds'"));
+            Assert.Equal(1L, await CountAsync(tenantDatabase, $"SELECT count(*) FROM axis.process_call_attempts WHERE call_id = '{callId}' AND outcome = 'retryable'"));
+            using (var early = await PackageRunnerServer.PostAsync(client, Take, runner.Token, HoldsTools))
+            {
+                Assert.Equal(HttpStatusCode.NoContent, early.StatusCode);
+            }
+
+            await PostgreSqlServer.AdminScalarAsync(tenantDatabase, $"UPDATE axis.process_work_items SET due_at = now() WHERE package_call_id = '{callId}'", CancellationToken);
+            Assert.Equal(WorkItemOutcome.Completed, await PackageRunnerServer.RunPackageCallItemAsync(id, tenantDatabase));
+
+            Assert.Equal(0L, await CountAsync(tenantDatabase, items));
+            Assert.Equal("pending", await CallAsync(tenantDatabase, callId, "state"));
+            Assert.Equal("1", await CallAsync(tenantDatabase, callId, "attempts"));
+            using var again = await PackageRunnerServer.PostAsync(client, Take, runner.Token, HoldsTools);
+            Assert.Equal(HttpStatusCode.OK, again.StatusCode);
+            Assert.Equal(callId, (await again.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("operationId").GetGuid());
+            Assert.Equal("2", await CallAsync(tenantDatabase, callId, "attempts"));
+            Assert.Equal("sending", await CallAsync(tenantDatabase, callId, "state"));
+        }
+        finally
+        {
+            await _server.DeleteRealmAsync(id);
+        }
+    }
+
+    [Fact]
+    public async Task A_retryable_result_on_the_last_attempt_fails_the_call_and_the_instance()
+    {
+        await _server.PrepareAsync();
+        var (id, tenantDatabase) = await _server.AddTenantAsync();
+        try
+        {
+            var releases = new CustomerHostedReleases();
+            var releaseId = await releases.ActivateOwnWithProcessAsync(tenantDatabase, _sumManifest, CancellationToken);
+            var callId = await releases.StageToolsSumCallAsync(tenantDatabase, releaseId, "1.0.0", CancellationToken);
+            await PostgreSqlServer.AdminScalarAsync(tenantDatabase, $"UPDATE axis.package_calls SET attempts = 2 WHERE id = '{callId}'", CancellationToken);
+            await using var factory = _server.Start();
+            using var admin = PackageRunnerServer.Client(factory, id).SignedInAs("admin");
+            var runner = await _server.CreateRunnerAsync(admin, id);
+            using var client = PackageRunnerServer.Client(factory, id);
+            var lease = await RegisterAndTakeAsync(client, runner);
+            Assert.Equal("3", await CallAsync(tenantDatabase, callId, "attempts"));
+
+            using var response = await PackageRunnerServer.PostAsync(client, ResultPath(lease), runner.Token, """{ "outcome": "retryable" }""");
+
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+            await AssertFailedAsync(tenantDatabase, callId, "Axis.Extensions.RetryableException");
+            Assert.Equal(0L, await CountAsync(tenantDatabase, $"SELECT count(*) FROM axis.process_work_items WHERE package_call_id = '{callId}'"));
+        }
+        finally
+        {
+            await _server.DeleteRealmAsync(id);
+        }
+    }
+
+    [Fact]
+    public async Task A_failed_result_fails_the_call_and_the_instance_at_once_with_the_posted_type()
+    {
+        await _server.PrepareAsync();
+        var (id, tenantDatabase) = await _server.AddTenantAsync();
+        try
+        {
+            var releases = new CustomerHostedReleases();
+            var releaseId = await releases.ActivateOwnWithProcessAsync(tenantDatabase, _sumManifest, CancellationToken);
+            var callId = await releases.StageToolsSumCallAsync(tenantDatabase, releaseId, "1.0.0", CancellationToken);
+            await using var factory = _server.Start();
+            using var admin = PackageRunnerServer.Client(factory, id).SignedInAs("admin");
+            var runner = await _server.CreateRunnerAsync(admin, id);
+            using var client = PackageRunnerServer.Client(factory, id);
+            var lease = await RegisterAndTakeAsync(client, runner);
+            Assert.Equal("1", await CallAsync(tenantDatabase, callId, "attempts"));
+
+            using var response = await PackageRunnerServer.PostAsync(client, ResultPath(lease), runner.Token, """{ "outcome": "failed", "error": "Acme.PaymentDeclined" }""");
+
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+            await AssertFailedAsync(tenantDatabase, callId, "Acme.PaymentDeclined");
+            Assert.Equal("1", await CallAsync(tenantDatabase, callId, "attempts"));
+            Assert.Equal(1L, await CountAsync(tenantDatabase, $"SELECT count(*) FROM axis.process_call_attempts WHERE call_id = '{callId}' AND outcome = 'failed'"));
+        }
+        finally
+        {
+            await _server.DeleteRealmAsync(id);
+        }
+    }
+
+    [Fact]
+    public async Task An_unknown_outcome_or_a_failed_result_without_an_error_answers_400_and_changes_nothing()
+    {
+        await _server.PrepareAsync();
+        var (id, tenantDatabase) = await _server.AddTenantAsync();
+        try
+        {
+            var releases = new CustomerHostedReleases();
+            var releaseId = await releases.ActivateOwnWithProcessAsync(tenantDatabase, _sumManifest, CancellationToken);
+            var callId = await releases.StageToolsSumCallAsync(tenantDatabase, releaseId, "1.0.0", CancellationToken);
+            await using var factory = _server.Start();
+            using var admin = PackageRunnerServer.Client(factory, id).SignedInAs("admin");
+            var runner = await _server.CreateRunnerAsync(admin, id);
+            using var client = PackageRunnerServer.Client(factory, id);
+            var lease = await RegisterAndTakeAsync(client, runner);
+
+            foreach (var body in new[] { """{ "outcome": "done" }""", """{ "outcome": "failed" }""", """{ "outcome": "failed", "error": "" }""" })
+            {
+                using var response = await PackageRunnerServer.PostAsync(client, ResultPath(lease), runner.Token, body);
+
+                Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            }
+
+            Assert.Equal("sending", await CallAsync(tenantDatabase, callId, "state"));
+            Assert.Equal("1", await CallAsync(tenantDatabase, callId, "attempts"));
+            Assert.Equal("waiting", await InstanceAsync(tenantDatabase, Guid.Parse((await CallAsync(tenantDatabase, callId, "process_instance_id"))!), "state"));
+        }
+        finally
+        {
+            await _server.DeleteRealmAsync(id);
+        }
+    }
+
+    // The call and its instance are failed with the error, and the history and the audit records say so.
+    private static async Task AssertFailedAsync(string tenantDatabase, Guid callId, string error)
+    {
+        var instanceId = (await CallAsync(tenantDatabase, callId, "process_instance_id"))!;
+        Assert.Equal("failed", await CallAsync(tenantDatabase, callId, "state"));
+        Assert.Equal(error, await CallAsync(tenantDatabase, callId, "last_error"));
+        Assert.Equal("failed", await InstanceAsync(tenantDatabase, Guid.Parse(instanceId), "state"));
+        Assert.Equal(1L, await CountAsync(tenantDatabase, $"SELECT count(*) FROM axis.process_step_history WHERE process_instance_id = '{instanceId}' AND step = 'sum' AND error = '{error}'"));
+        Assert.Equal(1L, await CountAsync(tenantDatabase, $"SELECT count(*) FROM axis.audit_records WHERE process_instance_id = '{instanceId}' AND action = 'process.failed'"));
+        Assert.Equal(1L, await CountAsync(tenantDatabase, $"SELECT count(*) FROM axis.audit_records WHERE process_instance_id = '{instanceId}' AND action = 'operation.called' AND details->>'outcome' = 'failed'"));
     }
 
     private static string ResultPath(Guid lease) => $"/api/package-runner/leases/{lease}/result";

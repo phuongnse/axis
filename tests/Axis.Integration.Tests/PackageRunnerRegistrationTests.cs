@@ -101,7 +101,7 @@ public sealed class PackageRunnerRegistrationTests(PostgreSqlFixture database, K
             await Check("take: blank id", id, good.Token, """{ "packages": [{ "id": "", "version": "1.0.0" }] }""", route: Take);
             await Check("take: a version that is not text", id, good.Token, """{ "packages": [{ "id": "tools", "version": 1 }] }""", route: Take);
 
-            // The result route is checked in the same order, and reads { "outcome": "succeeded", "output": {...} }. Only the lease decides the 404.
+            // The result route is checked in the same order, and reads { "outcome": "succeeded", "output": {...} }, { "outcome": "retryable" } or { "outcome": "failed", "error": "..." }. Only the lease decides the 404.
             var result = $"/api/package-runner/leases/{Guid.NewGuid()}/result";
             const string ResultBody = """{ "outcome": "succeeded", "output": { "total": "5" } }""";
             await Check("result: unknown host", "unknown", good.Token, ResultBody, route: result);
@@ -112,8 +112,8 @@ public sealed class PackageRunnerRegistrationTests(PostgreSqlFixture database, K
             await Check("result: not JSON", id, good.Token, "not json", route: result);
             await Check("result: not a JSON content type", id, good.Token, ResultBody, "text/plain", result);
             await Check("result: no outcome", id, good.Token, """{ "output": {} }""", route: result);
-            await Check("result: retryable", id, good.Token, """{ "outcome": "retryable", "error": "Busy" }""", route: result);
-            await Check("result: failed", id, good.Token, """{ "outcome": "failed", "error": "Broken" }""", route: result);
+            await Check("result: an unknown outcome", id, good.Token, """{ "outcome": "done" }""", route: result);
+            await Check("result: failed with no error", id, good.Token, """{ "outcome": "failed" }""", route: result);
             await Check("result: no output", id, good.Token, """{ "outcome": "succeeded" }""", route: result);
             await Check("result: an output that is not an object", id, good.Token, """{ "outcome": "succeeded", "output": 5 }""", route: result);
             await Check("result: a lease that is not known", id, good.Token, ResultBody, route: result);
@@ -160,8 +160,8 @@ public sealed class PackageRunnerRegistrationTests(PostgreSqlFixture database, K
                     ("result: not JSON", HttpStatusCode.BadRequest),
                     ("result: not a JSON content type", HttpStatusCode.BadRequest),
                     ("result: no outcome", HttpStatusCode.BadRequest),
-                    ("result: retryable", HttpStatusCode.BadRequest),
-                    ("result: failed", HttpStatusCode.BadRequest),
+                    ("result: an unknown outcome", HttpStatusCode.BadRequest),
+                    ("result: failed with no error", HttpStatusCode.BadRequest),
                     ("result: no output", HttpStatusCode.BadRequest),
                     ("result: an output that is not an object", HttpStatusCode.BadRequest),
                     ("result: a lease that is not known", HttpStatusCode.NotFound),
