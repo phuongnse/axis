@@ -766,7 +766,7 @@ trusted code, so the platform gives it more limits than an installation's packag
   [package run time a day](tenant-quotas.md#package-run-time-a-day). A customer-hosted package counts for nothing there.
 - **Plans** _(planned for M37)_. In Axis SaaS only a paid plan allows an application's packages, see
   [the catalogue](plans.md#the-catalogue).
-- **Switched on by the tenant** _(planned for M37)_. The tenant's administrator turns them on, see
+- **Switched on by the tenant.** The tenant's administrator turns them on, see
   [application packages](user-administration.md#application-packages), and gives each author the
   `developer` role, see [roles](user-administration.md#roles).
 - **In the folder.** `packages/<id>/` holds the package's manifest, adapter, lock file and tests. No file
