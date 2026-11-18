@@ -1642,11 +1642,29 @@ export async function fetchAuthoringRequest(
 }
 
 /**
- * A file the request changes. `target` is the module resource a layer file changes, null for any other file. `titles` is
- * the resource's label by locale, which only an accepted request's diff gives.
+ * The module resource a layer file changes, as a request's diff gives it. `before` and `after` are its JSON text with the
+ * layer applied at the diff's `start` and `tip`, and null where the target names no module resource. `marks` and `removed`
+ * are those of `after`.
+ */
+export interface AuthoringRequestLayerChange {
+  id: string
+  kind: string
+  name: string | null
+  file: string
+  before: string | null
+  after: string | null
+  marks: StudioModuleResource['marks']
+  removed: StudioModuleResource['removed']
+}
+
+/**
+ * A file the request changes. `target` is the module resource a layer file changes, null for any other file. `module` is
+ * that resource with the layer applied, on a layer file only. `titles` is the resource's label by locale, which only an
+ * accepted request's diff gives.
  */
 export interface AuthoringRequestDiffEntry extends StudioRevisionChange {
   target: string | null
+  module?: AuthoringRequestLayerChange
   titles?: Record<string, string> | null
 }
 

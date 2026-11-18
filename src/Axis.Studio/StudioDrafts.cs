@@ -70,12 +70,17 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
     /// holds them, so a compile reads the draft as it reads a folder. Records no version.
     /// </summary>
     public Task<StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>> FilesAsync(string id, CancellationToken ct) =>
-        InDraftAsync(id, (_, _, tip) =>
-        {
-            var files = new List<(string File, byte[] Bytes)>();
-            Walk(tip.Tree, "", files);
-            return StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>.Of(files);
-        }, ct);
+        InDraftAsync(id, (_, _, tip) => StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>.Of(FilesOf(tip)), ct);
+
+    /// <summary>
+    /// The files of the draft's branch at <paramref name="commit"/>, as <see cref="FilesAsync(string, CancellationToken)"/> gives
+    /// them for the tip. The commit is one from the draft's start to its tip, which is what a diff names. A commit the branch does
+    /// not hold is refused as <see cref="StudioWriteRefusal.DoesNotApply"/>. Records no version.
+    /// </summary>
+    public Task<StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>> FilesAsync(string id, string commit, CancellationToken ct) =>
+        InDraftAsync(id, (_, draft, tip) => OnBranch(draft, tip, commit) is { } at
+            ? StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>.Of(FilesOf(at))
+            : StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>.Refused(StudioWriteRefusal.DoesNotApply), ct);
 
     /// <summary>
     /// The files the draft added, changed or removed since the <c>main</c> commit it started at, as a page of whole entries
@@ -631,6 +636,14 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
     {
         using var content = new MemoryStream(bytes);
         return git.ObjectDatabase.CreateBlob(content);
+    }
+
+    // The *.json files and the files under packages/ of a commit's tree, in the order Walk gives them.
+    private static List<(string File, byte[] Bytes)> FilesOf(Commit commit)
+    {
+        var files = new List<(string File, byte[] Bytes)>();
+        Walk(commit.Tree, "", files);
+        return files;
     }
 
     private static IReadOnlyList<StudioFile> Resources(Commit commit)
