@@ -64,15 +64,21 @@ that holds it.
   work its "Done when" names, so its journey never waits for other work. As
   [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) agrees, a milestone groups work
   and does not order it.
-  1. **No milestone** for the kinds of issue listed today: a `bug` issue for CI on `main`, an issue
-     NexKit opens for a flaky test, an issue for a Dependabot advisory, an issue of the docs audit,
-     a `process` issue, a [design issue](#design-changes) and a `refactor` issue, such as one that a
-     design review finds. Also no milestone for an improvement to a delivered feature that no
-     milestone's [Done when](roadmap.md#milestones) names, such as the build and the docs of a
-     design review of screens already built.
-  2. **Otherwise the milestone whose "Done when" names what the issue builds:** its features, the
-     docs issues its readiness check asks for, its journey, its docs sweep, and the builds of a design
-     review of the screens it brings.
+  1. **No milestone, and one label that names the kind,** for these kinds:
+
+     | Label | Kind |
+     | --- | --- |
+     | `nexkit:ci`, `nexkit:flaky`, `nexkit:dependabot` | NexKit's issues for a failure of CI on `main`, a flaky test, a Dependabot advisory |
+     | `bug` | A fix of something a closed milestone delivered |
+     | `process` | How Axis is built |
+     | `refactor` | One concern moved to one shared mechanism, which keeps its behaviour |
+     | `design` | A [design review](#design-changes) |
+     | `docs-audit` | An issue the docs audit opens |
+     | `improvement` | An improvement to a delivered feature that no milestone's [Done when](roadmap.md#milestones) names, such as the build and the docs of a design review of screens already built |
+
+  2. **Otherwise the milestone whose [Done when](roadmap.md#milestones) names what the issue builds:**
+     its features, the docs issues its readiness check asks for, its journey, its docs sweep, the builds
+     of a design review of the screens it brings, and fixes of what it builds while it is in progress.
   3. **New capability that no row names is not filed,** until the owner adds it to a row's "Done
      when" or adds a row.
   4. **A part of a split and a follow-up take the same test.** A part builds part of its parent, so it
@@ -350,8 +356,8 @@ A milestone goes from a readiness check to its close in five steps.
    - the roadmap status of this milestone and the next one;
    - the **From** column of [concepts.md](domain/concepts.md) for every concept listed for this
      milestone, moved to a later milestone when the concept was not delivered;
-   - every *(planned for Mx)* marker for this milestone in any doc, removed when the work was built,
-     otherwise moved, added to a row's "Done when" or changed to *(planned)*, as
+   - every `_(planned for Mx)_` marker for this milestone in any doc, removed when the work was built,
+     otherwise moved, added to a row's "Done when" or changed to `_(planned)_`, as
      [planned work](writing-docs.md#planned-work) says. A moved marker has an open issue in its new
      milestone, which the sweep links in its pull request or opens first;
    - the doc sections that the milestone's pull requests changed: what is said twice is merged into

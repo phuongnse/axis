@@ -124,7 +124,7 @@ marker only to a later milestone whose "Done when" names the work. A moved marke
 its new milestone, which the sweep links in its pull request. When there is none, the sweep opens one
 in that milestone before its pull request is ready, as [follow-ups](delivery.md#the-life-of-an-issue)
 say. When no later "Done when" names the work, the sweep adds the work to that row's "Done when", or
-changes the marker to `_(planned)_`, and the issue that builds it leaves the milestone.
+changes the marker to `_(planned)_`, and the issue that builds it leaves the milestone for `improvement`.
 
 ## References in the code
 
