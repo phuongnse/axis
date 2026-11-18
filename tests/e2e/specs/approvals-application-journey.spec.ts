@@ -1,5 +1,6 @@
 import { expect, test } from '../test'
-import { confirmDialog, waitForDialog } from '../dialogs'
+import { waitForDialog } from '../dialogs'
+import { confirmPublish } from '../studio-resources'
 import { journeyURL } from '../server-settings'
 import { useJourneySession } from '../sessions'
 
@@ -32,7 +33,7 @@ test.describe('the author builds an application from the built-in Approvals appl
     await page.goto(`${journeyURL}/studio?app=OfficeApprovals&view=releases`)
 
     await page.getByRole('button', { name: 'Publish…', exact: true }).click()
-    await confirmDialog(page, 'Publish')
+    await confirmPublish(page)
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
       timeout: 300_000,
     })

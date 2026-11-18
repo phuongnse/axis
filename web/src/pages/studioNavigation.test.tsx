@@ -241,6 +241,10 @@ describe('studioActiveEntry', () => {
     expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=policies`), [], [])).toBe('policies')
   })
 
+  it('marks no entry on the publish page', () => {
+    expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=publish`), [], [])).toBe('')
+  })
+
   it('marks Overview otherwise', () => {
     expect(studioActiveEntry(new URLSearchParams(`app=${application}`), [], [])).toBe('overview')
   })

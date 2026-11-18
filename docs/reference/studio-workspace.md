@@ -91,6 +91,8 @@ comes first, so it is never next to Publish….
   fold into one "…" icon menu, More actions, in that order, and New resource… and Publish… stay. They unfold when the
   room comes back.
 
+- **On the publish page.** Publish… is hidden on the [publish page](studio.md#publishing), whose action bar has
+  the Publish button, so the screen has one solid button.
 - **Ask AI.** Ask AI is a text button just before Publish…. It shows when
   [`studioAi`](security.md#roles-and-the-current-user) is true, whether or not the author has connected their
   own AI, and it opens and closes the request panel of [AI authoring in Studio](ai-authoring-in-studio.md#the-request-panel).

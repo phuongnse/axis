@@ -26,10 +26,9 @@ opens the same view.
 - **A path.** A Used by entry or a diagnostic that opens a resource at a path adds `&path=<path>`.
 - **A view.** `&kind=<kind>` shows that kind's list, `&view=releases` the Releases entry,
   `&view=release&release=<number>` a [release page](studio-workspace.md#release-page) under it and
-  `&view=policies` the [policy matrix](#policy-matrix).
-- **The AI requests and publish views** _(planned for M35)_. `&view=requests` shows the
-  [AI requests](ai-authoring-in-studio.md#the-request-panel) table, `&view=requests&request=<id>` one
-  request's page, and `&view=publish` the [publish page](#publishing).
+  `&view=policies` the [policy matrix](#policy-matrix) and `&view=publish` the [publish page](#publishing).
+- **The AI requests view** _(planned for M35)_. `&view=requests` shows the
+  [AI requests](ai-authoring-in-studio.md#the-request-panel) table, `&view=requests&request=<id>` one page.
 - **A field** _(planned for M33)_. `&field=<name>` opens a field's
   [drawer](entity-designer.md#field-drawer) on an entity's page.
 - **Back is the browser's.** Studio has no Back or Next of its own and no breadcrumb.
@@ -218,19 +217,20 @@ its end.
 
 - **Validate** sends a validate request.
 - **Publish…** shows only when `GET /api/me` answers `studioPublisher: true`, and not when it answers
-  `false` or fails. Its dialog asks for an optional label, up to 100 characters, and an optional note,
-  up to 2,000, and leaves empty values out of the body. Confirming sends the publish request.
-- **The publish page** _(planned for M35)_. Publish… opens `/studio?app=<application>&view=publish` in place
-  of the dialog, and the page marks no sidebar entry. Its heading is "Publish this application", with the line
-  "Everything below goes live as a new release, in place of release `<n>`." or, with no release live, "Nothing
-  is live yet. Everything below goes live as the first release." When a release is live, the page lists the
-  [changed files](ai-authoring-in-studio.md#revisions) under the line; with none live, it lists no files.
-  Under them, "The release" holds Label, up to 100 characters, with the help "A short name for the release,
-  such as Spring update.", and Note, up to 2,000 characters, with the help "What changed and why, for whoever
-  reads the release list." Both are optional. The action bar says "Goes live as release `<n>`" and holds Cancel
-  and Publish. Publish sends the publish request, then goes back to the page Publish… was opened from, at its
-  top, and the status line follows it. With nothing to publish, the page says that everything is live, and
-  Publish is off.
+  `false` or fails. It opens the publish page and is hidden there, where the page has its own Publish.
+- **The publish page.** Publish… opens `/studio?app=<application>&view=publish`, which marks no sidebar entry and
+  shows the Overview without `studioPublisher`. Its heading is "Publish this application", with the line "Everything
+  below goes live as a new release, in place of release `<n>`.", "Nothing is live yet. Everything below goes live as
+  the first release." or, with nothing to publish, "Everything is live, so there is nothing to publish." Under it,
+  "The release" holds Label, up to 100 characters, with the help "A short name for the release, such as Spring
+  update.", and Note, up to 2,000, with the help "What changed and why, for whoever reads the release list."
+- **The changed files** _(planned for M35)_. The page lists the [changed files](ai-authoring-in-studio.md#revisions).
+- **The action bar** says "Goes live as release `<n>`" and holds Cancel and Publish. `<n>` is the number of an
+  earlier release with the folder's content hash, else the highest number plus one, or 1, see
+  [release history](authoring.md#release-history). Publish sends the request with only the filled
+  values. It and Cancel replace the page's history entry with the page Publish… was opened from, at its top, or
+  the Overview after a link, and the status line follows the request there. Publish is off while a request runs,
+  the reconnect shows, the history loads or nothing is left to publish. A failed history drops `<n>` and the line.
 - **Preview** shows only when `GET /api/me` answers a `studioPreviewHost` that is not null, and needs
   no `studioPublisher`. It sends `POST .../preview` at once, with no dialog. A succeeded preview shows
   Previewed and a link to each of the application's sites on the preview host, built from the page's

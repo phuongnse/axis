@@ -14,7 +14,7 @@ import { guardStep } from '../hang-guard'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
 import { previewURL, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { addMapping, openKind, openModuleResource, openProblems, openTab } from '../studio-resources'
+import { addMapping, confirmPublish, openKind, openModuleResource, openProblems, openTab } from '../studio-resources'
 import { chooseTheme } from '../shell'
 import { logInAtKeycloak } from '../keycloak'
 
@@ -148,12 +148,10 @@ async function signInToPreview(browser: Browser, baseURL: string, user: string) 
   return { context, page }
 }
 
-/** Clicks Publish, fills the dialog's label and confirms. */
+/** Clicks Publish…, fills the publish page's label and confirms. */
 async function publishWithLabel(page: Page, label: string) {
   await page.getByRole('button', { name: 'Publish…', exact: true }).click()
-  const dialog = await waitForDialog(page)
-  await dialog.getByRole('textbox', { name: 'Label (optional)', exact: true }).fill(label)
-  await confirmDialog(page, 'Publish')
+  await confirmPublish(page, label)
 }
 
 /**
@@ -793,7 +791,12 @@ test.describe('the active release of the purchase request sample changes', () =>
 
       await useSession(page, 'author')
       await page.goto(`${server.url}/studio?app=PurchaseRequests&view=releases`)
-      await publishWithLabel(page, label)
+      await page.getByRole('button', { name: 'Publish…', exact: true }).click()
+      await expect(page).toHaveURL(/view=publish/)
+      await expect(page.getByRole('heading', { name: 'Publish this application', exact: true })).toBeVisible()
+      await expect(page.getByText(`Goes live as release ${maxNumber + 1}`, { exact: true })).toBeVisible()
+      await confirmPublish(page, label)
+      await expect(page).toHaveURL(/view=releases/)
       await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
       const published = page.getByTestId('studio-release-row').filter({ hasText: label })
       await expect(published).toHaveAttribute('data-number', String(maxNumber + 1))

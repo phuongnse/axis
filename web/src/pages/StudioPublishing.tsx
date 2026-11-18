@@ -1,4 +1,4 @@
-import { Flex, Input, Modal } from 'antd'
+import { Flex } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { type ReactNode, type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
@@ -10,6 +10,7 @@ import {
   previewSiteUrl,
   previewStudioApp,
   publishStudioApp,
+  type PublishDetails,
   activateStudioRelease,
   ServerUnreachableError,
   type StudioDiagnostic,
@@ -22,7 +23,6 @@ import {
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
-import { useDesignTokens } from '../platform/themeMode'
 import { useFollowJob } from '../platform/useFollowJob'
 import { askAiPanelId } from './StudioAskAi'
 import { StudioBand } from './StudioBand'
@@ -30,9 +30,10 @@ import { StudioReleasesList } from './StudioReleases'
 import { StudioRequestStatus } from './StudioRequestStatus'
 import { StudioTestResults } from './StudioTestResults'
 
-/** What the page calls on this component: a test run of every scenario, or of the named ones, and an activation. */
+/** What the page calls on this component: a test run of every scenario, or of the named ones, a publish and an activation. */
 export interface StudioPublishingHandle {
   runTests(scenarios?: string[]): void
+  publish(details: PublishDetails): void
   activate(releaseId: string): void
 }
 
@@ -92,8 +93,10 @@ async function findPreviewLinks(
  * when it is a function. The release list follows only on `releasesView`, under the page's heading. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
  * preview request. When it succeeds, a link to each of the application's `sites` on the preview host shows, built
  * from the page's protocol and port. A preview never shows a release number, because its release belongs to the
- * preview tenant's history. Publish opens a dialog for an optional label and note, then
- * sends a publish request. A publish refused by a tenant quota shows the server's title in the error alert.
+ * preview tenant's history. Publish… calls `onOpenPublish`, which opens the publish page, see `StudioPublishPage`, and
+ * hides while `publishView` is set, because that page has its own Publish. The ref's `publish` sends the publish
+ * request with the label and note the page gives it, see docs/reference/studio.md#publishing, and the status line shows
+ * it wherever the author is then. A publish refused by a tenant quota shows the server's title in the error alert.
  * An Activate… button in the history sends an activate request, and so does the ref's `activate`, which a release
  * page's Activate… calls.
  * Run tests shows only when `canTest`, and sends a test request, which runs every scenario. The ref's `runTests`
@@ -126,6 +129,8 @@ export function StudioPublishing({
   onToggleAskAi,
   newResource,
   releasesView,
+  publishView,
+  onOpenPublish,
   onDiagnostics,
   onOpenScenario,
   onBusyChange,
@@ -146,6 +151,8 @@ export function StudioPublishing({
   onToggleAskAi: () => void
   newResource: ReactNode
   releasesView: boolean
+  publishView: boolean
+  onOpenPublish: () => void
   onDiagnostics: (diagnostics: StudioDiagnostic[]) => void
   onOpenScenario: (resourceId: string, path: string) => void
   onBusyChange?: (busy: boolean) => void
@@ -153,16 +160,12 @@ export function StudioPublishing({
   children?: ReactNode | ((history: StudioReleases | 'failed' | undefined) => ReactNode)
 }) {
   const t = useText()
-  const { size } = useDesignTokens()
   const { generation, reconnecting, lost } = useStudioConnection()
   const [request, setRequest] = useState<StudioRequest | null>(null)
   const [releaseNumber, setReleaseNumber] = useState<number | null>(null)
   const [previewLinks, setPreviewLinks] = useState<string[]>([])
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [label, setLabel] = useState('')
-  const [note, setNote] = useState('')
   const [history, setHistory] = useState<StudioReleases | 'failed'>()
   const [historyRevision, setHistoryRevision] = useState(0)
 
@@ -241,13 +244,6 @@ export function StudioPublishing({
     }
   }
 
-  async function publish() {
-    setDialogOpen(false)
-    await send(() => publishStudioApp(application, { label: label.trim(), note: note.trim() }))
-    setLabel('')
-    setNote('')
-  }
-
   function activateRelease(releaseId: string) {
     return send(() => activateStudioRelease(application, releaseId))
   }
@@ -260,6 +256,7 @@ export function StudioPublishing({
 
   useImperativeHandle(ref, () => ({
     runTests: (scenarios) => send(() => testStudioApp(application, scenarios)),
+    publish: (details) => send(() => publishStudioApp(application, details)),
     activate: activateRelease,
   }))
 
@@ -317,13 +314,8 @@ export function StudioPublishing({
                   {t('shell.studio.askAi')}
                 </AxisButton>
               )}
-              {canPublish && (
-                <AxisButton
-                  role="finish"
-                  data-testid="studio-publish"
-                  disabled={busy}
-                  onClick={() => setDialogOpen(true)}
-                >
+              {canPublish && !publishView && (
+                <AxisButton role="finish" data-testid="studio-publish" disabled={busy} onClick={onOpenPublish}>
                   {t('shell.studio.publish')}
                 </AxisButton>
               )}
@@ -359,33 +351,6 @@ export function StudioPublishing({
           />
         )}
       </Flex>
-      <Modal
-        open={dialogOpen}
-        width={size.dialog.medium}
-        title={t('shell.studio.publish.title')}
-        okText={t('shell.studio.publish.confirm')}
-        cancelText={t('shell.studio.cancel')}
-        onOk={publish}
-        onCancel={() => setDialogOpen(false)}
-      >
-        <Flex vertical gap="small">
-          <Input
-            aria-label={t('shell.studio.publish.label')}
-            placeholder={t('shell.studio.publish.label')}
-            maxLength={100}
-            value={label}
-            onChange={(event) => setLabel(event.target.value)}
-          />
-          <Input.TextArea
-            aria-label={t('shell.studio.publish.note')}
-            placeholder={t('shell.studio.publish.note')}
-            maxLength={2000}
-            autoSize={{ minRows: 3, maxRows: 8 }}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-          />
-        </Flex>
-      </Modal>
     </Flex>
   )
 }

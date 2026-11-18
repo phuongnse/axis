@@ -4,7 +4,8 @@ import path from 'node:path'
 import type { APIRequestContext, Locator, Page } from '@playwright/test'
 import { expect } from './test'
 import { csrfHeaders } from './csrf'
-import { confirmDialog, waitForDialog } from './dialogs'
+import { waitForDialog } from './dialogs'
+import { confirmPublish } from './studio-resources'
 import { fieldLabel } from './fields'
 import { journeyApplications, journeyURL } from './server-settings'
 import { useJourneySession } from './sessions'
@@ -128,7 +129,7 @@ export async function remapAdmin(page: Page, name: string) {
 export async function startPublish(page: Page, name: string) {
   await page.goto(`${journeyURL}/studio?app=${name}&view=releases`)
   await page.getByRole('button', { name: 'Publish…', exact: true }).click()
-  await confirmDialog(page, 'Publish')
+  await confirmPublish(page)
 }
 
 /** Publishes the application `name` and waits until the publish succeeds and `expectedReleases` rows show. */
