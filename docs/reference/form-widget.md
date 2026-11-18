@@ -113,6 +113,13 @@ validates.
   read-only child collection shows its rows with every cell read-only, and has no add or remove
   buttons. The widget sends only the editable fields it shows, and a server error on a field the form
   does not show appears above the form.
+- **Groups as parts** _(planned)_. A titled group of fields is a part of the page, as
+  [parts a rule apart](shell.md#layout) says. Its title is drawn by `SectionPart` as a level-2 heading at the
+  `heading5` size, with the part's spacing and no heading margin of its own. A `borderSubtle` rule sits above a
+  group drawn after another, and none above the first. A form with one untitled group, such as an `entity`
+  form, has no rule. The groups stay on one page, because a hidden group would hide its required fields and
+  their errors. A form too long for one page is split into [steps](form-widget-conditions.md#steps), which check
+  each step before the next.
 - **Conditions and steps.** The widget asks the server which fields to show, require and lock, and
   which messages to show, and shows `steps` as a wizard, see
   [form widget conditions](form-widget-conditions.md).
@@ -228,7 +235,11 @@ returns no label when the user may not read the target's display field.
 
 ## Child collections
 
-A child collection field shows its rows as a table under the field's label.
+A child collection field shows its rows as a table.
+
+- **Label on the toolbar** _(planned)_. An editable collection's label, its required mark and its help sit on the
+  left of its table's toolbar, on one row with Add row on the right. A read-only collection has no toolbar and keeps
+  its label above its table.
 
 - **Columns.** There is one column per child field, headed by its label or its name. Integer, decimal
   and money columns sit on the right, in the header and in every cell, in tabular figures, see the
@@ -292,11 +303,17 @@ The form sends only what changed, and shows the server's answer where it belongs
 - **Conflicts.** A `409` on edit that names no field is a stale version. The form shows a conflict
   message with a reload button, which loads the current values and version and drops the user's
   changes. A duplicate unique value is a `409` keyed `/values/<field>`, so it shows under its field.
-- **Return address.** Save and Cancel return to the table page that opened the form, with its paging
-  and sorting, which the table passes in history state. Without it, such as in a new tab, they go to
+- **Return address.** Save returns to the table page that opened the form, with its paging
+  and sorting, which the table passes in history state. Without it, such as in a new tab, it goes to
   `/{site}`, which opens the site's first page. Only an address inside the same site is used.
 - **Keys.** Enter in a date or date-time picker only confirms the picked value and never sends the
   form. Enter in a text input sends the form, as in any form.
+- **The save bar** _(planned)_. A site's form has no Save or Cancel row of its own. While the form has a change to
+  save, the [save bar](studio-resource-form.md#save-bar) shows Discard and Save. With no change it is not drawn, so a
+  new record's form shows it once the person types. Discard asks first, then puts every value back as the form
+  started. A form without the grant to save shows no bar. A person who leaves by the sidebar or the browser is asked
+  first, by [Leave without saving?](studio.md#editor), while there is a change. A wizard's Back and Next stay under
+  the step's fields, and the bar shows on its last step.
 
 ### Form drafts
 
@@ -320,7 +337,7 @@ checks are in [form drafts](record-form-state.md#form-drafts). A form draft is n
   draft was restored and when it was saved, and offers Discard.
 - **Dropping.** A successful create removes the draft on the server. Discard asks first, by
   [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm), because a discarded
-  draft cannot be brought back. It then deletes the draft and opens the form as new. Cancel keeps the
+  draft cannot be brought back. It then deletes the draft and opens the form as new. Leaving the form keeps the
   draft.
 - **Storage.** The draft is on the server only. Nothing goes in the URL or in browser storage.
 
@@ -344,11 +361,13 @@ A `form` widget can declare `startProcess` actions, which save the record and st
 }
 ```
 
-- **Buttons.** On a saved record, each action is a button next to Save and Cancel, with its label.
-  Save is the solid finish button, and beside it the action is a text button, see
-  [buttons](actions-and-controls.md#buttons). For a signed-in user, page metadata lists only the
-  actions whose process the user holds a `start` grant on. A new record shows no action buttons, so a
-  failed start never leaves a record behind on a form that still says new.
+- **Buttons.** On a saved record, each action is a button with its label. For a signed-in user, page
+  metadata lists only the actions whose process the user holds a `start` grant on. A new record shows no
+  action buttons, so a failed start never leaves a record behind on a form that still says new.
+- **On the page heading** _(planned)_. Each action on a saved record is the page's own: an outlined `main`
+  button on the right of the page's heading, on its row, through `PageActions`, with the `navigate` buttons
+  after the `startProcess` ones. A form drawn with no page heading, such as in a widget's preview, puts them at
+  its top, on the right.
 - **Compile checks.** The process must name the form's entity as its subject. An unknown process is
   `AXC0087`, and a process over another entity is `AXC0088`, both at
   `/widgets/{i}/actions/{j}/process`. `actions` on another widget type is `AXC0060`. The label joins
@@ -356,7 +375,7 @@ A `form` widget can declare `startProcess` actions, which save the record and st
 
 A click runs these steps, and the button is disabled while they run:
 
-1. It saves the changed fields first, as the save button does. If the save fails, its errors show as
+1. It saves the changed fields first, as Save does. If the save fails, its errors show as
    for a save, and nothing starts. When no field has changed, the save is skipped, so the record's
    version and history do not change for nothing.
 2. It posts `{ "subjectId" }` to the [start endpoint](processes.md#start-endpoint) with an
@@ -373,8 +392,12 @@ answer shows a generic platform error.
 ## History
 
 The form page of a saved record shows the record's history from the
-[history endpoint](record-audit.md#audit-records-and-history) in a panel below the form, newest first.
-A new record has no history panel.
+[history endpoint](record-audit.md#audit-records-and-history) below the form, newest first.
+A new record has no history.
+
+- **The form's last part** _(planned)_. The history is the last part of the form's page, titled History
+  ("Lịch sử"), drawn by `SectionPart` with a `borderSubtle` rule above it and no card. Its loading, empty, error
+  and paging states stay.
 
 - **Entry.** Each entry shows its action, who did it, its time and a short summary. The action is a
   platform text, such as "Updated" or "Task decided", and an action without a text shows as it is.
@@ -393,14 +416,14 @@ A new record has no history panel.
   [text](actions-and-controls.md#text).
 - **Open process.** An entry whose `inspectPath` is not `null` links to the instance page of the first
   page of the site whose widget is a `processInspector` that names the entry's process. The link reads
-  "Open process", and the process and the instance id are the segments of `inspectPath`. The panel
+  "Open process", and the process and the instance id are the segments of `inspectPath`. The history
   looks at the pages of the site's navigation in order, and loads their page metadata only when an
   entry has an `inspectPath`. The entry shows no link when no such page is in the navigation.
-- **Paging.** The panel shows 20 entries per page, with a paging control when there are more. The page
-  is the panel's own and stays out of the URL.
-- **Failure.** When the history fails to load, an error shows inside the panel, and the form still
+- **Paging.** The history shows 20 entries per page, with a paging control when there are more. The page
+  is the history's own and stays out of the URL.
+- **Failure.** When the history fails to load, an error shows in the history, and the form still
   works.
-- **Timeline.** _(planned for M43)_ The panel reads the [timeline](comments.md#the-timeline) route. A filter by kind
+- **Timeline.** _(planned for M43)_ The history reads the [timeline](comments.md#the-timeline) route. A filter by kind
   shows the comments, changes, steps or emails, or all of them.
 - **Comment box.** _(planned for M43)_ The box shows with the `comment` or `internalComments` grant. Its visibility is
   an `AxisChoiceField` of Internal and Shared, shown only to a person who holds both grants. Mentions use the

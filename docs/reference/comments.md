@@ -101,7 +101,7 @@ A comment lives in the tenant database, with its earlier versions and its files.
 
 _(planned for M43)_
 
-The timeline shows one record's comments, changes, process steps and emails in one list. The history panel of the [form widget](form-widget.md#history) shows it.
+The timeline shows one record's comments, changes, process steps and emails in one list. The history of the [form widget](form-widget.md#history) shows it.
 
 - **Access.** The timeline needs the same access, `404` rules and paging as the [history route](record-audit.md#the-history-route).
 - **Kinds.** `kinds` is a comma list of `comment`, `change`, `step` and `email`. All four show when `kinds` is left out. An unknown kind is a `400` keyed `kinds`.
