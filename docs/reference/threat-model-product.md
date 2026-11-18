@@ -1,6 +1,6 @@
 # Threat model: the product
 
-This page holds the threats to the product, the **P** scope of the [threat model](threat-model.md).
+This page holds the threats to the product, part of the **P** scope of the [threat model](threat-model.md).
 How its rows are found, rated and checked is in [threat model method](threat-model-method.md).
 
 ## The product
@@ -8,6 +8,7 @@ How its rows are found, rated and checked is in [threat model method](threat-mod
 The product is the server, the worker, the SPA, tenants, Studio and authoring, the MCP server and the
 agent host, extension packages, connectors, endpoints and webhooks, the identity provider Axis ships
 and the personal data Axis holds. The overview shows how the parts connect, and each boundary below has its own table.
+The identity provider and personal data boundaries are on [their own page](threat-model-identity-and-personal-data.md).
 
 ```mermaid
 flowchart LR
@@ -68,6 +69,80 @@ flowchart LR
 | P8 | A session stays open past its time limit or after an admin ends it. | Browser and server | Elevation of privilege | Medium | **Mitigated** | `SessionLifetimeTests` (a session ends after an hour idle or eight hours after sign in), `AdminTenantSessionEndTests` (ending one person's sessions leaves other people signed in). |
 | P100 | Crafted input to a parser, in a record body, an import file or an expression, crashes the parser or reaches SQL. | Browser and server | Tampering | High | **Mitigated** | `RecordBodyFuzzTests` (a body is accepted or refused with a 400 problem), `RecordImportFuzzTests` (any bytes give rows or refusals), `ExpressionFuzzTests` (no SQL the translator emits holds input text outside a parameter). |
 | P113 | The public `/licences` page tells an attacker which package versions Axis runs, and so which known weaknesses to try. | Browser and server | Information disclosure | Low | **Mitigated** | `LicenceEndpointTests` (an anonymous caller gets a 401 problem, and only a signed-in caller gets the versions). The public `/licences.json` holds names and licences only. |
+| P153 | A person without the `reassign` grant adds themselves or someone else to an open task for several people, to sway its outcome. | Browser and server | Elevation of privilege | High | **Mitigated** | _(planned for M38)_ The route needs the `reassign` grant on the task's process, answers a 403 without it, adds no task and writes `task.personAdded` with a reason. See [add a person](task-deadlines.md#add-a-person). |
+| P154 | A user without the `cancel` grant, or who may not read the subject, cancels one path or one task to steer the outcome. | Browser and server | Elevation of privilege | High | **Mitigated** | _(planned for M38)_ The routes need the `cancel` grant, answer 403 without it and 404 for an unreadable subject, and write nothing. See [cancel one path or one task](process-operator-commands.md#cancel-one-path-or-one-task). |
+| P155 | A path or task cancel leaves no record of who did it or why. | Browser and server | Repudiation | Medium | **Mitigated** | _(planned for M38)_ Each cancel writes its audit record, `process.pathCancelled` or `task.cancelled`, with the reason, and a history row. See [cancel one path or one task](process-operator-commands.md#cancel-one-path-or-one-task). |
+| P164 | Another person reads, changes or deletes a person's form draft of a new record. | Browser and server | Information disclosure | High | **Mitigated** | _(planned for M42)_ The key of a draft is the signed-in person, the application and the form, and no route names a person. See [form drafts](record-form-state.md#form-drafts). |
+| P165 | A person without the `create` grant, or for a field they may not write, stores values in a draft and reads them back. | Browser and server | Elevation of privilege | Medium | **Mitigated** | _(planned for M42)_ The routes answer 403 without the `create` grant and for a field the person may not write on create, and 400 for a key that is not an editable field of the form. See [form drafts](record-form-state.md#form-drafts). |
+| P166 | A flood of large drafts fills the tenant database. | Browser and server | Denial of service | Medium | **Mitigated** | _(planned for M42)_ A person has one draft for each form, a body over 256 KiB answers 413, and the worker deletes a draft 30 days after its last save. See [form drafts](record-form-state.md#form-drafts). |
+| P169 | A person runs a bulk action on rows they may not write, or uses one row they may write to change many. | Browser and server | Elevation of privilege | High | **Mitigated** | _(planned for M42)_ Each record of a bulk call is checked and written as a single write of it, under its own grants and record filters, in its own transaction, see [bulk actions](record-api.md#bulk-actions). |
+| P170 | A flood of large bulk calls takes the server's time from other people and tenants. | Browser and server | Denial of service | Medium | **Mitigated** | _(planned for M42)_ A call takes at most 100 records, and the server's rate limits apply, see [bulk actions](record-api.md#bulk-actions) and [rate limits](headers-and-rate-limits.md#rate-limits). |
+| P171 | A `richText` value carries script, an event attribute or a `javascript:` link that runs in the browser of the next person who reads it. | Browser and server | Elevation of privilege | High | **Mitigated** | _(planned for M42)_ The server keeps only the allow list on every write, and the SPA draws only cleaned HTML, see [more field types](resource-files.md#more-field-types-and-properties). |
+| P183 | Another person reads or changes a person's favourites or recent items. | Browser and server | Information disclosure | Medium | **Mitigated** | _(planned for M42)_ The lists are keyed by the signed-in person, no route names a person, and an `id` that is not the person's own answers `404`. See [site endpoints](frontend.md#site-endpoints). |
+| P184 | A favourite or recent item shows the label of a record the person may no longer read. | Browser and server | Information disclosure | High | **Mitigated** | _(planned for M42)_ Labels are read under the current grants, entries the person cannot open are left out, and a write for a record the person cannot read answers `404`. See [site endpoints](frontend.md#site-endpoints). |
+| P185 | A flood of favourite or recent writes fills the tenant database. | Browser and server | Denial of service | Medium | **Mitigated** | _(planned for M42)_ A person keeps at most 100 favourites per site, the recent list keeps the latest 20, and the server's [rate limits](headers-and-rate-limits.md#rate-limits) apply. See [site endpoints](frontend.md#site-endpoints). |
+
+**Administrator and calendar days** _(planned for M39)_
+
+An administrator keeps a calendar's days off and make-up days through the server, and the worker moves due
+times that have not passed when they change, see [days off and make-up days](working-time.md#days-off-and-make-up-days).
+
+```mermaid
+flowchart LR
+    subgraph browser [Browser]
+        Admin[Administrator in the SPA]
+    end
+    subgraph server [Server]
+        Routes[Calendar days routes]
+    end
+    subgraph tenantdb [Tenant database]
+        Days[(axis.calendar_days)]
+    end
+    subgraph worker [Worker]
+        Mover[Moves due times]
+    end
+    Admin -->|sets and removes days| Routes
+    Routes -->|writes| Days
+    Mover -->|reads days and counts again| Days
+```
+
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
+
+- (Elevation of privilege, High) a user without the `calendar` grant's `update` action changes days off and
+  moves every due time of the application.
+- (Repudiation, Medium) a change to days off leaves no audit record.
+- (Denial of service, Medium) one change makes the worker count a very large number of due times again.
+- (Tampering, Medium) a change to the days of one application moves due times of another application.
+
+**Browser and file origin** _(planned for M40)_
+
+An inline preview loads from a file origin that is not the application's own, through a short-lived signed
+link that the server gives after the checks of a download, see [preview](file-fields.md#download) and
+[the file origin's headers](headers-and-rate-limits.md#security-headers).
+
+```mermaid
+flowchart LR
+    subgraph browser [Browser]
+        Page[SPA page]
+    end
+    subgraph server [Server]
+        Link[Preview route, signs a link]
+    end
+    subgraph origin [File origin]
+        Bytes[Serves one file inline]
+    end
+    Page -->|session cookie| Link
+    Page -->|signed link, no cookie| Bytes
+```
+
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
+
+- (Information disclosure, High) a signed link is leaked, in a log or a shared screen, or reused after the
+  person who got it lost the right to read the file.
+- (Elevation of privilege, High) a previewed file runs script that reaches the application's origin or the
+  session.
+- (Information disclosure, High) a preview of a file is served to a user who has no read grant on its record.
+- (Tampering, Medium) a page of another site frames or embeds a file from the origin.
 
 ### Server and databases
 
@@ -98,6 +173,40 @@ flowchart LR
 | P14 | A tenant's secret is read from the database in clear text. | Server and databases | Information disclosure | High | **Mitigated** | `TenantSecretCipherTests` (an encrypted value hides its plain text and does not decrypt for another tenant or field). |
 | P15 | A slow read or write holds a database connection for too long. | Server and databases | Denial of service | Medium | **Mitigated** | `QueryTimeoutTests` and `WriteTimeoutTests` (a slow read or write answers 503, and is logged and counted). |
 | P144 | A session's refresh token is read from the session row or used for another session. | Server and databases | Information disclosure | High | **Mitigated** | `SessionTokensTests` (the row holds the token encrypted, no response carries it, and a token copied to another row does not decrypt). See [the refresh token](security.md#sign-in-flow). |
+| P167 | A sensitive value in a stored form draft is read in clear, from the table or a backup. | Server and databases | Information disclosure | High | **Mitigated** | _(planned for M42)_ A sensitive field's value in a draft is stored encrypted with the tenant's data key, bound to the tenant, entity, draft and field. See [form drafts](data-encryption.md#sensitive-field-values). |
+| P168 | A form draft is kept past 30 days, so typed values outlive their use. | Server and databases | Information disclosure | Low | **Mitigated** | _(planned for M42)_ A read ignores a draft saved over 30 days ago, and the worker deletes it every 24 hours. See [system tables](storage.md#system-tables). |
+| P186 | Stored recent items keep a long trail of the records a person opened. | Server and databases | Information disclosure | Low | **Mitigated** | _(planned for M42)_ Only the latest 20 items per person and site are kept, as ids with no record values. See [system tables](storage.md#system-tables). |
+
+**Server and object storage** _(planned for M40)_
+
+A tenant's files may live in an S3 object storage that its `storage` binding names, outside the tenant database,
+see [object storage](file-fields.md#storage-and-clean-up). A command moves them, see
+[moving files](tenant-setting-commands.md#moving-files).
+
+```mermaid
+flowchart LR
+    subgraph server [Server and worker]
+        Files[File reads and writes]
+    end
+    subgraph secrets [Tenant secrets]
+        Cred[Credential binding]
+    end
+    subgraph bucket [Object storage]
+        Objects[(Bucket)]
+    end
+    Files -->|reads binding| Cred
+    Files -->|https, tenant's own keys| Objects
+```
+
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
+
+- (Information disclosure, High) the storage credential is stolen, or appears in a log or an audit record.
+- (Information disclosure, Critical) one tenant's files are read through a bucket or a key that another tenant
+  shares.
+- (Denial of service, High) a file is lost by the move command, or by a restore that has no bucket to match
+  its archive.
+- (Tampering, Medium) an object is replaced in the bucket and the download serves it, because nothing checks
+  its SHA-256.
 
 ### Caller and server
 
@@ -197,6 +306,33 @@ flowchart LR
 
 Spoofing does not apply to a package in the worker's process. The operator installs each package, and a caller does not send a package an identity. A package in a runner is reached over the network, see P151.
 
+**Worker and document runner** _(planned for M40)_
+
+Documents are made from a Word file in a runner that has a sandbox, never in the server or the worker, see
+[the document runner](document-templates.md#the-document-runner).
+
+```mermaid
+flowchart LR
+    subgraph worker [Worker and server]
+        Ask[Asks for a document]
+    end
+    subgraph runner [Document runner, in a sandbox]
+        Make[Makes one file from one template]
+    end
+    Ask -->|template file and values of one tenant| Make
+    Make -->|one file| Ask
+```
+
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
+
+- (Elevation of privilege, High) a crafted Word file escapes the runner and reaches the host, the network or
+  another tenant.
+- (Denial of service, Medium) a template that loops, nests or grows without end uses up the runner's memory or
+  time, and other documents wait.
+- (Information disclosure, High) a document holds another tenant's data, because a runner keeps a value between
+  two calls.
+- (Information disclosure, Medium) a document holds a field that the person who downloads it may not read.
+
 ### Package runner and an application's package
 
 _(planned for M37)_
@@ -233,16 +369,23 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- |
 | P145 | An application's package reaches the data or the runner of another tenant. | Package runner and application's package | Elevation of privilege | High | **Delegated** | The operator, who installs gVisor (`runsc`). The chart's `runtimeClassName` and Compose's `runtime` put `application-package-host` under it (`scripts/helm.test.mjs`: the `application-package-host` pod sets `runtimeClassName` `gvisor` and no `package-host-*` pod sets one), the worker does not start without it when `Extensions:ApplicationPackages` is on (`ApplicationSandboxStartTests`: a worker with the setting on exits with code 1 when `application-package-host` does not answer that it runs under gVisor), and the installation refuses an application's package that Axis runs when the setting is off. Each tenant's calls to an application's package run in runners of its own, and a changed build never reuses a runner (`ApplicationPackageRunnerTests`: two tenants' `pid` operations return different process IDs and the host logs one runner for each tenant, and two releases with other built files of the same version run in different runners). The smoke test `scripts/onprem.test.mjs` shows that `application-package-host` runs under `runsc` in the Compose example and that a worker with the setting on becomes ready against it. See [An application's packages](extension-packages.md#an-applications-packages). |
 | P146 | An application's package calls a host that its manifest does not declare. | Package runner and application's package | Information disclosure | Medium | **Delegated** | The operator, whose runners hold one network route through an egress proxy that admits only the declared hosts, see [package runners](extension-packages.md#package-runners) (`ApplicationPackageRunnerTests`: an application package's request to an undeclared host through the egress proxy fails the call, with an error that names the operation and the package). |
-| P147 | A customer-hosted runner's credential is stolen, or kept after the customer stops using it. | Package runner and customer network | Spoofing | High | **Delegated** | The customer, which owns the machine of its runner, and the tenant's administrator, who can revoke its credential. The planned controls are the runner's own client credential, which Axis shows once and does not store, the lease that ties each result to the runner that took the call, and the revoke, which refuses the runner's next request. Registering sends each package's manifest, and the server refuses one that differs from the manifest the release pins, so a stolen credential cannot serve another contract. The runner takes only its tenant's calls, see [customer-hosted runners](extension-packages.md#customer-hosted-runners) and [staging a package call](process-execution.md#staging-a-package-call). |
+| P147 | A customer-hosted runner's credential is stolen, or kept after the customer stops using it. | Package runner and customer network | Spoofing | High | **Delegated** | The customer, which owns the machine of its runner, and the tenant's administrator, who can revoke its credential. The controls are the runner's own client credential, which Axis shows once and does not store, the lease that ties each result to the runner that took the call (`PackageRunnerResultTests` and `PackageRunnerLeaseTests`), and the revoke, which refuses the runner's next request. Registering sends each package's manifest, and the server refuses one that differs from the manifest the release pins, so a stolen credential cannot serve another contract. The runner takes only its tenant's calls, see [customer-hosted runners](extension-packages.md#customer-hosted-runners) and [staging a package call](process-execution.md#staging-a-package-call). |
 | P148 | A dependency of a package has a known vulnerability, or is malicious. | Package runner and application's package | Tampering | Medium | **Delegated** | The tenant's author, who chooses the dependencies. The package's lock file fixes them, and the scan when a package is installed and when its application is published checks them for known vulnerabilities, see [extension packages](extension-packages.md#what-a-package-is) and [an application's packages](extension-packages.md#an-applications-packages). A stub Trivy that reports a HIGH finding makes the host refuse the build, and `PublisherApplicationPackageBuildTests` shows that the publish then fails with `AXC0149` at the package's lock file and stores no release. |
 | P149 | A dependency's install script, run by the build of an application's package, reaches the publisher, its secrets or another tenant. | Package runner and application's package | Elevation of privilege | High | **Delegated** | The operator's sandbox, because the build runs in the tenant's sandbox and never in the publisher, see [an application's packages](extension-packages.md#an-applications-packages). `application-package-host` builds the files of a `build` message in a temporary copy, writes nothing to `Extensions:Path` and refuses a path outside the copy (`ApplicationPackageBuildTests`, `PackageHostTests`). A `test` message runs the package's tests in the same temporary copy, with an empty environment, and stops them after 2 minutes (`PackageHostTests`). `PublisherApplicationPackageBuildTests` shows that a publish succeeds and the host logs the build while the publisher's `PackageBuild:Python` is a missing command, and that a pip install that fails in the host fails the publish with `AXC0149`. |
 | P150 | A tenant's package uses so much CPU that other tenants' work waits. | Package runner and application's package | Denial of service | Medium | **Mitigated** | `PackageRunTimeTests` (each call to an application's package adds its CPU seconds to the tenant's day) and `PackageRunTimeHoldTests` (at the quota a call is held until 00:00 UTC with no attempt, and a call in flight finishes). The operator's CPU limits bound one runner, see [package run time a day](tenant-quotas.md#package-run-time-a-day). |
+| P187 | A runner posts a result for a call that it did not take, or after its lease ended. | Package runner and customer network | Tampering | Medium | **Mitigated** | `PackageRunnerResultTests` (a result for another runner's lease or an unknown lease answers `404`, and a second result or one after `lease_until` answers `409` and changes nothing) and `PackageRunnerLeaseTests` (a lease that ends with no result becomes an unknown outcome or is retried, and a result after that answers `409`). See [routes](extension-packages.md#routes). |
+
+**HTML email and attachments** _(planned for M40)_
+
+An email may carry an HTML body, the site's logo and attachments, see [email](notifications.md#email).
 
 Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
 
-- (Tampering, Medium) a runner posts a result for a call that it did not take, or after its lease ended. The planned
-  control is the lease id that the result route needs, see
-  [customer-hosted runners](extension-packages.md#customer-hosted-runners).
+- (Tampering, High) a placeholder's value adds script or a phishing link to an HTML email.
+- (Spoofing, Medium) an author's HTML template makes an email that looks like another sender's.
+- (Denial of service, Medium) an attachment over the size limit fails the send again and again, and the worker
+  keeps trying a dead email.
+- (Information disclosure, High) an attachment holds a file the recipient's record grant would not show.
 
 ### Worker and webhook receiver
 
@@ -523,228 +666,3 @@ flowchart LR
 Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
 
 - (Information disclosure, High) a model binding's endpoint may be a plain `http` address, which sends the key and the configuration without encryption.
-
-### Identity provider
-
-Axis's identity provider is Keycloak, with one realm for each tenant, see [identity provider](identity-provider.md)
-and [user administration](user-administration.md). It has six boundaries, each with its own diagram below.
-
-**Browser and sign-in page**
-
-```mermaid
-flowchart LR
-    subgraph browser [Browser]
-        Person[Person with the SPA]
-    end
-    subgraph realmpage [Realm sign-in page]
-        Form[Account form, code and Continue with a provider]
-    end
-    Person -->|password, code or provider choice| Form
-```
-
-**Realm and brokered provider**
-
-```mermaid
-flowchart LR
-    subgraph realm [Realm]
-        Broker[Realm brokers the sign-in]
-    end
-    subgraph provider [Brokered OIDC or SAML provider]
-        Upstream[Provider sign-in with its own MFA]
-    end
-    Broker -->|authorization request| Upstream
-    Upstream -->|token or SAML response with acr and claims| Broker
-```
-
-**Server and realm**
-
-```mermaid
-flowchart LR
-    subgraph server [Server]
-        Callback[Sign-in callback]
-        Activation[Activation step]
-        UsersPage[Users page]
-    end
-    subgraph realmclients [Realm of the tenant]
-        SiteClient[Site client and platform client, ID token with provider and acr]
-        ActivationClient[Activation client, providers and clients]
-        UsersClient[Users client, users only]
-    end
-    Callback -->|code exchange| SiteClient
-    Activation -->|writes providers and clients| ActivationClient
-    UsersPage -->|manages users| UsersClient
-```
-
-**Site and its providers**
-
-```mermaid
-flowchart LR
-    subgraph server [Server]
-        Check[Callback check]
-    end
-    subgraph release [Active release]
-        Allowed[Providers the site allows]
-    end
-    subgraph session [Session]
-        Alias[Session holds the provider alias]
-    end
-    Check -->|checks the provider and acr against| Allowed
-    Check -->|writes only for an allowed provider| Alias
-```
-
-**Preview tenant and main realm**
-
-```mermaid
-flowchart LR
-    subgraph previewtenant [Preview tenant]
-        PreviewHost[Preview host]
-        PreviewSession[Preview session]
-    end
-    subgraph maintenant [Main tenant]
-        MainRealm[Main tenant realm and platform client]
-        MainRoles[Roles given on the main tenant]
-        MainHost[Main host]
-    end
-    PreviewHost -->|signs in through| MainRealm
-    MainRealm -->|state returns to the preview host| PreviewSession
-    MainRoles -->|apply to| PreviewSession
-    PreviewSession -->|refused on| MainHost
-```
-
-**Administrator and users page**
-
-```mermaid
-flowchart LR
-    subgraph browser [Browser]
-        Admin[Administrator with session, CSRF header and recent sign-in]
-    end
-    subgraph server [Server]
-        Routes[Users routes]
-    end
-    subgraph realmusers [Realm]
-        UsersRealm[Users client, users only]
-    end
-    subgraph tenantdb [Tenant database]
-        Audit[(Audit records)]
-    end
-    Admin -->|invites, disables and gives roles| Routes
-    Routes -->|writes users| UsersRealm
-    Routes -->|one audit record per change| Audit
-```
-
-| Id | Threat | Boundary | Category | Rating | Status | Evidence |
-| --- | --- | --- | --- | --- | --- | --- |
-| P74 | A password is guessed or reused. | Browser and sign-in page | Spoofing | High | **Delegated** | The identity provider: at least 12 and at most 128 characters, a list of breached passwords and a wait after repeated failures, see [accounts](user-administration.md#accounts). `TenantRealmAccountRulesTests` refuses a short or breached password in the realm. |
-| P75 | A stolen password signs in without a second step. | Browser and sign-in page | Spoofing | High | **Delegated** | The identity provider: a code from an authenticator app at every account sign-in, see [accounts](user-administration.md#accounts). |
-| P76 | An account is made without an invitation. | Browser and sign-in page | Elevation of privilege | Medium | **Delegated** | The identity provider: the realm allows no self-registration, see [accounts](user-administration.md#accounts). |
-| P77 | The sign-in page shows whether an account exists or is locked. | Browser and sign-in page | Information disclosure | Low | **Delegated** | The identity provider: the sign-in page shows the same message in each case, see [accounts](user-administration.md#accounts). |
-| P78 | A provider signs a person in at an `acr` below its list. | Realm and brokered provider | Spoofing | High | **Mitigated** | `SiteSignInTests` (a site callback whose upstream `acr` the provider does not accept is refused), `SignInRefusalsTests` (an `acr` the list does not accept is refused as `acrNotAccepted`). The realm does not forward `acr_values`, so the callback check is the control. |
-| P79 | One person is split into two users, because a provider appears twice with other bindings or claims. | Realm and brokered provider | Spoofing | Medium | **Mitigated** | `RealmPlannerTests` (a provider that shares an issuer binding with another client is a conflict, and so is one with the same bindings and other claims), `AdminActivateRealmTests` (a conflicting second application fails activate with `AXC0291` and leaves the realm unchanged). |
-| P80 | Two people are merged into one user by a shared email. | Realm and brokered provider | Spoofing | High | **Mitigated** | `RealmBrokeredUsersTests` (one person signed in through two providers with the same email becomes two users), `TenantRealmAccountRulesTests` (a second run keeps a first-login flow that denies access, switched off, and then creates a user, and the realm allows duplicate emails). |
-| P81 | A person who signs in through a brokered provider skips its second step. | Realm and brokered provider | Spoofing | Medium | **Delegated** | The brokered provider's MFA policy. [D99](../decisions/d99-axis-ships-its-own-identity-provider.md) says a person who signs in through their organization follows that organization's MFA policy. |
-| P82 | A brokered OIDC token is forged or changed. | Realm and brokered provider | Tampering | High | **Delegated** | The identity provider checks the token signature with the provider's published keys, because the realm sync turns on signature validation for OIDC providers. See [identity provider](identity-provider.md). |
-| P83 | An ID token for one site's client is used on another site. | Server and realm | Spoofing | High | **Mitigated** | `SiteSignInTests` (an ID token for another site's client is refused and writes no session). |
-| P84 | A users client changes providers or clients, or the activation client changes users. | Server and realm | Elevation of privilege | High | **Mitigated** | `TenantRealmTests` (the users client manages users only, and the activation client manages clients and not users). |
-| P85 | A provider that no release names still signs people in. | Server and realm | Tampering | Medium | **Mitigated** | `AdminActivateRealmTests` (activating again without the provider removes it from the realm), `RealmSyncTests` (a second sync removes a site that is gone and its provider, and keeps the other clients). |
-| P86 | Realm sync output shows the activation secret. | Server and realm | Information disclosure | Medium | **Mitigated** | `AdminActivateRealmTests` (a wrong activation secret fails with a line that names no secret). |
-| P87 | A roles claim gives a role in an application that does not map it. | Server and realm | Elevation of privilege | High | **Mitigated** | `ApplicationRolesSignInTests` (a brokered person holds the mapped role in the application that maps it only), `SiteSignInTests` (a roles value the mapping does not list gives no role). |
-| P88 | A sign-in goes through a provider the site does not allow, even when `kc_idp_hint` forces it. | Site and its providers | Spoofing | High | **Mitigated** | `SiteSignInTests` (a callback through a provider the site does not allow is refused, for OIDC and for SAML, even when `kc_idp_hint` forces it), `SignInRefusalsTests` (a provider the site does not allow is refused as `providerNotAllowed`). |
-| P89 | A session through one provider opens a site that does not allow that provider. | Site and its providers | Elevation of privilege | Medium | **Mitigated** | `SiteSignInTests` (a session opens a second site that allows its provider, and a site that does not allow it asks to sign in again). |
-| P90 | A provider that the platform sign-in does not accept opens Studio, the console or the users page. | Site and its providers | Elevation of privilege | High | **Mitigated** | `PlatformSignInTests` (a sign-in through a provider the platform does not accept is refused and writes no session), `PlatformSignInSitesTests` (a person signed in through a site's provider sees no tool). |
-| P91 | A refused sign-in leaves no record. | Site and its providers | Repudiation | Low | **Mitigated** | `SiteSignInTests` (a refusal is recorded with the reason `providerNotAllowed`), `SignInTests` (a callback with another tenant's state is refused and recorded). |
-| P92 | A preview tenant's sign-in, made through its main tenant's realm and client, is used on the main tenant. | Preview tenant and main realm | Spoofing | Medium | **Mitigated** | `SignInTests` (a callback with another tenant's state is refused and recorded), `PreviewTenantSignInTests` (a preview session gets 401 on the main host, the cookie case in P54). |
-| P93 | A role removed on the main tenant keeps working on the preview. | Preview tenant and main realm | Elevation of privilege | Medium | **Mitigated** | `PreviewTenantPlatformSignInTests` (a role the main tenant's users page gives applies on the preview until it is removed, and a person without it is denied). |
-| P94 | A stolen or unattended administrator session gives its own user a platform role, such as publisher. | Administrator and users page | Elevation of privilege | High | **Mitigated** | `UserCommandTests` (a platform role change with an old login answers 403 and changes and audits nothing), `UserInvitationTests` (a platform role at invite time needs a recent login). |
-| P95 | An administrator gives themselves a role and denies it. | Administrator and users page | Repudiation | Medium | **Mitigated** | `UserCommandTests` (giving and removing a role each write one audit record), `UserInvitationTests` (an invitation with a role writes one record for the invitation and one for the role). |
-| P96 | A non-administrator lists, invites or changes users. | Administrator and users page | Elevation of privilege | High | **Mitigated** | `UserListTests` (a person without the administrator role gets 403 and nobody signed in gets 401), `UserCommandTests` (a person without the administrator role gets 403 on the user routes), `UserInvitationTests` (an invitation without an administrator session is refused). |
-| P97 | An invitation takes over an account, by a used email or by an old link after a resend. | Administrator and users page | Spoofing | Medium | **Mitigated** | `UserInvitationTests` (an invitation for a used email is refused, and a resent invitation ends the old link). |
-| P98 | A disabled person keeps a session or signs in. | Administrator and users page | Elevation of privilege | High | **Mitigated** | `UserCommandTests` (disabling a person ends their sessions and refuses their sign-in). |
-| P99 | An administrator locks the tenant out by disabling themselves or removing their own administrator role. | Administrator and users page | Denial of service | Medium | **Mitigated** | `UserCommandTests` (disabling oneself, and removing one's own administrator role, answer 409 and change nothing). |
-| P110 | A sign-out ends another person's identity provider session, or a slow identity provider holds sign-out up. | Server and realm | Denial of service | Medium | **Mitigated** | `SignInTests` (sign-out ends only the `sid` stored with the caller's own session, on the CSRF-checked route, and falls back to the end-session address when the call fails). |
-| P111 | Keycloak's account console is a second self-service surface, where a person changes their account outside Axis's account page. | Browser and sign-in page | Elevation of privilege | Low | **Mitigated** | `AdminTenantRealmTests` (`tenant create` turns off the `account-console` client and takes `manage-account` out of the default roles, and a rerun restores both after a hand change). |
-| P112 | A person denies accepting the terms, or a new terms version is never shown. | Server and realm | Repudiation | Low | **Mitigated** | `AdminTenantLegalRealmTests` (`tenant legal set` turns the Terms and Conditions action on with `defaultAction`, and a new `--terms-version` adds it to every user while a change of the addresses alone adds it to no one). Keycloak records when each person accepted. |
-
-An identity provider session's lifetime and CSRF are covered by P1, P2 and P8.
-
-Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
-
-- (Spoofing, High) no test shows that the realm checks the signature of a SAML provider's response. The sync keeps
-  what Keycloak's metadata import sets, which may leave the check off.
-- (Elevation of privilege, Medium) the `/api/apps/{app}` data endpoints do not check the session's provider, see
-  [sites and sign-in](identity-provider.md#sites-and-sign-in).
-
-### Personal data
-
-Axis holds personal data about the people who use it: user profiles with email addresses, records and
-their history, audit records with client addresses, notifications, logs and traces, uploaded files,
-exports and backups. LINDDUN finds the privacy threats to that data, see
-[threat model method](threat-model-method.md#how-it-is-filled).
-
-```mermaid
-flowchart LR
-    subgraph idp [Identity provider]
-        Claims[Identity provider claims]
-    end
-    subgraph server [Server]
-        Api[Server API]
-    end
-    subgraph worker [Worker]
-        Steps[Process steps and notify]
-    end
-    subgraph tenantdb [Tenant database]
-        Profiles[(User profiles)]
-        Records[(Records, record history and audit records with client addresses)]
-        Files[(Uploaded files)]
-        Outbox[(Notifications and email outbox)]
-    end
-    subgraph outside [Outside systems]
-        Smtp[SMTP server]
-        Collector[Collector run by the operator]
-    end
-    subgraph browser [Browser]
-        Download[Export file]
-    end
-    subgraph operator [Operator]
-        Admin[Admin tool tenant backup]
-        Archive[(Archive kept by the operator)]
-    end
-    Claims -->|name, email and locale at sign-in| Profiles
-    Api -->|writes| Records
-    Api -->|stores uploads| Files
-    Api -->|builds| Download
-    Steps -->|writes| Outbox
-    Outbox -->|sent over SMTP| Smtp
-    Api -->|logs and traces| Collector
-    Steps -->|logs and traces| Collector
-    Admin -->|tenant backup| Archive
-```
-
-| Id | Threat | Boundary | Category | Rating | Status | Evidence |
-| --- | --- | --- | --- | --- | --- | --- |
-| P61 | A trace holds a person's user id, a field value or a bound address. | Personal data | Linking | Medium | **Mitigated** | `TraceCorrelationTests` (on the purchase request journey, no span holds a field value, a secret, a user id or a bound address). |
-| P62 | A record's history shows a person's actions in another tenant. | Personal data | Linking | Low | **Mitigated** | `RecordHistoryTests` (a record's history holds only its own tenant's audit records). |
-| P63 | The reassign picker shows other users' names to someone without the grant. | Personal data | Identifying | Medium | **Mitigated** | `TaskReassignTests` (the picker is 403 for anyone without the grant, and lists at most 20 profiles). |
-| P109 | The user id field picker shows other users' names to someone who may not write the field. | Personal data | Identifying | Medium | **Mitigated** | `UserIdFieldTests` (the route is 403 for a user without a create or update grant that covers the field, 401 when not signed in, and answers only `id` and `displayName`). A user who may write the field can list the tenant's display names, which is intended. |
-| P64 | A user learns that a record or file exists from the answer code. | Personal data | Detecting | Medium | **Mitigated** | `FileDownloadTests` (no read grant, or a read filter that excludes the record, gets 404), `RecordHistoryTests` (a deleted record's history is 404). |
-| P65 | Other users see whether a person has read a notification. | Personal data | Detecting | Low | **Mitigated** | `NotificationEndpointTests` (marking notifications read lowers the unread count only for the caller). |
-| P66 | A user reads personal fields without a grant. | Personal data | Data disclosure | High | **Mitigated** | `RecordFieldPolicyTests` (reads and writes hold only the fields the user may read, and a write to any other field is a 403). |
-| P67 | An export holds rows or columns that the user may not read. | Personal data | Data disclosure | High | **Mitigated** | `ExportEndpointTests` (hidden rows and columns are absent, a user without the export grant gets 403 and nothing is audited, and each export is audited). |
-| P68 | A profile's email reaches a log. | Personal data | Data disclosure | Medium | **Mitigated** | `SignInTests` (a profile that cannot be written logs a warning without the email). |
-| P69 | A sensitive input shows in process inspection. | Personal data | Data disclosure | Medium | **Mitigated** | `ProcessInstanceSensitiveFieldTests` (the input that maps a sensitive field is hidden from a user who may read the field). |
-| P70 | People do not know what Axis keeps about them. | Personal data | Unawareness | Medium | **Delegated** | The operator. Axis names no regulation, so the operator tells people what the application keeps, see [Restricted](keys-and-data-protection.md#restricted). |
-| P71 | A person cannot correct their profile. | Personal data | Unawareness | Low | **Delegated** | The identity provider. Each sign-in rewrites the profile from its claims, see [user profiles](notifications.md#user-profiles). |
-| P72 | Notifications are kept longer than needed. | Personal data | Non-compliance | Medium | **Mitigated** | `NotificationRetentionTests` (notifications over the retention days are deleted with their reads, and newer ones stay). |
-| P73 | Logs, telemetry and backup archives are kept longer than needed. | Personal data | Non-compliance | Medium | **Delegated** | The operator keeps and removes them, see [log inventory](log-inventory.md#logs) and [Restricted](keys-and-data-protection.md#restricted). |
-| P101 | Session audit records keep the full client address forever. | Personal data | Identifying | Medium | **Mitigated** | `ClientAddressTests` (IPv4 loses its last octet and IPv6 its last 80 bits) and `SignInTests` (sign-in, sign-out and refused sign-in records hold the shortened address). |
-| P108 | A database login, a dump or a replica reads a sensitive field's value. | Personal data | Data disclosure | High | **Mitigated** | `RecordSensitiveValueTests` (the record API stores a sensitive value as ciphertext) and `LeaveRequestReasonStorageTests` (no runtime-readable column holds a submitted reason, and a backup keeps it as ciphertext). |
-
-Non-repudiation does not apply as a privacy threat. The audit records exist so that a person cannot deny
-a business action, see P3, P12 and P20. What they keep about a person is in the list below.
-
-Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
-
-- (Identifying, Medium) an audit record whose `actor_name` holds the actor's display name keeps it forever. A new
-  audit record stores no name.
-- (Non-compliance, Medium) `axis.email_outbox` rows keep the address and the body forever.
-- (Non-compliance, Medium) `axis.user_profiles` rows and old audit records cannot be removed for a person's
-  removal request.

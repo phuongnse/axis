@@ -44,17 +44,9 @@ public static class PinnedReleaseCheck
             return null;
         }
 
-        var active = await configuration.ActiveReleases.AsNoTracking().Select(row => row.ReleaseId).ToListAsync(cancellationToken);
-        var open = await processes.Instances
-            .AsNoTracking()
-            .Where(instance => instance.State == ProcessStarts.Running || instance.State == ProcessStarts.Waiting)
-            .Select(instance => instance.ReleaseId)
-            .Distinct()
-            .ToListAsync(cancellationToken);
-
         var store = new ActiveReleaseStore(configuration);
         var diagnostics = new List<Diagnostic>();
-        foreach (var releaseId in active.Concat(open).Distinct().Order())
+        foreach (var releaseId in await ReleasesInUse.ListAsync(configuration, processes, cancellationToken))
         {
             // A release is never deleted, so a missing row means a broken database.
             var release = await store.GetReleaseAsync(releaseId, cancellationToken)

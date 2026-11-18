@@ -123,6 +123,12 @@ public sealed partial class AuthorizationRouteTests
                     && response.StatusCode == HttpStatusCode.Unauthorized
                     && response.Headers.WwwAuthenticate.ToString().StartsWith("Bearer resource_metadata=", StringComparison.Ordinal);
             }
+            else if (route.Metadata.GetMetadata<PackageRunnerRoute>() is not null)
+            {
+                refused = refused
+                    && response.StatusCode == HttpStatusCode.Unauthorized
+                    && response.Headers.WwwAuthenticate.ToString().StartsWith("Bearer", StringComparison.Ordinal);
+            }
             else if (EndpointCaller.IsEndpointPath(path))
             {
                 refused = refused

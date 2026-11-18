@@ -91,6 +91,28 @@ as the [widget binding](data-sources.md#widget-binding) says.
   reach, with the category and each measure as columns. The loading, empty, error, null category and
   more-than-100-groups texts are platform texts.
 
+### Drill-down
+
+_(planned for M42)_
+
+A chart may have a `navigate` action, built like a KPI's, that opens another page when a person clicks a
+group. It has no `name`, as a KPI's has none:
+
+```json
+{ "type": "chart", "name": "by-category", "kind": "bar", "dataSource": "OpenTicketsByCategory", "category": "category", "measures": [{ "name": "openCount", "label": { "textKey": "dashboard.byCategory.open" } }], "title": { "textKey": "dashboard.byCategory.title" }, "navigate": { "type": "navigate", "page": "TicketsByCategory", "label": { "textKey": "dashboard.byCategory.show" }, "parameters": { "category": "category" } } }
+```
+
+- **Values.** The expressions of the action see the chart's `category` name, which holds the clicked group's value,
+  and the page's parameters. A click on a group, a bar, a point or a slice, opens the page with that value. A `null`
+  group gives `null`, which the [navigate](table-widget.md#navigate) rules leave out of the query.
+- **Compile.** The action is checked as every `navigate` action is, see
+  [navigate and row actions](configuration.md#navigate-and-row-actions), with `category` and the page's parameters as
+  the only names in its expressions.
+- **Metadata.** `chart.navigate` has the keys of every `navigate` action. It is `null` when the chart has none, and
+  when the user cannot read the target page, as a KPI's `navigate` is.
+- **Accessibility.** The data table that screen readers reach gives each category as a link to the target page with
+  that category's value, when the chart has a `navigate`.
+
 ## KPI widget
 
 A `kpi` widget shows one measure of a data source as a tile, with its label.

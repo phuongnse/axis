@@ -89,7 +89,7 @@ Studio lists on every request, in list order, and the first match wins. A resour
 | `GET /api/studio/apps/{application}/settings`                                       | `200` with `{ autoAccept }`, see [Application settings](#application-settings)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `PUT /api/studio/apps/{application}/settings`                                       | `200` with `{ autoAccept }`. The body is `{ "autoAccept": true }` or `false` as `application/json`. It needs the publisher role, see [Application settings](#application-settings)                                                                                                                                                                                                                                                                                                                                                                              |
 | `PUT /api/studio/apps/{application}/texts/{key}`                                    | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](authoring-text-writes.md)                                                                                                                                                                                                                                                                                                                                                                              |
-| `POST /api/studio/apps/{application}/expressions/check`                             | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression, draft }`, see [Expression check](#expression-check)                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `POST /api/studio/apps/{application}/expressions/check`                             | `200` with `{ type, diagnostics, reading }`. The body is `application/json`, `{ resourceId, path, expression, draft }`, see [Expression check](#expression-check)                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `POST /api/studio/apps/{application}/expressions/scope`                             | `200` with `{ type, fields, functions }`. The body is `application/json`, `{ resourceId, path, draft }`, see [Expression scope](#expression-scope)                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `POST /api/studio/apps/{application}/resources/{id}/page-metadata`                  | `200` with `{ page, diagnostics }`, or `{ widget, diagnostics }` for a form. The body is the full draft page or form as `application/json`, see [draft page metadata](draft-page-metadata.md)                                                                                                                                                                                                                                                                                                                                                                   |
 | `GET /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata`  | `200` with `{ page, diagnostics }` for a page of the module version that the application pins, see [a module page](draft-page-metadata.md#a-module-page)                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -383,12 +383,15 @@ memory. `null` fits every type, so the compile always type checks the place. The
 - **`type`** is the type the place needs, as in [Types](expressions.md#types), or null when any will do.
 - **`fields`** are the names in scope, in scope order, as `{ name, labelKey, type }`. `labelKey` is null
   for a name with no label, such as a parameter. A child collection is not listed.
-- **`functions`** are the functions and aggregates the type check allows at the place, as `{ name, parameters, result, group, example, description }`.
+- **`functions`** are the functions and aggregates the type check allows at the place, as `{ name, parameters, result, group, example, description, words }`.
   `result` is a type name or a parameter name. Signatures and groups are in [functions](expressions.md#functions) and [aggregates](expressions.md#aggregates).
   A place that runs as SQL, such as a filter or a migration value, lists only the [SQL subset](expressions.md#sql-subset).
 - **The language.** `description` is in the best `Accept-Language` match the platform has: `vi-VN` gives `vi`, else `en`.
 - **No type check.** A place checked without one, such as a migration value whose field types are not
   known yet, answers `{ type: null, fields: [], functions: [] }`.
+- **Reading words**. Each function also has `words`, the key of its reading words under
+  `shell.studio.expression.reads.`, such as `fn.daysBetween`. It is the key that a phrase of the
+  [reading](#expression-check) names.
 
 ## Expression check
 
@@ -418,11 +421,25 @@ may be left out.
 - **The rules.** The scope, types, limits and codes are those of
   [expression diagnostics](expressions.md#diagnostics). An expression of more than 2,000 characters
   answers `AXC0036` as a diagnostic, not `400`.
-- **The answer.** `{ type, diagnostics }`. `type` is the result type in the notation of
+- **The answer.** `{ type, diagnostics, reading }`. `type` is the result type in the notation of
   [Types](expressions.md#types): `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum`,
   `reference` or `null`. It is the expression's own type, so a text literal is `text` even where an
   enum is expected. `type` is null when there is a diagnostic, and when the compile cannot find the
   type yet, as for a migration value whose type check waits for activation.
+- **The reading.** The answer also holds `reading`, the expression as a tree that Studio says in
+  words, so the browser keeps no second grammar, as [D52](../decisions/d52-reference-pickers-label-texts-and-the-expression-editor.md)
+  says. It is `null` while there is a diagnostic. A node is a group `{ kind, items }`, where `all` and `any` join a run
+  of `and` or of `or`, and `notAll` and `none` are `not` before them, or a phrase `{ kind: "phrase", words, slots }`.
+  `words` names the phrase's text under `shell.studio.expression.reads.`, such as `equal`, `less.date`, `is-null`,
+  `in`, `of` or `fn.daysBetween`. Each slot is a list of parts: `{ kind: "name", name, labelKey }`, where a path's
+  step is named by the field it resolves to; `{ kind: "value", type, value, labelKey }`, where `value` is the literal
+  as JSON (a date as ISO 8601 text) and `labelKey` is an enum value's label key or null; or a nested phrase.
+  A function that takes any number of arguments, `concat` and `coalesce`, reads all of them in one slot, as a list.
+  `count` reads its list with `fn.count`, and with a condition as `fn.count.where`, which has two slots.
+  A text literal compared with an enum, by `==`, `!=` or `in`, reads as a value of type `enum`, although the check
+  types it as `text`, and its `labelKey` is that enum value's label key, or null when the field has no value labels. A
+  place that the compile checks without a type check, as for a migration value whose type check waits for activation,
+  still answers a reading: its names have a null `labelKey`, and its comparisons of dates read with the plain words.
 - **Diagnostics.** There is at most one, because the compile stops at the first problem. It is
   `{ code, message, start, end }`. `start` and `end` are offsets into the expression text after JSON
   decoding, in UTF-16 code units, and `end` is exclusive.

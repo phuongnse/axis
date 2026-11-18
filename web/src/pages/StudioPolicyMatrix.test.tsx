@@ -258,7 +258,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     await userEvent.click(screen.getByTestId('studio-matrix-cell-manager-entity-PurchaseRequest'))
 
     const grants = screen.getAllByTestId('studio-matrix-grant')
-    expect(within(grants[0]).getByText('No filter')).toBeInTheDocument()
+    expect(within(grants[0]).getByText('Every record')).toBeInTheDocument()
     expect(within(grants[0]).getByText('All fields')).toBeInTheDocument()
     expect(within(grants[1]).getByText('record.requester == user.id')).toBeInTheDocument()
     expect(within(grants[1]).getByText('title')).toBeInTheDocument()
@@ -317,7 +317,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
 
     await userEvent.click(screen.getByTestId('studio-matrix-cell-manager-dataSource-OpenRequests'))
 
-    expect(emptyDescription('No grant.')).toBeInTheDocument()
+    expect(emptyDescription('This role has no grant here.')).toBeInTheDocument()
   })
 
   it('says an editable role has no own grant on a cell it grants nothing on', async () => {
@@ -326,7 +326,9 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
 
     await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-endpoint-Intake'))
 
-    expect(emptyDescription('No grant.', screen.getByTestId('studio-matrix-own-grants'))).toBeInTheDocument()
+    expect(
+      emptyDescription('This role has no grant here.', screen.getByTestId('studio-matrix-own-grants')),
+    ).toBeInTheDocument()
   })
 
   it('shows no own-grant empty text under a shared grant of an editable row', async () => {
@@ -363,7 +365,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     const own = await screen.findByTestId('studio-matrix-own-grants')
     expect(within(screen.getByTestId('studio-matrix-grant')).getByText('StaffAccess')).toBeInTheDocument()
     expect(within(screen.getByTestId('studio-matrix-grant')).getByText('Shared')).toBeInTheDocument()
-    expect(within(own).queryByText('No grant.')).not.toBeInTheDocument()
+    expect(within(own).queryByText('This role has no grant here.')).not.toBeInTheDocument()
   })
 
   it('offers only the actions a process takes', async () => {
@@ -415,7 +417,11 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
 
     await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-entity-PurchaseRequest'))
 
-    expect(within(await screen.findByTestId('studio-matrix-grants')).getByText('Loading the grants…')).toBeVisible()
+    expect(
+      within(await screen.findByRole('region', { name: 'Grants of employee on PurchaseRequest' })).getByText(
+        'Loading the grants…',
+      ),
+    ).toBeVisible()
   })
 
   it('sends one patch with the loaded version that changes only the edited grant', async () => {
@@ -476,7 +482,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
 
     await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-process-PurchaseApproval'))
     const group = await screen.findByTestId('studio-matrix-actions')
-    expect(screen.getByText('Not accepted here: read')).toBeInTheDocument()
+    expect(screen.getByText('read does not apply here')).toBeInTheDocument()
     await userEvent.click(within(group).getByRole('checkbox', { name: 'cancel' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -484,6 +490,29 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(JSON.parse(patches(fetchMock)[0][1]!.body as string)).toEqual([
       { op: 'replace', path: '/grants/0/actions', value: ['start', 'cancel', 'read'] },
     ])
+  })
+
+  it('warns on each action the target does not accept', async () => {
+    stubFetch({ ...policyContent, grants: [{ process: 'PurchaseApproval', actions: ['read', 'export', 'start'] }] })
+    renderMatrix()
+
+    await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-process-PurchaseApproval'))
+    await screen.findByTestId('studio-matrix-actions')
+
+    expect(screen.getByText('read does not apply here')).toBeInTheDocument()
+    expect(screen.getByText('export does not apply here')).toBeInTheDocument()
+  })
+
+  it('says that the policy of an editable role could not be loaded, and names the policy', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 500 })),
+    )
+    renderMatrix()
+
+    await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-entity-PurchaseRequest'))
+
+    expect(await screen.findByText('The policy EmployeeAccess could not be loaded.')).toBeVisible()
   })
 
   it('removes the field list when the last field is cleared', async () => {
@@ -506,7 +535,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
 
     await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-process-PurchaseApproval'))
     const group = await screen.findByTestId('studio-matrix-actions')
-    expect(screen.getByRole('button', { name: 'Remove grant' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete grant' })).toBeDisabled()
     expect(screen.queryByTestId('studio-matrix-actions-required')).toBeNull()
 
     await userEvent.click(within(group).getByRole('checkbox', { name: 'start' }))
@@ -540,7 +569,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(within(grants[1]).getByTestId('studio-matrix-actions-required')).toBeVisible()
     expect(within(grants[1]).getAllByRole('checkbox')[0]).toHaveFocus()
     expect(patches(fetchMock)).toHaveLength(0)
-    expect(screen.getAllByRole('button', { name: 'Remove grant' })[0]).toBeEnabled()
+    expect(screen.getAllByRole('button', { name: 'Delete grant' })[0]).toBeEnabled()
 
     await userEvent.click(within(grants[1]).getAllByRole('checkbox')[0])
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -622,7 +651,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     renderMatrix()
 
     expect(screen.getByTestId('studio-matrix-readonly-manager')).toHaveTextContent(
-      'The matrix cannot change this role, because its access policy also names other roles. Policy: EmployeeAccess',
+      "This role's access policy EmployeeAccess also names other roles, so change its grants in that policy.",
     )
     expect(screen.queryByTestId('studio-matrix-readonly-employee')).not.toBeInTheDocument()
   })
@@ -633,7 +662,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     const warning = within(screen.getByTestId('studio-matrix-cell-employee-dataSource-OpenRequests')).getByTestId(
       'studio-matrix-missing-read',
     )
-    expect(warning).toHaveTextContent('PurchaseRequest')
+    expect(warning).toHaveTextContent('Needs read on PurchaseRequest')
   })
 })
 

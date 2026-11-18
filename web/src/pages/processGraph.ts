@@ -1,3 +1,5 @@
+import { fillText } from '../platform/fillText'
+
 export interface ProcessGraphStep {
   index: number
   name: string | null
@@ -26,10 +28,14 @@ export function transitionPointer(transition: ProcessGraphTransition): string {
   return transition.kind === 'branch' || transition.kind === 'outcome' ? `${transition.path}/next` : transition.path
 }
 
-/** The accessible name of a transition, such as "financeCheck to markApproved, otherwise". */
-export function transitionName(graph: ProcessGraph, transition: ProcessGraphTransition, to: string): string {
+/**
+ * The accessible name of a transition, such as "financeCheck to markApproved, otherwise". `edgeText` is the edge-name
+ * text of the locale, with `{source}` and `{target}`.
+ */
+export function transitionName(graph: ProcessGraph, transition: ProcessGraphTransition, edgeText: string): string {
   const nameOf = (index: number) => graph.steps.find((step) => step.index === index)?.name ?? `/steps/${index}`
-  return `${nameOf(transition.source)} ${to} ${nameOf(transition.target)}, ${transition.label ?? transition.kind}`
+  const edge = fillText(edgeText, { source: nameOf(transition.source), target: nameOf(transition.target) })
+  return `${edge}, ${transition.label ?? transition.kind}`
 }
 
 function isContent(value: unknown): value is Record<string, unknown> {

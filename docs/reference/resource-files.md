@@ -2,9 +2,10 @@
 
 An application is a folder of JSON resource files. This page describes the shape of those files: the
 properties every resource shares, the resource kinds that pages, seeds, rules and migrations use, the
-JSON Schema keywords that guide Studio, the entity field types and their constraints, entity logic,
-sequences and the application time zone. How the pipeline loads and checks the files, and the code
-of each problem, are in [the configuration pipeline](configuration.md).
+JSON Schema keywords that guide Studio, and the entity field types and their constraints. An entity's
+logic, its sequences, the application time zone and the fiscal year are in
+[entity logic and sequences](entity-logic-and-sequences.md). How the pipeline loads and checks the
+files, and the code of each problem, are in [the configuration pipeline](configuration.md).
 
 ## Resource file shape
 
@@ -128,6 +129,11 @@ A page holds one or more widgets. A leaf widget's `type` is `table`, `form`, `ta
 - **Chart.** A `chart` names a `dataSource` grouped by one field, its `kind` (`bar`, `line` or
   `pie`), the `category` that is that field, one or more `measures` with a `label` each, and a
   `title`, see [detail, chart and KPI widgets](detail-chart-kpi-widgets.md).
+- **Content** _(planned for M42)_. A `content` widget shows fixed text, an image, a link or a note, see
+  [content widget](content-widget.md#content-widget).
+- **Calendar, board, cards and tree** _(planned for M42)_. A `calendar`, a `board`, `cards` and a `tree` show an entity's
+  records by a date, in groups, as tiles and under their parent, see
+  [calendar, board, cards and tree widgets](calendar-board-card-tree-widgets.md).
 - **Form and detail actions.** A `form` or `detail` widget may list `actions`. Each is
   `{ "type": "startProcess", "name": "submit", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }`,
   a button that starts the process for the form's record, or a `navigate` action, see
@@ -144,6 +150,28 @@ A page holds one or more widgets. A leaf widget's `type` is `table`, `form`, `ta
   schema refuses it in `toolbarActions`, in a form's `actions` and on a kpi's `navigate`. It refuses
   a `delete` with a `process`, `page`, `parameters` or `record`, and a `delete` in `toolbarActions`
   or a form's `actions`.
+- **Bulk actions and inline edit** _(planned for M42)_. A `table` may list `bulkActions`. Each entry is a `startProcess`
+  with a `process`, a `setFields` with `fields`, a list of field names, or a `delete`. Each has a `name` and a `label`,
+  such as `{ "type": "setFields", "name": "close", "fields": ["status"], "label": { "textKey": "tickets.close" } }`.
+  The schema refuses `visibleWhen`, `page`, `parameters` and `record` on these entries. A table over an `entity` may
+  set `"inlineEdit": true`. A table over a data source may not. The compiler checks that a `process` takes the table's
+  entity as its subject. It also checks that each field in `fields` is a field of that entity that is not computed,
+  a sequence or a creator. See [bulk actions](table-widget.md#bulk-actions) and [inline edit](table-widget.md#inline-edit).
+- **Menu groups** _(planned for M42)_. A navigation entry may hold `entries` in place of its `page`, which makes it a
+  parent entry with a `label` and an optional `icon`. Its `entries` name pages, one level deep, such as
+  `{ "label": { "textKey": "purchasing.nav.reports" }, "icon": "chart", "entries": [{ "page": "Spend", "label": { "textKey": "purchasing.nav.spend" } }] }`.
+  The rule is [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md),
+  and its checks are in [sites](configuration.md#sites).
+- **A home page for each role** _(planned for M42)_. A site's `homePages` lists `{ "role", "page" }` entries, such as
+  `{ "role": "buyer", "page": "PurchaseRequests" }`. A person's home page is the page of the first entry whose role
+  they hold and whose page they may read. Otherwise it is the first navigation page they may read. The rule is
+  [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md),
+  and its checks are in [sites](configuration.md#sites).
+- **Brand** _(planned for M42)_. A site's `brand` is `{ "logo": "images/logo.png", "primary": "#1f6feb" }`. The `logo`
+  is a PNG, JPEG or WebP file in the application's `images` folder, under the same rule as a
+  [content widget](content-widget.md#content-widget) image. The `primary` is the site's main colour, and the compiler derives the other colours from it, see
+  [design tokens](frontend.md#design-tokens-and-previews). The rule is
+  [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
 
 ### Page parameters and navigate actions
 
@@ -167,8 +195,9 @@ opens a page with values for them.
   lists its `values`, and a `reference` parameter names its `target` entity. The type is checked by
   the same rules as an entity field. The compiled page lists its parameters in file order. A value
   lives in the URL query under the parameter name, and a table can bind it to a data source
-  parameter. A page whose widget is a form declares no parameters. The checks and their codes are in
-  [page parameters](configuration.md#page-parameters).
+  parameter. The checks and their codes are in [page parameters](configuration.md#page-parameters).
+- **Filter bar** _(planned for M42)_. A page may list a `filterBar` whose inputs set its parameters,
+  see [filter bar](data-sources.md#filter-bar).
 - **Navigate actions.** A `navigate` action opens another page. It sits in a table's `rowActions` or
   `toolbarActions`, or in a form's `actions`:
   `{ "type": "navigate", "name": "open", "page": "TicketDetail", "label": { "textKey": "tickets.open" }, "parameters": { "ticket": "id" } }`.
@@ -179,6 +208,18 @@ opens a page with values for them.
   to the form's entity, instead of `parameters`. The button opens `/{page}/{id}` with `record`, and
   `/{page}/new` without it. A table on the target page reads the parameter values through its
   `parameters` map.
+
+#### First values of a new record
+
+_(planned for M42)_
+
+A page whose widget is a form may declare parameters. A `navigate` action to that page without `record`
+may give them, such as `"parameters": { "customer": "id" }` in the actions of a customer's `detail`. It
+opens `/{page}/new?customer=<id>`. On `/new`, each field of the form's entity whose name matches a parameter,
+ignoring letter case, starts with the parameter's value, and the person may change it. A parameter with a
+field's name must have that field's type, and a `reference` the same target, otherwise it is refused. A
+field that the person may not set on create, because it is not in `createFields`, starts empty. The server
+checks the save as it checks every save. `/{id}` gives no field a value.
 
 ### Widget trees
 
@@ -242,9 +283,11 @@ widgets:
   defaults to `false`.
 - **Labels.** A label and a title are `{ "textKey": ... }`, like a page title.
 - **Depth.** Containers nest to at most 4 levels. The page's own `widgets` list is level 1.
-- **One of each.** A page holds at most one `table` of any kind, and at most one `form`, `taskInbox`
-  or `processInspector`, so the URL state stays unambiguous. Every `widgets`, `columns` and `tabs`
-  list has at least one entry.
+- **One owner for each part of the address** _(planned for M42)_. A page may hold several `table`
+  widgets, such as a record's related lists. Each owns its part of the address under a `prefix` of its
+  own, see [address prefix](table-widget.md#address-prefix). A page holds at most one `form`, `taskInbox`
+  or `processInspector`, so the URL state stays unambiguous, as [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) says.
+- **Not empty.** Every `widgets`, `columns` and `tabs` list has at least one entry.
 - **Every depth is checked.** The compiler checks every widget at any depth, and a problem is
   reported at the widget's own JSON pointer, such as `/widgets/0/columns/1/widgets/0/entity`.
 - **Names.** A widget, an action, a row action, a toolbar action, a column and a tab require a
@@ -497,8 +540,8 @@ rather than when the table is created, and a value outside the range is `AXC0013
   `unique`. Setting either, even to `false`, is `AXC0013`.
 - **`expression`** makes the field a computed field. `required` on a computed field is `AXC0013` at
   `/fields/{i}/required`, and an `expression` on a `reference`, `references` or `child-collection`
-  field is `AXC0013` at `/fields/{i}/expression`. See [entity logic](#entity-logic).
-- **`sequence`** names a [sequence](#sequences), ignoring letter case. It cannot be combined with
+  field is `AXC0013` at `/fields/{i}/expression`. See [entity logic](entity-logic-and-sequences.md#entity-logic).
+- **`sequence`** names a [sequence](entity-logic-and-sequences.md#sequences), ignoring letter case. It cannot be combined with
   `required: true` or `expression`, and a child entity's field cannot have it. Each is `AXC0013` at
   `/fields/{i}/sequence`.
 - **`creator`** is allowed only on a `text` field. It cannot be combined with `required: true`,
@@ -565,13 +608,28 @@ diagnostic.
   [imports](import-export.md), where an empty cell gets the default. A required field with a default
   may be left out of a create, and `now()` is the start time of the write transaction. An update
   never applies a default. Only the owner's fields get defaults: the rows of a child collection get
-  none. The [form state endpoint](record-api.md#form-state) returns the defaults of a new record,
+  none. The [form state endpoint](record-form-state.md#form-state) returns the defaults of a new record,
   and the form widget shows them on a new form.
 - **`searchable`.** On a `text` field. `searchable` on any other type is `AXC0013` at
   `/fields/{i}/searchable`, even when it is `false`. A searchable field and the display field get a
   trigram index, see [schema planning](storage.md#schema-planning). `search` reads every searchable
   field that the user may read, and the display field, which is always searched, see
   [paging and sorting](record-api.md#paging-and-sorting).
+- **`multiline`** _(planned for M42)_. A boolean on a `text` field, `false` by default, that makes the field
+  take several lines. It may not be combined with `userId`, and on another type the compiler refuses it, as it
+  refuses any property on the wrong type. The form shows a text area, see [inputs](form-widget.md#inputs).
+  Stored and read values keep their line breaks. As [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) agrees.
+- **`richText`** _(planned for M42)_. A type stored as text, which keeps a cleaned subset of HTML. It takes
+  `required`, `maxLength`, which counts the cleaned HTML, and `searchable`, and the compiler refuses any other
+  property on it. A read returns the cleaned HTML. An expression may test it only with `is null` and
+  `is not null`, and it is no valid `sort` or `filter` field. A table cell and an export show its plain words.
+  As [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) agrees.
+- **Rich text cleaning** _(planned for M42)_. On every write path (the record API, imports, process steps, inbound
+  endpoints and seeds) the server keeps only these elements: `p`, `br`, `strong`, `em`, `u`, `s`, `h2`, `h3`, `ul`,
+  `ol`, `li`, `blockquote` and `a`. It drops any other element and keeps its text, and it drops `script` and
+  `style` with their text. It drops every attribute except an `a`'s `href`, and keeps that `href` only when it is an
+  `https:` or `mailto:` link. The email body is cleaned as a step of the same kind, with its own list, see
+  [email](notifications.md#email).
 
 ### Matched references
 
@@ -636,203 +694,25 @@ An entity's `indexes` declare the database indexes that its queries need, as a l
 - **Every reference.** Every `reference` field and every child table's `owner_id` is indexed without
   a declaration.
 
-## Entity logic
+## System fields
 
-An entity may hold validations, computed fields and child collections, so that its own rules live
-with its data. Expressions use the syntax of the [expression language](expressions.md). A validation
-can call a named [rule](#rules), such as `IsPositive(quantity)` below, and both examples below
-compile, given that rule. A module entity's validation calls the rules of its own module, see
-[modules](modules-and-templates.md#modules).
+_(planned for M41)_
 
-```json
-{
-  "id": "0ec02f4a-bf31-4409-8eb9-bfb9c39b6756",
-  "kind": "entity",
-  "name": "PurchaseRequest",
-  "formatVersion": 1,
-  "label": { "textKey": "purchaseRequest.label" },
-  "displayField": "title",
-  "fields": [
-    { "name": "title", "type": "text", "required": true, "maxLength": 200 },
-    { "name": "lineItems", "type": "child-collection", "target": "LineItem" },
-    {
-      "name": "total",
-      "type": "decimal",
-      "precision": 18,
-      "scale": 2,
-      "expression": "sum(lineItems, amount)"
-    }
-  ],
-  "validations": [
-    {
-      "name": "needsLineItem",
-      "expression": "count(lineItems) >= 1",
-      "message": { "textKey": "purchaseRequest.needsLineItem" },
-      "field": "lineItems"
-    }
-  ]
-}
-```
+Every record has four system fields that the server keeps, so an entity does not declare them.
 
-```json
-{
-  "id": "b6c15e88-82e5-43e7-a589-c48ba8a56bc3",
-  "kind": "entity",
-  "name": "LineItem",
-  "formatVersion": 1,
-  "label": { "textKey": "lineItem.label" },
-  "fields": [
-    { "name": "description", "type": "text", "maxLength": 200 },
-    { "name": "quantity", "type": "integer" },
-    { "name": "unitPrice", "type": "decimal", "precision": 18, "scale": 2 },
-    {
-      "name": "amount",
-      "type": "decimal",
-      "precision": 18,
-      "scale": 2,
-      "expression": "quantity * unitPrice"
-    }
-  ],
-  "validations": [
-    {
-      "name": "quantityPositive",
-      "expression": "IsPositive(quantity)",
-      "message": { "textKey": "lineItem.quantityPositive" },
-      "field": "quantity"
-    }
-  ]
-}
-```
+| Name | Type | Holds |
+| --- | --- | --- |
+| `createdAt` | `date-time` | When the record was created |
+| `createdBy` | `text` | The user, service account or `system` that created it |
+| `updatedAt` | `date-time` | When the record was last changed |
+| `updatedBy` | `text` | Who last changed it |
 
-- **Validations.** `validations` is a list on the entity. Each entry has:
-  - `name`, which is required, so a [customization layer](customization-layers.md#list-keys) can
-    find the validation. It is a name like a field's, and it is unique in the entity's validations,
-    ignoring letter case (`AXC0343`, at `/validations/{i}/name`). A missing `name` breaks the JSON
-    Schema (`AXC0004`).
-  - `expression`, which must be boolean.
-  - `message`, a label that is checked like other labels (`AXC0028`). Its text key is the message of
-    a failure.
-  - `field`, which names a field of the same entity.
-
-  The expression reads the entity's own fields by name, and can call named rules. It can also
-  aggregate over the entity's child collections, such as `count(lineItems) >= 1`. An aggregate reads
-  the rows as they will be stored, so `count(lineItems) >= 1` refuses a create without rows and an
-  update that removes the last row. The server runs the validations on create and update, on the
-  record as it will be stored and after computed fields are calculated. A validation fails when its
-  condition is `false` or `null`, or stops with a run-time error. The validations of a child entity
-  run on each row that the body sends. See
-  [the record API](record-api.md#child-rows-computed-fields-and-validations).
-
-- **Computed fields.** A field with an `expression` is a computed field.
-  - The expression type must match the field's type, under the
-    [result type rule](expressions.md#types).
-  - The type must be a scalar type. A `reference` or a `child-collection` cannot be computed.
-  - `required` is not allowed. `unique`, `maxLength`, `precision`, `scale` and `values` keep their
-    usual meaning, because they describe the column that stores the value.
-  - It reads only the record's own fields and its child rows, never a reference path. It reads the
-    entity's own fields that are not computed. Naming a computed field, itself included, is
-    `AXC0046`.
-  - It cannot call `now()`, `today()` or `toDate`, because its stored value would go stale. A call,
-    also inside an aggregate's item expression, is `AXC0086`.
-  - It cannot call a rule (`AXC0050`).
-  - It reads child rows only through an [aggregate](expressions.md#aggregates), such as
-    `sum(lineItems, amount)`. Inside the item expression, names are the child row's fields, computed
-    ones included, and nothing else.
-  - The rows of a child collection are computed before the owner, so the owner's aggregates read the
-    rows' computed values. An update that leaves a collection out aggregates its stored rows.
-  - Clients cannot write it. A body that sets it, even to `null`, is a `400` at its pointer with the
-    message "Cannot be set.". A run-time error is a `400` at its pointer with "Could not be
-    computed.". A value that does not fit the column gets the message that a body value would get.
-    See [the record API](record-api.md#child-rows-computed-fields-and-validations) and
-    [child tables and computed columns](child-tables-and-computed-columns.md#child-tables-and-computed-columns).
-- **Child collections.** The field type `child-collection` needs a `target` that names the child
-  entity. Its rows are read and written only through the owner record, as
-  [the record API](record-api.md#child-rows-computed-fields-and-validations) describes.
-- **Limits on a child entity.** A child entity:
-  - is owned by exactly one `child-collection` field (`AXC0039`);
-  - is never the `target` of a `reference` or `references` field (`AXC0040`);
-  - is never the `entity` of a data source (`AXC0064`) or of a process (`AXC0068`);
-  - has no record routes of its own;
-  - has no `child-collection` or `references` fields (`AXC0041`). It may have `reference` fields, as
-    real line items point to a product. A reference from a child row gets a foreign key, and its
-    labels follow the rows, see
-    [child rows](record-api.md#child-rows-computed-fields-and-validations). Its index comes with the
-    platform indexes on every reference column.
-
-## Sequences
-
-A `sequence` resource hands out business numbers, such as `PR-2026-00042`. The compiler checks
-sequences and the fields that name them, and the record create fills a field that names a sequence
-with the next number.
-
-```json
-{
-  "id": "5d2f8a61-3c4b-4e7d-9a0f-6b1c2d3e4f09",
-  "kind": "sequence",
-  "name": "PurchaseRequestNumber",
-  "formatVersion": 1,
-  "format": "PR-{yyyy}-{n:5}"
-}
-```
-
-- **Tokens.** `{yyyy}` is the four-digit year of the create's transaction time in the
-  [application time zone](#application-time-zone), which is `UTC` when the application names none.
-  `{n}` is the number, and `{n:k}` is the number zero-padded to `k` digits, with `k` from 1 to 18.
-  Every other character is literal.
-- **One number.** The format holds exactly one `{n}` or `{n:k}` token. It may hold `{yyyy}`, even
-  more than once, and no other braces. Any other format is `AXC0004` at `/format`.
-- **Yearly restart.** The counter restarts each year in the
-  [application time zone](#application-time-zone), but only when the format holds `{yyyy}`, because
-  without a year a restart would hand out the same number twice. In `Asia/Ho_Chi_Minh`, a record
-  created at 18:00 UTC on 31 December gets the first number of the next year.
-
-An entity `text` field names the sequence in its `sequence` property:
-
-```json
-{
-  "id": "0ec02f4a-bf31-4409-8eb9-bfb9c39b6756",
-  "kind": "entity",
-  "name": "PurchaseRequest",
-  "formatVersion": 1,
-  "label": { "textKey": "purchaseRequest.label" },
-  "displayField": "title",
-  "fields": [
-    { "name": "number", "type": "text", "maxLength": 20, "unique": true, "sequence": "PurchaseRequestNumber" },
-    { "name": "title", "type": "text", "required": true, "maxLength": 200 }
-  ]
-}
-```
-
-- `sequence` names a loaded `sequence` resource, ignoring letter case.
-- The field gets its number on create, in the create's transaction, and clients cannot write it. See
-  [the record API](record-api.md#create-update-and-delete) and
-  [storage](storage.md#audit-records-and-sequence-counters).
-- A field with `sequence` cannot be `required` or have an `expression`, because the server always
-  assigns its value. A child entity's field cannot have a `sequence` either. Each of these is
-  `AXC0013`.
-
-## Application time zone
-
-The `application` manifest may name the application's time zone, which decides the calendar date of
-an instant wherever Axis needs one:
-
-```json
-{
-  "id": "6ec71db1-5b21-43d9-95d2-dcc45055eb0e",
-  "kind": "application",
-  "name": "ServiceDesk",
-  "formatVersion": 1,
-  "timeZone": "Asia/Ho_Chi_Minh"
-}
-```
-
-- **`timeZone`** is optional. It is an IANA time zone id, and without it the time zone is `UTC`. An
-  id is known when .NET finds it as an IANA id written with its exact letter case, as for a schedule
-  trigger. An unknown id is `AXC0277` at `/timeZone`. Studio's application form offers `timeZone`.
-- **Part of the release.** A change applies to work that runs on the new release.
-- **What uses it.** [`today()` and `toDate`](expressions.md#functions), a sequence's
-  [`{yyyy}`](#sequences) and its yearly restart, the dates in
-  [notifications](notifications.md#placeholders) and the date buckets of data sources.
-- **What does not.** `now()` stays an instant. A schedule trigger keeps its own `timeZone`. The SPA
-  shows a `date-time` in the browser's time zone. Durations keep a fixed length, so calendar
-  durations such as `P1M` stay `AXC0084`.
+- **Reserved.** An entity field named `createdAt`, `createdBy`, `updatedAt` or `updatedBy`, ignoring letter
+  case, is `AXC0392`, at `/fields/{i}/name`. A `sort`, a `filter`, a data source path and an expression
+  name them as they name a field, with no new syntax, because the names are plain.
+- **Where they are used.** The record API answers and filters them, see
+  [system fields](record-api.md#system-fields), and a [data source](data-sources.md#resource-shape) may project,
+  filter and sort on them. A migration and a seed never set them.
+- **Why they are not fields.** A field is a declared column that a body writes and a release changes by a
+  migration. The system fields are the same in every entity and are never written, so a release never
+  needs a migration for them.

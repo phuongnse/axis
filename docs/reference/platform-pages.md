@@ -1,9 +1,8 @@
 # Platform pages
 
-This page describes the pages that the platform site serves beside Studio: the account page, which any
-signed-in person opens, and the users page, which an administrator opens. They are platform routes in
+This page describes the pages that the platform site serves beside Studio. Each is a platform route in
 the shell, see [frontend](frontend.md) for the routes and [shell](shell.md) for the frame around them.
-Both sit before the site route, so `account` and `users` are reserved site paths.
+Each sits before the site route, so the first segment of its address is a reserved site path.
 
 ## Account page
 
@@ -50,6 +49,30 @@ sign-in first. A signed-out visit shows the sign-in prompt, because the list cal
   this state.
 - **Texts.** Its texts are `shell.account.sessions`, the menu entry, and `shell.account.sessions.*` for
   the page.
+
+### Absence
+
+_(planned for M43)_
+
+The Absence section shows the person's absence from `GET /api/me/absence`, with a From and an Until date
+field and a Delegate user picker. The picker is the one that [reassign](task-deadlines.md#reassign) uses.
+Save sends the dates and the delegate with `PUT`, and End absence sends `DELETE`. Both buttons are
+`AxisButton`s, and the fields are `AxisField`s. A refused request shows its errors in place, with
+`placeProblemErrors`. The dates follow [absences](user-administration.md#absences). Its texts are
+`shell.account.absence.*`.
+
+### Notifications
+
+_(planned for M43)_
+
+The Notifications section shows the person's [notification preferences](notifications.md#notification-preferences)
+from `GET /api/me/notification-preferences`. Each of the three sources has its own `AxisFieldGroup`, with two
+`AxisCheckboxField`s, In the application and Email. One more group, Daily digest, has a checkbox for each source and
+an hour field, an `AxisField`, for the hour of the digest. The page sends the browser's time zone with the choices.
+
+Save is an `AxisButton` and sends every choice with `PUT`. A refused request shows its errors in place, with
+`placeProblemErrors`. The section says that tenant notices always show in the application. Its texts are
+`shell.account.notifications.*`.
 
 ## Users page
 
@@ -218,8 +241,6 @@ failure shows "The model key could not be loaded." and is logged. Its texts are 
 
 ### Application packages
 
-_(planned for M37)_
-
 The People tab has an "Application packages" section below Model key, where
 an administrator turns the tenant's application packages on or off, see
 [application packages](user-administration.md#application-packages). The section is a component of its own, like Model
@@ -285,3 +306,66 @@ tenant with no directory row. A `403` or `404` is not logged, and any other fail
 - **A failed revoke.** The row stays as it was and the tab says "The consent was not revoked." A `502` says "The
   identity provider did not finish the revoke. Revoke again to finish it.", because the server keeps the stored revoke
   when the identity provider fails and revoking again finishes it.
+
+## Audit page
+
+_(planned for M41)_
+
+The platform route `/audit` is the tenant's audit, where an administrator searches and exports every audit
+record of the tenant: data changes, sign-ins, administration, publishes and the commands of an operator.
+The rules, the routes and what an item holds are in [the tenant's audit](record-audit.md#the-tenants-audit).
+The page shows names and the values that the administrator may read, and never a value of a field that
+person may not read. Its texts are `shell.audit.*`.
+
+- **The table.** It lists the audit records from `GET /api/tenant/audit-records`, newest first, 20 to a page,
+  in [the table](actions-and-controls.md#tables) that every list uses. The server filters, sorts and pages them.
+- **Columns.** Each row has the time, the person, the action, the application, the entity, the record and
+  the changes. The person is the display name, else the user id, and "System" for `system`. The changes
+  column lists each changed field with its old and new value, or only the field's label when the
+  administrator may not read the field, as [the form's history](form-widget.md#history) does. A header
+  sorts by time.
+- **Filter.** Filter, in the toolbar, finds records by person, application, entity, record, action and
+  time. The table has no Search box, because the route takes none.
+- **Export.** Export is a secondary action of the toolbar, with CSV and Excel as in
+  [the table's export](import-export.md#in-the-spa). It exports the records that the current filter finds.
+  A file that stopped at the row limit says so.
+- **The address.** The view lives in the address as `filter`, `sort`, `page`, `pageSize` and `columns`, so a
+  reload or the Back button keeps it.
+- **Empty.** A filter that finds nothing says "No audit records match."
+- **Refusals.** A `403` shows that the page is for administrators. Any other failure shows an error
+  message.
+
+## Recycle bin page
+
+_(planned for M41)_
+
+The platform route `/recycle-bin` is the recycle bin, where a person restores the records they deleted
+and an administrator purges them. Anyone who is signed in may open it, and it lists only the records that the
+person may restore. The rules, the routes and the refusals are in [recycle bin](recycle-bin.md). Its texts are
+`shell.recycleBin.*`.
+
+- **The table.** It lists the records from `GET /api/tenant/recycle-bin`, oldest deletion first, 20 to a
+  page, in [the table](actions-and-controls.md#tables) that every list uses. A row shows the record by its
+  display value, or by its id when the person may not read the display field, then its entity, its
+  application, who deleted it and when, and when it will be purged. The record has no page of its own while
+  it is in the bin, so its name is not a link.
+- **Filter.** Filter, in the toolbar, finds records by application, entity, the time of the delete
+  and who deleted them. The address holds `filter`, `sort`, `page` and `pageSize`, so a reload or the Back
+  button keeps the view.
+- **Restore.** Each row has Restore…, which opens a confirmation titled "Restore the record?" that names the
+  record: "{record} comes back with its rows and files." A restore may start processes, which a delete cannot
+  take back, so it asks first. Only the confirmation's "Restore" button sends the restore. On success the row
+  leaves the table and a notice says "{record} restored." A refusal keeps the row and says why in the
+  person's language: another record now has the same value in the field, or a record that this one refers to
+  is in the recycle bin.
+- **Purge.** Purge…, for an administrator only, opens a confirmation titled "Purge the record?" that names it:
+  "{record} is removed for good. Its history stays. This cannot be undone." Only the confirmation's "Purge"
+  button sends the purge, and the button is a destructive action. A refusal says that a record in the
+  recycle bin refers to it.
+- **The period.** An administrator sees the setting above the table: how many days a deleted record stays,
+  from 1 to 365, with a Save button. It reads and writes the
+  [period](recycle-bin.md#the-period). A value outside the range is refused before anything is sent.
+  Another person does not see the setting.
+- **Empty.** An empty bin says "The recycle bin is empty."
+- **Refusals.** A failed load shows an error message.
+

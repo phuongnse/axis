@@ -125,34 +125,70 @@ internal static class PackageCalls
     public static async Task<LoadedPackageCall?> LoadAsync(NpgsqlTransaction transaction, Guid id, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
-            """
-            SELECT process_instance_id, step, release_id, package, version, operation, state, attempts,
-                   retry_attempts, retry_backoff, idempotent, input::text
-            FROM axis.package_calls WHERE id = @id FOR UPDATE
-            """,
+            $"SELECT {CallColumns} FROM axis.package_calls WHERE id = @id FOR UPDATE",
             Connection(transaction),
             transaction);
         command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? await ReadCallAsync(reader, cancellationToken) : null;
+    }
+
+    /// <summary>
+    /// Finds the call that holds the lease <paramref name="leaseId"/> and locks it until the transaction ends, or returns
+    /// <see langword="null"/> when no call does. The call's instance is locked first, as a cancel locks it before its calls, so a result and
+    /// a cancel cannot deadlock. The answer says which runner holds the lease and whether it has ended, by the database clock.
+    /// </summary>
+    public static async Task<LeasedPackageCall?> LockLeasedAsync(NpgsqlTransaction transaction, Guid leaseId, CancellationToken cancellationToken)
+    {
+        await using (var lockInstance = new NpgsqlCommand(
+            """
+            SELECT 1 FROM axis.process_instances
+            WHERE id = (SELECT process_instance_id FROM axis.package_calls WHERE lease_id = @lease) FOR UPDATE
+            """,
+            Connection(transaction),
+            transaction))
+        {
+            lockInstance.Parameters.AddWithValue("lease", leaseId);
+            await lockInstance.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using var command = new NpgsqlCommand(
+            $"SELECT {CallColumns}, lease_until, lease_until < now() FROM axis.package_calls WHERE lease_id = @lease FOR UPDATE",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("lease", leaseId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
             return null;
         }
 
-        return new LoadedPackageCall(
-            id,
+        var call = await ReadCallAsync(reader, cancellationToken);
+        return new LeasedPackageCall(call, reader.GetFieldValue<DateTimeOffset>(14), reader.GetBoolean(15));
+    }
+
+    private const string CallColumns =
+        """
+        id, process_instance_id, step, release_id, package, version, operation, state, attempts,
+        retry_attempts, retry_backoff, idempotent, input::text, runner_id
+        """;
+
+    /// <summary>Maps a row that selects <see cref="CallColumns"/> first.</summary>
+    private static async Task<LoadedPackageCall> ReadCallAsync(NpgsqlDataReader reader, CancellationToken cancellationToken) =>
+        new(
             reader.GetGuid(0),
-            reader.GetString(1),
-            reader.GetGuid(2),
-            reader.GetString(3),
+            reader.GetGuid(1),
+            reader.GetString(2),
+            reader.GetGuid(3),
             reader.GetString(4),
             reader.GetString(5),
             reader.GetString(6),
-            reader.GetInt32(7),
-            new RetryPolicyModel(reader.GetInt32(8), reader.GetFieldValue<TimeSpan>(9)),
-            reader.GetBoolean(10),
-            await reader.IsDBNullAsync(11, cancellationToken) ? null : reader.GetString(11));
-    }
+            reader.GetString(7),
+            reader.GetInt32(8),
+            new RetryPolicyModel(reader.GetInt32(9), reader.GetFieldValue<TimeSpan>(10)),
+            reader.GetBoolean(11),
+            await reader.IsDBNullAsync(12, cancellationToken) ? null : reader.GetString(12),
+            await reader.IsDBNullAsync(13, cancellationToken) ? null : reader.GetGuid(13));
 
     /// <summary>
     /// Marks the <c>pending</c> call <paramref name="id"/> <c>sending</c> and counts the attempt.
@@ -273,9 +309,133 @@ internal static class PackageCalls
         }
     }
 
+    /// <summary>
+    /// Finds the oldest <c>pending</c> call that the runner <paramref name="runnerId"/> may take and locks it until the transaction ends, or
+    /// returns <see langword="null"/> when there is none. The call's package and version must be in both <paramref name="heldJson"/> and
+    /// the runner's registered list, and it must have no <c>package.call</c> work item. A call that another transaction has locked, and
+    /// a call in <paramref name="skipped"/>, are passed over.
+    /// </summary>
+    public static async Task<TakeableCall?> FindTakeableAsync(
+        NpgsqlTransaction transaction,
+        Guid runnerId,
+        string heldJson,
+        Guid[] skipped,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT c.id, c.step, c.release_id, c.package, c.version, c.operation, c.input::text, i.process_id, c.process_instance_id
+            FROM axis.package_calls c
+            JOIN axis.process_instances i ON i.id = c.process_instance_id
+            WHERE c.state = @pending
+              AND EXISTS (
+                SELECT 1 FROM jsonb_to_recordset(@held) AS h(id text, version text)
+                WHERE h.id = c.package AND h.version = c.version)
+              AND EXISTS (
+                SELECT 1 FROM axis.package_runners r, jsonb_to_recordset(r.packages) AS p(id text, version text)
+                WHERE r.id = @runner AND r.revoked_at IS NULL AND p.id = c.package AND p.version = c.version)
+              AND NOT EXISTS (
+                SELECT 1 FROM axis.process_work_items w WHERE w.package_call_id = c.id AND w.kind = @kind)
+              AND c.id <> ALL(@skipped)
+            ORDER BY c.created_at, c.id
+            LIMIT 1
+            FOR UPDATE OF c SKIP LOCKED
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("pending", Pending);
+        command.Parameters.AddWithValue("runner", runnerId);
+        command.Parameters.Add(new NpgsqlParameter("held", NpgsqlDbType.Jsonb) { Value = heldJson });
+        command.Parameters.AddWithValue("kind", ProcessStarts.PackageCallWorkItemKind);
+        command.Parameters.Add(new NpgsqlParameter("skipped", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = skipped });
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return new TakeableCall(
+            reader.GetGuid(0),
+            reader.GetString(1),
+            reader.GetGuid(2),
+            reader.GetString(3),
+            reader.GetString(4),
+            reader.GetString(5),
+            await reader.IsDBNullAsync(6, cancellationToken) ? null : reader.GetString(6),
+            reader.GetGuid(7),
+            reader.GetGuid(8));
+    }
+
+    /// <summary>
+    /// Marks the <c>pending</c> call <paramref name="id"/> <c>sending</c>, counts the attempt and stores the runner, the lease and its end,
+    /// which is the database clock's now plus <paramref name="timeout"/>. Returns the end of the lease, or <see langword="null"/> when the call
+    /// is not pending.
+    /// </summary>
+    public static async Task<DateTimeOffset?> TakeAsync(
+        NpgsqlTransaction transaction,
+        Guid id,
+        Guid runnerId,
+        Guid leaseId,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.package_calls
+            SET state = @sending, attempts = attempts + 1, runner_id = @runner, lease_id = @lease, lease_until = now() + @timeout
+            WHERE id = @id AND state = @pending
+            RETURNING lease_until
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("runner", runnerId);
+        command.Parameters.AddWithValue("lease", leaseId);
+        command.Parameters.Add(new NpgsqlParameter("timeout", NpgsqlDbType.Interval) { Value = timeout });
+        command.Parameters.AddWithValue("sending", Sending);
+        command.Parameters.AddWithValue("pending", Pending);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? await reader.GetFieldValueAsync<DateTimeOffset>(0, cancellationToken) : null;
+    }
+
+    /// <summary>
+    /// Deletes the <c>package.call</c> work items of the call <paramref name="callId"/>, which hold it back from a take or end a runner's lease.
+    /// </summary>
+    public static async Task DeleteItemsAsync(NpgsqlTransaction transaction, Guid callId, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "DELETE FROM axis.process_work_items WHERE package_call_id = @call AND kind = @kind",
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("call", callId);
+        command.Parameters.AddWithValue("kind", ProcessStarts.PackageCallWorkItemKind);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static NpgsqlConnection Connection(NpgsqlTransaction transaction) =>
         transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
 }
+
+/// <summary>A <c>pending</c> call that a customer-hosted runner may take, as <see cref="PackageCalls.FindTakeableAsync"/> reads it.</summary>
+/// <param name="Id">The call's operation identity.</param>
+/// <param name="Step">The declared name of the package operation step.</param>
+/// <param name="ReleaseId">The release the instance is pinned to.</param>
+/// <param name="Package">The package id.</param>
+/// <param name="Version">The pinned package version.</param>
+/// <param name="Operation">The operation's declared name.</param>
+/// <param name="Input">The stored input as JSON text.</param>
+/// <param name="ProcessId">The process of the call's instance.</param>
+/// <param name="ProcessInstanceId">The call's instance.</param>
+internal sealed record TakeableCall(
+    Guid Id,
+    string Step,
+    Guid ReleaseId,
+    string Package,
+    string Version,
+    string Operation,
+    string? Input,
+    Guid ProcessId,
+    Guid ProcessInstanceId);
 
 /// <summary>A package call that a package operation step stages for its instance.</summary>
 /// <param name="Id">The call's operation identity, a version 7 UUID.</param>
@@ -299,6 +459,12 @@ internal sealed record NewPackageCall(
     bool Idempotent,
     JsonObject Input);
 
+/// <summary>A call found by its lease, as <see cref="PackageCalls.LockLeasedAsync"/> reads it.</summary>
+/// <param name="Call">The call, whose <see cref="LoadedPackageCall.RunnerId"/> is the runner that holds the lease.</param>
+/// <param name="LeaseUntil">The end of the lease.</param>
+/// <param name="Ended">Whether the end of the lease has passed by the database clock.</param>
+internal sealed record LeasedPackageCall(LoadedPackageCall Call, DateTimeOffset LeaseUntil, bool Ended);
+
 /// <summary>A package call as the worker that runs it loads it.</summary>
 /// <param name="Id">The call's operation identity.</param>
 /// <param name="Package">The package id.</param>
@@ -308,6 +474,7 @@ internal sealed record NewPackageCall(
 /// <param name="Retry">The retry policy stored when the call was staged.</param>
 /// <param name="Idempotent">Whether the operation is idempotent, stored when the call was staged.</param>
 /// <param name="Input">The stored input as JSON text, or <see langword="null"/> once the call settled.</param>
+/// <param name="RunnerId">The customer-hosted runner that last took the call, or <see langword="null"/> when none did. Only a take sets it.</param>
 internal sealed record LoadedPackageCall(
     Guid Id,
     Guid ProcessInstanceId,
@@ -320,4 +487,5 @@ internal sealed record LoadedPackageCall(
     int Attempts,
     RetryPolicyModel Retry,
     bool Idempotent,
-    string? Input);
+    string? Input,
+    Guid? RunnerId);

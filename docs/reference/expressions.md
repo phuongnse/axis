@@ -19,7 +19,7 @@ Each use is type-checked by the compiler and runs on one back end:
 
 | Use                                                                                                                        | Runs on                                                                                                                                           |
 | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Entity [validations](resource-files.md#entity-logic) and [computed fields](resource-files.md#entity-logic), field defaults | The interpreter, when the record API writes a record                                                                                              |
+| Entity [validations](entity-logic-and-sequences.md#entity-logic) and [computed fields](entity-logic-and-sequences.md#entity-logic), field defaults | The interpreter, when the record API writes a record                                                                                              |
 | Named [rules](resource-files.md#resource-file-shape)                                                                       | The interpreter runs the rule's expression for a caller it evaluates, and a filter's SQL inlines it                                               |
 | Data source [filters](data-sources.md#resource-shape) and measure filters                                                  | SQL, which the data source endpoint runs                                                                                                          |
 | [Policy](roles-and-policies.md) filters                                                                                    | SQL, which the record API and the data source endpoint run                                                                                        |
@@ -318,6 +318,9 @@ Each use has its own scope:
     [collections through a path](#collections-through-a-path-and-the-outer-record).
   - A process without a subject sees its parameters and the named rules instead. See
     [processes](processes.md#steps) and [process flow](process-flow.md).
+  - **Variables and passes.** _(planned for M38)_ A process reads its
+    [variables](processes.md#variables) by name. A [repeat's](process-blocks.md#repeat-step) body reads
+    its pass as `<as>.item` and `<as>.number`.
 - **Scope in a navigate action.** On a table row, bare names are the row's columns, or the record's
   fields for a table over an entity, and on a form and a detail they are the record's fields. In a
   table's toolbar there are no names. The scope has no rules and no aggregates.
@@ -355,6 +358,9 @@ signatures, `n` is an integer or a decimal. Unless the table says otherwise, a f
 | `day(date)`                 | integer               | date    | 1 to 31.                                                                                                                                                                                                                                                                      | Yes |
 | `addDays(date, integer)`    | date                  | date    | A result outside 0001 to 9999 is a [run-time error](#run-time-errors).                                                                                                                                                                                                        | Yes |
 | `daysBetween(date, date)`   | integer               | date    | Second minus first.                                                                                                                                                                                                                                                           | Yes |
+| `addWorkingTime(date-time, text, text)` | date-time             | date    | Adds working time to an instant. The second argument is an ISO 8601 duration of hours, minutes and seconds, written as a text literal, otherwise the compiler refuses it. The third is a calendar name. See [working time](working-time.md#durations-in-working-time). _(planned for M39)_ | No |
+| `workingTimeBetween(date-time, date-time, text)` | integer               | date    | The minutes of working time on the calendar named by the text, second minus first. See [working time](working-time.md#durations-in-working-time). _(planned for M39)_ | No |
+| `isWorkingDay(date, text)`  | boolean               | date    | Tells whether the date is a working day of the calendar named by the text. See [working time](working-time.md#days-off-and-make-up-days). _(planned for M39)_ | No |
 | `coalesce(a, b, …)`         | type of the arguments | logic   | First argument that is not `null`. The arguments after it are not evaluated. All arguments fit each other under the rules of `==`. An integer and a decimal mix to a decimal, so a picked integer comes back as a decimal. A listed text literal and an enum mix to the enum. | Yes |
 | `if(condition, then, else)` | type of the branches  | logic   | A `null` condition picks `else`. Only the picked branch is evaluated. The branches fit each other under the rules of `==`. An integer and a decimal mix to a decimal, so a picked integer comes back as a decimal.                                                            | Yes |
 | `date(text literal)`        | date                  | date    | See [Literals](#literals).                                                                                                                                                                                                                                                    | Yes |
@@ -369,10 +375,14 @@ signatures, `n` is an integer or a decimal. Unless the table says otherwise, a f
 
 - **Dates.** The date functions work on `date` only, not on `date-time`. Taking a calendar day from
   an instant needs a time zone, so `toDate` does it.
+- **Working time** _(planned for M39)_. The calendar name is any text expression, and an unknown name is a
+  [run-time error](#run-time-errors). These functions read days off that change without a publish, so a
+  computed field, whose value is stored, cannot call them, and the SQL subset has none of them. See
+  [working time and SLAs](working-time.md).
 - **Text.** The text functions take `text` only. An enum value is not text to them, because no
   conversion is implicit except integer to decimal.
 - **The application time zone.** `today()` and `toDate(date-time)` use the
-  [application time zone](resource-files.md#application-time-zone), which is `UTC` when the
+  [application time zone](entity-logic-and-sequences.md#application-time-zone), which is `UTC` when the
   application names none. The time zone is part of the release, so a change applies to work that
   runs on the new release. The SQL translation converts with `AT TIME ZONE` and the time zone id as
   a bound parameter, so the interpreter and SQL agree. For example, at 18:00 UTC on 31 December
@@ -669,7 +679,7 @@ field defaults, data source filters, [process](processes.md#resource-shape) cond
 ```
 
 The property name above is only an example. For `expression` on a field, on a validation and on a
-rule, see [Entity logic](resource-files.md#entity-logic), and for `filter` on a data source, see
+rule, see [Entity logic](entity-logic-and-sequences.md#entity-logic), and for `filter` on a data source, see
 [data sources](data-sources.md#resource-shape).
 
 - **Quotes.** Text literals use single quotes, so they need no JSON escaping.

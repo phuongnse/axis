@@ -172,7 +172,8 @@ test.describe('Studio creates a resource from a starter', () => {
     await field.getByRole('textbox').fill('length(name)')
     await expect(field.locator('.cm-lintRange-error')).toHaveCount(0)
     await expect(field.getByTestId('studio-expression-error')).toHaveCount(0)
-    await expect(field.getByTestId('studio-expression-type')).toContainText('Gives a whole number')
+    await expect(field.getByTestId('studio-expression-reading')).toBeVisible()
+    await expect(field.getByTestId('studio-expression-type')).toHaveCount(0)
   })
 
   test('an author builds money, file, references and labelled enum fields in the designer', async ({ page }) => {
@@ -300,7 +301,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await page.getByRole('textbox', { name: 'Client ID', exact: true }).fill('PartnerClientId')
     await page.getByRole('textbox', { name: 'Client secret', exact: true }).fill('PartnerClientSecret')
     await writeLabel(page, 'studio-field-/label', { en: 'Continue with Partner' })
-    await page.getByRole('button', { name: 'Add role', exact: true }).click()
+    await page.getByRole('button', { name: 'Add claim value', exact: true }).click()
     const row = page.getByTestId('studio-role-row-0')
     await row.getByRole('textbox').fill('managers')
     await pickOption(row.getByRole('combobox'), 'Department manager', 'department-manager')
@@ -372,29 +373,33 @@ test.describe('Studio creates a resource from a starter', () => {
     await textbox('Path').fill('/warehouses/{warehouse}/shipments')
 
     for (let index = 0; index < 3; index++) {
-      await page.getByRole('button', { name: 'Add input field', exact: true }).click()
+      await page.getByRole('button', { name: 'Add input', exact: true }).click()
     }
-    await row(0).getByRole('textbox', { name: 'Input name', exact: true }).fill('warehouse')
-    await pickOption(row(0).getByRole('combobox', { name: 'Input placement', exact: true }), 'path')
+    await row(0).getByRole('textbox', { name: 'Name', exact: true }).fill('warehouse')
+    await pickOption(row(0).getByRole('combobox', { name: 'Sent in', exact: true }), 'path')
     await row(0).getByRole('checkbox', { name: 'Required', exact: true }).check()
 
-    await row(1).getByRole('textbox', { name: 'Input name', exact: true }).fill('dryRun')
-    await pickOption(row(1).getByRole('combobox', { name: 'Input type', exact: true }), 'boolean')
-    await pickOption(row(1).getByRole('combobox', { name: 'Input placement', exact: true }), 'query')
+    await row(1).getByRole('textbox', { name: 'Name', exact: true }).fill('dryRun')
+    await pickOption(row(1).getByRole('combobox', { name: 'Type', exact: true }), 'boolean')
+    await pickOption(row(1).getByRole('combobox', { name: 'Sent in', exact: true }), 'query')
 
-    await row(2).getByRole('textbox', { name: 'Input name', exact: true }).fill('lines')
-    await pickOption(row(2).getByRole('combobox', { name: 'Input type', exact: true }), 'list')
+    await row(2).getByRole('textbox', { name: 'Name', exact: true }).fill('lines')
+    await pickOption(
+      page.getByTestId('studio-field-/operations/0/input/2/type').getByRole('combobox', { name: 'Type', exact: true }),
+      'list',
+    )
     await expect(page.getByTestId('studio-field-/operations/0/input/2/in')).toHaveCount(0)
-    await nested(0).getByRole('textbox', { name: 'Field name', exact: true }).fill('sku')
+    await nested(0).getByRole('textbox', { name: 'Name', exact: true }).fill('sku')
     await nested(0).getByRole('checkbox', { name: 'Required', exact: true }).check()
     await row(2).getByRole('button', { name: 'Add nested field', exact: true }).click()
-    await nested(1).getByRole('textbox', { name: 'Field name', exact: true }).fill('quantity')
-    await pickOption(nested(1).getByRole('combobox', { name: 'Field type', exact: true }), 'integer')
+    await nested(1).getByRole('textbox', { name: 'Name', exact: true }).fill('quantity')
+    await pickOption(nested(1).getByRole('combobox', { name: 'Type', exact: true }), 'integer')
     await nested(1).getByRole('checkbox', { name: 'Required', exact: true }).check()
 
-    await page.getByRole('button', { name: 'Add output field', exact: true }).click()
-    await textbox('Output name').fill('trackingNumber')
-    await textbox('Output source').fill('/shipment/tracking/number')
+    await page.getByRole('button', { name: 'Add output', exact: true }).click()
+    const output = page.getByTestId('studio-field-/operations/0/output/0')
+    await output.getByRole('textbox', { name: 'Name', exact: true }).fill('trackingNumber')
+    await output.getByRole('textbox', { name: 'Read from', exact: true }).fill('/shipment/tracking/number')
 
     const diagnostics = await save(page)
     expect(diagnostics.filter((diagnostic) => diagnostic.file.includes('connectors/warehouse-shipping.json'))).toEqual([])

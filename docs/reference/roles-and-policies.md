@@ -154,7 +154,11 @@ outcomes. Operators inspect the approvals and change nothing:
   - a `dataSource` takes `read` and `export`;
   - a `process` takes `start`, `inspect`, `cancel`, `retry`, `resolve` and
     `reassign`, see [Reassign](task-deadlines.md#reassign);
-  - an `endpoint` takes `invoke`.
+  - an `endpoint` takes `invoke`;
+  - **a `calendar`** _(planned for M39)_ takes `read` and `update`, see
+    [days off and make-up days](working-time.md#days-off-and-make-up-days).
+  - **`comment` and `internalComments`** _(planned for M43)_ take the comment actions of an entity, see
+    [record comments](comments.md#record-comments).
   - `export` stays within the user's `read` grants and `import` within their
     `create` and `update` grants, as [import and export](import-export.md#grants)
     says.
@@ -202,10 +206,10 @@ grant lets a machine caller invoke an inbound endpoint. Neither takes a
 `filter` or `fields`.
 
 The `cancel` action of a `process` grant lets a user cancel that process's
-instances, see [Cancel](process-inspection.md#cancel). The `retry` action lets a user
-retry its failed instances, see [Retry](process-inspection.md#retry). The `resolve`
+instances, see [Cancel](process-operator-commands.md#cancel). The `retry` action lets a user
+retry its failed instances, see [Retry](process-operator-commands.md#retry). The `resolve`
 action lets a user settle an unknown connector call, see
-[Resolve](process-inspection.md#resolve). That covers a connector call and a package call.
+[Resolve](process-operator-commands.md#resolve). That covers a connector call and a package call.
 Each is checked on its own, and none implies another, and `start` implies none
 of them. The finance reviewer policy above lets its reviewers inspect, cancel,
 retry and resolve an approval. An operator role that may retry, cancel and
@@ -319,7 +323,7 @@ A field declares it with `"creator": true`, and policies test it, for example
   session, in the create's transaction. A create by the system or by seed
   data leaves it `null`.
 - **Not writable.** Clients cannot write it, as for a
-  [sequence](resource-files.md#sequences) field. A body that sets it on create or update, even
+  [sequence](entity-logic-and-sequences.md#sequences) field. A body that sets it on create or update, even
   to `null`, is a `400` at its pointer with the message "Cannot be set.". A
   seed value for it is `AXC0033`.
 - **Allowed fields.** `creator` is allowed only on a `text` field. It cannot

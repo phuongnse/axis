@@ -47,6 +47,8 @@ public static class ExpressionTypeChecker
                 new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance),
                 new HashSet<MemberNode>(ReferenceEqualityComparer.Instance),
                 new HashSet<MemberNode>(ReferenceEqualityComparer.Instance),
+                new Dictionary<ExpressionNode, ExpressionType>(ReferenceEqualityComparer.Instance),
+                new Dictionary<ExpressionNode, ExpressionScopeField>(ReferenceEqualityComparer.Instance),
                 storedValue,
                 currentUser,
                 contract,
@@ -71,6 +73,8 @@ public static class ExpressionTypeChecker
                 PathTargets = context.PathTargets,
                 CollectionPaths = context.CollectionPaths,
                 OuterReads = context.OuterReads,
+                Types = context.Types,
+                Fields = context.Fields,
             };
         }
         catch (CheckFailure failure)
@@ -106,9 +110,13 @@ public static class ExpressionTypeChecker
     private static ExpressionType Infer(ExpressionNode node, Context context)
     {
         var type = InferAny(node, context);
-        return type.Kind == ExpressionTypeKind.File
-            ? throw Fail(ExpressionDiagnosticCodes.TypeMismatch, "A file allows only 'is null' and 'is not null'", node.Offset)
-            : type;
+        if (type.Kind == ExpressionTypeKind.File)
+        {
+            throw Fail(ExpressionDiagnosticCodes.TypeMismatch, "A file allows only 'is null' and 'is not null'", node.Offset);
+        }
+
+        context.Types[node] = type;
+        return type;
     }
 
     private static ExpressionType InferAny(ExpressionNode node, Context context) => node switch
@@ -132,6 +140,11 @@ public static class ExpressionTypeChecker
     {
         if (context.Scope.TryGetField(name.Name, out var type))
         {
+            if (context.Scope.TryGetScopeField(name.Name, out var field))
+            {
+                context.Fields[name] = field;
+            }
+
             return type;
         }
 
@@ -166,12 +179,14 @@ public static class ExpressionTypeChecker
         }
 
         var target = PathTarget(member, context);
-        if (!PathScope(member, context).TryGetReferenceField(target, member.Name, out var type))
+        var pathScope = PathScope(member, context);
+        if (!pathScope.TryGetReferenceField(target, member.Name, out var type))
         {
             throw Fail(ExpressionDiagnosticCodes.UnknownName, $"Unknown field '{member.Name}' of '{target.Source}'", member.Offset);
         }
 
         context.PathTargets[member] = target.Source ?? "";
+        context.Fields[member] = pathScope.ReferenceScopeField(target, member.Name, type);
         return type;
     }
 
@@ -189,6 +204,11 @@ public static class ExpressionTypeChecker
         if (outer.TryGetField(member.Name, out var type))
         {
             context.OuterReads.Add(member);
+            if (outer.TryGetScopeField(member.Name, out var field))
+            {
+                context.Fields[member] = field;
+            }
+
             return type;
         }
 
@@ -843,7 +863,7 @@ public static class ExpressionTypeChecker
 
     /// <summary>
     /// What one check carries down the tree: the scope, the decimal calls, rule calls, path
-    /// steps and collection paths found so far, whether the expression computes a stored value, whether it is a
+    /// steps, collection paths, node types and resolved fields found so far, whether the expression computes a stored value, whether it is a
     /// policy filter, whether it is a module contract's expression, whether it is the set of a step that writes a record, whether it is an aggregate's
     /// item expression, and the scope of the record the whole expression runs on while it is.
     /// </summary>
@@ -854,6 +874,8 @@ public static class ExpressionTypeChecker
         Dictionary<MemberNode, string> PathTargets,
         HashSet<MemberNode> CollectionPaths,
         HashSet<MemberNode> OuterReads,
+        Dictionary<ExpressionNode, ExpressionType> Types,
+        Dictionary<ExpressionNode, ExpressionScopeField> Fields,
         bool StoredValue,
         bool CurrentUser,
         bool Contract,

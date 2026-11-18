@@ -523,6 +523,14 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("last_error");
 
+                    b.Property<Guid?>("LeaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_id");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_until");
+
                     b.Property<string>("Operation")
                         .IsRequired()
                         .HasColumnType("text")
@@ -553,6 +561,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnName("retry_backoff")
                         .HasDefaultValueSql("'30 seconds'::interval");
 
+                    b.Property<Guid?>("RunnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("runner_id");
+
                     b.Property<DateTimeOffset?>("SettledAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("settled_at");
@@ -578,6 +590,10 @@ namespace Axis.Processes.Storage.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_package_calls");
+
+                    b.HasIndex("LeaseId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_package_calls_lease_id");
 
                     b.HasIndex("ProcessInstanceId", "Step", "StagedRevision")
                         .IsUnique()

@@ -90,7 +90,7 @@ test.describe("Studio edits a module process as a layer", () => {
     await expect(page.getByTestId("studio-saved")).toBeVisible();
     await expect(page.getByTestId("studio-module-layer")).toBeVisible();
     await expect(
-      page.getByRole("note", { name: "Changed check", exact: true }),
+      page.getByRole("note", { name: "check, changed by this application", exact: true }),
     ).toBeVisible();
     await expect(page.getByTestId("studio-graph-node-2")).toHaveAccessibleName(
       "end1, end, Added",

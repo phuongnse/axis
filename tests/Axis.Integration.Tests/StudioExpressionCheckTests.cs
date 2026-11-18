@@ -64,6 +64,7 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
 
         Assert.Equal(type, answer.RootElement.GetProperty("type").GetString());
         Assert.Equal(0, answer.RootElement.GetProperty("diagnostics").GetArrayLength());
+        Assert.NotEqual(JsonValueKind.Null, answer.RootElement.GetProperty("reading").ValueKind);
         using var diagnostics = await _studio.GetJsonAsync("/api/studio/apps/PurchaseRequests/diagnostics");
         Assert.DoesNotContain(
             diagnostics.RootElement.GetProperty("diagnostics").EnumerateArray(),
@@ -80,12 +81,82 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
         using var answer = await _studio.CheckAsync(await _studio.IdOfAsync(File), "/validations/0/expression", "quantity > 'x'");
 
         Assert.Equal(JsonValueKind.Null, answer.RootElement.GetProperty("type").ValueKind);
+        Assert.Equal(JsonValueKind.Null, answer.RootElement.GetProperty("reading").ValueKind);
         var diagnostic = Assert.Single(answer.RootElement.GetProperty("diagnostics").EnumerateArray());
         Assert.Equal("AXC0047", diagnostic.GetProperty("code").GetString());
         Assert.Equal(9, diagnostic.GetProperty("start").GetInt32());
         Assert.Equal(10, diagnostic.GetProperty("end").GetInt32());
         Assert.Equal(before, Hash(File));
         Assert.Equal(versionBefore, await _studio.VersionOfAsync(File));
+    }
+
+    [Fact]
+    public async Task A_valid_expression_answers_its_reading_as_groups_and_phrases_with_label_keys_and_a_diagnostic_answers_none()
+    {
+        const string File = "entities/purchase-request.json";
+        var draft = JsonNode.Parse(System.IO.File.ReadAllText(Path.Combine(_studio.Folder, File)))!.AsObject();
+        var fields = draft["fields"]!.AsArray();
+        fields.Add(new JsonObject { ["name"] = "amount", ["type"] = "decimal", ["label"] = new JsonObject { ["textKey"] = "purchaseRequest.amount" } });
+        fields.Add(new JsonObject { ["name"] = "urgent", ["type"] = "boolean", ["label"] = new JsonObject { ["textKey"] = "purchaseRequest.urgent" } });
+        fields.Add(new JsonObject { ["name"] = "dueDate", ["type"] = "date", ["label"] = new JsonObject { ["textKey"] = "purchaseRequest.dueDate" } });
+        var status = fields.Select(field => field!.AsObject()).Single(field => field["name"]!.GetValue<string>() == "status");
+        var valueLabels = new JsonObject();
+        foreach (var value in status["values"]!.AsArray())
+        {
+            valueLabels[value!.GetValue<string>()] = new JsonObject { ["textKey"] = $"purchaseRequest.status.{value.GetValue<string>()}" };
+        }
+
+        status["valueLabels"] = valueLabels;
+        var id = await _studio.IdOfAsync(File);
+
+        var second = draft.DeepClone().AsObject();
+        using var answer = await _studio.CheckAsync(
+            id, "/validations/0/expression", "(status == 'draft' and amount >= 1000) or not (urgent or dueDate < today())", draft);
+
+        Assert.Equal("boolean", answer.RootElement.GetProperty("type").GetString());
+        var any = answer.RootElement.GetProperty("reading");
+        Assert.Equal("any", any.GetProperty("kind").GetString());
+        var items = any.GetProperty("items");
+        Assert.Equal(2, items.GetArrayLength());
+        var all = items[0];
+        Assert.Equal("all", all.GetProperty("kind").GetString());
+        var none = items[1];
+        Assert.Equal("none", none.GetProperty("kind").GetString());
+
+        var equal = all.GetProperty("items")[0];
+        Assert.Equal("phrase", equal.GetProperty("kind").GetString());
+        Assert.Equal("equal", equal.GetProperty("words").GetString());
+        AssertName(equal.GetProperty("slots")[0][0], "status", "purchaseRequest.status");
+        var draftValue = equal.GetProperty("slots")[1][0];
+        Assert.Equal("value", draftValue.GetProperty("kind").GetString());
+        Assert.Equal("enum", draftValue.GetProperty("type").GetString());
+        Assert.Equal("draft", draftValue.GetProperty("value").GetString());
+        Assert.Equal("purchaseRequest.status.draft", draftValue.GetProperty("labelKey").GetString());
+
+        var atLeast = all.GetProperty("items")[1];
+        Assert.Equal("greater-or-equal", atLeast.GetProperty("words").GetString());
+        AssertName(atLeast.GetProperty("slots")[0][0], "amount", "purchaseRequest.amount");
+        Assert.Equal(1000, atLeast.GetProperty("slots")[1][0].GetProperty("value").GetInt32());
+
+        var urgent = none.GetProperty("items")[0];
+        Assert.Equal("is-true", urgent.GetProperty("words").GetString());
+        AssertName(urgent.GetProperty("slots")[0][0], "urgent", "purchaseRequest.urgent");
+        var before = none.GetProperty("items")[1];
+        Assert.Equal("less.date", before.GetProperty("words").GetString());
+        AssertName(before.GetProperty("slots")[0][0], "dueDate", "purchaseRequest.dueDate");
+        Assert.Equal("fn.today", before.GetProperty("slots")[1][0].GetProperty("words").GetString());
+
+        using var wrong = await _studio.CheckAsync(id, "/validations/0/expression", "amount > 'x'", second);
+
+        Assert.Single(wrong.RootElement.GetProperty("diagnostics").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, wrong.RootElement.GetProperty("reading").ValueKind);
+    }
+
+    private static void AssertName(JsonElement part, string name, string labelKey)
+    {
+        Assert.Equal("name", part.GetProperty("kind").GetString());
+        Assert.Equal(name, part.GetProperty("name").GetString());
+        Assert.Equal(labelKey, part.GetProperty("labelKey").GetString());
     }
 
     [Fact]
@@ -328,6 +399,7 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
             Assert.False(string.IsNullOrEmpty(function.GetProperty("result").GetString()));
             Assert.False(string.IsNullOrEmpty(function.GetProperty("group").GetString()));
             Assert.False(string.IsNullOrEmpty(function.GetProperty("example").GetString()));
+            Assert.Equal("fn." + function.GetProperty("name").GetString(), function.GetProperty("words").GetString());
         }
     }
 

@@ -33,8 +33,39 @@ and revision, and `step`, the step it runs next.
   starts with null, and a sub-process's with its parent's values. An instance that a data change
   trigger or an event trigger starts holds the accountable user of the write or event that fired it,
   and no deciding task.
+- **Variables.** _(planned for M38)_ A `variables` `jsonb` column holds the values of the instance's
+  [variables](processes.md#variables) by name. A variable starts as `null`, or as an empty list for a
+  list variable. The column is never copied to history, audit records or logs, and inspection shows it
+  only under the [masking rule](process-inspection.md#values-and-masking).
 - Three more indexes serve the inspector's instance list: one by application, process and start time,
   newest first, one by application, process, state and start time, and one by subject record.
+
+### Paths
+
+_(planned for M38)_
+
+`axis.process_paths` holds one row per path that a block starts, see
+[paths](process-execution.md#paths). The instance is the root path, so its `step`, `revision` and state
+stay on `axis.process_instances` and the root path has no row here.
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `id` | `uuid` | A version 7 UUID |
+| `process_instance_id` | `uuid` | The instance |
+| `parent_path_id` | `uuid`, null | The path that waits on the block that started this one. Null when that path is the root path |
+| `block` | `text` | The declared name of the `parallel` or `repeat` step that started the path |
+| `branch` | `text`, null | The name of the branch. Null for a pass |
+| `pass` | `integer`, null | The number of the pass, counted from 1. Null for a branch |
+| `item` | `jsonb`, null | The item of the pass: the id of a child row or a referenced record, or a row of a data source. Null for a branch and for a pass of `times`, `while` or `until` |
+| `state` | `text` | `running`, `waiting`, `completed`, `failed` or `cancelled`, see [path states](process-states.md#path-states) |
+| `step` | `text`, null | The declared name of the step the path runs next. Null for a pass that waits for its turn and for a path that has ended |
+| `revision` | `bigint` | The path's revision. It starts at 1 and goes up each time the path changes, as an instance's does |
+| `gathered` | `jsonb`, null | The value that the pass gives to the repeat's `gather`. Null until the pass ends, and for a pass that skipped its item |
+| `created_at` | `timestamptz` | The start of the transaction that inserted the row, `now()` |
+| `ended_at` | `timestamptz`, null | When the path became `completed`, `failed` or `cancelled`. Null before |
+
+An index on `process_instance_id` and `state` finds the paths that still run. The `revision` of a
+step history row, a work item and a call is that of its path, and the instance's for the root path.
 
 ### Step history
 
@@ -45,6 +76,8 @@ and revision, and `step`, the step it runs next.
 | `id` | `uuid` | A version 7 UUID |
 | `process_instance_id` | `uuid` | The instance |
 | `step` | `text` | The declared name of the step |
+| `path_id` _(planned for M38)_ | `uuid`, null | The [path](#paths) the step ran on. Null for the root path |
+| `pass` _(planned for M38)_ | `integer`, null | The `pass` of that path. Null when the path is not a pass |
 | `revision` | `bigint` | The instance revision the step ran at |
 | `input` | `jsonb` | `{ "subjectId", "subjectVersion" }`: the subject record and the version the step read. For a task completion, the version its values were written over, or `null` without values. It holds no field values |
 | `output` | `jsonb`, null | What the step wrote, by step and event, as [History output](#history-output) lists. Null for a failed step |
@@ -67,15 +100,24 @@ The `output` column holds what each step or event wrote:
 | Task whose deadline expired it | `{ "taskId", "next" }` |
 | Task escalation | `{ "escalation" }`, the escalation's index, plus `notificationId` when it notified, see [Escalations and deadline](task-deadlines.md#escalations-and-deadline) |
 | `end` step | `{ "state": "completed" }` |
+| `parallel` or `repeat` step that started its paths _(planned for M38)_ | `{ "state": "waiting" }` |
+| `end` step that ends a path _(planned for M38)_ | `{ "state": "completed" }`, plus `"skipped": true` for an `end` that skips its pass |
+| Path that its block cancelled _(planned for M38)_ | `{ "state": "cancelled", "block" }`, with the name of the block |
+| Step that took an error path _(planned for M38)_ | `{ "error", "next" }` |
+| `setVariables` operation _(planned for M38)_ | `{ "next", "variables" }`, with the names of the variables it set and no value |
+| Task answer that did not decide a task for several people _(planned for M38)_ | `{ "taskId", "outcome" }` |
+| Task answer that decided it _(planned for M38)_ | `{ "taskId", "outcome", "decided": true, "next" }` |
 | `callConnector` or package operation step that staged its call | `{ "state": "waiting", "operationId" }` |
 | Call that succeeds | `{ "operationId", "outcome", "next" }`, plus `subjectVersion` when it wrote output fields |
 | Call that fails | `{ "operationId", "outcome": "failed" }` |
 | Connector call left unknown with no lookup, and package call left unknown | `{ "operationId", "outcome": "unknown" }` |
 | `raiseEvent` step | `{ "next", "eventId" }`, with the occurrence it stored |
+| `notify` operation | `{ "next", "notificationId" }`, with the id that the step run's notification and its emails share, see [Notify operation](notifications.md#notify-operation) |
 | `timer` step | `{ "state": "waiting", "dueAt" }`, and `{ "next" }` when its timer resumes the instance |
 | `waitEvent`, `subProcess` and `createRecord` steps | As [process flow](process-flow.md) says for each step |
 | Operator cancel | `{ "command": "cancel" }` |
 | Operator retry | `{ "command": "retry" }` |
+| Operator cancel of one task _(planned for M38)_ | `{ "command": "cancel", "taskId" }` |
 | Call an operator resolved as succeeded | `{ "operationId", "outcome", "next", "resolved": true }`, plus `subjectVersion` when it wrote output fields |
 | Call an operator resolved as failed | `{ "operationId", "outcome": "failed", "resolved": true }` |
 | Failed step | Null |
@@ -101,6 +143,9 @@ The `output` column holds what each step or event wrote:
   kind but `process.timer`, `task_id`, a foreign key to the task, the nullable integer `escalation`,
   `connector_call_id`, `package_call_id`, `event_id`, `trigger_id`, `release_id`, `occurrence_at`,
   `cursor`, `email_id`, `webhook_delivery_id` and `entity_id`.
+
+**Paths.** _(planned for M38)_ A `path_id` column, null for the root path, names the path of a `process.step`
+or `process.timer` item. Items of other kinds name their path through their task or call.
 
 | Kind | Its own columns | What it does |
 | --- | --- | --- |
@@ -143,13 +188,16 @@ assignee finds the open tasks of a user id or a role name.
 | `release_id` | `uuid` | The release the instance is pinned to |
 | `application_id` | `uuid` | The application |
 | `step` | `text` | The declared name of the task step |
+| `path_id` _(planned for M38)_ | `uuid`, null | The [path](#paths) the task step ran on. Null for the root path |
+| `pass` _(planned for M38)_ | `integer`, null | The `pass` of that path. Null when the path is not a pass |
+| `group_id` _(planned for M38)_ | `uuid`, null | The id that the tasks of one task step for several people share, see [a task for several people](task-api.md#a-task-for-several-people). Null for a task for one person or one role. An index on it finds a group's tasks |
 | `subject_entity_id` | `uuid` | The subject entity |
 | `subject_id` | `uuid` | The subject record |
 | `assignee_kind` | `text` | `user` or `role` |
 | `assignee` | `text` | The user id that the `user` expression gave, or the role name |
 | `form_id` | `uuid` | The id of the step's form |
 | `due_at` | `timestamptz`, null | `created_at` plus `dueIn`, or null when the step has no `dueIn` |
-| `state` | `text` | `open`, `completed`, `cancelled` or `expired` |
+| `state` | `text` | `open`, `completed`, `cancelled` or `expired`. _(planned for M38)_ Also `closed`, see [task states](process-states.md#task-states) |
 | `outcome` | `text`, null | The outcome the task was completed with. Null while it is `open`, and for a `cancelled` or `expired` task |
 | `completed_by` | `text`, null | The user who completed the task. Null while it is `open`, and for a `cancelled` or `expired` task |
 | `completed_at` | `timestamptz`, null | When the task was completed. Null while it is `open`, and for a `cancelled` or `expired` task |
@@ -166,11 +214,17 @@ assignee finds the open tasks of a user id or a role name.
 There is no column for a request or response body. Each call attempt row stores the `trace_id` of its
 attempt, see [Telemetry](../architecture.md#telemetry).
 
+**Paths.** _(planned for M38)_ The unique index is on (`process_instance_id`, `path_id`, `step`,
+`staged_revision`), where `staged_revision` is the path's revision, so a call is known by its step, its path
+and its pass. The index treats a null `path_id`, the root path, as one value.
+
 | Column | Type | Meaning |
 | --- | --- | --- |
 | `id` | `uuid` | A version 7 UUID, the call's operation identity. Every attempt and every lookup sends it as the idempotency key |
 | `process_instance_id` | `uuid` | The instance |
 | `step` | `text` | The declared name of the `callConnector` step |
+| `path_id` _(planned for M38)_ | `uuid`, null | The [path](#paths) the step ran on. Null for the root path |
+| `pass` _(planned for M38)_ | `integer`, null | The `pass` of that path. Null when the path is not a pass |
 | `staged_revision` | `bigint` | The instance revision the step ran at. A retry restage sets it to the new run's revision |
 | `release_id` | `uuid` | The release the instance is pinned to |
 | `connector` | `text` | The connector's name |
@@ -215,11 +269,16 @@ column for a request or response body.
 [loop](process-flow.md#loops). There is no column for an output. Each call attempt row stores the
 `trace_id` of its attempt, see [Telemetry](../architecture.md#telemetry).
 
+**Paths.** _(planned for M38)_ The unique index is on (`process_instance_id`, `path_id`, `step`,
+`staged_revision`), as for a connector call, see [connector calls](#connector-calls).
+
 | Column | Type | Meaning |
 | --- | --- | --- |
 | `id` | `uuid` | A version 7 UUID, the call's operation identity. It is the `OperationId` of the operation's context |
 | `process_instance_id` | `uuid` | The instance |
 | `step` | `text` | The declared name of the package operation step |
+| `path_id` _(planned for M38)_ | `uuid`, null | The [path](#paths) the step ran on. Null for the root path |
+| `pass` _(planned for M38)_ | `integer`, null | The `pass` of that path. Null when the path is not a pass |
 | `staged_revision` | `bigint` | The instance revision the step ran at. A retry restage sets it to the new run's revision |
 | `release_id` | `uuid` | The release the instance is pinned to |
 | `package` | `text` | The package id |
@@ -234,9 +293,9 @@ column for a request or response body.
 | `last_error` | `text`, null | The error of the last attempt: an exception type or a fixed sentence. It holds no exception message and no value |
 | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
 | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |
-| `runner_id` _(planned for M37)_ | `uuid`, null | The [customer-hosted runner](extension-packages.md#customer-hosted-runners) that holds the lease |
-| `lease_id` _(planned for M37)_ | `uuid`, null | The lease of the current attempt |
-| `lease_until` _(planned for M37)_ | `timestamptz`, null | When the lease ends |
+| `runner_id` | `uuid`, null | The [customer-hosted runner](extension-packages.md#customer-hosted-runners) that holds the lease |
+| `lease_id` | `uuid`, null | The lease of the current attempt. A unique index finds the call by its lease |
+| `lease_until` | `timestamptz`, null | When the lease ends |
 
 ### Events
 
@@ -264,6 +323,7 @@ filtered index of the same columns without `application_id`,
 | `source` _(planned for M35)_ | `text` | What made the notification, such as a `notify` step or a quota notice, see [In-app notifications](notifications.md#in-app-notifications) |
 | `kind` _(planned for M35)_ | `text` | The kind of the notification, see [In-app notifications](notifications.md#in-app-notifications) |
 | `values` | `jsonb` | The raw evaluated placeholder values, keyed by the placeholders' names. Dates are ISO text, as in an event payload. They are formatted when read |
+| `value_types` | `jsonb` | The type name of each value, keyed like `values`, such as `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` or `reference`. A value of type null or file has none. `{}` for a notification stored before the column existed |
 | `open_page` | `text`, null | The declared name of the page the notification opens. Null when the step has no `open` |
 | `open_parameters` | `jsonb`, null | The raw evaluated page parameters, keyed by the parameters' declared names. Null when the step has no `open` |
 | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |

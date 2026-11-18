@@ -112,6 +112,18 @@ public sealed class StorageQuotaRouteTests
         "POST /api/tenant/package-runners",
         "POST /api/tenant/package-runners/{id}/revoke",
 
+        // A runner's registration adds to the packages of its one row, and a billing limit must never stop a runner from starting, see
+        // docs/reference/tenant-quotas.md#refusals.
+        "POST /api/package-runner/packages",
+
+        // A runner's take marks a call as a step's Mark does, and a billing limit must never stop running work, see
+        // docs/reference/tenant-quotas.md#refusals.
+        "POST /api/package-runner/calls/take",
+
+        // A runner's result records a call as a step's Record does, and a billing limit must never stop running work, see
+        // docs/reference/tenant-quotas.md#refusals.
+        "POST /api/package-runner/leases/{leaseId}/result",
+
         "POST /api/apps/{app}/forms/{form}/state",
         "POST /api/apps/{app}/tasks/{id}/form-state",
 

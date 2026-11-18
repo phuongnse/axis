@@ -11,14 +11,24 @@ public sealed record ExpressionCollection(string Name, string Entity, Expression
 
 /// <summary>
 /// A name in a scope with its type and the text key of its label, or null when the name has no label.
+/// <see cref="ValueLabelKeys"/> holds the text key of each enum value's label by value, and is null for a field
+/// that is not an enum or has no value labels.
 /// </summary>
-public sealed record ExpressionScopeField(string Name, ExpressionType Type, string? LabelKey);
+public sealed record ExpressionScopeField(
+    string Name, ExpressionType Type, string? LabelKey, IReadOnlyDictionary<string, string>? ValueLabelKeys = null);
 
 /// <summary>
 /// Finds the type of the field <paramref name="fieldName"/> of the entity
 /// <paramref name="targetEntity"/>, or null when the entity has no such field with a value.
 /// </summary>
 public delegate ExpressionType? ReferenceFieldResolver(string targetEntity, string fieldName);
+
+/// <summary>
+/// Finds the field <paramref name="fieldName"/> of the entity <paramref name="targetEntity"/> with its
+/// label key and value label keys, or null when the entity has no such field with a value. It names the steps of a path
+/// in the reading, see docs/reference/authoring.md#expression-check.
+/// </summary>
+public delegate ExpressionScopeField? ReferenceLabelResolver(string targetEntity, string fieldName);
 
 /// <summary>
 /// Finds the child collection or references field <paramref name="name"/> of the entity
@@ -43,12 +53,14 @@ public sealed class ExpressionScope
 {
     private readonly Dictionary<string, ExpressionType> _fields;
     private readonly List<ExpressionScopeField> _fieldList = [];
+    private readonly Dictionary<string, ExpressionScopeField> _fieldsByName = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ExpressionRule> _rules = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Dictionary<string, ExpressionRule>> _moduleRules = new(StringComparer.Ordinal);
     private readonly HashSet<string>? _modules;
     private readonly Dictionary<string, ExpressionCollection> _collections = new(StringComparer.OrdinalIgnoreCase);
     private readonly ReferenceFieldResolver? _referenceFields;
     private readonly ReferenceCollectionResolver? _referenceCollections;
+    private readonly ReferenceLabelResolver? _referenceLabels;
 
     public ExpressionScope(
         IEnumerable<KeyValuePair<string, ExpressionType>> fields,
@@ -58,7 +70,9 @@ public sealed class ExpressionScope
         IEnumerable<string>? modules = null,
         bool undeclaredModuleIsUnknown = false,
         ReferenceCollectionResolver? referenceCollections = null,
-        IReadOnlyDictionary<string, string>? labelKeys = null)
+        IReadOnlyDictionary<string, string>? labelKeys = null,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? valueLabelKeys = null,
+        ReferenceLabelResolver? referenceLabels = null)
     {
         ArgumentNullException.ThrowIfNull(fields);
         _fields = new Dictionary<string, ExpressionType>(StringComparer.OrdinalIgnoreCase);
@@ -66,8 +80,13 @@ public sealed class ExpressionScope
         {
             if (_fields.TryAdd(name, type))
             {
-                _fieldList.Add(new ExpressionScopeField(
-                    name, type, labelKeys is not null && labelKeys.TryGetValue(name, out var labelKey) ? labelKey : null));
+                var field = new ExpressionScopeField(
+                    name,
+                    type,
+                    labelKeys is not null && labelKeys.TryGetValue(name, out var labelKey) ? labelKey : null,
+                    valueLabelKeys is not null && valueLabelKeys.TryGetValue(name, out var valueKeys) ? valueKeys : null);
+                _fieldList.Add(field);
+                _fieldsByName[name] = field;
             }
         }
 
@@ -96,6 +115,7 @@ public sealed class ExpressionScope
 
         _referenceFields = referenceFields;
         _referenceCollections = referenceCollections;
+        _referenceLabels = referenceLabels;
         _modules = modules is null ? null : new HashSet<string>(modules, StringComparer.Ordinal);
         UndeclaredModuleIsUnknown = undeclaredModuleIsUnknown;
     }
@@ -120,6 +140,10 @@ public sealed class ExpressionScope
 
     public bool TryGetField(string name, [NotNullWhen(true)] out ExpressionType? type) =>
         _fields.TryGetValue(name, out type);
+
+    /// <summary>Finds the field <paramref name="name"/> with its label key and value label keys.</summary>
+    public bool TryGetScopeField(string name, [NotNullWhen(true)] out ExpressionScopeField? field) =>
+        _fieldsByName.TryGetValue(name, out field);
 
     public bool TryGetRule(string name, [NotNullWhen(true)] out ExpressionRule? rule) =>
         _rules.TryGetValue(name, out rule);
@@ -153,6 +177,21 @@ public sealed class ExpressionScope
             ? _referenceFields(reference.Source ?? "", name)
             : null;
         return type is not null;
+    }
+
+    /// <summary>
+    /// The field <paramref name="name"/> of the entity that <paramref name="reference"/> points to, as
+    /// <see cref="TryGetReferenceField"/> found it with type <paramref name="type"/>, with its label keys. A scope
+    /// without a <see cref="ReferenceLabelResolver"/> answers the field with no labels.
+    /// </summary>
+    public ExpressionScopeField ReferenceScopeField(ExpressionType reference, string name, ExpressionType type)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(type);
+        return (_referenceLabels is not null && reference.Kind == ExpressionTypeKind.Reference
+            ? _referenceLabels(reference.Source ?? "", name)
+            : null) ?? new ExpressionScopeField(name, type, null);
     }
 
     /// <summary>

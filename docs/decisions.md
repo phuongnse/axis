@@ -30,8 +30,8 @@ the files agree, title and status included.
 | [D16](decisions/d16-expression-language.md) | Expression language | **Agreed** |
 | [D17](decisions/d17-entity-logic-and-child-collections.md) | Entity logic and child collections | **Agreed** |
 | [D18](decisions/d18-data-sources.md) | Data sources | **Agreed** |
-| [D19](decisions/d19-process-resource-and-worker-host.md) | Process resource and worker host | **Agreed** |
-| [D20](decisions/d20-human-tasks-task-inbox-and-forms.md) | Human tasks, task inbox and forms | **Agreed** |
+| D19 | Process resource and worker host | Superseded by [D155](decisions/d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md), [last text](https://github.com/phuongnse/axis/blob/b7af8e40c52f8d650fa4f6d0a1a4b6e099aa96a0/docs/decisions/d19-process-resource-and-worker-host.md) |
+| D20 | Human tasks, task inbox and forms | Superseded by [D160](decisions/d160-people-work-together-on-records-and-tasks-and-work-reaches-the-right-person-when-they-are-away.md), [last text](https://github.com/phuongnse/axis/blob/39fd77af1d7d7027212254c6ff4485ae0bee7cff/docs/decisions/d20-human-tasks-task-inbox-and-forms.md) |
 | [D21](decisions/d21-development-test-users-audit-records-and-sequences.md) | Development test users, audit records and sequences | **Agreed** |
 | [D22](decisions/d22-current-time-and-time-zones.md) | Current time and time zones | **Agreed** |
 | [D23](decisions/d23-sign-in-through-oidc-and-the-bff-session.md) | Sign-in through OIDC and the BFF session | **Agreed** |
@@ -72,22 +72,22 @@ the files agree, title and status included.
 | [D58](decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md) | Ant Design is a detail of the SPA, without ProComponents | **Agreed** |
 | [D59](decisions/d59-table-row-and-toolbar-actions.md) | Table row and toolbar actions | **Agreed** |
 | [D60](decisions/d60-the-service-desk-dashboard-ticket-detail-page-and-guided-form.md) | The service desk dashboard, ticket detail page and guided form | **Agreed** |
-| [D61](decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md) | Widget trees in columns, tabs and sections, and pages at phone width | **Agreed** |
+| D61 | Widget trees in columns, tabs and sections, and pages at phone width | Superseded by [D159](decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md), [last text](https://github.com/phuongnse/axis/blob/40b46c2ab7011e6d68dcd5364a4d122c9384b8e9/docs/decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md) |
 | [D62](decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md) | Conditional form states, validation as you type and wizard steps | **Agreed** |
-| [D63](decisions/d63-navigate-actions-and-page-parameters.md) | Navigate actions and page parameters | **Agreed** |
-| [D64](decisions/d64-detail-chart-and-kpi-widgets.md) | Detail, chart and KPI widgets | **Agreed** |
+| D63 | Navigate actions and page parameters | Superseded by [D159](decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md), [last text](https://github.com/phuongnse/axis/blob/40b46c2ab7011e6d68dcd5364a4d122c9384b8e9/docs/decisions/d63-navigate-actions-and-page-parameters.md) |
+| D64 | Detail, chart and KPI widgets | Superseded by [D159](decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md), [last text](https://github.com/phuongnse/axis/blob/40b46c2ab7011e6d68dcd5364a4d122c9384b8e9/docs/decisions/d64-detail-chart-and-kpi-widgets.md) |
 | [D65](decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md) | A visual page designer on a canvas drawn by the site's widgets | **Agreed** |
 | [D66](decisions/d66-a-visual-form-designer-for-form-resources.md) | A visual form designer for form resources | **Agreed** |
 | [D67](decisions/d67-live-widget-previews-in-the-design-system.md) | Live widget previews in the design system | **Agreed** |
 | [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) | Issues of several milestones run at once | **Agreed** |
-| [D69](decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md) | Timer, wait for event and sub-process steps, loops and create record | **Agreed** |
+| D69 | Timer, wait for event and sub-process steps, loops and create record | Superseded by [D155](decisions/d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md), [last text](https://github.com/phuongnse/axis/blob/b7af8e40c52f8d650fa4f6d0a1a4b6e099aa96a0/docs/decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md) |
 | [D70](decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md) | Processes without a subject, scheduled jobs and delete triggers | **Agreed** |
-| [D71](decisions/d71-task-deadlines-escalation-claim-and-reassign.md) | Task deadlines, escalation, claim and reassign | **Agreed** |
+| D71 | Task deadlines, escalation, claim and reassign | Superseded by [D156](decisions/d156-working-time-calendars-durations-in-working-hours-and-slas.md), [last text](https://github.com/phuongnse/axis/blob/27b802cb21dc1a322b24a4456b4ecd3b5c89a473/docs/decisions/d71-task-deadlines-escalation-claim-and-reassign.md) |
 | [D72](decisions/d72-a-delivery-limit-and-dead-letters.md) | A delivery limit and dead letters | **Agreed** |
 | [D73](decisions/d73-in-app-and-email-notifications.md) | In-app and email notifications | **Agreed** |
 | [D74](decisions/d74-a-visual-process-designer.md) | A visual process designer | **Agreed** |
-| [D75](decisions/d75-the-application-time-zone.md) | The application time zone | **Agreed** |
-| [D76](decisions/d76-file-money-and-enum-label-field-types.md) | File, money and enum label field types | **Agreed** |
+| D75 | The application time zone | Superseded by [D156](decisions/d156-working-time-calendars-durations-in-working-hours-and-slas.md), [last text](https://github.com/phuongnse/axis/blob/27b802cb21dc1a322b24a4456b4ecd3b5c89a473/docs/decisions/d75-the-application-time-zone.md) |
+| D76 | File, money and enum label field types | Superseded by [D157](decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md), [last text](https://github.com/phuongnse/axis/blob/11688aa43b8dfa85639ba00e0b14cd9baea8a54f/docs/decisions/d76-file-money-and-enum-label-field-types.md) |
 | [D77](decisions/d77-indexes-defaults-and-ranges.md) | Indexes, defaults and ranges | **Agreed** |
 | [D78](decisions/d78-references-from-child-rows-and-many-to-many.md) | References from child rows and many-to-many | **Agreed** |
 | [D79](decisions/d79-import-and-export-under-policies.md) | Import and export under policies | **Agreed** |
@@ -135,7 +135,7 @@ the files agree, title and status included.
 | [D121](decisions/d121-how-a-module-contract-is-declared-and-checked.md) | How a module contract is declared and checked | **Agreed** |
 | [D122](decisions/d122-how-a-customization-layer-is-written-and-applied.md) | How a customization layer is written and applied | **Agreed** |
 | [D123](decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md) | How an Axis SaaS cell keeps tenants apart, measured and recoverable | **Agreed** |
-| [D124](decisions/d124-the-organization-and-approvals-modules.md) | The organization and approvals modules | **Agreed** |
+| D124 | The organization and approvals modules | Superseded by [D160](decisions/d160-people-work-together-on-records-and-tasks-and-work-reaches-the-right-person-when-they-are-away.md), [last text](https://github.com/phuongnse/axis/blob/39fd77af1d7d7027212254c6ff4485ae0bee7cff/docs/decisions/d124-the-organization-and-approvals-modules.md) |
 | D125 | How AI authoring connects, runs and keeps its changes | Superseded by [D150](decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md), [last text](https://github.com/phuongnse/axis/blob/514687579949e77a807a36760fb4ecc7d29f90c5/docs/decisions/d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md) |
 | [D126](decisions/d126-sign-up-trials-and-the-control-plane.md) | Sign-up, trials and the control plane | **Agreed** |
 | [D127](decisions/d127-plans-payments-and-invoices.md) | Plans, payments and invoices | **Agreed** |
@@ -165,3 +165,10 @@ the files agree, title and status included.
 | [D151](decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md) | Tables whose rows grow have the full toolbar, and a view is a filter kept in the address | **Agreed** |
 | [D152](decisions/d152-every-screen-says-where-things-stand-with-at-most-one-main-action.md) | Every screen says where things stand, with at most one main action | **Agreed** |
 | [D153](decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md) | A person's table views and columns are kept on the server, and the address still wins | **Agreed** |
+| [D154](decisions/d154-every-capability-an-organization-needs-has-a-home-and-a-capability-map-keeps-it-so.md) | Every capability an organization needs has a home, and a capability map keeps it so | **Agreed** |
+| [D155](decisions/d155-processes-run-paths-at-once-repeat-steps-give-tasks-to-many-people-and-take-error-paths.md) | Processes run paths at once, repeat steps, give tasks to many people and take error paths | **Agreed** |
+| [D156](decisions/d156-working-time-calendars-durations-in-working-hours-and-slas.md) | Working time: calendars, durations in working hours, and SLAs | **Agreed** |
+| [D157](decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md) | Files reach calls and emails, show in the page, keep their versions, and documents come from Word templates | **Agreed** |
+| [D158](decisions/d158-history-keeps-old-and-new-values-a-deleted-record-waits-in-a-recycle-bin-and-every-record-has-system-fields.md) | History keeps old and new values, a deleted record waits in a recycle bin, and every record has system fields | **Agreed** |
+| [D159](decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) | Pages show related lists, boards and calendars, forms take context and drafts, and each site has its brand | **Agreed** |
+| [D160](decisions/d160-people-work-together-on-records-and-tasks-and-work-reaches-the-right-person-when-they-are-away.md) | People work together on records and tasks, and work reaches the right person when they are away | **Agreed** |

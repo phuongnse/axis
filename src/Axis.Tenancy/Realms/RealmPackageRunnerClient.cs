@@ -21,6 +21,18 @@ public static class RealmPackageRunnerClient
     /// <summary>The client id of the runner with <paramref name="id"/>: <see cref="ClientIdPrefix"/> and the id as 32 hexadecimal characters.</summary>
     public static string ClientId(Guid id) => $"{ClientIdPrefix}{id:N}";
 
+    /// <summary>
+    /// Reads the runner's id from a client id: true only when <paramref name="clientId"/> is <see cref="ClientIdPrefix"/> followed by
+    /// an id as 32 hexadecimal characters.
+    /// </summary>
+    public static bool TryReadId(string? clientId, out Guid id)
+    {
+        id = Guid.Empty;
+        return clientId is not null
+            && clientId.StartsWith(ClientIdPrefix, StringComparison.Ordinal)
+            && Guid.TryParseExact(clientId[ClientIdPrefix.Length..], "N", out id);
+    }
+
     /// <summary>The client representation, with the <paramref name="secret"/> the server made.</summary>
     public static Dictionary<string, object?> Representation(string clientId, string secret) => new()
     {

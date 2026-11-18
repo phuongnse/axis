@@ -1,3 +1,10 @@
 {
-  "accepted": []
+  "accepted": [
+    {
+      "advisory": "GHSA-fc5q-39xc-vjpf",
+      "package": "picomatch",
+      "found": "2026-11-17",
+      "reason": "No fixed picomatch version yet; dev-only via vite and vitest"
+    }
+  ]
 }

@@ -227,7 +227,7 @@ test.describe("Studio edits a process in the process editor", () => {
     await expect(async () => {
       if ((await name.inputValue()) === "markApproved") {
         await card
-          .getByRole("button", { name: "Remove step", exact: true })
+          .getByRole("button", { name: "Delete", exact: true })
           .click({ timeout: 2_000 });
       }
       await expect(name).not.toHaveValue("markApproved", { timeout: 2_000 });
@@ -282,7 +282,7 @@ test.describe("Studio edits a process in the process editor", () => {
       const node = page.getByTestId(`studio-graph-node-${i}`);
       await expect(node).toHaveAttribute("data-marked", "true");
       await expect(node).toHaveAccessibleName(
-        "markRejected, operation, has diagnostics",
+        "markRejected, operation, has problems",
       );
       await expect(page.getByTestId(`rf__edge-/steps/${i}/next`)).toHaveCount(
         0,
@@ -326,7 +326,7 @@ test.describe("Studio edits a process in the process editor", () => {
       );
       await page.keyboard.press("Delete");
       await expect(page.getByTestId("studio-process-announcement")).toHaveText(
-        "Removed step markReturned",
+        "Removed step markReturned.",
       );
       await expect(
         page.getByTestId(`studio-graph-node-${content.steps.length - 1}`),
@@ -365,8 +365,8 @@ test.describe("Studio edits a process in the process editor", () => {
       expect(moved).toBeGreaterThan(0);
       const before =
         moved === 1
-          ? "moved to the start"
-          : `moved after ${content.steps[moved - 2].name}`;
+          ? "Moved step financeCheck to the start."
+          : `Moved step financeCheck after ${content.steps[moved - 2].name}.`;
       await page.goto(
         `${server.url}/studio?app=PurchaseRequests&resource=${id}`,
       );
@@ -377,7 +377,7 @@ test.describe("Studio edits a process in the process editor", () => {
         .getByRole("button", { name: "Move up", exact: true })
         .click();
       await expect(page.getByTestId("studio-process-announcement")).toHaveText(
-        `Step financeCheck ${before}`,
+        before,
       );
       await expect(page.getByTestId(`studio-step-${moved - 1}`)).toContainText(
         "financeCheck",
@@ -422,13 +422,13 @@ test.describe("Studio edits a process in the process editor", () => {
         page.getByTestId(`studio-process-edge-drop-/steps/${rejected}/next`),
       );
       await expect(announcement).toHaveText(
-        "Step updateRecord1 added after markRejected",
+        "Added step updateRecord1 after markRejected.",
       );
 
       await page.getByTestId("studio-process-palette-raiseEvent").focus();
       await page.keyboard.press("Enter");
       await expect(announcement).toHaveText(
-        "Step raiseEvent1 added after updateRecord1",
+        "Added step raiseEvent1 after updateRecord1.",
       );
 
       await saveResource(page);

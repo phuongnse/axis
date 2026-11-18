@@ -85,7 +85,7 @@ test.describe("Studio adds states and transitions to a module contract as a laye
     );
     await openContract(page);
     await expect(page.getByTestId("studio-save")).toBeDisabled();
-    await expect(page.getByRole("button", { name: /^Remove / })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Delete / })).toHaveCount(0);
 
     await addState(page, "onHold");
     await addTransition(page, "hold", "submitted", "onHold");
@@ -95,11 +95,11 @@ test.describe("Studio adds states and transitions to a module contract as a laye
     await expect(page.getByTestId("studio-saved")).toBeVisible();
     for (const name of ["onHold", "hold", "resume"]) {
       await expect(
-        page.getByRole("note", { name: `Added ${name}`, exact: true }),
+        page.getByRole("note", { name: `${name}, added by this application`, exact: true }),
       ).toBeVisible();
     }
     await expect(
-      page.getByRole("button", { name: "Remove submit", exact: true }),
+      page.getByRole("button", { name: "Delete submit", exact: true }),
     ).toHaveCount(0);
     await expect(access(layerFile)).resolves.toBeUndefined();
   });
@@ -109,7 +109,7 @@ test.describe("Studio adds states and transitions to a module contract as a laye
   }) => {
     await openContract(page);
     await expect(
-      page.getByRole("note", { name: "Added onHold", exact: true }),
+      page.getByRole("note", { name: "onHold, added by this application", exact: true }),
     ).toBeVisible();
 
     await addTransition(page, "fastApprove", "returned", "approved");
@@ -117,7 +117,7 @@ test.describe("Studio adds states and transitions to a module contract as a laye
 
     await expect(page.getByTestId("studio-saved")).toBeVisible();
     await expect(
-      page.getByRole("note", { name: "Added fastApprove", exact: true }),
+      page.getByRole("note", { name: "fastApprove, added by this application", exact: true }),
     ).toBeVisible();
     await expect(page.getByTestId("studio-contract-diagnostics")).toContainText(
       "AXC0370",

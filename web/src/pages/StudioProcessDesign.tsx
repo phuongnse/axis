@@ -2,6 +2,7 @@ import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type Dra
 import { Button, Flex, Menu, Typography } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Announcement } from '../platform/Announcement'
+import { fillText } from '../platform/fillText'
 import { markOf } from '../platform/layerMarks'
 import type { JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
@@ -25,7 +26,7 @@ function nameAt(list: unknown[], index: number): string {
 /**
  * The Design tab of a process: the graph of the draft, and beside it the card of the selected step, which is the one
  * the Form tab shows. A node selects a step, and an edge selects itself and the step it leaves. An edit in the card
- * draws the graph again. With an edge selected, the panel offers Remove transition above the card, which clears the
+ * draws the graph again. With an edge selected, the panel offers Remove line above the card, which clears the
  * transition's target and keeps its branch or outcome. Removing a step leaves the transitions that named it, for the
  * checker to report. Delete in the canvas removes the selected edge, or else the selected step. A hidden live region
  * says what was removed. Move up and Move down on the card are one edit each, and the live region says where the step
@@ -113,7 +114,7 @@ export default function StudioProcessDesign({
       steps.filter((_, position) => position !== index),
     )
     selectStep(null)
-    setAnnouncement(`${t('shell.studio.process.removedStep')} ${name || `/steps/${index}`}`)
+    setAnnouncement(fillText(t('shell.studio.process.removedStep'), { name: name || `/steps/${index}` }))
   }
 
   function moveStep(index: number, offset: number) {
@@ -121,18 +122,18 @@ export default function StudioProcessDesign({
     const next = moved(steps, index, offset)
     onChange('/steps', next)
     selectStep(to)
-    const place =
+    setAnnouncement(
       to === 0
-        ? t('shell.studio.process.movedToStart')
-        : `${t('shell.studio.process.movedAfter')} ${nameAt(next, to - 1)}`
-    setAnnouncement(`${t('shell.studio.process.stepAdded')} ${nameAt(next, to)} ${place}`)
+        ? fillText(t('shell.studio.process.movedToStart'), { name: nameAt(next, to) })
+        : fillText(t('shell.studio.process.movedAfter'), { name: nameAt(next, to), after: nameAt(next, to - 1) }),
+    )
   }
 
   function removeTransition(transition: ProcessGraphTransition) {
     const name = transitionName(graph, transition, t('shell.studio.processGraph.to'))
     onChange(transitionPointer(transition), '')
     setEdge(null)
-    setAnnouncement(`${t('shell.studio.process.removedTransition')} ${name}`)
+    setAnnouncement(fillText(t('shell.studio.process.removedTransition'), { name }))
   }
 
   function apply(source: number, target: number, choice: ConnectChoice) {
@@ -148,7 +149,7 @@ export default function StudioProcessDesign({
     let label = ''
     if (choice.kind === 'newBranch') {
       const count = Array.isArray(edit.value) ? edit.value.length : 1
-      label = `${t('shell.studio.process.branchNumber')} ${count}`
+      label = fillText(t('shell.studio.process.branchNumber'), { number: count })
     } else if (choice.kind === 'newOutcome') {
       const added: unknown = Array.isArray(edit.value) ? edit.value.at(-1) : undefined
       label = (added as { name: string }).name
@@ -158,7 +159,10 @@ export default function StudioProcessDesign({
     onChange(edit.pointer, edit.value)
     setPending(null)
     setAnnouncement(
-      `${nameOf(source)}${label ? `, ${label}` : ''} ${t('shell.studio.process.nowGoesTo')} ${nameOf(target)}`,
+      fillText(t('shell.studio.process.nowGoesTo'), {
+        source: `${nameOf(source)}${label ? `, ${label}` : ''}`,
+        target: nameOf(target),
+      }),
     )
   }
 
@@ -187,11 +191,10 @@ export default function StudioProcessDesign({
     onChange('/steps', result.steps)
     selectStep(result.index)
     const after = source === undefined ? undefined : nameOfStep(source)
-    const text = `${t('shell.studio.process.stepAdded')} ${result.name}`
     setAnnouncement(
       after === undefined
-        ? `${text} ${t('shell.studio.process.added')}`
-        : `${text} ${t('shell.studio.process.addedAfter')} ${after}`,
+        ? fillText(t('shell.studio.process.added'), { name: result.name })
+        : fillText(t('shell.studio.process.addedAfter'), { name: result.name, after }),
     )
   }
 

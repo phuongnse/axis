@@ -265,7 +265,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
     await createResource(page, 'process', 'ExpenseApproval')
     await openFormTab(page)
     await pick(page, 'studio-field-/entity', 'Expense')
-    await page.getByTestId('studio-step-0').getByRole('button', { name: 'Remove step', exact: true }).click()
+    await page.getByTestId('studio-step-0').getByRole('button', { name: 'Delete', exact: true }).click()
 
     const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
     const steps: [name: string, type: string][] = [
@@ -284,7 +284,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
     async function setStatus(index: number, expression: string, next: string) {
       await pick(page, `studio-field-/steps/${index}/operation`, 'updateRecord')
       const row = page.getByTestId(`studio-field-/steps/${index}/set/status`)
-      await pickAction(stepCard(index).getByRole('combobox', { name: 'Add mapping Set', exact: true }), 'status', row)
+      await pickAction(stepCard(index).getByRole('combobox', { name: 'Add Set', exact: true }), 'status', row)
       await expect(row.locator('.cm-editor')).toBeVisible()
       await row.getByRole('textbox', { name: 'Expression', exact: true }).fill(expression)
       await pick(page, `studio-field-/steps/${index}/next`, next)

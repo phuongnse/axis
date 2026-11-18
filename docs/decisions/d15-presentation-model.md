@@ -12,12 +12,12 @@ first, and it must let widgets and layouts be added without a change to the page
 - **A page is a route in a site,** and widgets are its content. A page has no entity or template of
   its own.
 - **Layout is container widgets** that hold other widgets
-  ([D61](d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md)).
+  ([D159](d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md)).
 - **A `form` resource serves both a `form` widget and a process task**
-  ([D20](d20-human-tasks-task-inbox-and-forms.md)).
+  ([D160](d160-people-work-together-on-records-and-tasks-and-work-reaches-the-right-person-when-they-are-away.md)).
 
 Widgets read data through data sources ([D18](d18-data-sources.md)), and pages open each other
-through navigate actions ([D63](d63-navigate-actions-and-page-parameters.md)). The detail is in
+through navigate actions ([D159](d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md)). The detail is in
 [frontend](../reference/frontend.md).
 
 ## Consequences

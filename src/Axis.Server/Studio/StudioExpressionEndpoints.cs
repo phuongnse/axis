@@ -5,6 +5,7 @@ using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Functions;
+using Axis.Expressions.Reading;
 using Axis.Expressions.Typing;
 using Axis.Presentation.Texts;
 using Axis.Server.Presentation;
@@ -20,13 +21,14 @@ namespace Axis.Server.Studio;
 /// <c>{ resourceId, path, expression, draft }</c>: the resource's id, the JSON Pointer of a string in it, the text to try,
 /// and optionally the resource as the author has it. The path is evaluated in the draft when one is given, and in the
 /// saved resource otherwise. The text goes into a copy of that resource and the folder compiles in memory, so the answer
-/// is the compile's own and nothing is written or locked. It answers <c>{ type, diagnostics }</c>. A diagnostic has the
+/// is the compile's own and nothing is written or locked. It answers <c>{ type, diagnostics, reading }</c>. A diagnostic has the
 /// compile's <c>code</c> and <c>message</c> and a character range, <c>start</c> and <c>end</c>, as UTF-16 offsets into the
-/// expression with <c>end</c> exclusive. <c>type</c> is null when there is a diagnostic.
+/// expression with <c>end</c> exclusive. <c>type</c> and <c>reading</c> are null when there is a diagnostic, see
+/// <see cref="ExpressionReader"/> and docs/reference/authoring.md#expression-check.
 /// <c>POST /api/studio/apps/{application}/expressions/scope</c> answers what the same place offers. Its body is
 /// <c>{ resourceId, path, draft }</c> and the answer is <c>{ type, fields, functions }</c>, from the compile's type check at
-/// the place. Each function carries its parameters, result, group and example, and a description in the language of the
-/// request's <c>Accept-Language</c> header, or in <c>en</c>, see <see cref="RequestLocale"/>. The checks run in the order of the rest of the authoring API for both routes: session (401), author role (403),
+/// the place. Each function carries its parameters, result, group and example, a description in the language of the
+/// request's <c>Accept-Language</c> header, or in <c>en</c>, see <see cref="RequestLocale"/>, and its reading <c>words</c>. The checks run in the order of the rest of the authoring API for both routes: session (401), author role (403),
 /// application (404), then 415 for a content type other than
 /// <c>application/json</c>, 400 for a body that is not an expression check or a <c>draft</c> that is not an object, 404 for a
 /// resource id the application does not have, and 400 for a path that holds no expression. A path holds no expression when
@@ -196,7 +198,10 @@ internal static class StudioExpressionEndpoints
         }
 
         return (
-            new StudioExpressionCheckResponse(diagnostic is null ? TypeName(probe.Type) : null, diagnostic is null ? [] : [diagnostic]),
+            new StudioExpressionCheckResponse(
+                diagnostic is null ? probe.Type?.Notation : null,
+                diagnostic is null ? [] : [diagnostic],
+                diagnostic is null ? ExpressionReader.Read(expression, probe.Place) : null),
             null);
     }
 
@@ -231,14 +236,17 @@ internal static class StudioExpressionEndpoints
 
         return (
             new StudioExpressionScopeResponse(
-                place.Expected.Kind == ExpressionTypeKind.Null ? null : TypeName(place.Expected),
-                [.. place.Scope.Fields.Select(field => new StudioExpressionScopeField(field.Name, field.LabelKey, TypeName(field.Type)))],
+                place.Expected.Kind == ExpressionTypeKind.Null ? null : place.Expected.Notation,
+                [.. place.Scope.Fields.Select(field => new StudioExpressionScopeField(field.Name, field.LabelKey, field.Type.Notation))],
                 [.. place.Functions.Select(name => ScopeFunction(name, texts))]),
             null);
     }
 
     /// <summary>The key of the platform text that describes a function or an aggregate.</summary>
     internal static string FunctionDescriptionKey(string name) => $"shell.studio.function.{name}";
+
+    /// <summary>The key of the platform text that says a reading phrase or value in words.</summary>
+    internal static string ReadsKey(string words) => $"shell.studio.expression.reads.{words}";
 
     private static StudioExpressionScopeFunction ScopeFunction(string name, TextResources texts)
     {
@@ -249,7 +257,8 @@ internal static class StudioExpressionEndpoints
             signature.Result,
             signature.Group,
             signature.Example,
-            texts.Texts[FunctionDescriptionKey(signature.Name)]);
+            texts.Texts[FunctionDescriptionKey(signature.Name)],
+            ExpressionReader.FunctionWords(signature.Name));
     }
 
     /// <summary>
@@ -324,22 +333,6 @@ internal static class StudioExpressionEndpoints
             return null;
         }
     }
-
-    // The names of the Types table in docs/reference/expressions.md.
-    private static string? TypeName(ExpressionType? type) => type?.Kind switch
-    {
-        ExpressionTypeKind.Null => "null",
-        ExpressionTypeKind.Text => "text",
-        ExpressionTypeKind.Integer => "integer",
-        ExpressionTypeKind.Decimal => "decimal",
-        ExpressionTypeKind.Boolean => "boolean",
-        ExpressionTypeKind.Date => "date",
-        ExpressionTypeKind.DateTime => "date-time",
-        ExpressionTypeKind.Enum => "enum",
-        ExpressionTypeKind.Reference => "reference",
-        ExpressionTypeKind.File => "file",
-        _ => null,
-    };
 }
 
 /// <summary>
@@ -352,12 +345,19 @@ internal sealed record StudioExpressionScopeResponse(
 /// <summary>One name in scope. <c>LabelKey</c> is null for a name with no label, such as a parameter.</summary>
 internal sealed record StudioExpressionScopeField(string Name, string? LabelKey, string? Type);
 
-/// <summary>One function or aggregate a place allows, with its signature, its result, its group, an example and what it does.</summary>
+/// <summary>
+/// One function or aggregate a place allows, with its signature, its result, its group, an example, what it does and the
+/// key of its reading words, <c>Words</c>, see docs/reference/authoring.md#expression-scope.
+/// </summary>
 internal sealed record StudioExpressionScopeFunction(
-    string Name, IReadOnlyList<string> Parameters, string Result, string Group, string Example, string Description);
+    string Name, IReadOnlyList<string> Parameters, string Result, string Group, string Example, string Description, string Words);
 
-/// <summary>The answer to an expression check: the expression's type, and the problem with its range when there is one.</summary>
-internal sealed record StudioExpressionCheckResponse(string? Type, IReadOnlyList<StudioExpressionDiagnostic> Diagnostics);
+/// <summary>
+/// The answer to an expression check: the expression's type, the problem with its range when there is one, and the
+/// reading of the expression as a tree, which is null while there is a problem.
+/// </summary>
+internal sealed record StudioExpressionCheckResponse(
+    string? Type, IReadOnlyList<StudioExpressionDiagnostic> Diagnostics, ReadingNode? Reading);
 
 /// <summary>One problem of an expression. <c>Start</c> and <c>End</c> are UTF-16 offsets into the expression, and <c>End</c> is exclusive.</summary>
 internal sealed record StudioExpressionDiagnostic(string Code, string Message, int Start, int End);

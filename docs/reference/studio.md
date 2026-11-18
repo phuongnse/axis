@@ -366,25 +366,43 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
 - **Checking.** The editor checks its text once when it first draws, and 300 ms after each keystroke it
   sends the text to the [expression check route](authoring.md#expression-check), and shows only the
   latest answer. An empty text, required or not, is not sent. It underlines the range from `start` to
-  `end` and shows the message and then its error code under the editor, or the result `type` in words
-  when there is no error. From its first draw or a keystroke until the answer to its latest text
-  arrives or the check fails, and while its code loads, the editor has `aria-busy="true"`. An empty
-  text leaves it not busy. Tests wait on this busy state before they click on the Form tab, see
-  [flaky tests](../development.md#flaky-tests).
+  `end` and shows the message and then its error code under the editor. From its first draw or a keystroke
+  until the answer to its latest text arrives or the check fails, and while its code loads, the editor has
+  `aria-busy="true"`. An empty text leaves it not busy. Tests wait on this busy state before they click on
+  the Form tab, see [flaky tests](../development.md#flaky-tests).
 - **No answer.** The check places the text in the saved resource, so a place inside a field or an item
   that is not saved yet has no answer, while a new property of a saved object has one, see
   [the place](authoring.md#expression-check). With no answer, or an answer of `400` or `401`, the last
   result stays on screen. A `401` does not show the sign-in prompt, so the draft is kept. The editor
   never blocks Save.
-- **What the place needs.** A line under the box says what the place needs, as "Needs to
-  give yes or no", until the expression gives a type, then "Gives yes or no", with the type in words.
-  A validation, a condition or a filter needs a boolean, and a computed field or a default the field's
-  type. A place that takes any type shows no "Needs" line.
+- **One line under the box.** An empty box shows what the place needs, as "Needs to give yes or no". Once
+  the expression reads back, the reading takes the place of "Gives …", since a type that does not match is
+  already an error. A validation, a condition or a filter needs a boolean, and a computed field or a default
+  the field's type. A place that takes any type keeps "Gives …" under the reading.
+- **Reads back in words.** While the expression has no error, an "In words:" line under the box reads it back,
+  in every place, because every place uses this editor. A field reads as its label in bold, or as its name when
+  it has no label, and a path as the labels of its fields, such as "Name of Supplier". An enum value reads as
+  its value label, `true` and `false` as yes and no, and `null` as no value. Numbers and dates read in the
+  author's language. A text value reads between single quotes, such as 'PR-'. A comparison reads in words: "is
+  at least", "has no value", and "is one of" with the list joined by "or". A comparison of dates reads as before
+  or after. A yes-or-no field on its own reads as being yes, and after `not` as being no. Arithmetic keeps ×,
+  ÷ and −, so `amount * 1.1` reads "Amount × 1.1". With an error the line is hidden, and the error shows. The
+  reading comes from the [expression check](authoring.md#expression-check), and its words are texts in every
+  locale, so a change of language needs no new check.
+- **Functions read in words.** Each function has words of its own, such as "the days from … to …" for
+  `daysBetween`. `addDays(today(), 7)` reads "today plus 7 days".
+- **Groups read as the expression groups them.** A group of only `and`, or only `or`, reads on one line, joined
+  in the author's language. A group that holds a group reads as a list under "All of these:" or "At least one
+  of these:", so `and` binding tighter than `or` shows. A `not` group always reads as a list, under "Not all of
+  these:" for `and`, and under "None of these:" for `or`.
+- **The box is one line, with Expand inside it.** The box starts one line high, like a text
+  field. Expand is a small icon button inside the box, at the end of its first line, and each line keeps room at
+  its end, so the text never runs under it. The box in the Expand dialog shows at least eight lines.
 - **An error in words.** An error reads first in words, with its code after it, small. An
   empty expression is not sent to be checked. The box wraps long lines and grows with them.
 - **A function's signature.** In a call to an allowed function, a line shows `contains(text, text)` and what it does,
   with the parameter at the cursor in bold, counted by the commas at the call's own level. Outside a call, none.
-- **Expand.** An icon beside the box, next in Tab order, opens the expression in a large dialog, with an editor
+- **Expand.** Expand, next in Tab order after the box, opens the expression in a large dialog, with an editor
   that checks and saves like the box, and a panel of tabs Fields, Operators and Functions, with every rule
   allowed there. A click inserts the name at the cursor. A search looks in all three, best first: a name that
   is the words, then one that starts with them, then one that holds them, then one whose description does.
@@ -406,8 +424,9 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
 - **Completion.** Typing a word, or Ctrl+Space, opens a list of what fits at the cursor, and the arrow keys
   and Enter pick one. The fields, parameters and rules come from the [names route](authoring.md#names),
   loaded with the application and again after a save, a delete and a reconnect. The functions come from
-  the [expression scope](authoring.md#expression-scope), loaded once per place with the draft. Without
-  names the list offers the language's words and the functions only, and typing and Save keep working. A rule
+  the [expression scope](authoring.md#expression-scope), loaded once per place with the draft, and again with the
+  next check answer while the scope has no answer. Without names the list offers the language's words and the
+  functions only, and typing and Save keep working. A rule
   and a function with parameters go in with the cursor inside their brackets, and `now()` after them.
 - **What completion offers:**
   - the fields of the entity at the place: the entity being edited, a policy grant's `entity`, or the
@@ -453,8 +472,8 @@ the sidebar's Access group, and is kept in the address as `&view=policies`.
   - An entity grant, and no other, also edits its record filter and its fields. The **Fields** picker's
     help says an empty list grants every field, so clearing it removes the `fields` key.
   - Add grant adds a grant named after the cell's target with the first free number in the policy,
-    ignoring letter case, such as `purchaseRequest1`. A grant shows its name read-only. Remove deletes a
-    grant, but not the policy's last one.
+    ignoring letter case, such as `purchaseRequest1`. A grant shows its name read-only.
+  - **Delete grant.** It deletes a grant, but not the policy's last one.
 - **Saving.** Save is off while nothing changed. A click with a grant that has no ticked action says so under its
   actions, focuses them and sends nothing. It writes one file, with one patch that carries the version the panel
   loaded and changes only what the author edited. A stale version shows a conflict message, keeps the draft and offers
@@ -641,13 +660,15 @@ panel, its undo and its drag and drop.
   line for each of its diagnostics, with the code and the message. A widget is marked when a diagnostic
   of the page, of any severity, names its `path` or a path inside it, so a container is marked too when
   a widget inside it has one, even in a closed section or an inactive tab. A marked widget has a border
-  in the `danger` colour, "has diagnostics" in its text label, and `data-marked`. The marks follow the
+  in the `danger` colour, its text label, and `data-marked`. The marks follow the
   route's latest answer, and so the unsaved draft.
+- **Marked names.** A marked widget's text label reads "{name}, has problems", where the name is
+  its frame's name: the widget's type and the name it binds.
 - **Selection.** A click on the canvas or a pick in the widget tree selects a widget in both. A click
   selects the innermost widget under the pointer, and a click on the empty area of a container selects
   the container. The selected widget has `aria-current` and an outline in the primary colour. Every
   frame is a Tab stop, and Enter or Space selects it. A frame's name is its widget's type and the name
-  it binds, such as `table` and `PurchaseRequestList`, and says "has diagnostics" when it is marked. The
+  it binds, such as `table` and `PurchaseRequestList`, and reads as the marks above say when it is marked. The
   selection is kept across the Design and Form tabs while the resource stays open, and is not in the
   URL's `path`, which opens the Form tab.
 - **Property panel.** The side pane holds the whole widget tree and the panel of the selected widget,
@@ -784,7 +805,7 @@ The connector editor's Form tab shows the connector's fields in the four
 each field with its label and [help](frontend.md#platform-field-help). Add operation sits on the
 Operations heading, and the JSON view stays as the second view of the same draft.
 
-- **No values.** A binding is a name, named by what it holds, and its help says which kind it is. No
+- **No values.** A binding is a name, and its help says what it holds and that the file keeps only its name. No
   value of a binding is shown or stored: the editor reads the resource and schema routes and the
   binding names, and writes only the resource, and the values stay in tenant settings.
 - **Bindings from the tenant.** A binding is chosen from the tenant's names of the kind it needs, see
@@ -796,14 +817,14 @@ Operations heading, and the JSON view stays as the second view of the same draft
 - **Operations.** A card per operation shows its name, method, path and `lookup`, which is picked from
   the connector's other operations. Its input and output fields are rows of name, type and required,
   one field to a line, and the schema's required keys carry the shared required mark. Operations and rows
-  can be added and removed. A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
-- **Placement and nesting.** A scalar input has a Placement choice of `body`, `path`, `query` or
+  can be added and deleted. A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
+- **Placement and nesting.** A scalar input has a Sent in choice of `body`, `path`, `query` or
   `header`, which shows `body` when the file has no `in` key and removes the key when `body` is chosen.
   `object` and `list` inputs show nested field rows instead, down to four levels with the input as
   level 1. Choosing one adds `fields` and removes `in`, and a scalar type removes `fields`. The compiler
   reports placement and path errors after the save, see
   [structured payloads](integration-resources.md#structured-payloads).
-- **Output source.** An optional Source box holds a JSON Pointer into the response, and an empty box
+- **Read from.** An optional Read from box holds a JSON Pointer into the response, and an empty box
   removes `source`.
 - **Unknown keys.** A key the editor does not show, in the file, in an operation or in `auth`, is saved
   unchanged.
@@ -819,17 +840,17 @@ the Assurance heading, and the JSON view stays as the second view of the same dr
 
 - **Type.** Choosing `accounts`, `oidc` or `saml` removes the keys the new type forbids and adds the
   bindings it requires, with an empty name. An `accounts` provider shows only General, Roles and Assurance.
-- **Bindings.** A binding is a name box, and its help says which kind it is and that only the name is
+- **Bindings.** A binding is a name box, and its help says what it holds and that only the name is
   stored. No value is shown or stored. `oidc` shows the issuer, the client ID, and a choice of client
   credential: a client secret, or a client key for `private_key_jwt`, each option with its own help.
   `saml` shows the metadata. Name and Type carry the shared required mark.
-- **Label.** The "Continue with" label sits in Sign-in, after the bindings, and has its texts in every locale, see [label texts](#label-texts).
+- **Label.** The "Name on the sign-in button" field sits in Sign-in, after the bindings, and has its texts in every locale, see [label texts](#label-texts).
 - **Claims.** The display name, email and locale claims are name boxes that show their defaults,
   `name`, `email` and `locale`, until the author types another name.
 - **Roles.** The roles claim is a name box that shows `roles` by default. `values` are rows of a claim
-  value and a role picked from the application's roles, one field to a line, with add and remove. With no rows, a claim
+  value and a role picked from the application's roles, one field to a line, with Add claim value and Delete. With no rows, a claim
   value gives the role of the same name, and the editor says so.
-- **Assurance.** `acr` is a list of text rows, each with Remove below, and with none the key is removed.
+- **Assurance.** `acr` is a list of text rows, each with Delete below, and with none the key is removed.
 - **Unknown keys.** A key the editor does not show is saved unchanged.
 
 ### A site's sign-in

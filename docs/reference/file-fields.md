@@ -1,9 +1,9 @@
 # File fields
 
 A `file` field holds one uploaded file on a record. This page covers its value, the upload and
-download routes, where the bytes are stored and how they are cleaned up, the `fileStorage` manifest
-property and how the SPA shows a file. The reasons for the design are in
-[D76](../decisions/d76-file-money-and-enum-label-field-types.md).
+download routes, inline previews, earlier versions, where the bytes are stored and how they are
+cleaned up, the `fileStorage` manifest property and how the SPA shows a file. The reasons for the design are in
+[D157](../decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md).
 
 ## Field and value
 
@@ -38,6 +38,9 @@ contain.
 | `POST /api/apps/{app}/entities/{entity}/fields/{field}/files`              | Uploads a file to a field, see [upload](#upload)                   |
 | `POST /api/apps/{app}/entities/{entity}/fields/{collection}/{field}/files` | Uploads a file to a field of a child entity, see [upload](#upload) |
 | `GET /api/apps/{app}/files/{id}`                                           | Downloads a file, see [download](#download)                        |
+| `GET /api/apps/{app}/files/{id}/preview?thumbnail=` _(planned for M40)_ | Gives a short-lived link to a file's inline preview or its thumbnail, see [preview](#download) |
+| `GET /api/apps/{app}/files/{id}/versions` _(planned for M40)_ | Lists the earlier versions of a file, see [versions](#versions) |
+| `POST /api/apps/{app}/files/{id}/versions/{version}/restore` _(planned for M40)_ | Restores an earlier version, see [versions](#versions) |
 
 An upload stores a file as `pending`, and a later record write attaches it. This section covers the
 upload route, its checks and the attach step.
@@ -144,6 +147,18 @@ download, as they may read records.
 - **Headers.** `Content-Type` is the stored media type, `Content-Disposition: attachment` with the
   file name, and `X-Content-Type-Options: nosniff`. A browser never shows a file inline, so an
   uploaded HTML file, or an SVG sent under another type, cannot run in the application's origin.
+- **Preview.** _(planned for M40)_ An image or a PDF shows inline in the page, and the SPA asks
+  `GET /api/apps/{app}/files/{id}/preview` for it. The server makes the checks of a download, with the same
+  `404`, and answers `{ "url", "expiresAt" }`: a link to the file's bytes on the **file origin** that the host
+  setting `Files:PreviewOrigin` names. The link carries a signed token for that one file, and it lives for
+  `Files:PreviewLifetime`. The file origin is not the origin of the application, so the session cookie never
+  reaches it and a file that it serves cannot run script in Axis's origin. It serves only the types in the
+  [table of checks](#upload) that are images or `application/pdf`, with `Content-Disposition: inline`. SVG and
+  HTML never show inline, and the route answers `415` for any other type of a file that the user may read. The
+  [headers](headers-and-rate-limits.md#security-headers) of the file origin are in their own rule.
+- **Thumbnails.** _(planned for M40)_ `?thumbnail=true` gives the link of a small image of the file: the image
+  scaled down, or the first page of a PDF. The [document runner](document-templates.md#the-document-runner) makes
+  it when the file is attached, and it is kept and purged with the file, so the server decodes no image.
 - **Child rows.** A child row has no id of its own, so a download always goes by file id. It goes
   through the owner record, and the user's `read` grant must cover the owner's child collection
   field, such as `attachments`.
@@ -152,6 +167,29 @@ download, as they may read records.
   download holds one database connection until the client has received every byte.
   `FilePerformanceTests` fails when the best of three 25 MB downloads takes 5 s or more, or
   allocates as many bytes as the file.
+
+## Versions
+
+_(planned for M40)_
+
+A file keeps its earlier versions, so a person who replaces a contract by mistake gets the first one back.
+Replacing a file keeps the one before it, up to the number of versions that the host setting `Files:Versions`
+names, and the oldest version beyond it is purged as a deleted file is.
+
+- **What a version is.** The file that a field held before a write replaced it, with its name, media type,
+  size, who replaced it and when. Removing a file keeps it as a version too. A record delete purges every
+  version of the record's files, in the same statement as the delete.
+- **Who may see them.** A person who may update the record, with the record filters, as for an upload. Any
+  other request, and an unknown id, is the same `404` as a download.
+- **List.** `GET /api/apps/{app}/files/{id}/versions` takes the id of the file a field holds now and answers
+  its versions, newest first, as `[{ "id", "name", "mediaType", "size", "replacedBy", "replacedAt" }]`. A
+  version's own id downloads through `GET /api/apps/{app}/files/{id}`, for a user who may update the record.
+- **Restore.** `POST /api/apps/{app}/files/{id}/versions/{version}/restore` answers `204`. The version becomes
+  the file the field holds, and the file it replaces becomes the newest version. It is a write of the record,
+  so it needs `update`, applies the record filters and writes the record's audit record for the field. A
+  version that is not one of the file's, or that was purged, is a `404`.
+- **Kept ids.** A restore never reuses a purged file, and an id of a version cannot be attached by a record
+  write, as any file that is not `pending` cannot.
 
 ## Storage and clean-up
 
@@ -176,11 +214,26 @@ purged by the worker.
   ready and then at most every 5 minutes for each tenant, see
   [process execution](process-execution.md#worker-settings). An `attached` file is never purged.
   The sweep is internal, so it needs no scheduled job.
+- **Object storage.** _(planned for M40)_ The bytes may live in an object storage that speaks the S3 protocol,
+  which a `storage` binding names. It holds an endpoint and a bucket, and takes its credentials from a
+  [`secret` binding](integration-resources.md#deployment-bindings). Each object's key is made from the tenant and
+  the file's id, never from the file's name, so two tenants never share a key. The metadata stays in
+  `axis.files`, with the storage kind of the file. A command moves a tenant's files between the database and the
+  object storage, see [moving files](tenant-setting-commands.md#deployment-bindings).
 - **Backup.** Files in the tenant database are in the tenant's `pg_dump`, so
   [tenant backup](tenant-backup-and-restore.md) archives hold them.
+- **Backup of object storage.** _(planned for M40)_ Files in an object storage are not in the tenant's
+  `pg_dump`, so an archive holds their rows and not their bytes. The operator backs the bucket up with the
+  object storage's own means, at the time of the archive, and a restore needs a bucket that holds the files of
+  its archive.
 - **Audit.** An audit record names the file field that changed, never the file's name or bytes.
   Step history stores no field values, and a call input can never map a file, because only
   `is null` and `is not null` accept one, so a file's name and id never reach either.
+- **Audit of a file in a call.** _(planned for M40)_ A call input of the type `file` maps a file field by its
+  name. Step history, logs and audit hold the file's id and size, never its name or bytes, see
+  [files in calls](process-execution.md#files-in-calls).
+- **Comment files.** _(planned for M43)_ A file of a comment is a file of its owner comment, with the same upload,
+  download and clean-up, see [comment files](comments.md#files).
 
 ## The `fileStorage` manifest property
 
@@ -205,6 +258,9 @@ go:
   tenant a missing binding is a warning.
 - The binding's only value is `database`, so the bytes stay in `axis.file_contents`. See
   [deployment bindings](integration-resources.md#deployment-bindings).
+- **An object storage.** _(planned for M40)_ The binding's value may name an S3 object storage instead, so
+  the bytes live outside the tenant database, see [storage and clean-up](#storage-and-clean-up). The manifest
+  stays the same, because the release names the binding and never where it points.
 
 ## In the SPA
 
@@ -224,6 +280,16 @@ file URL of its own.
   `403` for a quota refusal shows the server's title, as [refusals](tenant-quotas.md#refusals) says.
   A file larger than `maxSize` is refused in the browser with the message of a `413`, and is not
   uploaded. `accept` only filters the file picker, and the server decides the type.
+- **Preview.** _(planned for M40)_ A detail shows an image or a PDF inline, in a frame that loads the link of
+  the [preview](#download), and a table shows an image's thumbnail beside its name. Another type shows
+  only the name as a download link. The CSP of the SPA lists the file origin, see
+  [headers](headers-and-rate-limits.md#security-headers).
+- **Earlier versions.** _(planned for M40)_ A form and a detail show a Versions… button for a person who may
+  update the record. It opens a dialog that lists the [versions](#versions), newest first, with each one's
+  name, who replaced it and when, and a Restore button on each row. The dialog is `large`, as
+  [dialogs](actions-and-controls.md#dialogs) say of a list. Restore asks nothing, because the file it replaces
+  becomes the newest version and the person can take it back, see
+  [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm).
 - **Table, detail and read-only child rows.** They show the file's name as a download link. A file
   column cannot be sorted.
 - **Keyboard and screen readers.** The Upload and Remove buttons are reached and used with the

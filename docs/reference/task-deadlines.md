@@ -39,8 +39,11 @@ A task step may add `escalations`, which reassign the task or notify people afte
   (`AXC0084`, at `/steps/{i}/deadline/after` for the deadline and at
   `/steps/{i}/escalations/{j}/after` for an escalation). It counts from the time of the task step's
   transaction, the same time `dueIn` counts from and the task's `created_at`. In a
-  [test scenario](test-scenarios.md) that time follows the scenario's `now`. There are no business
-  hours or calendars.
+  [test scenario](test-scenarios.md) that time follows the scenario's `now`.
+- **Working time** _(planned for M39)_. `dueIn`, an escalation's `after` and the deadline's `after` may
+  count working time on a calendar, and a due time that has not passed moves when the calendar changes,
+  see [durations in working time](working-time.md#durations-in-working-time) and
+  [when a calendar changes](working-time.md#when-a-calendar-changes).
 - **Escalation.** Each has a `name`, `after` and at least one of `reassign` and `notify`, otherwise
   `AXC0280` at `/steps/{i}/escalations/{j}`. A missing `name` is `AXC0004`, and a later escalation
   with a name already used in the task, ignoring letter case, is `AXC0359` at
@@ -115,9 +118,17 @@ An expired task leaves every inbox and cannot be completed: the task API answers
 with the `409` it gives for a completed task. It reads with `state` `expired`, and the API does not
 return `expired_at`.
 
+**Closed.** _(planned for M38)_ A `closed` task leaves every inbox and cannot be completed: the task
+API answers a completion of it with the `409` it gives for a completed task. It reads with `state`
+`closed`.
+
 **Overdue.** A task is overdue when it is `open` and its `due_at` is before the database's current
 time. The task API's list and read add `"overdue": true|false`, worked out when read with database
 time, and nothing is stored. A completed, cancelled or expired task is never overdue.
+
+**At risk** _(planned for M39)_. An open task that is not overdue, and whose instance has an
+[SLA](working-time.md#slas) that is `atRisk` or `breached`, reads with `"atRisk": true`. It is worked
+out when read, and nothing is stored.
 
 ## Claim and release
 
@@ -154,6 +165,7 @@ it.
 | ------------------------------------------ | --------------------------------------------------------------- |
 | `POST /api/apps/{app}/tasks/{id}/reassign` | Gives a task to another user or role, see [reassign](#reassign) |
 | `GET /api/apps/{app}/users`                | Lists the users to pick from, see [reassign](#reassign)         |
+| `POST /api/apps/{app}/tasks/{id}/add-person` _(planned for M38)_ | Adds a person to an open task for several people, see [add a person](#add-a-person) |
 
 A user with the `reassign` grant may give a task to another user or role, with a reason:
 
@@ -197,6 +209,40 @@ Content-Type: application/json
   no display name, and the details `{ "taskId", "from", "to", "escalation" }`, which have the
   escalation's index and no `reason`, because no person typed one.
 
+### Add a person
+
+_(planned for M38)_
+
+A user with the `reassign` grant may add a person to an open
+[task for several people](task-api.md#a-task-for-several-people), with a reason, such as when a
+reviewer joins a request that is in progress:
+
+```http
+POST /api/apps/{app}/tasks/{id}/add-person
+Content-Type: application/json
+
+{ "user": "li", "reason": "Joins the review for the budget part." }
+```
+
+- **Body.** It has `user`, a user id, and a `reason` of at most 500 characters that is not blank, as a
+  reassign has. A value that is not text or is blank is `Required.` at its pointer.
+- **Who may act.** A user with the `reassign` action on a grant of the task's process in the active
+  release, as for a reassign. Without the grant the answer is the `403` titled "You have no grant for
+  this action.", whoever the assignee is.
+- **Errors.** The checks run in the task API's order: `401`, `404`, `403` for the grant, `409` for a
+  task that is not open, then `409` titled "Only a task for several people can take another person.",
+  `415`, `400` for the body, then `400` for the target. A `user` must have a
+  [user profile](notifications.md#user-profiles), as for a reassign, otherwise it is a `400` keyed
+  `/user`. A person who already has a task in the group is a `409` titled "This person already has this
+  task.".
+- **Effect.** The route locks the group's tasks, the instance and the path in the order of the task API.
+  It inserts an `open` task for the user with the group's `group_id`, step, form, path, pass and
+  `due_at`, and the rule of completion then counts one more person. The task is not decided by being
+  added to.
+- **Response.** `200` with the task `{id}` in the single-read shape of the [task API](task-api.md).
+- **Audit.** `task.personAdded`, with the actor, the task id, the subject record and the instance. Its
+  details are `{ "taskId", "addedTaskId", "user", "reason" }`.
+
 ## Tables
 
 The columns that deadlines and claims use are in [process tables](process-tables.md#tables):
@@ -227,6 +273,8 @@ The [task inbox widget](task-inbox-widget.md) and the task page use these fields
 
 - The inbox shows an "Overdue" tag beside the due date of an `overdue` task, and a "Claimed by you"
   tag on a row whose `claimedBy` is set.
+- **At risk** _(planned for M39)_. The inbox and the task page show an "At risk" tag for an `atRisk` task,
+  see [task inbox widget](task-inbox-widget.md#task-inbox-widget).
 - The task page shows the "Overdue" tag. It shows Claim and Release when `commands` lists them, and
   shows the task the route returns. A `403` or `409` shows a message and loads the task again.
 - An `expired` task shows that its deadline passed, with no form or buttons.

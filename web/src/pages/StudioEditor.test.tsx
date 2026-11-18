@@ -15,7 +15,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { loadKindSchema } from '../platform/studioSchemas'
 import { chooseOption, selectRoot } from '../test/antd'
-import { addEntityField, entityFieldAction, openEntityField } from '../test/entityFields'
+import { addEntityField, entityFieldAction, entityFieldMenuItem, openEntityField } from '../test/entityFields'
 import { editJson, jsonText, jsonView } from '../test/jsonView'
 import { buildProcessGraph } from './processGraph'
 import { StudioEditor } from './StudioEditor'
@@ -705,7 +705,7 @@ describe('StudioEditor for a connector', () => {
     const { fetchMock } = stubResource(connectorItem, connectorContent)
     renderResource(connectorItem)
 
-    await userEvent.click(await screen.findByRole('combobox', { name: 'Auth type' }, slow))
+    await userEvent.click(await screen.findByRole('combobox', { name: 'Authentication type' }, slow))
     await userEvent.click(await screen.findByTitle('header'))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -781,9 +781,9 @@ describe('StudioEditor for an endpoint', () => {
     await screen.findByTestId('studio-field-/entity', {}, slow)
     await userEvent.click(screen.getByRole('combobox', { name: 'Event' }))
     await chooseOption('PaymentReceived')
-    await userEvent.click(screen.getByRole('combobox', { name: 'Add mapping Event fields' }))
+    await userEvent.click(screen.getByRole('combobox', { name: 'Add Event fields' }))
     await chooseOption('amount')
-    await userEvent.click(screen.getByRole('combobox', { name: 'Add mapping Event fields' }))
+    await userEvent.click(screen.getByRole('combobox', { name: 'Add Event fields' }))
     await chooseOption('reference')
     await userEvent.click(
       within(screen.getByTestId('studio-field-/event/fields/amount')).getByRole('combobox', { name: 'Event field' }),
@@ -959,7 +959,7 @@ describe('StudioEditor for a process', () => {
 
     const card = await screen.findByTestId('studio-step-4', {}, slow)
     expect(card).toHaveTextContent('markApproved')
-    await userEvent.click(within(card).getByRole('button', { name: 'Remove step' }))
+    await userEvent.click(within(card).getByRole('button', { name: 'Delete' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -1187,7 +1187,7 @@ describe('StudioEditor for a process', () => {
     for (const source of [8, 9, 10]) {
       expect(screen.queryByTestId(`rf__edge-/steps/${source}/next`)).not.toBeInTheDocument()
     }
-    expect(screen.getByTestId('studio-process-announcement')).toHaveTextContent('Removed step done')
+    expect(screen.getByTestId('studio-process-announcement')).toHaveTextContent('Removed step done.')
     expect(screen.getByText('Select a step on the canvas.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
     const named = JSON.parse(await jsonText())
@@ -1215,32 +1215,32 @@ describe('StudioEditor for a process', () => {
     const design = within(screen.getByTestId('studio-process-design'))
     expect(screen.getByTestId('rf__edge-/steps/2/otherwise')).toHaveAttribute('aria-current', 'true')
     expect(screen.getByTestId('studio-graph-node-2')).toHaveAttribute('aria-current', 'true')
-    expect(design.getByRole('button', { name: 'Remove transition' })).toBeInTheDocument()
+    expect(design.getByRole('button', { name: 'Remove line' })).toBeInTheDocument()
 
     await userEvent.keyboard('{Delete}')
 
     expect(screen.queryByTestId('rf__edge-/steps/2/otherwise')).not.toBeInTheDocument()
     expect(screen.getByTestId('studio-graph-node-4')).toBeInTheDocument()
     expect(within(design.getByTestId('studio-field-/steps/2/otherwise')).queryByText('markApproved')).toBeNull()
-    expect(design.queryByRole('button', { name: 'Remove transition' })).not.toBeInTheDocument()
+    expect(design.queryByRole('button', { name: 'Remove line' })).not.toBeInTheDocument()
     expect(design.getByTestId('studio-step-2')).toBeInTheDocument()
     expect(design.getByTestId('studio-process-announcement')).toHaveTextContent(
-      'Removed transition financeCheck to markApproved',
+      'Removed the line financeCheck to markApproved, otherwise.',
     )
   })
 
-  it('clears the transition with the Remove transition button, and one Undo restores it', async () => {
+  it('clears the transition with the Remove line button, and one Undo restores it', async () => {
     stubResource(processItem, processContent)
     renderResource(processItem)
 
     fireEvent.click(await screen.findByTestId('rf__edge-/steps/1/outcomes/0', {}, slow))
     const design = within(screen.getByTestId('studio-process-design'))
-    await userEvent.click(design.getByRole('button', { name: 'Remove transition' }))
+    await userEvent.click(design.getByRole('button', { name: 'Remove line' }))
 
     expect(screen.queryByTestId('rf__edge-/steps/1/outcomes/0')).not.toBeInTheDocument()
     expect(screen.getByTestId('rf__edge-/steps/1/outcomes/1')).toBeInTheDocument()
     expect(design.getByTestId('studio-process-announcement')).toHaveTextContent(
-      'Removed transition managerApproval to financeCheck, approve',
+      'Removed the line managerApproval to financeCheck, approve.',
     )
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
     expect(screen.getByTestId('rf__edge-/steps/1/outcomes/0')).toBeInTheDocument()
@@ -1254,12 +1254,12 @@ describe('StudioEditor for a process', () => {
     fireEvent.click(node)
     act(() => node.focus())
     const design = within(screen.getByTestId('studio-process-design'))
-    expect(design.queryByRole('button', { name: 'Remove transition' })).not.toBeInTheDocument()
+    expect(design.queryByRole('button', { name: 'Remove line' })).not.toBeInTheDocument()
     await userEvent.keyboard('{Delete}')
 
     expect(screen.queryByRole('button', { name: 'markRejected, operation' })).not.toBeInTheDocument()
     expect(screen.getByTestId('studio-graph-node-10')).toHaveAccessibleName('done, end')
-    expect(design.getByTestId('studio-process-announcement')).toHaveTextContent('Removed step markRejected')
+    expect(design.getByTestId('studio-process-announcement')).toHaveTextContent('Removed step markRejected.')
   })
 
   it('does not remove a step when Delete is pressed outside the canvas', async () => {
@@ -1282,11 +1282,11 @@ describe('StudioEditor for a process', () => {
     const marked = await screen.findByTestId('studio-graph-node-1', {}, slow)
     expect(marked).toHaveAttribute('data-marked', 'true')
     expect(marked).toHaveAccessibleName(
-      `${processContent.steps[1].name}, ${processContent.steps[1].type}, has diagnostics`,
+      `${processContent.steps[1].name}, ${processContent.steps[1].type}, has problems`,
     )
     const other = screen.getByTestId('studio-graph-node-0')
     expect(other).not.toHaveAttribute('data-marked')
-    expect(other).not.toHaveAccessibleName(/has diagnostics/)
+    expect(other).not.toHaveAccessibleName(/has problems/)
   })
 })
 
@@ -2096,13 +2096,15 @@ describe('StudioEditor for a form', () => {
     expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
   })
 
-  it('undoes a Remove section in one step, restoring sections and steps and returning the fields to the palette', async () => {
+  it('undoes a Delete section in one step, restoring sections and steps and returning the fields to the palette', async () => {
     stubForm(steppedContent)
     renderForm()
 
     await userEvent.click(await screen.findByRole('tab', { name: 'Design' }, slow))
     await userEvent.click(screen.getAllByTestId('studio-outline-section')[0])
-    await userEvent.click(screen.getByRole('button', { name: 'Remove section' }))
+    await userEvent.click(
+      within(screen.getByTestId('studio-design-panel')).getByRole('button', { name: 'Delete section' }),
+    )
     expect(screen.getAllByTestId('studio-outline-section')).toHaveLength(1)
     expect(screen.getByTestId('studio-form-palette-title')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Undo' })).toBeEnabled()
@@ -2114,13 +2116,15 @@ describe('StudioEditor for a form', () => {
     expect(draft.steps).toEqual(steppedContent.steps)
   })
 
-  it('undoes a Remove step in one step, restoring the step', async () => {
+  it('undoes a Delete step in one step, restoring the step', async () => {
     stubForm(steppedContent)
     renderForm()
 
     await userEvent.click(await screen.findByRole('tab', { name: 'Design' }, slow))
     await userEvent.click(screen.getAllByTestId('studio-outline-step')[1])
-    await userEvent.click(screen.getByRole('button', { name: 'Remove step' }))
+    await userEvent.click(
+      within(screen.getByTestId('studio-design-panel')).getByRole('button', { name: 'Delete step' }),
+    )
     expect(screen.getAllByTestId('studio-outline-step')).toHaveLength(1)
 
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
@@ -2465,7 +2469,8 @@ describe('StudioEditor for an entity', () => {
     const { fetchMock } = stubResource(designedItem, designed)
     renderResource(designedItem)
 
-    expect(within(await openEntityField(0)).getByRole('button', { name: 'Move up' })).toBeDisabled()
+    expect(await entityFieldMenuItem(0, 'Move up')).toHaveAttribute('aria-disabled', 'true')
+    await userEvent.click(document.body)
     await entityFieldAction(1, 'Move up')
     await entityFieldAction(1, 'Move down')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))

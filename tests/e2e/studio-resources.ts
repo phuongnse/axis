@@ -192,13 +192,19 @@ export async function addEntityField(page: Page, index: number) {
 }
 
 /**
- * Clicks Move up, Move down or Remove on the row of field `index` of the open entity. It closes an open field first.
- * Remove clicks the row's Remove field button, and the fields after a removed one move up an index.
+ * Chooses Move up, Move down or Remove in the "…" menu of the row of field `index` of the open entity. It closes an open
+ * field first. It presses Enter on the entry instead of clicking it: the row's expression checks finish after the menu
+ * opens, add lines and move the menu, so a click can miss the entry. It waits until the menu has closed, so its entries
+ * do not match the next action. The fields after a removed one move up an index.
  */
 export async function entityFieldAction(page: Page, index: number, action: 'Move up' | 'Move down' | 'Remove') {
   await closeEntityField(page)
-  const name = action === 'Remove' ? 'Remove field' : action
-  await page.getByTestId(`studio-field-/fields/${index}`).getByRole('button', { name, exact: true }).click()
+  await page.getByTestId(`studio-field-/fields/${index}`).getByRole('button', { name: 'Actions', exact: true }).click()
+  await page
+    .getByRole('menu', { name: 'Actions', exact: true })
+    .getByRole('menuitem', { name: action, exact: true })
+    .press('Enter')
+  await expect(page.getByRole('menu', { name: 'Actions', exact: true })).toHaveCount(0)
 }
 
 /**
@@ -257,10 +263,10 @@ export async function addListRow(page: Page, list: string) {
   await page.getByTestId(`studio-field-${list}`).getByRole('button', { name: 'Add row', exact: true }).click()
 }
 
-/** Clicks Add mapping in `scope` once the expression editors are still. */
+/** Clicks Add row in `scope`, which adds a mapping row, once the expression editors are still. */
 export async function addMapping(scope: Locator) {
   await waitForExpressions(scope.page())
-  await scope.getByRole('button', { name: 'Add mapping', exact: true }).click()
+  await scope.getByRole('button', { name: 'Add row', exact: true }).click()
 }
 
 /**

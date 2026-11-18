@@ -148,7 +148,7 @@ module's own files side by side.
   file. A layer with one of them is not applied. An element whose key the module's list lacks is an
   added element, so only a remove or an anchor can name an unknown key. After a version change, a
   changed element whose key the new version dropped is `AXC0372`, see
-  [versions until M29](#versions-until-m29).
+  [module versions and layers](#module-versions-and-layers).
 
 ## List keys
 
@@ -272,7 +272,7 @@ module ([kind lists](studio.md#kind-lists-and-module-resources)), and each opens
   a Customized tag and **Reset all**.
 - **Names.** In the schema form editors `name` shows as text, because the save route refuses a renamed
   module resource.
-- **Module policies.** The module editor edits a grant's actions and removes grants, and shows a
+- **Module policies.** The module editor edits a grant's actions and deletes grants, and shows a
   grant's filter and fields read-only. It does not add a grant. A grant past the module contract's
   ceiling (`AXC0334`) shows in the Problems panel after the save.
 - **Module pages.** A module page opens in the page designer with every input on and a Save
@@ -299,10 +299,10 @@ module ([kind lists](studio.md#kind-lists-and-module-resources)), and each opens
   refused write, and a change that adds a transition into a protected state is a diagnostic in the
   editor.
 
-## Versions until M29
+## Module versions and layers
 
 A layer applies to the module version that the application pins, and a newer installed version in
-range is applied with the same layer, by keys. The three-way merge that replaces this is in
+range is applied with the same layer, by keys. How an upgrade merges a layer three ways is in
 [upgrades with module migrations](modules-and-templates.md#upgrades-with-module-migrations).
 
 - **A key the new version lacks.** The compile compares the version it picks with the copy of the
@@ -316,5 +316,6 @@ range is applied with the same layer, by keys. The three-way merge that replaces
 - **When nothing is compared.** With no active release, or with the same version as the active release,
   the compare does not run, and an element whose key the module lacks is an added element. Only the
   step from the active version to the new one is compared.
-- **Built-in modules.** A new version of a built-in module ships to a business that has a layer over it
-  only with the three-way merge, so the layer is merged and not applied again by keys.
+- **Built-in modules** _(planned for M29)_. A new version of a built-in module ships to a business
+  that has a layer over it only with the three-way merge, so the layer is merged and not applied again
+  by keys.

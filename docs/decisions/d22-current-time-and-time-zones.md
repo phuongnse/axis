@@ -18,7 +18,8 @@ time zone, while a date or a local year does.
 - **Not in computed fields.** A computed field's value is stored and would go stale, so `now()` in
   a computed field is a compile error.
 - **Local dates come from the application.** Today's date and the local year of a sequence follow
-  the application's time zone of [D75](d75-the-application-time-zone.md). A schedule trigger that
+  the application's time zone of
+  [D156](d156-working-time-calendars-durations-in-working-hours-and-slas.md). A schedule trigger that
   names its own time zone runs in it, as [D26](d26-events-and-triggers.md) agrees.
 
 Which transaction each kind of expression uses is in

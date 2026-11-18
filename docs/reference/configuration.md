@@ -5,8 +5,9 @@ release active. This page describes its five steps, the checks each step runs wi
 code that each problem gets, and the reference index that the compile builds on the way. The
 resources it reads are described on their own pages:
 
-- [Resource files](resource-files.md): the file shape, the schema keywords, entity field types,
-  entity logic and sequences.
+- [Resource files](resource-files.md): the file shape, the schema keywords and entity field types.
+- [Entity logic and sequences](entity-logic-and-sequences.md): an entity's logic and sequences, the
+  application time zone and the fiscal year.
 - [Roles and policies](roles-and-policies.md), [integration resources](integration-resources.md),
   [identity providers](identity-provider.md#identity-provider-resource),
   [modules and templates](modules-and-templates.md), [module contracts](module-contracts.md),
@@ -136,7 +137,7 @@ including a reference to itself, must have a `displayField`, otherwise the refer
 ### Child collections
 
 A `child-collection` field's `target` is a child entity, owned by that field. The limits below exist
-for the reasons in [entity logic](resource-files.md#entity-logic).
+for the reasons in [entity logic](entity-logic-and-sequences.md#entity-logic).
 
 - **Target.** A `child-collection` field without `target` is `AXC0014` at the field, and a `target`
   that names no loaded entity is `AXC0012` at `/fields/{i}/target`.
@@ -158,12 +159,24 @@ A site belongs to one application, and its `path` and locales are checked here.
   `licences`), or one that an earlier site of the application already uses in path order, is
   `AXC0024` at `/path`. A reserved path is not also checked for duplicates. `assets` is reserved
   because the SPA serves its files under `/assets/`.
+- **History and recovery paths** _(planned for M41)_. `audit` and `recycle-bin` are reserved too, because the
+  [audit page](platform-pages.md#audit-page) and the [recycle bin page](platform-pages.md#recycle-bin-page) are
+  platform routes before the site route.
 - **Locales.** The `default` and `fallback` locales must be in `available`, and every available
   locale needs a `text` resource, ignoring letter case, otherwise it is `AXC0025`.
 - **Navigation.** A navigation entry must name a loaded page (`AXC0023`). Its optional `icon` must be
   a name from Axis's list of [navigation icons](shell.md#navigation-icons), otherwise it is
   `AXC0004` at `/navigation/{i}/icon`.
 - **Labels.** Site titles and descriptions and navigation labels join the `AXC0028` check.
+- **Menu groups and home pages** _(planned for M42)_. An entry with `entries` names no `page` and holds at least one
+  entry, and an entry inside `entries` holds none. Otherwise the entry is refused at `/navigation/{i}`. A `homePages`
+  entry must name a loaded role and a loaded page, and a role named twice is refused at the later entry, at
+  `/homePages/{i}`. The rule is [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
+- **Brand** _(planned for M42)_. A `logo` that is not a PNG, JPEG or WebP file in `images` is refused at `/brand/logo`.
+  A `primary` that is not `#rrggbb` is refused at `/brand/primary`, and so is one whose derived colours miss the
+  [contrast thresholds](frontend.md#design-tokens-and-previews) in either mode. Those are `primaryText` at 4.5:1 on
+  `surface` and `canvas`, `onPrimary` at 4.5:1 on `primary`, and `focusRing` at 3:1 on `surface` and `canvas`. The rule
+  is [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
 
 ### Pages and widgets
 
@@ -233,8 +246,11 @@ is reported at the widget's own pointer, such as `/widgets/0/columns/1/widgets/0
   otherwise the container that would hold a list on level 5 is `AXC0221`.
 - **Columns.** The `width` of the columns of one `columns` widget add up to 12, otherwise it is
   `AXC0222` at `/widgets/{i}/columns`.
-- **One of each.** A second `table` is `AXC0223`, and a second `form`, `taskInbox` or
-  `processInspector` is `AXC0224`, both at the second widget.
+- **One owner for each part of the address** _(planned for M42)_. A page may hold several `table`
+  widgets, each with a `prefix` of its own. A second `form`, `taskInbox` or `processInspector` is
+  refused at the second widget. A table `prefix` that is not letters and digits starting with a
+  letter is refused at the later table. So is a prefix that another table of the page has, ignoring
+  letter case, and a second table without a prefix.
 - **Labels.** A tab label and a section title join the `AXC0028` check.
 - **Shape.** The page schema requires `columns` on a `columns` widget, `tabs` on a `tabs` widget,
   and `title` with `widgets` on a `section` widget. It does not allow them on any other widget, and
@@ -253,8 +269,10 @@ A page's `parameters` are checked in file order, at `/parameters/{i}`.
   target is `AXC0012` at `/target`, a child entity target is `AXC0040` and a target without a display
   field is `AXC0030`. A `reference` parameter's `target` is a `field target` edge in the
   [reference index](#reference-index).
-- **Form pages.** A page that holds a `form` widget declares no parameters, otherwise it is
-  `AXC0236` at `/parameters`.
+- **Form pages** _(planned for M42)_. A page that holds a `form` widget may declare parameters. A
+  parameter with a field's name must have that field's type, and a `reference` the same target,
+  otherwise it is refused at `/parameters/{i}`. See
+  [first values of a new record](resource-files.md#first-values-of-a-new-record).
 
 ### Widget parameters
 
@@ -333,7 +351,7 @@ time, because the startup step checks them before it inserts any record, see
 
 ### Sequences
 
-A field's [`sequence`](resource-files.md#sequences) must name a loaded `sequence` resource, ignoring
+A field's [`sequence`](entity-logic-and-sequences.md#sequences) must name a loaded `sequence` resource, ignoring
 letter case, otherwise it is `AXC0066` at `/fields/{i}/sequence`. A `sequence` is `AXC0013` at
 `/fields/{i}/sequence` when the field is not `text`, is `required`, has an `expression`, or belongs
 to a child entity. The field gets one diagnostic, for the first of these reasons in that order, and a
@@ -580,13 +598,13 @@ The Check step type-checks the expressions of entity logic and of rules. A valid
 field with an error produces no model. [Data source](data-sources.md#compile-checks) filters are
 checked in the [Resolve](#data-sources) step, with the data sources.
 
-- **Validations.** Each entity's [validations](resource-files.md#entity-logic) are parsed and
+- **Validations.** Each entity's [validations](entity-logic-and-sequences.md#entity-logic) are parsed and
   type-checked against the entity's own fields and its child collections, which only
   [aggregates](expressions.md#aggregates) accept, and must be boolean. A problem in the expression
   is reported with its [expression diagnostic](expressions.md#diagnostics) code at
   `/validations/{i}/expression`. A `field` that names no field of the entity, ignoring letter case,
   is `AXC0052` at `/validations/{i}/field`, and the `message` joins the `AXC0028` check.
-- **Computed fields.** The expression of each [computed field](resource-files.md#entity-logic) is
+- **Computed fields.** The expression of each [computed field](entity-logic-and-sequences.md#entity-logic) is
   parsed and type-checked against the entity's fields that are not computed and its child
   collections, and must give the field's type. A call to `now()`, `today()` or `toDate` in it,
   including inside an aggregate's item expression, is `AXC0086`. A problem in it is reported the same

@@ -1,10 +1,11 @@
 import { Fragment, type ReactNode } from 'react'
+import { placeholderPattern } from './fillText'
 
 /** A text with a node at each `{name}` placeholder, see docs/reference/shared-widgets.md#which-widget. A placeholder with no node stays as written. */
 export function FilledText({ text, parts }: { text: string; parts: Record<string, ReactNode> }) {
   return (
     <>
-      {text.split(/(\{[A-Za-z0-9]+\})/).map((piece, index) => {
+      {text.split(placeholderPattern).map((piece, index) => {
         if (index % 2 === 0) {
           return piece
         }

@@ -29,6 +29,10 @@ their own controls where they expect them.
   `radius-base` corners, and the mark and the title are one link to the site's first navigation page.
   The platform site's title and mark name Axis, because the tenant has no name yet, as the
   [sign-in card](#the-sign-in-card) does.
+- **Home page for each role** _(planned for M42)_. The mark and the title link to the person's home page, not the first
+  navigation page. See [sites and pages](resource-files.md#sites-and-pages) and [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
+- **Logo and colour** _(planned for M42)_. A site with a `logo` shows it in place of the mark. Its main colour takes the
+  place of `primary` in its shell and pages, see [design tokens](frontend.md#design-tokens-and-previews).
 - **Account button.** The account button is the person's avatar, the initials of their name on a
   `primary` circle, then their name and a caret. A circle is a person, as a rounded square is an
   application or a site. What it does is in [account button](#account-button).
@@ -41,6 +45,10 @@ their own controls where they expect them.
   page is drawn in `primaryText` on a `primary` tint and marked `aria-current`.
 - **Parent entries** _(planned for M35)_. A `ShellNavigation` entry that holds entries is a parent entry, drawn as Ant
   Design's inline submenu.
+- **Menu groups** _(planned for M42)_. A site's navigation entry with `entries` is a parent entry, as
+  [sites and pages](resource-files.md#sites-and-pages) sets out. It stays open while it holds the current page, and it
+  shows in the narrow-width menu too. A parent left with no entry by policies is left out, see
+  [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
 - **A page's own sidebar.** A page with its own navigation, such as Studio, claims the sidebar by
   rendering `ShellSidebar`, and draws its navigation there in place of the site's. Such a page is a
   workspace, with `spacing-md` round its content, compact sidebar entries and a compact band, see
@@ -156,6 +164,21 @@ theme.
   choice, and follows the operating system's light or dark setting, changing at once when it changes.
   Light and Dark keep their mode. The choice is kept in `localStorage` under `axis.themeMode`, as
   `system`, `light` or `dark`, see [browser storage](frontend.md#locale).
+
+## Favourites and recent items
+
+_(planned for M42)_
+
+Each person keeps favourites and recent items on the server, for each application site, as [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md) sets out. The routes are in [site endpoints](frontend.md#site-endpoints).
+
+- **Favourites.** A favourite is a page of the site, with the record that the page shows, if it shows one. The page
+  header's toggle adds the current page or removes it.
+- **Recent items.** A recent item is a page that showed one record: a form page at `/{id}`, or a page with a `detail`
+  widget. Opening one notes it, and the list keeps the latest 20.
+- **The header menu.** A menu in the header lists both kinds by page title and record label.
+- **Entries left out.** An entry the person can no longer open is left out of the menu.
+- **Application sites only.** The platform site has no lists. On a site's own host, only that site's lists show.
+- **Look.** The look is left to [design changes](../delivery.md#design-changes).
 
 ## Account button
 

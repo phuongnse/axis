@@ -168,10 +168,18 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
         Assert.False(typed.IsError, typed.Error);
         Assert.Equal("decimal", typed.Output!["type"]!.GetValue<string>());
         Assert.Empty(typed.Output["diagnostics"]!.AsArray());
+        var reading = typed.Output["reading"]!;
+        Assert.Equal("phrase", reading["kind"]!.GetValue<string>());
+        Assert.Equal("multiply", reading["words"]!.GetValue<string>());
+        Assert.Equal("decimal", reading["slots"]![0]![0]!["type"]!.GetValue<string>());
+        Assert.Equal(1.5m, reading["slots"]![0]![0]!["value"]!.GetValue<decimal>());
+        Assert.Equal("integer", reading["slots"]![1]![0]!["type"]!.GetValue<string>());
+        Assert.Equal(2, reading["slots"]![1]![0]!["value"]!.GetValue<int>());
 
         var broken = await CallAsync("check_expression", Arguments(("draft", draft), ("id", rule), ("path", "/expression"), ("expression", "1 +")));
         Assert.False(broken.IsError, broken.Error);
         Assert.Null(broken.Output!["type"]);
+        Assert.Null(broken.Output["reading"]);
         var diagnostic = Assert.Single(broken.Output["diagnostics"]!.AsArray())!;
         Assert.NotEmpty(diagnostic["code"]!.GetValue<string>());
         Assert.NotEmpty(diagnostic["message"]!.GetValue<string>());

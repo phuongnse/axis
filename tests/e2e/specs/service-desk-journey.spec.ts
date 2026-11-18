@@ -13,11 +13,14 @@ import { expectForm, pick, pickLabelled, save, sample } from '../service-desk-st
 import {
   addListItem,
   addListRow,
+  addEntityField,
   addMapping,
+  closeEntityField,
   createResource,
   deleteResource,
   doneListItem,
   grantIn,
+  openEntityField,
   openFormTab,
   openKind,
   openListItem,
@@ -226,16 +229,18 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expectForm(page)
     await writeLabel(page, 'studio-field-/label', text('category.label'))
 
+    await openEntityField(page, 0)
     await page.getByTestId('studio-field-/fields/0/required').getByRole('checkbox').check()
     await page.getByTestId('studio-field-/fields/0/unique').getByRole('checkbox').check()
     await page.getByTestId('studio-field-/fields/0/maxLength').getByRole('spinbutton').fill('100')
     await pick(page, 'studio-field-/fields/0/label', 'category.name', 'category.name')
 
-    await page.getByRole('button', { name: 'Add field', exact: true }).click()
+    await addEntityField(page, 1)
     await page.getByTestId('studio-field-/fields/1/name').getByRole('textbox').fill('defaultAgent')
     await page.getByTestId('studio-field-/fields/1/maxLength').getByRole('spinbutton').fill('100')
     await pick(page, 'studio-field-/fields/1/label', 'category.defaultAgent', 'category.defaultAgent')
 
+    await closeEntityField(page)
     await pick(page, 'studio-field-/displayField', 'name')
     await save(page, [
       ['name', 'Skip'],
@@ -284,7 +289,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await writeLabel(page, 'studio-field-/label', text('ticket.label'))
 
     async function addField(index: number, name: string) {
-      await page.getByRole('button', { name: 'Add field', exact: true }).click()
+      await addEntityField(page, index)
       await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(name)
       await pick(page, `studio-field-/fields/${index}/label`, `ticket.${name}`, `ticket.${name}`)
     }
@@ -299,6 +304,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     }
 
     // Row 0 is the starter `name` field, which becomes `number`.
+    await openEntityField(page, 0)
     await page.getByTestId('studio-field-/fields/0/name').getByRole('textbox').fill('number')
     await page.getByTestId('studio-field-/fields/0/unique').getByRole('checkbox').check()
     await page.getByTestId('studio-field-/fields/0/maxLength').getByRole('spinbutton').fill('20')
@@ -334,6 +340,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await addField(8, 'resolution')
     await page.getByTestId('studio-field-/fields/8/maxLength').getByRole('spinbutton').fill('4000')
 
+    await closeEntityField(page)
     await pick(page, 'studio-field-/displayField', 'title')
     // Drop the starter data on the rename. Leave title null in existing rows, since it is new and required.
     await save(page, [
@@ -360,6 +367,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await openKind(page, 'entity')
     await page.getByTestId('studio-group-entity').getByRole('link', { name: 'Ticket', exact: true }).click()
     await expectForm(page)
+    await openEntityField(page, 7)
     const values = page.getByTestId('studio-field-/fields/7/values')
     await expect(values.getByText('reopened', { exact: true })).toBeVisible()
     // Backspace in the empty tags input removes the last tag, which is reopened.
@@ -559,7 +567,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await createResource(page, 'process', 'TicketHandling')
     await openFormTab(page)
     await pick(page, 'studio-field-/entity', 'Ticket')
-    await page.getByTestId('studio-step-0').getByRole('button', { name: 'Remove step', exact: true }).click()
+    await page.getByTestId('studio-step-0').getByRole('button', { name: 'Delete', exact: true }).click()
 
     const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
     const steps: [name: string, type: string][] = [
@@ -632,7 +640,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       await pick(page, `studio-field-/steps/${index}/operation`, 'updateRecord')
       for (const [field, expression] of sets) {
         const row = page.getByTestId(`studio-field-/steps/${index}/set/${field}`)
-        await pickAction(stepCard(index).getByRole('combobox', { name: 'Add mapping Set', exact: true }), field, row)
+        await pickAction(stepCard(index).getByRole('combobox', { name: 'Add Set', exact: true }), field, row)
         await expect(row.locator('.cm-editor')).toBeVisible()
         await row.getByRole('textbox', { name: 'Expression', exact: true }).fill(expression)
       }
@@ -943,7 +951,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     // The page has a ticket parameter, so the mapping key is picked from its parameters.
     const row = page.getByTestId('studio-field-/steps/5/open/parameters/ticket')
     await pickAction(
-      page.getByRole('combobox', { name: 'Add mapping Page parameters', exact: true }),
+      page.getByRole('combobox', { name: 'Add Page parameters', exact: true }),
       'ticket',
       row,
     )
@@ -1078,7 +1086,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         await page.getByTestId(`studio-field-/parameters/${index}/name`).getByRole('textbox').fill(parameter)
         await pick(page, `studio-field-/parameters/${index}/type`, type)
       }
-      await stepCard(0).getByRole('button', { name: 'Remove step', exact: true }).click()
+      await stepCard(0).getByRole('button', { name: 'Delete', exact: true }).click()
       for (const [index, [stepName, type]] of [
         [step.name, 'operation'],
         ['done', 'end'],

@@ -130,7 +130,8 @@ describe.each(['light', 'dark'])('ConnectorEditor in %s mode', (mode) => {
     expect(first).toBeVisible()
     expect(field('operations.name', 'textbox', within(first))).toHaveValue('createPurchaseOrder')
     expect(field('operations.path', 'textbox', within(first))).toBeVisible()
-    expect(within(first).getAllByRole('textbox', { name: texts('operations.input.name').label })).toHaveLength(2)
+    const inputs = within(screen.getByTestId('studio-field-/operations/0/input'))
+    expect(inputs.getAllByRole('textbox', { name: texts('operations.input.name').label })).toHaveLength(2)
     expect(screen.getByRole('button', { name: 'Add operation' })).toBeVisible()
   })
 })
@@ -217,7 +218,7 @@ describe('ConnectorEditor', () => {
     ])
 
     await userEvent.click(
-      within(screen.getByTestId('studio-operation-1')).getByRole('button', { name: 'Remove operation' }),
+      within(screen.getByTestId('studio-operation-1')).getByRole('button', { name: 'Delete operation' }),
     )
     expect(onChange).toHaveBeenLastCalledWith('/operations/1', undefined)
   })
@@ -226,19 +227,19 @@ describe('ConnectorEditor', () => {
     const onChange = renderEditor()
     const first = within(screen.getByTestId('studio-operation-0'))
 
-    await userEvent.click(first.getByRole('button', { name: 'Add input field' }))
+    await userEvent.click(first.getByRole('button', { name: 'Add input' }))
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/input', [
       ...connector.operations[0].input,
       { name: '', type: 'text' },
     ])
-    await userEvent.click(first.getByRole('button', { name: 'Add output field' }))
+    await userEvent.click(first.getByRole('button', { name: 'Add output' }))
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/output', [
       ...connector.operations[0].output,
       { name: '', type: 'text' },
     ])
 
     const row = within(screen.getByTestId('studio-field-/operations/0/input/1'))
-    await userEvent.click(row.getByRole('button', { name: 'Remove' }))
+    await userEvent.click(row.getByRole('button', { name: 'Delete' }))
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/input/1', undefined)
   })
 
@@ -287,7 +288,7 @@ describe('ConnectorEditor', () => {
     const row = within(screen.getByTestId('studio-field-/operations/0/input/0'))
 
     for (const input of [
-      field('name'),
+      field('name', 'textbox', within(screen.getByTestId('studio-field-/name'))),
       field('baseUrl'),
       field('auth.token'),
       field('operations.name', 'textbox', operation),
@@ -333,7 +334,8 @@ describe('ConnectorEditor', () => {
     const operations = [{ name: 'find', method: 'GET', path: '/x', input: [{ name: 'a', type: 'text' }] }]
     renderEditor({ ...connector, operations })
 
-    expect(field('operations.input.name')).toHaveValue('a')
+    const inputs = within(screen.getByTestId('studio-field-/operations/0/input'))
+    expect(field('operations.input.name', 'textbox', inputs)).toHaveValue('a')
     expect(screen.getByTestId('studio-connector-get-no-input')).toBeVisible()
   })
 
@@ -351,7 +353,8 @@ describe('ConnectorEditor', () => {
     ]
     renderEditor({ ...connector, operations })
 
-    expect(screen.getAllByRole('textbox', { name: texts('operations.input.name').label })).toHaveLength(2)
+    const inputs = within(screen.getByTestId('studio-field-/operations/0/input'))
+    expect(inputs.getAllByRole('textbox', { name: texts('operations.input.name').label })).toHaveLength(2)
     expect(screen.queryByTestId('studio-connector-get-no-input')).toBeNull()
   })
 
@@ -385,7 +388,7 @@ describe('ConnectorEditor', () => {
     await user.type(field('operations.path', 'textbox', operation), '/warehouses/{{warehouse}/shipments')
 
     for (let index = 0; index < 3; index++) {
-      await user.click(operation.getByRole('button', { name: 'Add input field' }))
+      await user.click(operation.getByRole('button', { name: 'Add input' }))
     }
     const row = (index: number) => `studio-field-/operations/0/input/${index}`
     const warehouse = within(screen.getByTestId(row(0)))
@@ -410,7 +413,7 @@ describe('ConnectorEditor', () => {
     await chooseOption('integer', screen.getByTestId(`${row(2)}/fields/1/type`))
     await user.click(field('operations.input.fields.required', 'checkbox', quantity))
 
-    await user.click(operation.getByRole('button', { name: 'Add output field' }))
+    await user.click(operation.getByRole('button', { name: 'Add output' }))
     const output = within(screen.getByTestId('studio-field-/operations/0/output/0'))
     await user.type(field('operations.output.name', 'textbox', output), 'trackingNumber')
     await user.type(field('operations.output.source', 'textbox', output), '/shipment/tracking/number')
@@ -530,7 +533,8 @@ describe('ConnectorEditor', () => {
     const onChange = renderEditor({ ...connector, operations })
 
     expect(screen.queryByRole('combobox', { name: texts('operations.input.in').label })).toBeNull()
-    expect(field('operations.input.fields.name')).toHaveValue('sku')
+    const nested = within(screen.getByTestId('studio-field-/operations/0/input/0/fields'))
+    expect(field('operations.input.fields.name', 'textbox', nested)).toHaveValue('sku')
     await chooseOption('text', screen.getByTestId('studio-field-/operations/0/input/0/type'))
     expect(onChange.mock.calls).toEqual([
       ['/operations/0/input/0/type', 'text'],
@@ -557,7 +561,7 @@ describe('ConnectorEditor', () => {
     const nested = within(screen.getByTestId('studio-field-/operations/0/input/0/fields/0'))
     await userEvent.click(field('operations.input.fields.required', 'checkbox', nested))
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/input/0/fields/0/required', true)
-    await userEvent.click(nested.getByRole('button', { name: 'Remove' }))
+    await userEvent.click(nested.getByRole('button', { name: 'Delete' }))
     expect(onChange).toHaveBeenLastCalledWith('/operations/0/input/0/fields/0', undefined)
   })
 

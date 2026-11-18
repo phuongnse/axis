@@ -5,6 +5,7 @@ import { waitForDialog } from './dialogs'
 import { pickerLabel } from './picker-labels'
 import { pickOption } from './select'
 import { serviceDesk } from './server-settings'
+import { closeEntityField } from './studio-resources'
 
 export async function pick(scope: Page | Locator, testId: string, option: string, filter?: string) {
   await pickOption(scope.getByTestId(testId).getByRole('combobox'), option, filter)
@@ -19,6 +20,8 @@ export async function pickLabelled(scope: Page | Locator, testId: string, folder
 }
 
 export async function save(page: Page, answers: [field: string, choice: string, expression?: string][] = []) {
+  // The save is not made from inside an open field.
+  await closeEntityField(page)
   // A save with a migration posts one changes call, and a save without one patches the resource.
   const answer = page.waitForResponse(
     (response) => {

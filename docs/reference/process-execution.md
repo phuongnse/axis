@@ -24,7 +24,9 @@ never leaves an instance half moved.
   and sets the instance to `failed`. No step is retried. A `callConnector` step retries its call
   under its retry policy, see [Connector calls](#connector-calls), and so does a package operation
   step, see [Package operations](#package-operations). An operator can retry a `failed` instance, see
-  [Retry](process-inspection.md#retry).
+  [Retry](process-operator-commands.md#retry).
+- **Error paths.** _(planned for M38)_ A step that names an error path for its kind of failure takes
+  it instead of failing its path, see [Paths](#paths).
 - **Work item errors.** When a work item's handler throws, its writes roll back. A following
   transaction, still checked against the claim token, deletes the item and calls the handler's
   failure callback with the error, and the item is not retried. A worker that crashes or stops before
@@ -36,8 +38,8 @@ never leaves an instance half moved.
 - **Restarts.** An instance that waits on a task has no work item, so it needs no running worker. One
   that waits on a connector call has the call's `connector.call` item, one that waits on a package
   call its `package.call` item, and one that waits on a timer, or on a `waitEvent` step with a
-  `timeout`, its `process.timer` item. One that waits on a call to a customer-hosted package has no
-  item, so a worker restart leaves it as it is. A task decision is accepted while no worker runs: it queues the
+  `timeout`, its `process.timer` item. One that waits on a call to a customer-hosted package has a
+  `package.call` item only while a runner's lease runs or a retry waits, and otherwise needs no worker. A task decision is accepted while no worker runs: it queues the
   next step's work item, and the next worker to start runs that step. A step that a worker never
   committed leaves no trace, and the worker that claims it after the lease runs it once.
 - **History.** Every step occurrence records its input, its output, the decision taken and any error.
@@ -53,7 +55,7 @@ work item that processes queue are described with their step:
 | `process.step`       | Runs the current step of its instance                                                   | This section                                                                                                       |
 | `process.timer`      | Resumes an instance that waits on a `timer` step, or on a `waitEvent` step at its `timeout` | This section, [Timer step](process-flow.md#timer-step) and [Wait for event step](process-flow.md#wait-for-event-step) |
 | `connector.call`     | Sends the call that a `callConnector` step staged                                       | [Staging and the call](#staging-and-the-call)                                                                      |
-| `package.call`       | Runs the operation that a package operation step staged                                 | [Staging a package call](#staging-a-package-call)                                                                  |
+| `package.call`       | Runs the operation that a package operation step staged, and ends a runner's lease      | [Staging a package call](#staging-a-package-call)                                                                  |
 | `process.resume`     | Resumes the parent of a `subProcess` step when its child completes                      | [Sub-process step](process-flow.md#sub-process-step)                                                               |
 | `event.deliver`      | Delivers an event to its `async` triggers and wakes the `waitEvent` steps that wait for it | [Event delivery](process-events.md#event-delivery)                                                                 |
 | `notification.email` | Sends one email that a `notify` step staged                                             | [Email](notifications.md#email)                                                                                    |
@@ -174,7 +176,7 @@ After the instance's new state, step 5 stores what the step adds or writes:
 - **Record update.** An `updateRecord` operation writes the values the way a record update does. Each
   value must fit its field, and a `null` for a required field is refused. Computed fields are
   recomputed, validations run, and the record's version goes up by one. A refused write is an error,
-  keyed and worded as in the [record API](record-api.md#child-rows-computed-fields-and-validations).
+  keyed and worded as in [child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations).
 - **Record create.** A `createRecord` operation creates its record in the step's transaction, as
   `system`, the way a record create does after its grant check: it applies the defaults of the fields
   `set` leaves out, sets each creator field to `system`, computes the computed fields, runs the
@@ -219,6 +221,84 @@ is one of these:
 See [Step errors](process-inspection.md#step-errors-in-inspection). The failure is also logged at
 Warning level with the step name, the instance id and the same fixed text as the history row. A failed
 work item is logged with its exception type only.
+
+**Error path.** _(planned for M38)_ A step with an `onError` entry for its kind of failure does not fail
+its path in this transaction. It takes the error path, see [Paths](#paths).
+
+## Paths
+
+_(planned for M38)_
+
+An instance is at one step, or at several when a [block](process-blocks.md) starts paths. A path is one
+line of steps that runs on its own. A process without blocks has one path, and every rule above holds
+for it as written. This section says what changes when paths run at once.
+
+- **Root path.** The instance is its own root path. Its `step`, `revision` and state are that path's,
+  and `axis.process_paths` holds a row only for a path that a block starts, see
+  [Paths](process-tables.md#paths).
+- **Starting paths.** The transaction of a `parallel` step inserts one path row for each branch that
+  runs, and queues a `process.step` item for each. The path that reached the block waits on the block
+  step, as a parent waits on a [sub-process](process-flow.md#sub-process-step), so the instance is
+  `waiting` while its root path waits, and a second start for the same record stays blocked. Each path
+  has its own state, see [path states](process-states.md#path-states).
+- **Own position, revision and history.** Each path keeps its own `step`, `revision` and state. A step
+  history row, a work item, a task and a call each name their path, so inspection and the worker tell
+  the paths apart. A step of a path that a block started writes that path's row and never the
+  instance's, so two paths never fight over one revision.
+- **First resume.** A resume counts only at the path's revision. The second of two concurrent resumes
+  of a path, such as a task completion and a deadline, finds the revision moved and writes nothing
+  else, as step 4 of [Running a step](#running-a-step) says for an instance.
+- **One transaction per step.** A step commits its business writes, its path's state and revision, its
+  history, its audit records and the next work item together. The path's state and revision take the
+  place of the instance's in the list of [Running a step](#running-a-step). A `process.step` item names
+  its path, and it is skipped when that path is missing or not `running`.
+- **Going on.** The transaction that ends a path checks the rule of the block it belongs to. When the
+  rule holds, it resumes the path that waits on the block, on the block's `next`, with the next
+  revision. A path that ends does not start a path outside its block.
+- **Cancelling.** The transaction that finds the rule holding also cancels the paths of the block that
+  still run. Each live sibling path and its descendants become `cancelled`, their open tasks become
+  `closed`, their `pending` calls become `cancelled`, their work items are deleted, and one history row
+  with the output `{ "state": "cancelled", "block" }` is written for each cancelled path. A call that
+  is `sending` or `unknown` settles on its call row and in the audit as it does for a cancelled
+  instance, but it writes no output and moves no path. Lock order follows
+  [Cancel](process-operator-commands.md#cancel): the open tasks, then the instance, then the paths, parents
+  before children. A path that ends locks the same way, so two paths that end at once queue and exactly
+  one of them sees the rule hold.
+- **Passes.** A `repeat` step's transaction reads its items once and inserts one path row for each item
+  of a `forEach` or each pass of `times`, and one pass at a time for `while` and `until`. In order, the
+  first pass runs, and the end of a pass starts the next one after the repeat's checks of `stopWhen`,
+  `while`, `until` and `maxPasses`. With `waitBetween`, the transaction that ends a pass queues a
+  `process.timer` item for the path that waits on the repeat, and its resume starts the next pass. With
+  `atOnce`, the first `atOnce` passes start together, the others wait for their turn, and each pass that
+  ends starts the next waiting one. When the repeat ends, the transaction cancels the passes still
+  running, as under Cancelling.
+- **Gathering.** A pass that ends without a skip stores the value of `gather` in the `gathered` column
+  of its path row. When the repeat ends, its transaction writes the values to the variable in the order
+  of the passes, so the list follows the items, see [variables](processes.md#variables).
+- **Calls.** A call is known by its step, its path and its pass. Its row has `path_id` and `pass`, and
+  the unique index is on instance, path, step and `staged_revision`, which is the path's revision. So a
+  step that runs on every pass of a repeat, or on each of two branches, stages one call for each.
+- **Error path.** A step that still fails takes the `onError` entry that names its kind of failure:
+  `call` for a failed call, `record` for a refused write, `expression` for an expression that failed,
+  `limit` for a reached limit and otherwise `any`. The step's failure transaction, or the outcome
+  transaction of a failed call, sets the path `running` on the entry's `next`, writes the history row
+  with the error and the output `{ "error", "next" }`, writes the audit record `process.errorPathTaken`
+  with details `{ "step", "error", "next" }` and the actor `system`, and queues the next step. A call
+  left `unknown` takes no error path, because it has not failed. The transaction is the one that would
+  otherwise fail the path.
+- **No error path.** A path whose step names no entry for its kind becomes `failed`. Its block then
+  cancels the paths that still run, as under Cancelling, and takes its own `onError` for the same kind
+  of failure. When the block has none, the path that waits on the block fails in turn. The root path
+  fails the instance, as [When a step fails](#when-a-step-fails) says.
+- **Limits.** Four limits keep an instance bounded, as [limits](process-blocks.md#limits) say. A limit
+  at run time fails the step that would pass it with the error kind `limit`, so an `onError` entry can
+  take it, and each has its [worker setting](#worker-settings):
+  - `Worker:MaxPathsAtOnce` bounds the paths that an instance runs at once, across all its blocks.
+  - `Worker:MaxRepeatItems` bounds the items of a `forEach` and the `times` of a repeat.
+  - `Worker:MaxRepeatPasses` bounds the passes of one repeat.
+  - Depth has no worker setting. It is a compile check, `AXC0379` in
+    [compile checks](process-blocks.md#compile-checks), because the publisher cannot read a worker's
+    settings.
 
 ## Connector calls
 
@@ -334,7 +414,7 @@ although a failed connector call keeps its stored input. It sets the call to `pe
 input, 0 attempts and 0 lookups, clears the last status, the last error and the settled time, and sets
 `staged_revision` to the revision the step runs at again. The history row, the audit record and the
 work item are written again as above, with the same `operationId`. See
-[Retry](process-inspection.md#retry).
+[Retry](process-operator-commands.md#retry).
 
 **Each attempt.** A worker that claims the `connector.call` item does this:
 
@@ -441,7 +521,7 @@ the system what happened: it calls the operation's `lookup` with the operation i
 | **Found:** `200` with a body that fits the output                                                                 | The call settles as succeeded with that output, as after a successful attempt. Nothing is sent again                                                                                                                                                                                                                                 |
 | **Not found:** `404`, so the system never acted                                                                   | The call goes back to `pending` and is retried with the same identity, which counts as an attempt. The retry is due after the step's backoff for the attempts made, as any retry is. When no attempts are left, the instance becomes `failed`                                                                                         |
 | **Failed lookup:** any other answer, including another `2xx` and a `200` whose body does not fit, or a lookup that is never sent | The call stays `unknown`, with the lookup's status and error, and the lookup is tried again. The delay starts at `backoff` and doubles each time, up to 1 hour, with no limit. The call row counts the failed lookups in `lookups`, so the delay survives a worker restart, and the count is reset when the call goes back to `pending` |
-| **No lookup:** the operation declares none                                                                        | The call stays `unknown`, and the instance stays `waiting`. A history row with output `{ "operationId", "outcome": "unknown" }` makes it visible, and an operator resolves it, see [Resolve](process-inspection.md#resolve)                                                                                                           |
+| **No lookup:** the operation declares none                                                                        | The call stays `unknown`, and the instance stays `waiting`. A history row with output `{ "operationId", "outcome": "unknown" }` makes it visible, and an operator resolves it, see [Resolve](process-operator-commands.md#resolve)                                                                                                           |
 
 The first lookup runs at once after the unknown outcome, and only a failed lookup waits. The same
 `connector.call` item runs each lookup, under the same claim and fencing rules as an attempt, and a
@@ -566,7 +646,7 @@ operation in place of the HTTP request:
   `{ "state": "waiting", "operationId" }` and the audit record `operation.staged`. The call also
   stores the step's retry policy and the operation's `idempotent` flag, because a worker that lacks
   the pinned version cannot read them from the release.
-- **Staging again.** A step that runs again after an operator [retry](process-inspection.md#retry)
+- **Staging again.** A step that runs again after an operator [retry](process-operator-commands.md#retry)
   reuses its `failed` row, as a connector call does, under the same operation identity. It stores
   fresh input, the step's current retry policy, the operation's `idempotent` flag, the new
   `staged_revision` and 0 attempts, and clears the last error and the settled time.
@@ -585,19 +665,21 @@ operation in place of the HTTP request:
   `application-package-host`, see [an application's packages](extension-packages.md#an-applications-packages). The
   worker reads the package's built files from the call's release in the mark transaction and sends them with the call's
   tenant when it starts the runner. Without `Extensions:Runners:Application`, the attempt is retryable and names the setting.
-- **Run in a customer-hosted runner** _(planned for M37)_. A call to a customer-hosted package, whether
+- **Run in a customer-hosted runner**. A call to a customer-hosted package, whether
   the application's own package or an installation's package that the application
   [declares](declaring-packages.md#declaring-packages-in-an-application) with `runner: customer`, see
   [customer-hosted runners](extension-packages.md#customer-hosted-runners), waits `pending`, its retry due, until a
   [customer-hosted runner](extension-packages.md#customer-hosted-runners) that registers the package and
   version takes it, and the runner receives no binding value.
   - **The take is the Mark step.** It marks the call `sending`, counts the attempt and gives a lease that
-    lasts the operation's `timeout`.
+    lasts the operation's `timeout`. It also queues a `package.call` item that is due when the lease ends,
+    and the posted result deletes it.
   - **The posted result is the Record step.** `succeeded` is checked against the manifest as an output that
     fits, `retryable` counts as a `RetryableException`, and `failed` counts as any other exception, keeping
     only the exception type.
-  - **A lease that ends with no result is a timeout.** The worker records an unknown outcome, as
-    [package call outcomes](#package-call-outcomes) says.
+  - **A lease that ends with no result is a timeout.** When the lease's item comes due and the call is still
+    `sending`, the worker records an unknown outcome with the timeout's error, as
+    [package call outcomes](#package-call-outcomes) says. A result that arrives after it answers `409`.
   - **A call that no runner takes** stays `pending`, and the instance stays `waiting`.
 - **Record.** An outcome transaction records the result, as for a connector call. On success it
   writes the output fields with the record update rules, sets the instance to `running` on `next`,
@@ -638,14 +720,18 @@ input under the same operation identity.
   backoff doubled for each attempt made, so after `backoff` × 2^(n−1) for attempt n, and at most an
   hour. A retry writes no history row and no audit record. A call with a missing version counts the
   attempt without marking the call `sending`, because the operation never ran. A release without the
-  step, or an installed manifest without the operation, is not retried, since a retry cannot fix it.
+  step, or an installed manifest without the operation, is not retried, since a retry cannot fix it. A
+  `retryable` result of a [customer-hosted runner](extension-packages.md#customer-hosted-runners) queues a
+  `package.call` item due after the same backoff. A runner can take the call only once that item is gone,
+  and the worker deletes it when it is due, with no other write, because the call is `pending` and a runner took
+  it before. The next take gives the same operation identity.
 - **Left unknown.** A call whose operation is not `idempotent`, or whose attempts ran out after an
   unknown outcome, stays `unknown`, and the instance stays `waiting`. The operation may have acted, so
   the platform neither runs it again nor fails the instance. A history row with output
   `{ "operationId", "outcome": "unknown" }` makes it visible. Its error is a fixed sentence, one for a
   timeout, one for a runner that exited and one for a call found `sending`. The call keeps its stored input, and it writes no
   `operation.called` audit record and no `process.failed`, because it has not settled. Packages have
-  no lookup, so an operator resolves it, see [Resolve](process-inspection.md#resolve).
+  no lookup, so an operator resolves it, see [Resolve](process-operator-commands.md#resolve).
 - **Audit.** Each settled call writes one audit record `operation.called`, with actor `system` and
   details `{ "package", "version", "operation", "operationId", "attempts", "outcome" }`. When it writes
   output fields, it also writes `record.updated`, as `updateRecord` does. A failed call also writes
@@ -654,6 +740,47 @@ input under the same operation identity.
   `System.FormatException`, never its message, because a message can hold input values or secrets. An
   output that does not fit gets a fixed sentence that names the package and the operation, and holds
   no value.
+
+## Files in calls
+
+_(planned for M40)_
+
+A file is a value that a call carries, so a purchase order goes to a purchasing system as a PDF and a signed
+contract comes back into a `file` field, as [D157](../decisions/d157-files-reach-calls-and-emails-show-in-the-page-keep-their-versions-and-documents-come-from-word-templates.md)
+agrees. This section covers a file that a connector call sends or receives and a file that a package operation
+takes or gives. The files themselves are in [file fields](file-fields.md), and a file that an email carries is in
+[email](notifications.md#email).
+
+- **A file input.** An operation input of the type `file` is mapped to the name of a `file` field of the
+  subject record, such as `"document": "contractDocument"`, or in a `list` input to a `file` field of the child
+  row. It is not an expression, because a file allows only `is null` and `is not null` in one. A required file
+  input whose field is `null` fails the step like any required input, with a message that names the input.
+- **Multipart.** An operation whose `encoding` is `multipart` sends its body as `multipart/form-data`. The file is
+  a part named as the input, with the file's stored name and media type, and each other `body` input is a text
+  part. An `object` or `list` input in such an operation is refused when the connector is compiled.
+- **In JSON.** An operation with the default encoding sends the file as a base64 string at the place of its
+  input in the JSON body.
+- **Bytes at send time.** The step stores the id of the file when it stages the call, never the bytes. The
+  worker reads them from the storage of the application's [`fileStorage` binding](file-fields.md#the-filestorage-manifest-property)
+  when it sends, so a retry sends the same file. A file that has been purged by then fails the attempt with a
+  message that names the input.
+- **A file output.** An operation output of the type `file` is read from the response: the whole body, or the
+  base64 string at its `source`. The step writes it as a new file in the `file` field that `output` names, and
+  the outcome's transaction attaches it to the subject record, as it writes any output. The media type comes from
+  `Content-Type`, and the name from `Content-Disposition`, or from the output's name when there is none.
+- **Checks on a file that comes in.** It meets the checks of an [upload](file-fields.md#upload): its declared type
+  is one Axis can check, its extension and content fit that type, it is not an executable or an SVG, and it is
+  within `maxSize` of the field and `Files:MaxSize`. A file that fails them fails the call as an output that does
+  not fit does, and nothing is stored.
+- **A package operation.** A package operation's input or output may have the type `file`, see the
+  [value types](extension-packages.md#contracts) of a package. The worker sends the bytes of an input file with
+  the call, and the runner never reads the storage. A file that the operation gives is checked and written to a
+  `file` field as a connector's output is.
+- **No bytes in the records.** Step history, logs and audit hold the file's id and size, never its name or
+  bytes, so a file's content reaches only the call, see [file fields](file-fields.md#storage-and-clean-up).
+- **Compile checks.** A `file` input names a `file` field of the subject, or of the child entity of its `list`,
+  and a `file` output names a `file` field that no other output of the step writes. A `file` input in a
+  connector operation with the `GET` method is refused, because a `GET` has no body.
 
 ## Worker settings
 
@@ -718,6 +845,9 @@ does not hold back the tenant's work items.
 | `Worker:Quantum`              | `10`                    | The work items a tenant of weight 1 runs in one turn, see [fair share](worker-scheduling.md#fair-share). It must be at least 1.                                                                                                                                                               |
 | `Worker:DeliveryAttempts`     | `5`                     | Failures of a delivery before it becomes a [dead letter](process-events.md#dead-letters). It must be at least 1.                                                                                                                                                                              |
 | `Worker:StatementTimeout`     | `00:01:00`              | The `statement_timeout` of every transaction a work item runs. A statement past it fails the attempt, so the item is retried like any other failure of its kind, and a delivery counts it toward its dead letter. A value that is not a duration of at least one millisecond stops the start. |
+| `Worker:MaxPathsAtOnce` _(planned for M38)_ | `100` | The paths one instance runs at once, across all its blocks, see [limits](#paths). It must be at least 1. |
+| `Worker:MaxRepeatItems` _(planned for M38)_ | `1000` | The items of a `forEach` repeat, and the `times` of a repeat, see [limits](#paths). It must be at least 1. |
+| `Worker:MaxRepeatPasses` _(planned for M38)_ | `1000` | The passes of one repeat, see [limits](#paths). It must be at least 1. |
 | `Notifications:RetentionDays` | `90`                    | How many days the worker keeps [in-app notifications](notifications.md#in-app-notifications). A value that is not a whole number of at least 1 stops the worker at start.                                                                                                                    |
 | `Health:Urls`                 | `http://127.0.0.1:5208` | The address of the worker's health endpoints, `/health/live` and `/health/ready`. It serves nothing else.                                                                                                                                                                                     |
 
@@ -726,6 +856,9 @@ As environment variables they are `Worker__LeaseDuration`, `Worker__PollInterval
 `Worker__DeliveryAttempts`, `Worker__StatementTimeout`, `Notifications__RetentionDays` and
 `Health__Urls`. What the health endpoints answer is in
 [health checks](../architecture.md#health-checks).
+
+**Limits.** _(planned for M38)_ As environment variables the three limits are `Worker__MaxPathsAtOnce`,
+`Worker__MaxRepeatItems` and `Worker__MaxRepeatPasses`.
 
 ### Worker metrics
 

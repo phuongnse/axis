@@ -53,6 +53,11 @@ public sealed class AuthenticationSchemeTests
             },
             scheme =>
             {
+                Assert.Equal("Axis.PackageRunner", scheme.Name);
+                Assert.Equal(typeof(PolicySchemeHandler), scheme.HandlerType);
+            },
+            scheme =>
+            {
                 Assert.Equal("Axis.Request", scheme.Name);
                 Assert.Equal(typeof(PolicySchemeHandler), scheme.HandlerType);
             },
@@ -80,6 +85,11 @@ public sealed class AuthenticationSchemeTests
             {
                 Assert.Equal("oidc-default", scheme.Name);
                 Assert.Equal(typeof(OpenIdConnectHandler), scheme.HandlerType);
+            },
+            scheme =>
+            {
+                Assert.Equal("runner-default", scheme.Name);
+                Assert.Equal(typeof(JwtBearerHandler), scheme.HandlerType);
             },
             scheme =>
             {

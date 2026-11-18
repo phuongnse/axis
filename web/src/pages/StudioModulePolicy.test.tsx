@@ -14,12 +14,12 @@ const policy = {
   ],
 }
 
-function renderPolicy() {
+function renderPolicy(value: Record<string, unknown> = policy) {
   const onChange = vi.fn()
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioModulePolicy value={policy} onChange={onChange} />
+        <StudioModulePolicy value={value} onChange={onChange} />
       </TextProvider>
     </ThemeModeProvider>,
   )
@@ -47,5 +47,36 @@ describe('StudioModulePolicy', () => {
     await userEvent.click(within(group).getByRole('checkbox', { name: 'export' }))
 
     expect(onChange).toHaveBeenCalledWith('/grants/1/actions', ['read', 'export'])
+  })
+
+  it('names the target of each grant by its kind', () => {
+    renderPolicy()
+
+    expect(within(screen.getByTestId('studio-module-policy-grant-0')).getByText('Entity PurchaseRequest')).toBeVisible()
+    expect(
+      within(screen.getByTestId('studio-module-policy-grant-1')).getByText('Data source OpenRequests'),
+    ).toBeVisible()
+  })
+
+  it('deletes a grant with its Delete button, and leaves the others', async () => {
+    const onChange = renderPolicy()
+
+    await userEvent.click(
+      within(screen.getByTestId('studio-module-policy-grant-0')).getByRole('button', { name: 'Delete grant' }),
+    )
+
+    expect(onChange).toHaveBeenCalledWith('/grants', [policy.grants[1]])
+  })
+
+  it('turns off the Delete button when the policy has one grant left', () => {
+    renderPolicy({ ...policy, grants: [policy.grants[0]] })
+
+    expect(screen.getByRole('button', { name: 'Delete grant' })).toBeDisabled()
+  })
+
+  it('joins the roles of the policy with the list format of the language', () => {
+    renderPolicy({ ...policy, roles: ['reviewer', 'approver'] })
+
+    expect(screen.getByText('reviewer and approver')).toBeVisible()
   })
 })

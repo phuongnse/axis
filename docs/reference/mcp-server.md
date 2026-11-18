@@ -147,7 +147,7 @@ A tool with an optional draft reads the working folder without it and the person
 | `read_resource`        | application, `id`, optional draft                        | The resource's content and version                                                                                                                                                                                                                                                                    |
 | `read_module_resource` | application, module, `id`                                | A resource of the pinned module version, with the application's layer applied                                                                                                                                                                                                                         |
 | `read_names`           | application, optional draft                              | The names the application defines, as the [names route](authoring.md#names) gives them                                                                                                                                                                                                                |
-| `check_expression`     | application, draft, `id`, path, expression               | The expression's type and diagnostics, as [the expression check](authoring.md#expression-check) answers them, in the draft                                                                                                                                                                            |
+| `check_expression`     | application, draft, `id`, path, expression               | The expression's type, diagnostics and reading, as [the expression check](authoring.md#expression-check) answers them, in the draft                                                                                                                                                                            |
 | `create_draft`         | application                                              | A new [draft](revisions-and-drafts.md#drafts): its id and the commit of the working folder's history it starts from                                                                                                                                                                                   |
 | `write_resource`       | application, draft, `content`                            | Creates or replaces a resource in the draft, with its diagnostics                                                                                                                                                                                                                                     |
 | `write_layer`          | application, draft, `module`, `id`, `content`            | Writes the layer that holds the difference in the draft, as Studio saves do, see [customization layers](customization-layers.md#in-studio), with the draft's diagnostics                                                                                                                              |
@@ -184,31 +184,31 @@ A tool with an optional draft reads the working folder without it and the person
 describe the kind. Both are embedded in the server at build time, so an agent reads the rules of the
 version it talks to. An unknown topic answers a tool error with a fixed title.
 
-| Topic              | Pages                                                                                  |
-| ------------------ | -------------------------------------------------------------------------------------- |
-| `application`      | [Resource files](resource-files.md)                                                    |
-| `entity`           | [Resource files](resource-files.md)                                                    |
-| `site`             | [Resource files](resource-files.md)                                                    |
-| `page`             | [Resource files](resource-files.md), [Frontend](frontend.md)                           |
-| `text`             | [Resource files](resource-files.md)                                                    |
-| `seed`             | [Resource files](resource-files.md)                                                    |
-| `dataSource`       | [Data sources](data-sources.md)                                                        |
-| `rule`             | [Resource files](resource-files.md)                                                    |
-| `sequence`         | [Resource files](resource-files.md)                                                    |
-| `process`          | [Processes](processes.md), [Process flow](process-flow.md)                             |
-| `form`             | [Form resource and form widget](form-widget.md), [Form conditions](form-conditions.md) |
-| `role`             | [Roles and policies](roles-and-policies.md)                                            |
-| `policy`           | [Roles and policies](roles-and-policies.md)                                            |
-| `connector`        | [Connectors, events and endpoints](integration-resources.md)                           |
-| `identityProvider` | [Axis's identity provider](identity-provider.md)                                       |
-| `event`            | [Connectors, events and endpoints](integration-resources.md)                           |
-| `endpoint`         | [Connectors, events and endpoints](integration-resources.md)                           |
-| `trigger`          | [Connectors, events and endpoints](integration-resources.md)                           |
-| `webhook`          | [Outbound webhooks](outbound-webhooks.md)                                              |
-| `migration`        | [Migrations and recomputing](migrations.md), [Resource files](resource-files.md)       |
-| `scenario`         | [Test scenarios](test-scenarios.md)                                                    |
-| `contract`         | [Module contracts](module-contracts.md)                                                |
-| `layer`            | [Customization layers](customization-layers.md)                                        |
+| Topic              | Pages                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------ |
+| `application`      | [Resource files](resource-files.md), [Entity logic and sequences](entity-logic-and-sequences.md) |
+| `entity`           | [Resource files](resource-files.md), [Entity logic and sequences](entity-logic-and-sequences.md) |
+| `site`             | [Resource files](resource-files.md)                                                              |
+| `page`             | [Resource files](resource-files.md), [Frontend](frontend.md)                                     |
+| `text`             | [Resource files](resource-files.md)                                                              |
+| `seed`             | [Resource files](resource-files.md)                                                              |
+| `dataSource`       | [Data sources](data-sources.md)                                                                  |
+| `rule`             | [Resource files](resource-files.md)                                                              |
+| `sequence`         | [Resource files](resource-files.md), [Entity logic and sequences](entity-logic-and-sequences.md) |
+| `process`          | [Processes](processes.md), [Process flow](process-flow.md)                                       |
+| `form`             | [Form resource and form widget](form-widget.md), [Form conditions](form-conditions.md)           |
+| `role`             | [Roles and policies](roles-and-policies.md)                                                      |
+| `policy`           | [Roles and policies](roles-and-policies.md)                                                      |
+| `connector`        | [Connectors, events and endpoints](integration-resources.md)                                     |
+| `identityProvider` | [Axis's identity provider](identity-provider.md)                                                 |
+| `event`            | [Connectors, events and endpoints](integration-resources.md)                                     |
+| `endpoint`         | [Connectors, events and endpoints](integration-resources.md)                                     |
+| `trigger`          | [Connectors, events and endpoints](integration-resources.md)                                     |
+| `webhook`          | [Outbound webhooks](outbound-webhooks.md)                                                        |
+| `migration`        | [Migrations and recomputing](migrations.md), [Resource files](resource-files.md)                 |
+| `scenario`         | [Test scenarios](test-scenarios.md)                                                              |
+| `contract`         | [Module contracts](module-contracts.md)                                                          |
+| `layer`            | [Customization layers](customization-layers.md)                                                  |
 
 `McpReferenceTopicsDocumentationTests` compares this table with the server's map and with the resource
 kinds.

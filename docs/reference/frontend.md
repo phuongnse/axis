@@ -48,6 +48,12 @@ component holds a number of its own.
   keyboard focus of every control. `onPrimary` colours text and icons on a `primary` fill.
 - **Contrast.** Every text colour reaches 4.5:1, and every border and focus ring 3:1, on `surface` and `canvas` in both
   modes. `onPrimary` reaches 4.5:1 on `primary` in both modes. [Each preview](widget-previews.md#the-spec) is checked.
+- **A site's brand** _(planned for M42)_. A site's `brand.primary` is its main colour, see [sites](configuration.md#sites)
+  and [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
+  The compiler works out the light and dark `primary`, `primaryText`, `focusRing` and `onPrimary` from it, and the
+  compiled site carries them. The SPA draws that site's shell and pages with them in place of the token file's values,
+  and every other token keeps its value. The platform site, Studio and the consoles keep the token file. A colour that
+  misses the Contrast rule is refused when compiled. The look is left to design reviews.
 - **Shadow.** The shadow group holds `overlay`, the only shadow. Dialogs, menus, pickers and popovers cast it, and
   widgets, cards, sections and buttons cast none.
 - **Type, spacing and radius.** Type has the body and code fonts and the font size, spacing runs from `spacing-xs` to
@@ -189,7 +195,7 @@ tenant host.
     application sites, which never replace or merge into it. A test checks that every locale has exactly the same keys
     as English, and the placeholder and untranslated-text rules of [UI writing](ui-writing.md#checks).
 - **Application sites.** The sites of the tenant's active applications are found by path, not by application name,
-  because the path is what users see and one application can have several sites. Four endpoints describe them, and the page one has a second form for module pages.
+  because the path is what users see and one application can have several sites. Four endpoints describe them, the page one has a second form for module pages, and a person's favourites and recent items have routes of their own.
 
 | Route                                         | Response                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -198,6 +204,11 @@ tenant host.
 | `GET /api/sites/{path}/texts/{locale}`        | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `GET /api/sites/{path}/pages/{page}`          | the [page metadata](#page-metadata). The page of a module is `GET /api/sites/{path}/pages/{module id}/{name}`, two path segments as the record API writes a module entity. Its `name` is `{module id}/{name}` and its title and labels resolve from the module's texts                                                                                                                                                                                                                                                                                                                                                                          |
 | `GET /api/sites/{path}/pages/{module}/{page}` | the [page metadata](modules-and-templates.md#module-pages) of a module's page                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `GET /api/sites/{path}/favourites` _(planned for M42)_ | `{ "favourites": [ { "id", "page", "record", "label" } ] }`, newest first. `record` is `null` for a page alone, and `label` is the record's display field value, or `null` |
+| `POST /api/sites/{path}/favourites` _(planned for M42)_ | takes `{ "page", "record" }`, with `record` `null` for a page alone. Answers `201` with the favourite, or `200` with the one already kept |
+| `DELETE /api/sites/{path}/favourites/{id}` _(planned for M42)_ | `204`, for the person's own favourite |
+| `GET /api/sites/{path}/recent` _(planned for M42)_ | `{ "recent": [ { "page", "record", "label", "openedAt" } ] }`, latest first, at most 20 |
+| `POST /api/sites/{path}/recent` _(planned for M42)_ | takes `{ "page", "record" }` and notes it as opened now, `204` |
 
 - **Titles.** `titles` in the site list has one entry for each available locale of the site, from the locale as the
   site declares it to the title text, so the home page can show each site without one more request per site.
@@ -219,6 +230,18 @@ tenant host.
 - **Load time.** At typical size, a page with a three-level widget tree loads in under 2 s: its metadata, then the rows
   of its table, chart and KPIs read in parallel over 100,000 records. `PageLoadPerformanceTests` fails when the best of
   three loads takes 2 s or more.
+- **Favourites and recent items** _(planned for M42)_. The lists belong to the signed-in person, the application and the
+  site, and no route names a person. A `page` must be a page of the site's application. A `record` must be a record of
+  the entity that page shows, and one the person may read, otherwise `404`. A 101st favourite answers `409`, and the
+  recent list keeps the latest 20. A `GET` reads each `label` under the current grants, and leaves out a page or record
+  the person cannot read or that no longer exists. Writes need the [CSRF header](security.md#csrf-header). An `id` that
+  is not the person's own answers `404`. On a site's own host, only that site's path answers. The lists are described in
+  [favourites and recent items](shell.md#favourites-and-recent-items), and the rule is
+  [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
+- **Menu groups, home page and brand** _(planned for M42)_. `GET /api/sites/{path}` gives a parent entry `page: null`
+  with its `entries`. It adds `homePage`, the name of the person's home page, and `brand`, which is
+  `{ "logo", "colours" }` with the logo's address and the light and dark colours, or `null`. See
+  [sites](configuration.md#sites).
 
 ## Page metadata
 
@@ -384,9 +407,9 @@ columns, one holding a table and the other a section with a task inbox:
   `null` for a field of a module's entity, which has no upload route, so the input shows no upload button.
   `downloadPath` is `/api/apps/{app}/files`, and the SPA appends a file's id to it. The SPA never builds a file URL
   itself.
-- **Values the server sets.** `computed` is `true` for a [computed field](resource-files.md#entity-logic), whose value
+- **Values the server sets.** `computed` is `true` for a [computed field](entity-logic-and-sequences.md#entity-logic), whose value
   the server sets on every write. `sequence` is `true` for a text field that names a
-  [sequence](resource-files.md#sequences), which the server numbers on create. `creator` is `true` for a text field
+  [sequence](entity-logic-and-sequences.md#sequences), which the server numbers on create. `creator` is `true` for a text field
   that declares [`creator`](roles-and-policies.md#record-creator), which the server sets to the creating user's id on
   create. A form shows each of them read-only and never sends it.
 - **`target`** names the referenced entity, its display field and the path of its record API, so the SPA never builds
@@ -459,6 +482,9 @@ and which fields each write action covers. A `taskInbox`, a `processInspector`, 
   without the action it needs, `create` on a new record and `update` on a saved one. Cancel and the start process
   buttons stay.
 - **On a table.** A toolbar action to a form without `record` shows only with `create`.
+- **Bulk actions and inline edit** _(planned for M42)_. A table's metadata lists only the
+  [bulk actions](table-widget.md#bulk-actions) the person may run. It also says whether the table has
+  [inline edit](table-widget.md#inline-edit). A cell is editable only for a field in `updateFields`.
 
 ## Routing
 
@@ -476,6 +502,8 @@ below answers `200`.
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/`                                    | the [platform home page](shell.md#platform-home-page): signed in, the launcher of the person's applications and tools, and with nobody signed in, sign-in at once with no screen drawn first, except at the addresses of [the sign-in card](shell.md#the-sign-in-card)                                                                                                                                                                                              |
 | `/licences`                            | the [open source licences](legal.md#open-source-licences) page, open without signing in                                                                                                                                                                                                                                                                                                                                                                             |
+| `/audit` _(planned for M41)_ | the [audit page](platform-pages.md#audit-page), for an administrator |
+| `/recycle-bin` _(planned for M41)_ | the [recycle bin page](platform-pages.md#recycle-bin-page), for anyone signed in |
 | `/{site}`                              | the site's first navigation entry, by redirect                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `/{site}/{page}`                       | the page inside the site shell, with the page title. A table page also takes `?search=&page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on. A page of a module is `/{site}/{module id}/{name}`, listed in the navigation as `{module id}/{name}`, with `/new` and `/{id}` under it for a form page. A second segment that is no record id names a module page |
 | `/{site}/{page}?ticket=<id>`           | a page with parameters: the values sit in the query under the parameter names                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -484,17 +512,25 @@ below answers `200`.
 | `/{site}/{inboxpage}/{taskId}`         | the task page of the task with that id, under the page of a task inbox                                                                                                                                                                                                                                                                                                                                                                                              |
 | `/{site}/{inspectorpage}/{instanceId}` | the instance page of the process instance with that id, under the page of a process inspector                                                                                                                                                                                                                                                                                                                                                                       |
 
+- **A site's home page** _(planned for M42)_. `/{site}` redirects to the person's home page, see [layout](shell.md#layout).
 - **The home page's cards.** `/?signIn=failed`, `/?signIn=declined` and `/?signedOut` show a card in place of
   sign-in, see [the sign-in card](shell.md#the-sign-in-card).
 - **Reserved paths.** The sessions screen at `/account` and the users page at `/users` with a user's page at
   `/users/{id}` are platform routes beside `/studio`, before the site route, so `account`, `users` and `licences` are reserved site paths. See
   [platform pages](platform-pages.md).
-- **One owner for each part of the address.** A page holds at most one `table` and at most one `form`, `taskInbox` or
-  `processInspector`, and the compiler checks this. `?search=&page=&pageSize=&sort=` and the data source parameter
-  values belong to the page's one `table`. `/new` and `/{id}` belong to its one `form`. `/{taskId}` and
-  `/{instanceId}` belong to its one `taskInbox` or `processInspector`. The instance list of a `processInspector`
-  and the task list of a `taskInbox` also read `search`, `filter`, `columns`, `sort`, `page` and `pageSize`. A `kpi`, a `detail` and a `chart` own no part
-  of the address and read only page parameters, so they do not count.
+- **History and recovery paths** _(planned for M41)_. The audit page at `/audit` and the recycle bin page at
+  `/recycle-bin` are platform routes too, so `audit` and `recycle-bin` are reserved site paths.
+- **One owner for each part of the address** _(planned for M42)_. A page may hold several `table` widgets, each
+  owning its part of the address under its `prefix`, see [address prefix](table-widget.md#address-prefix). A `calendar`,
+  a `board` and `cards` own their keys under a `prefix` in the same way. A table, calendar, board or cards widget
+  without a prefix, at most one, owns the plain keys: a table owns `?search=&page=&pageSize=&sort=` and the data source
+  parameter values, a calendar owns `?month=`, a board owns `?search=&filter=` and cards own
+  `?search=&filter=&page=&pageSize=&sort=`, see [calendar, board, cards and tree widgets](calendar-board-card-tree-widgets.md). A page holds at most one `form`,
+  `taskInbox` or `processInspector`, and the compiler checks this. `/new` and `/{id}` belong to its `form`.
+  `/{taskId}` and `/{instanceId}` belong to its `taskInbox` or `processInspector`. The instance list of a
+  `processInspector` and the task list of a `taskInbox` also read `search`, `filter`, `columns`, `sort`, `page` and
+  `pageSize`. A `kpi`, a `detail`, a `chart`, a `content` widget and a `tree` own no part of the address and read only
+  page parameters, so they do not count.
 - **Letter case.** `{site}` is the site path, and `{page}` is the page name in lower case, as navigation links write
   it. The server matches both ignoring letter case.
 - **Page parameters.** A required page parameter that is missing from the URL, or has the wrong form, shows the
@@ -535,6 +571,8 @@ gives the reasons. The rules that a table follows are in [actions and controls](
   platform table's key is a fixed name for its screen, such as `console.deadLetters`,
   `studio.{application}.history` or `studio.{application}.{kind}`. A platform page with a second table gives that
   table a key of its own. A key in any other form answers `400`.
+- **A prefixed table's key** _(planned for M42)_. A table with a `prefix` has the key `site.{site path}.{page name}.{prefix}`,
+  in lower case.
 - **The answer.** Every route needs a session, see [sign-in needed](security.md#sign-in-needed), and answers `401`
   without one. The `GET` route never answers `404` for a key with nothing kept. It answers `columns: null` and
   `views: []` instead, so the SPA needs one call when a table opens.
@@ -567,10 +605,65 @@ and can nest.
 | `kpi`                        | shows one value of a data source                                                                                                  | [Detail, chart and KPI widgets](detail-chart-kpi-widgets.md) |
 | `taskInbox`                  | lists the signed-in user's open tasks, and opens one on the task page `/{site}/{inboxpage}/{taskId}`                              | [Task inbox widget](task-inbox-widget.md)                    |
 | `processInspector`           | lists the instances of one process and opens one                                                                                  | [Process inspector widget](process-inspector-widget.md)      |
+| `content` _(planned for M42)_ | shows fixed text, an image, a link or a note                                                                                     | [Content widget](content-widget.md)                          |
+| `calendar`, `board`, `cards`, `tree` _(planned for M42)_ | show an entity's records by a date, in groups, as tiles or under their parent                                       | [Calendar, board, cards and tree widgets](calendar-board-card-tree-widgets.md) |
 | `columns`, `tabs`, `section` | hold other widgets: `columns` stack at narrow width, `tabs` keep the selected tab in `?tab=`, and a `section` can start collapsed | [Container widgets](container-widgets.md)                    |
 
 A widget opens another page, and sets its parameters, through a `navigate` action. A table opens and creates records
 through its [navigate actions](table-widget.md#navigate).
+
+## Printing
+
+_(planned for M40)_
+
+A record page prints on paper, with a layout made for it, so a person can print a purchase request or a ticket
+without a screenshot. This section says what prints and what does not. A report as a PDF is in
+[reports as PDF](document-templates.md#reports-as-pdf), and the document of one record is in the
+[page download](document-templates.md#page-download).
+
+- **What prints.** The page's content: the title of the page and the widgets of its regions in reading order,
+  with a `detail` or a `form` laid out in one column and a `table` with the rows that it shows. A `columns` or
+  a `tabs` widget prints all of its panels, one after another, so a tab that is not selected is not lost.
+- **What hides.** The shell, which means the header, the sidebar and the bell, the actions and buttons of every
+  widget, the paging and the filters of a table, and a toast. What a person cannot use on paper is not drawn.
+- **Colours and breaks.** The print layout draws on white with dark text, whatever the colour mode of the screen.
+  A table header repeats on each sheet, and a row or a section does not split across two sheets when it fits on
+  one.
+- **The action.** A page with a `detail` or `form` widget shows a Print… action. It is a Secondary
+  [button](actions-and-controls.md#buttons), and it ends in an ellipsis because it opens the browser's print
+  dialog. A user without the grant to read the page sees no Print action, as for any page.
+- **Text.** The words of the action and of the page's footer, such as the date and time of printing, come from
+  the platform's texts in the user's locale, and name the concept as the [glossary](ui-glossary.json) does.
+
+## Live pages
+
+_(planned for M43)_
+
+Some pages change while a person has them open, such as the bell, the task inbox and a list of records. The server
+tells the open page when the data changes, and the page reloads through its usual routes.
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/live` _(planned for M43)_ | Opens the live event stream of the signed-in session |
+
+- **Stream.** The SPA opens one stream for each browser tab. It uses server-sent events on the person's session, which
+  go one way, from the server to the page.
+- **Events.** An event is `{ "kind": "records" | "tasks" | "notifications", "application": "...", "entity": "..." }`.
+  It names what changed and never carries an id or a value.
+- **Who gets an event.** The server sends an event only when the session's roles give a `read` grant on the entity,
+  or when the person, or one of their roles, is addressed by the change.
+- **Reloads.** The bell, the task inbox and the open tables of the entity reload through their usual routes. The
+  [notifications](notifications.md#the-bell), the [task inbox](task-inbox-widget.md) and the
+  [table widget](table-widget.md) say which routes those are.
+- **Reconnect.** When a stream breaks and comes back, the page reloads its data once, since it may have missed events.
+- **Replicas.** A change on one replica reaches the others through `NOTIFY axis_live` on the platform database. The
+  server and the worker send it after the commit, as [waking a tenant](worker-scheduling.md#waking-a-tenant) does. The
+  signal may name the user or role that a task or a notification is for, so only their sessions reload. Each server
+  holds one `LISTEN` connection, see [connections](cells.md#connections).
+- **Without a platform database.** With `Tenancy:Source=configuration`, events come only from changes on the same
+  replica.
+- **Limits.** Opening a stream counts once in the session's rate limit. The streams that a session and a replica hold
+  are capped, see [rate limits](headers-and-rate-limits.md#rate-limits).
 
 ## Account button and sign-in prompt
 

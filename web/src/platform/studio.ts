@@ -74,10 +74,21 @@ export interface ExpressionDiagnostic {
   end: number
 }
 
-/** The answer of an expression check. `type` is `null` when there is a diagnostic. */
+/**
+ * The reading of an expression, see docs/reference/authoring.md#expression-check. A group reads its `items`, a phrase
+ * fills the text `shell.studio.expression.reads.{words}` with its `slots`, a name is a field, and a value is a literal.
+ */
+export type ExpressionReading =
+  | { kind: 'all' | 'any' | 'notAll' | 'none'; items: ExpressionReading[] }
+  | { kind: 'phrase'; words: string; slots: ExpressionReading[][] }
+  | { kind: 'name'; name: string; labelKey: string | null }
+  | { kind: 'value'; type: string; value: unknown; labelKey: string | null }
+
+/** The answer of an expression check. `type` and `reading` are `null` when there is a diagnostic. */
 export interface ExpressionCheck {
   type: string | null
   diagnostics: ExpressionDiagnostic[]
+  reading: ExpressionReading | null
 }
 
 /**

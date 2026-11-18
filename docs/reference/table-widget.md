@@ -16,7 +16,7 @@ label. A child collection and a `references` field have no column.
   otherwise the first column. For a data source it is the first column. It comes first. With a `navigate` row action it
   is the link that opens the row, see [opening a row](#opening-a-row).
 - **`priority`**. A `table` widget's `priorities` gives a column `high` or `low` by name, as `{ "amount": "low" }`,
-  for what moves under its row first when [room runs out](actions-and-controls.md#tables). It has no column chooser.
+  for what moves under its row first when [room runs out](actions-and-controls.md#tables).
 - **Layout.** Text, reference and file columns are free text, which shares the width left and wraps. Every other
   column, an enum too, fits its content and does not wrap, see [tables](actions-and-controls.md#tables). Every cell
   and the actions column line up at the top, so a row with wrapped text reads along its first line. Number columns sit
@@ -83,6 +83,33 @@ Paging, sorting and search live in the URL, so reload, sharing and the back butt
 - **Sorting.** Every column but a reference and a file is sortable, because the record API sorts a reference by the
   stored id, which does not match the label people see, and cannot sort a file. Repeated clicks on a header sort
   ascending, then descending, then not at all.
+
+### Address prefix
+
+_(planned for M42)_
+
+A table may set `prefix`, such as `"prefix": "orders"`, so that a page can hold several tables. The table's
+`search`, `filter`, `page`, `pageSize` and `sort`, and its unbound data source parameters, then live in the URL
+as `orders.search`, `orders.filter`, `orders.page`, `orders.pageSize`, `orders.sort` and `orders.{parameter}`.
+They keep the order and the rules of [paging and sorting](#paging-and-sorting). A table without a `prefix` keeps
+the plain keys, and a page has at most one table, calendar, board or cards widget without a `prefix`, see
+[calendar, board, cards and tree widgets](calendar-board-card-tree-widgets.md).
+
+A page parameter never takes a prefix. So a table bound to a page parameter reads its value from the URL under
+the plain name, and every table bound to it follows the same value. A customer page with its orders and tickets
+looks like this:
+
+```json
+{
+  "widgets": [
+    { "type": "detail", "name": "customer", "entity": "Customer", "record": "customer" },
+    { "type": "table", "name": "orders", "prefix": "orders", "dataSource": "CustomerOrders", "parameters": { "customer": "customer" } },
+    { "type": "table", "name": "tickets", "prefix": "tickets", "dataSource": "CustomerTickets", "parameters": { "customer": "customer" } }
+  ]
+}
+```
+
+The table's key in the SPA takes the prefix too, see [the table key](frontend.md#table-views-and-columns).
 
 ### Values
 
@@ -330,6 +357,58 @@ exports nothing.
 A row `startProcess` follows the rules of the [form widget](form-widget.md)'s start process action, with the row as the
 subject and the same `Idempotency-Key` and `409` text, without a save first. On `201` it loads the current page of rows
 again, with no success message. A failure shows above the table.
+
+### Bulk actions
+
+_(planned for M42)_
+
+A table with `bulkActions` shows a checkbox on each row and an "N selected" bar above the rows, as
+[tables](actions-and-controls.md#tables) says. The bar holds the bulk actions. The table's metadata lists a bulk action
+only when the person may run it:
+
+- A `startProcess` needs the `start` grant on its process.
+- A `setFields` needs `access.updateFields` to hold each of its fields.
+- A `delete` needs `access.actions` to hold `delete`.
+
+A `delete` asks for confirmation first. A `setFields` opens a dialog with one input for each of its fields. The
+inputs are drawn as the [form widget](form-widget.md) draws them. The same values go to every selected row.
+
+The SPA makes one call to the [bulk route](record-api.md#bulk-actions), with the selected rows' ids and, for an
+update, their versions. It then shows a result for each row, clears the selection and loads the current page of rows
+again. Each row that failed is listed, as [tables](actions-and-controls.md#tables) says.
+
+The reasons are in [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
+
+### Inline edit
+
+_(planned for M42)_
+
+An entity table with `"inlineEdit": true` lets a person edit a cell in place. A cell is editable only when its field is
+in `access.updateFields` and the field is not computed, a sequence, a `creator` or a matched reference. A data source
+table has no inline edit.
+
+A click or Enter opens the cell's input, drawn as the [form widget](form-widget.md) draws the field's type. A cell saves
+on Enter or when it loses focus, with `PATCH {recordsPath}/{id}`, the row's `version` and `X-Axis-Csrf: 1`. Escape
+restores the value.
+
+The answers:
+
+- `200` gives the row its new values and its new version.
+- `400` shows the message at the cell and keeps the old value.
+- `403`, `404` and `409` each show their own message above the table and restore the value.
+- Any other failure shows the generic platform error and restores the value.
+
+The reasons are in [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
+
+### Column chooser
+
+_(planned for M42)_
+
+A `table` widget has the Columns control of [tables](actions-and-controls.md#tables). It keeps each person's choice of
+columns under the table's key, see [table views and columns](frontend.md#table-views-and-columns). The identifying
+column stays first and always shows. The `priorities` still decide what moves under a row when room runs out.
+
+The reasons are in [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
 
 ### States
 

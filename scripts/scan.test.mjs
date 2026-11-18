@@ -7,7 +7,8 @@ import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 // Runs scripts/scan.sh with stub `dotnet` and `npm` commands that print recorded scan output for
-// real advisories, so the tests need no network and do not change when an advisory changes.
+// real advisories, so the tests need no network and do not change when an advisory changes. They read
+// an empty accepted list, so an entry in the real scripts/scan-accepted.json does not change them.
 const script = fileURLToPath(new URL('./scan.sh', import.meta.url))
 const fixtures = fileURLToPath(new URL('./fixtures/scan/', import.meta.url))
 
@@ -58,7 +59,7 @@ function scan({ dotnet = 'dotnet-clean.json', npm = 'npm-clean.json', accepted, 
       DOTNET_FIXTURE: `${fixtures}${dotnet}`,
       NPM_FIXTURE: `${fixtures}${npm}`,
       SCAN_TODAY: today,
-      SCAN_ACCEPTED: accepted ? `${fixtures}${accepted}` : path.join(path.dirname(script), 'scan-accepted.json'),
+      SCAN_ACCEPTED: `${fixtures}${accepted ?? 'accepted-empty.json'}`,
       ...env,
     },
   })

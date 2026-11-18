@@ -4,7 +4,7 @@ Status: **Agreed**
 
 ## Context
 
-A [form resource](d20-human-tasks-task-inbox-and-forms.md) lays out an entity's fields in sections,
+A [form resource](d160-people-work-together-on-records-and-tasks-and-work-reaches-the-right-person-when-they-are-away.md) lays out an entity's fields in sections,
 and in steps with conditions as
 [D62](d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md) sets out. An author
 needs to lay it out as visually as a page in

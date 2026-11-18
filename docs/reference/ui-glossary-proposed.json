@@ -2,30 +2,6 @@
   "$comment": "The terms that wait for the owner's approval, by locale. The owner approves a term by moving it to ui-glossary.json. See docs/reference/ui-writing.md#the-glossary. status: proposed or decide.",
   "terms": [
     {
-      "concept": "Deadline",
-      "en": "deadline",
-      "vi": "thời hạn chót",
-      "status": "proposed"
-    },
-    {
-      "concept": "Escalation",
-      "en": "escalation",
-      "vi": "leo thang",
-      "status": "proposed"
-    },
-    {
-      "concept": "Outcome (of a task)",
-      "en": "outcome",
-      "vi": "kết quả",
-      "status": "proposed"
-    },
-    {
-      "concept": "Timer (step)",
-      "en": "timer",
-      "vi": "hẹn giờ",
-      "status": "proposed"
-    },
-    {
       "concept": "Application template",
       "en": "template",
       "vi": "mẫu",
@@ -35,12 +11,6 @@
       "concept": "Action: Apply",
       "en": "Apply",
       "vi": "Áp dụng",
-      "status": "proposed"
-    },
-    {
-      "concept": "Connector operation",
-      "en": "operation",
-      "vi": "thao tác",
       "status": "proposed"
     },
     {
@@ -163,6 +133,246 @@
       "en": "Rename",
       "vi": "Đổi tên",
       "status": "proposed"
+    },
+    {
+      "concept": "Calendar",
+      "en": "calendar",
+      "vi": "lịch làm việc",
+      "status": "proposed"
+    },
+    {
+      "concept": "Working time",
+      "en": "working time",
+      "vi": "giờ làm việc",
+      "status": "proposed"
+    },
+    {
+      "concept": "Day off",
+      "en": "day off",
+      "vi": "ngày nghỉ",
+      "status": "proposed"
+    },
+    {
+      "concept": "Make-up day",
+      "en": "make-up day",
+      "vi": "ngày làm bù",
+      "status": "proposed"
+    },
+    {
+      "concept": "SLA",
+      "en": "SLA",
+      "vi": "cam kết dịch vụ",
+      "status": "proposed"
+    },
+    {
+      "concept": "At risk",
+      "en": "at risk",
+      "vi": "sắp trễ hạn",
+      "status": "proposed"
+    },
+    {
+      "concept": "Fiscal year",
+      "en": "fiscal year",
+      "vi": "năm tài chính",
+      "status": "proposed"
+    },
+    {
+      "concept": "Quarter",
+      "en": "quarter",
+      "vi": "quý",
+      "status": "proposed"
+    },
+    {
+      "concept": "Document template",
+      "en": "document template",
+      "vi": "mẫu tài liệu",
+      "status": "proposed"
+    },
+    {
+      "concept": "File version",
+      "en": "version",
+      "vi": "bản",
+      "status": "proposed",
+      "note": "An earlier copy of a file, listed with its number and when it was replaced. It takes the word of a module's version, and \"phiên bản\" stays the release of an application."
+    },
+    {
+      "concept": "Action: Print",
+      "en": "Print",
+      "vi": "In",
+      "status": "proposed"
+    },
+    {
+      "concept": "Recycle bin",
+      "en": "recycle bin",
+      "vi": "thùng rác",
+      "status": "proposed",
+      "note": "Where a deleted record waits before it is removed for good, and from where it is restored."
+    },
+    {
+      "concept": "Action: Purge",
+      "en": "Purge",
+      "vi": "Xóa vĩnh viễn",
+      "status": "proposed",
+      "note": "Removes a record in the recycle bin for good. Delete moves a record into the recycle bin."
+    },
+    {
+      "concept": "Audit (of the tenant)",
+      "en": "audit",
+      "vi": "nhật ký kiểm toán",
+      "status": "proposed",
+      "note": "The page where an administrator searches and exports every audit record of the tenant."
+    },
+    {
+      "concept": "Path (of an instance)",
+      "en": "path",
+      "vi": "luồng",
+      "status": "proposed",
+      "note": "One route of steps that an instance runs. It is not a URL path."
+    },
+    {
+      "concept": "Branch",
+      "en": "branch",
+      "vi": "nhánh",
+      "status": "proposed",
+      "note": "A decision's branch, as the screen already names it, or a parallel step's branch, which runs as a path of its own."
+    },
+    {
+      "concept": "Parallel (step)",
+      "en": "parallel",
+      "vi": "song song",
+      "status": "proposed",
+      "note": "A step that runs its branches at once."
+    },
+    {
+      "concept": "Repeat (step)",
+      "en": "repeat",
+      "vi": "lặp lại",
+      "status": "proposed",
+      "note": "A step that runs its body again and again. Each run of the body is a pass."
+    },
+    {
+      "concept": "Pass (of a repeat)",
+      "en": "pass",
+      "vi": "lượt lặp",
+      "status": "proposed",
+      "note": "One run of a repeat's body. \"lượt chạy quy trình\" names a process instance, so it never names a pass."
+    },
+    {
+      "concept": "Process variable",
+      "en": "variable",
+      "vi": "biến",
+      "status": "proposed",
+      "note": "A typed value that a process declares and that every path of its instance reads and sets."
+    },
+    {
+      "concept": "Error path",
+      "en": "error path",
+      "vi": "hướng xử lý lỗi",
+      "status": "proposed",
+      "note": "The route that a step takes when it fails for good, instead of ending its path."
+    },
+    {
+      "concept": "Completion (of a block or task)",
+      "en": "completion",
+      "vi": "điều kiện hoàn tất",
+      "status": "proposed",
+      "note": "The rule that says when a parallel step, or a task for several people, is done."
+    },
+    {
+      "concept": "Absence",
+      "en": "absence",
+      "vi": "vắng mặt",
+      "status": "proposed",
+      "note": "The dates a person is away, with the delegate who takes their open tasks meanwhile."
+    },
+    {
+      "concept": "Delegate",
+      "en": "delegate",
+      "vi": "người được ủy quyền",
+      "status": "proposed",
+      "note": "The person who takes over a task while the person it was given to is away."
+    },
+    {
+      "concept": "On behalf of",
+      "en": "on behalf of",
+      "vi": "thay mặt",
+      "status": "proposed",
+      "note": "The absent person that a task was moved from, or a decision was taken for."
+    },
+    {
+      "concept": "Form draft",
+      "en": "form draft",
+      "vi": "bản nháp biểu mẫu",
+      "status": "proposed",
+      "note": "On a form, \"draft\" alone may name it."
+    },
+    {
+      "concept": "Favourite",
+      "en": "favourite",
+      "vi": "mục yêu thích",
+      "status": "proposed",
+      "note": "A page or record a person keeps in their own list on a site."
+    },
+    {
+      "concept": "Recent items",
+      "en": "recent",
+      "vi": "gần đây",
+      "status": "proposed"
+    },
+    {
+      "concept": "Logo",
+      "en": "logo",
+      "vi": "logo",
+      "status": "proposed"
+    },
+    {
+      "concept": "Main colour",
+      "en": "main colour",
+      "vi": "màu chính",
+      "status": "proposed",
+      "note": "A site's colour, from which its other colours follow."
+    },
+    {
+      "concept": "Comment",
+      "en": "comment",
+      "vi": "bình luận",
+      "status": "proposed",
+      "note": "A message that a person posts on a record or a task. Name it comment, not note or remark."
+    },
+    {
+      "concept": "Internal comment",
+      "en": "internal",
+      "vi": "nội bộ",
+      "status": "proposed",
+      "note": "A comment that only people with the internal comments grant see."
+    },
+    {
+      "concept": "Shared comment",
+      "en": "shared",
+      "vi": "chia sẻ",
+      "status": "proposed",
+      "note": "A comment that people who may read the record see, as opposed to an internal one."
+    },
+    {
+      "concept": "Mention",
+      "en": "mention",
+      "vi": "nhắc đến",
+      "status": "proposed",
+      "note": "A name of a person in a comment. It tells that person only when they may read the comment."
+    },
+    {
+      "concept": "Timeline",
+      "en": "timeline",
+      "vi": "dòng thời gian",
+      "status": "proposed",
+      "note": "The list of a record's comments, changes, process steps and emails on its page."
+    },
+    {
+      "concept": "Digest",
+      "en": "digest",
+      "vi": "bản tổng hợp",
+      "status": "proposed",
+      "note": "One email that lists the emails a person chose to receive together, once a day."
     }
   ]
 }

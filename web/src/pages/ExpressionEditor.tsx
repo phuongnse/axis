@@ -6,11 +6,13 @@ import { EditorView, keymap } from '@codemirror/view'
 import { ExpandAltOutlined } from '@ant-design/icons'
 import { Flex, Modal, Typography } from 'antd'
 import { Fragment, useContext, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AxisButton } from '../platform/AxisButton'
 import {
   checkStudioExpression,
   fetchStudioExpressionScope,
   type ExpressionCheck,
+  type ExpressionReading as Reading,
   type ExpressionScope,
   type ExpressionScopeFunction,
   type StudioNames,
@@ -23,6 +25,7 @@ import { callAt } from './expressionCall'
 import { completeAt, insertAt } from './expressionCompletion'
 import { expressionLanguage } from './expressionLanguage'
 import { ExpressionPanel } from './ExpressionPanel'
+import { ExpressionReading } from './ExpressionReading'
 import type { ScopeOption } from './expressionScope'
 
 /** How long the author must stop typing before the expression is checked. */
@@ -55,6 +58,7 @@ export interface ExpressionEditorProps {
 interface Result {
   type: string | null
   error: { code: string; message: string } | null
+  reading: Reading | null
 }
 
 /** A code editor for one expression. It checks the text after the author stops typing and shows the newest answer. */
@@ -78,10 +82,12 @@ export default function ExpressionEditor({
   const tokens = useDesignTokens()
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  // The editor's outer element, which holds the Expand button inside the box.
+  const [frame, setFrame] = useState<HTMLElement | null>(null)
   const dialogView = useRef<EditorView | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [themeCompartment] = useState(() => new Compartment())
-  const [result, setResult] = useState<Result>({ type: null, error: null })
+  const [result, setResult] = useState<Result>({ type: null, error: null, reading: null })
   const [checking, setChecking] = useState(true)
   // The text before the cursor, which says whether the cursor is inside a call.
   const [before, setBefore] = useState('')
@@ -89,18 +95,22 @@ export default function ExpressionEditor({
   const [loaded, setLoaded] = useState<{ placeKey: string; scope: ExpressionScope | null } | null>(null)
   // An answer for another place is not this place's scope.
   const scope = loaded?.placeKey === placeKey ? loaded.scope : null
+  const unanswered = loaded?.placeKey === placeKey && loaded.scope === null
+  // Counts the check answers that came while the scope had no answer, so the scope is asked again.
+  const [asks, setAsks] = useState(0)
   const latest = useRef({
     onChange,
     onView,
     required,
     options,
     scope,
+    unanswered,
     names,
     locale,
     t,
     draft,
     value,
-    theme: expressionTheme(tokens, mode),
+    theme: (inDialog ? dialogTheme : boxTheme)(tokens, mode),
     themeCompartment,
   })
 
@@ -111,17 +121,19 @@ export default function ExpressionEditor({
       required,
       options,
       scope,
+      unanswered,
       names,
       locale,
       t,
       draft,
       value,
-      theme: expressionTheme(tokens, mode),
+      theme: (inDialog ? dialogTheme : boxTheme)(tokens, mode),
       themeCompartment,
     }
   })
 
   // The scope is loaded once per place, with the draft as it stands then, so a keystroke in the draft loads no more.
+  // A scope with no answer, such as one asked for a field that has no name yet, is asked again with the next check answer.
   useEffect(() => {
     const controller = new AbortController()
     fetchStudioExpressionScope(application, resourceId, path, latest.current.draft(), controller.signal).then(
@@ -133,7 +145,7 @@ export default function ExpressionEditor({
       () => {},
     )
     return () => controller.abort()
-  }, [application, resourceId, path, placeKey])
+  }, [application, resourceId, path, placeKey, asks])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -144,7 +156,7 @@ export default function ExpressionEditor({
       const id = counter
       const text = view.state.doc.toString()
       if (text === '') {
-        show(view, { type: null, diagnostics: [] })
+        show(view, { type: null, diagnostics: [], reading: null })
         setChecking(false)
         return
       }
@@ -155,6 +167,9 @@ export default function ExpressionEditor({
           }
           if (answer !== null) {
             show(view, answer)
+            if (latest.current.unanswered) {
+              setAsks((count) => count + 1)
+            }
           }
           setChecking(false)
         },
@@ -201,6 +216,7 @@ export default function ExpressionEditor({
       }),
     })
     viewRef.current = view
+    setFrame(view.dom)
     latest.current.onView?.(view)
     check(view)
 
@@ -211,13 +227,16 @@ export default function ExpressionEditor({
       setBefore('')
       view.destroy()
       viewRef.current = null
+      setFrame(null)
       latest.current.onView?.(null)
     }
   }, [application, resourceId, path, name])
 
   useEffect(() => {
-    viewRef.current?.dispatch({ effects: themeCompartment.reconfigure(expressionTheme(tokens, mode)) })
-  }, [themeCompartment, tokens, mode])
+    viewRef.current?.dispatch({
+      effects: themeCompartment.reconfigure((inDialog ? dialogTheme : boxTheme)(tokens, mode)),
+    })
+  }, [themeCompartment, tokens, mode, inDialog])
 
   useEffect(() => {
     const view = viewRef.current
@@ -242,17 +261,20 @@ export default function ExpressionEditor({
 
   return (
     <div aria-busy={checking}>
-      <Flex gap={tokens.spacing.xs} align="flex-start">
-        <div ref={hostRef} style={{ flex: 1, minWidth: 0 }} />
-        {!inDialog && (
+      <div ref={hostRef} />
+      {!inDialog &&
+        frame &&
+        createPortal(
           <AxisButton
             role="icon"
+            size="small"
             nameKey="shell.studio.expression.expand"
             icon={<ExpandAltOutlined />}
+            style={{ position: 'absolute', top: 3, right: 3 }}
             onClick={() => setExpanded(true)}
-          />
+          />,
+          frame,
         )}
-      </Flex>
       {call !== null && (
         <div data-testid="studio-expression-signature">
           <Typography.Text>
@@ -276,11 +298,20 @@ export default function ExpressionEditor({
           </Typography.Text>
         </div>
       ) : (
-        line !== null && (
-          <div>
-            <Typography.Text data-testid="studio-expression-type">{line}</Typography.Text>
-          </div>
-        )
+        <>
+          {result.reading !== null && (
+            <div data-testid="studio-expression-reading">
+              <Typography.Text type="secondary">{t('shell.studio.expression.inWords')}</Typography.Text>{' '}
+              <ExpressionReading reading={result.reading} names={names} locale={locale} />
+            </div>
+          )}
+          {/* The reading replaces what the place gives, unless the place takes any type, so the type shows under it. */}
+          {line !== null && (result.reading === null || !scope?.type) && (
+            <div>
+              <Typography.Text data-testid="studio-expression-type">{line}</Typography.Text>
+            </div>
+          )}
+        </>
       )}
       {expanded && (
         <Modal
@@ -329,7 +360,7 @@ export default function ExpressionEditor({
     const length = view.state.doc.length
     if (answer.diagnostics.length === 0) {
       view.dispatch(setDiagnostics(view.state, []))
-      setResult({ type: answer.type, error: null })
+      setResult({ type: answer.type, error: null, reading: answer.reading ?? null })
       return
     }
     const diagnostics: Diagnostic[] = answer.diagnostics.map((item) => {
@@ -346,7 +377,7 @@ export default function ExpressionEditor({
     })
     view.dispatch(setDiagnostics(view.state, diagnostics))
     const first = answer.diagnostics[0]
-    setResult({ type: null, error: { code: first.code, message: first.message } })
+    setResult({ type: null, error: { code: first.code, message: first.message }, reading: null })
   }
 }
 
@@ -362,4 +393,17 @@ const expressionTheme = sharedTheme((tokens, mode) => [
     '.cm-content': { padding: '4px 0' },
     '.cm-completionInfo code': { fontFamily: tokens.type.codeFontFamily },
   }),
+])
+
+// The box in a form leaves room at the end of each line for Expand. The box in the dialog shows at least eight lines,
+// see docs/reference/studio.md#expression-editor.
+const boxTheme = sharedTheme((tokens, mode) => [
+  expressionTheme(tokens, mode),
+  EditorView.theme({ '.cm-line': { paddingRight: `${tokens.size.smallControl + 6}px` } }),
+])
+
+// Eight lines at CodeMirror's line height of 1.4, plus the 4px of padding above and below the content.
+const dialogTheme = sharedTheme((tokens, mode) => [
+  expressionTheme(tokens, mode),
+  EditorView.theme({ '.cm-content': { minHeight: `calc(${8 * 1.4}em + 8px)` } }),
 ])

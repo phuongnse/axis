@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace Axis.Data.Storage;
 
@@ -28,6 +29,18 @@ public static class PackageRunners
     private const string RevokeSql =
         """
         UPDATE "axis"."package_runners" SET "revoked_at" = now() WHERE "id" = @id AND "revoked_at" IS NULL
+        """;
+
+    private const string AddPackagesSql =
+        """
+        UPDATE "axis"."package_runners"
+        SET "packages" = (SELECT COALESCE(jsonb_agg(DISTINCT p ORDER BY p), '[]'::jsonb) FROM jsonb_array_elements("packages" || @added) AS p)
+        WHERE "id" = @id AND "revoked_at" IS NULL
+        """;
+
+    private const string MarkCalledSql =
+        """
+        UPDATE "axis"."package_runners" SET "last_call_at" = now() WHERE "id" = @id AND "revoked_at" IS NULL
         """;
 
     /// <summary>Stores a new runner in <paramref name="transaction"/>, with no packages, no last call and no revoke time.</summary>
@@ -96,6 +109,38 @@ public static class PackageRunners
 
         await using var command = new NpgsqlCommand(RevokeSql, transaction.Connection, transaction);
         command.Parameters.AddWithValue("id", id);
+        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+    }
+
+    /// <summary>
+    /// Sets the last call time of the runner to now in <paramref name="transaction"/>, when the runner takes a call. It returns whether it
+    /// changed a row, so a runner that is missing or revoked gets <c>false</c>.
+    /// </summary>
+    public static async Task<bool> MarkCalledAsync(NpgsqlTransaction transaction, Guid id, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+
+        await using var command = new NpgsqlCommand(MarkCalledSql, transaction.Connection, transaction);
+        command.Parameters.AddWithValue("id", id);
+        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+    }
+
+    /// <summary>
+    /// Adds <paramref name="packages"/> to the packages of the runner in one statement, so a package that is already stored stays once. It
+    /// returns whether it changed a row, so a runner that is missing or revoked gets <c>false</c> and nothing is stored.
+    /// </summary>
+    public static async Task<bool> AddPackagesAsync(
+        NpgsqlConnection connection, Guid id, IReadOnlyCollection<PackageRunnerPackage> packages, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(packages);
+
+        await using var command = new NpgsqlCommand(AddPackagesSql, connection);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.Add(new NpgsqlParameter("added", NpgsqlDbType.Jsonb)
+        {
+            Value = JsonSerializer.Serialize(packages.Select(package => new { id = package.Id, version = package.Version })),
+        });
         return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
 

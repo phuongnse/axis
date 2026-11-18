@@ -84,8 +84,8 @@ and may [relax](module-contracts.md#relax-entries) points of its contract.
   `modules/<id>/module.json`. There is no other release table. A release keeps working when its version
   is removed from the installation later, because the release holds the files.
 - **A newer version.** A newer installed version in range gives a new release at the next activation,
-  as for packages. A [customization layer](customization-layers.md#versions-until-m29) that names a key
-  the newer version dropped fails that compile, and the release in use stays.
+  as for packages. A [customization layer](customization-layers.md#module-versions-and-layers)
+  that names a key the newer version dropped fails that compile, and the release in use stays.
 - **A reserved folder.** An application file under `modules/` is `AXC0212`, because releases reserve
   that folder.
 
@@ -162,7 +162,7 @@ in one tenant never share module data.
 
 A new module version must keep the tables that applications already hold, so a module upgrade is
 additive for its entities. How an application's layer follows a newer version is in
-[customization layers](customization-layers.md#versions-until-m29).
+[customization layers](customization-layers.md#module-versions-and-layers).
 
 - **Additive.** Activation compares each module copy in the release with the copy in the application's
   active release. It matches entities by the id written in the module file and fields by name, ignoring

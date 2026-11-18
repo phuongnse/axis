@@ -2343,10 +2343,10 @@ describe('StudioPage process graph marks', () => {
     renderPage(`/studio?app=PurchaseRequests&resource=${processItem.id}`)
 
     const marked = await screen.findByTestId('studio-graph-node-1', {}, slow)
-    expect(marked).toHaveAccessibleName(/has diagnostics$/)
+    expect(marked).toHaveAccessibleName(/has problems$/)
     expect(marked).toHaveAttribute('data-marked', 'true')
     const unmarked = screen.getByTestId('studio-graph-node-0')
-    expect(unmarked).not.toHaveAccessibleName(/has diagnostics/)
+    expect(unmarked).not.toHaveAccessibleName(/has problems/)
     expect(unmarked).not.toHaveAttribute('data-marked')
   })
 

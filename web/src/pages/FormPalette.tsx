@@ -3,6 +3,7 @@ import { Button, Flex, Typography } from 'antd'
 import { useContext, type PointerEventHandler } from 'react'
 import { Announcement } from '../platform/Announcement'
 import { EmptyState } from '../platform/EmptyState'
+import { fillText } from '../platform/fillText'
 import { addSection, addStep, insertionPlace, paletteFields } from '../platform/formLayout'
 import type { LayoutAdd } from '../platform/formLayout'
 import type { StudioNameField } from '../platform/studio'
@@ -53,7 +54,7 @@ export function FormPalette({
       onChange('/steps', add.steps)
     }
     onSelect(add.select)
-    onAnnounce(`${t('shell.studio.design.added')} ${add.name}`)
+    onAnnounce(fillText(t('shell.studio.design.added'), { name: add.name }))
   }
 
   return (

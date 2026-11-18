@@ -16,7 +16,7 @@ schedule triggers need no binding and no inbound surface.
 - **A module holds triggers** of every type: `event`, `dataChange`, delete triggers included, and
   `schedule`. A module trigger starts a process of its own module, and reacts to an event or an
   entity of its own module or of a module it declares. A schedule runs in the
-  [time zone](d75-the-application-time-zone.md) of each application that uses the module, with
+  [time zone](d156-working-time-calendars-durations-in-working-hours-and-slas.md) of each application that uses the module, with
   occurrences of its own in each application's copy.
 - **A module holds scenarios,** the contract scenarios of D102 among them. A module scenario gives
   its users role slots, which become the mapped application roles when it runs against the

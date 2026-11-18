@@ -217,11 +217,17 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.LastError).HasColumnName("last_error");
             call.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             call.Property(c => c.SettledAt).HasColumnName("settled_at");
+            call.Property(c => c.RunnerId).HasColumnName("runner_id");
+            call.Property(c => c.LeaseId).HasColumnName("lease_id");
+            call.Property(c => c.LeaseUntil).HasColumnName("lease_until");
 
             // A step stages at most one call per pass.
             call.HasIndex(c => new { c.ProcessInstanceId, c.Step, c.StagedRevision })
                 .IsUnique()
                 .HasDatabaseName("ux_package_calls_process_instance_id_step_staged_revision");
+
+            // A runner's result finds its call by the lease, and a lease belongs to one call.
+            call.HasIndex(c => c.LeaseId).IsUnique().HasDatabaseName("ux_package_calls_lease_id");
             call.HasOne<ProcessInstanceRow>()
                 .WithMany()
                 .HasForeignKey(c => c.ProcessInstanceId)

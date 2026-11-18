@@ -1,6 +1,7 @@
 import { Button, Flex, Tag, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { EmptyState } from '../platform/EmptyState'
+import { fillText } from '../platform/fillText'
 import type { StudioReference, StudioReferenceNode } from '../platform/studio'
 import { useText } from '../platform/texts'
 
@@ -45,7 +46,13 @@ export function StudioFormUsedOn({
                     {entry.node.name ?? entry.node.file}
                   </Button>
                 </Flex>
-                <Typography.Text type="secondary">{`${entry.file}, ${t('shell.studio.path')}: ${entry.path}`}</Typography.Text>
+                <Typography.Text type="secondary">
+                  {fillText(t('shell.studio.design.usedOnPlace'), {
+                    file: entry.file,
+                    label: t('shell.studio.path'),
+                    path: entry.path,
+                  })}
+                </Typography.Text>
               </Flex>
             </li>
           ))}

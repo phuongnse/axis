@@ -203,20 +203,20 @@ describe('StudioModuleContract', () => {
       await userEvent.type(await screen.findByRole('textbox', { name: 'Name' }), 'review')
       await userEvent.click(screen.getByRole('button', { name: 'Add' }))
 
-      expect(await screen.findByRole('note', { name: 'Added review' })).toBeInTheDocument()
+      expect(await screen.findByRole('note', { name: 'review, added by this application' })).toBeInTheDocument()
       expect(rowTexts(states)).toHaveLength(2)
     })
 
-    it('marks an added state and transition Added with Remove, and the module rows have no Remove', async () => {
+    it('marks an added state and transition Added with Delete, and the module rows have no Delete', async () => {
       renderLayered()
 
-      expect(await screen.findByRole('note', { name: 'Added onHold' })).toBeInTheDocument()
-      expect(screen.getByRole('note', { name: 'Added hold' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Remove onHold' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Remove hold' })).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Remove open' })).toBeNull()
-      expect(screen.queryByRole('button', { name: 'Remove check' })).toBeNull()
-      expect(screen.queryByRole('note', { name: 'Added open' })).toBeNull()
+      expect(await screen.findByRole('note', { name: 'onHold, added by this application' })).toBeInTheDocument()
+      expect(screen.getByRole('note', { name: 'hold, added by this application' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Delete onHold' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Delete hold' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Delete open' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Delete check' })).toBeNull()
+      expect(screen.queryByRole('note', { name: 'open, added by this application' })).toBeNull()
       expect(screen.queryByText('Checklist/states/onHold/initial')).toBeNull()
       expect(screen.queryByText('Checklist/transitions/hold')).toBeNull()
       expect(screen.getByText('Checklist/transitions/check')).toBeInTheDocument()
@@ -226,8 +226,8 @@ describe('StudioModuleContract', () => {
     it('sends the contract without a removed state to the module save route on Save', async () => {
       const { puts, onWritten } = renderLayered()
 
-      await userEvent.click(await screen.findByRole('button', { name: 'Remove onHold' }))
-      expect(screen.queryByRole('note', { name: 'Added onHold' })).toBeNull()
+      await userEvent.click(await screen.findByRole('button', { name: 'Delete onHold' }))
+      expect(screen.queryByRole('note', { name: 'onHold, added by this application' })).toBeNull()
       await userEvent.click(screen.getByTestId('studio-save'))
 
       await waitFor(() => expect(puts()).toHaveLength(1))
@@ -251,7 +251,7 @@ describe('StudioModuleContract', () => {
       await userEvent.click(add)
       expect(await within(stateDialog).findByText('Enter a name.')).toBeInTheDocument()
       expect(name).toHaveFocus()
-      expect(screen.queryByRole('note', { name: 'Added ' })).toBeNull()
+      expect(screen.queryByRole('note', { name: ', added by this application' })).toBeNull()
       await userEvent.type(name, 'ONHOLD')
       await userEvent.click(add)
       expect(await within(stateDialog).findByText('A state with this name already exists.')).toBeInTheDocument()
@@ -261,7 +261,7 @@ describe('StudioModuleContract', () => {
       await userEvent.click(within(stateDialog).getByRole('checkbox', { name: 'Deletable' }))
       await userEvent.click(add)
 
-      expect(await screen.findByRole('note', { name: 'Added review' })).toBeInTheDocument()
+      expect(await screen.findByRole('note', { name: 'review, added by this application' })).toBeInTheDocument()
       expect(screen.getByTestId('studio-save')).toBeEnabled()
       expect(screen.getByTestId('studio-contract-state-review')).toHaveTextContent('Deletable')
     })
@@ -336,19 +336,19 @@ describe('StudioModuleContract', () => {
       await chooseOption('onHold', formItem(within(dialog).getByRole('combobox', { name: 'To' })))
       await userEvent.click(within(dialog).getByRole('button', { name: 'Add' }))
 
-      expect(await screen.findByRole('note', { name: 'Added park' })).toBeInTheDocument()
+      expect(await screen.findByRole('note', { name: 'park, added by this application' })).toBeInTheDocument()
       expect(screen.getByTestId('studio-save')).toBeEnabled()
     })
 
     it('asks before a link leaves an edited contract, and not before one leaves an untouched contract', async () => {
       const router = renderLayered([], renderGuarded).router!
-      await screen.findByRole('note', { name: 'Added onHold' })
+      await screen.findByRole('note', { name: 'onHold, added by this application' })
 
       await followLink()
       expect(router.state.location.pathname).toBe('/elsewhere')
       await act(() => router.navigate('/studio'))
 
-      await userEvent.click(screen.getByRole('button', { name: 'Remove onHold' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Delete onHold' }))
       await followLink()
 
       expect(await screen.findByText('Leave without saving?')).toBeInTheDocument()

@@ -337,7 +337,7 @@ Studio edits an endpoint in the generic form, with [rows](studio-form-editors.md
 
 - **Endpoint `event`.** The [Studio](studio.md) endpoint form shows the
   `event` as a picker of the application's events. The event's `fields` show as
-  rows of a payload field and an expression, and **Add mapping** lists the
+  rows of a payload field and an expression, and the **Add row** picker lists the
   payload fields that have no row. Clearing the picker removes the whole
   `event`. Picking another event keeps the rows. A value that is not an object
   is left to the JSON view.

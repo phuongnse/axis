@@ -90,8 +90,8 @@ a seed record.
 - **Parsing.** Each record goes through the record input parser as a create body, so the rules of
   the record API apply. Every record is parsed before any write. An invalid value is `AXC0033` at
   `/records/{i}/values/<field>`, and so is a value for a
-  [computed field](resource-files.md#entity-logic) or a [sequence](resource-files.md#sequences)
-  field. The entity's [validations](resource-files.md#entity-logic) do not run on seed records.
+  [computed field](entity-logic-and-sequences.md#entity-logic) or a [sequence](entity-logic-and-sequences.md#sequences)
+  field. The entity's [validations](entity-logic-and-sequences.md#entity-logic) do not run on seed records.
 - **One transaction.** All inserts and updates of the folder run in one transaction, seed files in
   path order and records in file order, so a reference value must name an existing record or one
   inserted earlier in the same run. Each write computes the record's computed fields, an update from
@@ -380,12 +380,23 @@ and `Data:TenantPoolIdleLifetime`.
 | `Data:ImportMaxRows`          | `10000`    | The most data rows one import holds. A larger file fails its dry run. The worker reads it, and a value that is not an integer of at least 1 stops its start.                                                                                                                            |
 | `Data:ImportMaxBytes`         | `20971520` | The largest import file, 20 MB. A larger upload is a `413`. The server reads it, and a value that is not a whole number of at least 1 stops its start.                                                                                                                                  |
 | `Files:MaxSize`               | `26214400` | The largest file one upload stores, 25 MB. An upload is refused with `413` above the smaller of this and the field's `maxSize`. Publish checks a field's `maxSize` against the 25 MB default, not against this setting. The server reads it, and a value that is not a whole number of at least 1 stops its start. |
+| `Files:PreviewOrigin` _(planned for M40)_ | none | The origin that serves the inline previews and thumbnails of files, see [preview](file-fields.md#download). It is an `https` origin that is not the origin of any tenant, and the server reads it. |
+| `Files:PreviewLifetime` _(planned for M40)_ | — | How long the signed link to a preview lives, a duration of whole seconds. The server reads it. |
+| `Files:Versions` _(planned for M40)_ | — | The most earlier versions a file keeps, see [versions](file-fields.md#versions). Zero keeps none. The server reads it. |
+| `Email:MaxSize` _(planned for M40)_ | — | The largest email, with its attachments, that the worker sends, see [email](notifications.md#email). The worker reads it. |
+| `Documents:Runner` _(planned for M40)_ | none | The address of the [document runner](document-templates.md#the-document-runner). The server and the worker read it. |
+| `Documents:Timeout` _(planned for M40)_ | — | How long one call to the document runner may take, a duration. The server and the worker read it. |
 | `Data:TenantPoolMaxSize`      | `5`        | The most connections in the runtime role's pool of each tenant. It wins over `Maximum Pool Size` in the tenant's connection string. A value that is not an integer of at least 1 stops the start, and the error names the setting.                                                      |
 | `Data:TenantPoolMinSize`      | `0`        | The connections each tenant's pool keeps open when idle. It wins over `Minimum Pool Size` in the tenant's connection string. A value that is not an integer from 0 up to `Data:TenantPoolMaxSize` stops the start, and the error names the setting.                                     |
 | `Data:TenantPoolIdleLifetime` | `00:01:00` | How long an idle connection of a tenant's pool stays open before it closes, a duration of whole seconds of at least one second. It wins over `Connection Idle Lifetime` in the tenant's connection string. A shorter value lowers the pruning interval to match. Any other value stops the start, and the error names the setting. |
 
 As environment variables they are `Data__QueryTimeout`, `Files__MaxSize` and so on.
 
+- **Files, email and documents.** _(planned for M40)_ `Files:PreviewOrigin`, `Files:PreviewLifetime`,
+  `Files:Versions`, `Email:MaxSize`, `Documents:Runner` and `Documents:Timeout` set where previews are served, how
+  long their links live, how many versions a file keeps, the size of an email and where documents are made. A
+  `Files:PreviewOrigin` that is not an `https` origin, and a `Documents:Timeout` that is not a duration of at
+  least one millisecond, stop the start.
 - **Tenant pools.** The three pool settings apply to the runtime role's pools in the server and the
   worker. `Max Auto Prepare` is always 0 on these pools, as transaction-mode PgBouncer needs, see
   [connections](cells.md#connections).
@@ -475,6 +486,19 @@ minute for one replica. The rules of the limits are in
   start and names the setting.
 - **Defaults.** The weekly [load test](performance.md#load-test) never reaches the defaults, and it
   can tune them.
+
+## Comment and live page settings
+
+_(planned for M43)_
+
+These settings set how long an author may edit a comment, and how many live streams a session and a replica hold.
+The server reads them, and a bad value stops the start.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `Comments:EditWindow` _(planned for M43)_ | — | How long after posting an author may edit or delete a comment, see [editing and deleting](comments.md#editing-and-deleting). The server reads it. |
+| `Live:MaxStreamsPerSession` _(planned for M43)_ | — | The most live streams one session holds, see [live pages](frontend.md#live-pages). The server reads it. |
+| `Live:MaxStreams` _(planned for M43)_ | — | The most live streams one replica holds, see [rate limits](headers-and-rate-limits.md#rate-limits). The server reads it. |
 
 ## AI settings
 

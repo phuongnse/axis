@@ -76,6 +76,10 @@ A grouped data source adds `aggregate`, and its rows are groups, not records:
   [expressions](expressions.md#names-and-references). Each name matches ignoring letter case. A
   path cannot go through or end at a `child-collection`. A `null` reference along the path gives
   `null` and the row is kept, because each hop is a left join.
+- **System fields** _(planned for M41)_. A `path`, whether it ends at the root entity or at an entity along a
+  reference, may name a [system field](resource-files.md#system-fields), such as `updatedAt` or
+  `department.createdBy`, and so may the `filter`, as it names a field. A `sort` names them through a projected
+  field. Their types are `date-time` and `text`, and a user who may read the row may read them.
 - **`parameters`.** Typed inputs of the filter. A parameter has a `name`, a `type` and `required`,
   which defaults to `false`. A [customization layer](customization-layers.md#list-keys) finds a
   parameter by its `name`. The types are the scalar field types plus `enum` and `reference`. An
@@ -115,7 +119,7 @@ group.
   row.
 - **Date buckets.** A bucketed group value in a row is the first date of the bucket, as a date such
   as `2026-11-01`, and a week starts on Monday. A date is bucketed as it is. A date-time is bucketed
-  in the [application time zone](resource-files.md#application-time-zone), so each record counts on
+  in the [application time zone](entity-logic-and-sequences.md#application-time-zone), so each record counts on
   the local day it happened, even when that day differs in UTC.
   - In SQL the bucket is `date_trunc('<bucket>', col::timestamp)::date` for a date and
     `date_trunc('<bucket>', col AT TIME ZONE @tz)::date` for a date-time, where `@tz` is the time
@@ -123,6 +127,11 @@ group.
     tie-break order and a sort by that group field.
   - A measure over the same field reads the raw values, so `max` of a date-time stays a date-time.
   - Page metadata, export and Studio's names give a bucketed group the type `date`.
+- **Quarter and fiscal buckets** _(planned for M39)_. `bucket` also takes `quarter`, `fiscalQuarter` and
+  `fiscalYear`. The group value is the first date of the bucket. A quarter starts in January, April, July
+  or October. A fiscal year starts on day 1 of the application's
+  [`fiscalYearStart`](entity-logic-and-sequences.md#fiscal-year) month, so with April a record of 2026-06-15 is in the
+  fiscal year that starts on 2026-04-01. Fiscal quarters run every three months from that start.
 - **`measures`.** Each has a `name` and a `function`: `count`, `sum`, `min`, `max`, `avg` or
   `countDistinct`. It may also have a `filter`.
 - **`count`.** It takes no `field` and counts rows.
@@ -575,3 +584,33 @@ each binding.
   group column's is the sibling column that reads the currency field on the same record. Both are
   left out of the JSON when they do not apply. A measure column has `"measure": true`, and every other
   column leaves the property out.
+
+### Filter bar
+
+_(planned for M42)_
+
+A page's `filterBar` lists entries that set its parameters. Each entry names a page parameter and gives
+its label as a text key, because a page parameter has no label of its own. An entry may also set
+`valueLabels` for an `enum` parameter, as a data source parameter does. The bar sits above the page's
+widgets, with one input per entry in list order. Each input is the kind that a data source table draws
+for its filter inputs, and applies the same way, see [table widget](table-widget.md#data-source-binding).
+
+A new value writes the page parameter into the URL and adds a history entry. Every table, chart and KPI
+bound to the parameter reads again, and a table starts from page 1. A required parameter's input cannot
+be cleared. Each entry names a page parameter once, ignoring letter case, and each label is checked as
+every text key is.
+
+```json
+{
+  "parameters": [
+    { "name": "from", "type": "date", "required": true },
+    { "name": "to", "type": "date", "required": true }
+  ],
+  "filterBar": [
+    { "parameter": "from", "label": { "textKey": "dashboard.from" } },
+    { "parameter": "to", "label": { "textKey": "dashboard.to" } }
+  ]
+}
+```
+
+A chart and a KPI on that page bind `from` and `to` with their `parameters` map, so both follow the bar.

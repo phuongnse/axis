@@ -303,7 +303,8 @@ describe.each(['light', 'dark'])('The operation panel in %s mode', (mode) => {
 
   it('renders inside the theme root with its controls visible', async () => {
     renderEditor()
-    await screen.findAllByTestId('studio-expression-type')
+    // The first expression loads its editor lazily, which can take longer than the default wait while other files run.
+    await screen.findAllByTestId('studio-expression-type', undefined, { timeout: 5000 })
 
     const root = screen.getByTestId('studio-field-/steps/0/operation')
     expect(root.closest(`[data-theme-mode=${mode}]`)).not.toBeNull()
@@ -438,7 +439,7 @@ describe('A notify step', () => {
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/message/values/n', 'numberX')
     await userEvent.type(field('/steps/0/message/values/n').getByRole('textbox', { name: 'Placeholder' }), 'X')
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/message/values', { nX: 'number' })
-    await userEvent.click(field('/steps/0/message/values').getByRole('button', { name: 'Add mapping' }))
+    await userEvent.click(field('/steps/0/message/values').getByRole('button', { name: 'Add row' }))
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/message/values/', '')
   })
 
@@ -447,7 +448,7 @@ describe('A notify step', () => {
 
     await userEvent.type(field('/steps/0/open/page').getByRole('textbox', { name: 'Page' }), 'X')
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/open/page', 'PX')
-    await userEvent.click(field('/steps/0/open/parameters').getByRole('button', { name: 'Add mapping' }))
+    await userEvent.click(field('/steps/0/open/parameters').getByRole('button', { name: 'Add row' }))
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/open/parameters/', '')
     await userEvent.click(field('/steps/0/open').getByRole('checkbox', { name: 'Open a page' }))
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/open', undefined)
@@ -567,7 +568,7 @@ describe('An updateRecord step', () => {
   it('adds a row for an unmapped field of the entity', async () => {
     const onChange = renderEditor()
 
-    await userEvent.click(step(0).getByRole('combobox', { name: 'Add mapping Set' }))
+    await userEvent.click(step(0).getByRole('combobox', { name: 'Add Set' }))
     const options = optionTexts()
     expect(options).toEqual(['purchaseOrderNumber', 'lines'])
     await chooseOption('purchaseOrderNumber')
@@ -599,7 +600,7 @@ describe('An updateRecord step', () => {
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/set/totalAmount', '12')
     await userEvent.type(row.getByRole('textbox', { name: 'Field' }), 'X')
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/set', { status: "'submitted'", totalAmountX: '1' })
-    await userEvent.click(step(0).getByRole('button', { name: 'Add mapping' }))
+    await userEvent.click(step(0).getByRole('button', { name: 'Add row' }))
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/set/', '')
   })
 
@@ -740,14 +741,14 @@ describe('A callConnector step', () => {
     const pick = (row: string, name: RegExp) =>
       userEvent.click(within(screen.getByTestId(row)).getAllByRole('radio', { name })[0].closest('label')!)
 
-    await userEvent.click(input().getByRole('button', { name: 'Add mapping' }))
+    await userEvent.click(input().getByRole('button', { name: 'Add row' }))
     await userEvent.type(screen.getByTestId('studio-field-/steps/1/input/').querySelector('input')!, 'lines')
     await pick('studio-field-/steps/1/input/lines', /^List/)
     await chooseOption('lines', screen.getByTestId('studio-field-/steps/1/input/lines/from'))
 
     const rows = () => within(screen.getByTestId('studio-field-/steps/1/input/lines/fields'))
     for (const name of ['sku', 'quantity']) {
-      await userEvent.click(rows().getByRole('button', { name: 'Add mapping' }))
+      await userEvent.click(rows().getByRole('button', { name: 'Add row' }))
       await userEvent.type(
         screen.getByTestId('studio-field-/steps/1/input/lines/fields/').querySelector('input')!,
         name,
@@ -755,11 +756,11 @@ describe('A callConnector step', () => {
       await editExpression(`studio-field-/steps/1/input/lines/fields/${name}`, name)
     }
 
-    await userEvent.click(input().getAllByRole('button', { name: 'Add mapping' }).at(-1)!)
+    await userEvent.click(input().getAllByRole('button', { name: 'Add row' }).at(-1)!)
     await userEvent.type(screen.getByTestId('studio-field-/steps/1/input/').querySelector('input')!, 'address')
     await pick('studio-field-/steps/1/input/address', /^Object/)
     const address = () => within(screen.getByTestId('studio-field-/steps/1/input/address/fields'))
-    await userEvent.click(address().getByRole('button', { name: 'Add mapping' }))
+    await userEvent.click(address().getByRole('button', { name: 'Add row' }))
     await userEvent.type(
       screen.getByTestId('studio-field-/steps/1/input/address/fields/').querySelector('input')!,
       'city',
@@ -866,7 +867,7 @@ describe('A callConnector step', () => {
     const onChange = renderEditor(false)
 
     await userEvent.click(
-      within(screen.getByTestId('studio-field-/steps/1/input')).getByRole('button', { name: 'Add mapping' }),
+      within(screen.getByTestId('studio-field-/steps/1/input')).getByRole('button', { name: 'Add row' }),
     )
     expect(onChange).toHaveBeenLastCalledWith('/steps/1/input/', '')
     await userEvent.click(
@@ -904,7 +905,7 @@ describe('A raiseEvent step', () => {
     expect(row.getByRole('combobox', { name: 'Event field' })).toBeVisible()
     expect(row.getByRole('textbox', { name: 'Expression' })).toBeVisible()
 
-    await userEvent.click(step(2).getByRole('combobox', { name: 'Add mapping Event fields' }))
+    await userEvent.click(step(2).getByRole('combobox', { name: 'Add Event fields' }))
     const options = optionTexts()
     expect(options).toEqual(['amount'])
     await chooseOption('amount')
@@ -942,7 +943,7 @@ describe('A createRecord step', () => {
     expect(row.getByRole('textbox', { name: 'Expression' })).toBeVisible()
 
     // The rows are keyed by the fields of the step's entity, not of the process's entity.
-    await userEvent.click(step(5).getByRole('combobox', { name: 'Add mapping Set' }))
+    await userEvent.click(step(5).getByRole('combobox', { name: 'Add Set' }))
     expect(optionTexts()).toEqual(['author'])
     await chooseOption('author')
     expect(onChange).toHaveBeenLastCalledWith('/steps/5/set/author', '')

@@ -45,6 +45,11 @@ It is a step of the [process resource](processes.md), and it looks like this:
   expression with the scope of a `when`, and a problem is reported at
   `/steps/{i}/message/values/{name}`. A value may have any type, because it is formatted by its type,
   so only its syntax, names and rules are checked.
+- **`attachments`** _(planned for M40)_ is optional, and it needs the `email` channel. It is a list of files that
+  the email carries. An entry is `{ "field": "<file field>" }`, which attaches the file that a `file` field of the
+  subject record holds, or `{ "template": "<documentTemplate>", "format": "pdf" }`, which attaches a document made
+  for this email, see [document templates](document-templates.md#document-step). An entry whose field is `null`
+  attaches nothing. An in-app notification carries no attachment.
 - **`open`** is optional. It names a page of the application and maps its page parameters, as a
   navigate action does (`AXC0232` to `AXC0234`, at `/steps/{i}/open`). The page is a `navigate page`
   edge in the reference index, and the in-app notification opens it.
@@ -220,6 +225,56 @@ A bell in the header shows the signed-in user's unread count and opens their not
   and after any mark read. There is no timer. A failure to read the list hides the bell and never
   shows the sign-in prompt.
 
+- **Live reloads.** _(planned for M43)_ The bell also reloads when a `notifications` event arrives, see [live pages](frontend.md#live-pages).
+
+## Task notices
+
+_(planned for M43)_
+
+A person hears in the application and by email when a task is given to them, moved to them by an
+[absence](user-administration.md#absences), or reassigned to them.
+
+- **Claim-mode tasks.** A role task that waits to be claimed notifies the role in the application only.
+- **Chosen holders.** A task that [sharing role tasks](task-api.md#sharing-role-tasks) gives to a holder, by
+  `fewestOpen` or `turn`, notifies that holder.
+- **Email links.** The email lists one link for each outcome. Each link opens the
+  [task page](task-inbox-widget.md#deciding-from-an-email) with that outcome chosen.
+
+## Notification preferences
+
+_(planned for M43)_
+
+A person chooses how each kind of notice reaches them, and whether its emails come together in a daily digest. A choice only narrows the channels that a notice would use. It never adds one.
+
+| Route | What it does |
+| --- | --- |
+| `GET /api/me/notification-preferences` _(planned for M43)_ | Reads the signed-in person's preferences |
+| `PUT /api/me/notification-preferences` _(planned for M43)_ | Replaces the signed-in person's preferences |
+
+- **Sources.** A source is a kind of notice. `task` is the [task notices](#task-notices), `mention` is the [mentions](comments.md#mentions) and `process` is the message of a `notify` step, see [the notify operation](#notify-operation).
+- **Body.** `PUT` takes the three sources, `digestHour` and `timeZone`. Each source has `channels`, with `application` and `email` set to `true` or `false`, and `digest`, set to `true` or `false`. For example:
+
+  ```json
+  {
+    "sources": {
+      "task": { "channels": { "application": true, "email": true }, "digest": true },
+      "mention": { "channels": { "application": true, "email": false }, "digest": false },
+      "process": { "channels": { "application": true, "email": true }, "digest": false }
+    },
+    "digestHour": 8,
+    "timeZone": "Europe/Berlin"
+  }
+  ```
+
+- **Defaults.** With no saved choice, each source has both channels and no digest.
+- **Own preferences only.** The routes read and write the signed-in person's preferences. No route names another person.
+- **Digest hour and time zone.** `digestHour` is a whole hour from 0 to 23. `timeZone` is an IANA time zone name. The account page sends the browser's time zone, because a tenant has no time zone of its own, as [absences](user-administration.md#absences) do.
+- **Refusals.** A bad value is a `400` keyed by its path, such as `/digestHour` for an hour outside 0 to 23, or `/timeZone` for a name that is not an IANA time zone.
+- **In-app off.** A source with the `application` channel off does not show in the person's bell or its counts.
+- **Email and digest.** An email for a source with `email` on is sent as [email](#email) says. With `digest` on, the email waits in `axis.email_outbox` for the digest. The worker then sends the waiting emails as one digest, at `digestHour` in `timeZone`. The digest lists the subject and link of each waiting email.
+- **Tenant notices.** Tenant notices always show in the application, whatever the preferences say. See [tenant notices](#tenant-notices).
+- **Storage.** `axis.notification_preferences` holds one row for each person who has saved a choice.
+
 ## Email
 
 A `notify` step or a task escalation with the `email` channel stages one email for each address in its
@@ -232,6 +287,22 @@ own transaction, and the worker sends it later over SMTP, at least once.
   the tenant has no host. A step run stages at most one email per address, ignoring letter case, with
   the locale of the first recipient that gave it. The row also keeps the raw placeholder values of the
   step run in `values`, so a test scenario can check them. A role recipient gets no email.
+- **HTML.** _(planned for M40)_ A message may have `message.htmlBody`, a text key whose text is an HTML body,
+  beside the plain `body`. The worker then sends one `multipart/alternative` email that holds both, so a reader
+  that shows no HTML still has the text. An email with no `htmlBody` stays plain text.
+- **Placeholders in HTML.** _(planned for M40)_ The value of a placeholder is HTML-encoded where it is written
+  into the HTML body, so a value never adds a tag, a script or a link. The template's own HTML is the author's.
+- **Cleaning.** _(planned for M40)_ The step cleans the HTML body with an allow list of tags, attributes and URL
+  schemes before it stores it in `axis.email_outbox`. Script, event attributes, forms and `javascript:` links are
+  dropped, so what the worker sends is what was cleaned.
+- **Logo.** _(planned for M40)_ When the site that the email's link names has a logo, the HTML body shows it as
+  an image that the email carries inline, so it shows without a request to Axis's server.
+- **Attachments.** _(planned for M40)_ The worker reads each attachment's bytes when it sends, from the file's
+  storage, or asks the [document runner](document-templates.md#the-document-runner) for a document that the step
+  named. The outbox row holds the file ids and the template names, never the bytes.
+- **Size limit.** _(planned for M40)_ An email with its attachments may be at most `Email:MaxSize`. One over it
+  fails the send like a failed send, and becomes a dead letter after `Worker:DeliveryAttempts`, with a message
+  that names the limit and no file name. The step does not know the size of a document until it is made.
 - **Escalations.** A task escalation stages its emails in its own transaction, so one that rolls back,
   such as one whose `notify` expression fails, stages none. Its rows name the task step in `step`, and
   share the `notificationId` of the escalation's history row. The sending, the failure count and the
@@ -288,6 +359,10 @@ sign-in. A later sign-in updates it.
   [reassign](task-deadlines.md#reassign), the search route of a
   [`userId` field](resource-files.md#entity-field-types-and-constraints) and the actor names of the
   history views, and no other route lists them.
+- **Roles.** _(planned for M43)_ Each sign-in also keeps the application roles it carried, for
+  [sharing role tasks](task-api.md#sharing-role-tasks).
+- **Delegates.** _(planned for M43)_ The profiles also serve the delegate picker of an
+  [absence](user-administration.md#absences).
 
 ## Mail settings
 

@@ -328,6 +328,13 @@
       "status": "approved"
     },
     {
+      "concept": "Transition (between two steps)",
+      "en": "line",
+      "vi": "đường nối",
+      "status": "approved",
+      "note": "The arrow from one step to the next on the process designer's canvas. Never \"chuyển tiếp\"."
+    },
+    {
       "concept": "Job",
       "en": "job",
       "vi": "tác vụ",
@@ -347,9 +354,33 @@
       "status": "approved"
     },
     {
+      "concept": "Outcome (of a task)",
+      "en": "outcome",
+      "vi": "kết quả",
+      "status": "approved"
+    },
+    {
       "concept": "Trigger",
       "en": "trigger",
       "vi": "bộ kích hoạt",
+      "status": "approved"
+    },
+    {
+      "concept": "Deadline",
+      "en": "deadline",
+      "vi": "thời hạn chót",
+      "status": "approved"
+    },
+    {
+      "concept": "Escalation",
+      "en": "escalation",
+      "vi": "leo thang",
+      "status": "approved"
+    },
+    {
+      "concept": "Timer (step)",
+      "en": "timer",
+      "vi": "hẹn giờ",
       "status": "approved"
     },
     {
@@ -363,6 +394,19 @@
       "en": "connector",
       "vi": "bộ kết nối",
       "status": "approved"
+    },
+    {
+      "concept": "Connector operation",
+      "en": "operation",
+      "vi": "thao tác",
+      "status": "approved"
+    },
+    {
+      "concept": "Object (input kind of a call)",
+      "en": "Object",
+      "vi": "nhóm trường",
+      "status": "approved",
+      "note": "A value made of named fields. \"đối tượng\" is the entity."
     },
     {
       "concept": "Deployment binding",
@@ -427,6 +471,13 @@
       "vi": "ngôn ngữ",
       "status": "approved",
       "note": "An application's texts in one language. On screens it is named as a language, \"Languages\", \"Add language…\", \"Ngôn ngữ\", \"Thêm ngôn ngữ…\", and each one by its language's name, \"Tiếng Việt\", \"English\". The source language is one of them. \"text resource\" stays the kind's name in files, docs and the API."
+    },
+    {
+      "concept": "Placeholder (in a message text)",
+      "en": "placeholder",
+      "vi": "chỗ điền",
+      "status": "approved",
+      "note": "A named slot in a notification's subject or body that a value fills. Never \"chỗ giữ chỗ\"."
     },
     {
       "concept": "Translation",
@@ -574,7 +625,7 @@
       "en": "Delete",
       "vi": "Xóa",
       "status": "approved",
-      "note": "Destroys a thing."
+      "note": "Destroys a thing. A step, a section, a grant, or a row of a contract, a scenario, seed data or a connector is deleted too: \"Delete step\" / \"Xóa bước\"."
     },
     {
       "concept": "Action: Remove",

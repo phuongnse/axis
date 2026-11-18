@@ -102,9 +102,17 @@ nothing:
 - **Package runners.** A tenant administrator's [create and revoke of a package runner](user-administration.md#package-runners)
   are never refused over the `storage` quota. A create writes one small row and one audit record, and a revoke is a
   security action that a billing limit must never stop.
+- **A runner's registration, take and result.** A [customer-hosted runner](extension-packages.md#customer-hosted-runners)'s
+  registration of its packages, its take of a call and its result for a call are never refused over the `storage`
+  quota. A registration adds to the list of its one row, and a billing limit must never stop a runner from starting.
+  A take marks a call as a step's Mark does, and a billing limit must never stop running work. A result records a
+  call as a step's Record does, and a billing limit must never stop running work.
 - **Table views and columns.** A person's writes under `/api/me/tables/{key}` are never refused over
   the `storage` quota. Each row is small and bounded by the route's limits, and a person can always tidy their views,
   see [table views and columns](frontend.md#table-views-and-columns).
+- **Form drafts** _(planned for M42)_. A person's writes of a [form draft](record-form-state.md#form-drafts) are
+  never refused over the `storage` quota. Each person has one draft for each form, and it is bounded by the
+  route's size limit.
 - **`users`.** Inviting an account and enabling one on the [users page](user-administration.md) are
   refused when the count would pass the quota. A person who signs in through a brokered provider for
   the first time, and would pass the quota, is refused at the identity provider with a page that asks

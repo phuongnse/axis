@@ -419,7 +419,7 @@ test.describe('the active release of the purchase request sample changes', () =>
           page.getByTestId('studio-process-palette-notify'),
           page.getByTestId('studio-process-edge-drop-/steps/0/outcomes/0'),
         )
-        await expect(page.getByTestId('studio-process-announcement')).toHaveText('Step notify1 added after review')
+        await expect(page.getByTestId('studio-process-announcement')).toHaveText('Added step notify1 after review.')
 
         await page
           .getByTestId('studio-field-/steps/4/to')

@@ -45,6 +45,13 @@ and behind any proxy.
   proxies carry the headers. A violation then shows up only in the E2E run, Docker Compose or the Helm chart.
 - **File download.** A file download keeps to this policy and adds `Content-Disposition: attachment`. A custom widget
   bundle is served from the server's own origin and calls no `eval`.
+- **The file origin.** _(planned for M40)_ An inline preview of a file is served from the origin that
+  `Files:PreviewOrigin` names, see [preview](file-fields.md#download). Its answers carry a
+  `Content-Security-Policy` with no script, a `sandbox` and a `frame-ancestors` that lists only the hosts of the
+  tenant, so only the application's own pages can frame a file. They send `Content-Disposition: inline` and
+  `X-Content-Type-Options: nosniff`, and a `Cross-Origin-Resource-Policy` that keeps a page of another site from
+  embedding the file. The SPA's `img-src` and `frame-src` list that origin and nothing else, so the origin needs
+  no change to `script-src`.
 
 ### Header tests
 
@@ -64,7 +71,7 @@ cannot use up a replica.
 | ---------- | ------------------------------------------------------------- | -------------------- | ----------------------- |
 | Sign-in    | `GET /api/auth/sign-in` and `GET /api/auth/callback`, and the [cell console](cell-console.md#sign-in)'s `GET /api/cell/auth/sign-in` and `GET /api/cell/auth/callback` | Client address       | `RateLimits:SignIn`     |
 | Session    | Every other route that takes a session                        | Tenant and user      | `RateLimits:Session`    |
-| Bearer     | Inbound endpoints and [service accounts](security.md#service-accounts) | Tenant and caller id | `RateLimits:Bearer`     |
+| Bearer     | Inbound endpoints, [service accounts](security.md#service-accounts) and [customer-hosted runners](extension-packages.md#customer-hosted-runners) | Tenant and caller id | `RateLimits:Bearer`     |
 | Publishing | Studio validate, publish, preview, activate and test requests | Tenant and user      | `RateLimits:Publishing` |
 | MCP        | `/mcp`, the [MCP server](mcp-server.md)                       | Tenant and client id | `RateLimits:Mcp`        |
 
@@ -107,6 +114,10 @@ cannot use up a replica.
   its own: the `sign_up` partition of [sign-up](sign-up.md#bots-and-abuse), and the
   [billing portal](billing-portal.md#rules)'s. It counts its refusals in the same metric, with `sign_up` as
   `axis.partition`, see [the control plane's metrics](control-plane.md).
+- **Live streams.** _(planned for M43)_ Opening a [live stream](frontend.md#live-pages) counts once in Session. The
+  `Live:MaxStreamsPerSession` setting closes the oldest stream of a session when one more opens. The `Live:MaxStreams`
+  setting caps the streams that one replica holds, and a stream past it answers `503`, see
+  [live page settings](host-settings.md#comment-and-live-page-settings).
 
 ### A refused request
 
@@ -125,5 +136,5 @@ cannot use up a replica.
   the `429` with `Retry-After` and one refusal in the metric with `axis.partition` `mcp`, while another client of the
   same tenant still passes.
 - **A unit test** reads every route from the server's endpoint data source and fails on a route that is not open and
-  has no partition, that takes a bearer token and has no bearer partition, or that is the MCP route and has no MCP
+  has no partition, that takes a bearer token and has no bearer partition, that is a runner route and has no bearer partition, or that is the MCP route and has no MCP
   partition.

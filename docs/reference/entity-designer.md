@@ -26,12 +26,14 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
 
 - **The table.** The fields are the [standard table](actions-and-controls.md#tables), one row per field,
   in the file's order.
-- **Columns and row menu** _(planned for M33)_. Its columns are Name, Label, Type, Required, Unique and
-  Properties. It has a search, and Add field sits in the section's heading. Each row's menu has Move up,
-  Move down and Remove, and each of these replaces the `fields` array. A field's name opens the
+- **Row menu.** Each row's "…" menu, the table's [row actions](actions-and-controls.md#tables), has Move up,
+  Move down and Remove. Move up is off on the first row and Move down on the last, and Remove is destructive.
+  Each entry replaces the `fields` array. A read-only designer has no menu.
+- **Columns** _(planned for M33)_. Its columns are Name, Label, Type, Required, Unique and
+  Properties. It has a search, and Add field sits in the section's heading. A field's name opens the
   [field drawer](#field-drawer), beside the table, so every field stays in sight however many settings it has.
 - **Filter.** The table has a Filter on Name, Label, Type, Required and Unique, and none on the settings or the
-  row's buttons. Name and Label filter as text, Label on its text key, which is what the file holds. Type filters as a
+  row's menu. Name and Label filter as text, Label on its text key, which is what the file holds. Type filters as a
   choice of the field types. Required and Unique filter as a choice of Yes or No, and a field whose type does not take
   the setting counts as empty, as its cell shows nothing. The filter lives in the address as `fields.filter`. It only
   hides rows: every row shows on one page with no pager, and an edit to a hidden row stays in the draft. A field whose

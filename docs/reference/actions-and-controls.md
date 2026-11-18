@@ -236,8 +236,19 @@ be kept right.
   filter never hides, such as a row added since the last save, so the author always sees what they just added. Only
   a table that holds all its rows reads `keep`, and only for the filter. A column whose header is not plain text
   names itself in the builder and its chips through `filter`'s `title`, and without one they show the header text.
-- **Filter on every table** _(planned for M33)_. Every column of every table can be filtered on, a data source
-  table's included.
+- **Filter on every table.** Each column that shows a row's value can be filtered on, in a table with a view and
+  in a data source table. Some columns and tables have no Filter, as the lines below name.
+  - **Kinds in a `table` widget.** The widget leaves out boolean, reference, file and date-time columns, and a
+    measure column of a grouped data source. [Its filter](table-widget.md#filter) gives the reasons.
+  - **A list column.** A list column can have no filter, such as the Steps column of a cell job table.
+  - **A column of a table with a view.** The Event column of the webhook deliveries and the Task column of the
+    task inbox have no Filter. [The task inbox](task-inbox-widget.md) names the columns it filters on.
+  - **A table with no Filter.** A child collection on a [form or detail](form-widget.md#child-collections) and a
+    list of objects in a [Studio form](studio-form-editors.md) have none. So do the publishing releases table of the
+    [operator console](operator-console.md#views), and the Hosts and Usage tables of the
+    [users page](platform-pages.md#export-data-and-usage). The DNS records of a host request dialog have none too.
+    A [reference lookup](form-widget.md#lookup) on a target with no display field has none. The cell console's job
+    table, on a tenant's view and in Create a tenant, has none, see [the cell console](cell-console.md).
 - **Columns control.** A table whose view turns it on has Columns, an icon button after Search and Filter. It
   opens a dialog that shows, hides and orders the columns, with Reset, Cancel and Apply. Reset sets the dialog
   back to every column in its first order, and nothing takes effect until Apply. The identifying column, the
@@ -299,6 +310,14 @@ be kept right.
 - **Bulk actions**. Selecting rows is for bulk actions alone: a table shows checkboxes only when it has a
   bulk action. Selecting rows of the page shows an "N selected" bar above the rows that holds the bulk
   actions, and running one clears the selection. An action on one row stays on the row.
+- **Selection** _(planned for M42)_. A selection holds rows of the current page only. A new page, sort, search or filter
+  clears it, so a bulk action runs only on rows the person can see on the screen.
+- **Bulk results** _(planned for M42)_. After a bulk action, a summary above the table says how many rows succeeded.
+  Each row that failed is listed by its identifying value and its reason. The list sits in an `aria-live` region, and
+  a full success shows only the summary.
+- **Inline edit** _(planned for M42)_. An editable cell shows its input on click or Enter. It saves on Enter or when it
+  loses focus, and it cancels on Escape. A refused save keeps the old value with the reason. A cell that cannot be
+  edited shows its value as text, with no input.
 - **The growth test** _(planned for M35)_. A table whose rows grow as people use the application, such as
   records, requests or releases, has the full standard toolbar above. A table whose rows do not grow may
   show fewer of its controls, as the toolbar bullet says.
@@ -313,7 +332,8 @@ be kept right.
   as `AxisTable`'s `blankRow` draws them.
 
 The reasons for the table standard are in [D151](../decisions/d151-tables-whose-rows-grow-have-the-full-toolbar-and-a-view-is-a-filter-kept-in-the-address.md),
-and the reasons for each person's columns and saved views are in [D153](../decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md).
+and the reasons for each person's columns and saved views are in [D153](../decisions/d153-a-persons-table-views-and-columns-are-kept-on-the-server-and-the-address-still-wins.md),
+and the reasons for bulk actions, inline edit and the column chooser of an application's table are in [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
 
 ## Opening things
 

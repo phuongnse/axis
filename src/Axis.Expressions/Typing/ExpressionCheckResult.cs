@@ -46,8 +46,22 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
     public IReadOnlySet<MemberNode> OuterReads { get; internal init; } = new HashSet<MemberNode>(ReferenceEqualityComparer.Instance);
 
     /// <summary>
+    /// The type of every node the check inferred, keyed by the node and compared by reference. The reading of the
+    /// expression uses it, see docs/reference/authoring.md#expression-check.
+    /// </summary>
+    public IReadOnlyDictionary<ExpressionNode, ExpressionType> Types { get; internal init; } =
+        new Dictionary<ExpressionNode, ExpressionType>(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// The field each name, path step and <c>outer.field</c> read resolved to, with its label keys, keyed by the node
+    /// and compared by reference.
+    /// </summary>
+    public IReadOnlyDictionary<ExpressionNode, ExpressionScopeField> Fields { get; internal init; } =
+        new Dictionary<ExpressionNode, ExpressionScopeField>(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
     /// The result of a boolean expression built from expressions that <paramref name="results"/>
-    /// checked. It holds every rule call, path target, collection path, outer read and decimal call of them, so the tables
+    /// checked. It holds every rule call, path target, collection path, outer read, type and field of them, so the tables
     /// still match the nodes the built expression reuses.
     /// </summary>
     public static ExpressionCheckResult Merge(IEnumerable<ExpressionCheckResult> results)
@@ -59,6 +73,8 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
         var pathTargets = new Dictionary<MemberNode, string>(ReferenceEqualityComparer.Instance);
         var collectionPaths = new HashSet<MemberNode>(ReferenceEqualityComparer.Instance);
         var outerReads = new HashSet<MemberNode>(ReferenceEqualityComparer.Instance);
+        var types = new Dictionary<ExpressionNode, ExpressionType>(ReferenceEqualityComparer.Instance);
+        var fields = new Dictionary<ExpressionNode, ExpressionScopeField>(ReferenceEqualityComparer.Instance);
         foreach (var result in results)
         {
             decimalCalls.UnionWith(result.DecimalCalls);
@@ -73,6 +89,16 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
             {
                 pathTargets[step] = target;
             }
+
+            foreach (var (node, type) in result.Types)
+            {
+                types[node] = type;
+            }
+
+            foreach (var (node, field) in result.Fields)
+            {
+                fields[node] = field;
+            }
         }
 
         return new ExpressionCheckResult(ExpressionType.Boolean, null)
@@ -82,6 +108,8 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
             PathTargets = pathTargets,
             CollectionPaths = collectionPaths,
             OuterReads = outerReads,
+            Types = types,
+            Fields = fields,
         };
     }
 }

@@ -1,10 +1,11 @@
 # Record API
 
 The record API reads and writes the records of an application's entities over HTTP, under the
-user's policies. This page covers its routes, the record shape, paging, writes, concurrency, errors,
-request bodies and the form state endpoint. How another system calls an inbound endpoint is in
-[inbound-endpoints.md](inbound-endpoints.md), and the audit records and history of a record are in
-[record-audit.md](record-audit.md).
+user's policies. This page covers its routes, the record shape, paging, writes, concurrency, errors
+and request bodies and values. The form state endpoint and the form draft routes are in [record form state](record-form-state.md). Child rows, computed
+fields and validations are in [record child rows](record-child-rows-and-validations.md).
+How another system calls an inbound endpoint is in [inbound-endpoints.md](inbound-endpoints.md), and
+the audit records and history of a record are in [record-audit.md](record-audit.md).
 
 ## Access
 
@@ -46,8 +47,19 @@ record's audit records are read through its history route.
 | `POST /api/apps/{app}/entities/{module}/{entity}/records`                              | `201` with the new record of a module entity, see [routes](#routes)                                               |
 | `PATCH /api/apps/{app}/entities/{module}/{entity}/records/{id}`                        | `200` with the updated record of a module entity, see [routes](#routes)                                           |
 | `DELETE /api/apps/{app}/entities/{module}/{entity}/records/{id}`                       | `204` with no body, for a module entity, see [routes](#routes)                                                    |
+| `POST /api/apps/{app}/entities/{entity}/records/bulk` _(planned for M42)_ | `200` with a result for each record, see [bulk actions](#bulk-actions) |
+| `POST /api/apps/{app}/entities/{module}/{entity}/records/bulk` _(planned for M42)_ | `200` with a result for each record of a module entity, see [bulk actions](#bulk-actions) |
 | `GET /api/apps/{app}/entities/{module}/{entity}/records/{id}/history?page=&pageSize=`  | One page of audit records of a module entity's record, see [the history route](record-audit.md#the-history-route) |
-| `POST /api/apps/{app}/forms/{form}/state`                                              | The form state of a draft record, see [form state](#form-state)                                                   |
+| `POST /api/apps/{app}/forms/{form}/state`                                              | The form state of a draft record, see [form state](record-form-state.md#form-state)                                                   |
+
+**Recycle bin routes** _(planned for M41)_. The routes that restore and purge a deleted record, and the
+list of records in the bin, are in [recycle-bin.md](recycle-bin.md).
+
+**Form draft routes** _(planned for M42)_. The routes that read, replace and delete a person's draft of a
+new record are in [form drafts](record-form-state.md#form-drafts).
+
+**A record at a time** _(planned for M41)_. A read of one record takes `?at=` and answers the record as it was
+at that time, see [a record at a time](record-audit.md#a-record-at-a-time).
 
 `{app}` is the name of an active release, and `{entity}` an entity name in that
 release. Both match ignoring letter case. `{id}` is a record id in the
@@ -86,7 +98,7 @@ references:
 under its declared name, in declaration order. A field that is SQL `NULL` is `null`; it is never left out.
 A `child-collection` field is an array of its rows, in their stored order. It
 is `[]` when the record has no rows. List responses leave it out. See
-[Child rows, computed fields and validations](#child-rows-computed-fields-and-validations).
+[Child rows, computed fields and validations](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations).
 
 `labels` maps each `reference` field that is not `null` to the display field
 value of the referenced record, so a page can show "Finance" without one more
@@ -142,6 +154,42 @@ index, and so does each index an entity declares, see
 [schema planning](storage.md#schema-planning). A filter on a field no index
 covers reads the whole entity table.
 
+### System fields
+
+_(planned for M41)_
+
+Every record has four system fields, which answer beside `id` and `version` and are never entries of
+`values`:
+
+```json
+{
+  "id": "6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7",
+  "version": 2,
+  "createdAt": "2026-10-06T02:00:00.123456Z",
+  "createdBy": "requester",
+  "updatedAt": "2026-10-06T02:05:00.123456Z",
+  "updatedBy": "reviewer",
+  "values": { "name": "Desk" },
+  "labels": {}
+}
+```
+
+- **Names and types.** `createdAt` and `updatedAt` are `date-time` values, written as in
+  [reading values](#reading-values). `createdBy` and `updatedBy` are `text`: a user id, a service account id,
+  or `system`.
+- **Who sets them.** The server sets them in the write's transaction, so they hold the start time of the
+  transaction, as `now()` does. A create sets `createdAt` and `createdBy`, and `updatedAt` and `updatedBy`
+  to the same values. An update, including one with an empty `values`, a process step and a
+  [restore](recycle-bin.md#restore) set `updatedAt` and `updatedBy`. The actor is the actor of the write's
+  [audit record](record-audit.md#audit-records-and-history), and a seed record has `system`.
+- **Never written.** A body cannot set them. They are not fields, so a name in `values` that is one of
+  them is an unknown field, and an entity cannot declare one, see
+  [system fields](resource-files.md#system-fields).
+- **Who reads them.** A user who may read the record reads them, with no `fields` entry needed, because they
+  are not fields of the entity. A create response for a user with no `read` grant has none.
+- **Why not `values`.** A field named like them would clash with a declared field, and a client that reads
+  `values` and sends it back would send them.
+
 ## Reading values
 
 Each field type has one JSON form in a read:
@@ -155,7 +203,7 @@ Each field type has one JSON form in a read:
 | `date` | A string `yyyy-MM-dd` |
 | `date-time` | A string in UTC with exactly six fraction digits and `Z`, such as `2026-10-06T02:00:00.123456Z`. PostgreSQL stores microseconds, so no precision is lost |
 | `reference` | A string with the record id in the lowercase hyphenated form. Its label is in `labels` |
-| `child-collection` | An array of row objects in stored order, in a single read and in the response of a create or update. List responses leave it out. See [Child rows](#child-rows-computed-fields-and-validations) |
+| `child-collection` | An array of row objects in stored order, in a single read and in the response of a create or update. List responses leave it out. See [Child rows](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations) |
 | `money` | A number written as for `decimal`. The currency is the field's, or the value of its `currencyField` |
 | `file` | An object `{ "id", "name", "mediaType", "size" }`, or `null`, also in child rows and in list responses. See [file fields](file-fields.md#field-and-value) |
 | `references` | An array of record ids, in the order they were written. Its labels are an array in the same order in `labels`. List responses leave it out, as for a child collection |
@@ -202,6 +250,13 @@ A list takes a page, a page size, a sort, a filter and a search text in its quer
   does not speed it up. A search over 100,000 records with two searched fields
   answers a page within 2 s, and `SearchPerformanceTests` fails when it takes
   2 s or more.
+- **Rich text** _(planned for M42)_. `search` reads a `searchable` `richText` field as its plain words: tags are
+  removed and character references are decoded. So a tag name never matches, and `a &amp; b` matches `a & b`.
+  See [more field types](resource-files.md#more-field-types-and-properties).
+- **System fields** _(planned for M41)_. `sort` and `filter` may name `createdAt`, `createdBy`, `updatedAt`
+  and `updatedBy`, which are not entries of `values`, see [system fields](#system-fields). `createdAt` and
+  `updatedAt` are `date` fields for the operators below, and `createdBy` and `updatedBy` are `text`. They
+  need no field grant, and the names match exactly like a field name.
 - **Order.** Records are ordered by the sort column and then by `id`
   ascending, also for descending sorts. Without `sort`, they are ordered by
   `id` alone. `NULL` values follow the PostgreSQL defaults: last when
@@ -238,6 +293,29 @@ is a state conflict, not a `400`. It is only reported once the query is valid.
 A list with no `sort`, `search` or `filter` on a pending field answers with the stored
 values. A single read computes the pending field on the spot.
 
+### Changes since a time
+
+_(planned for M41)_
+
+Another system reads what changed since its last read with the list's own `filter` and `sort`, so there is
+one way to filter a list. This reads the records created or changed since the time:
+
+```text
+GET /api/apps/{app}/entities/{entity}/records?sort=updatedAt&filter={"all":[{"field":"updatedAt","op":"gte","value":"2026-10-06T02:00:00.000000Z"}]}
+```
+
+- **What it finds.** A record created since the time has `updatedAt` equal to `createdAt`, so it is in. A
+  record that a [restore](recycle-bin.md#restore) brought back is in too.
+- **Where to start next.** The next read starts from the `updatedAt` of the last record of this one, with
+  `gte`, so a record that shares the instant is not missed. `updatedAt` is the start time of the write's
+  transaction, so a write that is still open when a read runs commits with an earlier time. A reader
+  starts a little before its last `updatedAt` and treats a record it sees twice as the same record.
+- **Deletions.** A deleted record is not in the list. The bin list, filtered on `deletedAt` with `gte`, has
+  the records deleted since the time, see [the bin list](recycle-bin.md#the-bin-list). A record that was
+  purged before the read is in neither list, so a reader reads at least once in the
+  [period](recycle-bin.md#the-period).
+- **Access.** The grants, the read filters and the field checks are those of the list.
+
 ## Create, update and delete
 
 Writes go through the record command in `Axis.Processes`, which hosts without
@@ -269,13 +347,16 @@ HTTP also call. The record API maps its outcome to the responses below.
   in the same transaction, as `system`. The user needs no `start` grant. A
   write that fails starts none, and a start that is skipped never fails the
   write.
-- **Delete.** `DELETE` removes the record by id only. It needs no body and no
+- **Delete.** `DELETE` deletes the record by id only. It needs no body and no
   version. The response is `204` with no body. A record that another record
   references through a `reference` field is kept, and the response is `409`.
   So is a record that is the subject of a running or waiting process instance.
   A delete that commits also starts the processes of the matching
   [delete triggers](process-events.md#delete-triggers) in the same transaction,
   as `system`. A delete that is refused starts none.
+- **Recycle bin** _(planned for M41)_. A delete keeps the record in the [recycle bin](recycle-bin.md#deleting-into-the-bin)
+  with its child rows, files and references, and nowhere else shows it. Only a record outside the bin makes the
+  `409` for a referenced record, so a record in the bin never blocks the delete of the record it refers to.
 - **Content type.** Both need `Content-Type: application/json`. The media
   type matches ignoring letter case. The only allowed parameter is `charset`
   with the value `utf-8`, in any letter case. A cross-site page can send a
@@ -306,7 +387,7 @@ HTTP also call. The record API maps its outcome to the responses below.
   lock the target. The foreign key is the backstop: a target removed in
   between is a foreign-key violation that maps to the same error.
 - **Sequence fields.** A `text` field that names a
-  [sequence](resource-files.md#sequences) gets its number on create, in the
+  [sequence](entity-logic-and-sequences.md#sequences) gets its number on create, in the
   write's transaction, after the reference check. A create that is refused
   uses no number, so the next create gets it. A body that sets it on create
   or update, even to `null`, is a `400` at its pointer with the message
@@ -340,6 +421,41 @@ HTTP also call. The record API maps its outcome to the responses below.
   decide. The `form` name is checked after the grant and record checks and
   before the content type and the body, so a user without the grant still
   gets `403` or `404`.
+
+### Bulk actions
+
+_(planned for M42)_
+
+`POST /api/apps/{app}/entities/{entity}/records/bulk` runs one operation on several records at once. The bulk
+actions of a [table](table-widget.md#bulk-actions) use it.
+
+```http
+POST /api/apps/{app}/entities/{entity}/records/bulk
+Content-Type: application/json
+
+{ "operation": "update", "records": [{ "id": "0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01", "version": 3 }], "values": { "status": "closed" } }
+```
+
+- **Operation.** `operation` is `update`, `delete` or `startProcess`. An `update` sets `values` on each record. A
+  `delete` deletes each record. A `startProcess` also names its `process` and starts it with each record as the
+  subject.
+- **Records.** `records` holds 1 to 100 distinct ids, the largest page a table offers. Any other count, or a repeated
+  id, is a `400` for the whole call, and nothing changes.
+- **The whole call.** The `401`, the CSRF `403`, the read-only tenant `403` and the content type `415` apply to the
+  whole call. A body of the wrong shape is a `400`.
+- **Each record.** Each record is checked and written as a single `PATCH`, `DELETE` or
+  [start](processes.md#start-endpoint) with that record would be, in its own transaction. It uses that record's
+  grants, record filters and field grants. So one row's `403`, `404`, `409` or `400` leaves the other rows alone.
+- **Versions.** An `update` names each record's `version`, and a record changed since it was read is a `409`, as in
+  [concurrency](#concurrency). A `delete` and a `startProcess` need only the ids.
+- **Repeats.** A start for a record whose instance is already running is a `409`. So a retry of the call, while that
+  instance runs, starts nothing twice.
+- **Answer.** The answer is `200` with `results: [{ id, status, errors? }]` in the order of the request. Each `status`
+  is the status that a single call for that record would answer, such as `200`, `403` or `409`.
+- **Audit and triggers.** Each write commits its own audit record and starts its triggers, as a single write does.
+- **Rate.** The server's [rate limits](headers-and-rate-limits.md#rate-limits) apply to the call.
+
+The reasons are in [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
 
 ## Concurrency
 
@@ -379,7 +495,7 @@ A request is checked in this order, and the first failure is the response:
    pending field, `409`.
 9. Fields the user may not write, `403`.
 10. The matched references, then the computed fields and the validations, `400`, as
-    [Child rows, computed fields and validations](#child-rows-computed-fields-and-validations)
+    [Child rows, computed fields and validations](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations)
     says, then storage (`400`, `404` or `409`).
 11. On create and update, the new record outside every `create` or `update` filter, `403`.
 
@@ -463,7 +579,7 @@ release.
   `/values/<field>`.
 - **`400` for a validation.** A record that breaks one of its entity's
   validations is a validation problem keyed at the validation's field. See
-  [Child rows, computed fields and validations](#child-rows-computed-fields-and-validations).
+  [Child rows, computed fields and validations](record-child-rows-and-validations.md#child-rows-computed-fields-and-validations).
 - **`415`.** A `POST` or `PATCH` without `Content-Type` or with any type other
   than `application/json` with an optional `utf-8` charset.
 - **`409` for a unique value.** A value that repeats the value of a `unique`
@@ -634,240 +750,6 @@ failed validation is its text key instead. Messages may use
 field type names and limits from the model. They never contain a table,
 column, constraint or schema name, a PostgreSQL type name, exception text, or
 text from the request; the key already says where the problem is.
-
-## Child rows, computed fields and validations
-
-A record may hold child rows, computed fields and validations, which the record
-shape and the bodies above include. Computed fields and validations can
-[aggregate](expressions.md#aggregates) over the child rows.
-
-A record with a child collection holds its rows inside `values`:
-
-```json
-{
-  "id": "6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7",
-  "version": 2,
-  "values": {
-    "title": "Standing desks",
-    "total": 2550.90,
-    "lineItems": [
-      { "description": "Desk", "quantity": 2, "unitPrice": 1250.45, "amount": 2500.90 },
-      { "description": "Cable tray", "quantity": 1, "unitPrice": 50.00, "amount": 50.00 }
-    ]
-  },
-  "labels": {}
-}
-```
-
-- **Rows.** A row is a flat object of the child entity's fields, in
-  declaration order. It has no id. Rows are ordered by `position`, and the
-  array index is the position. A row includes its computed values.
-- **Reads.** A single read and the response of a create or update include the
-  collections. List responses leave them out.
-- **Create.** A missing collection means no rows. `null` is an error at
-  `/values/<collection>`.
-- **Update.** A missing collection keeps its rows. An array replaces all the
-  rows, in the same transaction, and increments the owner's `version`. `null`
-  is an error at `/values/<collection>`. A stale `version` is a `409`, and no
-  row changes.
-- **References.** A child entity may have `reference` fields. The labels of a
-  row's references come with the rows, as `labels` above describes. A row
-  that names a record that does not exist is a `400` at its cell,
-  `/values/<collection>/<index>/<field>`, with the message of a root
-  reference. A delete of a record that a child row points to is the `409` for
-  a referenced record. Once the owner record is deleted, its rows go with it
-  and the target can be deleted.
-- **No routes of its own.** A child entity has no record routes. Every method
-  on `/api/apps/{app}/entities/{child}/records` is a `404` with the same title
-  as an unknown entity.
-- **Parsing.** A row is parsed like a create body, so a required field of the
-  child entity must be present in every row. An array element that is not an
-  object is an error at its index. A row error is keyed
-  `/values/<collection>/<index>/<field>`, with a zero-based index.
-- **Computed fields.** A body that sets a computed field, of the owner or of
-  a row, even to `null`, is an error at its pointer with the message "Cannot
-  be set.". The server calculates the value on every create and update of the
-  record, including an update with no values, and stores it in the same
-  statement as the other values. Child rows are calculated before the owner.
-  A single read, and the response of an update, return a pending
-  field computed with the active release when the row's stamp is out of date.
-  A create always computes with the active release, so its response needs no
-  such step. A run-time error there reads `null`, and the read answers `200`.
-  The read stores nothing. A list shows the stored value. See
-  [Recomputing computed fields](migrations.md#recomputing-computed-fields).
-- **Aggregates.** An aggregate of the owner, such as `sum(lineItems, amount)`,
-  reads the rows the write stores. When the body sends the collection, it
-  reads the body's rows after their own computed fields. When an update
-  leaves the collection out, it reads the stored rows. A create without the
-  collection has no rows. A stored row value that cannot be evaluated
-  exactly is a `400` at the row's pointer, such as
-  `/values/lineItems/0/amount`, with "Cannot be evaluated exactly.".
-- **Delete.** Deleting the owner deletes its rows.
-
-A write runs its computed fields and validations in this order:
-
-1. Computed fields and validations run only on a body that parsed cleanly.
-   A body with parse errors is answered with those errors alone.
-2. On update of an entity with computed fields or validations, the stored
-   record is read first, with its rows and sets. An unknown record is still a `404`,
-   never a `400`.
-   The server then builds the record as it will be stored: the stored values,
-   the changes from the body, the
-   [matched references](resource-files.md#matched-references) set from them, the rows it will
-   store and the computed fields. A computed field that
-   fails is a `400`, and then no validation runs. So a change to one field
-   can break a validation reported on another.
-3. The validations of the entity and of each row the body sends run, inside
-   the write's transaction, so `now()` is that transaction's start time. A
-   validation's aggregates read the same rows as the computed fields, so
-   `count(lineItems) >= 1` refuses a create without rows and an update that
-   sends an empty array. Rows an update leaves out are unchanged and are not
-   checked again as rows, but the owner's aggregates still read them. An
-   aggregate over a `references` field reads the target records of the ids the
-   body sends, or of the stored set when an update leaves the field out, and a
-   create without the field has an empty set. It reads them whatever the
-   user's read grants and record filters on the target entity. An id that
-   names no record is left out of the aggregate, and then storage refuses it.
-   Any failure is a `400`.
-4. Storage runs. It answers as described above, for example `409` for a stale
-   `version`.
-
-A failure is keyed `/values/<field>` or by a row path such as
-`/values/lineItems/1/quantity`. Each key holds one message. When several
-validations fail on one key, it reports the first in declaration order. Every
-other key is reported in the same response. The message is the validation's
-text key, and the client shows the text in the user's locale. The client gets
-validation as the user types from the [form state endpoint](#form-state).
-
-A run-time error in an expression, or a computed value that does not fit its
-field, such as one with more fraction digits than `scale`, rejects the write
-with a `400` at that field's pointer. A run-time error in a computed field has
-the message "Could not be computed.". A value that does not fit gets the
-message a body value would get, such as "Must have at most 2 fraction
-digits.". Values are never rounded. So on an entity with computed fields or
-validations, a `decimal` value that the interpreter cannot hold exactly
-(see [expression types](expressions.md#types)) is a `400` at its own
-pointer, with the message "Cannot be evaluated exactly.", and no validation
-of that record runs. A stored decimal of a target record that cannot be held
-exactly is the same `400`, at the pointer of the `references` field.
-
-For example, a create or update with `quantity` `0` in the second row is
-answered with `400`:
-
-```json
-{
-  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
-  "title": "One or more validation errors occurred.",
-  "status": 400,
-  "errors": {
-    "/values/lineItems/1/quantity": ["lineItem.quantityPositive"]
-  }
-}
-```
-
-## Form state
-
-The form state endpoint answers what a form shows for a draft record, and which messages the
-user's input earns so far, and writes nothing. The conditions are in
-[Form conditions and steps](form-conditions.md#form-conditions-and-steps).
-
-`POST /api/apps/{app}/forms/{form}/state` needs `Content-Type: application/json`
-and the [CSRF header](#create-update-and-delete). `{form}` is a form name in
-the active release, ignoring letter case.
-
-```json
-{
-  "recordId": "0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b",
-  "values": { "status": "resolved" },
-  "touched": ["status", "resolution"]
-}
-```
-
-- `recordId` is `null` for a new record, or the id of the record being edited.
-- `values` has the shape of the `values` of a write, in the
-  [value format](#request-bodies-and-values). Child rows and their keys work
-  as on writes.
-- `touched` lists the fields the user has changed or left. It may be empty.
-
-The draft is the stored record, when there is one, overlaid with `values`. For
-a new record, each field that `values` leaves out first takes its `default`, as
-a create does. Computed fields are calculated on it.
-
-```json
-{
-  "sections": [{ "name": "update", "visible": true }],
-  "fields": {
-    "status": { "visible": true, "required": false, "readOnly": false },
-    "resolution": { "visible": true, "required": true, "readOnly": false }
-  },
-  "errors": { "/values/resolution": ["Required."] },
-  "defaults": {}
-}
-```
-
-- `sections` has one entry for each named section of the form that holds a
-  field the user may read. A hidden section hides its fields, and an unnamed
-  section has no entry.
-- `fields` has one entry for each field of the form that the user may read.
-  - `visible` is false in a hidden section and for a field whose `visibleWhen`
-    is not true.
-  - `required` is true for a visible field that the entity marks `required` or
-    whose `requiredWhen` is true.
-  - `readOnly` covers only the form's rules: the form's `readOnly`, a computed,
-    sequence or creator field and a true `readOnlyWhen`. It does not cover field
-    write grants, which are in the page metadata's `createFields` and
-    `updateFields`.
-- `errors` holds the parse errors, "Required." for an empty required field, the
-  computed-field errors and the entity's validation messages, keyed as on a
-  write. It holds only keys of fields that the user touched and may read.
-- `defaults` holds, for a new record, the `default` of each field of the form
-  that the user may read and that `values` leaves out, in form order. The values
-  are in the [value format](#request-bodies-and-values), so a date-time is UTC
-  text and a decimal shows its scale. The conditions and messages above are
-  worked out with them in place, so a form can show what a save would store.
-  - A field that `values` sends, even as `null`, is not in `defaults`. Neither
-    is a field whose value does not fit its type, because the user's text must
-    stay.
-  - A default that gives `null` for an optional field is `null` in `defaults`.
-  - A default that cannot be computed is left out, and its message is in
-    `errors` under the touched-field rule. The other defaults stay in.
-  - A field that is not on the form, or that the user may not read, is not in
-    `defaults`. A save still gives a field that is not on the form its default.
-  - `now()` is the time of this call, not of the save.
-  - It is `{}` for a record id, and on the
-    [task form state](task-api.md) route.
-- A value that does not fit its field, or a computed field that cannot be
-  computed, is a message in `errors` of a `200` answer, so that one bad value
-  does not stop the other fields from getting their states. A `400` is only for
-  a body of the wrong shape: it is not an object, `recordId` is not `null` or a
-  UUID, `values` is not an object, `touched` is not an array of text, a property
-  is repeated, unknown or missing (`recordId` may be left out).
-- At typical size, a form of 25 fields with a condition each and 50 line items,
-  it answers within 300 ms. `TypicalFormStatePerformanceTests` fails when a call
-  stays over that at best of three attempts.
-- It writes nothing, adds no audit record and uses no sequence number. It
-  does not run unique or reference-existence checks, because they query
-  storage on every keystroke and could reveal which records exist. A save runs
-  them.
-
-The checks run in this order, and the first failure is the response:
-
-1. `401` when nobody is signed in.
-2. `404` for an unknown application or form.
-3. `403` when the user has neither a `create` nor an `update` grant on the
-   form's entity.
-4. `415` for a wrong content type, then `400` for a malformed body.
-5. `403` without a `create` grant when `recordId` is `null`, or without an
-   `update` grant when it is set.
-6. `404` when the user has no `read` grant, or when the record is not one the
-   user's `read` filters reach. `409` when a `read` filter reads a computed
-   field that is being recomputed.
-
-The grant check is split because `recordId` is in the body, so the server
-cannot tell which grant the call needs before it reads the body. The call does
-not check `update` record filters. A save does.
-
-The problem details are as in [Errors](#errors).
 
 ## Inbound endpoints
 

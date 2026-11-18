@@ -1,6 +1,10 @@
-import { Button, Checkbox, Descriptions, Flex, Tag, Typography } from 'antd'
+import { Checkbox, Descriptions, Flex, Tag, Typography } from 'antd'
+import { useContext } from 'react'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { fillText } from '../platform/fillText'
 import { useText } from '../platform/texts'
+import { PlatformContext } from './context'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { targetActions } from './policyMatrixDraft'
 
@@ -19,7 +23,7 @@ function asGrant(value: unknown): Grant {
 /**
  * The editor of a policy of a module the application uses, with the application's layer applied: its role slots and its
  * grants, each with the target, an Actions group with a checkbox for each action the target takes, the filter and the
- * fields. An author ticks actions and removes grants, and the filter and the fields are read-only. A grant the layer added, changed or removed
+ * fields. An author ticks actions and deletes grants, and the filter and the fields are read-only. A grant the layer added, changed or removed
  * carries a mark with Reset to module. The parent owns the draft and the save.
  */
 export function StudioModulePolicy({
@@ -32,6 +36,7 @@ export function StudioModulePolicy({
   layer?: DesignerLayer
 }) {
   const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const grants: unknown[] = Array.isArray(value.grants) ? value.grants : []
 
   return (
@@ -42,7 +47,9 @@ export function StudioModulePolicy({
           {
             key: 'roles',
             label: t('shell.studio.moduleRoles'),
-            children: strings(value.roles).join(', ') || t('shell.studio.moduleGrants.none'),
+            children:
+              new Intl.ListFormat(locale, { type: 'conjunction' }).format(strings(value.roles)) ||
+              t('shell.studio.moduleGrants.none'),
           },
         ]}
       />
@@ -58,12 +65,19 @@ export function StudioModulePolicy({
             <Flex key={index} vertical gap={4} data-testid={`studio-module-policy-grant-${index}`}>
               <Flex gap="small" align="center" wrap>
                 {typeof grant.name === 'string' && <Typography.Text code>{grant.name}</Typography.Text>}
-                <span>{kind ? `${kind} ${grant[kind] as string}` : ''}</span>
+                <span>
+                  {kind
+                    ? fillText(t('shell.studio.matrix.grantTarget'), {
+                        kind: t(`shell.studio.nav.kindOne.${kind}`),
+                        name: grant[kind] as string,
+                      })
+                    : ''}
+                </span>
                 {layer !== undefined && typeof grant.name === 'string' && (
                   <LayerMarkTag layer={layer} list="/grants" index={index} name={grant.name} />
                 )}
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button
+                <AxisButton
+                  role="destructive"
                   size="small"
                   disabled={grants.length === 1}
                   onClick={() =>
@@ -74,7 +88,7 @@ export function StudioModulePolicy({
                   }
                 >
                   {t('shell.studio.matrix.removeGrant')}
-                </Button>
+                </AxisButton>
               </Flex>
               <AxisFieldGroup title={t('shell.studio.matrix.actions')} help={t('shell.studio.matrix.actions.help')}>
                 <Flex gap="small" align="center" wrap>
@@ -91,7 +105,7 @@ export function StudioModulePolicy({
                   {unaccepted.map((action) => (
                     // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
                     <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
-                      {t('shell.studio.matrix.unacceptedAction')} {action}
+                      {fillText(t('shell.studio.matrix.unacceptedAction'), { action })}
                     </Tag>
                   ))}
                 </Flex>

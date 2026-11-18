@@ -288,6 +288,7 @@ browser holds only a cookie with a random session id.
 - **Lifetimes.** A request reads the row and updates the time of the last request. A row ends 8 hours
   after sign-in, or after 1 hour without requests, whichever comes first. A request past either limit
   counts as no session, and the row is deleted. Every request with a session renews the cookie.
+- **Live streams.** _(planned for M43)_ A [live stream](frontend.md#live-pages) does not count as a request for the idle limit. The server checks the session row at each keep-alive, and closes the stream when the session ends, signs out or passes a limit.
 - **Bound to the tenant.** The row has no tenant id, because each tenant has its own database, so a
   cookie taken to another tenant's host finds no row there. The server also checks that the session's
   tenant is the tenant [resolved from the host](../architecture.md#request-resolution), so such a
@@ -382,7 +383,7 @@ Every `POST`, `PUT`, `PATCH` and `DELETE` under `/api` must carry `X-Axis-Csrf: 
   writes. See the record API's [CSRF header rule](record-api.md#create-update-and-delete).
 - Paths under `/api/apps/{app}/endpoints/` are exempt from the header, because they take a bearer token
   and no session cookie. So are the writes under `/api/cell/` that carry a bearer token, and a
-  [service account](#service-accounts) request.
+  [service account](#service-accounts) request or a [package runner](extension-packages.md#customer-hosted-runners)'s.
 
 ### Session lifetimes and re-authentication
 
@@ -672,9 +673,9 @@ without a grant. These rules say how grants combine into what a user may read an
   `export` and `import` on an entity, `read` and `export` on a data source, `start`, `inspect`,
   `cancel`, `retry`, `resolve` and `reassign` on a process, and `invoke` on an endpoint. `inspect`
   lists a process's instances, see [process inspection](process-inspection.md#process-inspection).
-  `cancel` stops a running or waiting instance, see [Cancel](process-inspection.md#cancel). `retry`
-  runs a failed instance again, see [Retry](process-inspection.md#retry). `resolve` settles an unknown
-  connector call, see [Resolve](process-inspection.md#resolve). Each is checked on its own. An entity
+  `cancel` stops a running or waiting instance, see [Cancel](process-operator-commands.md#cancel). `retry`
+  runs a failed instance again, see [Retry](process-operator-commands.md#retry). `resolve` settles an unknown
+  connector call, see [Resolve](process-operator-commands.md#resolve). Each is checked on its own. An entity
   grant may also have a record `filter` and a `fields` list. A user's grants are the grants of every
   policy they match.
 - **Default-deny.**
@@ -730,6 +731,7 @@ without a grant. These rules say how grants combine into what a user may read an
   when its subject record is readable. The instance detail needs the same. It also shows a call's input
   only when the user may read every field its mapping reads or writes, and a `sensitive` field is never
   shown. See [process inspection](process-inspection.md#process-inspection).
+- **Comments.** _(planned for M43)_ A record comment needs the `comment` or `internalComments` grant of its entity. A task comment needs a person who may act on the task, as [who may act](task-api.md#who-may-act) says. See [record comments](comments.md#record-comments) and [task comments](comments.md#task-comments).
 - **System work.** The worker, seed data and `updateRecord` steps run as `system`, and policies do not
   check them.
 - **Failures.** A filter that fails at run time adds no records through its grant. The server logs the

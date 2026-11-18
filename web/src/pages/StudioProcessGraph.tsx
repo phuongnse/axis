@@ -1,6 +1,7 @@
 import { useDroppable } from '@dnd-kit/core'
 import { EdgeLabelRenderer, type OnConnectEnd } from '@xyflow/react'
 import { type KeyboardEvent, useMemo, useRef } from 'react'
+import { fillText } from '../platform/fillText'
 import { ProcessGraphCanvas, type ProcessGraphStep, type ProcessGraphTransitionView } from '../platform/ProcessGraph'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -44,7 +45,7 @@ const edgeTestIdPrefix = 'rf__edge-'
 /**
  * The graph of the draft's steps and transitions, laid out again after every edit. A node selects its step, and an
  * edge selects itself and the step it leaves. The selected step is the node marked current, and the selected edge is
- * drawn in the primary colour. A step that a diagnostic path names has an error-coloured border and "has diagnostics"
+ * drawn in the primary colour. A step that a diagnostic path names has an error-coloured border and "has problems"
  * in its label. Tab reaches the edges, which come before the nodes, and each edge is named by its two steps and its
  * branch or outcome. Enter or Space on an edge selects it. Delete or Backspace in the canvas calls `onRemove`. The
  * canvas and the midpoint of each edge are drop targets of the process designer's palette: the canvas for `/steps`, and
@@ -77,7 +78,7 @@ export default function StudioProcessGraph({
   layerMarks?: ReadonlyMap<number, 'added' | 'changed'>
 }) {
   const t = useText()
-  const to = t('shell.studio.processGraph.to')
+  const edgeText = t('shell.studio.processGraph.to')
   const section = useRef<HTMLElement>(null)
   const { setNodeRef } = useDroppable({ id: 'process-canvas', data: { pointer: '/steps' } })
 
@@ -97,7 +98,7 @@ export default function StudioProcessGraph({
           kind: step.type ?? '',
           start: graph.start === step.index,
           tone: step.marked ? 'error' : selected === step.index ? 'selected' : 'plain',
-          ariaLabel: step.marked ? `${label}, ${t('shell.studio.processGraph.hasDiagnostics')}` : label,
+          ariaLabel: step.marked ? fillText(t('shell.studio.processGraph.hasDiagnostics'), { step: label }) : label,
           ariaCurrent: selected === step.index,
           note,
           connectable: !readOnly && step.type !== 'end',
@@ -114,11 +115,11 @@ export default function StudioProcessGraph({
         source: String(transition.source),
         target: String(transition.target),
         label: transition.label ?? transition.kind,
-        ariaLabel: transitionName(graph, transition, to),
+        ariaLabel: transitionName(graph, transition, edgeText),
         tone: transition.path === selectedEdge ? 'selected' : 'plain',
         ariaCurrent: transition.path === selectedEdge,
       })),
-    [graph, selectedEdge, to],
+    [graph, selectedEdge, edgeText],
   )
 
   // A drag ends on a node when React Flow snaps to its handle, and anywhere else on the node otherwise, so the node

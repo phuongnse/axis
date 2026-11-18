@@ -32,7 +32,7 @@ authorized, audited commands.
 - **The process inspector shows the commands the user's grants allow.** It warns before a retry only
   when the failed call is a package call that is not idempotent.
 
-The detail is in [operator commands](../reference/process-inspection.md#operator-commands).
+The detail is in [operator commands](../reference/process-operator-commands.md#operator-commands).
 
 ## Consequences
 

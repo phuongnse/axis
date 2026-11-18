@@ -79,9 +79,9 @@ test.describe("Studio edits form conditions and steps", () => {
     await expect(condition.getByTestId("studio-expression-error")).toHaveCount(
       0,
     );
-    await expect(condition.getByTestId("studio-expression-type")).toContainText(
-      "Gives yes or no",
-    );
+    await expect(
+      condition.getByTestId("studio-expression-reading"),
+    ).toContainText("is greater than 1,000");
 
     await page
       .getByTestId("studio-field-/sections/1/name")

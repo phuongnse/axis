@@ -68,6 +68,11 @@ form and texts below.
 - **Rules.** `IsDelegating(from, until)` is true when today, in the application's time zone, is
   between the two dates, both days included, and false when either date is empty. Other modules
   call it as `organization:IsDelegating(…)`.
+- **Platform absences.** _(planned for M43)_ `Employee` drops `delegate`, `delegateFrom` and `delegateUntil`.
+  `IsDelegating`, `OutOfOffice`, `AbsenceForm`, the delegate points of the contracts and their scenarios go, and
+  people set their absence through [absences](user-administration.md#absences).
+- **Department parameter.** _(planned for M43)_ `Employees` takes an optional `department` parameter, which limits
+  its rows to one department.
 - **Contracts:**
   - `Department`: a department is not its own parent. The named point is
     `Department/validations/notOwnParent`.
@@ -245,6 +250,10 @@ A requester who is a department head, and whose step would go to themselves, get
 instead. When the only administrator is the requester too, the guard refuses, and a business of
 that size relaxes `Request/transitions/approve` with its reason.
 
+- **Absences.** _(planned for M43)_ `findDelegate` goes. `decide` goes to the approver, with
+  `exclude: ["creator"]`, and the platform moves it to the approver's delegate while the approver is away.
+  The `Decision` keeps `onBehalfOf` from the task.
+
 ### Policies
 
 `MemberAccess` and `AdminAccess` give the slots what the contracts allow, so an application that only
@@ -294,6 +303,8 @@ The built-in application `approvals` is what a business starts from.
 - **Site.** One site that links My requests, To decide, Out of office, All requests, Request types,
   Departments and Employees. The site has no setting per role, so a person sees only the pages their
   role can read, and the rest are for `admin`.
+  - **Out of office.** _(planned for M43)_ The Out of office page leaves the site, as
+    [absences](user-administration.md#absences) replace it.
 - **Sign-in.** Axis accounts with a second step, as
   [the identity provider](identity-provider.md) describes for an application's own accounts.
 - **Texts** in `en` and `vi`.
