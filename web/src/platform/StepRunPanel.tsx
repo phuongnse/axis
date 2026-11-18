@@ -573,7 +573,9 @@ export function StepRunPanel({
           <Flex key={call.id} vertical gap={spacing.xs}>
             {calls.length > 1 && <Typography.Text strong>{targetOf(call)}</Typography.Text>}
             <AttemptTable
-              attempts={call.attempts}
+              // Records in time are newest first, as the timeline lists a call's attempts, see
+              // docs/reference/actions-and-controls.md.
+              attempts={[...call.attempts].reverse()}
               locale={locale}
               details={(attempt) => (
                 <TermList
