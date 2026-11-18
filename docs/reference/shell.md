@@ -59,7 +59,7 @@ their own controls where they expect them.
 - **One side panel in Studio.** Studio shows one side panel at a time, such as the problems panel, in
   `StudioSidePanel`, which draws it in `ShellAside`. By default the panel's head stays in place, its body scrolls on
   its own, and the page keeps the browser's scroll.
-- **Opening one closes the other** _(planned for M35)_. The Ask AI request panel is a side panel too, and opening one
+- **Opening one closes the other.** The Ask AI request panel is a side panel too, and opening one
   panel closes the other.
 - **Collapsed sidebar.** The header's button collapses the sidebar to a narrow strip of the entries'
   icons, each centred and named by a tooltip, and opens it again. Collapsed, a group's title gives way

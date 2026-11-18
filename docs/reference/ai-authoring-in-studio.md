@@ -6,8 +6,6 @@ lets an agent accept, and how revisions show. The rest of Studio is in [Studio](
 
 ## The request panel
 
-_(planned for M35)_
-
 The request panel is where an author asks AI for a change in words. Ask AI opens the panel, and each sent
 request opens its own page.
 
@@ -18,13 +16,15 @@ request opens its own page.
   "Accept when checks and review pass", asks for auto-accept, and shows only when the application
   [allows it](#auto-accept). Send has no count beside it, because Axis counts no requests, see
   [D150](../decisions/d150-each-authors-own-ai-with-axis-counting-no-requests.md).
-- **The request's page.** After a send, the main area opens the request's page at
-  `/studio?app=<application>&view=requests&request=<id>`, and the plan shows there once AI has written it.
-  The panel stays open and empty for the next request. The notices of AI requests open the same address,
-  see [tenant notices](notifications.md#tenant-notices). What the page shows is in [a request's page](#a-requests-page).
-- **No list.** The panel lists no requests. The [bell](notifications.md#the-bell) tells an author when a
+- **After a send.** The main area opens the request's address,
+  `/studio?app=<application>&view=requests&request=<id>`. The panel stays open and empty for the next request.
+- **The request's page** _(planned for M35)_. The plan shows there once AI has written it. The notices of AI
+  requests open the same address, see [tenant notices](notifications.md#tenant-notices). What the page shows is
+  in [a request's page](#a-requests-page).
+- **The panel lists no requests.** The panel has no list.
+- **The bell and the sidebar** _(planned for M35)_. The [bell](notifications.md#the-bell) tells an author when a
   request of theirs waits for them or ends, and the sidebar's AI requests entry, below, leads to every request.
-- **Before a key.** Until the author has connected their own AI, the panel shows two ways to ask AI, in
+- **Before a key** _(planned for M35)_. Until the author has connected their own AI, the panel shows two ways to ask AI, in
   place of the form. Whether the author has connected one comes from the [AI status](authoring-requests.md#routes) route.
   - **With your own API key.** "Add your AI provider's API key, and the requests you send here run on it.
     Your account pays for what you ask." The key works as [a person's own key](model-bindings.md#a-persons-own-key)
@@ -425,11 +425,11 @@ changed what and can undo it.
 
 ## Connected apps
 
-_(planned for M35)_
-
 A tenant administrator manages outside MCP clients, see
 [client registration](mcp-server.md#client-registration). The request panel ends, under a rule, with
 **Use your own AI app**. Under it, in `textMuted`, comes the sentence "An AI app that supports MCP can work
 on your applications once your administrator allows it. Give it this address:". The address, in code style,
-`https://<tenant host>/mcp`, with a copy button, ends that line, right after "Give it this address:". Before an author has connected
-their own AI, the panel shows this address once, in its second way, see [the request panel](#the-request-panel).
+`https://<tenant host>/mcp`, with a copy button, ends that line, right after "Give it this address:".
+
+- **Before a key** _(planned for M35)_. Before an author has connected their own AI, the panel shows this address
+  once, in its second way, see [the request panel](#the-request-panel).
