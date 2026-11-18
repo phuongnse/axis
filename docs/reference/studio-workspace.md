@@ -120,6 +120,10 @@ Overview, or the module an open resource comes from. It never names a file or a 
 JSON view shows. The page's own actions, such as a scenario's Run scenario and a kind's New entity…, sit on
 the heading's right, and so does a resource's "…" menu with [Delete…](studio.md#delete).
 
+**A page that shows one thing** _(planned)_. An open resource, a release and a revision are headed as
+[a page that shows one thing](shell.md#page-header) says. Their line is the kind alone, and a resource's module, or a
+revision's author and time, is a fact of the page's first part, see [facts as the first part](shell.md#page-header).
+
 ## Names
 
 Studio shows words, never an internal code, see [text](actions-and-controls.md#text).

@@ -173,6 +173,7 @@ folds into the More actions menu, as an [action bar](actions-and-controls.md#but
   [saving](form-widget.md#saving).
 - **Undo and Redo** _(planned)_. They show, as icons after the line, only where the editor gives them, so a site's
   form has none.
+- **Discard** _(planned)_. Discard is a `destructive` button, drawn in `dangerText`, wherever the bar shows.
 
 ## Form and JSON
 
