@@ -6,7 +6,7 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import { judgeCase, passBar, writeReport } from './lib/ai-eval.mjs'
 import { casesFolder, parseArguments, readCases } from './lib/ai-eval-run.mjs'
-import { agentEnvironment, applicationName, startingTemplate, tenantHost, tunnelTarget } from './lib/ai-eval-stack.mjs'
+import { agentEnvironment, agentHostSettings, applicationName, startingTemplate, tenantHost, tunnelTarget } from './lib/ai-eval-stack.mjs'
 
 const refusalCase = {
   name: 'approver-is-requester',
@@ -274,6 +274,27 @@ describe('the settings of the eval stack', () => {
   test('the application name is the start name and the tenant id in PascalCase', () => {
     assert.equal(applicationName({ from: 'application', name: 'approvals' }, 'eval-smoke'), 'ApprovalsEvalSmoke')
     assert.equal(applicationName({ from: 'template', name: 'purchase-requests' }, 'case1'), 'PurchaseRequestsCase1')
+  })
+
+  test('the agent host reads the tenant directory, calls the MCP servers through the proxy and trusts the run, with the scripted answers', () => {
+    const settings = agentHostSettings({
+      healthUrl: 'http://127.0.0.1:5999',
+      platform: 'Host=127.0.0.1;Database=axis_platform',
+      secretKey: 'key',
+      proxyUrl: 'http://127.0.0.1:5998',
+      trustDir: '/tmp/trust',
+      answersFile: '/tmp/answers.json',
+    })
+    assert.equal(settings.DOTNET_ENVIRONMENT, 'Testing')
+    assert.equal(settings.Health__Urls, 'http://127.0.0.1:5999')
+    assert.equal(settings.Tenancy__Source, 'directory')
+    assert.equal(settings.ConnectionStrings__Platform, 'Host=127.0.0.1;Database=axis_platform')
+    assert.equal(settings.Platform__SecretKey, 'key')
+    assert.equal(settings.HTTPS_PROXY, 'http://127.0.0.1:5998')
+    assert.equal(settings.https_proxy, 'http://127.0.0.1:5998')
+    assert.ok(settings.SSL_CERT_DIR.startsWith('/tmp/trust:'), settings.SSL_CERT_DIR)
+    assert.equal(settings.Ai__DefaultBinding, 'scripted')
+    assert.equal(settings.Ai__ScriptedAnswersFile, '/tmp/answers.json')
   })
 })
 

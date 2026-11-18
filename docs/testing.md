@@ -214,6 +214,17 @@ directory. The server listens on https at `AXIS_E2E_TENANT_HTTPS_PORT`, with a c
 on the tenant host with no port in the address. No redirect address is added by hand: only
 `tenant create` writes them.
 
+**The Ask AI agent spec** plans a request for real. It runs `tenant create` for `ask-ai-agent`, on the host
+`ask-ai-agent.eval.localhost`, and gives an author of that realm the author role and the agent client's roles mapper. Its
+server starts on offset 9, from the directory, with Ask AI on through the scripted binding. The spec makes its own
+certificate for `*.eval.localhost` with an authority of its own, not the run's `*.localhost` certificate, because
+OpenSSL in the agent host refuses a wildcard with one label after it. A CONNECT proxy opens the tunnel from
+`ask-ai-agent.eval.localhost:443` to the server's https port, so the agent host calls the tenant's `/mcp` at its own
+address. The agent host is `Axis.Agent` in `Testing`, with `tests/e2e/agent-host.ts` and the scripted answer of a plan
+with no questions. The spec starts the agent host only after the request's page shows Planning, because a running host
+could plan the request before the page's first read. The page then shows Awaiting approval. The spec stops the agent host,
+the proxy, its browser and its server when the test ends.
+
 **The cell console spec** starts a server of its own in `Testing`, on the next port offset, with the
 `Cell:*` settings of a cell, `Cell:ConsoleHost` set to `console.localhost` and the secret of the
 `axis-cell-console` client. The spec's browser maps `console.localhost` and the tenant host on

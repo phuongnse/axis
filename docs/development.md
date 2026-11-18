@@ -199,7 +199,9 @@ runs Playwright in Chromium. It:
 - starts the control plane with its databases `axis_controlplane` and `axis_directory`, which sends its emails
   to that Mailpit, see [the E2E stack](testing.md#the-e2e-stack);
 - makes a throwaway TLS certificate for the run, which the https server of each spec that runs `tenant create`
-  uses, on `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283) and the ports after it, one offset for each spec;
+  uses, on `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283) and the ports after it, one offset for each spec. The Ask AI
+  agent spec is the exception: it makes its own certificate for `*.eval.localhost`, see
+  [the E2E stack](testing.md#the-e2e-stack);
 - builds and checks the design-system bundle in `artifacts/design-system` for its spec, see
   [widget previews](reference/widget-previews.md).
 
