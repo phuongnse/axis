@@ -1,9 +1,12 @@
+using System.Text;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Releases;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Studio;
+using Npgsql;
 
 namespace Axis.Server.Studio;
 
@@ -21,6 +24,11 @@ namespace Axis.Server.Studio;
 /// user's draft as <c>{ start, tip, resources, cursor }</c>, 404 for an unknown draft or one that is someone else's, 400
 /// for a cursor the draft did not give and 503 when the write lock cannot be taken. See
 /// <c>docs/reference/revisions-and-drafts.md#drafts</c>.
+/// <c>GET /api/studio/apps/{application}/releases/live/diff?cursor=</c> answers one page of the files that differ between the live
+/// release and the working folder as <c>{ release, resources, cursor }</c>, each file with the revisions made since the live
+/// release was first activated that changed it, as <c>titles</c> and <c>by</c>. It answers 404 with no live release and with no
+/// revision history, 400 for a cursor it did not give and 503 when the write lock cannot be taken. See
+/// <c>docs/reference/authoring-revisions.md#live-diff</c>.
 /// Each route checks the session (401), the author role (403) and the application (404). A server without
 /// <c>Studio:RevisionsPath</c>, or a folder with no history yet, lists no revisions and answers 404 for a diff and an undo, as
 /// it does for an id that is not 40 hex characters or not a revision. The undo then answers 503 when the write lock cannot be taken,
@@ -36,12 +44,155 @@ internal static class StudioRevisionEndpoints
 
     internal const string ForeignCursor = "The cursor is not one this draft gave.";
 
+    internal const string NoLiveRelease = "The application has no live release.";
+
+    internal const string NoHistory = "The application has no revision history.";
+
     public static void MapStudioRevisionEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/studio/apps/{application}/revisions", ListAsync);
         endpoints.MapGet("/api/studio/apps/{application}/revisions/{revision}", GetAsync);
         endpoints.MapPost("/api/studio/apps/{application}/revisions/{revision}/undo", UndoAsync).WithStorageQuota();
         endpoints.MapGet("/api/studio/apps/{application}/drafts/{draft}/diff", DraftDiffAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/releases/live/diff", LiveDiffAsync);
+    }
+
+    // The order of checks is that of docs/reference/authoring-revisions.md#order-of-checks.
+    private static async Task<IResult> LiveDiffAsync(
+        string application, string? cursor, HttpContext httpContext, StudioOptions options, IStudioWriteLock writeLock, TenantDatabase database)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var ct = httpContext.RequestAborted;
+        if (StudioFolder.List(folder).FirstOrDefault(file => file.File == "application.json")?.Id is not { } applicationId)
+        {
+            return StudioEndpoints.NotFound(NoLiveRelease);
+        }
+
+        var store = new ActiveReleaseStore(await database.GetConfigurationAsync(ct));
+        if (await store.FindByApplicationIdAsync(applicationId, ct) is not { } active
+            || await store.GetReleaseAsync(active.ReleaseId, ct) is not { } release)
+        {
+            return StudioEndpoints.NotFound(NoLiveRelease);
+        }
+
+        // Activations are newest first. A release can be in the history more than once, always with one number, and its
+        // first activation is its publish.
+        var activations = (await store.ListActivationsAsync(applicationId, ct)).Where(row => row.ReleaseId == active.ReleaseId).ToList();
+        if (activations.Count == 0)
+        {
+            return StudioEndpoints.NotFound(NoLiveRelease);
+        }
+
+        if (await StudioEndpoints.RevisionsAsync(httpContext, options, folder) is not { } revisions)
+        {
+            return StudioEndpoints.NotFound(NoHistory);
+        }
+
+        StudioMain main;
+        var from = 0;
+        if (await StudioWrites.TryTakeAsync(writeLock, folder, ct) is not { } held)
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status503ServiceUnavailable, StudioEndpoints.WriteLockUnavailable);
+        }
+
+        await using (held)
+        {
+            revisions.RecordOutside();
+            string? at = null;
+            if (cursor is not null)
+            {
+                if (StudioDiffPages.ReadCursor(cursor) is not var (sha, index))
+                {
+                    return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, ForeignCursor);
+                }
+
+                at = sha;
+                from = index;
+            }
+
+            if (revisions.Main(at) is not { } found)
+            {
+                return cursor is null ? StudioEndpoints.NotFound(NoHistory) : StudioEndpoints.Problem(StatusCodes.Status400BadRequest, ForeignCursor);
+            }
+
+            main = found;
+        }
+
+        var releaseTexts = release.Resources.ToDictionary(resource => resource.Path, resource => resource.Content, StringComparer.Ordinal);
+        var tipTexts = main.Files.ToDictionary(file => file.File, file => Encoding.UTF8.GetString(file.Bytes), StringComparer.Ordinal);
+        var changes = StudioReleaseChanges.Compare(
+            [.. tipTexts.Select(file => new ResourceContent(file.Key, file.Value))],
+            [.. release.Resources.Select(resource => new ResourceContent(resource.Path, resource.Content))]);
+        var titles = StudioResourceTitles.Read(StudioFolder.Resources([.. main.Files.Where(file => file.File.EndsWith(".json", StringComparison.Ordinal))]));
+
+        // Git keeps commit times to the second and an activation has microseconds, so the activation's own second counts.
+        var activatedAt = activations[^1].ActivatedAt.ToUniversalTime();
+        var boundary = new DateTimeOffset(activatedAt.Ticks - activatedAt.Ticks % TimeSpan.TicksPerSecond, TimeSpan.Zero);
+        var since = main.History.Where(item => item.Revision.Time >= boundary).ToList();
+
+        var entries = new List<(StudioRevisionChange Entry, IReadOnlyDictionary<string, string>? Titles, List<StudioRevision> By)>();
+        foreach (var change in changes)
+        {
+            var entry = StudioRevisions.Entry(
+                change.Path, change.Change, releaseTexts.GetValueOrDefault(change.Path), tipTexts.GetValueOrDefault(change.Path));
+            var entryTitles = change.Change == "removed"
+                ? change.Titles
+                : Guid.TryParseExact(entry.Id, "D", out var id) && titles.TryGetValue(id, out var read) ? read.Titles : null;
+            entries.Add((entry, entryTitles is { Count: > 0 } ? entryTitles : null, [.. since.Where(item => item.Paths.Contains(change.Path)).Select(item => item.Revision)]));
+        }
+
+        var requests = await FindAuthoringRequestsAsync(
+            database, applicationId, [.. entries.SelectMany(item => item.By).Select(revision => revision.Request).OfType<string>().Distinct()], ct);
+        var live = entries
+            .Select(item => new StudioLiveDiffEntry(
+                item.Entry.File, item.Entry.Change, item.Entry.Id, item.Entry.Kind, item.Entry.Name, item.Entry.Before, item.Entry.After, item.Entry.Target,
+                item.Titles,
+                [.. item.By.Select(revision => new StudioLiveRevision(
+                    revision.Id, revision.Summary, revision.Author, revision.UserId, revision.Client, revision.Request, revision.Time,
+                    revision.Request is { } request ? requests.GetValueOrDefault(request) : null))]))
+            .ToList();
+        if (cursor is not null && from >= live.Count)
+        {
+            return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, ForeignCursor);
+        }
+
+        var (page, after) = StudioDiffPages.Page(live, from, main.Sha);
+        return Results.Ok(new StudioLiveDiff(activations[0].Number, page, after));
+    }
+
+    // The AI request of each accept publish request, found through the accept's draft. A request with no match has none.
+    private static async Task<IReadOnlyDictionary<string, Guid>> FindAuthoringRequestsAsync(
+        TenantDatabase database, Guid applicationId, IReadOnlyList<string> publishRequests, CancellationToken ct)
+    {
+        var ids = publishRequests.Select(id => Guid.TryParseExact(id, "D", out var parsed) ? parsed : (Guid?)null).OfType<Guid>().ToArray();
+        var found = new Dictionary<string, Guid>(StringComparer.Ordinal);
+        if (ids.Length == 0)
+        {
+            return found;
+        }
+
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT p.id, a.id
+            FROM axis.publish_requests p
+            JOIN axis.authoring_requests a ON a.draft_id = p.draft_id AND a.application_id = p.application_id
+            WHERE p.application_id = @application AND p.kind = 'accept' AND p.id = ANY(@ids)
+            """,
+            await database.GetConnectionAsync(ct));
+        command.Parameters.AddWithValue("application", applicationId);
+        command.Parameters.AddWithValue("ids", ids);
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            found[reader.GetGuid(0).ToString("D")] = reader.GetGuid(1);
+        }
+
+        return found;
     }
 
     private static async Task<IResult> DraftDiffAsync(
@@ -166,3 +317,23 @@ internal sealed record StudioRevisionListResponse(IReadOnlyList<StudioRevision> 
 
 /// <summary>The answer to an undo: the id of the revision it recorded and the folder's compile diagnostics.</summary>
 internal sealed record StudioUndoResponse(string? Id, IReadOnlyList<StudioDiagnostic> Diagnostics);
+
+/// <summary>A revision of a live diff's <c>by</c>: the revision list's fields and the AI request whose accept made it, or null.</summary>
+internal sealed record StudioLiveRevision(
+    string Id, string Summary, string Author, string? UserId, string? Client, string? Request, DateTimeOffset Time, Guid? AuthoringRequest);
+
+/// <summary>A file that differs from the live release: the revision diff's fields, its titles by locale or null, and the revisions made since the release that changed it, newest first.</summary>
+internal sealed record StudioLiveDiffEntry(
+    string File,
+    string Change,
+    string? Id,
+    string? Kind,
+    string? Name,
+    string? Before,
+    string? After,
+    string? Target,
+    IReadOnlyDictionary<string, string>? Titles,
+    IReadOnlyList<StudioLiveRevision> By);
+
+/// <summary>One page of the live diff: the live release's number, the files in this page sorted by file and the cursor of the next page, null on the last page.</summary>
+internal sealed record StudioLiveDiff(int Release, IReadOnlyList<StudioLiveDiffEntry> Resources, string? Cursor);

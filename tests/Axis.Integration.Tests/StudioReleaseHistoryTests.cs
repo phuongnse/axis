@@ -472,7 +472,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         Assert.Empty(result.Diagnostics);
     }
 
-    internal static WebApplicationFactory<Program> CreateFactory(string connectionString, string folder, string? modulesPath = null) =>
+    internal static WebApplicationFactory<Program> CreateFactory(string connectionString, string folder, string? modulesPath = null, string? revisionsPath = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -495,6 +495,11 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
             builder.UseSetting("Modules:Path", modulesPath ?? SampleModules.Path);
             builder.UseSetting("ActivateOnStartup:0", folder);
             builder.UseSetting("Studio:Folders:0", folder);
+            if (revisionsPath is not null)
+            {
+                builder.UseSetting("Studio:RevisionsPath", revisionsPath);
+            }
+
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"), new TestIdentity("requester", "Requester", "employee"));
         });

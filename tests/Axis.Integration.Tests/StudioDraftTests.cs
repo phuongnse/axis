@@ -484,7 +484,7 @@ public sealed class StudioDraftTests(PostgreSqlFixture database) : IClassFixture
         }
 
         Assert.True(pages.Count > 1);
-        Assert.All(pages, page => Assert.True(JsonSerializer.SerializeToUtf8Bytes(page, JsonSerializerOptions.Web).Length <= StudioDrafts.DiffPageBytes));
+        Assert.All(pages, page => Assert.True(JsonSerializer.SerializeToUtf8Bytes(page, JsonSerializerOptions.Web).Length <= StudioDiffPages.PageBytes));
         Assert.All(pages, page => Assert.Equal(pages[0].Tip, page.Tip));
         Assert.Equal(expected, pages.SelectMany(page => page.Resources).Select(entry => entry.File));
 

@@ -389,7 +389,7 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
         }
 
         Assert.True(pages.Count > 1);
-        Assert.All(pages, page => Assert.True(page.ToJsonString().Length <= StudioDrafts.DiffPageBytes));
+        Assert.All(pages, page => Assert.True(page.ToJsonString().Length <= StudioDiffPages.PageBytes));
         Assert.All(pages, page => Assert.Equal(pages[0]["tip"]!.GetValue<string>(), page["tip"]!.GetValue<string>()));
         Assert.Null(pages[^1]["cursor"]);
         Assert.Equal(expected, pages.SelectMany(page => page["resources"]!.AsArray()).Select(entry => entry!["file"]!.GetValue<string>()));
