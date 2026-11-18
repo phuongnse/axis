@@ -728,7 +728,7 @@ The `connect` command reads these settings, as environment variables with the na
 An application's package sits in the application's folder, and the tenant's author brings it. It is not
 trusted code, so the platform gives it more limits than an installation's package gets.
 
-- **The sandbox** _(planned for M37)_. The runners run under gVisor (`runsc`), in their own container,
+- **The sandbox.** The runners run under gVisor (`runsc`), in their own container,
   `application-package-host`, beside the worker. The Helm chart sets that pod's `runtimeClassName` and
   Compose sets that service's `runtime`, so the `package-host-*` containers keep the plain runtime. Compose's
   service sits behind the `application-packages` profile, so an installation without gVisor runs the rest.
