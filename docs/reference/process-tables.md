@@ -112,6 +112,7 @@ The `output` column holds what each step or event wrote:
 | Call that fails | `{ "operationId", "outcome": "failed" }` |
 | Connector call left unknown with no lookup, and package call left unknown | `{ "operationId", "outcome": "unknown" }` |
 | `raiseEvent` step | `{ "next", "eventId" }`, with the occurrence it stored |
+| `notify` operation | `{ "next", "notificationId" }`, with the id that the step run's notification and its emails share, see [Notify operation](notifications.md#notify-operation) |
 | `timer` step | `{ "state": "waiting", "dueAt" }`, and `{ "next" }` when its timer resumes the instance |
 | `waitEvent`, `subProcess` and `createRecord` steps | As [process flow](process-flow.md) says for each step |
 | Operator cancel | `{ "command": "cancel" }` |
@@ -322,6 +323,7 @@ filtered index of the same columns without `application_id`,
 | `source` _(planned for M35)_ | `text` | What made the notification, such as a `notify` step or a quota notice, see [In-app notifications](notifications.md#in-app-notifications) |
 | `kind` _(planned for M35)_ | `text` | The kind of the notification, see [In-app notifications](notifications.md#in-app-notifications) |
 | `values` | `jsonb` | The raw evaluated placeholder values, keyed by the placeholders' names. Dates are ISO text, as in an event payload. They are formatted when read |
+| `value_types` | `jsonb` | The type name of each value, keyed like `values`, such as `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` or `reference`. A value of type null or file has none. `{}` for a notification stored before the column existed |
 | `open_page` | `text`, null | The declared name of the page the notification opens. Null when the step has no `open` |
 | `open_parameters` | `jsonb`, null | The raw evaluated page parameters, keyed by the parameters' declared names. Null when the step has no `open` |
 | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
