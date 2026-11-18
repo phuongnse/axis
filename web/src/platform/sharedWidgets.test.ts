@@ -10,8 +10,8 @@ const tableHeader = /^\|\s*Job\s*\|\s*Shared widget\s*\|/
 const identifier = /`([A-Za-z]\w*)`/g
 /** A name that Ant Design's own API has, such as Ant Design's `Button`. */
 const antDesignName = /Ant Design's `\w+`/g
-/** A row with this marker names work that the code does not have yet. */
-const plannedMarker = /_\(planned for M\w+\)_/
+/** A row with this marker names work that the code does not have yet, a planned marker of a milestone or a bare one. */
+const plannedMarker = /_\(planned(?: for M\w+)?\)_/
 /** A row that names a source path is about the server, which the SPA does not hold. */
 const serverPath = /`src\/Axis\./
 /** An export of a function, a constant, a let, a class or the default. */
