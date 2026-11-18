@@ -4,8 +4,9 @@ Three routes of the [authoring API](authoring.md) read and undo the history that
 [revisions](revisions-and-drafts.md#revisions) keep, a fourth reads the diff of a
 [draft](revisions-and-drafts.md#drafts) and a fifth the diff from the live release. A revision is named by its
 full 40-character commit id. A server with no `Studio:RevisionsPath`, or a folder with no history yet, lists no
-revisions, and the diff and the undo answer `404`. The live diff answers `404` too, titled "The application has
-no revision history."
+revisions, and the diff and the undo answer `404`. The live diff answers `404` only on a server with no
+`Studio:RevisionsPath`, titled "The application has no revision history." For a folder with no history yet, it
+records the folder as the start of history first and answers.
 
 | Route                                                                       | What it does                                                                       |
 | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
