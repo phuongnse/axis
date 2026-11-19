@@ -34,6 +34,8 @@ interface ReasonDialogProps {
   size?: 'small' | 'medium'
   /** What the dialog shows when the command fails with no answer from the server. */
   failedText?: string
+  /** Proposed, see #3978: the text the field starts with, such as a file's name to rename. */
+  initialValue?: string
 }
 
 /**
@@ -55,6 +57,7 @@ export function ReasonDialog({
   requiredMessage,
   tooLongMessage,
   maxLength = 500,
+  initialValue,
   size: dialogSize = 'small',
   failedText,
 }: ReasonDialogProps) {
@@ -101,6 +104,7 @@ export function ReasonDialog({
         <Form form={form} layout="vertical" requiredMark={requiredMark}>
           <AxisField
             name="reason"
+            initialValue={initialValue}
             label={label ?? t('shell.inspector.commands.reason')}
             help={help ?? t('shell.inspector.commands.reason.help')}
             requiredMessage={requiredMessage ?? t('shell.inspector.commands.reasonRequired')}

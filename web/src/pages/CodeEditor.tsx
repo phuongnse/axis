@@ -1,8 +1,19 @@
-import { defaultKeymap, history, historyKeymap, redo, redoDepth, undo, undoDepth } from '@codemirror/commands'
+import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete'
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+  redo,
+  redoDepth,
+  undo,
+  undoDepth,
+} from '@codemirror/commands'
+import { bracketMatching, foldGutter, foldKeymap, indentOnInput } from '@codemirror/language'
 import { diagnosticCount, nextDiagnostic } from '@codemirror/lint'
 import { openSearchPanel, search, searchKeymap } from '@codemirror/search'
 import { Annotation, Compartment, EditorState, Transaction, type Extension } from '@codemirror/state'
-import { EditorView, keymap, lineNumbers } from '@codemirror/view'
+import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view'
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref, type RefObject } from 'react'
 import { selectedItemTint } from '../platform/antTheme'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
@@ -31,10 +42,17 @@ export interface CodeEditorProps {
   boundary?: RefObject<HTMLElement | null>
   /** The texts of the find bar. */
   findTexts: FindTexts
+  /**
+   * Proposed, see #3978: the editor fills the element that holds it, which sets its height, as a package's workspace
+   * does, in place of filling the window down to the footer.
+   */
+  fill?: boolean
   /** Called with the number of problems that the checks mark, each time it changes. */
   onProblems?: (count: number) => void
   /** Called with the number of steps that can be undone and redone, each time either changes. */
   onHistory?: (steps: { undo: number; redo: number }) => void
+  /** Proposed, see #3978: called with the cursor's line and column, from 1, each time it moves. */
+  onCursor?: (position: { line: number; column: number }) => void
   ref?: Ref<CodeEditorHandle>
 }
 
@@ -50,6 +68,8 @@ export interface CodeEditorHandle {
   undo(): void
   /** Redoes the step that was last undone. */
   redo(): void
+  /** Proposed, see #3978: puts the cursor at a line and column, from 1, scrolls it into view and focuses the editor. */
+  goTo(line: number, column?: number): void
 }
 
 /**
@@ -63,10 +83,12 @@ export default function CodeEditor({
   language,
   checks,
   readOnly = false,
+  fill = false,
   boundary,
   findTexts,
   onProblems,
   onHistory,
+  onCursor,
   ref,
 }: CodeEditorProps) {
   const { mode } = useThemeMode()
@@ -88,6 +110,7 @@ export default function CodeEditor({
     readOnly,
     onProblems,
     onHistory,
+    onCursor,
   })
 
   useEffect(() => {
@@ -101,6 +124,7 @@ export default function CodeEditor({
       readOnly,
       onProblems,
       onHistory,
+      onCursor,
     }
   })
 
@@ -114,13 +138,26 @@ export default function CodeEditor({
         doc: initial.value,
         extensions: [
           lineNumbers(),
+          // Proposed, see #3978: what a code editor gives as standard, the current line marked, folding, matching and
+          // closing brackets, indenting as one types and completion of the words in the text.
+          highlightActiveLineGutter(),
+          highlightActiveLine(),
+          foldGutter(),
+          bracketMatching(),
+          closeBrackets(),
+          indentOnInput(),
+          autocompletion(),
           languageCompartment.of(initial.language),
           history(),
           search({ top: true, createPanel: findPanel(() => latest.current.findTexts) }),
           // Go to line opens a dialog with CodeMirror's own English text, so the editor leaves it out.
           keymap.of([
+            ...closeBracketsKeymap,
             ...defaultKeymap,
             ...historyKeymap,
+            ...foldKeymap,
+            ...completionKeymap,
+            indentWithTab,
             ...searchKeymap.filter((binding) => binding.key !== 'Mod-Alt-g'),
           ]),
           themeCompartment.of(initial.theme),
@@ -137,6 +174,11 @@ export default function CodeEditor({
             if (next.undo !== steps.undo || next.redo !== steps.redo) {
               steps = next
               latest.current.onHistory?.(next)
+            }
+            if (update.selectionSet || update.docChanged) {
+              const head = update.state.selection.main.head
+              const line = update.state.doc.lineAt(head)
+              latest.current.onCursor?.({ line: line.number, column: head - line.from + 1 })
             }
             if (update.docChanged && !update.transactions.some((transaction) => transaction.annotation(external))) {
               latest.current.onChange(update.state.doc.toString())
@@ -211,12 +253,22 @@ export default function CodeEditor({
         redo(viewRef.current)
       }
     },
+    goTo(line, column = 1) {
+      const view = viewRef.current
+      if (!view) {
+        return
+      }
+      const target = view.state.doc.line(Math.min(Math.max(line, 1), view.state.doc.lines))
+      const head = Math.min(target.from + Math.max(column, 1) - 1, target.to)
+      view.dispatch({ selection: { anchor: head }, scrollIntoView: true })
+      view.focus()
+    },
   }))
 
   const gap = tokens.spacing.md
   const fit = () => {
     const host = hostRef.current
-    if (!host || host.offsetParent === null) {
+    if (fill || !host || host.offsetParent === null) {
       return
     }
     const rect = host.getBoundingClientRect()
@@ -245,7 +297,7 @@ export default function CodeEditor({
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  return <div ref={hostRef} style={{ height }} />
+  return <div ref={hostRef} style={{ height: fill ? '100%' : height }} />
 }
 
 const codeViewTheme = sharedTheme((tokens, mode) => {

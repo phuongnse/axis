@@ -22,6 +22,8 @@ import type {
   StudioLiveDiff,
   StudioLiveDiffEntry,
   StudioPackageFile,
+  StudioPackageRunInput,
+  StudioRequest,
   StudioPackageFileItem,
   StudioRevisionDiff,
 } from '../platform/studio'
@@ -978,6 +980,7 @@ function packageRoutes(files: readonly StudioPackageFile[], answers: StateAnswer
       files.length === 0
         ? new Response(null, { status: 404 })
         : ({ release: 2, resources: liveDiff(files), cursor: null } satisfies StudioLiveDiff & { cursor: null }),
+    ...packageJobRoutes(files),
     ...Object.fromEntries(
       files.map((file) => [
         `${folderPath}/packages/${file.package}/files/${file.path}`,
@@ -985,6 +988,148 @@ function packageRoutes(files: readonly StudioPackageFile[], answers: StateAnswer
           init?.method === 'PUT'
             ? { version: file.version, diagnostics: answers.diagnostics }
             : (file satisfies StudioPackageFile),
+      ]),
+    ),
+  }
+}
+
+/** Proposed, see #3978: the package a request of a package's workspace names, from its JSON body. */
+function packageOf(init?: RequestInit): string | null {
+  try {
+    return (JSON.parse(String(init?.body ?? '{}')) as { package?: string }).package ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Proposed, see #3978: a request of a package's workspace that ended, as the preview answers it at once. */
+function endedRequest(
+  kind: StudioRequest['kind'],
+  status: 'succeeded' | 'failed',
+  extra: Partial<StudioRequest>,
+): StudioRequest {
+  return {
+    id: `0e1f0000-0000-4000-8000-00000000${kind === 'build' ? '0b01' : kind === 'test' ? '0b02' : '0b03'}`,
+    application,
+    kind,
+    target: 'tenant',
+    status,
+    label: null,
+    note: null,
+    releaseId: null,
+    diagnostics: [],
+    scenarios: null,
+    ...extra,
+  }
+}
+
+/**
+ * Proposed, see #3978: the routes of a package's workspace that the server does not have yet: a build, a test and a
+ * run of one package, each a publisher request that the preview answers as ended, the named inputs of a package's
+ * operations, and a move of its files. The payment-terms package's build compiles its TypeScript with one warning, its
+ * tests pass but one, and its run answers the due date of a month end.
+ */
+function packageJobRoutes(files: readonly StudioPackageFile[]): Record<string, FixtureRoute> {
+  const packages = [...new Set(files.map((file) => file.package))]
+  return {
+    [`${folderPath}/build`]: (init) =>
+      endedRequest('build', 'succeeded', {
+        package: packageOf(init),
+        diagnostics: [
+          {
+            code: 'AXC0149',
+            severity: 'warning',
+            message: "TS6133: 'utc' is declared but its value is never read.",
+            file: 'packages/payment-terms/index.ts',
+            path: '',
+            resourceId: null,
+            line: 3,
+            column: 8,
+          },
+        ],
+        output: [
+          'Building payment-terms 1.0.0 (Node.js) in the tenant sandbox',
+          'Checking axis-package.json: passed',
+          'Compiling TypeScript: tsc -p tsconfig.json',
+          "index.ts(3,8): warning TS6133: 'utc' is declared but its value is never read.",
+          'Checking package-lock.json against package.json: passed',
+          'Installing dependencies: npm ci --ignore-scripts',
+          'added 1 package in 0.8s',
+          'Scanning dependencies with Trivy: 0 high, 0 critical',
+          'Built payment-terms 1.0.0 in 6.4 s, 1 warning',
+        ],
+      }),
+    [`${folderPath}/test`]: (init) =>
+      endedRequest('test', 'failed', {
+        package: packageOf(init),
+        packageTests: [
+          {
+            name: 'dueDate is the last day of the month 30 days after a month end',
+            outcome: 'passed',
+            message: null,
+            durationMs: 4,
+          },
+          {
+            name: 'dueDate is the last day of the month 30 days after a leap year',
+            outcome: 'passed',
+            message: null,
+            durationMs: 1,
+          },
+          {
+            name: 'dueDate is the last day of the month 30 days after a year that is not a leap year',
+            outcome: 'passed',
+            message: null,
+            durationMs: 1,
+          },
+          {
+            name: 'dueDate is the last day of the month 30 days after an offset that moves the UTC day',
+            outcome: 'failed',
+            message: "AssertionError: Expected '2026-02-28', got '2026-01-31'.",
+            durationMs: 2,
+          },
+        ],
+        output: [
+          'Building payment-terms 1.0.0 (Node.js) in the tenant sandbox',
+          'Running tests: node --test',
+          '3 passed, 1 failed in 0.3 s',
+        ],
+      }),
+    [`${folderPath}/run`]: (init) =>
+      endedRequest('run', 'succeeded', {
+        package: packageOf(init),
+        run: {
+          operation: 'dueDate',
+          outcome: 'succeeded',
+          output: { dueDate: '2026-04-30' },
+          error: null,
+          durationMs: 38,
+          cpuSeconds: 0.04,
+        },
+        output: [
+          'Building payment-terms 1.0.0 (Node.js) in the tenant sandbox',
+          'Calling dueDate',
+          'Answered in 38 ms',
+        ],
+      }),
+    ...Object.fromEntries(
+      packages.flatMap((id) => [
+        [
+          `${folderPath}/packages/${id}/run-inputs`,
+          (init?: RequestInit) =>
+            init?.method === 'PUT'
+              ? { version: 'run-inputs-2' }
+              : ({
+                  items:
+                    id === 'payment-terms'
+                      ? [
+                          { name: 'Month end', operation: 'dueDate', input: { from: '2026-03-31T10:00:00Z' } },
+                          { name: 'Leap year', operation: 'dueDate', input: { from: '2028-01-30T00:00:00Z' } },
+                        ]
+                      : [],
+                  version: id === 'payment-terms' ? 'run-inputs-1' : null,
+                } satisfies { items: StudioPackageRunInput[]; version: string | null }),
+        ],
+        [`${folderPath}/packages/${id}/move`, () => ({ diagnostics: [] })],
       ]),
     ),
   }

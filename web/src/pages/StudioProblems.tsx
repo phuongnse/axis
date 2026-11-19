@@ -1,4 +1,5 @@
 import { Flex, Tag } from 'antd'
+import { AxisButton } from '../platform/AxisButton'
 import { EmptyState } from '../platform/EmptyState'
 import { SidePanel } from '../platform/SidePanel'
 import type { StudioDiagnostic, StudioResourceItem } from '../platform/studio'
@@ -53,10 +54,16 @@ export function StudioProblemList({
   diagnostics,
   resources,
   onSelect,
+  onOpenFile,
 }: {
   diagnostics: StudioDiagnostic[]
   resources?: readonly StudioResourceItem[]
   onSelect?: (resourceId: string, path: string) => void
+  /**
+   * Proposed, see #3978: opens the file of a problem that names no resource, such as a package's file, at its line.
+   * Its file is then a link named by `fileName`, with its line in parentheses.
+   */
+  onOpenFile?: { name: (diagnostic: StudioDiagnostic) => string; open: (diagnostic: StudioDiagnostic) => void }
 }) {
   const ordered = [
     ...diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
@@ -66,7 +73,7 @@ export function StudioProblemList({
     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
       {ordered.map((diagnostic, index) => (
         <li key={index}>
-          <DiagnosticRow diagnostic={diagnostic} resources={resources} onSelect={onSelect} />
+          <DiagnosticRow diagnostic={diagnostic} resources={resources} onSelect={onSelect} onOpenFile={onOpenFile} />
         </li>
       ))}
     </ul>
@@ -78,11 +85,14 @@ function DiagnosticRow({
   diagnostic,
   resources,
   onSelect,
+  onOpenFile,
 }: {
   diagnostic: StudioDiagnostic
   resources?: readonly StudioResourceItem[]
   onSelect?: (resourceId: string, path: string) => void
+  onOpenFile?: { name: (diagnostic: StudioDiagnostic) => string; open: (diagnostic: StudioDiagnostic) => void }
 }) {
+  const t = useText()
   const resourceId = diagnostic.resourceId
   const resource = resourceId === null ? undefined : resources?.find((item) => item.id === resourceId)
   return (
@@ -93,11 +103,25 @@ function DiagnosticRow({
           <Tag color={diagnostic.severity === 'error' ? 'error' : 'warning'}>{diagnostic.severity}</Tag>
           <strong>{diagnostic.code}</strong> {diagnostic.message}
         </span>
-        <ResourceReference
-          resource={resource}
-          file={diagnostic.file}
-          onOpen={resourceId !== null && onSelect ? () => onSelect(resourceId, diagnostic.path) : undefined}
-        />
+        {resourceId === null && onOpenFile ? (
+          <AxisButton
+            role="link"
+            onClick={() => onOpenFile.open(diagnostic)}
+            style={{ height: 'auto', whiteSpace: 'normal', textAlign: 'start' }}
+          >
+            {diagnostic.line === undefined
+              ? onOpenFile.name(diagnostic)
+              : t('shell.studio.package.problemAt')
+                  .replace('{file}', onOpenFile.name(diagnostic))
+                  .replace('{line}', String(diagnostic.line))}
+          </AxisButton>
+        ) : (
+          <ResourceReference
+            resource={resource}
+            file={diagnostic.file}
+            onOpen={resourceId !== null && onSelect ? () => onSelect(resourceId, diagnostic.path) : undefined}
+          />
+        )}
       </Flex>
     </div>
   )

@@ -349,10 +349,30 @@ export const previews: Record<string, readonly PreviewState[]> = {
       caption: 'Package',
       fixtures: studioFixtures.typical,
       entry: `/studio?app=${application}&view=packages&package=payment-terms&file=index.ts`,
-      // Proposed: a package's code editor fills the window down to the footer, so its frame is as tall as a window, see #3978.
+      // Proposed: a package's workspace fills the window down to the footer, so its frame is as tall as a window, see #3978.
       frameHeight: 900,
     },
-  ].map((state) => ({ frameHeight: 640, ...state, draw: () => <ShellPreview /> })),
+    // Proposed: the package after Build, Run tests and Run, each with its tab of the output panel, see #3978.
+    ...(
+      [
+        ['Package after a build', 'package-build'],
+        ['Package after its tests', 'package-test'],
+        ['Package after a run', 'package-open-run', 'package-run-send'],
+      ] as const
+    ).map(([caption, ...testIds]) => ({
+      caption,
+      fixtures: studioFixtures.typical,
+      entry: `/studio?app=${application}&view=packages&package=payment-terms&file=index.ts`,
+      frameHeight: 900,
+      draw: () =>
+        testIds.reduceRight<ReactNode>(
+          (inner, testId) => (
+            <ClickOnMount selector={`[data-testid="${testId}"]:not([disabled])`}>{inner}</ClickOnMount>
+          ),
+          <ShellPreview />,
+        ),
+    })),
+  ].map((state) => ({ frameHeight: 640, draw: () => <ShellPreview />, ...state })),
   studioPageDesign: studioDesignerStates(typicalPageId),
   studioFormDesign: studioDesignerStates(typicalFormId),
   studioProcessDesign: studioDesignerStates(typicalProcessId),

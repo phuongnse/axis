@@ -337,6 +337,9 @@ export interface StudioDiagnostic {
   file: string
   path: string
   resourceId: string | null
+  /** Proposed, see #3978: the line and column, from 1, of a problem in a package's file, as its build reports them. */
+  line?: number
+  column?: number
   /**
    * Only an accept's `AXC0377` carries these: the author name and the time of the newest revision that changed the
    * resource or file. Both are `null` when none is found, see docs/reference/authoring-requests.md#accepting.
@@ -1269,7 +1272,7 @@ export interface StudioSkippedScenarioResult {
 export interface StudioRequest {
   id: string
   application: string
-  kind: 'validate' | 'publish' | 'activate' | 'test' | 'accept'
+  kind: 'validate' | 'publish' | 'activate' | 'test' | 'accept' | 'build' | 'run'
   target: 'tenant' | 'preview'
   status: StudioRequestStatus
   label: string | null
@@ -1277,6 +1280,14 @@ export interface StudioRequest {
   releaseId: string | null
   diagnostics: StudioDiagnostic[]
   scenarios: (StudioScenarioResult | StudioSkippedScenarioResult)[] | null
+  /** Proposed, see #3978: the package a `build`, `test` or `run` request works on, or `null`. */
+  package?: string | null
+  /** Proposed, see #3978: each test's outcome of a package's `test`, `null` until it ends. `package_tests` holds them. */
+  packageTests?: StudioPackageTestOutcome[] | null
+  /** Proposed, see #3978: the lines a package's `build`, `test` or `run` wrote, as the package host gave them. */
+  output?: string[] | null
+  /** Proposed, see #3978: what a package's `run` answered, `null` until it ends. */
+  run?: StudioPackageRun | null
 }
 
 /**
@@ -2332,4 +2343,152 @@ export async function deleteStudioPackageFile(
   }
   const body = (await response.json()) as { diagnostics: StudioDiagnostic[] }
   return { status: 'deleted', diagnostics: body.diagnostics }
+}
+
+/** Proposed, see #3978: one test of a package's `test`, as the package host reports it. */
+export interface StudioPackageTestOutcome {
+  name: string
+  outcome: 'passed' | 'failed'
+  /** The last line of a failed test's traceback, else `null`. */
+  message: string | null
+  /** How long the test took, in milliseconds. */
+  durationMs?: number
+}
+
+/** Proposed, see #3978: what one run of a package's operation answered. */
+export interface StudioPackageRun {
+  operation: string
+  outcome: 'succeeded' | 'failed'
+  /** The operation's output fields, `null` for a failed run. */
+  output: Record<string, unknown> | null
+  /** Why a failed run failed, `null` for a run that succeeded. */
+  error: { code: string; message: string } | null
+  durationMs: number
+  /** The CPU seconds the run counted against the tenant's package run time a day. */
+  cpuSeconds: number
+}
+
+/** Proposed, see #3978: a named input for an operation of a package, kept with the application and shared by its developers. */
+export interface StudioPackageRunInput {
+  name: string
+  operation: string
+  input: Record<string, unknown>
+}
+
+async function postPackageRequest(application: string, route: string, body: unknown): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/${route}`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    throw new QuotaRefusedError(title)
+  }
+  if (!response.ok) {
+    throw new Error(`Posting '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
+}
+
+/**
+ * Proposed, see #3978: sends a `build` request for one package of the working folder, which the publisher sends to the
+ * package host in the tenant's sandbox as a publish does, with no release. It answers at once with the queued request,
+ * which ends with the build's problems as diagnostics, each at its file, line and column, and its output lines.
+ */
+export function buildStudioPackage(application: string, packageId: string): Promise<StudioRequest> {
+  return postPackageRequest(application, 'build', { package: packageId })
+}
+
+/**
+ * Proposed, see #3978: sends a `test` request for one package, as the MCP server's `test_package` does, see
+ * docs/reference/authoring.md#test. It ends with each test's outcome in `packageTests`.
+ */
+export function testStudioPackage(application: string, packageId: string): Promise<StudioRequest> {
+  return postPackageRequest(application, 'test', { package: packageId })
+}
+
+/**
+ * Proposed, see #3978: sends a `run` request that builds the package's working files and calls one operation with
+ * `input`, in the tenant's sandbox, with the folder's bindings for its capabilities. It counts in the tenant's package
+ * run time a day, and ends with `run`.
+ */
+export function runStudioPackage(
+  application: string,
+  packageId: string,
+  operation: string,
+  input: Record<string, unknown>,
+): Promise<StudioRequest> {
+  return postPackageRequest(application, 'run', { package: packageId, operation, input })
+}
+
+/** Proposed, see #3978: the named inputs of a package's operations, with their version for the next save. */
+export async function fetchStudioPackageRunInputs(
+  application: string,
+  packageId: string,
+  signal?: AbortSignal,
+): Promise<{ items: StudioPackageRunInput[]; version: string | null }> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/packages/${encodeURIComponent(packageId)}/run-inputs`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as { items: StudioPackageRunInput[]; version: string | null }
+}
+
+/**
+ * Proposed, see #3978: replaces the named inputs of a package's operations, kept with the application outside the
+ * package's folder, so a build never holds them. Each save is a revision. A 409 means someone saved them since.
+ */
+export async function saveStudioPackageRunInputs(
+  application: string,
+  packageId: string,
+  items: readonly StudioPackageRunInput[],
+  version: string | null,
+): Promise<{ status: 'saved'; version: string } | { status: 'conflict' }> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/packages/${encodeURIComponent(packageId)}/run-inputs`
+  const response = await studioFetch(path, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(version === null ? { 'If-None-Match': '*' } : { 'If-Match': `"${version}"` }),
+    },
+    body: JSON.stringify({ items }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  if (!response.ok) {
+    throw new Error(`Saving '${path}' failed with status ${response.status}.`)
+  }
+  return { status: 'saved', version: ((await response.json()) as { version: string }).version }
+}
+
+/**
+ * Proposed, see #3978: moves or renames package files, each from `from` at its `version` to `to`, as one revision, so
+ * one Undo puts them all back. Renaming a folder moves each of its files. A 409 means a file changed since or a `to`
+ * exists, and a 400 names a path the server refuses. Nothing moves for either.
+ */
+export async function moveStudioPackageFiles(
+  application: string,
+  packageId: string,
+  moves: readonly { from: string; to: string; version: string }[],
+): Promise<{ status: 'moved'; diagnostics: StudioDiagnostic[] } | { status: 'conflict' } | { status: 'invalid' }> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/packages/${encodeURIComponent(packageId)}/move`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ moves }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  if (response.status === 400) {
+    return { status: 'invalid' }
+  }
+  if (!response.ok) {
+    throw new Error(`Moving files in '${path}' failed with status ${response.status}.`)
+  }
+  return { status: 'moved', diagnostics: ((await response.json()) as { diagnostics: StudioDiagnostic[] }).diagnostics }
 }

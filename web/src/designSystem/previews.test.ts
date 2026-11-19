@@ -174,6 +174,9 @@ describe('design-system previews', () => {
       'Revision',
       'Release page',
       'Package',
+      'Package after a build',
+      'Package after its tests',
+      'Package after a run',
     ])
     expect(states.map(({ caption }) => stateSlug(caption))).toEqual([
       'typical',
@@ -193,6 +196,9 @@ describe('design-system previews', () => {
       'revision',
       'release-page',
       'package',
+      'package-after-a-build',
+      'package-after-its-tests',
+      'package-after-a-run',
     ])
     for (const { frameHeight, fixtures } of states) {
       expect(frameHeight).toBeGreaterThan(0)

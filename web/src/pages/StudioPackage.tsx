@@ -1,43 +1,59 @@
 import { DownOutlined, UpOutlined } from '@ant-design/icons'
-import { Flex, Modal, Tabs, Tree, Typography, type TreeDataNode } from 'antd'
-import { useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { linter, type Diagnostic as EditorDiagnostic } from '@codemirror/lint'
+import type { Extension } from '@codemirror/state'
+import { Breadcrumb, Flex, Modal, Select, Tabs, Typography } from 'antd'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { CodeBlock } from '../platform/CodeBlock'
 import { EmptyState } from '../platform/EmptyState'
-import { nameCompare } from '../platform/listOrder'
 import { QuotaRefusedError } from '../platform/quota'
 import { ReasonDialog } from '../platform/ReasonDialog'
 import { ResizeHandle } from '../platform/ResizeHandle'
 import { navigationWidth } from '../platform/ShellNavigation'
+import { StatusTag } from '../platform/StatusTag'
 import {
+  buildStudioPackage,
   createStudioPackageFile,
   deleteStudioPackageFile,
   fetchStudioLiveDiff,
   fetchStudioPackageFile,
+  fetchStudioRequest,
+  moveStudioPackageFiles,
   packageManifestFile as manifestFile,
+  runStudioPackage,
   saveStudioPackageFile,
+  ServerUnreachableError,
+  testStudioPackage,
   type StudioDiagnostic,
   type StudioPackageFile,
   type StudioPackageFileItem,
+  type StudioPackageTestOutcome,
+  type StudioRequest,
 } from '../platform/studio'
 import { studioPackageAddress } from '../platform/studioAddress'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useFollowJob } from '../platform/useFollowJob'
 import CodeEditor, { type CodeEditorHandle } from './CodeEditor'
 import { codeLanguage } from './codeLanguage'
 import { PlatformContext } from './context'
+import { jsonViewHeight } from './jsonViewHeight'
+import { PackageExplorer, type ExplorerTarget } from './PackageExplorer'
+import { PackageRun, type PackageOperation } from './PackageRun'
 import { SaveBar } from './SaveBar'
 import { StudioPageHeading } from './StudioPageHeading'
 import { StudioProblemList } from './StudioProblems'
-import { StudioResourceMenu } from './StudioResourceMenu'
 
-/** What the heading reads from a package's manifest. */
+/** What the workspace reads from a package's manifest. */
 interface PackageManifest {
   label?: string
   version?: string
   language?: string
   adapter?: string
+  operations?: PackageOperation[]
 }
 
 function readManifest(content: string | undefined): PackageManifest {
@@ -61,48 +77,39 @@ interface OpenFile {
 /** Whether the package differs from the live release, read from the live diff. */
 type PackageStatus = { release: number; changed: boolean } | 'unpublished' | undefined
 
-/**
- * The files as a tree of folders, each folder before the files beside it and each group sorted by name, see
- * docs/reference/actions-and-controls.md#list-order. A folder's key is its path with a trailing slash.
- */
-function fileTree(paths: readonly string[], locale: string): TreeDataNode[] {
-  interface Folder {
-    folders: Map<string, Folder>
-    files: string[]
-  }
-  const root: Folder = { folders: new Map(), files: [] }
-  for (const path of paths) {
-    const parts = path.split('/')
-    let folder = root
-    for (const part of parts.slice(0, -1)) {
-      const next = folder.folders.get(part) ?? { folders: new Map(), files: [] }
-      folder.folders.set(part, next)
-      folder = next
-    }
-    folder.files.push(path)
-  }
-  const compare = nameCompare(locale)
-  const nodes = (folder: Folder, prefix: string): TreeDataNode[] => [
-    ...[...folder.folders.entries()]
-      .sort(([left], [right]) => compare(left, right))
-      .map(([name, child]) => ({ key: `${prefix}${name}/`, title: name, children: nodes(child, `${prefix}${name}/`) })),
-    ...folder.files
-      .map((path) => ({ path, name: path.slice(prefix.length) }))
-      .sort((left, right) => compare(left.name, right.name))
-      .map(({ path, name }) => ({ key: path, title: name, isLeaf: true })),
-  ]
-  return nodes(root, '')
-}
+/** A tool of the workspace that runs on the server, and the request that runs it. */
+type Job = 'build' | 'test' | 'run'
+
+/** The dialog that is open, if any. */
+type Dialog =
+  | { kind: 'newFile'; folder: string }
+  | { kind: 'newFolder'; folder: string }
+  | { kind: 'rename'; target: ExplorerTarget }
+  | { kind: 'delete'; target: ExplorerTarget }
+  | { kind: 'close'; path: string }
+  | { kind: 'quickOpen' }
+  | null
 
 const panelLeast = 120
-const panelFirst = 200
+const panelFirst = 240
+const panelTabs = ['problems', 'output', 'tests', 'run'] as const
+type PanelTab = (typeof panelTabs)[number]
+
+/** The name of a file or folder: its last segment. */
+function nameOf(path: string): string {
+  const trimmed = path.endsWith('/') ? path.slice(0, -1) : path
+  return trimmed.slice(trimmed.lastIndexOf('/') + 1)
+}
 
 /**
- * Proposed: an open package as a place to work, see #3978 and docs/reference/studio-packages.md#a-packages-files. Its
- * files are a tree of folders beside the code editor of the open one, and every file the author opens keeps its own
- * editor and steps, so several can change before one save writes them all. The output panel under the editor holds the
- * package's problems, its tests and the output of its build. Without the developer role the editor is read-only and no
- * save bar, New file… or Delete file… shows.
+ * Proposed: an open package as a place to write, build, test and run it, as a code editor's workspace, see #3978 and
+ * docs/reference/studio-packages.md#a-packages-files. The workspace is one frame that fills the window down to the
+ * footer: the explorer of files and folders on the left, the open files as tabs with the open file's path above its
+ * editor and a status line of the cursor's place, its language and what is unsaved below it, and the output panel under
+ * the editor, whose height a handle sets, with Problems, Output, Tests and Run. The heading's Build, Run tests and Run…
+ * send their request to the package host in the tenant's sandbox, and each opens its tab. Ctrl+S saves every changed
+ * file, Ctrl+P opens a file by its name and Ctrl+Shift+B builds. Without the developer role the files are read-only and
+ * no save bar, write or run shows.
  */
 export default function StudioPackage({
   application,
@@ -120,7 +127,7 @@ export default function StudioPackage({
   file: string | null
   /** The package's files. */
   files: readonly StudioPackageFileItem[]
-  /** The folder's diagnostics, of which the package's show in the output panel. */
+  /** The folder's diagnostics, of which the package's show in the Problems tab. */
   diagnostics: readonly StudioDiagnostic[]
   developer: boolean
   /** Studio is reconnecting, so nothing is saved. */
@@ -130,44 +137,93 @@ export default function StudioPackage({
 }) {
   const t = useText()
   const navigate = useNavigate()
-  const { colour, spacing } = useDesignTokens()
+  const { colour, radius, spacing, type } = useDesignTokens()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const [open, setOpen] = useState<Record<string, OpenFile>>({})
+  const [tabs, setTabs] = useState<string[]>([])
   const [failed, setFailed] = useState<Record<string, true>>({})
   const [steps, setSteps] = useState<Record<string, { undo: number; redo: number }>>({})
+  const [cursor, setCursor] = useState<{ line: number; column: number }>({ line: 1, column: 1 })
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [writeError, setWriteError] = useState<string | null>(null)
   const [status, setStatus] = useState<PackageStatus>()
-  const [newFileOpen, setNewFileOpen] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState(false)
+  const [emptyFolders, setEmptyFolders] = useState<string[]>([])
+  const [dialog, setDialog] = useState<Dialog>(null)
   const [panelOpen, setPanelOpen] = useState(true)
   const [panelHeight, setPanelHeight] = useState(panelFirst)
-  const [panelTab, setPanelTab] = useState('problems')
-  const root = useRef<HTMLDivElement>(null)
+  const [panelTab, setPanelTab] = useState<PanelTab>('problems')
+  const [requests, setRequests] = useState<Partial<Record<Job, StudioRequest>>>({})
+  const [lastJob, setLastJob] = useState<Job | null>(null)
+  const [jobError, setJobError] = useState<string | null>(null)
+  const [frameHeight, setFrameHeight] = useState(480)
+  const frame = useRef<HTMLDivElement>(null)
   const panel = useRef<HTMLElement>(null)
   const editors = useRef(new Map<string, CodeEditorHandle | null>())
+  const pendingGoTo = useRef<{ path: string; line: number; column?: number } | null>(null)
 
   const paths = useMemo(() => files.map((item) => item.path), [files])
-  const tree = useMemo(() => fileTree(paths, locale), [paths, locale])
   const manifest = readManifest(open[manifestFile]?.text)
   const file =
     requestedFile ??
     (manifest.adapter !== undefined && paths.includes(manifest.adapter) ? manifest.adapter : manifestFile)
   const known = paths.includes(file)
   const packagePrefix = `packages/${packageId}/`
-  const problems = diagnostics.filter((diagnostic) => diagnostic.file.startsWith(packagePrefix))
+  const buildProblems = requests.build?.status === 'running' ? [] : (requests.build?.diagnostics ?? [])
+  const problems = [
+    ...diagnostics.filter((diagnostic) => diagnostic.file.startsWith(packagePrefix)),
+    ...buildProblems.filter(
+      (built) =>
+        !diagnostics.some(
+          (diagnostic) =>
+            diagnostic.code === built.code && diagnostic.file === built.file && diagnostic.message === built.message,
+        ),
+    ),
+  ]
   const dirty = Object.entries(open)
     .filter(([, entry]) => entry.text !== entry.loaded.content)
     .map(([path]) => path)
   const conflicts = Object.entries(open)
     .filter(([, entry]) => entry.conflict)
     .map(([path]) => path)
+  // A problem at a line of a file marks that line in the file's editor, as a code editor's checks do.
+  const problemKey = JSON.stringify(problems.filter((problem) => problem.line !== undefined))
+  const checks = useMemo(() => {
+    const placed = (JSON.parse(problemKey) as StudioDiagnostic[]).filter((problem) => problem.line !== undefined)
+    const byFile = new Map<string, Extension>()
+    for (const path of new Set(placed.map((problem) => problem.file.slice(packagePrefix.length)))) {
+      const own = placed.filter((problem) => problem.file === `${packagePrefix}${path}`)
+      byFile.set(
+        path,
+        linter(
+          (view): EditorDiagnostic[] =>
+            own.map((problem) => {
+              const line = view.state.doc.line(Math.min(Math.max(problem.line!, 1), view.state.doc.lines))
+              const from = Math.min(line.from + Math.max((problem.column ?? 1) - 1, 0), line.to)
+              return {
+                from,
+                to: Math.max(from, line.to),
+                severity: problem.severity,
+                message: `${problem.code}: ${problem.message}`,
+              }
+            }),
+          { delay: 0 },
+        ),
+      )
+    }
+    return byFile
+  }, [problemKey, packagePrefix])
 
-  // The manifest is open from the start, as the heading reads it, and every file opens once, when it is first shown.
-  const wanted = [...new Set([manifestFile, file])].filter((path) => paths.includes(path))
+  // The open file joins the tabs, after the tab that was open, and a folder that now holds a file is kept by the file.
+  const openTabs = known && !tabs.includes(file) ? [...tabs, file] : tabs
+  const shownEmptyFolders = emptyFolders.filter((folder) => !paths.some((path) => path.startsWith(folder)))
+  const running = (job: Job) => {
+    const request = requests[job]
+    return request !== undefined && (request.status === 'queued' || request.status === 'running')
+  }
+
+  // The manifest is open from the start, as the heading reads it, and every tab's file loads once, when it opens.
+  const wanted = [...new Set([manifestFile, ...openTabs])].filter((path) => paths.includes(path))
   const missing = wanted.filter((path) => open[path] === undefined && failed[path] === undefined).join('\n')
   useEffect(() => {
     if (missing === '') {
@@ -209,14 +265,52 @@ export default function StudioPackage({
     return () => controller.abort()
   }, [application, packagePrefix, files])
 
+  // The frame fills the window down to the footer, as the code editor of a resource does.
+  const fit = useCallback(() => {
+    const element = frame.current
+    if (!element) {
+      return
+    }
+    const content = element.closest('main')
+    const next = jsonViewHeight({
+      windowHeight: window.innerHeight,
+      top: element.getBoundingClientRect().top + window.scrollY,
+      footerHeight: document.querySelector('[role=contentinfo]')?.getBoundingClientRect().height ?? 0,
+      below: content ? parseFloat(getComputedStyle(content).paddingBottom) || 0 : 0,
+      gap: spacing.md,
+    })
+    setFrameHeight((current) => (current === next ? current : Math.max(next, 420)))
+  }, [spacing.md])
+  useLayoutEffect(fit)
+  useEffect(() => {
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [fit])
+
+  // A problem chosen in another file opens that file, then moves its editor to the problem once the editor is there.
+  const loadedFile = open[file] !== undefined
+  useEffect(() => {
+    const pending = pendingGoTo.current
+    const handle = editors.current.get(file)
+    if (pending !== null && pending.path === file && loadedFile && handle) {
+      handle.goTo(pending.line, pending.column)
+      pendingGoTo.current = null
+    }
+  }, [file, loadedFile])
+
+  // Opening a file keeps the tab that was open and adds the file's own.
+  const openFile = (path: string) => {
+    setTabs(openTabs.includes(path) ? openTabs : [...openTabs, path])
+    navigate(studioPackageAddress(application, packageId, path))
+  }
+
   function edit(path: string, text: string) {
     setOpen((current) => ({ ...current, [path]: { ...current[path], text } }))
-    setSaved(false)
   }
 
   /** Puts each file back as loaded, or as the server now holds it, with a new editor so no step undoes into the change. */
-  async function putBack(paths: readonly string[], reload: boolean) {
-    for (const path of paths) {
+  async function putBack(list: readonly string[], reload: boolean) {
+    for (const path of list) {
       const loaded = reload ? await loadFile(application, packageId, path) : open[path].loaded
       setOpen((current) => ({
         ...current,
@@ -227,6 +321,9 @@ export default function StudioPackage({
   }
 
   async function saveAll() {
+    if (!developer || saving || dirty.length === 0) {
+      return
+    }
     setSaving(true)
     setSaveError(null)
     let answered: StudioDiagnostic[] | null = null
@@ -251,7 +348,6 @@ export default function StudioPackage({
         }))
       }
       if (answered !== null) {
-        setSaved(true)
         onChanged(answered)
       }
     } catch (error) {
@@ -261,27 +357,147 @@ export default function StudioPackage({
     }
   }
 
-  async function deleteFile() {
-    const entry = open[file]
-    if (!entry) {
-      return
+  /** Closes a tab, and opens the tab beside it when it was the open one. */
+  function closeTab(path: string) {
+    const index = openTabs.indexOf(path)
+    const rest = openTabs.filter((tab) => tab !== path)
+    setTabs(rest)
+    if (dirty.includes(path)) {
+      void putBack([path], false)
     }
-    setDeleting(true)
-    setDeleteError(false)
-    try {
-      const result = await deleteStudioPackageFile(application, packageId, file, entry.loaded.version)
+    if (path === file) {
+      const next = rest[Math.min(index, rest.length - 1)]
+      navigate(studioPackageAddress(application, packageId, next ?? manifestFile))
+    }
+  }
+
+  /** The files a target names: the file, or every file in the folder. */
+  const filesOf = (target: ExplorerTarget) =>
+    target.kind === 'file' ? [target.path] : paths.filter((path) => path.startsWith(target.path))
+
+  async function versionsOf(list: readonly string[]): Promise<Record<string, string>> {
+    const entries = await Promise.all(
+      list.map(async (path) => [
+        path,
+        open[path]?.loaded.version ?? (await loadFile(application, packageId, path)).version,
+      ]),
+    )
+    return Object.fromEntries(entries)
+  }
+
+  /** Moves a file or folder to `to`, a file's path or a folder's path with a trailing slash, as one revision. */
+  async function move(target: ExplorerTarget, to: string): Promise<boolean> {
+    setWriteError(null)
+    const list = filesOf(target)
+    if (list.length === 0) {
+      // A folder that holds no file yet is only in the explorer.
+      setEmptyFolders((current) => [...current.filter((folder) => folder !== target.path), to])
+      return true
+    }
+    const versions = await versionsOf(list)
+    const moves = list.map((path) => ({
+      from: path,
+      to: target.kind === 'file' ? to : `${to}${path.slice(target.path.length)}`,
+      version: versions[path],
+    }))
+    const result = await moveStudioPackageFiles(application, packageId, moves)
+    if (result.status !== 'moved') {
+      setWriteError(
+        t(result.status === 'conflict' ? 'shell.studio.package.moveConflict' : 'shell.studio.package.moveRefused'),
+      )
+      return false
+    }
+    const renamed = new Map(moves.map((entry) => [entry.from, entry.to]))
+    setTabs(openTabs.map((tab) => renamed.get(tab) ?? tab))
+    setOpen((current) =>
+      Object.fromEntries(Object.entries(current).map(([path, entry]) => [renamed.get(path) ?? path, entry])),
+    )
+    onChanged(result.diagnostics)
+    const moved = renamed.get(file)
+    if (moved !== undefined) {
+      openFile(moved)
+    }
+    return true
+  }
+
+  async function remove(target: ExplorerTarget): Promise<boolean> {
+    setWriteError(null)
+    const list = filesOf(target)
+    if (list.length === 0) {
+      setEmptyFolders((current) => current.filter((folder) => !folder.startsWith(target.path)))
+      return true
+    }
+    const versions = await versionsOf(list)
+    let answered: StudioDiagnostic[] | null = null
+    for (const path of list) {
+      const result = await deleteStudioPackageFile(application, packageId, path, versions[path])
       if (result.status === 'conflict') {
-        setOpen((current) => ({ ...current, [file]: { ...current[file], conflict: true } }))
-      } else {
-        setOpen((current) => Object.fromEntries(Object.entries(current).filter(([path]) => path !== file)))
-        onChanged(result.diagnostics)
-        navigate(studioPackageAddress(application, packageId))
+        setWriteError(t('shell.studio.package.moveConflict'))
+        break
       }
-      setDeleteOpen(false)
-    } catch {
-      setDeleteError(true)
-    } finally {
-      setDeleting(false)
+      answered = result.diagnostics
+    }
+    setTabs(openTabs.filter((tab) => !list.includes(tab)))
+    setOpen((current) => Object.fromEntries(Object.entries(current).filter(([path]) => !list.includes(path))))
+    if (answered !== null) {
+      onChanged(answered)
+    }
+    if (list.includes(file)) {
+      navigate(studioPackageAddress(application, packageId))
+    }
+    return true
+  }
+
+  // A request of the workspace is followed until it ends, as a publish is.
+  const followed = (Object.entries(requests) as [Job, StudioRequest][]).find(
+    ([, request]) => request.status === 'queued' || request.status === 'running',
+  )
+  useFollowJob(followed ? `${application}/${followed[1].id}` : null, {
+    read: (signal) => fetchStudioRequest(application, followed![1].id, signal),
+    ends: (next) => next.status !== 'queued' && next.status !== 'running',
+    interval: 1000,
+    waitFirst: true,
+    onAnswer: (next) => setRequests((current) => ({ ...current, [followed![0]]: next })),
+    onEnd: (next) => setRequests((current) => ({ ...current, [followed![0]]: next })),
+    onError: (error) => {
+      if (!(error instanceof ServerUnreachableError)) {
+        setJobError(t('shell.studio.package.jobFailed'))
+      }
+      setRequests((current) => {
+        const rest = { ...current }
+        delete rest[followed![0]]
+        return rest
+      })
+      return 'stop'
+    },
+  })
+
+  async function start(job: Job, send: () => Promise<StudioRequest>) {
+    setJobError(null)
+    setLastJob(job)
+    setPanelOpen(true)
+    setPanelTab(job === 'build' ? 'output' : job === 'test' ? 'tests' : 'run')
+    try {
+      const request = await send()
+      setRequests((current) => ({ ...current, [job]: request }))
+    } catch (error) {
+      setJobError(error instanceof QuotaRefusedError ? error.message : t('shell.studio.package.jobFailed'))
+    }
+  }
+  const build = () => void start('build', () => buildStudioPackage(application, packageId))
+  const runTests = () => void start('test', () => testStudioPackage(application, packageId))
+
+  function onKeyDown(event: React.KeyboardEvent) {
+    const mod = event.ctrlKey || event.metaKey
+    if (mod && event.key.toLowerCase() === 's') {
+      event.preventDefault()
+      void saveAll()
+    } else if (mod && event.key.toLowerCase() === 'p') {
+      event.preventDefault()
+      setDialog({ kind: 'quickOpen' })
+    } else if (mod && event.shiftKey && event.key.toLowerCase() === 'b' && developer && !running('build')) {
+      event.preventDefault()
+      build()
     }
   }
 
@@ -302,21 +518,84 @@ export default function StudioPackage({
           ),
   ].filter((line): line is string => line !== null)
 
-  const current = open[file]
   const activeSteps = steps[file] ?? { undo: 0, redo: 0 }
-  const panelMax = Math.max(panelLeast, Math.floor(window.innerHeight / 2))
+  const panelMax = Math.max(panelLeast, frameHeight - 160)
+  const lastRequest = lastJob === null ? undefined : requests[lastJob]
+  const tests = requests.test?.packageTests ?? null
+  const failedTests = tests?.filter((test) => test.outcome === 'failed').length ?? 0
+  const testColumns: AxisColumn<StudioPackageTestOutcome>[] = [
+    {
+      key: 'outcome',
+      kind: 'fixed',
+      title: t('shell.studio.package.tests.outcome'),
+      render: (_value, test) => (
+        <StatusTag tone={test.outcome === 'passed' ? 'success' : 'danger'}>
+          {t(`shell.studio.package.tests.${test.outcome}`)}
+        </StatusTag>
+      ),
+    },
+    { key: 'name', kind: 'freeText', title: t('shell.studio.package.tests.name'), dataIndex: 'name' },
+    {
+      key: 'duration',
+      kind: 'fixed',
+      align: 'right',
+      title: t('shell.studio.package.tests.duration'),
+      render: (_value, test) =>
+        test.durationMs === undefined
+          ? null
+          : t('shell.studio.package.run.milliseconds').replace('{count}', String(test.durationMs)),
+    },
+    { key: 'message', kind: 'freeText', title: t('shell.studio.package.tests.message'), dataIndex: 'message' },
+  ]
+  const fileName = (diagnostic: StudioDiagnostic) => diagnostic.file.slice(packagePrefix.length)
+  const goToProblem = (diagnostic: StudioDiagnostic) => {
+    const path = fileName(diagnostic)
+    if (diagnostic.line !== undefined) {
+      pendingGoTo.current = { path, line: diagnostic.line, column: diagnostic.column }
+    }
+    openFile(path)
+  }
+  // A problem in a file marks its line in the editor, as a code editor's checks do.
+  const segments = file.split('/')
 
   return (
-    <Flex ref={root} vertical gap="middle" data-testid="studio-package">
+    <Flex vertical gap="middle" data-testid="studio-package" onKeyDown={onKeyDown}>
       <StudioPageHeading
         title={manifest.label ?? packageId}
         line={lines}
         actions={
-          developer && (
-            <AxisButton role="secondary" onClick={() => setNewFileOpen(true)}>
-              {t('shell.studio.package.newFile')}
+          <Flex gap="small" wrap>
+            <AxisButton
+              role="secondary"
+              data-testid="package-build"
+              aria-keyshortcuts="Control+Shift+B"
+              disabled={!developer || busy}
+              loading={running('build')}
+              onClick={build}
+            >
+              {t('shell.studio.package.build')}
             </AxisButton>
-          )
+            <AxisButton
+              role="secondary"
+              data-testid="package-test"
+              disabled={!developer || busy}
+              loading={running('test')}
+              onClick={runTests}
+            >
+              {t('shell.studio.package.runTests')}
+            </AxisButton>
+            <AxisButton
+              role="secondary"
+              data-testid="package-open-run"
+              disabled={!developer || busy}
+              onClick={() => {
+                setPanelOpen(true)
+                setPanelTab('run')
+              }}
+            >
+              {t('shell.studio.package.runOperation')}
+            </AxisButton>
+          </Flex>
         }
       />
       {!developer && (
@@ -335,144 +614,294 @@ export default function StudioPackage({
           }
         />
       ))}
-      {saveError !== null && <AxisAlert data-testid="studio-save-error" kind="error" message={saveError} />}
-      <Flex gap="middle" align="start">
-        <nav aria-label={t('shell.studio.package.files')} style={{ width: navigationWidth, flex: 'none' }}>
-          <Tree
-            treeData={tree}
-            defaultExpandAll
-            blockNode
-            selectedKeys={[file]}
-            titleRender={(node) =>
-              node.isLeaf ? (
-                <Flex component="span" align="center" gap={spacing.xs} style={{ display: 'inline-flex' }}>
-                  <Link
-                    to={studioPackageAddress(application, packageId, String(node.key))}
-                    style={{ color: 'inherit' }}
-                  >
-                    {String(node.title)}
-                  </Link>
-                  {dirty.includes(String(node.key)) && (
+      {[saveError, writeError, jobError]
+        .filter((message): message is string => message !== null)
+        .map((message) => (
+          <AxisAlert key={message} kind="error" message={message} />
+        ))}
+      <div
+        ref={frame}
+        data-testid="package-workspace"
+        style={{
+          display: 'flex',
+          height: frameHeight,
+          border: `1px solid ${colour.borderSubtle}`,
+          borderRadius: radius.base,
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ width: navigationWidth, flex: 'none', borderInlineEnd: `1px solid ${colour.borderSubtle}` }}>
+          <PackageExplorer
+            paths={paths}
+            emptyFolders={shownEmptyFolders}
+            dirty={dirty}
+            active={file}
+            developer={developer}
+            locale={locale}
+            actions={{
+              onOpen: openFile,
+              onNewFile: (folder) => setDialog({ kind: 'newFile', folder }),
+              onNewFolder: (folder) => setDialog({ kind: 'newFolder', folder }),
+              onRename: (target) => setDialog({ kind: 'rename', target }),
+              onDelete: (target) => setDialog({ kind: 'delete', target }),
+              onMove: (target, folder) =>
+                void move(
+                  target,
+                  target.kind === 'file' ? `${folder}${nameOf(target.path)}` : `${folder}${nameOf(target.path)}/`,
+                ),
+              onCopyPath: (target) => void navigator.clipboard?.writeText(`${packagePrefix}${target.path}`),
+              onRefresh: () => onChanged([...diagnostics]),
+            }}
+          />
+        </div>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <Tabs
+            type="editable-card"
+            hideAdd
+            size="small"
+            activeKey={file}
+            onChange={openFile}
+            onEdit={(key, action) => {
+              if (action === 'remove') {
+                const path = String(key)
+                if (dirty.includes(path)) {
+                  setDialog({ kind: 'close', path })
+                } else {
+                  closeTab(path)
+                }
+              }
+            }}
+            tabBarStyle={{ margin: 0 }}
+            items={openTabs.map((path) => ({
+              key: path,
+              label: (
+                <span title={path} data-testid={`package-tab-${path}`}>
+                  {nameOf(path)}
+                  {dirty.includes(path) && (
                     <span
                       role="img"
                       aria-label={t('shell.studio.package.unsaved')}
-                      style={{ width: 6, height: 6, borderRadius: '50%', background: colour.primary, flex: 'none' }}
+                      style={{
+                        display: 'inline-block',
+                        width: 6,
+                        height: 6,
+                        marginInlineStart: spacing.xs,
+                        borderRadius: '50%',
+                        background: colour.primary,
+                        verticalAlign: 'middle',
+                      }}
                     />
                   )}
-                </Flex>
-              ) : (
-                String(node.title)
-              )
-            }
-          />
-        </nav>
-        <Flex vertical gap="small" style={{ flex: 1, minWidth: 0 }}>
-          <Flex justify="space-between" align="center" gap="small" style={{ minHeight: spacing.xl }}>
-            <Typography.Text strong>{file}</Typography.Text>
-            {developer && known && current && (
-              <StudioResourceMenu disabled={busy || deleting} onDelete={() => setDeleteOpen(true)} />
-            )}
-          </Flex>
-          {!known ? (
-            <AxisAlert kind="warning" message={t('shell.studio.package.notFound')} />
-          ) : failed[file] ? (
-            <AxisAlert kind="error" message={t('shell.studio.package.loadFailed')} />
-          ) : null}
-          {Object.entries(open).map(([path, entry]) => (
-            // Each open file keeps its editor, hidden while another file shows, so its steps live on.
-            <div key={path} style={{ display: path === file ? undefined : 'none' }}>
-              <CodeEditor
-                key={entry.generation}
-                ref={(handle) => {
-                  editors.current.set(path, handle)
-                }}
-                label={path}
-                value={entry.text}
-                onChange={(text) => edit(path, text)}
-                language={codeLanguage(path)}
-                readOnly={!developer}
-                boundary={root}
-                findTexts={{
-                  field: t('shell.studio.package.findField'),
-                  count: t('shell.studio.json.findCount'),
-                  none: t('shell.studio.json.findNone'),
-                }}
-                onHistory={(next) => setSteps((all) => ({ ...all, [path]: next }))}
-              />
-            </div>
-          ))}
-          {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
-        </Flex>
-      </Flex>
-      <section
-        ref={panel}
-        aria-label={t('shell.studio.package.panel')}
-        data-testid="studio-package-panel"
-        style={{
-          position: 'relative',
-          borderTop: `1px solid ${colour.borderSubtle}`,
-          height: panelOpen ? panelHeight : undefined,
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {panelOpen && (
-          <ResizeHandle
-            edge="top"
-            size={panelHeight}
-            min={panelLeast}
-            max={panelMax}
-            measure={(event) =>
-              panel.current ? panel.current.getBoundingClientRect().bottom - event.clientY : panelHeight
-            }
-            onChange={(next) => setPanelHeight(Math.min(panelMax, Math.max(panelLeast, Math.round(next))))}
-          />
-        )}
-        <Tabs
-          activeKey={panelTab}
-          onChange={(key) => {
-            setPanelTab(key)
-            setPanelOpen(true)
-          }}
-          size="small"
-          style={{ flex: 1, minHeight: 0 }}
-          tabBarStyle={{ marginBottom: panelOpen ? spacing.sm : 0 }}
-          tabBarExtraContent={
-            <AxisButton
-              role="icon"
-              nameKey={panelOpen ? 'shell.studio.package.panel.hide' : 'shell.studio.package.panel.show'}
-              icon={panelOpen ? <DownOutlined /> : <UpOutlined />}
-              aria-expanded={panelOpen}
-              onClick={() => setPanelOpen((value) => !value)}
-            />
-          }
-          items={[
-            {
-              key: 'problems',
-              label: `${t('shell.studio.problems.title')} (${problems.length})`,
-              children: panelOpen && (
-                <div style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain' }}>
-                  {problems.length === 0 ? (
-                    <EmptyState text={t('shell.studio.problems.none')} />
-                  ) : (
-                    <StudioProblemList diagnostics={problems} />
-                  )}
-                </div>
+                </span>
               ),
-            },
-            {
-              key: 'tests',
-              label: t('shell.studio.package.panel.tests'),
-              children: panelOpen && <EmptyState text={t('shell.studio.package.panel.testsNone')} />,
-            },
-            {
-              key: 'output',
-              label: t('shell.studio.package.panel.output'),
-              children: panelOpen && <EmptyState text={t('shell.studio.package.panel.outputNone')} />,
-            },
-          ]}
-        />
-      </section>
+            }))}
+          />
+          <Flex
+            align="center"
+            style={{ minHeight: 28, paddingInline: spacing.sm, borderBottom: `1px solid ${colour.borderSubtle}` }}
+          >
+            <Breadcrumb items={[{ title: packageId }, ...segments.map((segment) => ({ title: segment }))]} />
+          </Flex>
+          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+            {!known ? (
+              <div style={{ padding: spacing.sm }}>
+                <AxisAlert kind="warning" message={t('shell.studio.package.notFound')} />
+              </div>
+            ) : failed[file] ? (
+              <div style={{ padding: spacing.sm }}>
+                <AxisAlert kind="error" message={t('shell.studio.package.loadFailed')} />
+              </div>
+            ) : null}
+            {Object.entries(open)
+              .filter(([path]) => openTabs.includes(path))
+              .map(([path, entry]) => (
+                // Each open file keeps its editor, hidden while another file shows, so its steps live on.
+                <div key={path} style={{ display: path === file ? undefined : 'none', height: '100%' }}>
+                  <CodeEditor
+                    key={entry.generation}
+                    ref={(handle) => {
+                      editors.current.set(path, handle)
+                    }}
+                    label={path}
+                    value={entry.text}
+                    onChange={(text) => edit(path, text)}
+                    language={codeLanguage(path)}
+                    checks={checks.get(path)}
+                    readOnly={!developer}
+                    fill
+                    findTexts={{
+                      field: t('shell.studio.package.findField'),
+                      count: t('shell.studio.json.findCount'),
+                      none: t('shell.studio.json.findNone'),
+                    }}
+                    onHistory={(next) => setSteps((all) => ({ ...all, [path]: next }))}
+                    onCursor={(next) => path === file && setCursor(next)}
+                  />
+                </div>
+              ))}
+          </div>
+          <section
+            ref={panel}
+            aria-label={t('shell.studio.package.panel')}
+            data-testid="studio-package-panel"
+            style={{
+              position: 'relative',
+              flex: 'none',
+              borderTop: `1px solid ${colour.borderSubtle}`,
+              height: panelOpen ? panelHeight : undefined,
+              display: 'flex',
+              flexDirection: 'column',
+              paddingInline: spacing.sm,
+            }}
+          >
+            {panelOpen && (
+              <ResizeHandle
+                edge="top"
+                size={panelHeight}
+                min={panelLeast}
+                max={panelMax}
+                measure={(event) =>
+                  panel.current ? panel.current.getBoundingClientRect().bottom - event.clientY : panelHeight
+                }
+                onChange={(next) => setPanelHeight(Math.min(panelMax, Math.max(panelLeast, Math.round(next))))}
+              />
+            )}
+            {/* The panel's tabs fill it, so the part under the tab bar scrolls inside the panel. */}
+            <style>{`.axis-package-panel { display: flex; flex-direction: column; } .axis-package-panel > .ant-tabs-body-holder { flex: 1; min-height: 0; } .axis-package-panel > .ant-tabs-body-holder > .ant-tabs-body, .axis-package-panel .ant-tabs-content-active { height: 100%; }`}</style>
+            <Tabs
+              activeKey={panelTab}
+              onChange={(key) => {
+                setPanelTab(key as PanelTab)
+                setPanelOpen(true)
+              }}
+              size="small"
+              className="axis-package-panel"
+              style={{ flex: 1, minHeight: 0 }}
+              tabBarStyle={{ marginBottom: panelOpen ? spacing.sm : 0 }}
+              tabBarExtraContent={
+                <AxisButton
+                  role="icon"
+                  nameKey={panelOpen ? 'shell.studio.package.panel.hide' : 'shell.studio.package.panel.show'}
+                  icon={panelOpen ? <DownOutlined /> : <UpOutlined />}
+                  aria-expanded={panelOpen}
+                  onClick={() => setPanelOpen((value) => !value)}
+                />
+              }
+              items={[
+                {
+                  key: 'problems',
+                  label: t('shell.studio.package.panel.problems').replace('{count}', String(problems.length)),
+                  children: panelOpen && (
+                    <PanelBody>
+                      {problems.length === 0 ? (
+                        <EmptyState text={t('shell.studio.problems.none')} />
+                      ) : (
+                        <StudioProblemList diagnostics={problems} onOpenFile={{ name: fileName, open: goToProblem }} />
+                      )}
+                    </PanelBody>
+                  ),
+                },
+                {
+                  key: 'output',
+                  label: t('shell.studio.package.panel.output'),
+                  children: panelOpen && (
+                    <PanelBody>
+                      {lastRequest === undefined ? (
+                        <EmptyState text={t('shell.studio.package.panel.outputNone')} />
+                      ) : (
+                        <Flex vertical gap="small" data-testid="package-output">
+                          <Flex gap="small" align="center">
+                            <Typography.Text strong>{t(`shell.studio.package.job.${lastJob}`)}</Typography.Text>
+                            <StatusTag tone={requestTone(lastRequest)}>
+                              {t(`shell.studio.package.jobState.${lastRequest.status}`)}
+                            </StatusTag>
+                          </Flex>
+                          <CodeBlock text={(lastRequest.output ?? []).join('\n') || null} />
+                        </Flex>
+                      )}
+                    </PanelBody>
+                  ),
+                },
+                {
+                  key: 'tests',
+                  label:
+                    tests === null
+                      ? t('shell.studio.package.panel.tests')
+                      : t('shell.studio.package.panel.testsCount')
+                          .replace('{passed}', String(tests.length - failedTests))
+                          .replace('{failed}', String(failedTests)),
+                  children: panelOpen && (
+                    <PanelBody>
+                      {running('test') ? (
+                        <Typography.Text type="secondary">{t('shell.studio.package.tests.running')}</Typography.Text>
+                      ) : tests === null ? (
+                        <EmptyState text={t('shell.studio.package.panel.testsNone')} />
+                      ) : (
+                        <AxisTable<StudioPackageTestOutcome>
+                          compact
+                          rowKey={(test) => test.name}
+                          columns={testColumns}
+                          dataSource={tests}
+                          testId="package-tests"
+                        />
+                      )}
+                    </PanelBody>
+                  ),
+                },
+                {
+                  key: 'run',
+                  label: t('shell.studio.package.panel.run'),
+                  children: panelOpen && (
+                    <PanelBody>
+                      <PackageRun
+                        application={application}
+                        packageId={packageId}
+                        operations={manifest.operations ?? []}
+                        developer={developer}
+                        locale={locale}
+                        running={running('run')}
+                        run={requests.run?.run ?? null}
+                        output={requests.run?.output ?? []}
+                        onRun={(operation, input) =>
+                          void start('run', () => runStudioPackage(application, packageId, operation, input))
+                        }
+                      />
+                    </PanelBody>
+                  ),
+                },
+              ]}
+            />
+          </section>
+          <Flex
+            align="center"
+            gap="middle"
+            data-testid="package-status-line"
+            style={{
+              flex: 'none',
+              minHeight: 24,
+              paddingInline: spacing.sm,
+              borderTop: `1px solid ${colour.borderSubtle}`,
+              background: colour.canvas,
+              color: colour.textMuted,
+              fontSize: type.fontSize - 2,
+            }}
+          >
+            <span>
+              {t('shell.studio.package.cursor')
+                .replace('{line}', String(cursor.line))
+                .replace('{column}', String(cursor.column))}
+            </span>
+            <span>{languageLabel(file, t)}</span>
+            <span style={{ marginInlineStart: 'auto' }}>
+              {dirty.length === 0
+                ? t('shell.studio.package.allSaved')
+                : t(
+                    dirty.length === 1 ? 'shell.studio.package.unsavedOne' : 'shell.studio.package.unsavedMany',
+                  ).replace('{count}', String(dirty.length))}
+            </span>
+          </Flex>
+        </div>
+      </div>
       {developer && (
         <SaveBar
           unsaved={dirty.length > 0}
@@ -486,7 +915,7 @@ export default function StudioPackage({
           onSave={() => void saveAll()}
         />
       )}
-      {newFileOpen && (
+      {dialog?.kind === 'newFile' && (
         <ReasonDialog
           title={t('shell.studio.package.newFile.title')}
           label={t('shell.studio.package.newFile.label')}
@@ -496,14 +925,15 @@ export default function StudioPackage({
           requiredMessage={t('shell.studio.package.newFile.required')}
           failedText={t('shell.studio.package.saveFailed')}
           maxLength={200}
-          onClose={() => setNewFileOpen(false)}
+          initialValue={dialog.folder}
+          onClose={() => setDialog(null)}
           onChanged={() => {}}
           onSend={async (path) => {
             const trimmed = path.trim()
             const result = await createStudioPackageFile(application, packageId, trimmed, '')
             if (result.status === 'created') {
               onChanged(result.diagnostics)
-              navigate(studioPackageAddress(application, packageId, trimmed))
+              openFile(trimmed)
               return { ok: true }
             }
             const title = t(
@@ -515,23 +945,141 @@ export default function StudioPackage({
           }}
         />
       )}
+      {dialog?.kind === 'newFolder' && (
+        <ReasonDialog
+          title={t('shell.studio.package.newFolder.title')}
+          label={t('shell.studio.package.newFolder.label')}
+          help={t('shell.studio.package.newFolder.help')}
+          okText={t('shell.studio.package.newFile.create')}
+          cancelText={t('shell.studio.cancel')}
+          requiredMessage={t('shell.studio.package.newFolder.required')}
+          maxLength={200}
+          initialValue={dialog.folder}
+          onClose={() => setDialog(null)}
+          onChanged={() => {}}
+          onSend={async (path) => {
+            const folder = `${path.trim().replace(/\/+$/, '')}/`
+            setEmptyFolders((current) => (current.includes(folder) ? current : [...current, folder]))
+            return { ok: true }
+          }}
+        />
+      )}
+      {dialog?.kind === 'rename' && (
+        <ReasonDialog
+          title={t('shell.studio.package.rename.title').replace('{name}', nameOf(dialog.target.path))}
+          label={t('shell.studio.package.rename.label')}
+          help={t('shell.studio.package.rename.help')}
+          okText={t('shell.studio.package.rename')}
+          cancelText={t('shell.studio.cancel')}
+          requiredMessage={t('shell.studio.package.newFile.required')}
+          failedText={t('shell.studio.package.saveFailed')}
+          maxLength={200}
+          initialValue={dialog.target.path.replace(/\/$/, '')}
+          onClose={() => setDialog(null)}
+          onChanged={() => {}}
+          onSend={async (next) => {
+            const trimmed = next.trim().replace(/\/+$/, '')
+            const to = dialog.target.kind === 'folder' ? `${trimmed}/` : trimmed
+            const done = await move(dialog.target, to)
+            return done
+              ? { ok: true }
+              : { ok: false, problem: { status: 409, title: t('shell.studio.package.moveConflict'), errors: {} } }
+          }}
+        />
+      )}
       <Modal
-        open={deleteOpen}
-        title={t('shell.studio.package.deleteFile.title').replace('{file}', file)}
+        open={dialog?.kind === 'delete'}
+        title={
+          dialog?.kind === 'delete'
+            ? t(
+                dialog.target.kind === 'file'
+                  ? 'shell.studio.package.deleteFile.title'
+                  : 'shell.studio.package.deleteFolder.title',
+              )
+                .replace('{file}', dialog.target.path)
+                .replace('{count}', String(filesOf(dialog.target).length))
+            : ''
+        }
         okText={t('shell.studio.delete')}
         okButtonProps={{ danger: true }}
         cancelText={t('shell.studio.cancel')}
-        confirmLoading={deleting}
-        onOk={() => void deleteFile()}
-        onCancel={() => setDeleteOpen(false)}
+        onOk={() => {
+          if (dialog?.kind === 'delete') {
+            void remove(dialog.target).then(() => setDialog(null))
+          }
+        }}
+        onCancel={() => setDialog(null)}
       >
-        <Flex vertical gap="small">
-          <span>{t('shell.studio.package.deleteFile.body')}</span>
-          {deleteError && <AxisAlert kind="error" message={t('shell.studio.package.deleteFile.failed')} />}
-        </Flex>
+        <span>{t('shell.studio.package.deleteFile.body')}</span>
+      </Modal>
+      <Modal
+        open={dialog?.kind === 'close'}
+        title={
+          dialog?.kind === 'close'
+            ? t('shell.studio.package.closeTab.title').replace('{file}', nameOf(dialog.path))
+            : ''
+        }
+        okText={t('shell.studio.package.closeTab.discard')}
+        okButtonProps={{ danger: true }}
+        cancelText={t('shell.studio.cancel')}
+        onOk={() => {
+          if (dialog?.kind === 'close') {
+            closeTab(dialog.path)
+          }
+          setDialog(null)
+        }}
+        onCancel={() => setDialog(null)}
+      >
+        <span>{t('shell.studio.package.closeTab.body')}</span>
+      </Modal>
+      <Modal
+        open={dialog?.kind === 'quickOpen'}
+        title={t('shell.studio.package.quickOpen')}
+        footer={null}
+        onCancel={() => setDialog(null)}
+        destroyOnHidden
+      >
+        <Select
+          autoFocus
+          showSearch
+          open
+          aria-label={t('shell.studio.package.quickOpen')}
+          style={{ width: '100%' }}
+          options={paths.map((path) => ({ value: path, label: path }))}
+          onChange={(path: string) => {
+            setDialog(null)
+            openFile(path)
+          }}
+        />
       </Modal>
     </Flex>
   )
+}
+
+/** The part of the output panel under its tabs, which scrolls on its own and stops at its end. */
+function PanelBody({ children }: { children: React.ReactNode }) {
+  return <div style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain' }}>{children}</div>
+}
+
+/** What a request's state asks of the reader, as its tag's tone. */
+function requestTone(request: StudioRequest): 'neutral' | 'success' | 'danger' {
+  return request.status === 'succeeded' ? 'success' : request.status === 'failed' ? 'danger' : 'neutral'
+}
+
+/** The language a file's name says, in words, for the status line. */
+function languageLabel(path: string, t: (key: string) => string): string {
+  const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+  const known: Record<string, string> = {
+    cs: 'C#',
+    csproj: 'XML',
+    ts: 'TypeScript',
+    js: 'JavaScript',
+    mjs: 'JavaScript',
+    py: 'Python',
+    json: 'JSON',
+    txt: t('shell.studio.package.plainText'),
+  }
+  return known[extension] ?? t('shell.studio.package.plainText')
 }
 
 /** Loads a package file with its text. A file that is gone throws, as any other failure does. */
