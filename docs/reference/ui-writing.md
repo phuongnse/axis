@@ -162,7 +162,7 @@ These rules add to the principles for the `en` texts.
 - Plain international English, with British spelling where it differs: "behaviour", "licence" for the noun.
 - Address the person as "you" only when a sentence needs a subject; most texts need none.
 - An action is a verb: "Add field", not "Field addition".
-- **A button names the thing it makes.** _(planned for M35)_ A button does not name a thing that the row points to: a
+- **A button names the thing it makes.** A button does not name a thing that the row points to: a
   row that maps a claim value to a role is added by "Add claim value", not "Add role".
 
 ## Vietnamese
