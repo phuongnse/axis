@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "TellLeadTicketDeleted",
   "formatVersion": 1,
+  "title": { "textKey": "processes.tellLeadTicketDeleted.title" },
   "parameters": [
     {
       "name": "number",

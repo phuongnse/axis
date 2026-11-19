@@ -320,6 +320,7 @@ public static class CallResolveCommand
             ["resolved"] = true,
         };
         AuditEntry? recordAudit = null;
+        JsonArray? changes = null;
         IReadOnlyList<EffectRecord> effects = [];
         if (values.Count > 0)
         {
@@ -337,6 +338,7 @@ public static class CallResolveCommand
 
             await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, tenantId, pinned, subject, target.ReleaseId, cancellationToken);
             updated = stored;
+            changes = RunValues.Changes(pinned, subject, record, stored);
             effects = written.Effects;
             output["subjectVersion"] = stored.Version;
             recordAudit = new AuditEntry(
@@ -370,7 +372,8 @@ public static class CallResolveCommand
                 output,
                 Decision: null,
                 Error: null,
-                startedAt),
+                startedAt,
+                Changes: changes),
             cancellationToken);
         if (recordAudit is not null)
         {

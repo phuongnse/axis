@@ -8,6 +8,7 @@
     "site.title": "Release app",
     "nav.tasks": "Tasks",
     "pages.tasks.title": "My tasks",
+    "processes.ticketReview.title": "Ticket review",
     "ticket.label": "Ticket",
     "ticket.topic": "Topic",
     "ticketReview.task": "Review the ticket",
