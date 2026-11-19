@@ -72,6 +72,9 @@ public sealed class StorageQuotaRouteTests
         "PUT /api/me/tables/{key}/columns",
         "PUT /api/me/tables/{key}/views/{id}",
 
+        // A person's notification preferences are one small row, never refused over the quota, see docs/reference/tenant-quotas.md#refusals.
+        "PUT /api/me/notification-preferences",
+
         // An MCP session message writes nothing: the session id is a protected token, and no tenant data is stored.
         "POST /mcp",
 

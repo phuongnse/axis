@@ -54,6 +54,7 @@ public static class RuntimeRoleGrants
         "given_roles",
         "table_views",
         "table_columns",
+        "notification_preferences",
         "application_settings",
         "resource_writes",
         "files",
