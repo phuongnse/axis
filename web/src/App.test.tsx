@@ -128,6 +128,7 @@ const signedInUser: CurrentUser = {
   studioPreviewHost: null,
   studioTest: false,
   studioAi: false,
+  studioDeveloper: false,
   console: false,
   users: false,
   tenantStatus: 'active',

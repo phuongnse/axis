@@ -20,7 +20,8 @@ namespace Axis.Integration.Tests;
 /// The package file routes of the authoring API, see <c>docs/reference/studio-packages.md#the-authoring-api</c>. A write takes the
 /// write lock in the platform database, so these tests run on real PostgreSQL. The identity <c>developer</c> holds the author and
 /// developer roles, <c>author</c> holds the author role only and <c>outsider</c> holds the developer role only. The tenant's
-/// application packages switch is on in the host unless a test turns it off, see <see cref="CreateFactoryAsync"/>.
+/// application packages switch is on in the host unless a test turns it off, see <see cref="CreateFactoryAsync"/>. They also cover
+/// <c>studioDeveloper</c> of <c>GET /api/me</c>, see <c>docs/reference/security.md#roles-and-the-current-user</c>.
 /// </summary>
 public sealed class StudioPackageFileTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
@@ -158,6 +159,39 @@ public sealed class StudioPackageFileTests(PostgreSqlFixture database) : IClassF
         Assert.False(File.Exists(Path.Combine(folder.Path, "packages", "x", "new.py")));
         using var read = await client.GetAsync(new Uri(FileUrl, UriKind.Relative), CancellationToken);
         Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+    }
+
+    [Fact]
+    public async Task Me_answers_studioDeveloper_for_an_author_with_the_developer_role_while_the_switch_is_on()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: true);
+        using var client = factory.CreateClient().SignedInAs("developer");
+
+        using var response = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var me = await ReadAsync(response);
+        Assert.True(me.GetProperty("studio").GetBoolean());
+        Assert.True(me.GetProperty("studioDeveloper").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Me_answers_no_studioDeveloper_without_the_developer_role_without_the_author_role_or_with_the_switch_off()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var on = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: true);
+        await using var off = await CreateFactoryAsync(folder.Path, revisions.Path, switchOn: false);
+
+        foreach (var (factory, identity) in new[] { (on, "author"), (on, "outsider"), (off, "developer") })
+        {
+            using var client = factory.CreateClient().SignedInAs(identity);
+            using var response = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.False((await ReadAsync(response)).GetProperty("studioDeveloper").GetBoolean(), identity);
+        }
     }
 
     [Fact]
