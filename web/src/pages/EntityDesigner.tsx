@@ -1,8 +1,8 @@
-import { Button, Checkbox, ConfigProvider, Flex, Input, InputNumber, Select, Typography, DatePicker } from 'antd'
+import { Button, ConfigProvider, Drawer, Flex, Input, InputNumber, Select, Typography, DatePicker } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import dayjs from 'dayjs'
-import { memo, useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react'
+import { memo, useCallback, useContext, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
@@ -18,12 +18,14 @@ import {
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
-import { referenceOptions, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
+import { labelText, referenceOptions, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { useTableView } from '../platform/useTableView'
 import { LabelTexts } from './LabelTexts'
 import { type DesignerLayer, LayerMarkTag, RemovedRows } from './LayerMarkViews'
+import { PlatformContext } from './context'
 import { Expression } from './ProcessFields'
 import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
@@ -32,8 +34,8 @@ import { setOwn } from '../platform/ownProperty'
 
 type Content = Record<string, unknown>
 
-/** The settings that the settings column shows, in the order it shows them. `required` and `unique` have columns. */
-const settingColumns: FieldSetting[] = [
+/** The settings that the field drawer shows after the help, in the order it shows them. `required` and `unique` come before them. */
+const drawerSettings: FieldSetting[] = [
   'maxLength',
   'minLength',
   'min',
@@ -142,8 +144,9 @@ const Picker = memo(function Picker({
 /**
  * The designer of an entity, in the sections General, Fields, Validations and Indexes, see
  * docs/reference/entity-designer.md#sections. General shows the entity's name, label, description and display field.
- * Fields is a table of name, label, type, required, unique and a settings column that shows only the settings the
- * field's type takes, and Validations is rows of a name, an expression, a message key and a field. A field can be
+ * Fields is a table of name, label and type, and a field's name opens the field drawer with the field's inputs and the
+ * settings its type takes, see docs/reference/entity-designer.md#field-drawer. Validations is rows of a name, an
+ * expression, a message key and a field. A field can be
  * added, removed and moved, and a type change drops the settings the new type does not take. A computed field's
  * `expression` and each validation's expression use the expression editor, and so does a field's `default`, which has
  * no field in scope. A field's settings also include `min` and `max` in the type of the field, `minLength` and
@@ -153,12 +156,12 @@ const Picker = memo(function Picker({
  * `validation1`, the first name its list does not use. The designer edits the draft through `onChange`, so a key it
  * does not show, such as `id`, `kind` or an unknown key on a field, stays as it is. Every input has the id
  * `studio-field-<pointer>`, and each row of the table has the id of its field, so a diagnostic opens at its input or
- * at the row of a setting that the row does not show. Clearing an optional value removes its key. With `readOnly`,
+ * at the row of a setting inside a field, which the drawer, drawn outside the form, holds. Clearing an optional value removes its key. With `readOnly`,
  * as for an entity of a module, every input is off, the label is its plain text key, and there are no buttons that
  * add, remove or move a field or a validation. With `origins`, the loaded name of each row of the fields table or
  * `null` for a row added in this session, Add field, Remove and Move report the origins that follow through
  * `onOriginsChange`, and Remove also reports the origin of the removed row as touched. With `warnings`, the row
- * numbers of fields whose change no migration follows, a warning shows in the settings column of that row. With `layer`,
+ * numbers of fields whose change no migration follows, a warning shows at the top of that field's drawer. With `layer`,
  * as for a module entity that has a customization layer, a field, an index or a validation that the layer added or
  * changed shows an Added or Changed tag, found by its name and not by its position. The layer's removed ones show as
  * muted Removed rows under their list. Each has Reset to module, which calls `onReset` with the list and the name, and is
@@ -254,43 +257,26 @@ function rowOrigins(fields: unknown[], origins: FieldOrigin[] | undefined): Fiel
   return fields.map((_, index) => origins?.[index] ?? null)
 }
 
-/** The columns of the Fields table that have a filter, by the name their filter has in the address. */
+/** The columns of the Fields table, all of which have a filter, by the name their filter has in the address. */
 const fieldTableFields = [
   { name: 'name', type: 'text' },
   { name: 'label', type: 'text' },
   { name: 'type', type: 'enum' },
-  { name: 'required', type: 'enum' },
-  { name: 'unique', type: 'enum' },
 ] as const
 
 /** The Fields table keeps no data source parameter in the address, only its view. */
 const noParameters: string[] = []
 
 /**
- * What the Required and Unique columns filter on: Yes or No, and empty for a field whose type does not take the setting,
- * as the cell shows nothing for it.
- */
-function flagFilter(
-  setting: FieldSetting,
-  options: { value: string; label: string }[],
-): NonNullable<AxisColumn<FieldRow>['filter']> {
-  return {
-    kind: 'enum',
-    value: ({ field }) => {
-      const content = isContent(field) ? field : {}
-      return fieldSettings(text(content.type)).includes(setting) ? String(content[setting] === true) : null
-    },
-    options,
-  }
-}
-
-/**
- * The fields of the entity as a table, in the Fields section, with Add field on the right of its heading. Every cell is a
- * memo component of stable props, so a key in one row draws that row's cells and no other. The table has a Filter on
- * Name, Label, Type, Required and Unique, kept in the address as `fields.filter`. A filter only hides rows: every row
- * shows on one page, an edit to a hidden row stays in the draft, and a field whose origin is `null`, one added since the
- * last save, stays shown. Each row's "…" menu has Move up, Move down and Remove, and a read-only designer has no menu,
- * see docs/reference/entity-designer.md#fields.
+ * The fields of the entity as a table, in the Fields section, with Add field on the right of its heading. A row reads the
+ * field's name as a link with its layer mark, its label and its type, and the name opens the field drawer, which holds
+ * the field's inputs, see docs/reference/entity-designer.md#field-drawer. Every cell is a memo component of stable
+ * props, so a key in one row draws that row's cells and no other. Only the row has an id in the table, so a diagnostic
+ * inside a field opens at its row. The table has a Filter on Name, Label and Type, kept in the address as
+ * `fields.filter`. A filter only hides rows: every row shows on one page, an edit to a hidden row stays in the draft, and
+ * a field whose origin is `null`, one added since the last save, stays shown. Each row's "…" menu has Move up, Move down
+ * and Remove, which close the drawer, and a read-only designer has no menu, see
+ * docs/reference/entity-designer.md#fields.
  */
 const Fields = memo(function Fields({
   fields,
@@ -310,6 +296,12 @@ const Fields = memo(function Fields({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  // The row of the field whose drawer is open or leaving. The drawer keeps its field while it closes, and shows as
+  // closed when its row is gone, as after an Undo.
+  const [drawer, setDrawer] = useState<{ index: number; open: boolean } | null>(null)
+  const shown = drawer !== null && fields !== undefined && drawer.index < fields.length ? drawer.index : null
+  const openDrawer = useCallback((index: number) => setDrawer({ index, open: true }), [])
+  const closeDrawer = useCallback(() => setDrawer((current) => current && { ...current, open: false }), [])
   const { view, setView } = useTableView(fieldTableFields, recordPageSize, noParameters, false, true, false, 'fields.')
   // What the entries of a row's menu read when they are pressed, so they stay the same between draws.
   const latest = useRef({ fields, origins, onOriginsChange, onChange })
@@ -332,29 +324,37 @@ const Fields = memo(function Fields({
     [currencySignature],
   )
 
-  const onMove = useCallback((index: number, offset: number) => {
-    const { fields, origins, onOriginsChange, onChange } = latest.current
-    const next = [...fields!]
-    ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
-    onChange('/fields', next)
-    if (onOriginsChange) {
-      const moved = rowOrigins(fields!, origins)
-      ;[moved[index], moved[index + offset]] = [moved[index + offset], moved[index]]
-      onOriginsChange(moved)
-    }
-  }, [])
+  const onMove = useCallback(
+    (index: number, offset: number) => {
+      const { fields, origins, onOriginsChange, onChange } = latest.current
+      closeDrawer()
+      const next = [...fields!]
+      ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
+      onChange('/fields', next)
+      if (onOriginsChange) {
+        const moved = rowOrigins(fields!, origins)
+        ;[moved[index], moved[index + offset]] = [moved[index + offset], moved[index]]
+        onOriginsChange(moved)
+      }
+    },
+    [closeDrawer],
+  )
 
-  const onRemove = useCallback((index: number) => {
-    const { fields, origins, onOriginsChange, onChange } = latest.current
-    onChange(
-      '/fields',
-      fields!.filter((_, position) => position !== index),
-    )
-    onOriginsChange?.(
-      rowOrigins(fields!, origins).filter((_, position) => position !== index),
-      origins?.[index] ?? undefined,
-    )
-  }, [])
+  const onRemove = useCallback(
+    (index: number) => {
+      const { fields, origins, onOriginsChange, onChange } = latest.current
+      closeDrawer()
+      onChange(
+        '/fields',
+        fields!.filter((_, position) => position !== index),
+      )
+      onOriginsChange?.(
+        rowOrigins(fields!, origins).filter((_, position) => position !== index),
+        origins?.[index] ?? undefined,
+      )
+    },
+    [closeDrawer],
+  )
 
   function addField() {
     onChange('/fields', [...fields!, { name: '', type: 'text' }])
@@ -371,17 +371,13 @@ const Fields = memo(function Fields({
     )
   }
 
-  const yesNo = [
-    { value: 'true', label: t('shell.table.yes') },
-    { value: 'false', label: t('shell.table.no') },
-  ]
   const columns: AxisColumn<FieldRow>[] = [
     {
       key: 'name',
       kind: 'freeText',
       title: t('shell.studio.entity.fieldName'),
       filter: { kind: 'text', value: ({ field }) => text(isContent(field) ? field.name : undefined) || null },
-      render: (_, { field, index }) => <NameCell index={index} field={field} layer={layer} onChange={onChange} />,
+      render: (_, { field, index }) => <NameCell index={index} field={field} layer={layer} onOpen={openDrawer} />,
     },
     {
       key: 'label',
@@ -395,14 +391,7 @@ const Fields = memo(function Fields({
           return (isContent(label) ? text(label.textKey) : '') || null
         },
       },
-      render: (_, { field, index }) => (
-        <FieldLabel
-          name={t('shell.studio.entity.fieldLabel')}
-          pointer={`/fields/${index}/label`}
-          value={isContent(field) ? field.label : undefined}
-          onChange={onChange}
-        />
-      ),
+      render: (_, { field }) => <LabelCell field={field} />,
     },
     {
       key: 'type',
@@ -413,40 +402,7 @@ const Fields = memo(function Fields({
         value: ({ field }) => text(isContent(field) ? field.type : undefined) || null,
         options: fieldTypes.map((option) => ({ value: option, label: option })),
       },
-      render: (_, { field, index }) => <TypeCell index={index} field={field} onChange={onChange} />,
-    },
-    {
-      key: 'required',
-      kind: 'fixed',
-      title: t('shell.studio.entity.required'),
-      filter: flagFilter('required', yesNo),
-      render: (_, { field, index }) => (
-        <Flag field={field} setting="required" pointer={`/fields/${index}/required`} onChange={onChange} />
-      ),
-    },
-    {
-      key: 'unique',
-      kind: 'fixed',
-      title: t('shell.studio.entity.unique'),
-      filter: flagFilter('unique', yesNo),
-      render: (_, { field, index }) => (
-        <Flag field={field} setting="unique" pointer={`/fields/${index}/unique`} onChange={onChange} />
-      ),
-    },
-    {
-      key: 'settings',
-      kind: 'freeText',
-      title: t('shell.studio.entity.settings'),
-      render: (_, { field, index }) => (
-        <SettingsCell
-          index={index}
-          field={field}
-          currencyNames={isContent(field) && editableSettings(field).includes('currency') ? currencyNames : undefined}
-          readOnly={readOnly}
-          warning={warnings?.get(index)}
-          onChange={onChange}
-        />
-      ),
+      render: (_, { field }) => text(isContent(field) ? field.type : undefined) || null,
     },
   ]
 
@@ -505,112 +461,176 @@ const Fields = memo(function Fields({
           <RemovedRows layer={layer} list="/fields" />
         </Flex>
       </div>
+      <FieldDrawer
+        index={shown}
+        open={drawer?.open === true}
+        field={shown === null ? undefined : fields[shown]}
+        currencyNames={
+          shown !== null && isContent(fields[shown]) && editableSettings(fields[shown]).includes('currency')
+            ? currencyNames
+            : undefined
+        }
+        readOnly={readOnly}
+        warning={shown === null ? undefined : warnings?.get(shown)}
+        onChange={onChange}
+        onClose={closeDrawer}
+      />
     </SectionPart>
   )
 })
 
-/** The name box of a field's row, with the mark of a customization layer. */
+/** The name of a field's row as a link that opens the field drawer, with the mark of a customization layer. */
 const NameCell = memo(function NameCell({
   index,
   field,
   layer,
-  onChange,
+  onOpen,
 }: {
   index: number
   field: unknown
   layer: DesignerLayer | undefined
-  onChange: ChangeHandler
+  onOpen: (index: number) => void
 }) {
   const t = useText()
   const name = text(isContent(field) ? field.name : undefined)
   return (
-    <Flex vertical gap="small">
-      <div data-testid={`studio-field-/fields/${index}/name`}>
-        <Input
-          aria-label={t('shell.studio.entity.fieldName')}
-          value={name}
-          onChange={(event) => onChange(`/fields/${index}/name`, event.target.value)}
-        />
-      </div>
+    <Flex gap="small" align="center" wrap>
+      {/* A read-only designer turns its inputs off, but its name still opens the drawer. */}
+      <AxisButton role="link" size="small" disabled={false} onClick={() => onOpen(index)}>
+        {name || t('shell.studio.entity.unnamedField')}
+      </AxisButton>
       {layer && <LayerMarkTag layer={layer} list="/fields" index={index} name={name} />}
     </Flex>
   )
 })
 
-/** The type picker of a field's row. */
-const TypeCell = memo(function TypeCell({
-  index,
-  field,
-  onChange,
-}: {
-  index: number
-  field: unknown
-  onChange: ChangeHandler
-}) {
-  const t = useText()
-  const content = isContent(field) ? field : {}
-  return (
-    <div data-testid={`studio-field-/fields/${index}/type`}>
-      <Select
-        aria-label={t('shell.studio.entity.fieldType')}
-        showSearch
-        optionFilterProp="label"
-        virtual={false}
-        style={{ minWidth: 160 }}
-        value={typeof content.type === 'string' ? content.type : undefined}
-        options={fieldTypes.map((option) => ({ value: option, label: option }))}
-        onChange={(next: string) => onChange(`/fields/${index}`, changeFieldType(content, next))}
-      />
-    </div>
-  )
+/** The label of a field's row in the author's language, else its text key, and the dash when it has none. */
+const LabelCell = memo(function LabelCell({ field }: { field: unknown }) {
+  const names = useContext(StudioNamesContext)
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const label = isContent(field) ? field.label : undefined
+  const key = (isContent(label) ? text(label.textKey) : '') || undefined
+  if (key === undefined) {
+    return null
+  }
+  return (names && labelText(names, key, locale)) || key
 })
 
-/** The help text, the settings and the migration warning of a field's row. */
-const SettingsCell = memo(function SettingsCell({
+/**
+ * The drawer of a field, beside the table and above the save bar, with no mask so the table stays clickable, see
+ * docs/reference/entity-designer.md#field-drawer. From the top it holds the migration warning, then the field's name,
+ * label, type, help, Required, Unique and the settings its type takes, each an input with its help and its id.
+ */
+const FieldDrawer = memo(function FieldDrawer({
   index,
+  open,
   field,
   currencyNames,
   readOnly,
   warning,
   onChange,
+  onClose,
 }: {
-  index: number
+  index: number | null
+  open: boolean
   field: unknown
   currencyNames: (string | null)[] | undefined
   readOnly: boolean
   warning: FieldWarning | undefined
   onChange: ChangeHandler
+  onClose: () => void
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
+  const content = isContent(field) ? field : {}
+  const name = text(content.name)
+  const type = text(content.type)
+  const taken = fieldSettings(type)
+  const pointer = `/fields/${index}`
+
+  function flag(setting: 'required' | 'unique') {
+    return (
+      taken.includes(setting) && (
+        <div data-testid={`studio-field-${pointer}/${setting}`}>
+          <AxisCheckboxField
+            {...fieldTexts(t, `fields.${setting}`)}
+            checked={content[setting] === true}
+            onChange={(checked) => onChange(`${pointer}/${setting}`, checked)}
+          />
+        </div>
+      )
+    )
+  }
+
   return (
-    <Flex vertical gap="small">
-      <AxisField {...fieldTexts(t, 'fields.helpText')}>
-        <FieldLabel
-          name={fieldTexts(t, 'fields.helpText').label}
-          pointer={`/fields/${index}/help`}
-          value={isContent(field) ? field.help : undefined}
-          onChange={onChange}
-        />
-      </AxisField>
-      <Settings
-        index={index}
-        field={isContent(field) ? field : {}}
-        currencyNames={currencyNames}
-        readOnly={readOnly}
-        onChange={onChange}
-      />
-      {warning && (
-        <AxisAlert
-          kind="warning"
-          data-testid={`studio-migration-warning-/fields/${index}`}
-          message={t(
-            warning === 'enum'
-              ? 'shell.studio.entity.migration.enumWarning'
-              : 'shell.studio.entity.migration.uniqueWarning',
+    <Drawer
+      open={open && index !== null}
+      mask={false}
+      size={size.dialog.medium}
+      destroyOnHidden
+      // The save bar shows as soon as there is an edit, so the drawer always leaves its height free.
+      rootStyle={{ bottom: size.bar }}
+      title={name || t('shell.studio.entity.unnamedField')}
+      onClose={onClose}
+    >
+      {index !== null && (
+        <Flex vertical gap="middle" data-testid="studio-field-drawer" key={index}>
+          {warning && (
+            <AxisAlert
+              kind="warning"
+              data-testid={`studio-migration-warning-${pointer}`}
+              message={t(
+                warning === 'enum'
+                  ? 'shell.studio.entity.migration.enumWarning'
+                  : 'shell.studio.entity.migration.uniqueWarning',
+              )}
+            />
           )}
-        />
+          <div data-testid={`studio-field-${pointer}/name`}>
+            <AxisField {...fieldTexts(t, 'fields.name')} required>
+              <Input value={name} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
+            </AxisField>
+          </div>
+          <AxisField {...fieldTexts(t, 'fields.label')}>
+            <FieldLabel
+              name={fieldTexts(t, 'fields.label').label}
+              pointer={`${pointer}/label`}
+              value={content.label}
+              onChange={onChange}
+            />
+          </AxisField>
+          <div data-testid={`studio-field-${pointer}/type`}>
+            <AxisField {...fieldTexts(t, 'fields.type')} required>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                virtual={false}
+                value={type === '' ? undefined : type}
+                options={fieldTypes.map((option) => ({ value: option, label: option }))}
+                onChange={(next: string) => onChange(pointer, changeFieldType(content, next))}
+              />
+            </AxisField>
+          </div>
+          <AxisField {...fieldTexts(t, 'fields.helpText')}>
+            <FieldLabel
+              name={fieldTexts(t, 'fields.helpText').label}
+              pointer={`${pointer}/help`}
+              value={content.help}
+              onChange={onChange}
+            />
+          </AxisField>
+          {flag('required')}
+          {flag('unique')}
+          <Settings
+            index={index}
+            field={content}
+            currencyNames={currencyNames}
+            readOnly={readOnly}
+            onChange={onChange}
+          />
+        </Flex>
       )}
-    </Flex>
+    </Drawer>
   )
 })
 
@@ -664,34 +684,6 @@ const FieldLabel = memo(function FieldLabel({
   )
 })
 
-/** The checkbox of `required` or `unique`, shown only when the field's type takes the setting. */
-const Flag = memo(function Flag({
-  field,
-  setting,
-  pointer,
-  onChange,
-}: {
-  field: unknown
-  setting: FieldSetting
-  pointer: string
-  onChange: ChangeHandler
-}) {
-  const t = useText()
-  const content = isContent(field) ? field : {}
-  if (!fieldSettings(text(content.type)).includes(setting)) {
-    return null
-  }
-  return (
-    <div data-testid={`studio-field-${pointer}`}>
-      <Checkbox
-        aria-label={t(`shell.studio.entity.${setting}`)}
-        checked={content[setting] === true}
-        onChange={(event) => onChange(pointer, event.target.checked)}
-      />
-    </div>
-  )
-})
-
 /** The settings of one field that its type takes, each with its own input and id. */
 function Settings({
   index,
@@ -709,7 +701,7 @@ function Settings({
   const t = useText()
   const pointer = `/fields/${index}`
   const taken = editableSettings(field)
-  const shown = settingColumns.filter((setting) => taken.includes(setting))
+  const shown = drawerSettings.filter((setting) => taken.includes(setting))
 
   const settingTexts = (setting: FieldSetting) => fieldTexts(t, `fields.${setting}`)
 

@@ -10,16 +10,20 @@ function entityFieldRow(index: number): Promise<HTMLElement> {
   return screen.findByTestId(`studio-field-/fields/${index}`, {}, wait)
 }
 
-/** Makes field `index` ready to edit and returns the element that holds its settings: for now its row of the Fields table. */
-export function openEntityField(index: number): Promise<HTMLElement> {
-  return entityFieldRow(index)
+/** The link of the first cell of field `index`'s row: the field's name, which opens the field drawer. */
+function entityFieldLink(row: HTMLElement): HTMLElement {
+  return within(within(row).getAllByRole('cell')[0]).getAllByRole('button')[0]
 }
 
-/** The name of each field in the Fields table, in order: for now read from each row's Field name box. */
+/** Makes field `index` ready to edit: clicks its name in the Fields table and returns the field drawer's dialog. */
+export async function openEntityField(index: number): Promise<HTMLElement> {
+  await userEvent.click(entityFieldLink(await entityFieldRow(index)))
+  return (await screen.findByTestId('studio-field-drawer', {}, wait)).closest('[role="dialog"]') as HTMLElement
+}
+
+/** The name of each field in the Fields table, in order, read from the link in each row's first cell. */
 export function entityFieldNames(): string[] {
-  return screen
-    .getAllByTestId(/^studio-field-\/fields\/\d+$/)
-    .map((row) => (within(row).getByRole('textbox', { name: 'Field name' }) as HTMLInputElement).value)
+  return screen.getAllByTestId(/^studio-field-\/fields\/\d+$/).map((row) => entityFieldLink(row).textContent ?? '')
 }
 
 /** Opens the "…" menu of field `index` and returns its entry `action`, unclicked. */

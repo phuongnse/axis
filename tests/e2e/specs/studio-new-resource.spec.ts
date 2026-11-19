@@ -124,7 +124,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await values.press('Enter')
     await values.fill('closed')
     await values.press('Enter')
-    await values.press('Escape')
+    await values.blur()
 
     await addField(page, 2, 'department', 'reference')
     await pick(page, 'studio-field-/fields/2/target', 'Supplier')
@@ -186,7 +186,7 @@ test.describe('Studio creates a resource from a starter', () => {
       const combobox = page.getByTestId(field).getByRole('combobox')
       await combobox.fill(value)
       await combobox.press('Enter')
-      await combobox.press('Escape')
+      await combobox.blur()
     }
 
     await createResource(page, 'entity', 'ShipmentLine')
@@ -206,7 +206,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await pick(page, 'studio-field-/fields/1/valueLabels/USD', 'nav.departments')
 
     await addField(page, 2, 'amount', 'money')
-    await page.getByTestId('studio-field-/fields/2').getByRole('radio', { name: /^From a field/ }).check()
+    await page.getByTestId('studio-field-drawer').getByRole('radio', { name: /^From a field/ }).check()
     await pick(page, 'studio-field-/fields/2/currencyField', 'currencyCode')
 
     await addField(page, 3, 'receipt', 'file')
@@ -257,7 +257,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await values.press('Enter')
     await values.fill('closed')
     await values.press('Enter')
-    await values.press('Escape')
+    await values.blur()
     const stageDefault = page.getByTestId('studio-field-/fields/1/default')
     // The read-only fallback is replaced once CodeMirror loads, so wait for the editor before typing.
     await expect(stageDefault.locator('.cm-editor')).toBeVisible()

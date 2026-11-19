@@ -125,8 +125,10 @@ export async function pickOptions(combobox: Locator, options: string[]) {
       ).toHaveAttribute('aria-selected', 'true', { timeout: 5_000 })
     }
   } finally {
-    await combobox.press('Escape')
+    // Escape can also close the field drawer or a modal that holds the select, so the select closes on blur instead.
+    await combobox.blur()
   }
+  await expect(list).toBeHidden()
 }
 
 /** Expects the option `option` to be the chosen one: it opens the select, looks and closes it again. */

@@ -29,15 +29,18 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
 - **Row menu.** Each row's "…" menu, the table's [row actions](actions-and-controls.md#tables), has Move up,
   Move down and Remove. Move up is off on the first row and Move down on the last, and Remove is destructive.
   Each entry replaces the `fields` array. A read-only designer has no menu.
+- **Name, Label and Type.** The Name cell is the field's name as a link that opens the [field drawer](#field-drawer),
+  with the field's layer mark beside it, and reads "Unnamed field" while the name is empty. The Label cell is the
+  label in the author's language, or its text key where the key has no text, and the dash where the field has no
+  label. The Type cell is the field's type as written. The table has no input.
 - **Columns** _(planned)_. Its columns are Name, Label, Type, Required, Unique and
   Properties. It has a search, and Add field sits in the section's heading. A field's name opens the
   [field drawer](#field-drawer), beside the table, so every field stays in sight however many settings it has.
-- **Filter.** The table has a Filter on Name, Label, Type, Required and Unique, and none on the settings or the
-  row's menu. Name and Label filter as text, Label on its text key, which is what the file holds. Type filters as a
-  choice of the field types. Required and Unique filter as a choice of Yes or No, and a field whose type does not take
-  the setting counts as empty, as its cell shows nothing. The filter lives in the address as `fields.filter`. It only
-  hides rows: every row shows on one page with no pager, and an edit to a hidden row stays in the draft. A field whose
-  origin is new, one added since the last save, stays shown. The table has no search, sort or Columns.
+- **Filter.** The table has a Filter on Name, Label and Type, and none on the row's menu. Name and Label filter as
+  text, Label on its text key, which is what the file holds. Type filters as a choice of the field types. The filter
+  lives in the address as `fields.filter`. It only hides rows: every row shows on one page with no pager, and an edit to
+  a hidden row stays in the draft. A field whose origin is new, one added since the last save, stays shown. The table
+  has no search, sort or Columns.
 - **Type in words** _(planned)_. The cell reads the type's name, and for a reference, references or child
   collection the entity it points to, by its label, as "Reference to Department" or "Child collection
   of Line item". The name shows only where that entity has no label. Enum and every other type read as
@@ -62,13 +65,22 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
 
 ## Field drawer
 
+A field's name opens its settings in a drawer of the `medium` width, titled by the name or "Unnamed field", with no
+mask, so the table stays in sight and clickable. The drawer ends above the save bar, whether or not the bar shows. From
+the top it holds the migration warning, then the name, label, type, help text, Required, Unique and the settings the
+field's type takes. Each is an [`AxisField`](actions-and-controls.md#fields) or `AxisCheckboxField` with its help, at its
+`studio-field-<pointer>` id, and the name and the type show the required mark. Required and Unique show only where the
+type takes them. A read-only designer opens the drawer from the name too, with every input in it off. Move up, Move down
+and Remove close an open drawer, and Add field adds a row without opening it. The drawer does not follow its field on
+Undo, Redo or an edit in the JSON tab, and shows as closed when its row no longer exists.
+
 ### The drawer and its groups
 
 _(planned)_
 
-A field's settings open in a drawer of the `medium` width with the table still in sight, as
-Salesforce's Object Manager, Dataverse and Strapi have it. The drawer has an address, `&field=<name>`,
-so Back reopens it and a link can open a field. A migration warning is at the top of the drawer.
+A field's settings open in a drawer with the table still in sight, as Salesforce's Object Manager, Dataverse and
+Strapi have it. The drawer has an address, `&field=<name>`, so Back reopens it and a link can open a field. It follows
+its field when Add field opens it and when the field moves.
 
 The settings are in groups, each setting an [`AxisField`](actions-and-controls.md#fields) with its help,
 and the value labels an `AxisFieldGroup` with a label for each value. A setting that the field's type does not take does not show, as the
@@ -139,8 +151,8 @@ These settings take a control of their own:
 The keys that `entity.schema.json` requires show the shared `*` and are announced as required: the entity
 name, an index's fields, and a validation's expression, message and field. So do the target of a reference
 field and the currency field of a money field, which cannot be emptied. The name of an index or a
-validation is read-only text and has no mark. The Name and Type cells of the fields table have none yet,
-as a table cell has no label for it.
+validation is read-only text and has no mark. A field's name and type, which the schema requires, show it in the
+[field drawer](#field-drawer).
 
 ## Indexes
 
@@ -163,7 +175,8 @@ letter case.
 ## Diagnostics
 
 Every input keeps its `studio-field-<pointer>` id, and each row has the id of its field, so a diagnostic
-opens at its input, or at the row when the row does not show the setting.
+opens at its input, or at the row when the row does not show the setting. The [field drawer](#field-drawer) is drawn
+outside the form, so a diagnostic at a setting inside a field opens at the field's row.
 
 - **Inside a field** _(planned)_. A diagnostic inside a field opens the
   [field drawer](#field-drawer) at the setting.
