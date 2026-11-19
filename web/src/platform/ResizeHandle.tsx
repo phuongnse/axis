@@ -1,4 +1,4 @@
-import { HolderOutlined } from '@ant-design/icons'
+import { PauseOutlined } from '@ant-design/icons'
 import { useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -8,7 +8,7 @@ import { useDesignTokens } from './themeMode'
  * side panel has it on its start edge and sets its width, and a package's bottom panel has it on its top edge and sets
  * its height, see docs/reference/shell.md#layout. Proposed, see #3978: a package's explorer has it on its end edge and
  * sets its width, and the rule under a handle turns `primary` while the pointer is on it or drags it, as a code
- * editor's sash does, and the library's drag handle icon, `HolderOutlined`, sits in `textMuted` at the middle of
+ * editor's sash does, and the split view grip, two bars along the rule drawn by `PauseOutlined`, sits in `textMuted` at the middle of
  * the rule at all times, as a split view's grip does, so a person sees that the edge moves before pointing at it; `labelKey` names what it resizes. Each arrow moves the edge by `spacing-md`, and the arrow that moves the
  * edge away from the panel makes it larger. `measure` gives the size that a pointer at the event's place sets, and
  * `onChange` clamps and keeps it.
@@ -100,7 +100,7 @@ export function ResizeHandle({
             pointerEvents: 'none',
           }}
         >
-          <HolderOutlined />
+          <PauseOutlined />
         </span>
       </div>
     </>
