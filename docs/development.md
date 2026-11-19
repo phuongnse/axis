@@ -191,8 +191,8 @@ runs Playwright in Chromium. It:
 - starts MinIO with the bucket `axis-exports` and a KMS key, which the export job's encrypted upload needs, and
   gives Playwright its five `AXIS_E2E_EXPORT_STORAGE_*` values. Only the cell specs pass them on, as the
   `Cell:ExportStorage` settings of their server and their publisher;
-- gives Playwright the connection string of the scenario role as `AXIS_E2E_SCENARIO_DATABASE`, which the publisher of the
-  Ask AI agent spec passes on as its `Scenarios:ServerConnectionString`;
+- gives Playwright the connection string of the scenario role as `AXIS_E2E_SCENARIO_DATABASE`, which the publishers of the
+  AI authoring specs pass on as their `Scenarios:ServerConnectionString`;
 - creates the `journey` tenant for Studio journeys, with its own database `axis_journey`, its roles
   `axis_journey_schema` and `axis_journey_runtime`, and its server on `127.0.0.2`, which the worker
   and the publisher serve too;
@@ -809,10 +809,11 @@ The run's shared publisher reads the `Tenants` section, so it runs no provisioni
 jobs, such as the cell console spec and the cell quota journey, starts its own publisher with `startPublisher` of the
 same file, which reads the tenant directory with a cell's settings and runs the jobs. Both start it, with their server
 and browser, through `startCell` of `tests/e2e/cell.ts`, see [the E2E stack](testing.md#the-e2e-stack).
-The Ask AI agent spec starts a publisher too, with the server's Studio settings, for the scenarios of its request's
-checks and of its accept. A publisher claims the work of every directory tenant, so `startPublisher` holds a PostgreSQL
-advisory lock for the publisher's whole life. The Ask AI agent spec's publisher takes it alone, and the cell specs'
-publishers share it.
+The two AI authoring specs, the Ask AI agent spec and the AI authoring journey spec, each start a publisher too, with the
+server's Studio settings, for the scenarios of their requests' checks and of their accepts. A publisher claims the work of
+every directory tenant, so `startPublisher` holds a PostgreSQL advisory lock for the publisher's whole life. The AI
+authoring specs' publishers take it alone, and the cell specs' publishers share it. Both AI authoring specs also hold the
+AI authoring lock for their whole run, see [testing](testing.md#the-e2e-stack).
 
 ## Widget previews
 
