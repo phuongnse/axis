@@ -69,7 +69,8 @@ The file step writes them, so this is what to expect, not what to do:
 - One docs issue per page, labelled `documentation`, with every `wrong`, `built`, `missing` and
   `standard` finding of that page as an acceptance criterion. It is also labelled `bug` when it holds
   a `wrong` finding, as [how the docs stay correct](../../../docs/writing-docs.md#how-the-docs-stay-correct) says.
-- One `bug` issue per `unbuilt` finding, and one test issue per `untested-list` finding.
+- One `bug` issue per `unbuilt` finding, and one test issue per `untested-list` finding, labelled
+  `documentation`.
 - Each issue carries the `docs-audit` label, which is its home, as [how issues run](../../../docs/delivery.md#how-issues-run)
   says, so it is in no milestone. It links the page and the code it rests on, and carries a hidden
   `docs-audit` marker, so a later run leaves it alone while it is open, and NexKit's marker of the run
