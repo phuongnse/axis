@@ -1,5 +1,8 @@
 import type { ChartKind } from '../platform/chartOption'
 import type { CurrentUser } from '../platform/currentUser'
+import type { OwnAuthenticators } from '../platform/ownAuthenticators'
+import type { OwnSessions } from '../platform/ownSessions'
+import type { UserList, UserRoles } from '../platform/users'
 import type { LegalLinks } from '../platform/LegalLine'
 import type { NotificationPage } from '../platform/notifications'
 import type { HistoryPage, RecordItem, RecordPage } from '../platform/records'
@@ -1240,13 +1243,13 @@ export const signUpDocuments = {
 export const signUpRegion = { tenantDomain: 'vn.example.com' }
 
 /** The person's own authenticators on the account page, as `GET /api/me/authenticators` answers them. */
-const ownAuthenticators = {
+const ownAuthenticators: OwnAuthenticators = {
   account: true,
   authenticators: [{ id: 'totp-1', label: 'Phone', createdAt: '2026-02-10T08:15:00Z' }],
 }
 
 /** The person's live sessions on the account page, as `GET /api/me/sessions` answers them. */
-const ownSessions = {
+const ownSessions: OwnSessions = {
   endAllowed: true,
   sessions: [
     { id: 'session-1', signedInAt: '2026-03-04T08:30:00Z', lastRequestAt: '2026-03-04T09:42:00Z', current: true },
@@ -1258,7 +1261,7 @@ const ownSessions = {
 export const userId = '7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f'
 
 /** The tenant's users, as `GET /api/users` answers them. */
-const userList = {
+const userList: UserList = {
   items: [
     {
       id: currentUser.id,
@@ -1291,7 +1294,7 @@ const userList = {
 }
 
 /** Jordan Lee's roles, as `GET /api/users/{id}/roles` answers them. */
-const userRoles = {
+const userRoles: UserRoles = {
   displayName: 'Jordan Lee',
   email: 'jordan.lee@contoso.example',
   given: [
