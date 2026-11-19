@@ -3,6 +3,10 @@
     { "advisory": "CVE-2026-102554", "package": "com.google.guava:guava", "found": "2026-10-31", "reason": "Inside the Keycloak 26.8 image, which ships guava 33.6.0; fixed in 33.7.2 once Keycloak takes it" },
     { "advisory": "CVE-2026-91403", "package": "java-21-openjdk-headless", "found": "2026-10-31", "reason": "No fixed OpenJDK 21 in the Keycloak 26.8 image yet" },
     { "advisory": "CVE-2026-114938", "package": "java-21-openjdk-headless", "found": "2026-11-18", "reason": "No fixed OpenJDK 21 in the Keycloak 26.8 image yet" },
+    { "advisory": "CVE-2026-114939", "package": "java-21-openjdk-headless", "found": "2026-11-19", "reason": "No fixed OpenJDK 21 in the Keycloak 26.8 image yet" },
+    { "advisory": "CVE-2026-114940", "package": "java-21-openjdk-headless", "found": "2026-11-19", "reason": "No fixed OpenJDK 21 in the Keycloak 26.8 image yet" },
+    { "advisory": "CVE-2026-114941", "package": "java-21-openjdk-headless", "found": "2026-11-19", "reason": "No fixed OpenJDK 21 in the Keycloak 26.8 image yet" },
+    { "advisory": "CVE-2026-114942", "package": "java-21-openjdk-headless", "found": "2026-11-19", "reason": "No fixed OpenJDK 21 in the Keycloak 26.8 image yet" },
     { "advisory": "CVE-2026-119373", "package": "sqlite-libs", "found": "2026-10-31", "reason": "No fixed sqlite-libs for EL9 in the Keycloak 26.8 image yet" },
     { "advisory": "CVE-2026-119586", "package": "sqlite-libs", "found": "2026-10-31", "reason": "No fixed sqlite-libs for EL9 in the Keycloak 26.8 image yet" },
     { "advisory": "CVE-2026-119374", "package": "sqlite-libs", "found": "2026-11-09", "reason": "No fixed sqlite-libs for EL9 in the Keycloak 26.8 image yet" },
@@ -10,6 +14,7 @@
     { "advisory": "CVE-2026-76844", "package": "zlib", "found": "2026-11-14", "reason": "No fixed zlib for EL9 in the Keycloak 26.8 image yet" },
     { "advisory": "CVE-2026-109518", "package": "apt", "found": "2026-11-05", "reason": "In the .NET 10 aspnet and runtime base images; no rebuilt image with a fixed apt yet" },
     { "advisory": "CVE-2026-109518", "package": "libapt-pkg6.0t64", "found": "2026-11-05", "reason": "In the .NET 10 aspnet and runtime base images; no rebuilt image with a fixed apt yet" },
-    { "advisory": "CVE-2026-112366", "package": "picomatch", "found": "2026-11-17", "reason": "Bundled in npm 11.21.2 of the axis-package-host-node image, which the package host needs for npm ci; no fixed picomatch version yet" }
+    { "advisory": "CVE-2026-112366", "package": "picomatch", "found": "2026-11-17", "reason": "Bundled in npm 11.21.2 of the axis-package-host-node image, which the package host needs for npm ci; no fixed picomatch version yet" },
+    { "advisory": "CVE-2026-97054", "package": "stdlib", "found": "2026-11-19", "reason": "Go standard library in the Trivy binary of the package host images; no Trivy release built with a fixed Go yet" }
   ]
 }
