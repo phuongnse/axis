@@ -64,6 +64,10 @@ let authorContext: BrowserContext
 let firstRequestUrl: string
 // The address of the layer test's ready request. The Accept tests that follow it open it.
 let readyRequestUrl: string
+// The colleague's context, which the tests share, so the colleague signs in once. See the tests that use it.
+let colleagueContext: BrowserContext
+// The id of the approvals application's employee role. The layer test's draft reads it, and the conflict test changes it.
+let employeeRole: string
 
 /** Signs `account` in on the tenant's host in `context` and leaves the page on the tenant's home. */
 async function signIn(context: BrowserContext, account: { username: string; password: string; secret: string }) {
@@ -156,6 +160,7 @@ test.afterAll(async () => {
   await publisher?.stop()
   await agent?.stop()
   await authorContext?.close()
+  await colleagueContext?.close()
   proxy?.close()
   await browser?.close()
   await server?.stop()
@@ -373,6 +378,42 @@ test("a request whose work adds a field to a module entity's layer reaches Ready
       'utf8',
     ),
   )
+  // The approvals application comes first, because the scripted answers name the id of its employee role.
+  const setup = await authorContext.newPage()
+  try {
+    // The call runs in a page of the tenant's host, as the first test's does.
+    await setup.goto(`https://${host}/`)
+    const made = await setup.evaluate(
+      async ({ headers, name, template }) => {
+        const response = await fetch('/api/studio/apps', {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, template }),
+        })
+        return response.status
+      },
+      {
+        headers: csrfHeaders,
+        name: approvalsApplication,
+        template: 'approvals',
+      },
+    )
+    expect(made).toBe(201)
+
+    // The employee role's id, which the scripted read names. A template copy may get new ids, so it is read here.
+    employeeRole = await setup.evaluate(
+      async (url) => {
+        const { items } = (await (await fetch(url)).json()) as {
+          items: { id: string; kind: string; name: string | null }[]
+        }
+        return items.find((item) => item.kind === 'role' && item.name === 'employee')!.id
+      },
+      `/api/studio/apps/${approvalsApplication}/resources`,
+    )
+  } finally {
+    await setup.close()
+  }
+
   const layerAnswers = path.join(folder, 'answers-layer.json')
   await writeFile(
     layerAnswers,
@@ -380,6 +421,20 @@ test("a request whose work adds a field to a module entity's layer reaches Ready
       {
         content: [{ type: 'text', text: layerPlan }],
         stop_reason: 'end_turn',
+        usage,
+      },
+      // The work reads the employee role before it writes the layer, so the draft records the role's version. The conflict
+      // test changes the role after AI reads it, and the accept then meets that change, see there.
+      {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'read-1',
+            name: 'read_resource',
+            input: { application: approvalsApplication, id: employeeRole },
+          },
+        ],
+        stop_reason: 'tool_use',
         usage,
       },
       {
@@ -427,25 +482,6 @@ test("a request whose work adds a field to a module entity's layer reaches Ready
 
   const page = await authorContext.newPage()
   try {
-    // The call runs in a page of the tenant's host, as the first test's does.
-    await page.goto(`https://${host}/`)
-    const made = await page.evaluate(
-      async ({ headers, name, template }) => {
-        const response = await fetch('/api/studio/apps', {
-          method: 'POST',
-          headers: { ...headers, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, template }),
-        })
-        return response.status
-      },
-      {
-        headers: csrfHeaders,
-        name: approvalsApplication,
-        template: 'approvals',
-      },
-    )
-    expect(made).toBe(201)
-
     await askAi(page, layerRequest, approvalsApplication)
     await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Awaiting approval', { timeout: 120_000 })
     await expect(page.getByText(layerPlan, { exact: true })).toBeVisible()
@@ -496,9 +532,10 @@ test("a request whose work adds a field to a module entity's layer reaches Ready
 })
 
 test('another author sees the ready request and its diff, and whose accept it waits for, with no actions', async () => {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true })
+  // The colleague's context stays open for the conflict test that follows, which acts as the colleague, so it signs in once.
+  colleagueContext = await browser.newContext({ ignoreHTTPSErrors: true })
+  const page = await signIn(colleagueContext, colleague)
   try {
-    const page = await signIn(context, colleague)
     await page.goto(readyRequestUrl)
     await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Ready')
     const changed = page.getByTestId('studio-changes-file').filter({ hasText: 'Department' })
@@ -514,7 +551,91 @@ test('another author sees the ready request and its diff, and whose accept it wa
       await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
     }
   } finally {
-    await context.close()
+    await page.close()
+  }
+})
+
+test("an author's accept after another author changed a resource the draft read shows who changed it, and nothing is accepted", async () => {
+  let changed: { id: string; author: string; time: string } | undefined
+  const colleaguePage = await colleagueContext.newPage()
+  try {
+    await colleaguePage.goto(`https://${host}/`)
+    // The colleague changes the employee role, which the draft read, as another author does while AI's draft waits.
+    const outcome = await colleaguePage.evaluate(
+      async ({ headers, application, role }) => {
+        const api = `/api/studio/apps/${application}`
+        const { version } = (await (await fetch(`${api}/resources/${role}`)).json()) as { version: string }
+        const patch = await fetch(`${api}/resources/${role}`, {
+          method: 'PATCH',
+          headers: { ...headers, 'Content-Type': 'application/json-patch+json', 'If-Match': `"${version}"` },
+          body: JSON.stringify([{ op: 'replace', path: '/label/textKey', value: 'role.admin' }]),
+        })
+        const { items } = (await (await fetch(`${api}/revisions`)).json()) as {
+          items: { id: string; author: string; time: string }[]
+        }
+        return { status: patch.status, revision: items[0] }
+      },
+      { headers: csrfHeaders, application: approvalsApplication, role: employeeRole },
+    )
+    expect(outcome.status).toBe(200)
+    changed = outcome.revision
+
+    // The accept is the publisher's work, so the spec's publisher runs from just before Accept until the accept ends.
+    const page = await authorContext.newPage()
+    try {
+      await page.goto(readyRequestUrl)
+      await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Ready')
+      publisher = await startSpecPublisher()
+      try {
+        await page.getByRole('button', { name: 'Accept', exact: true }).click()
+        try {
+          await expect(page.getByTestId('studio-ai-request-conflict')).toBeVisible({ timeout: 300_000 })
+        } catch (error) {
+          await test.info().attach('publisher-output', {
+            body: publisher.output(),
+            contentType: 'text/plain',
+          })
+          throw error
+        }
+      } finally {
+        await publisher.stop()
+        publisher = undefined
+      }
+
+      // One bullet names the role by its title now, which the colleague's change set to Administrator, then the colleague
+      // who changed it and the time of that change.
+      const items = page.getByTestId('studio-ai-request-conflict-item')
+      await expect(items).toHaveCount(1)
+      await expect(items).toContainText('Administrator')
+      await expect(items).toContainText(changed.author)
+      const datetime = await items.locator('time').getAttribute('datetime')
+      expect(new Date(datetime!).getTime()).toBe(new Date(changed.time).getTime())
+
+      // The bar offers Drop… and no Accept, and the request stays Ready.
+      const guide = page.getByTestId('studio-ai-request-guide')
+      await expect(guide).toContainText('Resources changed since AI read them')
+      await expect(guide.getByRole('button', { name: 'Accept', exact: true })).toHaveCount(0)
+      await expect(guide.getByRole('button', { name: 'Drop…', exact: true })).toBeVisible()
+      await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Ready')
+    } finally {
+      await page.close()
+    }
+  } finally {
+    // The colleague undoes the change, so the draft's recorded version matches again and the Accept test can accept.
+    if (changed !== undefined) {
+      const undone = await colleaguePage.evaluate(
+        async ({ headers, application, revision }) =>
+          (
+            await fetch(`/api/studio/apps/${application}/revisions/${revision}/undo`, {
+              method: 'POST',
+              headers,
+            })
+          ).status,
+        { headers: csrfHeaders, application: approvalsApplication, revision: changed.id },
+      )
+      expect(undone).toBe(200)
+    }
+    await colleaguePage.close()
   }
 })
 
