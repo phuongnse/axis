@@ -77,7 +77,7 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     const rows = screen.getAllByTestId('studio-test-result')
     expect(rows).toHaveLength(1)
     expect(rows[0]).toHaveAttribute('data-outcome', 'passed')
-    expect(rows[0]).toHaveTextContent('1234 ms')
+    expect(rows[0]).toHaveTextContent('1.2 sec')
     expect(within(rows[0]).getByText('passed').closest('[data-tone]')).toHaveAttribute('data-tone', 'success')
     expect(within(rows[0]).getByText('Test scenario')).toBeInTheDocument()
 
@@ -93,6 +93,7 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     const failed = rows[1]
     expect(failed).toHaveAttribute('data-outcome', 'failed')
     expect(failed).toHaveTextContent('ApprovalBelowThreshold')
+    expect(failed).toHaveTextContent('< 1 sec')
     expect(within(failed).getByText('failed').closest('[data-tone]')).toHaveAttribute('data-tone', 'danger')
     expect(within(failed).getByText('Test scenario')).toBeInTheDocument()
     expect(within(failed).getByText('Step 6')).toBeInTheDocument()

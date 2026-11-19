@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PlusOutlined } from '@ant-design/icons'
 import { ConfigProvider } from 'antd'
+import { useState } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -15,6 +16,7 @@ import { withAntdStyles } from '../test/antdStyles'
 
 const texts = {
   'test.add': 'Add a row',
+  'test.added': 'Added',
   'test.validate': 'Validate',
   'test.preview': 'Preview',
   'test.runTests': 'Run tests',
@@ -120,6 +122,30 @@ describe('the icon-only button', () => {
     await userEvent.hover(button)
 
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Add a row')
+  })
+
+  it('says its done text in the tooltip right after a pointer click, and keeps its name', async () => {
+    function Copy() {
+      const [done, setDone] = useState(false)
+      return (
+        <AxisButton
+          role="icon"
+          icon={<PlusOutlined />}
+          nameKey="test.add"
+          doneKey={done ? 'test.added' : undefined}
+          onClick={() => setDone(true)}
+        />
+      )
+    }
+    renderIn('light', <Copy />)
+    const button = screen.getByRole('button', { name: 'Add a row' })
+    await userEvent.hover(button)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Add a row')
+
+    await userEvent.click(button)
+
+    await waitFor(() => expect(screen.getByRole('tooltip')).toHaveTextContent('Added'))
+    expect(screen.getByRole('button', { name: 'Add a row' })).toBeInTheDocument()
   })
 
   it('appends its suffix to the accessible name but shows the name alone as a tooltip', async () => {

@@ -340,6 +340,7 @@ platform tools they may open.
 | `studioTest`        | True when `studio` is true and `Studio:Tests` is true                                                                                                       |
 | `studioCreate`      | True when `studio` is true and `Studio:ApplicationsPath` is set                                                                                             |
 | `studioAi`          | True when `studio` is true and `Ai:DefaultBinding` is set                                                                                                   |
+| `studioDeveloper`   | True when `studio` is true, the user holds `Studio:DeveloperRole` and the tenant's [application packages](user-administration.md#application-packages) switch is on, the checks of a [package file write](studio-packages.md#the-authoring-api) |
 | `tenantStatus`      | `readOnly` while the tenant is [read-only](subscriptions.md#the-read-only-tenant), otherwise `active`. A suspended tenant is never served                   |
 | `billingUrl`        | `https://account.<Cell:TenantDomain>/tenants/<tenant id>` for a user who holds the administrator role in a tenant of a cell, see [billing portal](billing-portal.md#where). Otherwise null, also in a preview tenant |
 | `tenantExports`     | True for a user who holds the administrator role in a tenant of a cell that is not a preview tenant, the tenants whose [export routes](tenant-lifecycle.md#exports-by-a-tenant-administrator) answer. Otherwise false |
