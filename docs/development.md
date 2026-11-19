@@ -819,8 +819,9 @@ AI authoring lock for their whole run, see [testing](testing.md#the-e2e-stack).
 
 `npm run dev:design-system --prefix web` serves `http://localhost:5174/design-system.html` from
 `web/src/designSystem/`, with React Fast Refresh. It needs no Docker, server, database or sign-in. An edit to a
-widget swaps in place in the open page. An edit to the previews or the fixtures reloads the page. The query
-parameters are the ones in [widget previews](reference/widget-previews.md#the-bundle).
+widget swaps in place in the open page. An edit to the previews or the fixtures reloads the page. An edit to a
+platform text in `src/Axis.Presentation/Texts/` reloads the page too, so the open preview shows the new text without
+a restart. The query parameters are the ones in [widget previews](reference/widget-previews.md#the-bundle).
 
 The server serves the harness, the modules it loads and the files in `web/`. Paths that begin with `/api` or
 `/health` go to the Axis server, and answer `502` while it is not running. Any other path that names none of

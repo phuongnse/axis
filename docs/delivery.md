@@ -417,6 +417,17 @@ change, a design review and a sync are in the
   before each step, the session merges `origin/main` into the branch and never rebases it. So the
   previews differ from `main` only by what the review changes. `main` stays the standard for behaviour
   and the prototype the standard for its look.
+- **Each step is checked before the owner sees it.** The session checks each fixture the step adds or
+  changes against the API's reference page and the server code that answers it, such as
+  `ProcessInspectionEndpoints` for an instance. A value no API gives today is a field marked _Proposed_ in
+  the code, named in the design issue's build notes. It never looks like a real value. The session also
+  checks the step against the rules for every screen, which
+  [checking a card](../.claude/skills/axis-design/checking-a-card.md#the-rules-for-every-screen) lists with
+  their reference sections: text, showing what is empty, list order, opening things, and the contrast of
+  design tokens and previews in both modes.
+- **A step stays one step.** When a step brings a new screen or a new concept of the platform, the session
+  proposes it to the owner as its own design issue. The issue has the `design` and `on-hold` labels, no
+  milestone, and is *blocked by* the review. The step goes on without it.
 - **The design runs ahead of the repository only by open issues.** While a design issue is open, the
   artifact holds its change and its last change note names the issue. A review does not change the
   artifact: it is published once the review's issues are merged, so nothing else in the artifact
@@ -424,8 +435,9 @@ change, a design review and a sync are in the
 - **A review's agreed rules are comments on its design issue.** The design issue stays short enough to
   read in one pass. Its body holds the review's scope and what the build must do beyond the docs,
   because NexKit plans from the body. One comment holds the review's state: the prototype branch, the
-  `main` commit it stands on, what is done, what waits for the owner, what comes next and each change's
-  parts list. Before it builds a change, the session lists each visible part with the shared widget,
+  `main` commit it stands on, each agreed step with a link to its rule comment, what waits for the owner,
+  what comes next and the parts list of the step in hand. It holds the present only: what happened in a
+  step is in its commits. Before it builds a change, the session lists each visible part with the shared widget,
   helper or token that draws it, as
   [which widget](reference/shared-widgets.md#which-widget) shows, and marks **new** each mechanism the
   change adds, so the owner decides only on what is new. The session edits that comment in place and
@@ -437,6 +449,9 @@ change, a design review and a sync are in the
   screen is added to that comment by an edit. A rule that changes while the issue has `on-hold` is
   edited in its comment. NexKit reads the issue only once the label comes off, and GitHub keeps each
   comment's edit history. There is no docs branch, and no other file holds these rules.
+- **An agreed step is audited for one mechanism.** When the owner agrees a step, an agent audits the step's
+  diff for one concern done by two mechanisms. The session merges what it finds before the next step. The
+  audit of the whole prototype, when the review ends, still comes last.
 - **A review ends when the design issue's `on-hold` label comes off.** Before that, the session tags the
   prototype and comments the tag on each issue that waits for the design issue. A screen that is already
   built has no such issue, so the session first writes one build issue *blocked by* the design issue.
