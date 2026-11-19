@@ -175,7 +175,7 @@ export default function StudioPackage({
     }
     const controller = new AbortController()
     for (const path of missing.split('\n')) {
-      fetchStudioPackageFile(application, packageId, path, controller.signal).then(
+      loadFile(application, packageId, path, controller.signal).then(
         (loaded) =>
           setOpen((current) => ({
             ...current,
@@ -217,7 +217,7 @@ export default function StudioPackage({
   /** Puts each file back as loaded, or as the server now holds it, with a new editor so no step undoes into the change. */
   async function putBack(paths: readonly string[], reload: boolean) {
     for (const path of paths) {
-      const loaded = reload ? await fetchStudioPackageFile(application, packageId, path) : open[path].loaded
+      const loaded = reload ? await loadFile(application, packageId, path) : open[path].loaded
       setOpen((current) => ({
         ...current,
         [path]: { loaded, text: loaded.content, conflict: false, generation: current[path].generation + 1 },
@@ -501,7 +501,7 @@ export default function StudioPackage({
           onSend={async (path) => {
             const trimmed = path.trim()
             const result = await createStudioPackageFile(application, packageId, trimmed, '')
-            if (result.status === 'saved') {
+            if (result.status === 'created') {
               onChanged(result.diagnostics)
               navigate(studioPackageAddress(application, packageId, trimmed))
               return { ok: true }
@@ -532,4 +532,18 @@ export default function StudioPackage({
       </Modal>
     </Flex>
   )
+}
+
+/** Loads a package file with its text. A file that is gone throws, as any other failure does. */
+async function loadFile(
+  application: string,
+  packageId: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<StudioPackageFile> {
+  const loaded = await fetchStudioPackageFile(application, packageId, path, signal)
+  if (loaded === null) {
+    throw new Error(`The package file '${path}' is gone.`)
+  }
+  return { package: packageId, path, ...loaded }
 }

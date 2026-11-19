@@ -3,6 +3,7 @@ import { AxisAlert } from './AxisAlert'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from './AxisTable'
+import { CopyableId } from './CopyableId'
 import { EmptyState } from './EmptyState'
 import { formatValue } from './formatValue'
 import {
@@ -266,11 +267,7 @@ export function InstanceDetailView({
     title: t('shell.inspector.traceId'),
     filter: { kind: 'text' as const, value: (row: { traceId: string | null }) => row.traceId },
     render: (_v: unknown, row: { traceId: string | null }) =>
-      row.traceId === null ? null : (
-        <Typography.Text code copyable>
-          {row.traceId}
-        </Typography.Text>
-      ),
+      row.traceId === null ? null : <CopyableId id={row.traceId} />,
   }
   const historyColumns: AxisColumn<PathEntry>[] = [
     {
@@ -700,7 +697,7 @@ function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attem
         />
       )}
       {call.inputHidden && (
-        <Typography.Text type="secondary">{`${t('shell.inspector.input')}: ${t('shell.inspector.hidden')}`}</Typography.Text>
+        <Typography.Text type="secondary">{`${t('shell.inspector.input')}: ${t('shell.value.hidden')}`}</Typography.Text>
       )}
       {input !== null && input.length > 0 && (
         <Descriptions

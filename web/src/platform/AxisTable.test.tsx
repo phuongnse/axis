@@ -1296,6 +1296,64 @@ describe('AxisTable', () => {
     })
   })
 
+  describe('title, compact and headless', () => {
+    withAntdStyles()
+
+    it('draws its title first at the left end of the toolbar, before the search box', () => {
+      const searchable: AxisColumn<Row> = { ...nameColumn, searchText: (row) => row.name ?? '' }
+      renderTable({
+        columns: [searchable, amountColumn],
+        view: { query: { page: 1, pageSize: 20, sort: null }, onChange: vi.fn() },
+        pagination: undefined,
+        title: <span>Lines</span>,
+      })
+
+      const title = screen.getByText('Lines')
+      const search = screen.getByRole('searchbox', { name: 'Search' })
+      expect(title.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(screen.getByTestId('axis-table-title').parentElement?.firstElementChild).toBe(
+        screen.getByTestId('axis-table-title'),
+      )
+    })
+
+    it('draws a toolbar for a table with only a title', () => {
+      renderTable({ title: <span>Lines</span> })
+
+      expect(screen.getByText('Lines')).toBeInTheDocument()
+    })
+
+    it('draws no header row when it is headless', () => {
+      const { container } = renderTable({ headless: true })
+
+      expect(container.querySelector('thead')).toBeNull()
+      expect(screen.queryByRole('columnheader')).not.toBeInTheDocument()
+      expect(screen.getByRole('cell', { name: 'Buy paper' })).toBeInTheDocument()
+    })
+
+    it('pads each side of a cell by spacing-sm when it is compact and spacing-lg otherwise', () => {
+      const { spacing } = designTokensFor('light')
+      // Ant Design gives the padding through a CSS variable that a rule names by the classes of the table's wrapper.
+      const paddings = (compact: boolean) => {
+        const { container, unmount } = renderTable({ compact })
+        const wrapper = container.querySelector('.ant-table-wrapper') as HTMLElement
+        const css = [...document.querySelectorAll('style')].map((style) => style.textContent ?? '').join('\n')
+        const found = css
+          .split('}')
+          .filter((rule) =>
+            [...wrapper.classList].some(
+              (name) => name.startsWith('css-var-') && rule.split('{')[0].includes(`.${name}.`),
+            ),
+          )
+          .map((rule) => rule.match(/--ant-table-cell-padding-inline:\s*([^;]*);/)?.[1])
+          .find((value) => value !== undefined)
+        unmount()
+        return found
+      }
+      expect(paddings(true)).toBe(`${spacing.sm}px`)
+      expect(paddings(false)).toBe(`${spacing.lg}px`)
+    })
+  })
+
   describe('spacing', () => {
     withAntdStyles()
 

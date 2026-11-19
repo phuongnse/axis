@@ -3,6 +3,7 @@ import { cloneElement, forwardRef, useId, type ReactElement, type Ref } from 're
 import { Announcement } from './Announcement'
 import { requiredMark } from './requiredMark'
 import { useDesignTokens } from './themeMode'
+import { visuallyHidden } from './visuallyHidden'
 
 type FieldInput = ReactElement<{ id?: string; 'aria-describedby'?: string; onChange?: (...args: never[]) => void }>
 
@@ -29,6 +30,7 @@ type FormFieldProps = {
   status?: AxisFieldStatus
   /** A field in a form is marked required by its `requiredMessage`, the one way to mark it. */
   required?: never
+  hideLabel?: never
   /** The input, such as an `Input` or a `Select`. Ant Design's form gives it its value and its change handler. */
   children: FieldInput
 }
@@ -46,6 +48,8 @@ type OwnFieldProps = {
   status?: never
   /** Marks the field required: the shared `requiredMark` after the label and `aria-required` on the input. The screen checks the value. */
   required?: boolean
+  /** Hides the label from the eye while it still names the input, for a control in a table cell whose row and column name it. */
+  hideLabel?: boolean
   /** The input, such as an `Input` or a `Select`. The caller gives it its `value` and its change handler. */
   children: FieldInput
 }
@@ -78,7 +82,8 @@ function isEmpty(value: unknown): boolean {
  *   checks it, so the mark and the check never part. The check holds for text, numbers, lists and boxes, and blank text and an unticked box are
  *   empty.
  * - Without a `name`, the field needs no form: the caller gives the input its `value` and change handler, and the
- *   label still names the input. `required` draws the shared `requiredMark` after the label and sets `aria-required`
+ *   label still names the input. `hideLabel` hides the label from the eye and keeps it naming the input, for a control in a
+ *   table cell that its row and column name. `required` draws the shared `requiredMark` after the label and sets `aria-required`
  *   on the input, and the screen checks the value.
  *
  * A `status` on a field with a `name` shows a check's result under the input: busy while it runs, a message a screen
@@ -117,13 +122,20 @@ function statusItemProps(
 }
 
 /** A field the caller holds the value of: a label tied to the input, then the help and the input. */
-function OwnField({ label, help, required, children }: OwnFieldProps) {
+function OwnField({ label, help, required, hideLabel, children }: OwnFieldProps) {
   const { colour } = useDesignTokens()
   const ownId = useId()
   const id = children.props.id ?? ownId
   return (
     <div>
-      <label htmlFor={id} style={{ display: 'block', paddingBottom: 8, fontWeight: 500, color: colour.textMuted }}>
+      <label
+        htmlFor={id}
+        style={
+          hideLabel === true
+            ? visuallyHidden
+            : { display: 'block', paddingBottom: 8, fontWeight: 500, color: colour.textMuted }
+        }
+      >
         {requiredMark(label, { required: required === true })}
       </label>
       <HelpedInput help={help} input={children} id={id} {...(required === true ? { 'aria-required': true } : {})} />

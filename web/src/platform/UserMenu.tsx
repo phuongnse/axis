@@ -20,7 +20,7 @@ function initials(displayName: string): string {
 /**
  * The account button in the shell header. With nobody signed in, it is a sign-in button that goes
  * to the identity provider and back to the current page. With someone signed in, it shows their
- * initials on an avatar, their name and a caret, with a menu. Its Sessions entry opens the account screen. Its sign-out entry ends the
+ * initials on an avatar, their name and a caret, with a menu. Its Your account entry opens the account page. Its sign-out entry ends the
  * session, then sends the browser to the identity provider's sign-out page. It renders nothing while
  * the user loads, when loading fails, or with nobody signed in on the home page, which starts sign-in or shows a sign-in card.
  */
@@ -61,7 +61,7 @@ export function UserMenu() {
     signOutSession().then(assignLocation, (error: unknown) => console.warn('Signing out failed', error))
   }
   const items: MenuProps['items'] = [
-    { key: 'sessions', label: <Link to="/account">{t('shell.account.sessions')}</Link> },
+    { key: 'account', label: <Link to="/account">{t('shell.account.title')}</Link> },
     { key: 'signOut', label: t('shell.account.signOut'), onClick: signOut },
   ]
 

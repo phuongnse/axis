@@ -8,32 +8,47 @@ Studio is in [Studio](studio.md) and [Studio workspace](studio-workspace.md).
 
 ## The Packages entry
 
-_(planned for M37)_
-
 The Packages entry gives an author the application's packages. It ends the sidebar's Integration group,
-see [the workspace](studio-workspace.md#workspace).
+see [the workspace](studio-workspace.md#workspace). It is kept in the address as `&view=packages`, and a
+package's page as `&view=packages&package=<id>`.
 
 - **The list.** It is the standard table, an `AxisTable`, of each package's label, id, language and
-  version, one row for each folder under `packages/`.
-- **New package.** The "New package…" action is for a person with the developer role only. It asks for an
-  id and a language, and creates the package's manifest, adapter and lock file for that language.
+  version, one row for each folder under `packages/`. The id comes from the files that
+  `GET .../package-files` lists, so a folder with no file has no row. The label, language and version come
+  from a read of the package's `axis-package.json`. A package whose manifest is missing or is not valid
+  JSON still has its row, with its id as the label and empty language and version cells. The table has a
+  filter on every column, a sort on Label and ID, and no search or pager.
+- **New package.** The "New package…" action sits on the right of the page's heading and shows only when
+  `GET /api/me` answers `studioDeveloper: true`. It asks for an id and a language, C#, TypeScript or
+  Python, and writes the language's starter one file at a time with `PUT` and `If-None-Match: *`, the
+  manifest first, so no file is replaced. The dialog checks the id against the manifest's id pattern
+  `^[a-z][a-z0-9-]*$` and sends nothing until it passes. An id that exists already, a `409` on the
+  manifest, shows under the id field and the dialog stays open. The new row then appears, and the
+  [Problems panel](studio-workspace.md#problems-panel) shows the diagnostics of the writes.
+- **Tested starters.** The files that New package writes come from `web/src/platform/packageStarters.json`,
+  with one starter each for C#, TypeScript and Python. A C# package gets `axis-package.json`, a project file,
+  `EchoOperation.cs` and `packages.lock.json`. A TypeScript package gets `axis-package.json`, `index.js`,
+  `package.json` and `package-lock.json`. A Python package gets `axis-package.json`, `adapter.py` and
+  `requirements.txt`. Each starter has version `0.1.0`, one `echo` operation and a label taken from the id.
+  A Vitest test checks the placeholders and the manifest against its schema. A server test compiles each
+  starter in an application with application packages on, and expects no diagnostic under `packages/<id>/`.
 - **Opening one.** A row opens the package's files, see [a package's files](#a-packages-files).
 
 ## A package's files
 
-_(planned for M37)_
-
-An author reads and edits the text of each file of a package, so a package can be written in the browser.
+An open package lists its files. Reading and editing the text of a file, so that a package can be written in the
+browser, is planned, see the marked bullets below.
 
 - **The file list.** An open package lists its files by path, the manifest, the adapter, the lock file and
-  the tests among them.
-- **The code editor.** Opening a file shows its text in a code editor. It builds on the CodeMirror editor of
+  the tests among them. The page is headed with the package's label, and its table has a filter and a sort on
+  Path, and no search or pager. It shows the working folder.
+- **The code editor** _(planned for M37)_. Opening a file shows its text in a code editor. It builds on the CodeMirror editor of
   the [JSON view](studio-resource-form.md#json-view), in `JsonView.tsx` and `codeEditorTheme.ts`, with the
   highlighting of the file's language and the same colours, so no editor draws in CodeMirror's own.
-- **Saving.** A save uses the version check of [versions](authoring.md#versions), and a save over a stale
+- **Saving** _(planned for M37)_. A save uses the version check of [versions](authoring.md#versions), and a save over a stale
   version answers `409`, as it does for a resource.
-- **Without the developer role.** The editor is read-only, and the file shows no save action.
-- **Problems.** A build failure of a package shows in the [Problems panel](studio-workspace.md#problems-panel)
+- **Without the developer role** _(planned for M37)_. The editor is read-only, and the file shows no save action.
+- **Problems** _(planned for M37)_. A build failure of a package shows in the [Problems panel](studio-workspace.md#problems-panel)
   like any other diagnostic.
 
 ## Diffs

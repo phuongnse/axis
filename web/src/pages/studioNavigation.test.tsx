@@ -98,7 +98,7 @@ describe('studioNavigation', () => {
     expect(built).toEqual(documented)
   })
 
-  it('lists the kinds of each group in order, with the policy matrix ending Access', () => {
+  it('lists the kinds of each group in order, with the policy matrix ending Access and Packages ending Integration', () => {
     const nav = navigationFor(fullFolder)
 
     expect(keysOf(groupOf(nav, 'group:data'))).toEqual([
@@ -116,7 +116,12 @@ describe('studioNavigation', () => {
       'kind:identityProvider',
       'policies',
     ])
-    expect(keysOf(groupOf(nav, 'group:integration'))).toEqual(['kind:connector', 'kind:endpoint', 'kind:webhook'])
+    expect(keysOf(groupOf(nav, 'group:integration'))).toEqual([
+      'kind:connector',
+      'kind:endpoint',
+      'kind:webhook',
+      'packages',
+    ])
     expect(keysOf(groupOf(nav, 'group:texts'))).toEqual(['kind:text'])
     expect(keysOf(groupOf(nav, 'group:tests'))).toEqual(['kind:scenario'])
   })
@@ -126,6 +131,13 @@ describe('studioNavigation', () => {
 
     expect(keysOf(groupOf(nav, 'group:access'))).toEqual(['policies'])
     expect(groupOf(nav, 'group:access')[0].label).toBe('Policy matrix')
+  })
+
+  it('keeps Packages as the only Integration entry when the application has no integration resource', () => {
+    const nav = navigationFor([resource('purchase-requests', 'application'), resource('request', 'entity')])
+
+    expect(keysOf(groupOf(nav, 'group:integration'))).toEqual(['packages'])
+    expect(groupOf(nav, 'group:integration')[0].label).toBe('Packages')
   })
 
   it('leaves out a kind with no folder or module resource, and keeps a kind only a module has', () => {
@@ -156,7 +168,7 @@ describe('studioNavigation', () => {
   it('leaves Settings out when the folder has no manifest', () => {
     const nav = navigationFor([resource('request', 'entity')])
 
-    expect(keysOf(nav)).toEqual(['overview', 'releases', 'history', 'group:data', 'group:access'])
+    expect(keysOf(nav)).toEqual(['overview', 'releases', 'history', 'group:data', 'group:access', 'group:integration'])
   })
 
   it('points each entry at its view, kind or manifest', () => {
@@ -169,6 +181,7 @@ describe('studioNavigation', () => {
     expect(pathOf('settings')).toBe('/studio?app=purchase-requests&resource=purchase-requests')
     expect(pathOf('kind:entity')).toBe('/studio?app=purchase-requests&kind=entity')
     expect(pathOf('policies')).toBe('/studio?app=purchase-requests&view=policies')
+    expect(pathOf('packages')).toBe('/studio?app=purchase-requests&view=packages')
   })
 
   it('shows no entry with a digit in its text, and collapsed entries as icons with a tooltip', async () => {
@@ -239,6 +252,13 @@ describe('studioActiveEntry', () => {
       'history',
     )
     expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=policies`), [], [])).toBe('policies')
+  })
+
+  it('marks Packages for the list and for a package page', () => {
+    expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=packages`), [], [])).toBe('packages')
+    expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=packages&package=tools`), [], [])).toBe(
+      'packages',
+    )
   })
 
   it('marks no entry on the publish page', () => {

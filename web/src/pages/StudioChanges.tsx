@@ -2,6 +2,7 @@ import { Flex, Typography } from 'antd'
 import { useContext, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
+import { CodeBlock } from '../platform/CodeBlock'
 import { EmptyDash } from '../platform/EmptyValue'
 import { FilledText } from '../platform/FilledText'
 import { fillText } from '../platform/fillText'
@@ -45,24 +46,11 @@ function parsedJson(text: string | null): unknown {
 
 /** One side of a diff: its title over the JSON text, or over the em dash where the file does not exist. */
 function Side({ testId, title, text }: { testId: string; title: string; text: string | null }) {
-  const { colour, radius, spacing, type } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   return (
     <Flex vertical gap={spacing.xs} style={{ minWidth: 0 }}>
       <Typography.Text style={{ color: colour.textMuted }}>{title}</Typography.Text>
-      <pre
-        data-testid={testId}
-        style={{
-          margin: 0,
-          padding: spacing.sm,
-          overflow: 'auto',
-          fontFamily: type.codeFontFamily,
-          background: colour.surface,
-          border: `1px solid ${colour.borderSubtle}`,
-          borderRadius: radius.base,
-        }}
-      >
-        {text === null ? <EmptyDash /> : prettyJson(text)}
-      </pre>
+      <CodeBlock testId={testId} text={text === null ? null : prettyJson(text)} />
     </Flex>
   )
 }

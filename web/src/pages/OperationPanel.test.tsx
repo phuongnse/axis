@@ -29,8 +29,9 @@ const names: StudioNames = {
           type: 'text',
           target: null,
           values: null,
+          unique: false,
         })),
-        { name: 'lines', type: 'child-collection', target: 'LineItem', values: null },
+        { name: 'lines', type: 'child-collection', target: 'LineItem', values: null, unique: false },
       ],
     },
     {
@@ -42,6 +43,7 @@ const names: StudioNames = {
         type: 'text',
         target: null,
         values: null,
+        unique: false,
       })),
     },
     {
@@ -53,6 +55,7 @@ const names: StudioNames = {
         type: 'text',
         target: null,
         values: null,
+        unique: false,
       })),
     },
   ],

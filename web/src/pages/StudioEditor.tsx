@@ -56,6 +56,7 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { StudioBindingsContext, StudioCatalogContext, StudioRelaxedContext } from '../platform/studioCatalog'
 import { StudioNamesContext, textsOf } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
+import { useCopy } from '../platform/useCopy'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { withoutEditorView } from '../platform/unsavedChanges'
@@ -250,6 +251,7 @@ export function StudioEditor({
   const rootRef = useRef<HTMLDivElement>(null)
   const jsonViewRef = useRef<JsonViewHandle>(null)
   const [messageApi, messageHolder] = message.useMessage()
+  const { copy: copyText } = useCopy()
   const dirtyRef = useRef(false)
   const [loaded, setLoaded] = useState<Loaded>()
   const [schema, setSchema] = useState<JsonSchema>()
@@ -832,11 +834,9 @@ export function StudioEditor({
   }
 
   async function copy() {
-    try {
-      await navigator.clipboard.writeText(shownJson)
+    if (await copyText(shownJson)) {
       void messageApi.success(t('shell.studio.json.copied'))
-    } catch (error) {
-      console.warn('Copying the JSON failed', error)
+    } else {
       void messageApi.error(t('shell.studio.json.copyFailed'))
     }
   }
@@ -1187,12 +1187,7 @@ export function StudioEditor({
                           disabled={jsonInvalid}
                           onClick={format}
                         />
-                        <AxisButton
-                          role="icon"
-                          nameKey="shell.studio.json.copy"
-                          icon={<CopyOutlined />}
-                          onClick={copy}
-                        />
+                        <AxisButton role="icon" nameKey="shell.copy.copy" icon={<CopyOutlined />} onClick={copy} />
                       </AxisActionRow>
                     ) : undefined
                   }

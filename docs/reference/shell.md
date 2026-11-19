@@ -166,7 +166,7 @@ below it. It says where the person is and what the page is.
   [fields](actions-and-controls.md#fields), above a `borderSubtle` rule. It never sits on the heading's line.
 - **Platform pages.** The platform home page has no band and no breadcrumb, and has its own headings,
   see the [platform home page](#platform-home-page). The users page has the band "Axis › Users".
-- **The account page's band** _(planned for M43)_. The account page has the band "Axis › Your account".
+- **The account page's band.** The account page has the band "Axis › Your account".
 
 ## App switcher and preferences
 
@@ -228,7 +228,7 @@ Sign-in itself is in [sign-in and the session](security.md#sign-in-and-the-sessi
   caret after it. Sign out in its menu ends the session. The server ends
   the identity provider's session itself and the browser goes to `/?signedOut`. Only when that fails
   does the browser go to the identity provider's sign-out page.
-- **Account menu** _(planned for M43)_. Its menu holds Your account (`shell.account.title`), which opens the
+- **Account menu.** Its menu holds Your account (`shell.account.title`), which opens the
   [account page](platform-pages.md#tabs), and Sign out, as [signed in](#account-button) says.
 - **Texts.** The platform texts are `shell.account.signIn`, `shell.account.signOut` and
   `shell.account.label`, the menu's label.
@@ -393,7 +393,7 @@ to the frame shows in every state. How previews work is in
 
   | Preview          | States                                                                                                                                                                                                                                                                                                                                                                                        |
   | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `shell`          | Application site, Navigation collapsed, Form page, Dashboard, Platform site, App switcher, and Language and theme                                                                                                                                                                                                                                                                                        |
+  | `shell`          | Application site, Navigation collapsed, Form page, Dashboard, Platform site, App switcher, Language and theme, Account page, and Account notifications                                                                                                                                                                                                                                                   |
   | `signIn`         | Sign-in refused, Signed out and Session ended, with the organization's heading over the cards                                                                                                                                                                                                                                                                                                 |
   | `identitySignIn` | The sign-in page of [Axis's identity provider](identity-provider.md#theme) in Sign in, Wrong password, Fields left empty, Organization sign-in only, Two-step verification, Forgot password, Set password, Add an authenticator, Choose how to sign in, Update your profile, Terms and privacy, Terms not accepted, Sign out, Notice, Error, and Language and theme with the gear's menu open |
 
@@ -404,7 +404,7 @@ to the frame shows in every state. How previews work is in
   the page scrolls inside it as in a window, so a dialog opens in the middle of what shows.
 - **The State control** _(planned)_. `shell`, `signIn` and `identitySignIn` show one state at a time under a State
   control, as `studio` does, and `&state=<slug>` opens one.
-- **Account states** _(planned for M43)_. The `shell` preview gains Account page, the platform's `/account` on its
+- **Account states.** The `shell` preview gains Account page, the platform's `/account` on its
   Security tab, and Account notifications, the same page on its Notifications tab. Both use fixtures of
   `GET /api/me/authenticators`, `GET /api/me/sessions` and `GET /api/me/notification-preferences`, and `PUT`
   answers `204`.

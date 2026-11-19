@@ -1,5 +1,6 @@
 import { Flex } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { CodeBlock } from '../platform/CodeBlock'
 import type { ModuleResourceItem, StudioDiagnostic, StudioResource, StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { StudioModuleContract } from './StudioModuleContract'
@@ -27,9 +28,7 @@ function StudioModuleJson({ application, module, id }: { application: string; mo
   return (
     <Flex vertical gap="middle">
       <StudioModuleReadOnly />
-      <pre data-testid="studio-module-content" style={{ margin: 0, overflow: 'auto' }}>
-        {JSON.stringify(content, null, 2)}
-      </pre>
+      <CodeBlock testId="studio-module-content" text={JSON.stringify(content, null, 2)} />
     </Flex>
   )
 }

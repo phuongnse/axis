@@ -163,4 +163,25 @@ describe('AxisCheckboxField', () => {
       <AxisCheckboxField label="Active" checked onChange={vi.fn()} />,
     ).toBeDefined()
   })
+
+  it('names a switch by a label hidden from the eye', () => {
+    render(
+      <ThemeModeProvider initialMode="light">
+        <TextProvider catalogs={catalogs} development={false}>
+          <AxisCheckboxField
+            kind="switch"
+            label="Mentions: In the application"
+            help=""
+            hideLabel
+            checked
+            onChange={vi.fn()}
+          />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    const toggle = screen.getByRole('switch', { name: 'Mentions: In the application' })
+    expect(toggle).toBeChecked()
+    expect(screen.getByText('Mentions: In the application')).toHaveStyle({ position: 'absolute', width: '1px' })
+  })
 })

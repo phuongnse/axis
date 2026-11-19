@@ -47,10 +47,11 @@ import { StudioHistory, StudioRevisionPage } from './StudioHistory'
 import { StudioKindList } from './StudioKindList'
 import { ModuleResourceView } from './StudioModuleView'
 import { StudioNewApplication } from './StudioNewApplication'
+import { StudioNewPackage } from './StudioNewPackage'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioOverview } from './StudioOverview'
+import { StudioPackages } from './StudioPackages'
 import { StudioPageHeading } from './StudioPageHeading'
-import { StudioPackageList } from './StudioPackageList'
 import { StudioReleasePage } from './StudioReleasePage'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioAskAi } from './StudioAskAi'
@@ -166,6 +167,9 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * and the release list again, as a save does. The sidebar's Policy matrix entry shows the policy matrix, kept in the address
  * as `&view=policies`. The matrix shows in place of the content under a Policy matrix heading, and
  * its Open policy link opens the policy in the Resources view. The band and the Problems panel show in every view.
+ * The sidebar's Packages entry, `&view=packages`, shows `StudioPackages` under a Packages heading, and `&package=<id>` shows that
+ * package's `StudioPackagePage` in place of the list, under the same entry. New package… sits on the heading's right and shows only
+ * when `GET /api/me` answers `studioDeveloper: true`, see docs/reference/studio-packages.md#the-packages-entry.
  * `&view=releases` shows only the Releases heading and the release list. `&view=release&release=<number>` shows that
  * release's `StudioReleasePage` in place of the list, under the Releases entry, and its Activate… sends the same request as the list's.
  * `&view=requests&request=<id>` shows that authoring request's page in place of the content, and no sidebar entry is marked for it.
@@ -230,6 +234,8 @@ function StudioWorkspace() {
   const path = params.get('path')
   const kind = params.get('kind')
   const policiesView = params.get('view') === 'policies'
+  const packagesView = params.get('view') === 'packages'
+  const packageId = params.get('package')
   const releasesView = params.get('view') === 'releases'
   const releaseView = params.get('view') === 'release'
   const releaseNumber = params.get('release')
@@ -239,8 +245,6 @@ function StudioWorkspace() {
   const revisionId = params.get('revision')
   const requestsView = params.get('view') === 'requests'
   const requestId = params.get('request')
-  const packagesView = params.get('view') === 'packages'
-  const packageId = params.get('package')
   const packageFile = params.get('file')
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
@@ -591,7 +595,7 @@ function StudioWorkspace() {
 
   const publishView = requestedPublish && canPublish
   const overviewApp = apps.find((item) => item.name === application)
-  const entries = studioNavigation(application, resources, allModuleGroups, t, packageFiles.length > 0)
+  const entries = studioNavigation(application, resources, allModuleGroups, t)
   const activeKey = studioActiveEntry(
     params,
     resources,
@@ -664,8 +668,27 @@ function StudioWorkspace() {
                     busy={requestBusy || reconnecting}
                     onActivate={(releaseId) => publishing.current?.activate(releaseId)}
                   />
+                ) : releasesView ? (
+                  <StudioPageHeading title={t('shell.studio.releases')} />
+                ) : requestsView && requestId !== null ? (
+                  <StudioAuthoringRequestPage
+                    application={application!}
+                    requestId={requestId}
+                    userId={userId}
+                    resources={resources}
+                  />
+                ) : historyView ? (
+                  revisionId !== null ? (
+                    <StudioRevisionPage application={application!} revisionId={revisionId} resources={resources} />
+                  ) : (
+                    <Flex vertical gap="middle">
+                      <StudioPageHeading title={t('shell.studio.history')} />
+                      <StudioHistory application={application!} folderRevision={folderRevision} onUndone={onUndone} />
+                    </Flex>
+                  )
                 ) : packagesView ? (
                   packageId !== null ? (
+                    // Proposed: an open package is a place to work, see #3978.
                     <Suspense fallback={null}>
                       <LazyStudioPackage
                         key={packageId}
@@ -684,26 +707,13 @@ function StudioWorkspace() {
                     </Suspense>
                   ) : (
                     <Flex vertical gap="small">
-                      <StudioPageHeading title={t('shell.studio.nav.packages')} />
-                      <StudioPackageList application={application!} files={packageFiles} />
-                    </Flex>
-                  )
-                ) : releasesView ? (
-                  <StudioPageHeading title={t('shell.studio.releases')} />
-                ) : requestsView && requestId !== null ? (
-                  <StudioAuthoringRequestPage
-                    application={application!}
-                    requestId={requestId}
-                    userId={userId}
-                    resources={resources}
-                  />
-                ) : historyView ? (
-                  revisionId !== null ? (
-                    <StudioRevisionPage application={application!} revisionId={revisionId} resources={resources} />
-                  ) : (
-                    <Flex vertical gap="middle">
-                      <StudioPageHeading title={t('shell.studio.history')} />
-                      <StudioHistory application={application!} folderRevision={folderRevision} onUndone={onUndone} />
+                      <StudioPageHeading
+                        title={t('shell.studio.nav.packages')}
+                        actions={
+                          canDevelop ? <StudioNewPackage application={application!} onCreated={onWritten} /> : undefined
+                        }
+                      />
+                      <StudioPackages application={application!} folderRevision={folderRevision} />
                     </Flex>
                   )
                 ) : policiesView ? (

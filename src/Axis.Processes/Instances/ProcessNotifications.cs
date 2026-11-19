@@ -21,6 +21,9 @@ internal static class ProcessNotifications
     /// <summary>The kind of a recipient that is every user with one role.</summary>
     internal const string RoleRecipient = "role";
 
+    /// <summary>The source of a notification that a <c>notify</c> step or a task escalation stores.</summary>
+    internal const string ProcessSource = "process";
+
     /// <summary>The in-app channel, the only one that stores a notification yet.</summary>
     internal const string InAppChannel = "inApp";
 
@@ -195,13 +198,14 @@ internal static class ProcessNotifications
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.notifications
-                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, open_page, open_parameters, created_at)
-            SELECT @id, @application, @release, recipient.kind, recipient.name, @subject, @body, @values, @valueTypes, @page, @parameters, now()
+                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, open_page, open_parameters, source, created_at)
+            SELECT @id, @application, @release, recipient.kind, recipient.name, @subject, @body, @values, @valueTypes, @page, @parameters, @source, now()
             FROM unnest(@kinds, @recipients) AS recipient(kind, name)
             """,
             transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
             transaction);
         command.Parameters.AddWithValue("id", notification.Id);
+        command.Parameters.AddWithValue("source", ProcessSource);
         command.Parameters.AddWithValue("application", notification.ApplicationId);
         command.Parameters.AddWithValue("release", notification.ReleaseId);
         command.Parameters.AddWithValue("subject", notification.SubjectKey);

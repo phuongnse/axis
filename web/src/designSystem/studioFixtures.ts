@@ -202,8 +202,8 @@ function entityNames(folder: Folder): StudioNameEntity[] {
     name: entity.name,
     module: null,
     fields: [
-      { name: 'title', type: 'text', target: null, values: null },
-      { name: 'amount', type: 'decimal', target: null, values: null },
+      { name: 'title', type: 'text', target: null, values: null, unique: false },
+      { name: 'amount', type: 'decimal', target: null, values: null, unique: false },
     ],
   }))
 }
@@ -863,7 +863,10 @@ function expressionNames(): StudioNames {
       entity.name === 'Request'
         ? {
             ...entity,
-            fields: [...entity.fields, { name: 'amountWithTax', type: 'decimal', target: null, values: null }],
+            fields: [
+              ...entity.fields,
+              { name: 'amountWithTax', type: 'decimal', target: null, values: null, unique: false },
+            ],
           }
         : entity,
     ),

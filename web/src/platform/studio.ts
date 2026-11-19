@@ -381,6 +381,8 @@ export interface StudioNameField {
   type: string
   target: string | null
   values: string[] | null
+  /** Whether the entity file marks the field `unique`, see docs/reference/authoring.md#names. */
+  unique: boolean
 }
 
 /** The names of one kind in `GET .../names`. `module` is the module id, or `null` for the application's own. */
@@ -593,6 +595,97 @@ export async function fetchStudioNames(application: string, signal?: AbortSignal
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
   return (await response.json()) as StudioNames
+}
+
+/** One file of an application's package, as `GET .../package-files` lists it. `version` is the SHA-256 of its bytes. */
+export interface StudioPackageFileItem {
+  package: string
+  path: string
+  version: string
+}
+
+/** The path of a package file's route, each segment of the id and the path encoded. */
+function packageFilePath(application: string, pkg: string, path: string): string {
+  const segments = path.split('/').map(encodeURIComponent).join('/')
+  return `/api/studio/apps/${encodeURIComponent(application)}/packages/${encodeURIComponent(pkg)}/files/${segments}`
+}
+
+/**
+ * Loads the files under `packages/` of an application's working folder, sorted by file, see
+ * docs/reference/studio-packages.md#the-authoring-api. A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function fetchStudioPackageFiles(
+  application: string,
+  signal?: AbortSignal,
+): Promise<StudioPackageFileItem[]> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/package-files`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return ((await response.json()) as { items: StudioPackageFileItem[] }).items
+}
+
+/**
+ * Reads one file of an application's package, as text with its version. It answers `null` for a 404. A 401 shows the
+ * sign-in prompt and throws, as any other failure does.
+ */
+export async function fetchStudioPackageFile(
+  application: string,
+  pkg: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<{ content: string; version: string } | null> {
+  const route = packageFilePath(application, pkg, path)
+  const response = await studioFetch(route, { signal })
+  if (response.status === 404) {
+    return null
+  }
+  if (!response.ok) {
+    throw new Error(`Loading '${route}' failed with status ${response.status}.`)
+  }
+  const { content, version } = (await response.json()) as { content: string; version: string }
+  return { content, version }
+}
+
+/** What creating a package file answers: the new file's version and the folder's diagnostics, or why nothing was written. */
+export type CreatePackageFileResult =
+  | { status: 'created'; version: string; diagnostics: StudioDiagnostic[] }
+  | { status: 'conflict' }
+  | { status: 'invalid' }
+
+/**
+ * Creates one file of an application's package with `If-None-Match: *`, so it never replaces a file. A 409 means the file
+ * exists, and a 400 means the server refuses the package or the path. Nothing is written for either. A quota refusal
+ * throws a {@link QuotaRefusedError}. A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function createStudioPackageFile(
+  application: string,
+  pkg: string,
+  path: string,
+  content: string,
+): Promise<CreatePackageFileResult> {
+  const route = packageFilePath(application, pkg, path)
+  const response = await studioFetch(route, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'If-None-Match': '*' },
+    body: JSON.stringify({ content }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    throw new QuotaRefusedError(title)
+  }
+  if (response.status === 400) {
+    return { status: 'invalid' }
+  }
+  if (!response.ok) {
+    throw new Error(`Creating '${route}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as { version: string; diagnostics: StudioDiagnostic[] }
+  return { status: 'created', version: body.version, diagnostics: body.diagnostics }
 }
 
 /**
@@ -2182,49 +2275,9 @@ function compareOrdinal(left: string, right: string): number {
 /** The manifest of every package, at the root of its folder, see docs/reference/extension-packages.md#manifest. */
 export const packageManifestFile = 'axis-package.json'
 
-/** A file of one of the application's packages, as `GET /api/studio/apps/{application}/package-files` lists it. */
-export interface StudioPackageFileItem {
-  package: string
-  path: string
-  version: string
-}
-
 /** A package file with its text, see docs/reference/studio-packages.md#the-authoring-api. */
 export interface StudioPackageFile extends StudioPackageFileItem {
   content: string
-}
-
-function packageFilePath(application: string, packageId: string, path: string): string {
-  const segments = path.split('/').map(encodeURIComponent).join('/')
-  return `/api/studio/apps/${encodeURIComponent(application)}/packages/${encodeURIComponent(packageId)}/files/${segments}`
-}
-
-/** Lists every file of the application's packages, sorted by file. A 401 shows the sign-in prompt and throws, as any other failure does. */
-export async function fetchStudioPackageFiles(
-  application: string,
-  signal?: AbortSignal,
-): Promise<StudioPackageFileItem[]> {
-  const path = `/api/studio/apps/${encodeURIComponent(application)}/package-files`
-  const response = await studioFetch(path, { signal })
-  if (!response.ok) {
-    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
-  }
-  return ((await response.json()) as { items: StudioPackageFileItem[] }).items
-}
-
-/** Loads one package file with its text. A 401 shows the sign-in prompt and throws, as any other failure does. */
-export async function fetchStudioPackageFile(
-  application: string,
-  packageId: string,
-  file: string,
-  signal?: AbortSignal,
-): Promise<StudioPackageFile> {
-  const path = packageFilePath(application, packageId, file)
-  const response = await studioFetch(path, { signal })
-  if (!response.ok) {
-    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
-  }
-  return (await response.json()) as StudioPackageFile
 }
 
 /**
@@ -2254,40 +2307,6 @@ export async function saveStudioPackageFile(
   }
   if (!response.ok) {
     throw new Error(`Saving '${path}' failed with status ${response.status}.`)
-  }
-  const body = (await response.json()) as { version: string; diagnostics: StudioDiagnostic[] }
-  return { status: 'saved', version: body.version, diagnostics: body.diagnostics }
-}
-
-/**
- * Creates a package file with `If-None-Match: *`. A 409 means a file of that path exists, and nothing was written. A 400
- * names a path the server refuses. A quota refusal throws a {@link QuotaRefusedError}. A 401 shows the sign-in prompt and
- * throws, as any other failure does.
- */
-export async function createStudioPackageFile(
-  application: string,
-  packageId: string,
-  file: string,
-  content: string,
-): Promise<PatchResult | { status: 'refused' }> {
-  const path = packageFilePath(application, packageId, file)
-  const response = await studioFetch(path, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'If-None-Match': '*' },
-    body: JSON.stringify({ content }),
-  })
-  if (response.status === 409) {
-    return { status: 'conflict' }
-  }
-  if (response.status === 400) {
-    return { status: 'refused' }
-  }
-  const title = await quotaRefusalTitle(response)
-  if (title !== null) {
-    throw new QuotaRefusedError(title)
-  }
-  if (!response.ok) {
-    throw new Error(`Creating '${path}' failed with status ${response.status}.`)
   }
   const body = (await response.json()) as { version: string; diagnostics: StudioDiagnostic[] }
   return { status: 'saved', version: body.version, diagnostics: body.diagnostics }

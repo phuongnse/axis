@@ -217,6 +217,37 @@ export async function openEntityField(page: Page, index: number): Promise<Locato
 }
 
 /**
+ * Opens field `name` of the open entity by its address: it loads the page again with `field=<name>` added, as a shared
+ * link or a reload does, and returns the field drawer's dialog once it has opened. Loading the page again drops any
+ * draft, so this is only for a page with no draft, see docs/reference/studio.md#route-and-address.
+ */
+export async function openEntityFieldByAddress(page: Page, name: string): Promise<Locator> {
+  const url = new URL(page.url())
+  url.searchParams.set('field', name)
+  await page.goto(url.toString())
+  await waitForDialog(page, name)
+  return fieldDrawer(page)
+}
+
+/**
+ * Moves from the open entity to the kind `kind` by its sidebar entry and answers "Leave without saving?" with `answer`.
+ * The open field's drawer is closed first, because `confirmDialog` needs a single dialog. Stay keeps the address on the
+ * entity with its draft, and Leave moves to the kind's list, see docs/reference/studio.md#editor.
+ */
+export async function answerLeave(page: Page, kind: string, answer: 'Stay' | 'Leave') {
+  await closeEntityField(page)
+  await kindEntry(page, kind).click()
+  await waitForDialog(page, 'Leave without saving?')
+  await confirmDialog(page, answer)
+  const onKind = new RegExp(`[?&]kind=${kind}(&|$)`)
+  if (answer === 'Stay') {
+    await expect(page).not.toHaveURL(onKind)
+  } else {
+    await expect(page).toHaveURL(onKind)
+  }
+}
+
+/**
  * Clicks Add field in the open entity, waits until the new row, at `index`, shows, then waits for the new field's drawer,
  * which Add field opens, named "Unnamed field" until the field has a name. It closes an open field first, because a
  * drawer could cover the button.
@@ -227,6 +258,17 @@ export async function addEntityField(page: Page, index: number): Promise<Locator
   await expect(page.getByTestId(`studio-field-/fields/${index}`)).toBeVisible()
   await waitForDialog(page, 'Unnamed field')
   return fieldDrawer(page)
+}
+
+/**
+ * Chooses where the open field's value comes from, such as "Computed", "Sequence" or "Creator", in its drawer's Value
+ * group, and waits until the choice shows as made, see docs/reference/entity-designer.md#settings. The field's other ways
+ * and the settings of an entered value go with the choice.
+ */
+export async function chooseValueSource(page: Page, way: string) {
+  const radio = fieldDrawer(page).getByRole('radio', { name: new RegExp(`^${way}`) })
+  await radio.check()
+  await expect(radio).toBeChecked()
 }
 
 /**

@@ -152,6 +152,12 @@ export interface AxisTableProps<T> {
    */
   keep?: (row: T) => boolean
   toolbar?: AxisTableToolbar
+  /** A title at the left end of the toolbar, before the search, see docs/reference/actions-and-controls.md#tables. */
+  title?: ReactNode
+  /** Whether each cell has `spacing-sm` on each side, see docs/reference/actions-and-controls.md#tables. */
+  compact?: boolean
+  /** Whether the table has no header row, see docs/reference/actions-and-controls.md#tables. */
+  headless?: boolean
   /** What sits between the toolbar and the rows, such as a filter bar, messages and dialogs. */
   below?: ReactNode
   /** What shows in place of the rows, such as a message that they did not load. The toolbar stays. */
@@ -219,6 +225,9 @@ export function AxisTable<T extends object>({
   view,
   keep,
   toolbar = {},
+  title,
+  compact = false,
+  headless = false,
   below,
   failure,
   rowActions,
@@ -246,7 +255,8 @@ export function AxisTable<T extends object>({
   })
   const tokens = useDesignTokens()
   // The same theme object between draws, so the cells under the table are not drawn again for nothing.
-  const theme = useMemo(() => tableTheme(tokens), [tokens])
+  const theme = useMemo(() => tableTheme(tokens, compact), [tokens, compact])
+  const cellPadding = compact ? tokens.spacing.sm : tokens.spacing.lg
   const narrow = useNarrowWidth()
   // The widths the columns need when drawn and not stretched. A moved column is not drawn, so it is remembered.
   const naturalWidths = useRef(new Map<string, number>())
@@ -288,7 +298,7 @@ export function AxisTable<T extends object>({
       const sizes = shown.map((column) => {
         const head = heads.get(column.key)
         if (column.kind === 'freeText') {
-          return { key: column.key, width: freeTextMinWidth + 2 * tokens.spacing.lg, priority: column.priority }
+          return { key: column.key, width: freeTextMinWidth + 2 * cellPadding, priority: column.priority }
         }
         // With slack, a table with no free text stretches its last column past what it needs.
         const stretched = freeTexts === 0 && column.key === lastKey && drawn <= available
@@ -300,7 +310,7 @@ export function AxisTable<T extends object>({
       const { moved, scrolls } = makeRoom(available, others, sizes)
       // The moved lines of a row are as wide as the row's content, which starts after the checkbox and its padding.
       const selection = root.querySelector<HTMLElement>('th.ant-table-selection-column')?.offsetWidth ?? 0
-      const next = { moved, scrolls, lineWidth: Math.max(0, available - selection - 2 * tokens.spacing.lg) }
+      const next = { moved, scrolls, lineWidth: Math.max(0, available - selection - 2 * cellPadding) }
       setRoom((current) =>
         current.scrolls === next.scrolls &&
         current.lineWidth === next.lineWidth &&
@@ -469,6 +479,7 @@ export function AxisTable<T extends object>({
   // Only the rows that show count, so the count and the action's rows match what the person sees.
   const selected = bulk ? (pageRows ?? []).filter((item) => selectedKeys.includes(rowKey(item))) : []
   const hasToolbar =
+    title !== undefined ||
     searchable ||
     filterable ||
     arrangeable ||
@@ -521,8 +532,9 @@ export function AxisTable<T extends object>({
         <Flex justify="space-between" align="center" gap="small" wrap>
           {/* The search box keeps its own width, so Filter, Columns and Views follow it on one line, see
               docs/reference/actions-and-controls.md#tables. */}
-          {(searchable || filterable || arrangeable || view?.saved !== undefined) && (
-            <Flex gap="small" wrap style={{ minWidth: 0 }}>
+          {(title !== undefined || searchable || filterable || arrangeable || view?.saved !== undefined) && (
+            <Flex gap="small" align="center" wrap style={{ minWidth: 0 }}>
+              {title !== undefined && <div data-testid="axis-table-title">{title}</div>}
               {searchable && (
                 <Input.Search
                   allowClear
@@ -604,6 +616,7 @@ export function AxisTable<T extends object>({
                   : undefined
               }
               columns={antColumns}
+              showHeader={!headless}
               // The table moves columns under their row first. Only what stays still and does not fit scrolls sideways.
               scroll={{ x: true }}
               // Ant Design otherwise switches to a fixed layout once a column is fixed.

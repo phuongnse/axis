@@ -91,8 +91,6 @@ itself when it is read-only), and back to the field's name in the table when Clo
 
 ### The drawer and its groups
 
-_(planned)_
-
 A field's settings open in a drawer with the table still in sight, as Salesforce's Object Manager, Dataverse and
 Strapi have it.
 
@@ -104,7 +102,7 @@ where the value comes from decides whether Required applies.
 
 | Group              | Settings                                                                                                                                                         |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| General            | Name, label, type and help text. The label and the help are [label texts](studio.md#label-texts)                                                                  |
+| General            | Name, label, type and help text                                                                                                                                  |
 | The type's         | Titled by the type, as "Reference settings": the target entity, `values` with `valueLabels`, the currency, `precision` and `scale`, and `maxLength`                |
 | Value              | The value comes from, then only the chosen way's settings                                                                                                         |
 | Validation         | Checks on an entered value: Required, Unique, `minLength`, `min` and `max`, a file's `maxSize` and `accept`, then the validations at this field                     |
@@ -127,16 +125,24 @@ These settings take a control of their own:
 | Currency            | On a `money` field, a choice between a fixed `currency` code and a `currencyField`, picked from the entity's `enum` and `text` fields, through `AxisChoiceField`                           |
 | `valueLabels`       | On an `enum` field, rows of a value and its label, typed as [label texts](studio.md#label-texts)                                                                                          |
 
-- **The value comes from one choice** _(planned)_. The compiler refuses two ways together (`AXC0013`), so the Value
+- **The value comes from one choice**. The compiler refuses two ways together (`AXC0013`), so the Value
   group is one `AxisChoiceField` of the ways the type takes, each with a line of help: Entered by people,
   Computed, Sequence, Creator, and Matched for a reference. Only the chosen way's settings follow: a
   `default` and Holds a user ([`userId`](resource-files.md#entity-field-types-and-constraints)) for an
   entered value, the `expression`, the `sequence`, or Find by and From for a
-  [`match`](resource-files.md#matched-references). Required shows only for an entered value. Choosing a
-  way rewrites the field once, dropping the other ways' keys and those only an entered value may have.
-- **Matched** _(planned)_. Find by offers only the target entity's unique fields, from `unique` in the
+  [`match`](resource-files.md#matched-references). Required, `default`, `userId`, `min`, `max` and `minLength` show
+  only for an entered value. Choosing a way rewrites the field once, dropping the other ways' keys and those only
+  an entered value may have, and writing an empty key for the chosen way: `expression`, `sequence`, `creator: true`
+  or a `match` with an empty `field` and `from`. Choosing the way the field has changes nothing. Creator is only a
+  way, never a checkbox. Unticking Holds a user removes `userId`, rather than write `false`. Exact lookup shows
+  only once the field is sensitive, and unticking Sensitive removes `exactLookup` in the same change.
+- **A field's label and help are label texts** _(planned)_. The drawer's label and help are
+  [label texts](studio.md#label-texts), typed as texts and not as text keys.
+- **Matched**. Find by offers only the target entity's unique fields, from `unique` in the
   [names](authoring.md#names), and From only this entity's fields of the same type that the compiler
-  allows (`AXC0362`).
+  allows (`AXC0362`): for a reference, the same target too, and never the field itself or a sensitive, matched or
+  computed field. Both show the required mark. They are plain boxes until the names have loaded, and From offers
+  nothing while Find by names no unique field of the target.
 - **Maximum length is the type's**. `maxLength` is the size of the stored text, which a value the server
   sets keeps too, so it is under Text settings, as precision and scale are of a number. Validation holds
   only checks on an entered value.
@@ -152,20 +158,23 @@ These settings take a control of their own:
   Fixed code removes `currencyField`. A typed code is turned into upper case.
 - **An enum keeps a removed value's label.** Removing a value keeps its label in `valueLabels`, and
   Validate reports it (`AXC0242`).
-- **A key already in the file stays.** A `default`, `min`, `max` or `minLength` on a field with an
-  `expression`, a `sequence` or `creator` stays in the file, hidden. Validate reports it.
-- **Its diagnostic** _(planned)_. The key stays until the author changes the way, and the diagnostic
-  opens at the field.
+- **A key already in the file stays.** A key that the chosen way hides, such as a `default`, `required`,
+  `userId`, `min`, `max` or `minLength` on a field with an `expression`, a `sequence` or `creator`, or another
+  way's key, stays in the file, hidden. Validate reports it.
+- **Its diagnostic**. The key stays until the author changes the way, and the diagnostic opens the drawer at the
+  field, with focus on the drawer, as the [diagnostics](#diagnostics) rule says for a setting the drawer does not show.
 - **Clearing removes the key.** Clearing a field's label, the display field, `maxLength`, `precision`,
-  `scale`, `maxSize`, `accept`, `sequence`, `expression`, `default`, `min`, `max`, `minLength`, the last
-  enum value or the last value label removes the key. Turning `searchable` off and unticking an index's
+  `scale`, `maxSize`, `accept`, `default`, `min`, `max`, `minLength`, the last
+  enum value or the last value label removes the key. Clearing the chosen way's `expression` or `sequence`
+  leaves it empty instead, so the field keeps its way, and Validate reports it. Turning `searchable` off and unticking an index's
   Unique also remove the key, rather than write `false`.
 
 ## Required keys
 
 The keys that `entity.schema.json` requires show the shared `*` and are announced as required: the entity
 name, an index's fields, and a validation's expression, message and field. So do the target of a reference
-field and the currency field of a money field, which cannot be emptied. The name of an index or a
+field, the currency field of a money field, the chosen way's expression and sequence, and a matched reference's Find
+by and From, which cannot be emptied. The name of an index or a
 validation is read-only text and has no mark. A field's name and type, which the schema requires, show it in the
 [field drawer](#field-drawer).
 

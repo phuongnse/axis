@@ -1,0 +1,19 @@
+{
+  "csharp": {
+    "axis-package.json": "{\n  \"id\": \"$id\",\n  \"version\": \"0.1.0\",\n  \"label\": \"$label\",\n  \"language\": \"csharp\",\n  \"assembly\": \"$name.dll\",\n  \"lock\": \"packages.lock.json\",\n  \"operations\": [\n    {\n      \"name\": \"echo\",\n      \"type\": \"$name.EchoOperation\",\n      \"idempotent\": true,\n      \"input\": [{ \"name\": \"text\", \"type\": \"text\", \"required\": true }],\n      \"output\": [{ \"name\": \"text\", \"type\": \"text\", \"required\": true }]\n    }\n  ]\n}\n",
+    "$name.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\">\n\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n    <AssemblyName>$name</AssemblyName>\n    <RootNamespace>$name</RootNamespace>\n    <Version>0.1.0</Version>\n    <Nullable>enable</Nullable>\n    <ImplicitUsings>enable</ImplicitUsings>\n    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>\n  </PropertyGroup>\n\n  <ItemGroup>\n    <!-- Not copied: the host supplies Axis.Extensions at run time. -->\n    <PackageReference Include=\"Axis.Extensions\" Version=\"0.*\" ExcludeAssets=\"runtime\" />\n  </ItemGroup>\n\n</Project>\n",
+    "EchoOperation.cs": "using Axis.Extensions;\n\nnamespace $name;\n\n/// <summary>Returns the text it is given. It is the first operation of a new package.</summary>\npublic sealed class EchoOperation : IOperation\n{\n    public Task<IReadOnlyDictionary<string, object?>> RunAsync(\n        IReadOnlyDictionary<string, object?> input,\n        IOperationContext context,\n        CancellationToken cancellationToken)\n    {\n        ArgumentNullException.ThrowIfNull(input);\n\n        IReadOnlyDictionary<string, object?> output = new Dictionary<string, object?>\n        {\n            [\"text\"] = input[\"text\"],\n        };\n        return Task.FromResult(output);\n    }\n}\n",
+    "packages.lock.json": "{\n  \"version\": 2,\n  \"dependencies\": {\n    \"net10.0\": {}\n  }\n}\n"
+  },
+  "node": {
+    "axis-package.json": "{\n  \"id\": \"$id\",\n  \"version\": \"0.1.0\",\n  \"label\": \"$label\",\n  \"language\": \"node\",\n  \"adapter\": \"index.js\",\n  \"lock\": \"package-lock.json\",\n  \"operations\": [\n    {\n      \"name\": \"echo\",\n      \"type\": \"echo\",\n      \"idempotent\": true,\n      \"input\": [{ \"name\": \"text\", \"type\": \"text\", \"required\": true }],\n      \"output\": [{ \"name\": \"text\", \"type\": \"text\", \"required\": true }]\n    }\n  ]\n}\n",
+    "index.js": "\"use strict\";\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.echo = echo;\nfunction echo(input) {\n    return { text: input.text };\n}\n",
+    "package.json": "{\n  \"name\": \"$id\",\n  \"version\": \"0.1.0\",\n  \"private\": true\n}\n",
+    "package-lock.json": "{\n  \"name\": \"$id\",\n  \"version\": \"0.1.0\",\n  \"lockfileVersion\": 3,\n  \"requires\": true,\n  \"packages\": {\n    \"\": {\n      \"name\": \"$id\",\n      \"version\": \"0.1.0\"\n    }\n  }\n}\n"
+  },
+  "python": {
+    "axis-package.json": "{\n  \"id\": \"$id\",\n  \"version\": \"0.1.0\",\n  \"label\": \"$label\",\n  \"language\": \"python\",\n  \"adapter\": \"adapter.py\",\n  \"lock\": \"requirements.txt\",\n  \"operations\": [\n    {\n      \"name\": \"echo\",\n      \"type\": \"echo\",\n      \"idempotent\": true,\n      \"input\": [{ \"name\": \"text\", \"type\": \"text\", \"required\": true }],\n      \"output\": [{ \"name\": \"text\", \"type\": \"text\", \"required\": true }]\n    }\n  ]\n}\n",
+    "adapter.py": "def echo(input, context):\n    return {\"text\": input[\"text\"]}\n",
+    "requirements.txt": "# Pin each requirement with its version and a --hash, such as name==1.0.0 --hash=sha256:<digest>.\n"
+  }
+}

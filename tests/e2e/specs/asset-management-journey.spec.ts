@@ -15,6 +15,7 @@ import {
   addEntityField,
   addListItem,
   addMapping,
+  chooseValueSource,
   closeEntityField,
   confirmPublish,
   createResource,
@@ -112,10 +113,11 @@ test.describe('the author builds the asset management application with Studio on
       const dialog = await waitForDialog(page)
       await dialog.getByRole('button', { name: choice, exact: true }).click()
     }
-    await expect(page.getByTestId('studio-saved')).toBeVisible()
+    // The save can take longer than an assertion's timeout on a busy runner, so the answer is awaited first.
     const { diagnostics } = (await (await answer).json()) as {
       diagnostics: { file: string; severity: string }[]
     }
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
     return diagnostics
   }
 
@@ -518,6 +520,7 @@ test.describe('the author builds the asset management application with Studio on
     await addField(page, 1, 'number')
     await page.getByTestId('studio-field-/fields/1/unique').getByRole('checkbox').check()
     await page.getByTestId('studio-field-/fields/1/maxLength').getByRole('spinbutton').fill('20')
+    await chooseValueSource(page, 'Sequence')
     await pick(page, 'studio-field-/fields/1/sequence', 'AssetNumber')
     await pick(page, 'studio-field-/fields/1/label', 'asset.number', 'asset.number')
     await entityFieldAction(page, 1, 'Move up')

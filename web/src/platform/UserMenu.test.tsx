@@ -21,6 +21,7 @@ const requester: CurrentUser = {
   studioPreviewHost: null,
   studioTest: false,
   studioAi: false,
+  studioDeveloper: false,
   console: false,
   users: false,
   tenantStatus: 'active',
@@ -37,6 +38,7 @@ const author: CurrentUser = {
   studioPreviewHost: null,
   studioTest: false,
   studioAi: false,
+  studioDeveloper: false,
   console: false,
   users: false,
   tenantStatus: 'active',
@@ -137,7 +139,7 @@ describe('UserMenu', () => {
   })
 
   it.each(locales)(
-    'has a Sessions entry that links to the account screen, with the platform $name text',
+    'has a Your account entry that links to the account page, with the platform $name text',
     async ({ texts }) => {
       stubServer(requester)
       renderMenu(texts)
@@ -145,7 +147,7 @@ describe('UserMenu', () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Requester User' }))
 
       const link = within(await screen.findByRole('menu', { name: texts['shell.account.label'] })).getByRole('link', {
-        name: texts['shell.account.sessions'],
+        name: texts['shell.account.title'],
       })
       expect(link).toHaveAttribute('href', '/account')
     },
@@ -156,7 +158,7 @@ describe('UserMenu', () => {
       expect(texts).toHaveProperty(['shell.account.label'])
       expect(texts).toHaveProperty(['shell.account.signIn'])
       expect(texts).toHaveProperty(['shell.account.signOut'])
-      expect(texts).toHaveProperty(['shell.account.sessions'])
+      expect(texts).toHaveProperty(['shell.account.title'])
     }
   })
 

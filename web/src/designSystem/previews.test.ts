@@ -74,6 +74,8 @@ describe('design-system previews', () => {
         'Platform site',
         'App switcher',
         'Language and theme',
+        'Account page',
+        'Account notifications',
       ],
     ],
     ['signIn', ['Sign-in refused', 'Signed out', 'Session ended']],
