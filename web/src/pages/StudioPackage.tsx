@@ -1,7 +1,7 @@
 import { DownOutlined, UpOutlined } from '@ant-design/icons'
 import { linter, type Diagnostic as EditorDiagnostic } from '@codemirror/lint'
 import type { Extension } from '@codemirror/state'
-import { Breadcrumb, Flex, Modal, Select, Tabs, Typography } from 'antd'
+import { Flex, Modal, Select, Tabs, Typography } from 'antd'
 import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
@@ -90,6 +90,8 @@ type Dialog =
   | { kind: 'quickOpen' }
   | null
 
+/** The height of the explorer's title row and of the file tabs, so their rules meet in one line. */
+const rowHeight = 40
 const panelLeast = 120
 const panelFirst = 240
 const panelTabs = ['problems', 'output', 'tests', 'run'] as const
@@ -137,7 +139,7 @@ export default function StudioPackage({
 }) {
   const t = useText()
   const navigate = useNavigate()
-  const { colour, radius, spacing, type } = useDesignTokens()
+  const { colour, spacing, type } = useDesignTokens()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const [open, setOpen] = useState<Record<string, OpenFile>>({})
   const [tabs, setTabs] = useState<string[]>([])
@@ -271,16 +273,16 @@ export default function StudioPackage({
     if (!element) {
       return
     }
-    const content = element.closest('main')
+    // The workspace takes the page's padding under it, so it ends on the footer's rule.
     const next = jsonViewHeight({
       windowHeight: window.innerHeight,
       top: element.getBoundingClientRect().top + window.scrollY,
       footerHeight: document.querySelector('[role=contentinfo]')?.getBoundingClientRect().height ?? 0,
-      below: content ? parseFloat(getComputedStyle(content).paddingBottom) || 0 : 0,
-      gap: spacing.md,
+      below: 0,
+      gap: 0,
     })
     setFrameHeight((current) => (current === next ? current : Math.max(next, 420)))
-  }, [spacing.md])
+  }, [])
   useLayoutEffect(fit)
   useEffect(() => {
     window.addEventListener('resize', fit)
@@ -556,7 +558,6 @@ export default function StudioPackage({
     openFile(path)
   }
   // A problem in a file marks its line in the editor, as a code editor's checks do.
-  const segments = file.split('/')
 
   return (
     <Flex vertical gap="middle" data-testid="studio-package" onKeyDown={onKeyDown}>
@@ -625,8 +626,10 @@ export default function StudioPackage({
         style={{
           display: 'flex',
           height: frameHeight,
-          border: `1px solid ${colour.borderSubtle}`,
-          borderRadius: radius.base,
+          // The workspace reaches the page's edges and the footer, as the band does, and rules part its regions, as
+          // the header and the sidebar part the shell.
+          margin: `0 -${spacing.md}px -${spacing.md}px`,
+          borderTop: `1px solid ${colour.borderSubtle}`,
           overflow: 'hidden',
         }}
       >
@@ -638,6 +641,7 @@ export default function StudioPackage({
             active={file}
             developer={developer}
             locale={locale}
+            rowHeight={rowHeight}
             actions={{
               onOpen: openFile,
               onNewFile: (folder) => setDialog({ kind: 'newFile', folder }),
@@ -655,10 +659,13 @@ export default function StudioPackage({
           />
         </div>
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          {/* The file tabs read as the panel's tabs do: no box round a tab, the open one underlined in `primary`, and one rule
+              under the row, level with the explorer's. */}
+          <style>{`.axis-file-tabs > .ant-tabs-nav { margin: 0; height: ${rowHeight}px; padding-inline: ${spacing.sm}px; } .axis-file-tabs > .ant-tabs-nav::before { border-bottom-color: ${colour.borderSubtle}; } .axis-file-tabs .ant-tabs-tab { border: none !important; background: transparent !important; border-radius: 0 !important; margin: 0 !important; padding-inline: ${spacing.sm}px !important; } .axis-file-tabs .ant-tabs-tab-active { box-shadow: inset 0 -2px 0 ${colour.primary}; } .axis-file-tabs .ant-tabs-body-holder { display: none; }`}</style>
           <Tabs
+            className="axis-file-tabs"
             type="editable-card"
             hideAdd
-            size="small"
             activeKey={file}
             onChange={openFile}
             onEdit={(key, action) => {
@@ -671,7 +678,6 @@ export default function StudioPackage({
                 }
               }
             }}
-            tabBarStyle={{ margin: 0 }}
             items={openTabs.map((path) => ({
               key: path,
               label: (
@@ -696,12 +702,6 @@ export default function StudioPackage({
               ),
             }))}
           />
-          <Flex
-            align="center"
-            style={{ minHeight: 28, paddingInline: spacing.sm, borderBottom: `1px solid ${colour.borderSubtle}` }}
-          >
-            <Breadcrumb items={[{ title: packageId }, ...segments.map((segment) => ({ title: segment }))]} />
-          </Flex>
           <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
             {!known ? (
               <div style={{ padding: spacing.sm }}>
@@ -751,7 +751,7 @@ export default function StudioPackage({
               height: panelOpen ? panelHeight : undefined,
               display: 'flex',
               flexDirection: 'column',
-              paddingInline: spacing.sm,
+              paddingInline: spacing.md,
             }}
           >
             {panelOpen && (
@@ -816,7 +816,7 @@ export default function StudioPackage({
                               {t(`shell.studio.package.jobState.${lastRequest.status}`)}
                             </StatusTag>
                           </Flex>
-                          <CodeBlock text={(lastRequest.output ?? []).join('\n') || null} />
+                          <CodeBlock plain text={(lastRequest.output ?? []).join('\n') || null} />
                         </Flex>
                       )}
                     </PanelBody>
@@ -879,9 +879,8 @@ export default function StudioPackage({
             style={{
               flex: 'none',
               minHeight: 24,
-              paddingInline: spacing.sm,
+              paddingInline: spacing.md,
               borderTop: `1px solid ${colour.borderSubtle}`,
-              background: colour.canvas,
               color: colour.textMuted,
               fontSize: type.fontSize - 2,
             }}

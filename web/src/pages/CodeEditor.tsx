@@ -12,7 +12,7 @@ import {
 import { bracketMatching, foldGutter, foldKeymap, indentOnInput } from '@codemirror/language'
 import { diagnosticCount, nextDiagnostic } from '@codemirror/lint'
 import { openSearchPanel, search, searchKeymap } from '@codemirror/search'
-import { Annotation, Compartment, EditorState, Transaction, type Extension } from '@codemirror/state'
+import { Annotation, Compartment, EditorState, Prec, Transaction, type Extension } from '@codemirror/state'
 import { EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view'
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref, type RefObject } from 'react'
 import { selectedItemTint } from '../platform/antTheme'
@@ -111,6 +111,7 @@ export default function CodeEditor({
     onProblems,
     onHistory,
     onCursor,
+    fill,
   })
 
   useEffect(() => {
@@ -125,6 +126,7 @@ export default function CodeEditor({
       onProblems,
       onHistory,
       onCursor,
+      fill,
     }
   })
 
@@ -161,6 +163,15 @@ export default function CodeEditor({
             ...searchKeymap.filter((binding) => binding.key !== 'Mod-Alt-g'),
           ]),
           themeCompartment.of(initial.theme),
+          // Proposed, see #3978: an editor that fills a workspace draws no border of its own, as the workspace's rules part it.
+          initial.fill
+            ? Prec.highest(
+                EditorView.theme({
+                  '&': { border: 'none', borderRadius: '0' },
+                  '&.cm-focused': { outlineOffset: '-2px' },
+                }),
+              )
+            : [],
           readOnlyCompartment.of(EditorState.readOnly.of(initial.readOnly)),
           EditorView.contentAttributes.of({ 'aria-label': label }),
           checksCompartment.of(initial.checks ?? []),

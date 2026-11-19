@@ -1,15 +1,6 @@
-import {
-  FileAddOutlined,
-  FileOutlined,
-  FolderAddOutlined,
-  FolderOpenOutlined,
-  FolderOutlined,
-  MinusSquareOutlined,
-  MoreOutlined,
-  ReloadOutlined,
-} from '@ant-design/icons'
-import { Dropdown, Flex, Tree, Typography, type MenuProps, type TreeDataNode } from 'antd'
-import { useMemo, useState, type Key, type ReactNode } from 'react'
+import { EllipsisOutlined, FileAddOutlined, FolderAddOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Dropdown, Flex, Menu, Typography, type MenuProps, type TreeDataNode } from 'antd'
+import { useMemo, useState, type DragEvent, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -31,22 +22,26 @@ export interface ExplorerActions {
   onRefresh: () => void
 }
 
-/** Every folder key of a tree, to open them all. */
-function folderKeys(nodes: readonly TreeDataNode[]): string[] {
-  return nodes.flatMap((node) => (node.isLeaf ? [] : [String(node.key), ...folderKeys(node.children ?? [])]))
-}
-
 /** The folder a node's new file goes in: the folder itself, or the folder that holds the file. */
 function folderOf(target: ExplorerTarget): string {
   return target.kind === 'folder' ? target.path : target.path.slice(0, target.path.lastIndexOf('/') + 1)
 }
 
+/** Every folder key of a tree. */
+function folderKeys(nodes: readonly TreeDataNode[]): string[] {
+  return nodes.flatMap((node) => (node.isLeaf ? [] : [String(node.key), ...folderKeys(node.children ?? [])]))
+}
+
+const dragType = 'application/x-axis-package-node'
+
 /**
- * Proposed, see #3978: a package's explorer, as a code editor's file explorer. Its title row holds New file, New folder,
- * Collapse all and Refresh. A file opens on a click. Each node has its actions in a "…" menu and on a right click: New
- * file and New folder in it, Rename, Delete and Copy path. A file or folder dragged onto a folder moves into it. A file
- * with unsaved changes has a dot, and a folder that holds no file yet reads its name in `textMuted`, as it is kept only
- * once a file is in it. Without the developer role only the files and Refresh show.
+ * Proposed, see #3978: a package's explorer, drawn by the same inline `Menu` as the shell's navigation, so a file is
+ * chosen, marked and indented as a navigation entry is, and a folder opens and closes as a group does. Its title row,
+ * as high as the editor's tab row so their rules meet, holds New file, New folder and Refresh. Each node has its
+ * actions in a "…" menu and on a right click: New file and New folder in it, Rename, Delete and Copy path. A file or
+ * folder dragged onto a folder moves into it, and onto the explorer's free space to the package's root. A file with
+ * unsaved changes has a dot, and a folder that holds no file yet reads in `textMuted`, as it is kept only once a file is
+ * in it. Without the developer role only the files and Refresh show.
  */
 export function PackageExplorer({
   paths,
@@ -55,6 +50,7 @@ export function PackageExplorer({
   active,
   developer,
   locale,
+  rowHeight,
   actions,
 }: {
   paths: readonly string[]
@@ -64,16 +60,18 @@ export function PackageExplorer({
   active: string
   developer: boolean
   locale: string
+  /** The height of the title row, the same as the editor's tab row. */
+  rowHeight: number
   actions: ExplorerActions
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
   const tree = useMemo(() => fileTree(paths, emptyFolders, locale), [paths, emptyFolders, locale])
   const allFolders = useMemo(() => folderKeys(tree), [tree])
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
-  const expanded = allFolders.filter((key) => !collapsed.has(key))
+  const [closed, setClosed] = useState<ReadonlySet<string>>(new Set())
+  const [dropOn, setDropOn] = useState<string | null>(null)
 
-  const menu = (): MenuProps['items'] => [
+  const menu: MenuProps['items'] = [
     ...(developer
       ? [
           { key: 'newFile', label: t('shell.studio.package.newFile') },
@@ -86,7 +84,8 @@ export function PackageExplorer({
       : []),
     { key: 'copyPath', label: t('shell.studio.package.copyPath') },
   ]
-  const onMenu = (target: ExplorerTarget) => (info: { key: string }) => {
+  const onMenu = (target: ExplorerTarget) => (info: { key: string; domEvent: { stopPropagation: () => void } }) => {
+    info.domEvent.stopPropagation()
     const folder = folderOf(target)
     if (info.key === 'newFile') actions.onNewFile(folder)
     if (info.key === 'newFolder') actions.onNewFolder(folder)
@@ -95,52 +94,90 @@ export function PackageExplorer({
     if (info.key === 'copyPath') actions.onCopyPath(target)
   }
 
-  const node = (data: TreeDataNode): ReactNode => {
-    const key = String(data.key)
-    const target: ExplorerTarget = data.isLeaf ? { kind: 'file', path: key } : { kind: 'folder', path: key }
-    const empty = !data.isLeaf && emptyFolders.includes(key) && (data.children?.length ?? 0) === 0
-    return (
-      <Dropdown trigger={['contextMenu']} menu={{ items: menu(), onClick: onMenu(target) }}>
-        <Flex
-          component="span"
-          align="center"
-          gap={spacing.xs}
-          className="axis-explorer-node"
-          data-testid={`package-node-${key}`}
-          style={{ display: 'flex', minWidth: 0 }}
+  const drop = (folder: string) => ({
+    onDragOver: (event: DragEvent) => {
+      if (developer && event.dataTransfer.types.includes(dragType)) {
+        event.preventDefault()
+        event.stopPropagation()
+        setDropOn(folder)
+      }
+    },
+    onDragLeave: () => setDropOn((current) => (current === folder ? null : current)),
+    onDrop: (event: DragEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      setDropOn(null)
+      const target = JSON.parse(event.dataTransfer.getData(dragType)) as ExplorerTarget
+      const inside = target.kind === 'folder' && folder.startsWith(target.path)
+      if (folderOf(target) !== folder && !inside && target.path !== folder) {
+        actions.onMove(target, folder)
+      }
+    },
+  })
+
+  const label = (target: ExplorerTarget, name: string, empty: boolean): ReactNode => (
+    <Dropdown trigger={['contextMenu']} menu={{ items: menu, onClick: onMenu(target) }}>
+      <Flex
+        component="span"
+        align="center"
+        gap={spacing.xs}
+        className="axis-explorer-node"
+        data-testid={`package-node-${target.path}`}
+        draggable={developer}
+        onDragStart={(event: DragEvent) => event.dataTransfer.setData(dragType, JSON.stringify(target))}
+        {...(target.kind === 'folder' ? drop(target.path) : {})}
+        style={{
+          display: 'flex',
+          minWidth: 0,
+          outline: dropOn === target.path ? `2px solid ${colour.focusRing}` : undefined,
+          outlineOffset: -2,
+        }}
+      >
+        <span
+          title={empty ? t('shell.studio.package.emptyFolder') : target.path}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            color: empty ? colour.textMuted : undefined,
+          }}
         >
-          <span aria-hidden style={{ flex: 'none', color: colour.textMuted }}>
-            {data.isLeaf ? <FileOutlined /> : expanded.includes(key) ? <FolderOpenOutlined /> : <FolderOutlined />}
-          </span>
+          {name}
+        </span>
+        {dirty.includes(target.path) && (
           <span
-            style={{
-              flex: 1,
-              minWidth: 0,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              color: empty ? colour.textMuted : undefined,
-            }}
-            title={empty ? t('shell.studio.package.emptyFolder') : undefined}
-          >
-            {String(data.title)}
-          </span>
-          {dirty.includes(key) && (
-            <span
-              role="img"
-              aria-label={t('shell.studio.package.unsaved')}
-              style={{ width: 6, height: 6, borderRadius: '50%', background: colour.primary, flex: 'none' }}
+            role="img"
+            aria-label={t('shell.studio.package.unsaved')}
+            style={{ width: 6, height: 6, borderRadius: '50%', background: colour.primary, flex: 'none' }}
+          />
+        )}
+        <span className="axis-explorer-more" onClick={(event) => event.stopPropagation()}>
+          <Dropdown trigger={['click']} menu={{ items: menu, onClick: onMenu(target) }}>
+            <AxisButton
+              role="icon"
+              size="small"
+              nameKey="shell.studio.package.nodeActions"
+              icon={<EllipsisOutlined />}
             />
-          )}
-          <span className="axis-explorer-more" onClick={(event) => event.stopPropagation()}>
-            <Dropdown trigger={['click']} menu={{ items: menu(), onClick: onMenu(target) }}>
-              <AxisButton role="icon" size="small" nameKey="shell.studio.package.nodeActions" icon={<MoreOutlined />} />
-            </Dropdown>
-          </span>
-        </Flex>
-      </Dropdown>
-    )
-  }
+          </Dropdown>
+        </span>
+      </Flex>
+    </Dropdown>
+  )
+
+  const items = (nodes: readonly TreeDataNode[]): NonNullable<MenuProps['items']> =>
+    nodes.map((node) => {
+      const key = String(node.key)
+      const name = String(node.title)
+      if (node.isLeaf) {
+        return { key, label: label({ kind: 'file', path: key }, name, false) }
+      }
+      const children = node.children ?? []
+      return children.length === 0
+        ? { key, label: label({ kind: 'folder', path: key }, name, true) }
+        : { key, label: label({ kind: 'folder', path: key }, name, false), children: items(children) }
+    })
 
   return (
     <nav
@@ -149,11 +186,16 @@ export function PackageExplorer({
       style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}
     >
       {/* The "…" of a node shows while the pointer is on it, or the node or its menu has the focus. */}
-      <style>{`.axis-explorer-more { visibility: hidden; } .ant-tree-treenode:hover .axis-explorer-more, .ant-tree-treenode:focus-within .axis-explorer-more, .ant-tree-treenode-selected .axis-explorer-more { visibility: visible; }`}</style>
+      <style>{`.axis-explorer-more { visibility: hidden; } .axis-explorer .ant-menu-item:hover .axis-explorer-more, .axis-explorer .ant-menu-submenu-title:hover .axis-explorer-more, .axis-explorer .ant-menu-item-selected .axis-explorer-more, .axis-explorer-node:focus-within .axis-explorer-more { visibility: visible; }`}</style>
       <Flex
         align="center"
         justify="space-between"
-        style={{ minHeight: 32, paddingInlineStart: spacing.sm, borderBottom: `1px solid ${colour.borderSubtle}` }}
+        style={{
+          flex: 'none',
+          height: rowHeight,
+          paddingInline: spacing.md,
+          borderBottom: `1px solid ${colour.borderSubtle}`,
+        }}
       >
         <Typography.Text strong>{t('shell.studio.package.files')}</Typography.Text>
         <Flex>
@@ -161,7 +203,6 @@ export function PackageExplorer({
             <>
               <AxisButton
                 role="icon"
-                size="small"
                 nameKey="shell.studio.package.newFile"
                 icon={<FileAddOutlined />}
                 data-testid="package-new-file"
@@ -169,7 +210,6 @@ export function PackageExplorer({
               />
               <AxisButton
                 role="icon"
-                size="small"
                 nameKey="shell.studio.package.newFolder"
                 icon={<FolderAddOutlined />}
                 data-testid="package-new-folder"
@@ -179,14 +219,6 @@ export function PackageExplorer({
           )}
           <AxisButton
             role="icon"
-            size="small"
-            nameKey="shell.studio.package.collapseAll"
-            icon={<MinusSquareOutlined />}
-            onClick={() => setCollapsed(new Set(allFolders))}
-          />
-          <AxisButton
-            role="icon"
-            size="small"
             nameKey="shell.studio.package.refresh"
             icon={<ReloadOutlined />}
             onClick={actions.onRefresh}
@@ -194,43 +226,30 @@ export function PackageExplorer({
         </Flex>
       </Flex>
       <div
-        style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', paddingBlock: spacing.xs }}
+        {...drop('')}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
+          paddingBlock: spacing.xs,
+          outline: dropOn === '' ? `2px solid ${colour.focusRing}` : undefined,
+          outlineOffset: -2,
+        }}
       >
-        <Tree
-          treeData={tree}
-          blockNode
-          expandedKeys={expanded}
-          onExpand={(keys: Key[]) => {
-            const open = new Set(keys.map(String))
-            setCollapsed(new Set(allFolders.filter((key) => !open.has(key))))
-          }}
+        <Menu
+          className="axis-explorer"
+          mode="inline"
+          style={{ borderInlineEnd: 'none' }}
           selectedKeys={[active]}
-          onSelect={(_keys, info) => {
-            if (info.node.isLeaf) {
-              actions.onOpen(String(info.node.key))
-            } else {
-              const key = String(info.node.key)
-              setCollapsed((current) => {
-                const next = new Set(current)
-                if (next.has(key)) next.delete(key)
-                else next.add(key)
-                return next
-              })
+          openKeys={allFolders.filter((key) => !closed.has(key))}
+          onOpenChange={(open) => setClosed(new Set(allFolders.filter((key) => !open.includes(key))))}
+          onClick={(info) => {
+            if (!info.key.endsWith('/')) {
+              actions.onOpen(info.key)
             }
           }}
-          draggable={developer ? { icon: false, nodeDraggable: () => true } : false}
-          allowDrop={({ dropNode, dropPosition }) => !dropNode.isLeaf && dropPosition === 0}
-          onDrop={(info) => {
-            const dragged = String(info.dragNode.key)
-            const folder = info.node.isLeaf ? '' : String(info.node.key)
-            const target: ExplorerTarget = info.dragNode.isLeaf
-              ? { kind: 'file', path: dragged }
-              : { kind: 'folder', path: dragged }
-            if (folderOf(target) !== folder && !folder.startsWith(target.kind === 'folder' ? dragged : '\0')) {
-              actions.onMove(target, folder)
-            }
-          }}
-          titleRender={node}
+          items={items(tree)}
         />
       </div>
     </nav>
