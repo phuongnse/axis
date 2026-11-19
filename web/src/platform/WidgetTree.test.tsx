@@ -6,6 +6,7 @@ import type { PageWidgetMetadata, WidgetMetadata } from './site'
 import { TableWidget } from './TableWidget'
 import { TaskInboxWidget } from './TaskInboxWidget'
 import { TextProvider } from './TextProvider'
+import { NarrowWidthOverride } from './useNarrowWidth'
 import { WidgetTree } from './WidgetTree'
 
 function leaf(type: WidgetMetadata['type'], extra: Partial<WidgetMetadata> = {}): WidgetMetadata {
@@ -136,23 +137,50 @@ describe('WidgetTree', () => {
     expect(within(section).getAllByTestId('leaf')).toHaveLength(2)
   })
 
-  it('draws columns side by side in file order, each as wide as its width in twelfths of 24 parts', () => {
-    const { container } = renderTree([
+  it('draws columns side by side in file order, each as wide as its width in twelfths', () => {
+    renderTree([
       {
         type: 'columns',
         columns: [
-          { width: 8, widgets: [named('wide')] },
-          { width: 4, widgets: [named('narrow')] },
+          { width: 6, widgets: [named('wide')] },
+          { width: 6, widgets: [named('narrow')] },
         ],
       },
     ])
 
-    const columns = container.querySelectorAll('.ant-col')
+    const columns = screen.getAllByTestId('column')
     expect(columns).toHaveLength(2)
-    expect(columns[0]).toHaveClass('ant-col-16')
-    expect(columns[1]).toHaveClass('ant-col-8')
+    expect(columns[0]).toHaveStyle({ gridColumn: 'span 6' })
+    expect(columns[1]).toHaveStyle({ gridColumn: 'span 6' })
     expect(within(columns[0] as HTMLElement).getByTestId('leaf')).toHaveTextContent('wide')
     expect(within(columns[1] as HTMLElement).getByTestId('leaf')).toHaveTextContent('narrow')
+  })
+
+  it('stacks the columns, each on the whole row, at narrow width', () => {
+    render(
+      <NarrowWidthOverride value={true}>
+        <MemoryRouter>
+          <TextProvider catalogs={catalogs} development={false}>
+            <WidgetTree
+              widgets={[
+                {
+                  type: 'columns',
+                  columns: [
+                    { width: 6, widgets: [named('wide')] },
+                    { width: 6, widgets: [named('narrow')] },
+                  ],
+                },
+              ]}
+              renderLeaf={(widget) => <Probe widget={widget} />}
+            />
+          </TextProvider>
+        </MemoryRouter>
+      </NarrowWidthOverride>,
+    )
+
+    for (const column of screen.getAllByTestId('column')) {
+      expect(column).toHaveStyle({ gridColumn: 'span 12' })
+    }
   })
 
   it('draws containers inside containers', () => {
@@ -292,7 +320,7 @@ describe('WidgetTree', () => {
     const failed = await screen.findByTestId('records-error')
     expect(failed).toHaveTextContent('The records could not be loaded.')
     expect(await screen.findByText('No open tasks.')).toBeInTheDocument()
-    const columns = Array.from(document.querySelectorAll<HTMLElement>('.ant-col'))
+    const columns = Array.from(screen.getAllByTestId('column'))
     expect(within(columns[0]).getByTestId('records-error')).toBe(failed)
     expect(within(columns[0]).queryByText('No open tasks.')).not.toBeInTheDocument()
     expect(within(columns[1]).getByText('No open tasks.')).toBeInTheDocument()

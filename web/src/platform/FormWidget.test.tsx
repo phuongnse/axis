@@ -13,6 +13,7 @@ import { FormWidget } from './FormWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
+import { NarrowWidthOverride } from './useNarrowWidth'
 import type { ThemeMode } from './themeMode'
 import { hostileMarkup } from '../test/hostile'
 import { withAntdStyles } from '../test/antdStyles'
@@ -486,25 +487,32 @@ function CurrentLocation() {
   )
 }
 
-function renderForm(recordId: string | null = null, widget: EntityWidgetMetadata = noteWidget, mode?: ThemeMode) {
+function renderForm(
+  recordId: string | null = null,
+  widget: EntityWidgetMetadata = noteWidget,
+  mode?: ThemeMode,
+  narrow?: boolean,
+) {
   const path = `/e2e/noteform/${recordId ?? 'new'}`
   const form = (
-    <MemoryRouter initialEntries={[{ pathname: path, state: { from: '/e2e/notes?pageSize=10' } }]}>
-      {/* Without motion the lookup dialog leaves the document at once, as jsdom runs no animations. */}
-      <ConfigProvider theme={{ token: { motion: false } }}>
-        <TextProvider catalogs={catalogs} development={false}>
-          <FormWidget
-            widget={widget}
-            sitePath="e2e"
-            pages={['Notes', 'NoteForm']}
-            recordId={recordId}
-            returnTo="/e2e/notes?pageSize=10"
-            locale="en"
-          />
-        </TextProvider>
-      </ConfigProvider>
-      <CurrentLocation />
-    </MemoryRouter>
+    <NarrowWidthOverride value={narrow}>
+      <MemoryRouter initialEntries={[{ pathname: path, state: { from: '/e2e/notes?pageSize=10' } }]}>
+        {/* Without motion the lookup dialog leaves the document at once, as jsdom runs no animations. */}
+        <ConfigProvider theme={{ token: { motion: false } }}>
+          <TextProvider catalogs={catalogs} development={false}>
+            <FormWidget
+              widget={widget}
+              sitePath="e2e"
+              pages={['Notes', 'NoteForm']}
+              recordId={recordId}
+              returnTo="/e2e/notes?pageSize=10"
+              locale="en"
+            />
+          </TextProvider>
+        </ConfigProvider>
+        <CurrentLocation />
+      </MemoryRouter>
+    </NarrowWidthOverride>
   )
   return render(mode ? <ThemeModeProvider initialMode={mode}>{form}</ThemeModeProvider> : form)
 }
@@ -755,7 +763,9 @@ describe('FormWidget', () => {
       expect(items.length).toBeGreaterThan(1)
       for (const item of items) {
         expect(getComputedStyle(item).getPropertyValue('--ant-form-item-margin-bottom')).toBe('0px')
-        expect(item.closest<HTMLElement>('.ant-row')?.style.rowGap).toBe(`${designTokensFor('light').spacing.lg}px`)
+        expect(item.closest<HTMLElement>('[data-testid^="field-column-"]')?.parentElement?.style.rowGap).toBe(
+          `${designTokensFor('light').spacing.lg}px`,
+        )
       }
     })
 
@@ -1566,8 +1576,8 @@ describe('FormWidget', () => {
           {
             ...form.sections[0],
             fields: [
-              { name: 'title', readOnly: false, width: 8 },
-              { name: 'status', readOnly: false, width: 4 },
+              { name: 'title', readOnly: false, width: 6 },
+              { name: 'status', readOnly: false, width: 6 },
               { name: 'code', readOnly: true },
             ],
           },
@@ -1576,9 +1586,38 @@ describe('FormWidget', () => {
     })
 
     const column = (field: HTMLElement) => field.closest('.ant-form-item')?.parentElement
-    expect(column(await screen.findByRole('textbox', { name: 'Title' }))).toHaveClass('ant-col-xs-24', 'ant-col-lg-16')
-    expect(column(await screen.findByLabelText('Status'))).toHaveClass('ant-col-lg-8')
-    expect(column(await screen.findByTestId('field-value-code'))).toHaveClass('ant-col-lg-24')
+    expect(column(await screen.findByRole('textbox', { name: 'Title' }))).toHaveStyle({ gridColumn: 'span 6' })
+    expect(column(await screen.findByLabelText('Status'))).toHaveStyle({ gridColumn: 'span 6' })
+    expect(column(await screen.findByTestId('field-value-code'))).toHaveStyle({ gridColumn: 'span 12' })
+  })
+
+  it('puts every field on the whole row at narrow width', async () => {
+    stubFetch({ status: 200, body: sectionsJson(1) })
+    const form = sectionsWidget.form!
+    renderForm(
+      noteId,
+      {
+        ...sectionsWidget,
+        form: {
+          ...form,
+          sections: [
+            {
+              ...form.sections[0],
+              fields: [
+                { name: 'title', readOnly: false, width: 6 },
+                { name: 'status', readOnly: false, width: 6 },
+              ],
+            },
+          ],
+        },
+      },
+      undefined,
+      true,
+    )
+
+    const column = (field: HTMLElement) => field.closest('.ant-form-item')?.parentElement
+    expect(column(await screen.findByRole('textbox', { name: 'Title' }))).toHaveStyle({ gridColumn: 'span 12' })
+    expect(column(await screen.findByLabelText('Status'))).toHaveStyle({ gridColumn: 'span 12' })
   })
 
   it('shows read-only fields and rows without letting them change, and never sends them', async () => {
