@@ -1,4 +1,4 @@
-import { Button, Flex } from 'antd'
+import { Button, Flex, Tabs } from 'antd'
 import dayjs from 'dayjs'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useCallback, useEffect, useState } from 'react'
@@ -20,6 +20,7 @@ import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
 import { visuallyHidden } from '../platform/visuallyHidden'
+import { AccountNotifications } from './AccountNotifications'
 import { usePlatform } from './context'
 
 const noParameters: string[] = []
@@ -35,7 +36,8 @@ const sessionFields = [
 ] as const
 
 /**
- * The person's account page. For an account of the tenant's realm, Change password and the
+ * The person's account page, titled Your account, with a Security tab, which opens first, and a Notifications tab, see
+ * {@link AccountNotifications}. On Security, for an account of the tenant's realm, Change password and the
  * authenticators come first: each button sends the browser to the identity provider's own step
  * through the sign-in route, which returns here. Remove is disabled on the only authenticator. A
  * brokered user sees neither. Below come the person's live sessions, with an End button on every
@@ -115,155 +117,187 @@ export function AccountPage() {
 
   return (
     <PageLayout
-      title={t('shell.account.sessions.title')}
-      breadcrumb={[{ label: t(platform.site.titleKey), to: '/' }, { label: t('shell.account.sessions.title') }]}
+      title={t('shell.account.title')}
+      breadcrumb={[{ label: t(platform.site.titleKey), to: '/' }, { label: t('shell.account.title') }]}
     >
-      {authenticatorsFailed && (
-        <AxisAlert
-          data-testid="authenticators-error"
-          kind="error"
-          message={t('shell.account.authenticators.loadFailed')}
-        />
-      )}
-      <SectionParts>
-        {authenticators?.account && (
-          <SectionPart testName="password" heading={{ title: t('shell.account.password.title') }}>
-            <Flex vertical gap="small" align="flex-start">
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button onClick={() => assignLocation(accountActionUrl('/account', 'UPDATE_PASSWORD'))}>
-                {t('shell.account.password.change')}
-              </Button>
-            </Flex>
-          </SectionPart>
-        )}
-        {authenticators?.account && (
-          <SectionPart testName="authenticators" heading={{ title: t('shell.account.authenticators.title') }}>
-            <Flex vertical gap="small" align="flex-start">
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button onClick={() => assignLocation(accountActionUrl('/account', 'CONFIGURE_TOTP'))}>
-                {t('shell.account.authenticators.add')}
-              </Button>
-              <AxisTable<OwnAuthenticator>
-                rowKey={(authenticator) => authenticator.id}
-                view={{ query: authenticatorsView.view, onChange: authenticatorsView.setView, paging: false }}
-                dataSource={authenticators.authenticators}
-                emptyText={t('shell.account.authenticators.empty')}
-                columns={[
-                  {
-                    key: 'label',
-                    kind: 'freeText',
-                    title: t('shell.account.authenticators.name'),
-                    render: (_value, authenticator) => authenticator.label ?? t('shell.account.authenticators.unnamed'),
-                    filter: { kind: 'text', value: (authenticator) => authenticator.label },
-                  },
-                  {
-                    key: 'createdAt',
-                    kind: 'fixed',
-                    title: t('shell.account.authenticators.addedAt'),
-                    render: (_value, authenticator) => (authenticator.createdAt ? time(authenticator.createdAt) : null),
-                    filter: {
-                      kind: 'date',
-                      value: (authenticator) =>
-                        authenticator.createdAt ? dayjs(authenticator.createdAt).format('YYYY-MM-DD') : null,
-                    },
-                  },
-                  {
-                    key: 'remove',
-                    kind: 'fixed',
-                    title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
-                    render: (_value, authenticator) => (
-                      // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                      <Button
-                        size="small"
-                        disabled={authenticators.authenticators.length <= 1}
-                        onClick={() =>
-                          assignLocation(accountActionUrl('/account', `delete_credential:${authenticator.id}`))
-                        }
-                      >
-                        {t('shell.account.authenticators.remove')}
-                      </Button>
-                    ),
-                  },
-                ]}
-              />
-            </Flex>
-          </SectionPart>
-        )}
-        <SectionPart testName="sessions" heading={{ title: t('shell.account.sessions.heading') }}>
-          <Flex vertical gap="small">
-            {loadFailed && (
-              <AxisAlert data-testid="sessions-error" kind="error" message={t('shell.account.sessions.loadFailed')} />
-            )}
-            {endFailed && (
-              <AxisAlert
-                data-testid="sessions-end-error"
-                kind="error"
-                message={t('shell.account.sessions.endFailed')}
-              />
-            )}
-            {sessions && !sessions.endAllowed && (
-              <AxisAlert
-                data-testid="sessions-reauthenticate"
-                kind="info"
-                message={t('shell.account.sessions.reauthenticate')}
-                action={
-                  // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                  <Button size="small" onClick={() => assignLocation(reauthenticateUrl('/account'))}>
-                    {t('shell.account.sessions.signInAgain')}
-                  </Button>
-                }
-              />
-            )}
-            {sessions && (
-              <Flex vertical gap="small" align="flex-start">
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button
-                  disabled={!endAllowed || sessions.sessions.every((session) => session.current)}
-                  onClick={() => end(endOtherSessions)}
-                >
-                  {t('shell.account.sessions.endOthers')}
-                </Button>
-                <AxisTable<OwnSession>
-                  rowKey={(session) => session.id}
-                  view={{ query: sessionsView.view, onChange: sessionsView.setView, paging: false }}
-                  dataSource={sessions.sessions}
-                  emptyText={t('shell.account.sessions.empty')}
-                  columns={[
-                    {
-                      key: 'signedInAt',
-                      kind: 'fixed',
-                      title: t('shell.account.sessions.signedInAt'),
-                      render: (_value, session) => time(session.signedInAt),
-                      filter: { kind: 'date', value: (session) => dayjs(session.signedInAt).format('YYYY-MM-DD') },
-                    },
-                    {
-                      key: 'lastRequestAt',
-                      kind: 'fixed',
-                      title: t('shell.account.sessions.lastRequestAt'),
-                      render: (_value, session) => time(session.lastRequestAt),
-                      filter: { kind: 'date', value: (session) => dayjs(session.lastRequestAt).format('YYYY-MM-DD') },
-                    },
-                    {
-                      key: 'end',
-                      kind: 'fixed',
-                      title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
-                      render: (_value, session) =>
-                        session.current ? (
-                          <StatusTag tone="neutral">{t('shell.account.sessions.current')}</StatusTag>
-                        ) : (
-                          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                          <Button size="small" disabled={!endAllowed} onClick={() => end(() => endSession(session.id))}>
-                            {t('shell.account.sessions.end')}
+      <Tabs
+        defaultActiveKey="security"
+        items={[
+          {
+            key: 'security',
+            label: t('shell.account.tabs.security'),
+            children: (
+              <>
+                {authenticatorsFailed && (
+                  <AxisAlert
+                    data-testid="authenticators-error"
+                    kind="error"
+                    message={t('shell.account.authenticators.loadFailed')}
+                  />
+                )}
+                <SectionParts>
+                  {authenticators?.account && (
+                    <SectionPart testName="password" heading={{ title: t('shell.account.password.title') }}>
+                      <Flex vertical gap="small" align="flex-start">
+                        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                        <Button onClick={() => assignLocation(accountActionUrl('/account', 'UPDATE_PASSWORD'))}>
+                          {t('shell.account.password.change')}
+                        </Button>
+                      </Flex>
+                    </SectionPart>
+                  )}
+                  {authenticators?.account && (
+                    <SectionPart testName="authenticators" heading={{ title: t('shell.account.authenticators.title') }}>
+                      <Flex vertical gap="small" align="flex-start">
+                        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                        <Button onClick={() => assignLocation(accountActionUrl('/account', 'CONFIGURE_TOTP'))}>
+                          {t('shell.account.authenticators.add')}
+                        </Button>
+                        <AxisTable<OwnAuthenticator>
+                          rowKey={(authenticator) => authenticator.id}
+                          view={{ query: authenticatorsView.view, onChange: authenticatorsView.setView, paging: false }}
+                          dataSource={authenticators.authenticators}
+                          emptyText={t('shell.account.authenticators.empty')}
+                          columns={[
+                            {
+                              key: 'label',
+                              kind: 'freeText',
+                              title: t('shell.account.authenticators.name'),
+                              render: (_value, authenticator) =>
+                                authenticator.label ?? t('shell.account.authenticators.unnamed'),
+                              filter: { kind: 'text', value: (authenticator) => authenticator.label },
+                            },
+                            {
+                              key: 'createdAt',
+                              kind: 'fixed',
+                              title: t('shell.account.authenticators.addedAt'),
+                              render: (_value, authenticator) =>
+                                authenticator.createdAt ? time(authenticator.createdAt) : null,
+                              filter: {
+                                kind: 'date',
+                                value: (authenticator) =>
+                                  authenticator.createdAt ? dayjs(authenticator.createdAt).format('YYYY-MM-DD') : null,
+                              },
+                            },
+                            {
+                              key: 'remove',
+                              kind: 'fixed',
+                              title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
+                              render: (_value, authenticator) => (
+                                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
+                                <Button
+                                  size="small"
+                                  disabled={authenticators.authenticators.length <= 1}
+                                  onClick={() =>
+                                    assignLocation(
+                                      accountActionUrl('/account', `delete_credential:${authenticator.id}`),
+                                    )
+                                  }
+                                >
+                                  {t('shell.account.authenticators.remove')}
+                                </Button>
+                              ),
+                            },
+                          ]}
+                        />
+                      </Flex>
+                    </SectionPart>
+                  )}
+                  <SectionPart testName="sessions" heading={{ title: t('shell.account.sessions.heading') }}>
+                    <Flex vertical gap="small">
+                      {loadFailed && (
+                        <AxisAlert
+                          data-testid="sessions-error"
+                          kind="error"
+                          message={t('shell.account.sessions.loadFailed')}
+                        />
+                      )}
+                      {endFailed && (
+                        <AxisAlert
+                          data-testid="sessions-end-error"
+                          kind="error"
+                          message={t('shell.account.sessions.endFailed')}
+                        />
+                      )}
+                      {sessions && !sessions.endAllowed && (
+                        <AxisAlert
+                          data-testid="sessions-reauthenticate"
+                          kind="info"
+                          message={t('shell.account.sessions.reauthenticate')}
+                          action={
+                            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
+                            <Button size="small" onClick={() => assignLocation(reauthenticateUrl('/account'))}>
+                              {t('shell.account.sessions.signInAgain')}
+                            </Button>
+                          }
+                        />
+                      )}
+                      {sessions && (
+                        <Flex vertical gap="small" align="flex-start">
+                          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                          <Button
+                            disabled={!endAllowed || sessions.sessions.every((session) => session.current)}
+                            onClick={() => end(endOtherSessions)}
+                          >
+                            {t('shell.account.sessions.endOthers')}
                           </Button>
-                        ),
-                    },
-                  ]}
-                />
-              </Flex>
-            )}
-          </Flex>
-        </SectionPart>
-      </SectionParts>
+                          <AxisTable<OwnSession>
+                            rowKey={(session) => session.id}
+                            view={{ query: sessionsView.view, onChange: sessionsView.setView, paging: false }}
+                            dataSource={sessions.sessions}
+                            emptyText={t('shell.account.sessions.empty')}
+                            columns={[
+                              {
+                                key: 'signedInAt',
+                                kind: 'fixed',
+                                title: t('shell.account.sessions.signedInAt'),
+                                render: (_value, session) => time(session.signedInAt),
+                                filter: {
+                                  kind: 'date',
+                                  value: (session) => dayjs(session.signedInAt).format('YYYY-MM-DD'),
+                                },
+                              },
+                              {
+                                key: 'lastRequestAt',
+                                kind: 'fixed',
+                                title: t('shell.account.sessions.lastRequestAt'),
+                                render: (_value, session) => time(session.lastRequestAt),
+                                filter: {
+                                  kind: 'date',
+                                  value: (session) => dayjs(session.lastRequestAt).format('YYYY-MM-DD'),
+                                },
+                              },
+                              {
+                                key: 'end',
+                                kind: 'fixed',
+                                title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
+                                render: (_value, session) =>
+                                  session.current ? (
+                                    <StatusTag tone="neutral">{t('shell.account.sessions.current')}</StatusTag>
+                                  ) : (
+                                    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
+                                    <Button
+                                      size="small"
+                                      disabled={!endAllowed}
+                                      onClick={() => end(() => endSession(session.id))}
+                                    >
+                                      {t('shell.account.sessions.end')}
+                                    </Button>
+                                  ),
+                              },
+                            ]}
+                          />
+                        </Flex>
+                      )}
+                    </Flex>
+                  </SectionPart>
+                </SectionParts>
+              </>
+            ),
+          },
+          { key: 'notifications', label: t('shell.account.tabs.notifications'), children: <AccountNotifications /> },
+        ]}
+      />
     </PageLayout>
   )
 }

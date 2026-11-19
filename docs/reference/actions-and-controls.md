@@ -105,7 +105,9 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   border of a field with a warning take `warningText`, as an error's take `dangerText`, so both pass
   contrast.
 - **A label is above its input, everywhere**, as the form widget has it, never beside it. Each form
-  names Ant Design's vertical layout, and a Vitest check refuses a form that does not.
+  names Ant Design's vertical layout, and a Vitest check refuses a form that does not. In a table cell whose row
+  and column name the control, such as a switch in a row of settings, the label is visually hidden and still
+  names the input, through `hideLabel` on a field the screen holds the value of.
 - **One field for the platform's screens.** `AxisField` draws a field: its label, its help and its input, as a
   group that its help describes. Inside a vertical form it takes the form's value and checks. Outside an
   Ant Design form, where a screen keeps its draft itself, the caller gives the input its value and change

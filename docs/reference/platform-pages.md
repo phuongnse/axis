@@ -13,8 +13,6 @@ Keycloak's account console client and removes `manage-account` from the realm's 
 
 ### Tabs
 
-_(planned for M43)_
-
 The page is titled "Your account" ("Tài khoản của bạn"), from `shell.account.title`, and the account
 menu's entry that opens it reads the same. It has two tabs:
 
@@ -73,11 +71,11 @@ Save sends the dates and the delegate with `PUT`, and End absence sends `DELETE`
 
 ### Notifications
 
-_(planned for M43)_
-
 The Notifications tab shows the person's [notification preferences](notifications.md#notification-preferences)
 from `GET /api/me/notification-preferences`, and saves each change as the person makes it.
 
+- **Loading.** While the preferences load, the tab shows no table. When they fail to load, it shows an error
+  `AxisAlert` and no table, as the Security tab does for its own loads.
 - **One table.** An `AxisTable` has a row for each source: Tasks, Mentions, Process messages and AI requests,
   for `task`, `mention`, `process` and `authoringRequest`. Each row shows its name and a one-line description
   in `textMuted`.
@@ -86,13 +84,15 @@ from `GET /api/me/notification-preferences`, and saves each change as the person
 - **Email.** The second column is one choice of Off, Right away or In the daily digest. Off sets `email` to
   `false`. Right away sets `email` to `true` and `digest` to `false`. In the daily digest sets both `email` and
   `digest` to `true`.
-- **Accessible names.** Each control is named by its row and column, such as "Mentions: In the application".
+- **Accessible names.** Each control is named by its row and column, such as "Mentions: In the application", through
+  a label that is visually hidden, see [fields](actions-and-controls.md#fields).
 - **Notices to administrators.** A last row shows while `GET /api/me` answers `users: true`. It is locked on in
   the application, with "Always on", and has no email choice. See
   [notification preferences](notifications.md#notification-preferences).
 - **Saved at once.** There is no Save button, because each choice stands on its own, and a switch takes effect
   as it is set. A change sends the whole preferences with `PUT` at once.
-- **Busy.** The changed control is busy while the save runs.
+- **Busy.** The changed control is busy while the save runs, and the other controls are disabled until it ends,
+  because every save sends the whole set.
 - **Saved.** A `204` is announced to assistive technology as "Saved.", through `Announcement`.
 - **Refused.** Any other answer, or a failed request, puts the last value back. It shows "Your change could not
   be saved, so it was put back." in an `AxisAlert`.

@@ -6,6 +6,7 @@ import {
   formatTimeAgo,
   formatValue,
   referencesLabels,
+  timeOfDayText,
   timePattern,
   type FormatOptions,
 } from './formatValue'
@@ -227,6 +228,15 @@ describe('referencesLabels', () => {
     expect(referencesLabels([], ['Word'])).toEqual([])
     expect(referencesLabels(undefined, undefined)).toEqual([])
     expect(referencesLabels(null, 'Word')).toEqual([])
+  })
+})
+
+describe('timeOfDayText', () => {
+  it("shows a whole hour on the locale's clock", () => {
+    expect(timeOfDayText(8, 'en')).toBe('8:00 AM')
+    expect(timeOfDayText(8, 'vi')).toBe('08:00')
+    expect(timeOfDayText(20, 'en')).toBe('8:00 PM')
+    expect(timeOfDayText(20, 'vi')).toBe('20:00')
   })
 })
 

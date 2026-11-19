@@ -20,6 +20,7 @@ type FormMode = Shared & {
   checked?: never
   onChange?: never
   loading?: never
+  hideLabel?: never
 }
 
 type OwnMode = Shared & {
@@ -34,6 +35,8 @@ type OwnMode = Shared & {
   required?: boolean
   /** Shows a switch as busy, such as while its change is saved. */
   loading?: boolean
+  /** Hides the label from the eye, as for {@link AxisField}. It still names the input. */
+  hideLabel?: boolean
 }
 
 function isOwnMode(props: FormMode | OwnMode): props is OwnMode {
@@ -50,9 +53,9 @@ function isOwnMode(props: FormMode | OwnMode): props is OwnMode {
 export function AxisCheckboxField(props: FormMode | OwnMode) {
   const { label, help, kind = 'checkbox', disabled } = props
   if (isOwnMode(props)) {
-    const { checked, onChange, loading, required } = props
+    const { checked, onChange, loading, required, hideLabel } = props
     return (
-      <AxisField label={label} help={help} required={required}>
+      <AxisField label={label} help={help} required={required} hideLabel={hideLabel}>
         {kind === 'switch' ? (
           <Switch checked={checked} disabled={disabled} loading={loading} onChange={(value) => onChange(value)} />
         ) : (

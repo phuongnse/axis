@@ -111,13 +111,6 @@ export function isTableOnlyField(kind: unknown, path: string): boolean {
   )
 }
 
-/** A time zone as the select shows it, such as "(UTC+07:00) Asia/Ho Chi Minh". `offset` is minutes from UTC. */
-export function timeZoneText(zone: { id: string; offset: number }): string {
-  const minutes = Math.abs(zone.offset)
-  const clock = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
-  return `(UTC${zone.offset < 0 ? '-' : '+'}${clock}) ${zone.id.replaceAll('_', ' ')}`
-}
-
 /** A slot's title in the locale, else in `en`, else its name. */
 export function slotTitle(slot: StudioCatalogSlot, locale: string): string {
   return textIn(slot.titles, locale) ?? slot.name
