@@ -352,6 +352,13 @@ export const previews: Record<string, readonly PreviewState[]> = {
       // Proposed: a package's workspace fills the window down to the footer, so its frame is as tall as a window, see #3978.
       frameHeight: 900,
     },
+    // Proposed: a Python package whose tests sit in a folder, so the tree shows a folder and its file, see #3978.
+    {
+      caption: 'Package with folders',
+      fixtures: studioFixtures.typical,
+      entry: `/studio?app=${application}&view=packages&package=phone-numbers&file=tests%2Ftest_adapter.py`,
+      frameHeight: 900,
+    },
     // Proposed: the package after Build, Run tests and Run, each with its tab of the output panel, see #3978.
     ...(
       [

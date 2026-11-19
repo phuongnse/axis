@@ -213,6 +213,17 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
   ].join('\n')
 }
 
+/**
+ * Proposed, see #3978: how the shell's navigation, an inline `Menu`, marks an entry, read from the same tokens Ant
+ * Design's Menu takes them from: the chosen entry's tint, the tint under the pointer and the corners. A list that is
+ * not a Menu, such as a package's file tree, marks its rows with these, so a chosen row reads as a chosen entry does,
+ * its text in `primaryText` as `Menu.itemSelectedColor` sets.
+ */
+export function navigationItemLook(mode: ThemeMode): { selected: string; hover: string; radius: number } {
+  const token = theme.getDesignToken(antThemeFor(mode))
+  return { selected: token.controlItemBgActive, hover: token.colorBgTextHover, radius: token.borderRadiusLG }
+}
+
 /** The tint Ant Design gives a selected item. Dropdown menus draw their selected item on it, so Axis reads it here. */
 export function selectedItemTint(mode: ThemeMode): string {
   return theme.getDesignToken(antThemeFor(mode)).controlItemBgActive
