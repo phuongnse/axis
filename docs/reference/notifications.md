@@ -198,6 +198,7 @@ recipient kind `platformRole`, and no application lists it.
   - **Request stopped** on a move to `failed`. The kind is `warning`. The text key `notices.authoringFailed` gives "Request stopped" and "Your request in {application} stopped before it was done. Open it to see why."
 
   The values are `application`, the application's name, and `request`. The states are in [authoring requests](authoring-requests.md#states).
+- **Preferences and email** _(planned for M43)_. AI request notices follow the person's `authoringRequest` preference. With `application` off they are not in the bell or its counts. With `email` on, the commit that stores the notice also stages one email in `axis.email_outbox` to the person's profile address. The email has the notice's subject and body in platform texts of the profile locale, as Texts above says, and a link to the request in Studio on the tenant's platform host. It is sent as [email](#email) says, now or in the digest. A person with no profile email gets none.
 - **Read and done** _(planned for M35)_. A notice is read when its person opens it from the bell or marks it read. An `action` notice is done when its request leaves the state it waits on, whether it is read or not. Plan ready waits on `awaitingApproval`, and draft ready waits on `ready`.
 - **Open** _(planned for M35)_. An AI request notice opens its request in Studio, with `{ "page": "studio", "parameters": { "app", "view", "request" } }`. The bell opens `/studio?app=<name>&view=requests&request=<id>`, see [AI authoring in Studio](ai-authoring-in-studio.md#the-request-panel).
 
@@ -244,22 +245,23 @@ A person hears in the application and by email when a task is given to them, mov
 
 _(planned for M43)_
 
-A person chooses how each kind of notice reaches them, and whether its emails come together in a daily digest. A choice only narrows the channels that a notice would use. It never adds one.
+A person chooses on the account page's [Notifications tab](platform-pages.md#notifications). They choose how each kind of notice reaches them, and whether its emails come together in a daily digest. A choice only narrows the channels that a notice would use. It never adds one.
 
 | Route | What it does |
 | --- | --- |
 | `GET /api/me/notification-preferences` _(planned for M43)_ | Reads the signed-in person's preferences |
 | `PUT /api/me/notification-preferences` _(planned for M43)_ | Replaces the signed-in person's preferences |
 
-- **Sources.** A source is a kind of notice. `task` is the [task notices](#task-notices), `mention` is the [mentions](comments.md#mentions) and `process` is the message of a `notify` step, see [the notify operation](#notify-operation).
-- **Body.** `PUT` takes the three sources, `digestHour` and `timeZone`. Each source has `channels`, with `application` and `email` set to `true` or `false`, and `digest`, set to `true` or `false`. For example:
+- **Sources.** A source is a kind of notice. `task` is the [task notices](#task-notices), `mention` is the [mentions](comments.md#mentions), `process` is the message of a `notify` step, see [the notify operation](#notify-operation), and `authoringRequest` is the notices of the person's own AI requests, see [tenant notices](#tenant-notices).
+- **Body.** `PUT` takes the four sources, `digestHour` and `timeZone`. Each source has `channels`, with `application` and `email` set to `true` or `false`, and `digest`, set to `true` or `false`. For example:
 
   ```json
   {
     "sources": {
       "task": { "channels": { "application": true, "email": true }, "digest": true },
       "mention": { "channels": { "application": true, "email": false }, "digest": false },
-      "process": { "channels": { "application": true, "email": true }, "digest": false }
+      "process": { "channels": { "application": true, "email": true }, "digest": false },
+      "authoringRequest": { "channels": { "application": true, "email": false }, "digest": false }
     },
     "digestHour": 8,
     "timeZone": "Europe/Berlin"
@@ -272,7 +274,7 @@ A person chooses how each kind of notice reaches them, and whether its emails co
 - **Refusals.** A bad value is a `400` keyed by its path, such as `/digestHour` for an hour outside 0 to 23, or `/timeZone` for a name that is not an IANA time zone.
 - **In-app off.** A source with the `application` channel off does not show in the person's bell or its counts.
 - **Email and digest.** An email for a source with `email` on is sent as [email](#email) says. With `digest` on, the email waits in `axis.email_outbox` for the digest. The worker then sends the waiting emails as one digest, at `digestHour` in `timeZone`. The digest lists the subject and link of each waiting email.
-- **Tenant notices.** Tenant notices always show in the application, whatever the preferences say. See [tenant notices](#tenant-notices).
+- **Notices to administrators.** A tenant notice to the administrators always shows in the application, whatever the preferences say, and is never emailed. An AI request notice follows the `authoringRequest` source. See [tenant notices](#tenant-notices).
 - **Storage.** `axis.notification_preferences` holds one row for each person who has saved a choice.
 
 ## Email

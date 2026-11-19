@@ -136,10 +136,10 @@ application never depends on the UI library.
 A page with a band starts with a header band on `surface` across the page area, with a `borderSubtle` rule
 below it. It says where the person is and what the page is.
 
-- **Regular band.** The band of a platform page that keeps one, the Sessions and Users pages, holds the breadcrumb,
+- **Regular band.** The band of a platform page that keeps one, the account and Users pages, holds the breadcrumb,
   then the page title in `heading4`. It has `spacing-lg` padding above and at its sides, `spacing-md` below the title,
   and `spacing-xs` between the breadcrumb and the title.
-- **Breadcrumb.** The breadcrumb starts at the site and ends at the page: "Axis › Your sessions". Every step but the
+- **Breadcrumb.** The breadcrumb starts at the site and ends at the page: "Axis › Users". Every step but the
   last is a link, and the last is marked `aria-current`.
 - **Site pages** _(planned)_. A page of an application site starts with its title in `heading4` as the page's
   level-one heading, with no breadcrumb and no band of its own. The sidebar marks where the person is, and the browser
@@ -165,8 +165,8 @@ below it. It says where the person is and what the page is.
   elsewhere, is the page's first part. It is a list of facts through `TermList`, see
   [fields](actions-and-controls.md#fields), above a `borderSubtle` rule. It never sits on the heading's line.
 - **Platform pages.** The platform home page has no band and no breadcrumb, and has its own headings,
-  see the [platform home page](#platform-home-page). The Sessions page has the band "Axis › Your
-  sessions", and the users page the band "Axis › Users".
+  see the [platform home page](#platform-home-page). The users page has the band "Axis › Users".
+- **The account page's band** _(planned for M43)_. The account page has the band "Axis › Your account".
 
 ## App switcher and preferences
 
@@ -225,10 +225,11 @@ Sign-in itself is in [sign-in and the session](security.md#sign-in-and-the-sessi
   the current path and query string as `returnUrl`, so the person comes back there, but to `/` from the
   card addresses.
 - **Signed in.** With someone signed in, it shows their display name, with their avatar before it and a
-  caret after it. Its menu holds Sessions, which opens the
-  [account page](platform-pages.md#account-page), and Sign out, which ends the session. The server ends
+  caret after it. Sign out in its menu ends the session. The server ends
   the identity provider's session itself and the browser goes to `/?signedOut`. Only when that fails
   does the browser go to the identity provider's sign-out page.
+- **Account menu** _(planned for M43)_. Its menu holds Your account (`shell.account.title`), which opens the
+  [account page](platform-pages.md#tabs), and Sign out, as [signed in](#account-button) says.
 - **Texts.** The platform texts are `shell.account.signIn`, `shell.account.signOut` and
   `shell.account.label`, the menu's label.
 
@@ -403,6 +404,10 @@ to the frame shows in every state. How previews work is in
   the page scrolls inside it as in a window, so a dialog opens in the middle of what shows.
 - **The State control** _(planned)_. `shell`, `signIn` and `identitySignIn` show one state at a time under a State
   control, as `studio` does, and `&state=<slug>` opens one.
+- **Account states** _(planned for M43)_. The `shell` preview gains Account page, the platform's `/account` on its
+  Security tab, and Account notifications, the same page on its Notifications tab. Both use fixtures of
+  `GET /api/me/authenticators`, `GET /api/me/sessions` and `GET /api/me/notification-preferences`, and `PUT`
+  answers `204`.
 - **The Studio group** is the eighth group of cards, after Shell. Its `studio` preview draws Studio
   through the shell over fixtures of the purchase request sample, in sixteen states: Typical, Empty,
   Loading, Failed, Many rows, Long names, Access denied, Overview with errors and changes not live,
