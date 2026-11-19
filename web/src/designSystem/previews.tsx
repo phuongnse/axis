@@ -248,6 +248,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
       type === 'child-collection' ? childCollectionStates : fieldStates(type),
     ]),
   ),
+  // Prototype only, until #4645 builds it: an empty fixtures object shows the states one at a time under the chooser.
   shell: [
     { caption: 'Application site', draw: () => <ShellPreview />, entry: '/sample/requests', frameHeight: 600 },
     {
@@ -288,7 +289,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
       entry: '/sample/requests',
       frameHeight: 600,
     },
-  ],
+  ].map((state) => ({ ...state, fixtures: {} })),
   studio: [
     { caption: 'Typical', fixtures: studioFixtures.typical, entry: `/studio?app=${application}` },
     { caption: 'Empty', fixtures: studioFixtures.empty, entry: '/studio' },
