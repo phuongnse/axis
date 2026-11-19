@@ -35,7 +35,7 @@ import { StudioConnectionContext, useStudioConnection } from '../platform/studio
 import { kindName, kindSingular } from '../platform/studioKinds'
 import { studioResourceAddress } from '../platform/studioAddress'
 import { starterKinds } from '../platform/studioStarters'
-import { StudioNamesContext } from '../platform/studioNames'
+import { StudioApplicationContext, StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { Tile, TileFocusStyle } from '../platform/Tile'
 import { leaveWithoutAsking } from '../platform/unsavedChanges'
@@ -715,42 +715,44 @@ function StudioWorkspace() {
                           />
                         </SectionPart>
                         <SectionPart testName="editor">
-                          <StudioNamesContext.Provider value={names ?? undefined}>
-                            <StudioEditor
-                              key={`editor-${selected.id}`}
-                              ref={editor}
-                              application={application!}
-                              item={selected}
-                              publisher={canPublish}
-                              resources={loaded.resources}
-                              path={path}
-                              diagnosticPaths={diagnosticPaths}
-                              onOpen={openReference}
-                              onSaved={(diagnostics, created) => {
-                                setFolder({
-                                  ...loaded,
-                                  resources: created ? [...loaded.resources, ...created] : loaded.resources,
-                                  diagnostics,
-                                })
-                                setFolderRevision((value) => value + 1)
-                              }}
-                              onTextsWritten={(diagnostics) => {
-                                setFolder({ ...loaded, diagnostics })
-                                setFolderRevision((value) => value + 1)
-                              }}
-                              onDeleted={(diagnostics) => {
-                                setFolder({
-                                  ...loaded,
-                                  resources: loaded.resources.filter((item) => item.id !== selected.id),
-                                  diagnostics,
-                                })
-                                setFolderRevision((value) => value + 1)
-                                navigate(`/studio?${new URLSearchParams({ app: application! })}`, {
-                                  state: leaveWithoutAsking,
-                                })
-                              }}
-                            />
-                          </StudioNamesContext.Provider>
+                          <StudioApplicationContext.Provider value={application!}>
+                            <StudioNamesContext.Provider value={names ?? undefined}>
+                              <StudioEditor
+                                key={`editor-${selected.id}`}
+                                ref={editor}
+                                application={application!}
+                                item={selected}
+                                publisher={canPublish}
+                                resources={loaded.resources}
+                                path={path}
+                                diagnosticPaths={diagnosticPaths}
+                                onOpen={openReference}
+                                onSaved={(diagnostics, created) => {
+                                  setFolder({
+                                    ...loaded,
+                                    resources: created ? [...loaded.resources, ...created] : loaded.resources,
+                                    diagnostics,
+                                  })
+                                  setFolderRevision((value) => value + 1)
+                                }}
+                                onTextsWritten={(diagnostics) => {
+                                  setFolder({ ...loaded, diagnostics })
+                                  setFolderRevision((value) => value + 1)
+                                }}
+                                onDeleted={(diagnostics) => {
+                                  setFolder({
+                                    ...loaded,
+                                    resources: loaded.resources.filter((item) => item.id !== selected.id),
+                                    diagnostics,
+                                  })
+                                  setFolderRevision((value) => value + 1)
+                                  navigate(`/studio?${new URLSearchParams({ app: application! })}`, {
+                                    state: leaveWithoutAsking,
+                                  })
+                                }}
+                              />
+                            </StudioNamesContext.Provider>
+                          </StudioApplicationContext.Provider>
                         </SectionPart>
                       </SectionParts>
                     </PageLayout>
@@ -775,18 +777,20 @@ function StudioWorkspace() {
                           />
                         </SectionPart>
                         <SectionPart testName="view">
-                          <StudioNamesContext.Provider value={names ?? undefined}>
-                            <ModuleResourceView
-                              key={`module-${selectedModuleItem.kind}-${selectedModuleItem.id}`}
-                              application={application!}
-                              item={selectedModuleItem}
-                              manifest={manifest}
-                              diagnostics={loaded.diagnostics}
-                              onModuleWritten={onModuleWritten}
-                              onManifestSaved={onManifestSaved}
-                              onManifestStale={() => setManifestReload((value) => value + 1)}
-                            />
-                          </StudioNamesContext.Provider>
+                          <StudioApplicationContext.Provider value={application!}>
+                            <StudioNamesContext.Provider value={names ?? undefined}>
+                              <ModuleResourceView
+                                key={`module-${selectedModuleItem.kind}-${selectedModuleItem.id}`}
+                                application={application!}
+                                item={selectedModuleItem}
+                                manifest={manifest}
+                                diagnostics={loaded.diagnostics}
+                                onModuleWritten={onModuleWritten}
+                                onManifestSaved={onManifestSaved}
+                                onManifestStale={() => setManifestReload((value) => value + 1)}
+                              />
+                            </StudioNamesContext.Provider>
+                          </StudioApplicationContext.Provider>
                         </SectionPart>
                       </SectionParts>
                     </PageLayout>

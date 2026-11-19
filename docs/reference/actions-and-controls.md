@@ -408,7 +408,7 @@ A thing opens at one of three levels, chosen by what the person does, never by t
   thing it names opens in the same site, such as a record, an instance, a sub-process or a step's run. A thing in
   another site, such as Studio, opens only from a button named for it, such as Open in Studio. So a call's connector
   and operation are plain text.
-- **Studio's and the platform's references** _(planned)_. A user, a tenant, an application or a release that a Studio
+- **Studio's and the platform's references**. A user, a tenant, an application or a release that a Studio
   or platform page names is a link to its page where the reader may open it, and plain text otherwise. A Studio
   reference picker whose chosen resource exists has an Open button joined to it, which opens that resource in Studio.
 

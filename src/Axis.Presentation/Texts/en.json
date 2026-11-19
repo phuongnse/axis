@@ -2105,6 +2105,7 @@
   "shell.studio.field.identityProvider.acr": "Assurance level",
   "shell.studio.field.identityProvider.acr.help": "An assurance level that the provider must sign the person in at, such as urn:level2. Axis refuses a sign-in at any other level.",
   "shell.studio.unknownName": "unknown",
+  "shell.studio.reference.open": "Open",
   "shell.studio.versionRange.version": "Version",
   "shell.studio.versionRange.updates": "Updates",
   "shell.studio.versionRange.newest": "{version} (newest)",

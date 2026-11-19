@@ -366,7 +366,7 @@ muted, each `spacing-xs` from the last.
 - The time is a length of time in the same words as [the History's Duration](#the-history), such as "40 s".
 - A failure adds one sentence under the name, in the same column and in the text colour. It says where and why, such as
   "Failed at step 2: The purchasing system did not answer at its test address."
-- The band's Run tests draws its results the same way, see [Studio](studio.md#running-tests).
+- The band's Run tests draws its results the same way, see [running tests](studio-running-tests.md#running-tests).
 
 ### Preview the draft
 

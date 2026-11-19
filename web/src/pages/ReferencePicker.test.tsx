@@ -1,12 +1,14 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
+import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { StudioNames } from '../platform/studio'
 import { colourTokens } from '../platform/designTokens'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { TextProvider } from '../platform/TextProvider'
-import { StudioNamesContext } from '../platform/studioNames'
+import { StudioApplicationContext, StudioNamesContext } from '../platform/studioNames'
 import type { JsonSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
@@ -130,15 +132,39 @@ function ThemeRoot({ children }: { children: ReactNode }) {
   return <div data-theme-mode={useThemeMode().mode}>{children}</div>
 }
 
-function renderForm(value: Record<string, unknown>, namesLoaded = true, formSchema: JsonSchema = schema) {
+/** The address the probe shows, so a test can see where an Open link led. */
+function LocationProbe() {
+  const location = useLocation()
+  return <output data-testid="location">{location.pathname + location.search}</output>
+}
+
+/** Renders the form. With `application`, Studio's editor is open on it, inside a router with a location probe. */
+function renderForm(
+  value: Record<string, unknown>,
+  namesLoaded = true,
+  formSchema: JsonSchema = schema,
+  application?: string,
+) {
   const onChange = vi.fn()
+  const form = (
+    <StudioNamesContext.Provider value={namesLoaded ? names : undefined}>
+      <SchemaForm schema={formSchema} value={value} onChange={onChange} />
+    </StudioNamesContext.Provider>
+  )
   render(
     <ThemeModeProvider>
       <ThemeRoot>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioNamesContext.Provider value={namesLoaded ? names : undefined}>
-            <SchemaForm schema={formSchema} value={value} onChange={onChange} />
-          </StudioNamesContext.Provider>
+          {application === undefined ? (
+            form
+          ) : (
+            <MemoryRouter initialEntries={['/studio?app=Shop']}>
+              <StudioApplicationContext.Provider value={application}>
+                {form}
+                <LocationProbe />
+              </StudioApplicationContext.Provider>
+            </MemoryRouter>
+          )}
         </TextProvider>
       </ThemeRoot>
     </ThemeModeProvider>,
@@ -243,6 +269,64 @@ describe.each(['light', 'dark'])('ReferencePicker in %s mode', (mode) => {
     expect(onChange).not.toHaveBeenCalled()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
     expect(onChange).toHaveBeenLastCalledWith('/grants/0', { entity: 'Order', fields: ['Id'] })
+  })
+
+  it('opens a chosen entity in Studio from an Open link joined to the select', async () => {
+    renderForm({ entity: 'Order', grants: [] }, true, schema, 'Shop')
+
+    const open = screen.getByRole('link', { name: 'Open entity' })
+    expect(open).toHaveAttribute('href', studioResourceAddress('Shop', '1'))
+
+    await userEvent.click(open)
+    expect(screen.getByTestId('location').textContent).toBe(studioResourceAddress('Shop', '1'))
+  })
+
+  it('opens a chosen role from an Open link to its resource', () => {
+    const roleSchema: JsonSchema = {
+      type: 'object',
+      properties: { role: { type: 'string', 'x-axis-reference': 'role' } },
+    }
+    renderForm({ role: 'manager' }, true, roleSchema, 'Shop')
+
+    expect(screen.getByRole('link', { name: 'Open role' })).toHaveAttribute('href', studioResourceAddress('Shop', '3'))
+  })
+
+  it.each([
+    ['empty', { grants: [] }],
+    ['unknown', { entity: 'Gone', grants: [] }],
+  ])('shows no Open link when the value is %s', (_, value) => {
+    renderForm(value, true, schema, 'Shop')
+
+    expect(screen.queryByRole('link', { name: 'Open entity' })).not.toBeInTheDocument()
+  })
+
+  it('shows no Open link on a text key, which names no resource', () => {
+    const textSchema: JsonSchema = {
+      type: 'object',
+      properties: { text: { type: 'string', 'x-axis-reference': 'text' } },
+    }
+    renderForm({ text: 'entities.supplier.label' }, true, textSchema, 'Shop')
+
+    expect(screen.getByRole('combobox', { name: 'text' })).toBeVisible()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('shows no Open link on a field of the grant dialog, which is part of a resource', async () => {
+    renderForm({ grants: [{ entity: 'Order', fields: ['Total'] }] }, true, schema, 'Shop')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Order' }))
+    const dialog = await screen.findByRole('dialog')
+    const fields = within(dialog).getByTestId('studio-field-/grants/0/fields/0')
+
+    expect(within(fields).getByRole('combobox', { name: 'fields 1' })).toBeVisible()
+    expect(within(fields).queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('shows no Open link outside the Studio editor, even for a chosen entity', () => {
+    renderForm({ entity: 'Order', grants: [] })
+
+    expect(screen.getByRole('combobox', { name: 'entity' })).toBeVisible()
+    expect(screen.queryByRole('link', { name: 'Open entity' })).not.toBeInTheDocument()
   })
 
   it('shows a text box until the names load', () => {
