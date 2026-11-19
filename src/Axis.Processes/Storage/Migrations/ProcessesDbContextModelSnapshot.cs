@@ -774,6 +774,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("release_id");
 
+                    b.Property<string>("Result")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("result");
+
                     b.Property<long>("Revision")
                         .HasColumnType("bigint")
                         .HasColumnName("revision");

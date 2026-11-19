@@ -461,6 +461,12 @@ internal static class ProcessInspectionEndpoints
         var names = await UserProfiles.FindDisplayNamesAsync(connection, userIds, cancellationToken);
         string Name(string userId) => names.GetValueOrDefault(userId) ?? userId;
 
+        // The values the instance started with and ended with, each masked on its own.
+        var input = subject is null ? await InputAsync(connection, pinned, pinnedProcess, active, viewer, row, cancellationToken) : null;
+        var result = row.State == ProcessStarts.Completed
+            ? await ResultAsync(connection, pinned, active, subject, viewer, row, cancellationToken)
+            : null;
+
         // The operator commands do not serve an instance without a subject yet, so the detail
         // offers none of them and no call is resolvable.
         var allowsResolve = subject is not null && viewer.AllowsResolve(active, process);
@@ -492,6 +498,8 @@ internal static class ProcessInspectionEndpoints
             row.EndedAt?.UtcDateTime,
             timerDueAt?.UtcDateTime,
             startedBy,
+            input,
+            result,
             parent,
             subProcesses,
             graph,
@@ -567,6 +575,97 @@ internal static class ProcessInspectionEndpoints
                 .ToList(),
             commands,
             author ? new ProcessStudioAddress(active.Manifest.Name, process.Id) : null);
+    }
+
+    // The parameters the instance started with, in declared order, each hidden on its own. A value that a delete trigger or a
+    // sub-process step of the pinned release fills from record fields is hidden unless the viewer may read all of those fields
+    // and none is sensitive. A parameter that only a person or a schedule fills is a literal and is shown.
+    private static async Task<IReadOnlyList<ProcessInstanceValue>> InputAsync(
+        NpgsqlConnection connection,
+        ApplicationModel pinned,
+        ProcessModel pinnedProcess,
+        ApplicationModel active,
+        InspectionViewer viewer,
+        ProcessInstanceRow row,
+        CancellationToken cancellationToken)
+    {
+        var stored = (await InstanceQueries.ValuesAsync(connection, row.Id, cancellationToken)).Parameters is { } text
+            ? JsonNode.Parse(text) as JsonObject
+            : null;
+        return pinnedProcess.Parameters
+            .Select(parameter =>
+            {
+                var hidden = ParameterSources(pinned, pinnedProcess, parameter.Name)
+                    .Any(fields => !Readable(active, viewer, fields) || Sensitive(pinned, active, fields));
+                var value = stored?.FirstOrDefault(entry => string.Equals(entry.Key, parameter.Name, StringComparison.OrdinalIgnoreCase)).Value;
+                return new ProcessInstanceValue(parameter.Name, hidden ? null : value, hidden);
+            })
+            .ToList();
+    }
+
+    // For each delete trigger and each sub-process step of the pinned release that fills the parameter, the record fields its
+    // expression reads. A null set is a source whose fields the walker cannot tell, such as a parent's own parameter, so it hides.
+    private static List<IReadOnlySet<MappedField>?> ParameterSources(ApplicationModel pinned, ProcessModel process, string parameter)
+    {
+        var sources = new List<IReadOnlySet<MappedField>?>();
+        foreach (var trigger in pinned.Triggers.Where(candidate => candidate.Process.Id == process.Id))
+        {
+            if (trigger.ParameterExpressions?.FirstOrDefault(entry => string.Equals(entry.Key, parameter, StringComparison.OrdinalIgnoreCase)).Value is { } expression)
+            {
+                sources.Add(trigger.Entity is { } watched && pinned.FindEntity(watched.Id) is { } entity
+                    ? MappingFields.Collect(pinned, entity, expression)
+                    : null);
+            }
+        }
+
+        foreach (var parent in pinned.Processes)
+        {
+            foreach (var step in parent.Steps.OfType<SubProcessStepModel>().Where(candidate => candidate.ProcessId == process.Id))
+            {
+                if (step.Parameters.FirstOrDefault(entry => string.Equals(entry.Parameter, parameter, StringComparison.OrdinalIgnoreCase)) is { } given)
+                {
+                    sources.Add(parent.Entity is { } subject && pinned.FindEntity(subject.Id) is { } entity
+                        ? MappingFields.Collect(pinned, entity, given.Value)
+                        : null);
+                }
+            }
+        }
+
+        return sources;
+    }
+
+    // The end step and the values the instance completed with, as the engine kept them, in the subject's field order. Each value is hidden when its field is
+    // unreadable for the viewer, sensitive in either release, or gone from the active release. Values are null for an instance that
+    // completed before the engine kept them.
+    private static async Task<ProcessInstanceResult> ResultAsync(
+        NpgsqlConnection connection,
+        ApplicationModel pinned,
+        ApplicationModel active,
+        EntityModel? subject,
+        InspectionViewer viewer,
+        ProcessInstanceRow row,
+        CancellationToken cancellationToken)
+    {
+        if ((await InstanceQueries.ValuesAsync(connection, row.Id, cancellationToken)).Result is not { } text
+            || JsonNode.Parse(text) is not JsonObject stored)
+        {
+            return new ProcessInstanceResult(row.Step, null);
+        }
+
+        // PostgreSQL's jsonb does not keep key order, so the values follow the subject's field order, and a stored key that
+        // the entity no longer has comes after them.
+        var order = subject?.Fields.Select((field, index) => (field.Name, index))
+            .ToDictionary(entry => entry.Name, entry => entry.index, StringComparer.OrdinalIgnoreCase);
+        var values = new List<ProcessInstanceValue>();
+        foreach (var (name, value) in stored.OrderBy(entry => order is not null && order.TryGetValue(entry.Key, out var index) ? index : int.MaxValue))
+        {
+            var hidden = subject is null
+                || !Readable(active, viewer, new HashSet<MappedField> { new(subject.Id, name) })
+                || Sensitive(pinned, active, new HashSet<MappedField> { new(subject.Id, name) });
+            values.Add(new ProcessInstanceValue(name, hidden ? null : value, hidden));
+        }
+
+        return new ProcessInstanceResult(row.Step, values);
     }
 
     // A kept request, response or returned value as JSON, or null when the call keeps none or the reader may not see it.
@@ -803,7 +902,8 @@ internal sealed record ProcessInstanceListItem(
 /// <paramref name="Commands"/> lists the operator commands (<c>retry</c>, <c>cancel</c>) that the user holds the grant for and
 /// that the instance's state and calls allow. <paramref name="TimerDueAt"/> is the time the timer step that the instance waits on
 /// fires, or null when the instance is not waiting on a timer. The detail names the parent and the sub-processes whose process the user may
-/// inspect in the active release, with no subject id.
+/// inspect in the active release, with no subject id. <paramref name="Input"/> lists the parameters of an instance of a process without a subject,
+/// and is null for a process with one. <paramref name="Result"/> is the end step and the values of a completed instance, and null before.
 /// </summary>
 internal sealed record ProcessInstanceDetailResponse(
     Guid Id,
@@ -819,6 +919,8 @@ internal sealed record ProcessInstanceDetailResponse(
     DateTime? EndedAt,
     DateTime? TimerDueAt,
     ProcessInstanceStartedBy? StartedBy,
+    IReadOnlyList<ProcessInstanceValue>? Input,
+    ProcessInstanceResult? Result,
     ProcessInstanceParent? Parent,
     IReadOnlyList<ProcessSubProcess> SubProcesses,
     ProcessGraph Graph,
@@ -827,6 +929,18 @@ internal sealed record ProcessInstanceDetailResponse(
     IReadOnlyList<ProcessInstanceCall> Calls,
     IReadOnlyList<string> Commands,
     ProcessStudioAddress? Studio);
+
+/// <summary>
+/// A value of an instance's <c>input</c> or <c>result</c>, by name. It is null with <paramref name="Hidden"/> true when the viewer may not
+/// see it, under <see href="docs/reference/process-inspection.md#values-and-masking">values and masking</see>.
+/// </summary>
+internal sealed record ProcessInstanceValue(string Name, JsonNode? Value, bool Hidden);
+
+/// <summary>
+/// What a completed instance ended with: the end <paramref name="Step"/> it reached and the subject fields its steps write.
+/// <paramref name="Values"/> is null for an instance that completed before the engine kept them.
+/// </summary>
+internal sealed record ProcessInstanceResult(string Step, IReadOnlyList<ProcessInstanceValue>? Values);
 
 /// <summary>The application and the process resource that open in Studio, for a viewer who holds the author role.</summary>
 internal sealed record ProcessStudioAddress(string App, Guid Resource);

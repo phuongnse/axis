@@ -254,9 +254,18 @@ in any state. The body has these parts:
   started before Axis recorded its starter, see [process tables](process-tables.md#process-instances).
   For `parent`, `name` and `id` follow the rule of `parent` above: a parent the user may not inspect, or
   whose process the active release no longer has, gives `null` for both, and `kind` stays `parent`.
-- **Input and result.** _(planned)_ `input` holds the parameters the instance started with, or `null`,
-  and follows [values and masking](#values-and-masking). `result` is `{ "step", "values" }` once the
-  instance completed, and `null` before. Its `values` follow the same rule.
+- **Input and result.** `input` is `[{ "name", "value", "hidden" }]`: each declared parameter of a process
+  without a subject in declaration order, with the value the instance started with. It is `null` for a
+  process with a subject. `result` is `{ "step", "values" }` once the instance is `completed`, and `null` in
+  every other state, including `failed` and `cancelled`. `step` is the end step it reached.
+  - `values` is the same list shape. It holds the subject record's fields that the process's steps write,
+    each with its value at the moment the instance completed. The fields are the keys of each
+    `updateRecord` operation's `set` and the fields each connector or package operation's `output`
+    writes, in the entity's field order. The fields that a task's form writes are not in it.
+  - `values` is `[]` for a process without a subject, which writes no record. It is `null` for an instance
+    that completed before the engine kept these values.
+  - Each value is hidden on its own, under [values and masking](#values-and-masking). A hidden value is
+    `null` with `hidden` `true`, and the other values stay readable.
 - **Studio.** `studio` is `{ "app", "resource" }`, from which the SPA builds Studio's address
   for the process. It is `null` for a reader who may not author the application, which is a reader
   without the author role, the one rule that Studio's own routes use.
@@ -317,6 +326,8 @@ in any state. The body has these parts:
   "endedAt": null,
   "timerDueAt": null,
   "startedBy": { "kind": "person", "name": "Ada Lovelace", "id": "ada", "via": "purchaseRequest.submit" },
+  "input": null,
+  "result": null,
   "parent": null,
   "subProcesses": [],
   "graph": {
@@ -402,14 +413,13 @@ in any state. The body has these parts:
 ```
 
 The example shortens the lists. The graph, the path, the tasks, `subjectEntity`, `releaseNumber` and `timerDueAt` are the
-same for every user who may inspect the instance. `subjectLabel`, `studio`, a call's `input`,
-`commands`, `parent` and `subProcesses`, and each call's `resolvable` and `outputs` differ between users.
+same for every user who may inspect the instance. `subjectLabel`, `studio`, a call's `input`, the hidden values of `input`
+and `result`, `commands`, `parent` and `subProcesses`, and each call's `resolvable` and `outputs` differ between users.
 
 **Values by user.** A call's `request`, `response` and `returned` differ between users too, as the masking
 rule hides them.
 
-**Run values by user.** _(planned)_ The values that the masking rule hides in a run, and in the instance's
-`input` and `result`, differ between users as well.
+**Run values by user.** _(planned)_ The values that the masking rule hides in a run differ between users as well.
 
 **Paths and variables.** _(planned for M38)_ The `variables`, and the `commands` of each path and task,
 differ between users too. The rest of `paths` and `tasks` is the same for every user.
@@ -454,6 +464,18 @@ evaluated input that the call sent, so it holds field values.
   subject is always hidden. The mapping reads parameters, not fields, and they
   can carry field values from a record that no longer exists, so the rule
   cannot show that the input is safe.
+- **Parameters.** An instance's `input` hides a parameter value by value. A parameter that only a person or a
+  schedule fills holds literal values, so it is shown to anyone who may inspect the instance. A delete trigger
+  and a sub-process step of the pinned release fill a parameter from record fields, so the value is hidden unless
+  the user may read every field that the expression of each such source reads, and none of them is sensitive in
+  the pinned or the active release. It is also hidden when the rule cannot tell which fields the value came
+  from, as for a parent's parameter that a sub-process step passes on. A parameter with no such source is shown.
+  The rule reads the pinned release, not how the instance started, so it may hide a value that this instance
+  took from a person.
+- **Result.** Each value of `result.values` is hidden when the user may not read its field on the subject
+  entity, when the field is sensitive in the pinned or the active release, or when the active release no longer
+  has the field. A sensitive field is never stored, so no instance keeps its value, see
+  [process instances](process-tables.md#process-instances).
 - **Sensitive fields.** A field that declares
   [`sensitive`](roles-and-policies.md#sensitive-fields) is never shown in
   inspection, for any user. A call whose mapping reads or writes one has its
@@ -473,9 +495,8 @@ evaluated input that the call sent, so it holds field values.
   hiding rule of the call's `input`, also when the call no longer stores its input, so a settled package
   call's `returned` is hidden from the readers who may not see what it was called with. A hidden value is
   `null`. No kept value is copied to history, audit records or logs.
-- **Kept run values.** _(planned)_ A run's `read` and `made`, and the instance's `input` and `result`, follow
-  the hiding rule too, each over the fields it came from. A hidden `read` or `made` value is `null` with
-  `hidden` `true`.
+- **Kept run values.** _(planned)_ A run's `read` and `made` follow the hiding rule too, each over the fields
+  it came from. A hidden `read` or `made` value is `null` with `hidden` `true`.
 - **Variables.** _(planned for M38)_ A variable's `value` is shown only when the user may read every field
   that each expression setting the variable reads. Those expressions are the `set` entries of each
   `setVariables` step that sets it, and the `gather.value` of each repeat that gathers into it, both from

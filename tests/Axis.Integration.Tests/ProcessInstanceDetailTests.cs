@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Axis.Configuration.Diagnostics;
+using Axis.Data.Naming;
 using Axis.Processes.Instances;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -23,7 +24,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
         var root = body.RootElement;
         Assert.Equal(
-            ["id", "process", "subjectEntity", "subjectId", "subjectLabel", "releaseId", "releaseNumber", "state", "step", "createdAt", "endedAt", "timerDueAt", "startedBy", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands", "studio"],
+            ["id", "process", "subjectEntity", "subjectId", "subjectLabel", "releaseId", "releaseNumber", "state", "step", "createdAt", "endedAt", "timerDueAt", "startedBy", "input", "result", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands", "studio"],
             root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(instance, root.GetProperty("id").GetGuid());
         Assert.Equal("Break", root.GetProperty("process").GetString());
@@ -104,6 +105,96 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal("end", steps[1].GetProperty("type").GetString());
         Assert.Equal(JsonValueKind.Null, steps[1].GetProperty("labelKey").ValueKind);
         Assert.Empty(steps[1].GetProperty("transitions").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_completed_instance_gives_its_end_step_and_the_values_its_steps_wrote_and_a_waiting_one_gives_none()
+    {
+        var subject = await fixture.InsertRequestAsync(TenantA, null);
+        var instance = await fixture.StartAsync(TenantA, "Submit", subject);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+        using var record = await GetRecordAsync(TenantA, subject);
+        var recorded = record.RootElement.GetProperty("values");
+
+        using var body = await GetOkAsync(TenantA, "Submit", instance);
+
+        Assert.Equal("completed", body.RootElement.GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("input").ValueKind);
+        var result = body.RootElement.GetProperty("result");
+        Assert.Equal(["step", "values"], result.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("done", result.GetProperty("step").GetString());
+        var values = result.GetProperty("values").EnumerateArray().ToList();
+        Assert.Equal(["status", "submittedAt"], values.Select(value => value.GetProperty("name").GetString()));
+        Assert.All(values, value =>
+        {
+            Assert.Equal(["name", "value", "hidden"], value.EnumerateObject().Select(property => property.Name));
+            Assert.False(value.GetProperty("hidden").GetBoolean());
+        });
+        Assert.Equal("submitted", values[0].GetProperty("value").GetString());
+        Assert.Equal(recorded.GetProperty("submittedAt").GetString(), values[1].GetProperty("value").GetString());
+
+        // The record changes later, but the instance keeps the values it completed with.
+        Assert.True(fixture.Model.TryGetEntity("Request", out var request));
+        await fixture.ExecuteAsync(
+            TenantA,
+            $"UPDATE {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} SET {EntityNaming.Column("status")} = 'draft' WHERE {EntityNaming.IdColumn} = @id",
+            ("id", subject));
+        using var later = await GetOkAsync(TenantA, "Submit", instance);
+        Assert.Equal("submitted", later.RootElement.GetProperty("result").GetProperty("values")[0].GetProperty("value").GetString());
+
+        var waiting = await StartAndRunAsync(TenantA, "RoleApprove");
+        using var waitingBody = await GetOkAsync(TenantA, "RoleApprove", waiting);
+        Assert.Equal("waiting", waitingBody.RootElement.GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, waitingBody.RootElement.GetProperty("result").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_user_who_may_not_read_a_written_field_gets_that_value_as_null_and_hidden()
+    {
+        var instance = await StartAndRunAsync(TenantA, "Submit");
+
+        using var body = await GetOkAsync(TenantA, "Submit", instance, "carl");
+
+        var values = body.RootElement.GetProperty("result").GetProperty("values").EnumerateArray().ToList();
+        Assert.Equal(["status", "submittedAt"], values.Select(value => value.GetProperty("name").GetString()));
+        Assert.All(values, value =>
+        {
+            Assert.Equal(JsonValueKind.Null, value.GetProperty("value").ValueKind);
+            Assert.True(value.GetProperty("hidden").GetBoolean());
+        });
+        Assert.DoesNotContain("\"submitted\"", body.RootElement.GetProperty("result").ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_values_of_a_result_follow_the_subjects_field_order_and_a_field_the_entity_no_longer_has_comes_last()
+    {
+        var instance = await StartAndRunAsync(TenantA, "Submit");
+        // jsonb sorts keys by length and then by bytes, which is status, comment, divisor, legacy. Request declares divisor, status, comment.
+        await fixture.ExecuteAsync(
+            TenantA,
+            "UPDATE axis.process_instances SET result = '{\"comment\": \"c\", \"status\": \"submitted\", \"divisor\": 3, \"legacy\": 1}'::jsonb WHERE id = @id",
+            ("id", instance));
+
+        using var body = await GetOkAsync(TenantA, "Submit", instance);
+
+        var values = body.RootElement.GetProperty("result").GetProperty("values").EnumerateArray().ToList();
+        Assert.Equal(["divisor", "status", "comment", "legacy"], values.Select(value => value.GetProperty("name").GetString()));
+        Assert.Equal(3, values[0].GetProperty("value").GetInt32());
+        Assert.False(values[2].GetProperty("hidden").GetBoolean());
+        Assert.True(values[3].GetProperty("hidden").GetBoolean());
+    }
+
+    [Fact]
+    public async Task An_instance_that_completed_before_the_result_was_kept_has_values_null()
+    {
+        var instance = await StartAndRunAsync(TenantA, "Submit");
+        await fixture.ExecuteAsync(TenantA, "UPDATE axis.process_instances SET result = NULL WHERE id = @id", ("id", instance));
+
+        using var body = await GetOkAsync(TenantA, "Submit", instance);
+
+        var result = body.RootElement.GetProperty("result");
+        Assert.Equal("done", result.GetProperty("step").GetString());
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("values").ValueKind);
     }
 
     [Fact]
@@ -568,6 +659,15 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
             ("startedBy", ProcessStartedBy.Parent("RoleApprove", parent).ToJson()),
             ("id", child));
         return child;
+    }
+
+    private async Task<JsonDocument> GetRecordAsync(string tenant, Guid id)
+    {
+        using var client = fixture.CreateClient().SignedInAs("ines");
+        using var request = RecordApiFixture.Request($"/api/apps/StepApp/entities/Request/records/{id:D}", Host(tenant));
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
     }
 
     private async Task<Guid> StartAndRunAsync(string tenant, string process)

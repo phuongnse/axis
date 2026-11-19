@@ -248,6 +248,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
         JsonObject output;
         JsonObject details;
         string? action;
+        string? endResult = null;
         DateTimeOffset? timerDueAt = null;
         Guid? matchedEventId = null;
         PendingChild? child = null;
@@ -313,6 +314,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
                 action = AuditActions.ProcessStepCompleted;
                 break;
             case EndStepModel:
+                // The record may change or go later, so the written fields are kept on the instance now.
+                endResult = ProcessResults.Values(model, process, entity, stored).ToJsonString();
                 state = ProcessStarts.Completed;
                 nextStep = step.Name;
                 decision = null;
@@ -552,7 +555,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
                 throw Failure($"The engine cannot run the step '{step.Name}' of type '{step.GetType().Name}'.", instance, input);
         }
 
-        if (!await ProcessSteps.TryAdvanceAsync(context.Transaction, instance.Id, instance.Revision, state, nextStep, cancellationToken))
+        if (!await ProcessSteps.TryAdvanceAsync(context.Transaction, instance.Id, instance.Revision, state, nextStep, endResult, cancellationToken))
         {
             // The newer revision owns the instance now, so this item is discarded with no other write.
             LogStaleRevision(instance.Id, step.Name, instance.Revision);
