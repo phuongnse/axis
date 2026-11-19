@@ -46,6 +46,37 @@ public sealed class SampleApplicationTests
         Assert.NotNull(result.Model);
     }
 
+    // A process names itself to people by its title, so every process of a sample or fixture has one, with a text in
+    // each locale the application has. Module processes count too, since their texts are in the model.
+    [Theory]
+    [InlineData("Samples/purchase-requests", new[] { "en", "vi" })]
+    [InlineData("Samples/leave-requests", new[] { "en", "vi" })]
+    [InlineData("Samples/service-desk", new[] { "en", "vi" })]
+    [InlineData("Samples/asset-management", new[] { "en", "vi" })]
+    [InlineData("Fixtures/e2e-app", new[] { "en", "vi" })]
+    [InlineData("Fixtures/subprocess-app", new[] { "en" })]
+    public void Every_process_has_a_title_with_a_text_in_each_locale_of_the_application(string folder, string[] locales)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, folder);
+        var result = folder.StartsWith("Samples/", StringComparison.Ordinal)
+            ? ApplicationCompiler.Compile(path, SamplePackages.Versions, SampleModules.Modules)
+            : ApplicationCompiler.Compile(path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.Equal(locales, result.Model.Texts.Select(texts => texts.Locale).Order().ToArray());
+        Assert.NotEmpty(result.Model.Processes);
+        foreach (var process in result.Model.Processes)
+        {
+            Assert.NotNull(process.Title);
+            foreach (var texts in result.Model.Texts)
+            {
+                Assert.True(texts.Texts.TryGetValue(process.Title.TextKey, out var text), $"The {texts.Locale} texts have no {process.Title.TextKey} for {process.Name}.");
+                Assert.False(string.IsNullOrWhiteSpace(text), $"The {texts.Locale} text of {process.Title.TextKey} is blank.");
+            }
+        }
+    }
+
     [Fact]
     public void Purchase_request_sample_held_in_memory_compiles_to_the_content_hash_of_its_folder()
     {

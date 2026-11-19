@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "TicketHandling",
   "formatVersion": 1,
+  "title": { "textKey": "processes.ticketHandling.title" },
   "entity": "Ticket",
   "startCondition": {
     "expression": "status == 'draft'",

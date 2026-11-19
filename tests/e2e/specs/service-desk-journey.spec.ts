@@ -573,6 +573,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await createResource(page, 'process', 'TicketHandling')
     await openFormTab(page)
     await pick(page, 'studio-field-/entity', 'Ticket')
+    await writeLabel(page, 'studio-field-/title', text('processes.ticketHandling.title'))
     await page.getByTestId('studio-step-0').getByRole('button', { name: 'Delete', exact: true }).click()
 
     const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
@@ -1085,6 +1086,8 @@ test.describe('the author builds the service desk with Studio only', () => {
     ) {
       await createResource(page, 'process', name)
       await openFormTab(page)
+      const titleKey = `processes.${name.charAt(0).toLowerCase()}${name.slice(1)}.title`
+      await writeLabel(page, 'studio-field-/title', text(titleKey))
       await page.getByRole('radio', { name: /^Parameters/ }).click()
       await expect(page.getByTestId('studio-field-/entity')).toHaveCount(0)
       for (const [index, [parameter, type]] of parameters.entries()) {

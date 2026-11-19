@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "DailyOverdueReminder",
   "formatVersion": 1,
+  "title": { "textKey": "processes.dailyOverdueReminder.title" },
   "parameters": [
     {
       "name": "daysOverdue",
