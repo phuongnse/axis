@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { TextProvider } from '../platform/TextProvider'
 import { useDesignTokens } from '../platform/themeMode'
 import { PageTheme } from './PageTheme'
-import { catalogs, chooseFixtures, stateSlug, type PreviewState } from './previews'
+import { catalogs, chooseFixtures, previews, stateSlug, type PreviewState } from './previews'
 
 function Canvas({ children }: { children: ReactNode }) {
   const { colour, spacing } = useDesignTokens()
@@ -105,7 +105,8 @@ export function Preview({ states }: { states: readonly PreviewState[] }) {
       <PageTheme>
         <TextProvider catalogs={catalogs} development>
           <Canvas>
-            {states.some((state) => state.fixtures) ? (
+            {/* Temporary for the review of #4662: the shell preview shows one state at a time too, to read it easily. */}
+            {states.some((state) => state.fixtures) || states === previews.shell ? (
               <Chooser states={states} />
             ) : (
               states.map((state) => <Figure key={state.caption} state={state} />)
