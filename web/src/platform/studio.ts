@@ -597,6 +597,97 @@ export async function fetchStudioNames(application: string, signal?: AbortSignal
   return (await response.json()) as StudioNames
 }
 
+/** One file of an application's package, as `GET .../package-files` lists it. `version` is the SHA-256 of its bytes. */
+export interface StudioPackageFileItem {
+  package: string
+  path: string
+  version: string
+}
+
+/** The path of a package file's route, each segment of the id and the path encoded. */
+function packageFilePath(application: string, pkg: string, path: string): string {
+  const segments = path.split('/').map(encodeURIComponent).join('/')
+  return `/api/studio/apps/${encodeURIComponent(application)}/packages/${encodeURIComponent(pkg)}/files/${segments}`
+}
+
+/**
+ * Loads the files under `packages/` of an application's working folder, sorted by file, see
+ * docs/reference/studio-packages.md#the-authoring-api. A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function fetchStudioPackageFiles(
+  application: string,
+  signal?: AbortSignal,
+): Promise<StudioPackageFileItem[]> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/package-files`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return ((await response.json()) as { items: StudioPackageFileItem[] }).items
+}
+
+/**
+ * Reads one file of an application's package, as text with its version. It answers `null` for a 404. A 401 shows the
+ * sign-in prompt and throws, as any other failure does.
+ */
+export async function fetchStudioPackageFile(
+  application: string,
+  pkg: string,
+  path: string,
+  signal?: AbortSignal,
+): Promise<{ content: string; version: string } | null> {
+  const route = packageFilePath(application, pkg, path)
+  const response = await studioFetch(route, { signal })
+  if (response.status === 404) {
+    return null
+  }
+  if (!response.ok) {
+    throw new Error(`Loading '${route}' failed with status ${response.status}.`)
+  }
+  const { content, version } = (await response.json()) as { content: string; version: string }
+  return { content, version }
+}
+
+/** What creating a package file answers: the new file's version and the folder's diagnostics, or why nothing was written. */
+export type CreatePackageFileResult =
+  | { status: 'created'; version: string; diagnostics: StudioDiagnostic[] }
+  | { status: 'conflict' }
+  | { status: 'invalid' }
+
+/**
+ * Creates one file of an application's package with `If-None-Match: *`, so it never replaces a file. A 409 means the file
+ * exists, and a 400 means the server refuses the package or the path. Nothing is written for either. A quota refusal
+ * throws a {@link QuotaRefusedError}. A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function createStudioPackageFile(
+  application: string,
+  pkg: string,
+  path: string,
+  content: string,
+): Promise<CreatePackageFileResult> {
+  const route = packageFilePath(application, pkg, path)
+  const response = await studioFetch(route, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'If-None-Match': '*' },
+    body: JSON.stringify({ content }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    throw new QuotaRefusedError(title)
+  }
+  if (response.status === 400) {
+    return { status: 'invalid' }
+  }
+  if (!response.ok) {
+    throw new Error(`Creating '${route}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as { version: string; diagnostics: StudioDiagnostic[] }
+  return { status: 'created', version: body.version, diagnostics: body.diagnostics }
+}
+
 /**
  * One resource of the folder or of a module the application uses, as `GET .../resource-activity` answers it. `titles` and
  * `descriptions` are set for a module resource only, see docs/reference/studio-resource-form.md#resource-activity.

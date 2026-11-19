@@ -45,13 +45,14 @@ Then come the resource kinds in groups by what an author does with them:
 | Pages       | site, page, form                                       |
 | Logic       | process, rule, event, trigger                          |
 | Access      | role, policy, identity provider, then the policy matrix |
-| Integration | connector, endpoint, webhook                           |
+| Integration | connector, endpoint, webhook, then Packages            |
 | Texts       | text                                                   |
 | Tests       | scenario                                               |
 
 A kind outside these groups shows under Other. Settings opens the application's manifest. The sidebar
 leaves out a kind the application has no resource of, since the Overview introduces those, and no
-entry shows a count. An open entry shows its label alone and a collapsed one its icon alone, with the
+entry shows a count. Packages, like the policy matrix, shows even when the application has none, so the
+Integration group is always there, see [the Packages entry](studio-packages.md#the-packages-entry). An open entry shows its label alone and a collapsed one its icon alone, with the
 label as its tooltip; collapsed, a group's title becomes a thin rule.
 
 A kind's entry opens its list, at `&kind=<kind>`, under a heading with the kind's name. For a kind that

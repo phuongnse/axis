@@ -45,7 +45,7 @@ that work:
 | `studioCreate`                 | True when `studio` is true and `Studio:ApplicationsPath` is set                                                                                             | Show New application…                                           |
 | `studioAi`                     | True when `studio` is true and `Ai:DefaultBinding` is set                                                                                                   | Show the request panel                                          |
 | `studioTest`                   | True when `studio` is true and `Studio:Tests` is true                                                                                                       | Show Run tests and a scenario's Run                             |
-| `studioDeveloper`              | True when `studio` is true, the user also holds the developer role and the tenant's application packages switch is on                                       | Show New package… _(planned for M37)_                           |
+| `studioDeveloper`              | True when `studio` is true, the user also holds the developer role and the tenant's application packages switch is on                                       | Show New package…                                               |
 | `studioPreviewHost`            | The first host of the served tenant whose `PreviewOf` is the session's tenant, else `null`, and `null` when `studio` is false                               | Show Preview, only when it is set                               |
 
 - **The tenant's setting** _(planned for M35)_. `studioAi` is also false while the tenant's [AI authoring](user-administration.md#ai-authoring) setting is off.

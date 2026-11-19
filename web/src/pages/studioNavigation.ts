@@ -30,6 +30,12 @@ export function studioNavigation(
     icon: 'list',
     label: t('shell.studio.view.policies'),
   }
+  const packages: ShellNavigationEntry = {
+    key: 'packages',
+    path: path({ view: 'packages' }),
+    icon: 'tool',
+    label: t('shell.studio.nav.packages'),
+  }
 
   const entries: (ShellNavigationEntry | ShellNavigationGroup)[] = [
     { key: 'overview', path: path(), icon: 'dashboard', label: t('shell.studio.nav.overview') },
@@ -52,6 +58,9 @@ export function studioNavigation(
     if (name === 'access') {
       groupEntries.push(policyMatrix)
     }
+    if (name === 'integration') {
+      groupEntries.push(packages)
+    }
     if (groupEntries.length > 0) {
       entries.push({ key: `group:${name}`, label: t(`shell.studio.nav.group.${name}`), entries: groupEntries })
     }
@@ -64,7 +73,10 @@ export function studioNavigation(
   return entries
 }
 
-/** The key of the sidebar entry the address shows: an open resource's kind, the manifest's Settings, or a view. The publish page marks none. */
+/**
+ * The key of the sidebar entry the address shows: an open resource's kind, the manifest's Settings, or a view. The publish page marks none.
+ * Packages stays marked on a package's page, `&package=<id>`.
+ */
 export function studioActiveEntry(
   params: URLSearchParams,
   resources: readonly StudioResourceItem[],
@@ -92,7 +104,7 @@ export function studioActiveEntry(
   if (view === 'release') {
     return 'releases'
   }
-  if (view === 'releases' || view === 'history' || view === 'policies') {
+  if (view === 'releases' || view === 'history' || view === 'policies' || view === 'packages') {
     return view
   }
   // A request's page has no entry of its own, so no entry is marked for it, not even Overview.
