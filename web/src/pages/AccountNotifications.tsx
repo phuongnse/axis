@@ -6,6 +6,7 @@ import { AxisField } from '../platform/AxisField'
 import { AxisTable } from '../platform/AxisTable'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { fillText } from '../platform/fillText'
+import { timeOfDayText } from '../platform/formatValue'
 import {
   fetchNotificationPreferences,
   notificationSources,
@@ -15,6 +16,7 @@ import {
   type SourcePreference,
 } from '../platform/ownNotificationPreferences'
 import { SectionPart } from '../platform/SectionParts'
+import { timeZoneText } from '../platform/studioCatalog'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { usePlatform } from './context'
@@ -31,16 +33,17 @@ function emailChoice(preference: SourcePreference): EmailChoice {
   return !preference.channels.email ? 'off' : preference.digest ? 'digest' : 'now'
 }
 
-/** The time zone in words in the page's locale, such as "Indochina Time", else its IANA name. */
-function timeZoneName(timeZone: string, locale: string): string {
-  try {
-    const part = new Intl.DateTimeFormat(locale, { timeZone, timeZoneName: 'longGeneric' })
+/** The browser's time zone, which the page sends with each save, see docs/reference/notifications.md#notification-preferences. */
+const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+/** Minutes from UTC of a time zone now, from Intl's "GMT+07:00", for the time zone select's words. */
+function offsetOf(timeZone: string): number {
+  const name =
+    new Intl.DateTimeFormat('en', { timeZone, timeZoneName: 'longOffset' })
       .formatToParts(new Date())
-      .find((candidate) => candidate.type === 'timeZoneName')
-    return part?.value ?? timeZone
-  } catch {
-    return timeZone
-  }
+      .find((part) => part.type === 'timeZoneName')?.value ?? 'GMT'
+  const match = /GMT([+-])(\d{2}):(\d{2})/.exec(name)
+  return match ? (match[1] === '-' ? -1 : 1) * (Number(match[2]) * 60 + Number(match[3])) : 0
 }
 
 /**
@@ -78,6 +81,7 @@ export function AccountNotifications() {
   /** Saves the next preferences at once, and puts the last ones back when the save is refused. */
   const save = (next: NotificationPreferences, what: string) => {
     const previous = preferences
+    next = { ...next, timeZone: browserTimeZone }
     setPreferences(next)
     setSaving(what)
     setSaveFailed(false)
@@ -209,15 +213,15 @@ export function AccountNotifications() {
             <AxisField
               label={t('shell.account.notifications.digestHour')}
               help={fillText(t('shell.account.notifications.digestHour.help'), {
-                timeZone: timeZoneName(preferences.timeZone, locale),
+                timeZone: timeZoneText({ id: browserTimeZone, offset: offsetOf(browserTimeZone) }),
               })}
             >
               <Select<number>
-                style={{ width: 120 }}
+                style={{ width: 140 }}
                 value={preferences.digestHour}
                 loading={saving === 'digestHour'}
                 onChange={(digestHour) => save({ ...preferences, digestHour }, 'digestHour')}
-                options={hours.map((hour) => ({ value: hour, label: `${String(hour).padStart(2, '0')}:00` }))}
+                options={hours.map((hour) => ({ value: hour, label: timeOfDayText(hour, locale) }))}
               />
             </AxisField>
           </div>

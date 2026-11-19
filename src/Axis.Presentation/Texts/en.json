@@ -71,7 +71,7 @@
   "shell.account.notifications.alwaysOn": "Always on",
   "shell.account.notifications.cell": "{notice}: {channel}",
   "shell.account.notifications.digestHour": "Daily digest at",
-  "shell.account.notifications.digestHour.help": "The emails you put in the digest come together once a day, at this hour, {timeZone}.",
+  "shell.account.notifications.digestHour.help": "The emails you put in the digest come together once a day, at this hour in {timeZone}.",
   "shell.account.notifications.saved": "Saved.",
   "shell.account.notifications.saveFailed": "Your change could not be saved, so it was put back.",
   "shell.account.notifications.loadFailed": "Your notification choices could not be loaded.",

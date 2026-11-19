@@ -71,7 +71,7 @@
   "shell.account.notifications.alwaysOn": "Luôn bật",
   "shell.account.notifications.cell": "{notice}: {channel}",
   "shell.account.notifications.digestHour": "Gửi bản tin hằng ngày lúc",
-  "shell.account.notifications.digestHour.help": "Các email bạn gộp vào bản tin sẽ đến một lần mỗi ngày, vào giờ này, {timeZone}.",
+  "shell.account.notifications.digestHour.help": "Các email bạn gộp vào bản tin sẽ đến một lần mỗi ngày, vào giờ này theo múi giờ {timeZone}.",
   "shell.account.notifications.saved": "Đã lưu.",
   "shell.account.notifications.saveFailed": "Không lưu được thay đổi, nên lựa chọn cũ đã được giữ lại.",
   "shell.account.notifications.loadFailed": "Không tải được lựa chọn thông báo của bạn.",

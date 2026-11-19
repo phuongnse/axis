@@ -130,6 +130,13 @@ function patternOf(format: Intl.DateTimeFormat, hour: string): string {
     .join('')
 }
 
+/** A whole hour of the day on the locale's clock, as every shown time is: "8:00 AM" in `en`, "08:00" in `vi`. */
+export function timeOfDayText(hour: number, locale: string): string {
+  return plain(
+    new Intl.DateTimeFormat(locale, { ...timeOptions(locale), timeZone: 'UTC' }).format(Date.UTC(2026, 0, 1, hour)),
+  )
+}
+
 /** The dayjs pattern of the shown time to the minute, which the date-time picker's time part uses. */
 export function timePattern(locale: string): string {
   const time = new Intl.DateTimeFormat(locale, { ...timeOptions(locale), timeZone: 'UTC' })
