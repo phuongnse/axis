@@ -163,17 +163,19 @@ public static class ConnectorCalls
     /// <summary>
     /// Sets the call <paramref name="id"/> back to <c>pending</c> for its next attempt, with the last
     /// attempt's or lookup's status and error, and resets its failed lookups. Its stored input is
-    /// kept, so the retry sends it again.
+    /// kept, so the retry sends it again. A <paramref name="request"/> that is not <see langword="null"/>
+    /// replaces the kept request.
     /// </summary>
-    internal static async Task RetryAsync(NpgsqlTransaction transaction, Guid id, int? lastStatus, string? lastError, CancellationToken cancellationToken)
+    internal static async Task RetryAsync(NpgsqlTransaction transaction, Guid id, int? lastStatus, string? lastError, string? request, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
-            "UPDATE axis.connector_calls SET state = @state, lookups = 0, last_status = @status, last_error = @error WHERE id = @id",
+            "UPDATE axis.connector_calls SET state = @state, lookups = 0, last_status = @status, last_error = @error, request = COALESCE(@request, request) WHERE id = @id",
             Connection(transaction),
             transaction);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("state", Pending);
         AddLast(command, lastStatus, lastError);
+        AddRequest(command, request);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -181,8 +183,8 @@ public static class ConnectorCalls
     /// Sets the call <paramref name="id"/> to <c>unknown</c>, with the last attempt's status and
     /// error. Its stored input is kept, since a later retry or reconciliation may still need it.
     /// </summary>
-    internal static Task MarkUnknownAsync(NpgsqlTransaction transaction, Guid id, int? lastStatus, string? lastError, CancellationToken cancellationToken) =>
-        SetStateAsync(transaction, id, Unknown, lastStatus, lastError, cancellationToken);
+    internal static Task MarkUnknownAsync(NpgsqlTransaction transaction, Guid id, int? lastStatus, string? lastError, string? request, CancellationToken cancellationToken) =>
+        SetStateAsync(transaction, id, Unknown, lastStatus, lastError, request, cancellationToken);
 
     /// <summary>
     /// Counts a failed lookup of the <c>unknown</c> call <paramref name="id"/>, with its status and
@@ -208,7 +210,8 @@ public static class ConnectorCalls
     /// <summary>
     /// Settles the call <paramref name="id"/> as <paramref name="state"/>, <c>succeeded</c> or
     /// <c>failed</c>, at the transaction's time, with the last attempt's status and error. Its
-    /// stored input is kept, so inspection shows what was sent.
+    /// stored input is kept, so inspection shows what was sent. A <paramref name="request"/> that is not
+    /// <see langword="null"/> replaces the kept request.
     /// </summary>
     internal static async Task SettleAsync(
         NpgsqlTransaction transaction,
@@ -216,12 +219,13 @@ public static class ConnectorCalls
         string state,
         int? lastStatus,
         string? lastError,
+        string? request,
         CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             """
             UPDATE axis.connector_calls
-            SET state = @state, last_status = @status, last_error = @error, settled_at = now()
+            SET state = @state, last_status = @status, last_error = @error, request = COALESCE(@request, request), settled_at = now()
             WHERE id = @id
             """,
             Connection(transaction),
@@ -229,6 +233,7 @@ public static class ConnectorCalls
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("state", state);
         AddLast(command, lastStatus, lastError);
+        AddRequest(command, request);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -259,17 +264,23 @@ public static class ConnectorCalls
         string state,
         int? lastStatus,
         string? lastError,
+        string? request,
         CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
-            "UPDATE axis.connector_calls SET state = @state, last_status = @status, last_error = @error WHERE id = @id",
+            "UPDATE axis.connector_calls SET state = @state, last_status = @status, last_error = @error, request = COALESCE(@request, request) WHERE id = @id",
             Connection(transaction),
             transaction);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("state", state);
         AddLast(command, lastStatus, lastError);
+        AddRequest(command, request);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
+
+    /// <summary>Adds the kept request. A <see langword="null"/> request leaves the one the call keeps.</summary>
+    private static void AddRequest(NpgsqlCommand command, string? request) =>
+        command.Parameters.Add(new NpgsqlParameter("request", NpgsqlDbType.Jsonb) { Value = (object?)request ?? DBNull.Value });
 
     private static void AddLast(NpgsqlCommand command, int? lastStatus, string? lastError)
     {

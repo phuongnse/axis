@@ -25,7 +25,8 @@ namespace Axis.Integration.Tests;
 /// with a new token each time, unless a test lines up a status with <see cref="RespondToken"/>. A
 /// refused <c>3xx</c> answer carries a <c>Location</c> that points back at the token request's own path,
 /// so a client that followed it would send a second token request. A test can hold the next token
-/// response with <see cref="HoldToken"/>.
+/// response with <see cref="HoldToken"/>. <see cref="AnswerHeaders"/> adds response headers, such as
+/// <c>Set-Cookie</c>, to every answer that is not a token response.
 /// </summary>
 public sealed class ConnectorStub : IAsyncDisposable
 {
@@ -43,6 +44,7 @@ public sealed class ConnectorStub : IAsyncDisposable
     private HeldResponse? _held;
     private HeldResponse? _heldToken;
     private bool _dropNext;
+    private readonly ConcurrentDictionary<string, string> _answerHeaders = new(StringComparer.OrdinalIgnoreCase);
 
     private ConnectorStub(WebApplication app) => _app = app;
 
@@ -57,6 +59,9 @@ public sealed class ConnectorStub : IAsyncDisposable
 
     /// <summary>The token requests the stub got, in the order they arrived, with the token each one was given.</summary>
     public IReadOnlyCollection<TokenRequest> TokenRequests => _tokenRequests;
+
+    /// <summary>The headers that the stub adds to every answer that is not a token response. A test sets one by name, such as <c>Set-Cookie</c>.</summary>
+    public IDictionary<string, string> AnswerHeaders => _answerHeaders;
 
     /// <summary>The <c>expires_in</c> of the tokens the stub issues, in seconds.</summary>
     public int TokenExpiresIn { get; set; } = 3600;
@@ -249,6 +254,11 @@ public sealed class ConnectorStub : IAsyncDisposable
         if (location is not null)
         {
             context.Response.Headers.Location = location;
+        }
+
+        foreach (var header in _answerHeaders)
+        {
+            context.Response.Headers[header.Key] = header.Value;
         }
 
         context.Response.ContentType = "application/json";

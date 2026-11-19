@@ -75,6 +75,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("release_id");
 
+                    b.Property<string>("Request")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("request");
+
                     b.Property<DateTimeOffset?>("SettledAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("settled_at");
@@ -584,6 +588,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnName("retry_backoff")
                         .HasDefaultValueSql("'30 seconds'::interval");
 
+                    b.Property<string>("Returned")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("returned");
+
                     b.Property<Guid?>("RunnerId")
                         .HasColumnType("uuid")
                         .HasColumnName("runner_id");
@@ -665,6 +673,10 @@ namespace Axis.Processes.Storage.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("outcome");
+
+                    b.Property<string>("Response")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("response");
 
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("timestamp with time zone")

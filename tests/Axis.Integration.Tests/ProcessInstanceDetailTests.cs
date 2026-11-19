@@ -166,6 +166,25 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
     }
 
     [Fact]
+    public async Task The_values_of_a_result_follow_the_subjects_field_order_and_a_field_the_entity_no_longer_has_comes_last()
+    {
+        var instance = await StartAndRunAsync(TenantA, "Submit");
+        // jsonb sorts keys by length and then by bytes, which is status, comment, divisor, legacy. Request declares divisor, status, comment.
+        await fixture.ExecuteAsync(
+            TenantA,
+            "UPDATE axis.process_instances SET result = '{\"comment\": \"c\", \"status\": \"submitted\", \"divisor\": 3, \"legacy\": 1}'::jsonb WHERE id = @id",
+            ("id", instance));
+
+        using var body = await GetOkAsync(TenantA, "Submit", instance);
+
+        var values = body.RootElement.GetProperty("result").GetProperty("values").EnumerateArray().ToList();
+        Assert.Equal(["divisor", "status", "comment", "legacy"], values.Select(value => value.GetProperty("name").GetString()));
+        Assert.Equal(3, values[0].GetProperty("value").GetInt32());
+        Assert.False(values[2].GetProperty("hidden").GetBoolean());
+        Assert.True(values[3].GetProperty("hidden").GetBoolean());
+    }
+
+    [Fact]
     public async Task An_instance_that_completed_before_the_result_was_kept_has_values_null()
     {
         var instance = await StartAndRunAsync(TenantA, "Submit");
@@ -502,7 +521,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         var calls = body.RootElement.GetProperty("calls").EnumerateArray().ToList();
         var item = Assert.Single(calls);
         Assert.Equal(
-            ["id", "kind", "step", "connector", "operation", "state", "attempts", "input", "inputHidden", "resolvable"],
+            ["id", "kind", "step", "connector", "operation", "state", "attempts", "input", "inputHidden", "request", "returned", "resolvable"],
             item.EnumerateObject().Select(property => property.Name));
         Assert.Equal(call, item.GetProperty("id").GetGuid());
         Assert.Equal("connector", item.GetProperty("kind").GetString());
@@ -519,7 +538,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
                 attempt.GetProperty("outcome").GetString()!,
                 attempt.GetProperty("httpStatus").GetInt32())));
         Assert.Equal(
-            ["kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "traceId"],
+            ["kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "traceId", "response"],
             attempts[0].EnumerateObject().Select(property => property.Name));
         Assert.Equal(JsonValueKind.Null, attempts[0].GetProperty("error").ValueKind);
         Assert.Equal(JsonValueKind.Null, attempts[0].GetProperty("traceId").ValueKind);

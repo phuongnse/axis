@@ -114,7 +114,7 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.Equal((ConnectorCalls.Failed, 1, (int?)400), (call.State, call.Attempts, call.LastStatus));
         Assert.Contains("400", call.LastError, StringComparison.Ordinal);
 
-        // A failed call keeps its input too. Its attempt row holds the status and a fixed error, not the body.
+        // A failed call keeps its input too. Its attempt row holds the status and a fixed error, and the body only in its response.
         var stored = Assert.IsType<JsonObject>(JsonNode.Parse(call.Input!));
         Assert.Equal($"Request {subjectId:N}", stored["reference"]!.GetValue<string>());
         var failedAttempt = Assert.Single(await AttemptsAsync(tenant, callId));
@@ -822,10 +822,10 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         return rows;
     }
 
-    /// <summary>All text in the call's attempt rows, to check that no body is in it.</summary>
+    /// <summary>All text in the call's attempt rows but their <c>response</c>, which keeps the body of the answer by design, to check that no body is elsewhere in it.</summary>
     private static async Task<string> AttemptTextAsync(ProcessStepFixture tenant, Guid callId) =>
         (string)(await tenant.ScalarAsync(
-            "SELECT string_agg(row_to_json(a)::text, ' ') FROM axis.process_call_attempts a WHERE call_id = @id",
+            "SELECT string_agg((to_jsonb(a) - 'response')::text, ' ') FROM axis.process_call_attempts a WHERE call_id = @id",
             ("id", callId)))!;
 
     /// <summary>The failed lookups of the call since it became <c>unknown</c>.</summary>
