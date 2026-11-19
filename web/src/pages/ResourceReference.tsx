@@ -14,12 +14,12 @@ import { PlatformContext } from './context'
  * docs/reference/shared-widgets.md#which-widget.
  */
 export function ResourceReference({
-  resource,
   file,
+  resource,
   onOpen,
 }: {
-  resource: Pick<StudioResourceItem, 'kind' | 'name' | 'titles' | 'locale'> | undefined
   file: string
+  resource: Pick<StudioResourceItem, 'kind' | 'name' | 'titles' | 'locale'> | undefined
   onOpen?: () => void
 }) {
   const t = useText()

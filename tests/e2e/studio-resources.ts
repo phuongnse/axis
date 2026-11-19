@@ -217,14 +217,16 @@ export async function openEntityField(page: Page, index: number): Promise<Locato
 }
 
 /**
- * Clicks Add field in the open entity, waits until the new row, at `index`, shows, then opens the new field's drawer.
- * It closes an open field first, because a drawer could cover the button.
+ * Clicks Add field in the open entity, waits until the new row, at `index`, shows, then waits for the new field's drawer,
+ * which Add field opens, named "Unnamed field" until the field has a name. It closes an open field first, because a
+ * drawer could cover the button.
  */
 export async function addEntityField(page: Page, index: number): Promise<Locator> {
   await closeEntityField(page)
   await page.getByRole('button', { name: 'Add field', exact: true }).click()
   await expect(page.getByTestId(`studio-field-/fields/${index}`)).toBeVisible()
-  return openEntityField(page, index)
+  await waitForDialog(page, 'Unnamed field')
+  return fieldDrawer(page)
 }
 
 /**

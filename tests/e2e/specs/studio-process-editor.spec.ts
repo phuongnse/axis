@@ -235,9 +235,12 @@ test.describe("Studio edits a process in the process editor", () => {
     }).toPass({ timeout: 20_000 });
     await saveResource(page);
 
+    // Both transitions that name markApproved give the same message and resource, so the rows differ only by path. The
+    // list keeps the order of the diagnostics, which sorts by path, so the first row is the one at /steps/2/otherwise.
     const diagnostic = (await openProblems(page))
       .getByRole("listitem")
-      .filter({ hasText: "AXC0070" });
+      .filter({ hasText: "AXC0070" })
+      .first();
     await expect(diagnostic).toContainText("AXC0070");
     await diagnostic
       .getByRole("button", { name: "PurchaseRequestApproval", exact: true })

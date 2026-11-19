@@ -274,9 +274,10 @@ const noParameters: string[] = []
  * props, so a key in one row draws that row's cells and no other. Only the row has an id in the table, so a diagnostic
  * inside a field opens at its row. The table has a Filter on Name, Label and Type, kept in the address as
  * `fields.filter`. A filter only hides rows: every row shows on one page, an edit to a hidden row stays in the draft, and
- * a field whose origin is `null`, one added since the last save, stays shown. Each row's "…" menu has Move up, Move down
- * and Remove, which close the drawer, and a read-only designer has no menu, see
- * docs/reference/entity-designer.md#fields.
+ * a field whose origin is `null`, one added since the last save, stays shown. Add field opens the new field's drawer.
+ * Move up and Move down keep the open drawer on its field at the field's new index, and Remove closes the drawer only
+ * when it removes that field, see docs/reference/entity-designer.md#field-drawer. A read-only designer has no "…" menu,
+ * see docs/reference/entity-designer.md#fields.
  */
 const Fields = memo(function Fields({
   fields,
@@ -324,41 +325,54 @@ const Fields = memo(function Fields({
     [currencySignature],
   )
 
-  const onMove = useCallback(
-    (index: number, offset: number) => {
-      const { fields, origins, onOriginsChange, onChange } = latest.current
-      closeDrawer()
-      const next = [...fields!]
-      ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
-      onChange('/fields', next)
-      if (onOriginsChange) {
-        const moved = rowOrigins(fields!, origins)
-        ;[moved[index], moved[index + offset]] = [moved[index + offset], moved[index]]
-        onOriginsChange(moved)
-      }
-    },
-    [closeDrawer],
-  )
+  const onMove = useCallback((index: number, offset: number) => {
+    const { fields, origins, onOriginsChange, onChange } = latest.current
+    // The drawer's field moves with it, and a closed drawer keeps its index in step, so it never opens on another field.
+    setDrawer(
+      (current) =>
+        current &&
+        (current.index === index
+          ? { ...current, index: index + offset }
+          : current.index === index + offset
+            ? { ...current, index }
+            : current),
+    )
+    const next = [...fields!]
+    ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
+    onChange('/fields', next)
+    if (onOriginsChange) {
+      const moved = rowOrigins(fields!, origins)
+      ;[moved[index], moved[index + offset]] = [moved[index + offset], moved[index]]
+      onOriginsChange(moved)
+    }
+  }, [])
 
-  const onRemove = useCallback(
-    (index: number) => {
-      const { fields, origins, onOriginsChange, onChange } = latest.current
-      closeDrawer()
-      onChange(
-        '/fields',
-        fields!.filter((_, position) => position !== index),
-      )
-      onOriginsChange?.(
-        rowOrigins(fields!, origins).filter((_, position) => position !== index),
-        origins?.[index] ?? undefined,
-      )
-    },
-    [closeDrawer],
-  )
+  const onRemove = useCallback((index: number) => {
+    const { fields, origins, onOriginsChange, onChange } = latest.current
+    // Removing the drawer's own field closes the drawer. Removing a field before it moves the drawer up an index.
+    setDrawer((current) =>
+      current === null
+        ? null
+        : current.index === index
+          ? { ...current, open: false }
+          : current.index > index
+            ? { ...current, index: current.index - 1 }
+            : current,
+    )
+    onChange(
+      '/fields',
+      fields!.filter((_, position) => position !== index),
+    )
+    onOriginsChange?.(
+      rowOrigins(fields!, origins).filter((_, position) => position !== index),
+      origins?.[index] ?? undefined,
+    )
+  }, [])
 
   function addField() {
     onChange('/fields', [...fields!, { name: '', type: 'text' }])
     onOriginsChange?.([...rowOrigins(fields!, origins), null])
+    openDrawer(fields!.length)
   }
 
   if (fields === undefined) {
