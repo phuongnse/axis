@@ -26,7 +26,7 @@ keeps every part of them that still holds.
   empty. A page is readable when one of its widgets is.
 - **One breakpoint for the platform.** Below it, columns stack, tables scroll inside their widget and
   the navigation collapses into a menu, with no setting per widget.
-- **Studio edits the tree,** as [D53](d53-typed-editors-and-the-process-graph-in-studio.md) sets out.
+- **Studio edits the tree,** as [D164](d164-typed-editors-and-one-process-graph-laid-out-by-elk.md) sets out.
 - **Typed page parameters in the URL query.** A page declares `parameters`, each with a name, an
   entity field type and whether it is required. Their values live in the URL query under their names,
   as a data source's parameters do ([D18](d18-data-sources.md)), and a name a table's own query uses

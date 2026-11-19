@@ -33,7 +33,7 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
   with the field's layer mark beside it, and reads "Unnamed field" while the name is empty. The Label cell is the
   label in the author's language, or its text key where the key has no text, and the dash where the field has no
   label. The table has no input.
-- **Columns** _(planned)_. Its columns are Name, Label, Type, Required, Unique and
+- **Columns.** Its columns are Name, Label, Type, Required, Unique and
   Properties. It has a search, and Add field sits in the section's heading. A field's name opens the
   [field drawer](#field-drawer), beside the table, so every field stays in sight however many settings it has.
 - **Filter.** The table has a Filter on Name, Label, Type, Required and Unique, and none on the row's menu.
@@ -42,13 +42,16 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
   setting counts as empty. Properties has no filter, as a list of tags has no single value. The filter
   lives in the address as `fields.filter`. It only hides rows: every row shows on one page with no pager, and an edit to
   a hidden row stays in the draft. A field whose origin is new, one added since the last save, stays shown. The table
-  has no search, sort or Columns.
+  has no sort or Columns.
+- **Search.** The search box looks in the name and in the label as the Label cell shows it, the text in the author's
+  language, or else the text key. It lives in the address as `fields.search`. It hides rows as the filter does, except
+  that a field added since the last save is not kept, so a search can hide it until its name or label matches.
 - **Type in words.** The cell reads the type's name, and for a reference, references or child
   collection the entity it points to, by its label, as "Reference to Department" or "Child collection
   of Line item". The name shows only where that entity has no label. Enum and every other type read as
   their name alone, with no count. A reference with no target yet reads "Reference to" and the dash in
   place of the target.
-- **The target is a link** _(planned)_. In the Type cell the target's label is a link that opens the entity, and a
+- **The target is a link.** In the Type cell the target's label is a link that opens the entity, and a
   module's entity at its module view. The field's name stays the control that opens the drawer.
 - **Required and Unique read Yes or No**, the words a record's boolean reads, as a No is a value and
   the dash means none. They are columns because every field has them and an author compares them down

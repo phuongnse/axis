@@ -15,6 +15,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react'
+import { useSearchParams } from 'react-router'
 import {
   applyAnswers,
   fieldQuestions,
@@ -57,6 +58,7 @@ import { StudioNamesContext, textsOf } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { withoutTableView } from '../platform/unsavedChanges'
 import { ConnectorEditor } from './ConnectorEditor'
 import { EndpointEvent } from './EndpointEvent'
 import { EndpointValues } from './EndpointValues'
@@ -286,6 +288,7 @@ export function StudioEditor({
   const [tab, setTab] = useState<'design' | 'form' | 'json' | 'usedBy'>(
     item.kind === 'page' || item.kind === 'form' || item.kind === 'process' ? 'design' : 'form',
   )
+  const [searchParams, setSearchParams] = useSearchParams()
   const [formDrawn, setFormDrawn] = useState(false)
   const [seenPath, setSeenPath] = useState<string | null>(null)
   // The step that the Design tab of a process shows. It is not written to the URL, which would switch to Form.
@@ -855,6 +858,19 @@ export function StudioEditor({
   }
 
   /**
+   * Opens a tab, and clears every table's search, filter, sort, page and page size from the address, so one tab's view
+   * never filters another tab's table, see docs/reference/studio-resource-form.md#used-by. The address changes in place,
+   * so Back does not bring back the view that was cleared.
+   */
+  function openTab(next: typeof tab) {
+    setTab(next)
+    const cleared = withoutTableView(searchParams)
+    if (cleared.toString() !== searchParams.toString()) {
+      setSearchParams(cleared, { replace: true, preventScrollReset: true })
+    }
+  }
+
+  /**
    * A click on Save. JSON that does not parse is shown first, because the form then shows the last valid draft, whose
    * seed problems may be stale. A wrong seed cell opens the form at that cell. Nothing is sent while either shows.
    * See docs/reference/actions-and-controls.md#fields.
@@ -862,7 +878,7 @@ export function StudioEditor({
   function checkAndSave() {
     if (jsonInvalid || problems.size > 0) {
       pendingProblem.current = jsonInvalid ? 'json' : 'seed'
-      setTab(jsonInvalid ? 'json' : 'form')
+      openTab(jsonInvalid ? 'json' : 'form')
       // A tab that is open already draws nothing new, so no render follows.
       showPendingProblem()
     } else {
@@ -1051,7 +1067,7 @@ export function StudioEditor({
           kind="warning"
           message={t('shell.studio.jsonError.readOnly')}
           action={
-            <AxisButton role="secondary" onClick={() => setTab('json')}>
+            <AxisButton role="secondary" onClick={() => openTab('json')}>
               {t('shell.studio.goToJson')}
             </AxisButton>
           }
@@ -1102,6 +1118,7 @@ export function StudioEditor({
     <EntityDesigner
       value={draft}
       onChange={onChange}
+      application={application}
       origins={origins}
       warnings={entityWarnings}
       onOriginsChange={onOriginsChange}
@@ -1156,7 +1173,7 @@ export function StudioEditor({
               <LabelTextsContext.Provider value={labelContext}>
                 <Tabs
                   activeKey={tab}
-                  onChange={(key) => setTab(key as 'design' | 'form' | 'json' | 'usedBy')}
+                  onChange={(key) => openTab(key as 'design' | 'form' | 'json' | 'usedBy')}
                   tabBarExtraContent={
                     tab === 'json' ? (
                       <AxisActionRow align="center">
@@ -1370,7 +1387,7 @@ export function StudioEditor({
                       role="secondary"
                       onClick={() => {
                         setDeleteOpen(false)
-                        setTab('usedBy')
+                        openTab('usedBy')
                       }}
                     >
                       {t('shell.studio.deleteSeeUses')}

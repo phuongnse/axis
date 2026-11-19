@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { followLink, renderGuarded } from '../test/leaveGuard'
-import { leaveWithoutAsking, onlyTableViewChanged, useUnsavedChanges } from './unsavedChanges'
+import { leaveWithoutAsking, onlyTableViewChanged, useUnsavedChanges, withoutTableView } from './unsavedChanges'
 
 function Editor({ counted = false }: { counted?: boolean }) {
   const [unsaved, setUnsaved] = useState(counted)
@@ -191,5 +191,20 @@ describe('onlyTableViewChanged', () => {
         { pathname: '/studio', search: `?app=B&filter=${filter}` },
       ),
     ).toBe(false)
+  })
+})
+
+describe('withoutTableView', () => {
+  it('drops the view of the table and of every prefixed table, and keeps the other parameters and the columns', () => {
+    const params = new URLSearchParams(
+      'app=A&resource=r1&search=x&filter=f&sort=name&page=2&pageSize=50&columns=name&fields.search=code&fields.filter=f&text.page=3',
+    )
+
+    expect(withoutTableView(params).toString()).toBe('app=A&resource=r1&columns=name')
+    expect(params.get('search')).toBe('x')
+  })
+
+  it('returns the address as it is when it holds no table view', () => {
+    expect(withoutTableView(new URLSearchParams('app=A&resource=r1')).toString()).toBe('app=A&resource=r1')
   })
 })

@@ -7,11 +7,14 @@ of the [page designer](studio.md#page-designer).
 
 ## Canvas
 
-The canvas is the process graph: React Flow, `@xyflow/react`, draws it and dagre, `@dagrejs/dagre`,
-lays it out. The designer stores no position, and every edit lays the graph out again, so the process
-file holds no layout. The canvas and the step panel read the same unsaved draft, so an edit in the
+The canvas is the process graph. The designer stores no position, and every edit lays the graph out again, so
+the process file holds no layout. The canvas and the step panel read the same unsaved draft, so an edit in the
 panel, the Form tab or the JSON view redraws the graph at once.
 
+- **One graph** _(planned)_. The designer draws and edits through `ProcessGraphCanvas`, with the layout, the step
+  cards, the transition labels, the controls, the zoom limit and a diagnostic's `danger` border of the
+  [process graph](process-inspector-widget.md#process-graph). The selected step is the chosen card. Find a step
+  selects the step it finds. A step shows no run duration and no state icon, which belong to an instance.
 - **Selecting.** Clicking a node selects its step, and the step's panel shows beside the graph. Clicking
   an edge, or pressing Enter on it, selects that edge and the step it leaves, because that step's panel
   holds the picker of the transition. The selected step's node has `aria-current`, and the selected
@@ -39,19 +42,21 @@ the blocks are in [process blocks](process-blocks.md).
 - **Edges.** An edge runs from a lane's head, or the area's head, to the `start` step of that list. No edge is
   drawn while `start` is empty.
 - **Nesting.** Frames nest. A block inside a lane or an area is drawn as a smaller frame inside it.
-- **Layout.** dagre lays out the steps of each lane or area inside its frame, and no position is stored, as
+- **Layout.** The graph's layout places the steps of each lane or area inside its frame, and no position is stored, as
   [the canvas](#canvas) says.
 - **Leaving a block.** A block's handle sits at the frame's bottom and sets its `next`, as the other steps'
   handles do. No transition leaves a block, as [structure](process-blocks.md#structure) says.
 
 ## Loading and redraw
 
-The Design tab is the lazy chunk `assets/StudioProcessDesign-*.js`, which loads, with React Flow and
-dagre, when the tab first opens. The build fails when that chunk is missing or is part of the main
-bundle, as the [bundle budget](../development.md#scripts) describes. On a 40-step process the canvas
+The Design tab is the lazy chunk `assets/StudioProcessDesign-*.js`, which loads, with React Flow, when the tab first opens. The build fails when that chunk is missing or is part of
+the main bundle, as the [bundle budget](../development.md#scripts) describes. On a 40-step process the canvas
 shows a panel edit within 2 s, and
 [`studio-process-redraw.spec.ts`](../../tests/e2e/specs/studio-process-redraw.spec.ts) fails at 2 s or
 more.
+
+- **Layout chunk** _(planned)_. `elkjs` loads in a chunk of its own, only on a page that draws a process, see
+  [design tokens and previews](frontend.md#design-tokens-and-previews).
 
 ## Palette
 
@@ -70,8 +75,8 @@ operation is missing from the palette.
 - **Package operation.** The entry adds an operation step with an empty `operation`, which the author
   types as `<package>/<operation>` in the panel, as the operation picker does.
 - **Dropping on the canvas** adds an unconnected step.
-- **Dropping on an edge** inserts the step into that transition. The drop target is the edge's midpoint,
-  a small area that takes no clicks, so clicking an edge still selects it. The transition names the new
+- **Dropping on an edge** _(planned)_ inserts the step into that transition. The drop target is the middle of the
+  transition's route, a small area that takes no clicks, so clicking an edge still selects it. The transition names the new
   step, and the new step's `next` names the old target. A type with no `next`, such as `decision`, gets
   the old target as its `otherwise`. A `task` gets one outcome with an empty name and label whose `next`
   is the old target, and the diagnostics mark the empty name and label until the author fills them in.

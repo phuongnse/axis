@@ -64,7 +64,7 @@ the files agree, title and status included.
 | [D50](decisions/d50-sign-in-audit-records-and-security-scanning-in-ci.md) | Sign-in audit records and security scanning in CI | **Agreed** |
 | [D51](decisions/d51-creating-applications-and-resources-from-studio.md) | Creating applications and resources from Studio | **Agreed** |
 | [D52](decisions/d52-reference-pickers-label-texts-and-the-expression-editor.md) | Reference pickers, label texts and the expression editor | **Agreed** |
-| [D53](decisions/d53-typed-editors-and-the-process-graph-in-studio.md) | Typed editors and the process graph in Studio | **Agreed** |
+| D53 | Typed editors and the process graph in Studio | Superseded by [D164](decisions/d164-typed-editors-and-one-process-graph-laid-out-by-elk.md), [last text](https://github.com/phuongnse/axis/blob/b03da4b8bf5f23062d62d28604f9b615c8107bdd/docs/decisions/d53-typed-editors-and-the-process-graph-in-studio.md) |
 | [D54](decisions/d54-the-entity-designer-and-the-policy-matrix.md) | The entity designer and the policy matrix | **Agreed** |
 | [D55](decisions/d55-running-test-scenarios-from-studio.md) | Running test scenarios from Studio | **Agreed** |
 | [D56](decisions/d56-a-service-desk-as-the-third-sample-application.md) | A service desk as the third sample application | **Agreed** |
@@ -175,3 +175,4 @@ the files agree, title and status included.
 | [D161](decisions/d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md) | Connector calls run on bindings and secrets, and process inspection keeps what a run sent and answered, with step errors as codes | **Agreed** |
 | [D162](decisions/d162-each-entitys-records-open-on-one-record-page-in-each-site.md) | Each entity's records open on one record page in each site | **Agreed** |
 | [D163](decisions/d163-a-new-screen-is-designed-first-one-subject-to-each-design-issue-on-a-short-prototype-with-fixtures.md) | A new screen is designed first, one subject to each design issue, on a short prototype with fixtures | **Agreed** |
+| [D164](decisions/d164-typed-editors-and-one-process-graph-laid-out-by-elk.md) | Typed editors and one process graph laid out by ELK | **Agreed** |

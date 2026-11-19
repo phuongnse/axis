@@ -23,22 +23,28 @@ export function leavesWithoutAsking(state: unknown): boolean {
 const viewParameters = ['search', 'filter', 'sort', 'page', 'pageSize']
 
 /**
- * Whether two addresses differ only in a table's view, its `search`, `filter`, `sort`, `page` and `pageSize`, also under
- * the table's prefix such as `fields.filter`, see docs/reference/actions-and-controls.md#tables. Such a move keeps the
- * editor on screen, so the guard does not ask.
+ * The address without a table's view: its `search`, `filter`, `sort`, `page` and `pageSize`, also under the table's
+ * prefix such as `fields.search`, see docs/reference/actions-and-controls.md#tables. The columns a person keeps stay.
+ */
+export function withoutTableView(params: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(params)
+  for (const key of params.keys()) {
+    if (viewParameters.some((name) => key === name || key.endsWith(`.${name}`))) {
+      next.delete(key)
+    }
+  }
+  return next
+}
+
+/**
+ * Whether two addresses differ only in a table's view, see `withoutTableView`. Such a move keeps the editor on screen,
+ * so the guard does not ask.
  */
 export function onlyTableViewChanged(
   current: { pathname: string; search: string },
   next: { pathname: string; search: string },
 ): boolean {
-  const withoutView = (search: string) => {
-    const params = new URLSearchParams(search)
-    const views = [...params.keys()].filter((key) =>
-      viewParameters.some((name) => key === name || key.endsWith(`.${name}`)),
-    )
-    views.forEach((key) => params.delete(key))
-    return params.toString()
-  }
+  const withoutView = (search: string) => withoutTableView(new URLSearchParams(search)).toString()
   return current.pathname === next.pathname && withoutView(current.search) === withoutView(next.search)
 }
 
