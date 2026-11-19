@@ -139,7 +139,8 @@ Version, Roles and Connectors, as [a dialog holds only what it edits](actions-an
 What uses a resource is a tab of its own, Used by, beside Design, Form and JSON, opened when it is needed,
 before a rename or a delete. A kind nothing can use, the application, has no such tab. What a resource uses
 is shown by its own editor, and deleting it breaks nothing it uses, so it has no list of its own, see
-[D141](../decisions/d141-the-reference-index-and-what-uses-a-resource.md).
+[D141](../decisions/d141-the-reference-index-and-what-uses-a-resource.md). Changing the editor's tab clears every
+table's search, filter, sort, page and page size from the address, so one tab's view never filters another's table.
 
 The tab is the [standard table](actions-and-controls.md#tables), flat, with search and Filter on each column: Name as
 text, and Kind and How it is used as choices of those in the rows:

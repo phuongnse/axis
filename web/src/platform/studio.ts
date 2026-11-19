@@ -2050,8 +2050,13 @@ export function moduleResourceTitle(
   titles: Readonly<Record<string, string>> | null | undefined,
   locale: string,
 ): string {
-  const prefix = `${item.module}/`
-  return textIn(titles, locale) ?? (item.name.startsWith(prefix) ? item.name.slice(prefix.length) : item.name)
+  return textIn(titles, locale) ?? withoutModulePrefix(item.name, item.module)
+}
+
+/** A module resource's name without its module's `<module>/` prefix, so `organization/Department` reads `Department`. */
+export function withoutModulePrefix(name: string, module: string | null): string {
+  const prefix = `${module}/`
+  return module !== null && name.startsWith(prefix) ? name.slice(prefix.length) : name
 }
 
 /**

@@ -16,11 +16,13 @@ import {
 } from '../platform/entityFields'
 import { setAt } from '../platform/jsonPatch'
 import type { LayerElement } from '../platform/layerMarks'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
+import { PlatformContext, type Platform } from './context'
 import { chooseOption, clearPicker, clearSelect, openDropdown, optionTexts, removeTag } from '../test/antd'
 import {
   addEntityField,
@@ -127,6 +129,41 @@ const names = {
   ],
 } as unknown as StudioNames
 
+/**
+ * The names for the targets of a reference: an entity labelled Department, a module's entity labelled Department, a
+ * module's entity with no label, and the texts of two field labels.
+ */
+const withTargets = {
+  ...names,
+  entities: [
+    ...names.entities,
+    { id: 'e3', name: 'OrgUnit', labelKey: 'entity.department', module: null, fields: [] },
+    { id: 'e4', name: 'organization/Department', labelKey: 'entity.department', module: 'organization', fields: [] },
+    { id: 'e5', name: 'organization/Employee', labelKey: null, module: 'organization', fields: [] },
+  ],
+  texts: [
+    ...names.texts,
+    { key: 'entity.department', texts: { en: 'Department', vi: 'Phòng ban' }, usedBy: 1 },
+    { key: 'field.size', texts: { en: 'Quantity', vi: 'Số lượng' }, usedBy: 1 },
+  ],
+} as unknown as StudioNames
+
+/** The platform context of a shell that shows `locale`, which the designer reads the author's language from. */
+function platformIn(locale: string): Platform {
+  return {
+    site: {
+      name: 'platform',
+      titleKey: 'shell.title',
+      locales: { default: 'en', fallback: 'en', available: ['en', 'vi'] },
+      navigation: [],
+    },
+    fallbackTexts: platformEnglish,
+    current: { locale, texts: platformEnglish },
+    setCurrent: vi.fn(),
+    development: false,
+  }
+}
+
 const labelContext = {
   application: 'Shop',
   file: 'entities/invoice.json',
@@ -218,7 +255,7 @@ function renderDesigner(
 ) {
   render(
     <Providers loaded={loaded}>
-      <EntityDesigner value={value} onChange={onChange} readOnly={readOnly} />
+      <EntityDesigner value={value} onChange={onChange} application="Shop" readOnly={readOnly} />
     </Providers>,
   )
   return onChange
@@ -273,6 +310,7 @@ function renderContent(initial: Record<string, unknown>) {
       <>
         <EntityDesigner
           value={value}
+          application="Shop"
           onChange={(pointer, next) => setValue((current) => setAt(current, pointer, next) as Record<string, unknown>)}
         />
         <output data-testid="entity-content">{JSON.stringify(value)}</output>
@@ -435,6 +473,111 @@ describe('EntityDesigner', () => {
     expect(fieldCells(2)[2]).toBe('Reference to Department')
     expect(fieldCells(3)[2]).toBe('Reference to —')
     expect(fieldCells(4)[2]).toBe('Text')
+  })
+
+  it('links the target of a reference to its entity, and leaves the name of the field a button', () => {
+    renderDesigner(entity({ fields: [{ name: 'unit', type: 'reference', target: 'OrgUnit' }] }), vi.fn(), withTargets)
+
+    const row = screen.getByTestId('studio-field-/fields/0')
+    expect(within(row).getByRole('link', { name: 'Department' })).toHaveAttribute(
+      'href',
+      studioResourceAddress('Shop', 'e3'),
+    )
+    expect(within(row).getByRole('button', { name: 'unit' })).toBeInTheDocument()
+    expect(within(row).queryByRole('link', { name: 'unit' })).toBeNull()
+  })
+
+  it('links a target with no label by its name, and a module entity by its own id at its module view', () => {
+    renderDesigner(
+      entity({
+        fields: [
+          { name: 'vendor', type: 'reference', target: 'Supplier' },
+          { name: 'unit', type: 'reference', target: 'organization/Department' },
+          { name: 'staff', type: 'child-collection', target: 'organization/Employee' },
+        ],
+      }),
+      vi.fn(),
+      withTargets,
+    )
+
+    expect(
+      within(screen.getByTestId('studio-field-/fields/0')).getByRole('link', { name: 'Supplier' }),
+    ).toHaveAttribute('href', studioResourceAddress('Shop', 'e2'))
+    expect(
+      within(screen.getByTestId('studio-field-/fields/1')).getByRole('link', { name: 'Department' }),
+    ).toHaveAttribute('href', studioResourceAddress('Shop', 'e4'))
+    expect(
+      within(screen.getByTestId('studio-field-/fields/2')).getByRole('link', { name: 'Employee' }),
+    ).toHaveAttribute('href', studioResourceAddress('Shop', 'e5'))
+  })
+
+  it('shows a target the application does not have, and a reference with none, with no link', () => {
+    renderDesigner(
+      entity({
+        fields: [
+          { name: 'ghost', type: 'reference', target: 'Missing' },
+          { name: 'empty', type: 'reference' },
+        ],
+      }),
+      vi.fn(),
+      withTargets,
+    )
+
+    expect(fieldCells(0)[2]).toBe('Reference to Missing')
+    expect(fieldCells(1)[2]).toBe('Reference to —')
+    expect(screen.queryByRole('link')).toBeNull()
+  })
+
+  it('shows a target as text, with no link, until the names have loaded', () => {
+    renderDesigner(entity({ fields: [{ name: 'vendor', type: 'reference', target: 'Supplier' }] }), vi.fn(), null)
+
+    expect(fieldCells(0)[2]).toBe('Reference to Supplier')
+    expect(screen.queryByRole('link')).toBeNull()
+  })
+
+  describe('the search of the Fields table', () => {
+    const searchedFields = [
+      { name: 'total', type: 'decimal', label: { textKey: 'field.total' } },
+      { name: 'code', type: 'text' },
+      { name: 'count', type: 'integer', label: { textKey: 'field.size' } },
+    ]
+
+    function renderSearched(locale: string) {
+      render(
+        <PlatformContext.Provider value={platformIn(locale)}>
+          <Providers loaded={withTargets}>
+            <EntityDesigner value={entity({ fields: searchedFields })} onChange={vi.fn()} application="Shop" />
+          </Providers>
+        </PlatformContext.Provider>,
+      )
+    }
+
+    it('narrows the rows by a field name, as the search box is typed in and entered', async () => {
+      renderSearched('en')
+
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'cod{Enter}')
+
+      expect(entityFieldNames()).toEqual(['code'])
+    })
+
+    it('narrows the rows by the label as the Label cell shows it, and not by its text key', async () => {
+      renderSearched('en')
+
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'quantity{Enter}')
+      expect(entityFieldNames()).toEqual(['count'])
+
+      await userEvent.clear(screen.getByRole('searchbox', { name: 'Search' }))
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'field.size{Enter}')
+      expect(screen.queryAllByTestId(/^studio-field-\/fields\/\d+$/)).toHaveLength(0)
+    })
+
+    it("narrows the rows by the label in the author's language", async () => {
+      renderSearched('vi')
+
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'số lượng{Enter}')
+
+      expect(entityFieldNames()).toEqual(['count'])
+    })
   })
 
   it('shows the properties of a field as tags in their order, with one source of its value, and the dash for none', () => {
@@ -1082,7 +1225,7 @@ describe('EntityDesigner', () => {
     function renderFiltered(origins: (string | null)[]) {
       render(
         <Providers loaded={names}>
-          <EntityDesigner value={entity({ fields })} onChange={vi.fn()} origins={origins} />
+          <EntityDesigner value={entity({ fields })} onChange={vi.fn()} application="Shop" origins={origins} />
         </Providers>,
       )
     }
@@ -1236,7 +1379,7 @@ describe('EntityDesigner', () => {
         <ExpressionCheckContext.Provider
           value={{ application: 'Shop', resourceId: 'b5a5f1cb', kind: 'entity', draft: () => draft, names }}
         >
-          <EntityDesigner value={draft} onChange={vi.fn()} />
+          <EntityDesigner value={draft} onChange={vi.fn()} application="Shop" />
         </ExpressionCheckContext.Provider>
       </Providers>,
     )
@@ -1282,6 +1425,7 @@ describe('EntityDesigner', () => {
         <EntityDesigner
           value={value}
           onChange={onChange}
+          application="Shop"
           origins={['total', 'code', 'note']}
           onOriginsChange={onOriginsChange}
         />
@@ -1523,7 +1667,7 @@ describe('EntityDesigner with a customization layer', () => {
     const onReset = vi.fn()
     render(
       <Providers loaded={names}>
-        <EntityDesigner value={value} onChange={vi.fn()} layer={{ elements, disabled, onReset }} />
+        <EntityDesigner value={value} onChange={vi.fn()} application="Shop" layer={{ elements, disabled, onReset }} />
       </Providers>,
     )
     return onReset
@@ -1624,7 +1768,7 @@ describe('typing in the entity designer', () => {
       )
       return (
         <ExpressionCheckContext.Provider value={check}>
-          <EntityDesigner value={value} onChange={onChange} />
+          <EntityDesigner value={value} onChange={onChange} application="Shop" />
           <output data-testid="entity-content">{JSON.stringify(value)}</output>
         </ExpressionCheckContext.Provider>
       )
