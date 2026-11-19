@@ -1,19 +1,9 @@
 import { Tag } from 'antd'
 import type { ReactNode } from 'react'
-import type { ColourName } from './designTokens'
+import { toneColours, type StatusTone } from './statusTones'
 import { useDesignTokens } from './themeMode'
 
-/** The five tones of a status, which say what the status asks of the reader. See docs/reference/shared-widgets.md#which-widget. */
-export type StatusTone = 'neutral' | 'attention' | 'success' | 'muted' | 'danger'
-
-/** Each tone's text colour and border colour, as tokens. A tag is outlined on a transparent background. */
-const toneColours: Record<StatusTone, { text: ColourName; border: ColourName }> = {
-  neutral: { text: 'text', border: 'border' },
-  attention: { text: 'warningText', border: 'warningText' },
-  success: { text: 'successText', border: 'successText' },
-  muted: { text: 'textMuted', border: 'borderSubtle' },
-  danger: { text: 'dangerText', border: 'dangerText' },
-}
+export type { StatusTone }
 
 /**
  * A status as an outlined tag in one of five tones. It has no margin of its own, so the heading that holds it sets the

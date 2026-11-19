@@ -205,6 +205,39 @@ describe('ProcessInspectorWidget', () => {
     expect(within(completed).getAllByRole('cell')[5]).not.toHaveTextContent('—')
   })
 
+  it('shows each instance state as a status tag in its tone', async () => {
+    const states = [
+      ['running', 'neutral', 'Running'],
+      ['waiting', 'neutral', 'Waiting'],
+      ['completed', 'success', 'Completed'],
+      ['failed', 'danger', 'Failed'],
+      ['cancelled', 'muted', 'Cancelled'],
+    ]
+    const template = JSON.parse(instancePage).items[0]
+    stubInstances(
+      JSON.stringify({
+        items: states.map(([state], index) => ({
+          ...template,
+          id: `0192f4a9-2d3e-7f40-8a1b-2c3d4e5f6a8${index}`,
+          step: `step${index}`,
+          state,
+        })),
+        page: 1,
+        pageSize: 20,
+        totalCount: states.length,
+      }),
+    )
+
+    renderWidget()
+
+    await screen.findByRole('row', { name: /step0/ })
+    const rows = screen.getAllByRole('row').slice(1)
+    states.forEach(([, tone, words], index) => {
+      const tag = within(within(rows[index]).getAllByRole('cell')[1]).getByText(words)
+      expect(tag.closest('.ant-tag')).toHaveAttribute('data-tone', tone)
+    })
+  })
+
   it('shows "No subject" as the record link of an instance without a subject', async () => {
     stubInstances(
       JSON.stringify({

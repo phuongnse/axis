@@ -13,6 +13,7 @@ import {
   forbidden,
   instanceCommands,
   callStateText,
+  callStateTone,
   instanceStates,
   retryWarns,
   sendCommand,
@@ -30,7 +31,7 @@ import {
 import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { ReasonDialog } from './ReasonDialog'
 import { ResolveDialog } from './ResolveDialog'
-import { StatusTag, type StatusTone } from './StatusTag'
+import { StatusTag } from './StatusTag'
 import { SectionPart, SectionParts } from './SectionParts'
 import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
@@ -637,15 +638,6 @@ interface CallItemProps {
   attemptColumns: AxisColumn<CallAttempt>[]
 }
 
-const callTones: Record<string, StatusTone> = {
-  pending: 'neutral',
-  sending: 'neutral',
-  unknown: 'attention',
-  succeeded: 'success',
-  failed: 'danger',
-  cancelled: 'muted',
-}
-
 /**
  * One call: where it goes, its state, its input and its attempts. The Attempts table filters on each column and keeps
  * its filter in the address under `attempts.{callId}.`, see docs/reference/process-inspector-widget.md#instance-page.
@@ -678,7 +670,7 @@ function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attem
         <Typography.Text strong>{stepLabel(call.step)}</Typography.Text>
         <Typography.Text>{target}</Typography.Text>
         <Typography.Text>{call.operation}</Typography.Text>
-        <StatusTag tone={callTones[call.state] ?? 'neutral'}>{callStateText(t, call.state)}</StatusTag>
+        <StatusTag tone={callStateTone(call.state)}>{callStateText(t, call.state)}</StatusTag>
         {call.resolvable && call.outputs && (
           // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           <Button size="small" data-testid={`inspector-resolve-${call.id}`} onClick={() => setResolving(true)}>

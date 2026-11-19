@@ -1,5 +1,6 @@
 import { apiFetch } from './api'
 import { parseRecordJson, type RecordProblem } from './records'
+import type { StatusTone } from './statusTones'
 
 /** The states of a process instance, as the inspection API's `state` filter takes them. */
 export const instanceStates = ['running', 'waiting', 'completed', 'failed', 'cancelled'] as const
@@ -13,17 +14,109 @@ export const attemptKinds = ['attempt', 'lookup'] as const
 /** The outcomes of an attempt or a lookup, see docs/reference/process-inspection.md#attempts. */
 export const attemptOutcomes = ['succeeded', 'retryable', 'unknown', 'failed', 'found', 'notFound'] as const
 
+/** The tone of a known state, or `neutral` for a state this build does not know. */
+function toneOf(tones: Record<string, StatusTone>, state: string): StatusTone {
+  return Object.hasOwn(tones, state) ? tones[state] : 'neutral'
+}
+
+/** The text of a known state under `prefix`, or the state as the API sends it when this build does not know it. */
+function textOf(t: (key: string) => string, prefix: string, known: readonly string[], state: string): string {
+  return known.includes(state) ? t(`${prefix}${state}`) : state
+}
+
+const instanceTones: Record<(typeof instanceStates)[number], StatusTone> = {
+  running: 'neutral',
+  waiting: 'neutral',
+  completed: 'success',
+  failed: 'danger',
+  cancelled: 'muted',
+}
+
+/** The tone of an instance state, see docs/reference/shared-widgets.md#which-widget. An unknown state is `neutral`. */
+export function stateTone(state: string): StatusTone {
+  return toneOf(instanceTones, state)
+}
+
 /** The platform text of an instance state. A state this build does not know shows as the API sends it. */
 export function stateText(t: (key: string) => string, state: string): string {
-  return (instanceStates as readonly string[]).includes(state) ? t(`shell.inspector.states.${state}`) : state
+  return textOf(t, 'shell.inspector.states.', instanceStates, state)
+}
+
+/**
+ * The run states of a step, the vocabulary of its state on the graph, see
+ * docs/reference/process-inspector-widget.md#process-graph. A step not reached has none.
+ */
+export const runStates = ['done', 'running', 'waitingForEvent', 'waitingForPerson', 'failed', 'cancelled'] as const
+
+/** The run state of a step. */
+export type RunState = (typeof runStates)[number]
+
+const runTones: Record<RunState, StatusTone> = {
+  done: 'success',
+  running: 'neutral',
+  waitingForEvent: 'neutral',
+  waitingForPerson: 'attention',
+  failed: 'danger',
+  cancelled: 'muted',
+}
+
+/** The tone of a run state. An unknown state is `neutral`. */
+export function runStateTone(state: string): StatusTone {
+  return toneOf(runTones, state)
+}
+
+/** The platform text of a run state. A state this build does not know shows as sent. */
+export function runStateText(t: (key: string) => string, state: string): string {
+  return textOf(t, 'shell.inspector.runStates.', runStates, state)
+}
+
+const attemptTones: Record<(typeof attemptOutcomes)[number], StatusTone> = {
+  succeeded: 'success',
+  found: 'success',
+  failed: 'danger',
+  retryable: 'muted',
+  notFound: 'muted',
+  unknown: 'attention',
+}
+
+/** The tone of an attempt's outcome. An unknown outcome is `neutral`. */
+export function attemptOutcomeTone(outcome: string): StatusTone {
+  return toneOf(attemptTones, outcome)
+}
+
+/** The platform text of an attempt's outcome. An outcome this build does not know shows as sent. */
+export function attemptOutcomeText(t: (key: string) => string, outcome: string): string {
+  return textOf(t, 'shell.inspector.attemptOutcomes.', attemptOutcomes, outcome)
+}
+
+/** The types of a step, see docs/reference/process-inspection.md#instance-detail. */
+export const stepTypes = ['decision', 'task', 'operation', 'subProcess', 'timer', 'waitEvent', 'end'] as const
+
+/** The platform text of a step's type. A type this build does not know shows as sent. */
+export function stepTypeText(t: (key: string) => string, type: string): string {
+  return textOf(t, 'shell.inspector.stepTypes.', stepTypes, type)
 }
 
 /** The states of a process call, see docs/reference/process-inspection.md#instance-detail. */
 export const callStates = ['pending', 'sending', 'unknown', 'succeeded', 'failed', 'cancelled'] as const
 
+const callTones: Record<(typeof callStates)[number], StatusTone> = {
+  pending: 'neutral',
+  sending: 'neutral',
+  unknown: 'attention',
+  succeeded: 'success',
+  failed: 'danger',
+  cancelled: 'muted',
+}
+
+/** The tone of a call state. An unknown state is `neutral`. */
+export function callStateTone(state: string): StatusTone {
+  return toneOf(callTones, state)
+}
+
 /** The platform text of a call state. A state this build does not know shows as the API sends it. */
 export function callStateText(t: (key: string) => string, state: string): string {
-  return (callStates as readonly string[]).includes(state) ? t(`shell.inspector.callStates.${state}`) : state
+  return textOf(t, 'shell.inspector.callStates.', callStates, state)
 }
 
 /**
