@@ -1,4 +1,6 @@
 import { apiFetch } from './api'
+import { fillText } from './fillText'
+import { formatDuration } from './formatValue'
 import { parseRecordJson, type RecordProblem } from './records'
 
 /** The states of a process instance, as the inspection API's `state` filter takes them. */
@@ -24,6 +26,42 @@ export const callStates = ['pending', 'sending', 'unknown', 'succeeded', 'failed
 /** The platform text of a call state. A state this build does not know shows as the API sends it. */
 export function callStateText(t: (key: string) => string, state: string): string {
   return (callStates as readonly string[]).includes(state) ? t(`shell.inspector.callStates.${state}`) : state
+}
+
+/** The code of a failed step or attempt with its values, see docs/reference/process-inspection.md#step-errors-in-inspection. */
+export interface StepProblem {
+  code: string
+  values: Record<string, number>
+}
+
+/** The codes of a step problem, see docs/reference/process-inspection.md#step-errors-in-inspection. */
+export const stepProblems = [
+  'unavailable',
+  'serverError',
+  'refused',
+  'timeout',
+  'notSent',
+  'exception',
+  'expressionFailed',
+  'writeRefused',
+] as const
+
+/**
+ * The words of a row's error in the reader's language: the platform text of its `problem`, with `timeout`'s `seconds` as a length of time,
+ * or the stored `error` for a row with no `problem` and for a code this build does not know.
+ */
+export function problemText(
+  t: (key: string) => string,
+  locale: string,
+  problem: StepProblem | null | undefined,
+  error: string | null,
+): string | null {
+  if (!problem || !(stepProblems as readonly string[]).includes(problem.code)) {
+    return error
+  }
+  return fillText(t(`shell.stepProblem.${problem.code}`), {
+    seconds: formatDuration((problem.values.seconds ?? 0) * 1000, locale, t),
+  })
 }
 
 /**
@@ -85,6 +123,8 @@ export interface PathEntry {
   decision: string | null
   output: unknown
   error: string | null
+  /** The code of `error`, or `null` when the entry has none. */
+  problem: StepProblem | null
   /** The trace id of the run that wrote the entry, or `null` when it stored none. */
   traceId: string | null
 }
@@ -111,6 +151,8 @@ export interface CallAttempt {
   outcome: string
   httpStatus: number | null
   error: string | null
+  /** The code of `error`, or `null` when the row has none. */
+  problem: StepProblem | null
   /** The trace id of the run that wrote the row, or `null` when it stored none. */
   traceId: string | null
 }

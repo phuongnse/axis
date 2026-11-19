@@ -88,7 +88,7 @@ step history row, a work item and a call is that of its path, and the instance's
 | `output` | `jsonb`, null | What the step wrote, by step and event, as [History output](#history-output) lists. Null for a failed step |
 | `decision` | `text`, null | The branch a decision took: its zero-based index, such as `0`, or `otherwise`. The outcome's declared name for a task completion, and `deadline` for a task its deadline expired. Null for other steps and failed steps |
 | `error` | `text`, null | The error of a failed step. The exception type, or a fixed text that names the step, part, field pointer or message key. Never the exception message or a value, see [Step errors](process-inspection.md#step-errors-in-inspection) |
-| `problem` _(planned)_ | `jsonb`, null | The error of a failed step as a code with its values, see [Step errors](process-inspection.md#step-errors-in-inspection) |
+| `problem` | `jsonb`, null | The error of a failed step as a code with its values, see [Step errors](process-inspection.md#step-errors-in-inspection) |
 | `started_at` | `timestamptz` | The start of the step's transaction, `now()` |
 | `finished_at` | `timestamptz` | When the row was written, `clock_timestamp()` |
 | `trace_id` | `text`, null | The 32-hex trace id of the run that wrote the row. For a task completion through the server, it is the request's trace. Null when no span was current, such as a row written by the scenario runner, and for rows that existed before the column |
@@ -258,7 +258,7 @@ keeps each number once. The call is in one of two tables, so `call_id` has no fo
 **Response.** The `response` column keeps an attempt's response, as
 [call input kept](process-inspection.md#call-input-kept) says.
 
-**Problem.** _(planned)_ The `problem` column keeps an attempt's error, as
+**Problem.** The `problem` column keeps an attempt's error, as
 [step errors](process-inspection.md#step-errors-in-inspection) say.
 
 | Column | Type | Meaning |
@@ -274,7 +274,7 @@ keeps each number once. The call is in one of two tables, so `call_id` has no fo
 | `http_status` | `integer`, null | The HTTP status, when one answered. Null for a package call and when none answered |
 | `error` | `text`, null | A fixed text, such as a timeout. It holds no body, no exception message and no secret |
 | `response` | `jsonb`, null | An attempt's response: status, headers and body as text, with the body cut at 64 KiB and marked `truncated`. Null for a lookup, a package call and an attempt that got no answer |
-| `problem` _(planned)_ | `jsonb`, null | The attempt's error as a code with its values, see [Step errors](process-inspection.md#step-errors-in-inspection). Null with no error |
+| `problem` | `jsonb`, null | The attempt's error as a code with its values, see [Step errors](process-inspection.md#step-errors-in-inspection). Null with no error |
 | `trace_id` | `text`, null | The 32-hex trace id of the run that made the attempt or lookup. Null when no span was current, and for rows that existed before the column |
 
 ### Package calls

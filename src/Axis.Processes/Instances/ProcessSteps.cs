@@ -226,8 +226,8 @@ internal static class ProcessSteps
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.process_step_history
-                (id, process_instance_id, step, revision, input, output, decision, error, started_at, finished_at, trace_id)
-            VALUES (@id, @instance, @step, @revision, @input, @output, @decision, @error, @started, clock_timestamp(), @trace)
+                (id, process_instance_id, step, revision, input, output, decision, error, problem, started_at, finished_at, trace_id)
+            VALUES (@id, @instance, @step, @revision, @input, @output, @decision, @error, @problem, @started, clock_timestamp(), @trace)
             """,
             Connection(transaction),
             transaction);
@@ -239,6 +239,7 @@ internal static class ProcessSteps
         command.Parameters.Add(new NpgsqlParameter("output", NpgsqlDbType.Jsonb) { Value = (object?)occurrence.Output?.ToJsonString() ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("decision", NpgsqlDbType.Text) { Value = (object?)occurrence.Decision ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)occurrence.Error ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("problem", NpgsqlDbType.Jsonb) { Value = occurrence.Problem is null ? DBNull.Value : occurrence.Problem.ToJsonString() });
         command.Parameters.AddWithValue("started", occurrence.StartedAt.ToUniversalTime());
         command.Parameters.Add(new NpgsqlParameter("trace", NpgsqlDbType.Text) { Value = (object?)AxisTelemetry.CurrentTraceId() ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -278,6 +279,7 @@ internal sealed record LoadedInstance(
 /// <param name="Decision">
 /// The branch a decision took, its zero-based index or <c>otherwise</c>, or the outcome a task was completed with.
 /// </param>
+/// <param name="Problem">The code of <paramref name="Error"/>, or <see langword="null"/> when it has none or the step did not fail.</param>
 internal sealed record StepOccurrence(
     Guid InstanceId,
     string Step,
@@ -286,4 +288,5 @@ internal sealed record StepOccurrence(
     JsonObject? Output,
     string? Decision,
     string? Error,
-    DateTimeOffset StartedAt);
+    DateTimeOffset StartedAt,
+    StepProblem? Problem = null);

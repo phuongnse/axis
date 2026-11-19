@@ -181,11 +181,12 @@ in any state. The body has these parts:
     set to `null`.
 - `path` is the history rows of the instance, ordered by `finished_at`, then
   by `id`. Each is
-  `{ "step", "startedAt", "finishedAt", "decision", "output", "error", "traceId" }`.
+  `{ "step", "startedAt", "finishedAt", "decision", "output", "error", "problem", "traceId" }`.
   - `decision` and `output` are the stored values, see
     [Tables](process-tables.md#tables). `output` holds no field values.
   - `error` is the stored error, see
-    [Step errors](#step-errors-in-inspection).
+    [Step errors](#step-errors-in-inspection). `problem` is its code, `null` with no error and for an error that
+    has none.
   - `traceId` is the trace id of the run that wrote the row, see [Attempts](#attempts).
   - The history's `input` is not returned. It holds only the subject id and
     version, which the instance already has.
@@ -204,7 +205,7 @@ in any state. The body has these parts:
     `succeeded` or `failed`.
   - `attempts` lists the rows of [Attempts](#attempts) for the call, ordered
     by `startedAt`, then by `id`. Each is
-    `{ "kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "traceId", "response" }`,
+    `{ "kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "problem", "traceId", "response" }`,
     with `kind` either `attempt` or `lookup`. `traceId` follows [Attempts](#attempts).
   - `input` and `inputHidden` follow [Values and masking](#values-and-masking).
   - **Output and response.** A call has no output of its own. The engine writes the outputs
@@ -278,7 +279,7 @@ in any state. The body has these parts:
   never keeps is `null`: a package call's `request`, a connector call's `returned`, and the `response` of a
   lookup, of a package attempt and of an attempt that got no answer. A value that the hiding rule of
   `input` hides is `null` too, so a reader cannot tell the two apart.
-- **Errors.** _(planned)_ `problem` is `{ "code", "values" }` on a path entry and on an attempt, and
+- **Errors.** `problem` is `{ "code", "values" }` on a path entry and on an attempt, and
   `null` with no error. Its codes are in [step errors](#step-errors-in-inspection).
 - **Paths.** _(planned for M38)_ `revision` is the revision of the root path, which is the instance
   itself. `paths` lists the paths that a block started, ordered by `createdAt`, then by `id`. Each is
@@ -352,6 +353,7 @@ in any state. The body has these parts:
       "decision": null,
       "output": { "state": "waiting", "taskId": "0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01" },
       "error": null,
+      "problem": null,
       "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
     }
   ],
@@ -387,7 +389,8 @@ in any state. The body has these parts:
           "finishedAt": "2026-10-10T04:00:03.000000Z",
           "outcome": "retryable",
           "httpStatus": 503,
-          "error": null,
+          "error": "The operation 'createOrder' of the connector 'PurchasingSystem' answered with the status 503.",
+          "problem": { "code": "serverError", "values": {} },
           "traceId": "0af7651916cd43dd8448eb211c80319c"
         }
       ],
@@ -553,7 +556,7 @@ earlier ones.
   error text. It never holds an exception message or a secret's value.
 - **Response.** A row of a connector attempt also holds the attempt's `response`, see
   [Call input kept](#call-input-kept). A lookup row holds none.
-- **Problem.** _(planned)_ A row also holds the attempt's `problem`, see [Step errors](#step-errors-in-inspection).
+- **Problem.** A row also holds the attempt's `problem`, see [Step errors](#step-errors-in-inspection).
 
 ### Step errors in inspection
 
@@ -575,20 +578,26 @@ message can hold a value:
 
 None of them holds a value, and inspection shows the error as it is stored.
 
-**Problem codes.** _(planned)_ A path entry and an attempt carry `problem`, a code with its values. The
+**Problem codes.** A path entry and an attempt carry `problem`, a code with its values. The
 page words it through `shell.stepProblem.<code>` in the reader's language. A row with no `problem` shows
 its stored `error`. The codes are:
 
-- `unavailable`: the outside system could not be reached. The stored error is the attempt's fixed text.
+- `unavailable`: the outside system could not be reached: a connection that never opened, a binding that is
+  missing or not `https`, or a token request that failed. The stored error is the attempt's fixed text.
 - `serverError`: the outside system answered with a server error. The stored error is the attempt's fixed text.
 - `refused`: the outside system refused the call. The stored error is the attempt's fixed text.
-- `timeout`: the outside system did not answer in time, with `seconds`, the wait that ran out. The stored error is the attempt's fixed text, such as a timeout.
+- `timeout`: the outside system did not answer in time, or a package operation ran past its step's timeout. It has
+  `seconds`, the wait that ran out. The stored error is the attempt's fixed text, such as a timeout.
 - `notSent`: a connector call could not be sent, or its success could not be recorded. The stored error ends with the exception type.
-- `exception`: any other failure. The stored error is the exception type.
+- `exception`: any other failure, among them a package operation that threw. The stored error is the exception type.
 - `expressionFailed`: an expression of the step failed. The stored error is the fixed text that names the step, the part and the kind of expression error.
 - `writeRefused`: a write to a record was refused. The stored error is the refused-write text.
 
-**No stack traces.** _(planned)_ No page of an application shows a stack trace or an exception message,
+Only `timeout` has a value, `seconds`. Every other code has empty `values`, and no `problem` holds an exception
+message. A failure with any other fixed text, such as an operator resolving a call as failed or a step that the
+release lacks, has no `problem`, and its row shows the stored error.
+
+**No stack traces.** No page of an application shows a stack trace or an exception message,
 as [D161](../decisions/d161-connector-calls-run-on-bindings-and-secrets-and-process-inspection-keeps-what-a-run-sent-and-answered-with-step-errors-as-codes.md) says.
 
 ### Inspection errors

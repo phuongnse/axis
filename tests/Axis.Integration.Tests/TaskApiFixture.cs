@@ -402,12 +402,12 @@ public sealed class TaskApiFixture : IAsyncLifetime
     /// and finished a second later.
     /// </summary>
     public async Task InsertCallAttemptAsync(
-        string tenant, Guid callId, string kind, int number, DateTimeOffset startedAt, string outcome, int? httpStatus, string? error = null)
+        string tenant, Guid callId, string kind, int number, DateTimeOffset startedAt, string outcome, int? httpStatus, string? error = null, string? problem = null)
     {
         await using var command = DataSource(tenant).CreateCommand(
             """
-            INSERT INTO axis.process_call_attempts (id, call_kind, call_id, kind, number, started_at, finished_at, outcome, http_status, error)
-            VALUES (@id, 'connector', @call, @kind, @number, @startedAt, @finishedAt, @outcome, @status, @error)
+            INSERT INTO axis.process_call_attempts (id, call_kind, call_id, kind, number, started_at, finished_at, outcome, http_status, error, problem)
+            VALUES (@id, 'connector', @call, @kind, @number, @startedAt, @finishedAt, @outcome, @status, @error, @problem)
             """);
         command.Parameters.AddWithValue("id", Guid.CreateVersion7());
         command.Parameters.AddWithValue("call", callId);
@@ -418,6 +418,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
         command.Parameters.AddWithValue("outcome", outcome);
         command.Parameters.Add(new NpgsqlParameter("status", NpgsqlDbType.Integer) { Value = (object?)httpStatus ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)error ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("problem", NpgsqlDbType.Jsonb) { Value = (object?)problem ?? DBNull.Value });
         await command.ExecuteNonQueryAsync();
     }
 

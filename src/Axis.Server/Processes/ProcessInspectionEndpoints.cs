@@ -503,6 +503,7 @@ internal static class ProcessInspectionEndpoints
                     entry.Decision,
                     entry.Output is null ? null : JsonNode.Parse(entry.Output),
                     entry.Error,
+                    Problem(entry.Problem),
                     entry.TraceId))
                 .ToList(),
             tasks
@@ -554,6 +555,7 @@ internal static class ProcessInspectionEndpoints
                                 attempt.Outcome,
                                 attempt.HttpStatus,
                                 attempt.Error,
+                                Problem(attempt.Problem),
                                 attempt.TraceId,
                                 Kept(attempt.Response, concealed)))
                             .ToList(),
@@ -571,6 +573,9 @@ internal static class ProcessInspectionEndpoints
 
     // A kept request, response or returned value as JSON, or null when the call keeps none or the reader may not see it.
     private static JsonNode? Kept(string? json, bool concealed) => json is null || concealed ? null : JsonNode.Parse(json);
+
+    // The code of a step's or an attempt's error as JSON, or null when the row has none. It holds no field value, so the masking rule does not apply.
+    private static JsonNode? Problem(string? json) => json is null ? null : JsonNode.Parse(json);
 
     // The process in the active release when it exists and the viewer may inspect it, otherwise null.
     private static ProcessModel? InspectableProcess(ApplicationModel application, InspectionViewer viewer, Guid processId) =>
@@ -869,9 +874,10 @@ internal sealed record ProcessGraphTransition(string Next, string? On, string? B
 
 /// <summary>
 /// One occurrence of a step in the instance's history. A failed step has an error and no output.
+/// <paramref name="Problem"/> is the code of the error, <c>{ code, values }</c>, or null when the entry has none. It holds no field value, so no rule hides it.
 /// <paramref name="TraceId"/> is the trace id of the run that wrote the entry, or null when it stored none.
 /// </summary>
-internal sealed record ProcessPathEntry(string Step, DateTime StartedAt, DateTime FinishedAt, string? Decision, JsonNode? Output, string? Error, string? TraceId);
+internal sealed record ProcessPathEntry(string Step, DateTime StartedAt, DateTime FinishedAt, string? Decision, JsonNode? Output, string? Error, JsonNode? Problem, string? TraceId);
 
 /// <summary>
 /// A task of the instance, with who it is assigned to and how it ended. <paramref name="Assignee"/> is a user assignee's name,
@@ -929,6 +935,7 @@ internal sealed record ProcessCallOutput(string Name, string Type, bool Required
 
 /// <summary>
 /// An attempt or reconciliation lookup of a call. <c>Kind</c> is <c>attempt</c> or <c>lookup</c>.
+/// <paramref name="Problem"/> is the code of the error, <c>{ code, values }</c>, or null when the row has none. It holds no field value, so no rule hides it.
 /// <paramref name="TraceId"/> is the trace id of the run that wrote the row, or null when it stored none.
 /// <paramref name="Response"/> is the response of the outside system, or null when the attempt got none, for a
 /// lookup and a package call, and when the rule that hides the call's input hides it.
@@ -941,5 +948,6 @@ internal sealed record ProcessCallAttemptEntry(
     string Outcome,
     int? HttpStatus,
     string? Error,
+    JsonNode? Problem,
     string? TraceId,
     JsonNode? Response);

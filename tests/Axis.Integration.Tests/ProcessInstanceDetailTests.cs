@@ -34,10 +34,11 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal(DateTimeKind.Utc, root.GetProperty("createdAt").GetDateTime().Kind);
         var path = Assert.Single(root.GetProperty("path").EnumerateArray());
         Assert.Equal(
-            ["step", "startedAt", "finishedAt", "decision", "output", "error", "traceId"],
+            ["step", "startedAt", "finishedAt", "decision", "output", "error", "problem", "traceId"],
             path.EnumerateObject().Select(property => property.Name));
         Assert.Equal("lower", path.GetProperty("step").GetString());
         Assert.Equal("The record update was rejected: /values/amount: request.amountNegative", path.GetProperty("error").GetString());
+        Assert.Equal(("writeRefused", 0), (path.GetProperty("problem").GetProperty("code").GetString(), path.GetProperty("problem").GetProperty("values").EnumerateObject().Count()));
         Assert.Equal(JsonValueKind.Null, path.GetProperty("output").ValueKind);
         Assert.Equal(JsonValueKind.Null, path.GetProperty("decision").ValueKind);
         Assert.Empty(root.GetProperty("tasks").EnumerateArray());
@@ -422,7 +423,16 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         var (instance, call) = await StartWithCallAsync(TenantA, """{"reference":"Sales","amount":500}""");
         var start = DateTimeOffset.UtcNow.AddMinutes(-5);
         await fixture.InsertCallAttemptAsync(TenantA, call, "attempt", 2, start.AddSeconds(4), "succeeded", 200);
-        await fixture.InsertCallAttemptAsync(TenantA, call, "attempt", 1, start, "retryable", 503);
+        await fixture.InsertCallAttemptAsync(
+            TenantA,
+            call,
+            "attempt",
+            1,
+            start,
+            "retryable",
+            503,
+            "The operation 'createOrder' of the connector 'Purchasing' answered with the status 503.",
+            """{"code":"serverError","values":{}}""");
         await fixture.InsertCallAttemptAsync(TenantA, call, "lookup", 1, start.AddSeconds(2), "notFound", 404);
 
         using var body = await GetOkAsync(TenantA, "DepartmentOrder", instance);
@@ -447,9 +457,15 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
                 attempt.GetProperty("outcome").GetString()!,
                 attempt.GetProperty("httpStatus").GetInt32())));
         Assert.Equal(
-            ["kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "traceId", "response"],
+            ["kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "problem", "traceId", "response"],
             attempts[0].EnumerateObject().Select(property => property.Name));
-        Assert.Equal(JsonValueKind.Null, attempts[0].GetProperty("error").ValueKind);
+
+        // A failed attempt returns the stored code beside its fixed error, and an attempt with no error has no code.
+        Assert.Equal("The operation 'createOrder' of the connector 'Purchasing' answered with the status 503.", attempts[0].GetProperty("error").GetString());
+        Assert.Equal(("serverError", 0), (attempts[0].GetProperty("problem").GetProperty("code").GetString(), attempts[0].GetProperty("problem").GetProperty("values").EnumerateObject().Count()));
+        Assert.Equal(JsonValueKind.Null, attempts[1].GetProperty("problem").ValueKind);
+        Assert.Equal(JsonValueKind.Null, attempts[2].GetProperty("error").ValueKind);
+        Assert.Equal(JsonValueKind.Null, attempts[2].GetProperty("problem").ValueKind);
         Assert.Equal(JsonValueKind.Null, attempts[0].GetProperty("traceId").ValueKind);
         Assert.Equal(DateTimeKind.Utc, attempts[0].GetProperty("startedAt").GetDateTime().Kind);
         Assert.True(attempts[0].GetProperty("startedAt").GetDateTime() < attempts[1].GetProperty("startedAt").GetDateTime());

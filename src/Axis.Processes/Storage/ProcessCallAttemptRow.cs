@@ -49,6 +49,13 @@ public sealed class ProcessCallAttemptRow
     /// </summary>
     public string? Response { get; init; }
 
+    /// <summary>
+    /// The error as a code with its values, as JSON text: <c>code</c> and <c>values</c>, see
+    /// docs/reference/process-inspection.md#step-errors-in-inspection. It holds no exception message.
+    /// <see langword="null"/> with no error and for a fixed text that has no code.
+    /// </summary>
+    public string? Problem { get; init; }
+
     /// <summary>The trace id of the run that made the attempt or lookup, or <see langword="null"/> when no span was current.</summary>
     public string? TraceId { get; init; }
 }
