@@ -112,10 +112,11 @@ test.describe('the author builds the asset management application with Studio on
       const dialog = await waitForDialog(page)
       await dialog.getByRole('button', { name: choice, exact: true }).click()
     }
-    await expect(page.getByTestId('studio-saved')).toBeVisible()
+    // The save can take longer than an assertion's timeout on a busy runner, so the answer is awaited first.
     const { diagnostics } = (await (await answer).json()) as {
       diagnostics: { file: string; severity: string }[]
     }
+    await expect(page.getByTestId('studio-saved')).toBeVisible()
     return diagnostics
   }
 

@@ -38,6 +38,12 @@ describe.each(['light', 'dark'] as const)('the Ant Design theme in %s mode', (mo
       onPrimary: token.colorTextLightSolid,
     }).toEqual(colour)
   })
+
+  it('draws Ant Design secondary text in the muted text colour, as it does tertiary text', () => {
+    const token = theme.getDesignToken(antThemeFor(mode))
+    expect(token.colorTextSecondary).toBe(designTokensFor(mode).colour.textMuted)
+    expect(token.colorTextSecondary).toBe(token.colorTextTertiary)
+  })
 })
 
 describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Design theme in %s mode', (mode) => {
@@ -377,6 +383,14 @@ describe('the table theme', () => {
     expect(tableTheme(designTokensFor('light')).components?.Table).toEqual({
       cellPaddingBlock: spacing.xs,
       cellPaddingInline: spacing.lg,
+    })
+  })
+
+  it('pads a compact cell by spacing-sm on each side', () => {
+    const { spacing } = designTokensFor('light')
+    expect(tableTheme(designTokensFor('light'), true).components?.Table).toEqual({
+      cellPaddingBlock: spacing.xs,
+      cellPaddingInline: spacing.sm,
     })
   })
 })
