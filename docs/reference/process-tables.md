@@ -219,7 +219,7 @@ assignee finds the open tasks of a user id or a role name.
 `step`, `staged_revision`) lets a step stage one call per pass of a [loop](process-flow.md#loops).
 Each call attempt row stores the `trace_id` of its attempt, see [Telemetry](../architecture.md#telemetry).
 
-**Request and responses.** _(planned)_ The `request` column keeps the request that the call sent, and each
+**Request and responses.** The `request` column keeps the request that the call sent, and each
 call attempt row keeps its response, as [call input kept](process-inspection.md#call-input-kept) says.
 
 **Paths.** _(planned for M38)_ The unique index is on (`process_instance_id`, `path_id`, `step`,
@@ -241,7 +241,7 @@ and its pass. The index treats a null `path_id`, the root path, as one value.
 | `attempts` | `integer` | The attempts made so far, the first one included. An operator retry resets it to 0 |
 | `lookups` | `integer` | The failed lookups since the call last became `unknown`. It sets the delay before the next lookup. Reset to 0 when the call goes back to `pending` |
 | `input` | `jsonb`, null | The evaluated input, sent again by every retry. Kept after the call settles, but cleared when the call is cancelled. Never copied to history, audit records or logs, and shown only through [inspection](process-inspection.md#values-and-masking) |
-| `request` _(planned)_ | `jsonb`, null | The request the call sent: method, URL, query, headers and body, with every secret as `[secret]`. Kept as [call input kept](process-inspection.md#call-input-kept) says, and shown only through [inspection](process-inspection.md#values-and-masking) |
+| `request` | `jsonb`, null | The request of the call's last attempt that sent one: method, URL, query, headers and body, with every secret as `[secret]` and the body cut at 64 KiB. Null before a request was sent. Kept as [call input kept](process-inspection.md#call-input-kept) says, and shown only through [inspection](process-inspection.md#values-and-masking) |
 | `last_status` | `integer`, null | The HTTP status of the last attempt or lookup. Null when none answered |
 | `last_error` | `text`, null | The error of the last attempt or lookup, such as a timeout. It holds no body, secret, exception message or value |
 | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
@@ -255,8 +255,10 @@ writes its row. A call found still `sending` has no row for its lost attempt, so
 finds it writes that row, with the outcome `unknown`. A unique index on (`call_id`, `kind`, `number`)
 keeps each number once. The call is in one of two tables, so `call_id` has no foreign key.
 
-**Response and problem.** _(planned)_ The `response` column keeps an attempt's response, and `problem` its
-error, as [call input kept](process-inspection.md#call-input-kept) and
+**Response.** The `response` column keeps an attempt's response, as
+[call input kept](process-inspection.md#call-input-kept) says.
+
+**Problem.** _(planned)_ The `problem` column keeps an attempt's error, as
 [step errors](process-inspection.md#step-errors-in-inspection) say.
 
 | Column | Type | Meaning |
@@ -271,7 +273,7 @@ error, as [call input kept](process-inspection.md#call-input-kept) and
 | `outcome` | `text` | For an attempt: `succeeded`, `retryable`, `unknown` or `failed`. For a lookup: `found`, `notFound` or `failed` |
 | `http_status` | `integer`, null | The HTTP status, when one answered. Null for a package call and when none answered |
 | `error` | `text`, null | A fixed text, such as a timeout. It holds no body, no exception message and no secret |
-| `response` _(planned)_ | `jsonb`, null | An attempt's response: status, headers and body as text, with the body cut at a size limit and marked `truncated` |
+| `response` | `jsonb`, null | An attempt's response: status, headers and body as text, with the body cut at 64 KiB and marked `truncated`. Null for a lookup, a package call and an attempt that got no answer |
 | `problem` _(planned)_ | `jsonb`, null | The attempt's error as a code with its values, see [Step errors](process-inspection.md#step-errors-in-inspection). Null with no error |
 | `trace_id` | `text`, null | The 32-hex trace id of the run that made the attempt or lookup. Null when no span was current, and for rows that existed before the column |
 
@@ -283,7 +285,7 @@ error, as [call input kept](process-inspection.md#call-input-kept) and
 [loop](process-flow.md#loops). Each call attempt row stores the `trace_id` of its attempt, see
 [Telemetry](../architecture.md#telemetry).
 
-**Returned values.** _(planned)_ The `returned` column keeps the values the operation returned, under the
+**Returned values.** The `returned` column keeps the values the operation returned, under the
 masking rule of `input`, see [call input kept](process-inspection.md#call-input-kept).
 
 **Paths.** _(planned for M38)_ The unique index is on (`process_instance_id`, `path_id`, `step`,
@@ -307,7 +309,7 @@ masking rule of `input`, see [call input kept](process-inspection.md#call-input-
 | `retry_backoff` | `interval` | The step's backoff, stored when the call is staged |
 | `idempotent` | `boolean` | Whether the operation is `idempotent`, stored when the call is staged |
 | `input` | `jsonb`, null | The evaluated input. Kept while the call is `unknown`, and cleared when it settles or is cancelled. Never copied to history, audit records or logs |
-| `returned` _(planned)_ | `jsonb`, null | The values the operation returned, hidden under the masking rule of `input`. Kept as [call input kept](process-inspection.md#call-input-kept) says |
+| `returned` | `jsonb`, null | The values the operation returned, by output name, once the call succeeds. Hidden under the masking rule of `input`. Kept as [call input kept](process-inspection.md#call-input-kept) says |
 | `last_error` | `text`, null | The error of the last attempt: an exception type or a fixed sentence. It holds no exception message and no value |
 | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
 | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |

@@ -49,8 +49,8 @@ decision replaces D25 and D34 and keeps every part of them that still holds, as 
   is pinned to, the path it took, its tasks, and its connector and package calls with every attempt.
 - **What was sent stays visible.** Each attempt and lookup of a call is kept, and a connector call
   keeps its input after it settles.
-- **A kept request and response.** _(planned)_ A connector call keeps its request and each attempt's
-  response, with the body as text, unchanged. A body longer than a size limit is cut and marked
+- **A kept request and response.** A connector call keeps its request and each attempt's
+  response, with the body as text, unchanged. A body longer than 64 KiB is cut and marked
   `truncated`. Every secret is kept as `[secret]`, under the masking rule of the call's input, and the
   call keeps them for as long as the instance's history. They are never copied to history, audit
   records or logs.
@@ -93,8 +93,8 @@ The detail is in
   [D29](d29-release-pinning-and-text-resources.md) keeps them.
 - A user may see less than they could read field by field, because a partly readable input is hidden
   whole.
-- **An operator sees each call's traffic.** _(planned)_ An operator sees what a call sent and what each
-  attempt answered. Each kept body is bounded by the size limit, which bounds the tenant database's
+- **An operator sees each call's traffic.** An operator sees what a call sent and what each
+  attempt answered. Each kept body is bounded by the 64 KiB limit, which bounds the tenant database's
   growth per call.
 - **A page words each error.** _(planned)_ A page words an error in the reader's language, and a row
   without a code falls back to its stored error.

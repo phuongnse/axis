@@ -197,17 +197,17 @@ in any state. The body has these parts:
   values.
 - `calls` are the connector and package calls of the instance, ordered by
   `createdAt`, then by `id`. Each is
-  `{ "id", "kind", "step", "connector" or "package" with "version" and "idempotent", "operation", "state", "attempts", "input", "inputHidden", "resolvable", "outputs" }`.
+  `{ "id", "kind", "step", "connector" or "package" with "version" and "idempotent", "operation", "state", "attempts", "input", "inputHidden", "request", "returned", "resolvable", "outputs" }`.
   - `kind` is `connector` or `package`. A connector call has `connector`. A
     package call has `package` and `version`, the version its release pins.
   - `state` is the call's state: `pending`, `sending`, `unknown`,
     `succeeded` or `failed`.
   - `attempts` lists the rows of [Attempts](#attempts) for the call, ordered
     by `startedAt`, then by `id`. Each is
-    `{ "kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "traceId" }`,
+    `{ "kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "traceId", "response" }`,
     with `kind` either `attempt` or `lookup`. `traceId` follows [Attempts](#attempts).
   - `input` and `inputHidden` follow [Values and masking](#values-and-masking).
-  - **Output and response.** _(planned)_ A call has no output of its own. The engine writes the outputs
+  - **Output and response.** A call has no output of its own. The engine writes the outputs
     of a call straight to the subject record. Each attempt's `response` is kept, see [Attempts](#attempts).
   - `idempotent` is only on a package call. It is the value stored when the
     engine staged the call, for the inspector's retry warning.
@@ -269,10 +269,15 @@ in any state. The body has these parts:
   `[{ "name", "value", "hidden" }]`, and `made`, a `RunOutput`:
   `{ "changes": [{ "field", "before", "after", "hidden" }], "event": { "name", "fields" }, "notified": { "to", "channels", "subject" }, "created": { "entity", "id" } }`.
   Each part of `made` is `null` when the run did not make it.
-- **Calls.** _(planned)_ A connector call has `request`, `{ "method", "url", "query", "headers", "body", "truncated" }`,
-  and each of its `attempts` has `response`, `{ "status", "headers", "body", "truncated" }`. A package
-  call has `returned`, the values its operation returned. `request`, `response` and `returned` follow the
-  hiding rule of `input`.
+- **Calls.** A connector call has `request`, `{ "method", "url", "query", "headers", "body", "truncated" }`,
+  the request of its last attempt that sent one. `url` is the base URL and the path, with no query string,
+  and `query` and `headers` are objects that map each name to its text. `body` is text, or `null` when the
+  request sent none. Each of its `attempts` has `response`, `{ "status", "headers", "body", "truncated" }`.
+  A package call has `returned`, an object of the values its operation returned, by output name. Every
+  call has `request` and `returned`, and every attempt has `response`, so a value that the kind of call
+  never keeps is `null`: a package call's `request`, a connector call's `returned`, and the `response` of a
+  lookup, of a package attempt and of an attempt that got no answer. A value that the hiding rule of
+  `input` hides is `null` too, so a reader cannot tell the two apart.
 - **Errors.** _(planned)_ `problem` is `{ "code", "values" }` on a path entry and on an attempt, and
   `null` with no error. Its codes are in [step errors](#step-errors-in-inspection).
 - **Paths.** _(planned for M38)_ `revision` is the revision of the root path, which is the instance
@@ -400,8 +405,11 @@ The example shortens the lists. The graph, the path, the tasks, `subjectEntity`,
 same for every user who may inspect the instance. `subjectLabel`, `studio`, a call's `input`,
 `commands`, `parent` and `subProcesses`, and each call's `resolvable` and `outputs` differ between users.
 
-**Values by user.** _(planned)_ The values that the masking rule hides, and a call's `request`,
-`response` and `returned` also differ between users.
+**Values by user.** A call's `request`, `response` and `returned` differ between users too, as the masking
+rule hides them.
+
+**Run values by user.** _(planned)_ The values that the masking rule hides in a run, and in the instance's
+`input` and `result`, differ between users as well.
 
 **Paths and variables.** _(planned for M38)_ The `variables`, and the `commands` of each path and task,
 differ between users too. The rest of `paths` and `tasks` is the same for every user.
@@ -461,10 +469,13 @@ evaluated input that the call sent, so it holds field values.
   input only while the call is `pending` or `unknown`, and clears it when it
   settles, so inspection shows a settled package call with `input` `null` and
   `inputHidden` `false`.
-- **Kept values.** _(planned)_ A call's `request`, each attempt's `response` and a package call's `returned`
-  follow the hiding rule of the call's `input`. So do a run's `read` and `made`, and the instance's `input`
-  and `result`, each over the fields it came from. A hidden `read` or `made` value is `null` with `hidden`
-  `true`. No kept value is copied to history, audit records or logs.
+- **Kept values.** A call's `request`, each attempt's `response` and a package call's `returned` follow the
+  hiding rule of the call's `input`, also when the call no longer stores its input, so a settled package
+  call's `returned` is hidden from the readers who may not see what it was called with. A hidden value is
+  `null`. No kept value is copied to history, audit records or logs.
+- **Kept run values.** _(planned)_ A run's `read` and `made`, and the instance's `input` and `result`, follow
+  the hiding rule too, each over the fields it came from. A hidden `read` or `made` value is `null` with
+  `hidden` `true`.
 - **Variables.** _(planned for M38)_ A variable's `value` is shown only when the user may read every field
   that each expression setting the variable reads. Those expressions are the `set` entries of each
   `setVariables` step that sets it, and the `gather.value` of each repeat that gathers into it, both from
@@ -489,10 +500,16 @@ to history, audit records or logs, and inspection
 shows it only under the [masking rule](#values-and-masking). A package call's input is cleared when
 the call settles, see [Staging a package call](process-execution.md#staging-a-package-call).
 
-**Request and responses.** _(planned)_ A connector call also keeps its request and each attempt's
-response. The body is kept as text, unchanged, up to a size limit. A longer body is cut and marked
-`truncated`. Every secret is kept as `[secret]`. They are kept for as long as the instance's history,
-never copied to history, audit records or logs, and shown only under the [masking rule](#values-and-masking).
+**Request and responses.** A connector call also keeps its request and each attempt's response. The body is
+kept as text, unchanged, up to 64 KiB, which is 65,536 bytes of UTF-8. A longer body is cut at the last whole
+character within the limit and marked `truncated`, for a request and for a response. The call keeps the
+request of its last attempt that sent one, and an attempt that sent nothing leaves it as it was, such as
+one that found no binding or failed to get a token. Its headers are the ones Axis sets, so headers that
+the HTTP stack adds while sending are not kept. Each attempt keeps the response of the outside system, for a
+`2xx` and an error answer alike, and none when no answer came. `Authorization` and the header that the
+connector's auth names are kept as `[secret]`, and so is a response's `Set-Cookie`. They are kept for as
+long as the instance's history, never copied to history, audit records or logs, and shown only under the
+[masking rule](#values-and-masking).
 
 ### Attempts
 
@@ -534,8 +551,9 @@ earlier ones.
   call whose release lacks the step before any attempt was counted.
 - **Content.** A row holds the times, the outcome, the HTTP status and a fixed
   error text. It never holds an exception message or a secret's value.
-- **Response and problem.** _(planned)_ A row also holds the attempt's `response`, see
-  [Call input kept](#call-input-kept), and its `problem`, see [Step errors](#step-errors-in-inspection).
+- **Response.** A row of a connector attempt also holds the attempt's `response`, see
+  [Call input kept](#call-input-kept). A lookup row holds none.
+- **Problem.** _(planned)_ A row also holds the attempt's `problem`, see [Step errors](#step-errors-in-inspection).
 
 ### Step errors in inspection
 

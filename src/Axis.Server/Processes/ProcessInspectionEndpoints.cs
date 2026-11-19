@@ -528,8 +528,10 @@ internal static class ProcessInspectionEndpoints
                         mappings[call.Step] = fields = MappedFields(pinned, pinnedProcess, pinnedSubject, call.Step);
                     }
 
-                    var hidden = call.Input is not null
-                        && (!Readable(active, viewer, fields) || Sensitive(pinned, active, fields));
+                    // The kept request, responses and returned values follow the rule of the input, also when the
+                    // call no longer stores its input, so they use the rule itself and not InputHidden.
+                    var concealed = !Readable(active, viewer, fields) || Sensitive(pinned, active, fields);
+                    var hidden = call.Input is not null && concealed;
                     var outputs = allowsResolve && call.State == ConnectorCalls.Unknown && row.State == ProcessStarts.Waiting && row.Step == call.Step
                         ? DeclaredOutputs(pinned, call, packages)
                         : null;
@@ -552,10 +554,13 @@ internal static class ProcessInspectionEndpoints
                                 attempt.Outcome,
                                 attempt.HttpStatus,
                                 attempt.Error,
-                                attempt.TraceId))
+                                attempt.TraceId,
+                                Kept(attempt.Response, concealed)))
                             .ToList(),
                         call.Input is null || hidden ? null : JsonNode.Parse(call.Input),
                         hidden,
+                        Kept(call.Request, concealed),
+                        Kept(call.Returned, concealed),
                         outputs is not null,
                         outputs);
                 })
@@ -563,6 +568,9 @@ internal static class ProcessInspectionEndpoints
             commands,
             author ? new ProcessStudioAddress(active.Manifest.Name, process.Id) : null);
     }
+
+    // A kept request, response or returned value as JSON, or null when the call keeps none or the reader may not see it.
+    private static JsonNode? Kept(string? json, bool concealed) => json is null || concealed ? null : JsonNode.Parse(json);
 
     // The process in the active release when it exists and the viewer may inspect it, otherwise null.
     private static ProcessModel? InspectableProcess(ApplicationModel application, InspectionViewer viewer, Guid processId) =>
@@ -890,7 +898,10 @@ internal sealed record ProcessInstanceTask(
 /// call has <paramref name="Connector"/> and a package call has <paramref name="Package"/> and
 /// <paramref name="Version"/>. <paramref name="Input"/> is null, and <paramref name="InputHidden"/> true,
 /// when the user may not read every field the step's mapping uses, or when one of them is sensitive
-/// in the pinned or the active release. A package call has <paramref name="Idempotent"/>, as stored when the call was staged.
+/// in the pinned or the active release. <paramref name="Request"/> is the request of a connector call's last sending attempt and
+/// <paramref name="Returned"/> the values a package call's operation returned. Each is null when the call keeps none, and
+/// when the same rule hides it, also for a call that no longer stores its input, so it is not tied to <paramref name="InputHidden"/>.
+/// A package call has <paramref name="Idempotent"/>, as stored when the call was staged.
 /// <paramref name="Resolvable"/> is true when the user holds <c>resolve</c>, the call is <c>unknown</c>, the instance
 /// is <c>waiting</c> on the call's step, and the pinned release or the installed package version declares the
 /// operation. Only then are its declared <paramref name="Outputs"/> listed.
@@ -908,6 +919,8 @@ internal sealed record ProcessInstanceCall(
     IReadOnlyList<ProcessCallAttemptEntry> Attempts,
     JsonNode? Input,
     bool InputHidden,
+    JsonNode? Request,
+    JsonNode? Returned,
     bool Resolvable,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ProcessCallOutput>? Outputs);
 
@@ -917,6 +930,8 @@ internal sealed record ProcessCallOutput(string Name, string Type, bool Required
 /// <summary>
 /// An attempt or reconciliation lookup of a call. <c>Kind</c> is <c>attempt</c> or <c>lookup</c>.
 /// <paramref name="TraceId"/> is the trace id of the run that wrote the row, or null when it stored none.
+/// <paramref name="Response"/> is the response of the outside system, or null when the attempt got none, for a
+/// lookup and a package call, and when the rule that hides the call's input hides it.
 /// </summary>
 internal sealed record ProcessCallAttemptEntry(
     string Kind,
@@ -926,4 +941,5 @@ internal sealed record ProcessCallAttemptEntry(
     string Outcome,
     int? HttpStatus,
     string? Error,
-    string? TraceId);
+    string? TraceId,
+    JsonNode? Response);

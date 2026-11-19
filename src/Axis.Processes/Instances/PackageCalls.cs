@@ -265,19 +265,21 @@ internal static class PackageCalls
     /// <summary>
     /// Settles the call <paramref name="id"/> as <paramref name="state"/>, <c>succeeded</c> or
     /// <c>failed</c>, at the transaction's time, with the last attempt's error. Its stored input is
-    /// cleared.
+    /// cleared. <paramref name="returned"/> is the values the operation returned as JSON text, which
+    /// the call keeps, or <see langword="null"/> when it returned none.
     /// </summary>
     public static async Task SettleAsync(
         NpgsqlTransaction transaction,
         Guid id,
         string state,
         string? lastError,
+        string? returned,
         CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             """
             UPDATE axis.package_calls
-            SET state = @state, last_error = @error, input = NULL, settled_at = now()
+            SET state = @state, last_error = @error, returned = @returned, input = NULL, settled_at = now()
             WHERE id = @id
             """,
             Connection(transaction),
@@ -285,6 +287,7 @@ internal static class PackageCalls
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("state", state);
         command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)lastError ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("returned", NpgsqlDbType.Jsonb) { Value = (object?)returned ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

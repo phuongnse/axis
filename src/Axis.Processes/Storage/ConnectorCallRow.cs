@@ -2,8 +2,8 @@ namespace Axis.Processes.Storage;
 
 /// <summary>
 /// A row of <c>axis.connector_calls</c>: one connector call that a <c>callConnector</c> step
-/// staged. Its id is the call's operation identity. Times use the database clock. No request or
-/// response body is stored.
+/// staged. Its id is the call's operation identity. Times use the database clock. It keeps the
+/// request of its last attempt that sent one, as <see cref="Request"/> says.
 /// </summary>
 public sealed class ConnectorCallRow
 {
@@ -48,6 +48,14 @@ public sealed class ConnectorCallRow
     /// settles. It is never copied to history, audit records or logs.
     /// </summary>
     public string? Input { get; init; }
+
+    /// <summary>
+    /// The request the last attempt that sent one made, as JSON text: <c>method</c>, <c>url</c>,
+    /// <c>query</c>, <c>headers</c>, <c>body</c> and <c>truncated</c>. A secret header is <c>[secret]</c>
+    /// and a body is cut at 64 KiB. It is never copied to history, audit records or logs, and the
+    /// inspection API hides it as it hides <see cref="Input"/>. <see langword="null"/> before a request was sent.
+    /// </summary>
+    public string? Request { get; init; }
 
     /// <summary>The HTTP status of the last attempt or lookup, or <see langword="null"/> when none answered.</summary>
     public int? LastStatus { get; init; }

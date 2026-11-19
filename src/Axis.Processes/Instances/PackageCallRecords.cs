@@ -167,8 +167,8 @@ internal static class PackageCallRecords
 
     /// <summary>
     /// Writes the success in the transaction: the output fields with the record update rules, the call <c>succeeded</c>, the instance
-    /// <c>running</c> on <c>next</c>, the history row, the audit records, the data change triggers from the active release that
-    /// <paramref name="findActive"/> finds, the attempt row and the next step's work item. Returns the error when the record write is
+    /// <c>running</c> on <c>next</c>, with the values <paramref name="returned"/> that it keeps, the history row, the audit records,
+    /// the data change triggers from the active release that <paramref name="findActive"/> finds, the attempt row and the next step's work item. Returns the error when the record write is
     /// refused, or <see langword="null"/>. The caller rolls back on an error.
     /// </summary>
     /// <exception cref="InvalidOperationException">The instance is no longer waiting on the call's step.</exception>
@@ -181,6 +181,7 @@ internal static class PackageCallRecords
         EntityModel? entity,
         PackageOperationStepModel step,
         List<KeyValuePair<FieldModel, object?>> values,
+        JsonObject returned,
         RecordCipher? cipher,
         Func<Guid, CancellationToken, Task<(Guid ReleaseId, ApplicationModel Model)?>> findActive,
         ILogger logger,
@@ -253,7 +254,7 @@ internal static class PackageCallRecords
                 });
         }
 
-        await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Succeeded, null, cancellationToken);
+        await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Succeeded, null, returned.ToJsonString(), cancellationToken);
         await CallAttempts.InsertAsync(transaction, CallAttempts.Package, call.Id, AttemptRow(attempt, CallAttempts.Succeeded, null), Tags(tenantId, attempt), cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
@@ -351,7 +352,7 @@ internal static class PackageCallRecords
             return false;
         }
 
-        await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Failed, error, cancellationToken);
+        await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Failed, error, null, cancellationToken);
         await InsertAttemptAsync(transaction, Tags(tenantId, attempt), call, row, cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,

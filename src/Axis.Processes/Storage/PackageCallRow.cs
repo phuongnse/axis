@@ -2,7 +2,7 @@ namespace Axis.Processes.Storage;
 
 /// <summary>
 /// A row of <c>axis.package_calls</c>: one package operation call that a process step staged. Its
-/// id is the call's operation identity. Times use the database clock. No output is stored.
+/// id is the call's operation identity. Times use the database clock. It keeps the values its operation returned, as <see cref="Returned"/> says.
 /// </summary>
 public sealed class PackageCallRow
 {
@@ -59,6 +59,13 @@ public sealed class PackageCallRow
     /// never copied to history, audit records or logs.
     /// </summary>
     public string? Input { get; init; }
+
+    /// <summary>
+    /// The values the operation returned, as a JSON object keyed by the operation's declared output
+    /// names, kept after the call succeeds. It is never copied to history, audit records or logs, and
+    /// the inspection API hides it as it hides the call's input. <see langword="null"/> before the call succeeds.
+    /// </summary>
+    public string? Returned { get; init; }
 
     /// <summary>The error of the last attempt. It holds no value of the input and no exception message.</summary>
     public string? LastError { get; init; }
