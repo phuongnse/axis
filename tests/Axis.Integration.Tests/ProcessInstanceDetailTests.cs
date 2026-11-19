@@ -399,6 +399,40 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
     }
 
     [Fact]
+    public async Task A_task_completion_that_saves_values_gives_the_field_it_changed_with_the_value_before_and_after()
+    {
+        var department = await fixture.InsertDepartmentAsync(TenantA, "maria");
+        var subject = await fixture.InsertRequestAsync(TenantA, department);
+        var instance = await fixture.StartAsync(TenantA, "Decide", subject);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+        var task = await fixture.TaskIdAsync(TenantA, instance);
+        using (var maria = fixture.CreateClient().SignedInAs("maria"))
+        using (var request = RecordApiFixture.Request(
+            HttpMethod.Post,
+            $"/api/apps/StepApp/tasks/{task:D}/complete",
+            Host(TenantA),
+            """{ "outcome": "approve", "values": { "comment": "Fine" }, "version": 1 }"""))
+        {
+            using var response = await maria.SendAsync(request, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+        using var body = await GetOkAsync(TenantA, "Decide", instance, "maria");
+
+        var path = body.RootElement.GetProperty("path").EnumerateArray().ToList();
+        var completed = Assert.Single(path, entry => entry.GetProperty("step").GetString() == "decide" && entry.GetProperty("decision").ValueKind == JsonValueKind.String);
+        Assert.Equal("approve", completed.GetProperty("decision").GetString());
+        var change = Assert.Single(completed.GetProperty("made").GetProperty("changes").EnumerateArray());
+        Assert.Equal("comment", change.GetProperty("field").GetString());
+        Assert.Equal(JsonValueKind.Null, change.GetProperty("before").ValueKind);
+        Assert.Equal("Fine", change.GetProperty("after").GetString());
+        Assert.False(change.GetProperty("hidden").GetBoolean());
+        var waiting = Assert.Single(path, entry => entry.GetProperty("step").GetString() == "decide" && entry.GetProperty("decision").ValueKind == JsonValueKind.Null);
+        Assert.Equal(JsonValueKind.Null, waiting.GetProperty("made").GetProperty("changes").ValueKind);
+    }
+
+    [Fact]
     public async Task An_update_record_run_gives_each_field_it_changed_with_the_value_before_and_after()
     {
         var subject = await fixture.InsertRequestAsync(TenantA, null);

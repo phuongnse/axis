@@ -10,7 +10,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// A connector call keeps its request and each attempt's response, and a package call the values it returned. The
 /// instance detail gives them to a reader who may read every mapped field: <c>ada</c> does and <c>ines</c> may not
-/// read <c>department.name</c>.
+/// read <c>department.name</c>. A call that writes its outputs gives what it changed in <c>made.changes</c>, which
+/// <c>carl</c> may not read for <c>comment</c>.
 /// </summary>
 public sealed class ProcessCallKeptValuesTests(TaskApiFixture fixture) : IClassFixture<TaskApiFixture>
 {
@@ -160,6 +161,52 @@ public sealed class ProcessCallKeptValuesTests(TaskApiFixture fixture) : IClassF
 
         // The marker is kept in the one place that holds the response.
         Assert.Equal(1L, await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.process_call_attempts WHERE response::text LIKE @pattern", ("pattern", pattern)));
+    }
+
+    [Fact]
+    public async Task A_call_that_writes_its_outputs_gives_the_field_it_changed_with_the_value_before_and_after()
+    {
+        var marker = NewMarker();
+        fixture.Stub.Respond(200, $$"""{"orderNumber":"{{marker}}"}""");
+        var (instance, _, _) = await SendAsync();
+
+        using var detail = await GetDetailAsync("ada", instance);
+
+        var change = Assert.Single(CreateOrderChanges(detail));
+        Assert.Equal(["field", "before", "after", "hidden"], change.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("comment", change.GetProperty("field").GetString());
+        Assert.Equal(JsonValueKind.Null, change.GetProperty("before").ValueKind);
+        Assert.Equal(marker, change.GetProperty("after").GetString());
+        Assert.False(change.GetProperty("hidden").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_reader_who_may_not_read_the_changed_field_gets_its_values_null_and_hidden()
+    {
+        var marker = NewMarker();
+        fixture.Stub.Respond(200, $$"""{"orderNumber":"{{marker}}"}""");
+        var (instance, _, _) = await SendAsync();
+
+        using var detail = await GetDetailAsync("carl", instance);
+
+        var change = Assert.Single(CreateOrderChanges(detail));
+        Assert.Equal("comment", change.GetProperty("field").GetString());
+        Assert.Equal(JsonValueKind.Null, change.GetProperty("before").ValueKind);
+        Assert.Equal(JsonValueKind.Null, change.GetProperty("after").ValueKind);
+        Assert.True(change.GetProperty("hidden").GetBoolean());
+        Assert.DoesNotContain(marker, detail.RootElement.ToString(), StringComparison.Ordinal);
+    }
+
+    // The changes of the createOrder run that succeeded.
+    private static List<JsonElement> CreateOrderChanges(JsonDocument detail)
+    {
+        var run = Assert.Single(
+            detail.RootElement.GetProperty("path").EnumerateArray(),
+            entry => entry.GetProperty("step").GetString() == "createOrder"
+                && entry.GetProperty("output").ValueKind == JsonValueKind.Object
+                && entry.GetProperty("output").TryGetProperty("outcome", out var outcome)
+                && outcome.GetString() == "succeeded");
+        return [.. run.GetProperty("made").GetProperty("changes").EnumerateArray()];
     }
 
     // Stages the call of a new DepartmentOrder instance and sends it to the stub. Returns the instance, the call and the subject.

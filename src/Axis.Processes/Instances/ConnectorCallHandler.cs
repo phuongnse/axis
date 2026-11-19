@@ -964,6 +964,7 @@ internal sealed partial class ConnectorCallHandler(
         var output = new JsonObject { ["operationId"] = call.Id, ["outcome"] = ConnectorCalls.Succeeded, ["next"] = target.Step.Next };
         AuditEntry? recordAudit = null;
         Record? updated = null;
+        JsonArray? changes = null;
         IReadOnlyList<EffectRecord> effects = [];
         var write = new RecordWriteContext(instance.AccountableUser, instance.DecisionTask);
         if (values.Count > 0)
@@ -977,6 +978,7 @@ internal sealed partial class ConnectorCallHandler(
 
             await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, item.TenantId, target.Model, entity!, call.ReleaseId, cancellationToken);
             updated = written;
+            changes = RunValues.Changes(target.Model, entity!, record!, written);
             effects = result.Effects;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
@@ -997,7 +999,7 @@ internal sealed partial class ConnectorCallHandler(
         await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, Tags(item, attempt), cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
-            new StepOccurrence(instance.Id, call.Step, attempt.Revision, input, output, null, null, attempt.StartedAt),
+            new StepOccurrence(instance.Id, call.Step, attempt.Revision, input, output, null, null, attempt.StartedAt, Changes: changes),
             cancellationToken);
         if (recordAudit is not null)
         {

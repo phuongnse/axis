@@ -692,7 +692,7 @@ internal static class ProcessInspectionEndpoints
                 return new ProcessInstanceValue(name, hidden ? null : entry["value"]?.DeepClone(), hidden);
             })];
 
-    // The fields an updateRecord run changed, as the engine kept them, each masked on its own, in the stored order. Null for a run that kept none.
+    // The fields a run that wrote the subject record changed (an updateRecord step, a task completion with values, a call's outputs or a resolve as succeeded), as the engine kept them, each masked on its own, in the stored order. Null for a run that kept none.
     private static IReadOnlyList<ProcessRunChange>? RunChanges(string? json, ApplicationModel pinned, ApplicationModel active, EntityModel? subject, InspectionViewer viewer) =>
         json is null || JsonNode.Parse(json) is not JsonArray stored
             ? null
@@ -1048,8 +1048,8 @@ internal sealed record ProcessPathEntry(
     ProcessRunMade Made);
 
 /// <summary>
-/// What a run made, see "Runs" in docs/reference/process-inspection.md#instance-detail. <paramref name="Changes"/> is the fields an
-/// <c>updateRecord</c> run changed, an empty list when none differed. <paramref name="Event"/>, <paramref name="Notified"/> and
+/// What a run made, see "Runs" in docs/reference/process-inspection.md#instance-detail. <paramref name="Changes"/> is the fields a run that wrote the
+/// subject record changed (an <c>updateRecord</c> step, a task completion with values, a call's outputs or a resolve as succeeded), an empty list when none differed. <paramref name="Event"/>, <paramref name="Notified"/> and
 /// <paramref name="Created"/> are null until a run's event, notification and created record are built.
 /// </summary>
 internal sealed record ProcessRunMade(IReadOnlyList<ProcessRunChange>? Changes, JsonNode? Event, JsonNode? Notified, JsonNode? Created);

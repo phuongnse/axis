@@ -90,6 +90,23 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
     }
 
     [Fact]
+    public async Task A_sum_call_keeps_the_total_it_changed_with_the_value_before_and_after()
+    {
+        var tenant = fixture.Tenant;
+        var (_, instanceId) = await fixture.StageAsync("PackageSum", CancellationToken);
+
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync(CancellationToken));
+
+        var stored = (string)(await tenant.ScalarAsync(
+            "SELECT changes::text FROM axis.process_step_history WHERE process_instance_id = @id AND output->>'outcome' = 'succeeded'",
+            ("id", instanceId)))!;
+        var change = Assert.Single(JsonNode.Parse(stored)!.AsArray())!;
+        Assert.Equal("total", change["field"]!.GetValue<string>());
+        Assert.Null(change["before"]);
+        Assert.Equal(5L, change["after"]!.GetValue<long>());
+    }
+
+    [Fact]
     public async Task Staging_leaves_the_instance_waiting_and_the_call_pending_with_a_history_row_and_one_audit_record()
     {
         var tenant = fixture.Tenant;

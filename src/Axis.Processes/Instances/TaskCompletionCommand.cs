@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Core.Telemetry;
 using Axis.Data.Records;
@@ -145,6 +146,7 @@ public static class TaskCompletionCommand
         IReadOnlyList<string> fields = [];
         Record? previous = null;
         Record? updated = null;
+        JsonArray? changes = null;
         IReadOnlyList<EffectRecord> effects = [];
         var write = new RecordWriteContext(actor.Id, task.Id);
         if (body.Input is { } input)
@@ -198,6 +200,7 @@ public static class TaskCompletionCommand
             await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, tenantId, release, entity, task.ReleaseId, cancellationToken);
             previous = stored;
             updated = written;
+            changes = RunValues.Changes(release, entity, stored, written);
             effects = result.Effects;
             readVersion = stored.Version;
             writtenVersion = written.Version;
@@ -231,7 +234,7 @@ public static class TaskCompletionCommand
         await ProcessTasks.ResumeAsync(
             transaction,
             task,
-            new TaskCompletion(outcome.Name, outcome.Next, actor.Id, readVersion, writtenVersion, fields),
+            new TaskCompletion(outcome.Name, outcome.Next, actor.Id, readVersion, writtenVersion, fields, changes),
             tenantId,
             cancellationToken);
 

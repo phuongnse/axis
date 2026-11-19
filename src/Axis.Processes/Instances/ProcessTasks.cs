@@ -267,7 +267,8 @@ public static class ProcessTasks
                 output,
                 completion.Outcome,
                 null,
-                await RecordQueries.TransactionTimeAsync(connection, cancellationToken)),
+                await RecordQueries.TransactionTimeAsync(connection, cancellationToken),
+                Changes: completion.Changes),
             cancellationToken);
         await AuditRecords.AppendAsync(
             transaction,
@@ -305,13 +306,15 @@ public static class ProcessTasks
 /// <param name="SubjectVersion">The subject record version the values were written over, or <see langword="null"/> when no values were written.</param>
 /// <param name="WrittenVersion">The subject record version the values wrote, or <see langword="null"/> when no values were written.</param>
 /// <param name="Fields">The declared names of the fields the completion set, in declaration order.</param>
+/// <param name="Changes">The subject fields the completion's values changed, see <c>RunValues.Changes</c>, or <see langword="null"/> when no values were written.</param>
 public sealed record TaskCompletion(
     string Outcome,
     string Next,
     string UserId,
     long? SubjectVersion,
     long? WrittenVersion,
-    IReadOnlyList<string> Fields);
+    IReadOnlyList<string> Fields,
+    JsonArray? Changes = null);
 
 /// <summary>A task that a <c>task</c> step creates for its instance.</summary>
 /// <param name="AssigneeKind"><c>user</c> or <c>role</c>.</param>

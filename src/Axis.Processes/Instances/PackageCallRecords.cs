@@ -225,6 +225,7 @@ internal static class PackageCallRecords
         var output = new JsonObject { ["operationId"] = call.Id, ["outcome"] = PackageCalls.Succeeded, ["next"] = step.Next };
         AuditEntry? recordAudit = null;
         Record? updated = null;
+        JsonArray? changes = null;
         IReadOnlyList<EffectRecord> effects = [];
         var write = new RecordWriteContext(instance.AccountableUser, instance.DecisionTask);
         if (values.Count > 0)
@@ -238,6 +239,7 @@ internal static class PackageCallRecords
 
             await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, tenantId, model, entity!, call.ReleaseId, cancellationToken);
             updated = written;
+            changes = RunValues.Changes(model, entity!, record!, written);
             effects = result.Effects;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
@@ -258,7 +260,7 @@ internal static class PackageCallRecords
         await CallAttempts.InsertAsync(transaction, CallAttempts.Package, call.Id, AttemptRow(attempt, CallAttempts.Succeeded, null), Tags(tenantId, attempt), cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
-            new StepOccurrence(instance.Id, call.Step, attempt.Revision, input, output, null, null, attempt.StartedAt),
+            new StepOccurrence(instance.Id, call.Step, attempt.Revision, input, output, null, null, attempt.StartedAt, Changes: changes),
             cancellationToken);
         if (recordAudit is not null)
         {
