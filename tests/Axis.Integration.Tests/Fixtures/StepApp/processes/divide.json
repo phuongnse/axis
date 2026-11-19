@@ -9,7 +9,8 @@
     {
       "name": "check",
       "type": "decision",
-      "branches": [{ "name": "branch1", "when": "round(amount / divisor, divisor) > 1", "next": "done" }],
+      "label": { "textKey": "request.check" },
+      "branches": [{ "name": "branch1", "label": { "textKey": "request.check.divided" }, "when": "round(amount / divisor, divisor) > 1", "next": "done" }],
       "otherwise": "done"
     },
     { "name": "done", "type": "end" }

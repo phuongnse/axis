@@ -203,7 +203,6 @@
               "message": false,
               "open": false,
               "next": false,
-              "label": false,
               "assignee": false,
               "form": false,
               "dueIn": false,
@@ -258,7 +257,6 @@
               "parameters": false,
               "branches": false,
               "otherwise": false,
-              "label": false,
               "assignee": false,
               "form": false,
               "dueIn": false,
@@ -292,7 +290,6 @@
               "channels": false,
               "message": false,
               "open": false,
-              "label": false,
               "assignee": false,
               "form": false,
               "dueIn": false,
@@ -329,7 +326,6 @@
               "message": false,
               "open": false,
               "next": false,
-              "label": false,
               "assignee": false,
               "form": false,
               "dueIn": false,
@@ -366,7 +362,6 @@
               "channels": false,
               "message": false,
               "open": false,
-              "label": false,
               "assignee": false,
               "form": false,
               "dueIn": false,
@@ -400,7 +395,6 @@
               "channels": false,
               "message": false,
               "open": false,
-              "label": false,
               "assignee": false,
               "form": false,
               "dueIn": false,
@@ -544,7 +538,8 @@
       "properties": {
         "name": { "$ref": "#/$defs/name" },
         "when": { "type": "string", "minLength": 1, "x-axis-expression": true },
-        "next": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "step", "of": "/name" } }
+        "next": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "step", "of": "/name" } },
+        "label": { "$ref": "#/$defs/textReference" }
       }
     },
     "assignee": {

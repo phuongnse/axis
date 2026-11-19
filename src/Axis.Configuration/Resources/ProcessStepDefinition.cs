@@ -122,7 +122,7 @@ public sealed record ProcessStepDefinition
     /// <summary>The step an operation, <c>subProcess</c>, <c>timer</c> or <c>waitEvent</c> step leads to, or null for any other step.</summary>
     public string? Next { get; init; }
 
-    /// <summary>The label of a task, shown in the task inbox and on the task page, or null for any other step.</summary>
+    /// <summary>The label of the step. A task must have one: it is shown in the task inbox and on the task page. Any other step may have one, or null.</summary>
     public TextReference? Label { get; init; }
 
     /// <summary>Who a task is assigned to, or null for any other step.</summary>

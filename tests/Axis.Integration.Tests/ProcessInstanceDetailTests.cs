@@ -90,10 +90,17 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal("approve", graph.GetProperty("start").GetString());
         var steps = graph.GetProperty("steps").EnumerateArray().ToList();
         Assert.Equal(["approve", "done"], steps.Select(step => step.GetProperty("name").GetString()));
-        Assert.Equal(["name", "type", "labelKey", "transitions"], steps[0].EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["name", "type", "labelKey", "event", "eventLabelKey", "transitions"], steps[0].EnumerateObject().Select(property => property.Name));
         Assert.Equal("task", steps[0].GetProperty("type").GetString());
         Assert.Equal("request.approve", steps[0].GetProperty("labelKey").GetString());
         Assert.Equal([("done", "approve")], Transitions(steps[0]));
+        var outcome = Assert.Single(steps[0].GetProperty("transitions").EnumerateArray());
+        Assert.Equal(["next", "on", "branch", "labelKey", "after"], outcome.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("task.approve", outcome.GetProperty("labelKey").GetString());
+        Assert.Equal(JsonValueKind.Null, outcome.GetProperty("branch").ValueKind);
+        Assert.Equal(JsonValueKind.Null, outcome.GetProperty("after").ValueKind);
+        Assert.Equal(JsonValueKind.Null, steps[0].GetProperty("event").ValueKind);
+        Assert.Equal(JsonValueKind.Null, steps[0].GetProperty("eventLabelKey").ValueKind);
         Assert.Equal("end", steps[1].GetProperty("type").GetString());
         Assert.Equal(JsonValueKind.Null, steps[1].GetProperty("labelKey").ValueKind);
         Assert.Empty(steps[1].GetProperty("transitions").EnumerateArray());
@@ -241,10 +248,36 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal("check", root.GetProperty("graph").GetProperty("start").GetString());
         Assert.Equal("decision", steps[0].GetProperty("type").GetString());
         Assert.Equal([("done", "0"), ("done", "otherwise")], Transitions(steps[0]));
+        Assert.Equal("request.check", steps[0].GetProperty("labelKey").GetString());
+        var transitions = steps[0].GetProperty("transitions").EnumerateArray().ToList();
+        Assert.Equal("branch1", transitions[0].GetProperty("branch").GetString());
+        Assert.Equal("request.check.divided", transitions[0].GetProperty("labelKey").GetString());
+        Assert.Equal(JsonValueKind.Null, transitions[1].GetProperty("branch").ValueKind);
+        Assert.Equal(JsonValueKind.Null, transitions[1].GetProperty("labelKey").ValueKind);
         Assert.Equal("end", steps[1].GetProperty("type").GetString());
         Assert.Empty(steps[1].GetProperty("transitions").EnumerateArray());
         Assert.Empty(root.GetProperty("path").EnumerateArray());
         Assert.Empty(root.GetProperty("tasks").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_wait_event_graph_gives_its_event_and_the_timeout_after()
+    {
+        var instance = await StartAndRunAsync(TenantA, "WaitEvent");
+
+        using var body = await GetOkAsync(TenantA, "WaitEvent", instance);
+
+        var steps = body.RootElement.GetProperty("graph").GetProperty("steps").EnumerateArray().ToList();
+        var wait = steps[0];
+        Assert.Equal("waitEvent", wait.GetProperty("type").GetString());
+        Assert.Equal("request.await", wait.GetProperty("labelKey").GetString());
+        Assert.Equal("RequestNoted", wait.GetProperty("event").GetString());
+        Assert.Equal(JsonValueKind.Null, wait.GetProperty("eventLabelKey").ValueKind);
+        Assert.Equal([("done", (string?)null), ("timedOut", "timeout")], Transitions(wait));
+        var transitions = wait.GetProperty("transitions").EnumerateArray().ToList();
+        Assert.Equal(JsonValueKind.Null, transitions[0].GetProperty("after").ValueKind);
+        Assert.Equal("PT1H", transitions[1].GetProperty("after").GetString());
+        Assert.Equal(JsonValueKind.Null, steps[1].GetProperty("event").ValueKind);
     }
 
     [Fact]

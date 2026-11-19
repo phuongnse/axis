@@ -220,7 +220,7 @@ and operations, and where each is described:
 | `repeat`                                                | _(planned for M38)_ Runs its body for each item, a number of times, while or until a condition | [Repeat step](process-blocks.md#repeat-step) |
 | `end`                                                   | Completes the instance                                               | Below                                                            |
 
-- **Labels.** _(planned)_ Every step may have an optional `label`, a text resource, and so may each
+- **Labels.** Every step may have an optional `label`, a text resource, and so may each
   `branches[]` entry of a decision. A task's `label` and each outcome's `label` stay required.
 - **`decision`.** `branches` is an ordered list, and each branch has a `name`, a `when` expression
   and a `next` step. A branch name is unique in its decision, ignoring letter case. The branches are
@@ -399,8 +399,8 @@ Each code is in the [diagnostic code table](diagnostic-codes.md).
   [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
 - A step has the properties of its type and no others, as the table below says (`AXC0004`). `to`,
   `channels`, `message` and `open` are on a `notify` step only, `process`, `subject` and `parameters`
-  on a `subProcess` step only, and the task properties are `label`, `assignee`, `form`, `dueIn` and
-  `outcomes`.
+  on a `subProcess` step only, the task properties are `assignee`, `form`, `dueIn` and
+  `outcomes`, and `label` is a property of every step.
 - A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at `/steps/{i}/assignee`). A
   `role` is a non-empty name (`AXC0004`) that names a declared [role](roles-and-policies.md),
   compared exactly, otherwise it is `AXC0089` at `/steps/{i}/assignee/role`. A name whose role file
@@ -422,10 +422,10 @@ Each code is in the [diagnostic code table](diagnostic-codes.md).
 - **SLAs** _(planned for M39)_. A process may declare `slas`, see [SLAs](working-time.md#slas).
 - Outcome names are unique within the step, ignoring letter case (`AXC0085` at
   `/steps/{i}/outcomes/{j}/name`).
-- The `startCondition` message's text key, each task `label`'s and each outcome `label`'s exist,
-  checked like other labels (`AXC0028`).
-- **Labels.** _(planned)_ `label` is a property of every step type and of a decision branch, not of a
-  task only. Each key joins the `AXC0028` check.
+- The `startCondition` message's text key, each step `label`'s, each decision branch `label`'s and
+  each outcome `label`'s exist, checked like other labels (`AXC0028` at
+  `/steps/{i}/label/textKey`, `/steps/{i}/branches/{j}/label/textKey` and
+  `/steps/{i}/outcomes/{j}/label/textKey`).
 - Every expression gets the usual syntax, type and cost diagnostics, see
   [Diagnostics](expressions.md#diagnostics).
 - **Blocks.** _(planned for M38)_ A `parallel` or `repeat` step is checked as
@@ -458,12 +458,12 @@ Each code is in the [diagnostic code table](diagnostic-codes.md).
 | `task`                      | `label`, `assignee`, `form` and at least one outcome | `branches`, `otherwise`, `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields`, `next`                |
 | `end`                       | Nothing more                                     | `next`, `branches`, `otherwise`, `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields`, `wait`, `until` and the task properties |
 | `timer`                     | `next`                                           | `branches`, `otherwise`, `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields` and the task properties |
-| `waitEvent`                 | `event` and `next`                               | Any property but `when` and `timeout`                                                                                                    |
+| `waitEvent`                 | `event` and `next`                               | Any property but `label`, `when` and `timeout`                                                                                           |
 | _(planned for M38)_ `parallel`                 | `branches` and `next`                            | Any property but `branches`, `completion` and `next`                                                                                     |
 | _(planned for M38)_ `repeat`                   | Exactly one of `forEach`, `times`, `while` and `until`, with `start`, `steps` and `next` | Any property not listed in [Repeat step](process-blocks.md#repeat-step)                  |
 | _(planned for M38)_ `operation` with `setVariables` | `set` with at least one variable and `next`  | `branches`, `otherwise`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields` and the task properties |
 | _(planned for M38)_ `waitEvent` with `events`  | `events`                                         | Any property but `events` and `timeout`                                                                                                  |
-| `subProcess`                | `process` and `next`                             | Any property but `subject` and `parameters`                                                                                              |
+| `subProcess`                | `process` and `next`                             | Any property but `label`, `subject` and `parameters`                                                                                     |
 
 - **Error paths and skip.** _(planned for M38)_ Every step but `end` may have `onError`, see
   [Error paths](#error-paths). An `end` in a repeat body may have `skip`, see

@@ -54,7 +54,11 @@ public sealed record ProcessParameterModel(string Name, FieldType Type);
 public sealed record ProcessStartConditionModel(ExpressionModel Expression, TextReference Message);
 
 /// <summary>A step of a process.</summary>
-public abstract record ProcessStepModel(string Name);
+public abstract record ProcessStepModel(string Name)
+{
+    /// <summary>The step's label, or null when it has none. A task always has one.</summary>
+    public TextReference? Label { get; init; }
+}
 
 /// <summary>
 /// A decision: its branches are evaluated in order and the first one that is true is taken. A
@@ -62,8 +66,12 @@ public abstract record ProcessStepModel(string Name);
 /// </summary>
 public sealed record DecisionStepModel(string Name, IReadOnlyList<DecisionBranchModel> Branches, string Otherwise) : ProcessStepModel(Name);
 
-/// <summary>A branch of a decision: its boolean condition and the declared name of the step it leads to.</summary>
-public sealed record DecisionBranchModel(ExpressionModel When, string Next);
+/// <summary>A branch of a decision: its declared name, its boolean condition, the declared name of the step it leads to and its label, or null.</summary>
+public sealed record DecisionBranchModel(string Name, ExpressionModel When, string Next)
+{
+    /// <summary>The label of the branch, or null when it has none.</summary>
+    public TextReference? Label { get; init; }
+}
 
 /// <summary>
 /// A human task: a person assigned through <see cref="Assignee"/> completes it on
@@ -74,13 +82,20 @@ public sealed record DecisionBranchModel(ExpressionModel When, string Next);
 /// </summary>
 public sealed record TaskStepModel(
     string Name,
-    TextReference Label,
     TaskAssigneeModel Assignee,
     FormReference Form,
     TimeSpan? DueIn,
     IReadOnlyList<TaskOutcomeModel> Outcomes,
     TaskDeadlineModel? Deadline,
-    IReadOnlyList<TaskEscalationModel> Escalations) : ProcessStepModel(Name);
+    IReadOnlyList<TaskEscalationModel> Escalations) : ProcessStepModel(Name)
+{
+    /// <summary>The label of the task, shown in the task inbox and on the task page. It is the step's <see cref="ProcessStepModel.Label"/>, which a task always has.</summary>
+    public new required TextReference Label
+    {
+        get => base.Label!;
+        init => base.Label = value;
+    }
+}
 
 /// <summary>
 /// The assignee of a task: exactly one of <see cref="User"/>, a <c>text</c> expression over the
@@ -152,8 +167,11 @@ public sealed record TimerStepModel(string Name, TimeSpan? Wait, ExpressionModel
 /// </summary>
 public sealed record WaitEventStepModel(string Name, string Event, ExpressionModel? When, WaitTimeoutModel? Timeout, string Next) : ProcessStepModel(Name);
 
-/// <summary>The timeout of a <see cref="WaitEventStepModel"/>: how long the wait lasts and the step taken when it runs out.</summary>
-public sealed record WaitTimeoutModel(TimeSpan After, string Next);
+/// <summary>
+/// The timeout of a <see cref="WaitEventStepModel"/>: how long the wait lasts, the duration's text as the process file writes it
+/// (<see cref="AfterText"/>, such as <c>PT1H</c>) and the step taken when it runs out.
+/// </summary>
+public sealed record WaitTimeoutModel(TimeSpan After, string AfterText, string Next);
 
 /// <summary>
 /// An <c>updateRecord</c> operation step: it sets each field in

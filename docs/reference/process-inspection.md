@@ -158,15 +158,21 @@ in any state. The body has these parts:
     not apply. The `inspect` grant alone decides. The user may still get `404`
     when they open a child whose subject record they may not read.
 - `graph` is the graph of the release the instance is pinned to:
-  `{ "start", "steps": [ { "name", "type", "labelKey", "transitions" } ] }`.
+  `{ "start", "steps": [ { "name", "type", "labelKey", "event", "eventLabelKey", "transitions" } ] }`.
   - `type` is the step type: `decision`, `task`, `operation`, `timer`, `waitEvent` or `end`.
-  - `labelKey` is the step's label text key, or `null` when it has none.
-  - `transitions` is a list of `{ "next", "on" }`, one for each step the step
+  - `labelKey` is the key of the step's `label`, or `null` when it has none.
+  - `event` is a `waitEvent` step's event name. `eventLabelKey` is the key of the event's `label`, and
+    is always `null`, since an event has no label. Both are `null` for any other step.
+  - `transitions` is a list of `{ "next", "on", "branch", "labelKey", "after" }`, one for each step the step
     can lead to. `on` is always text or `null`. It is the zero-based index of
     a decision branch as text, such as `"0"`, as in the history's `decision`,
     then `"otherwise"` for the fallback branch, the name of a task outcome, or
     `null` for the `next` of an operation, a `subProcess`, a timer or a `waitEvent`. A `waitEvent`
     step's timeout transition has `"timeout"`. An `end` step has none.
+  - A transition's `labelKey` is the key of the `label` of its decision branch or task outcome, or `null`.
+    `branch` is the decision branch's name, and `null` for the fallback and every other transition.
+    `after` is the timeout's duration as the process file writes it, such as `PT1H`, on a `waitEvent`
+    step's `timeout` transition, and `null` on every other transition.
   - A `callConnector`, package, `raiseEvent` and `subProcess` step have type `operation`.
   - **Blocks.** _(planned for M38)_ The steps inside a block follow the block in list order, after it. Each step
     has `block`, the name of its block step, and `branch`, the name of its branch, or `null` in a repeat. A block's
@@ -235,11 +241,6 @@ in any state. The body has these parts:
   `null` for a process with no subject. Its `subjectLabel` and `releaseNumber` are as the
   [instance list](#instance-list) defines them. With `subjectId`, `subjectEntity` addresses the subject record, see
   [routing](frontend.md#routing).
-- **Labels.** _(planned)_ Each `graph` step's `labelKey` is the key of its `label`, or `null`. Each
-  transition's `labelKey` is the key of its outcome's or branch's `label`, or `null`. A `waitEvent` step
-  has `event`, the event's name, and `eventLabelKey`, the key of the event's `label`, or `null`. A decision
-  branch's transition has `branch`, the branch's name, and the fallback's and every other transition's is `null`.
-  A `waitEvent` step's `timeout` transition has `after`, the timeout's duration as the process file writes it.
 - **Who started it.** `startedBy` is `{ "kind", "name", "id", "via" }`. `kind` is `person`,
   `trigger`, `endpoint`, `schedule` or `parent`. `name` is the person's name, the resource's name for a
   trigger, endpoint or schedule, or the parent process's name for `parent`. `id` is the user's id, or the
@@ -320,18 +321,22 @@ in any state. The body has these parts:
         "name": "managerApproval",
         "type": "task",
         "labelKey": "purchaseRequest.managerApproval",
+        "event": null,
+        "eventLabelKey": null,
         "transitions": [
-          { "next": "registerPurchase", "on": "approve" },
-          { "next": "done", "on": "reject" }
+          { "next": "registerPurchase", "on": "approve", "branch": null, "labelKey": "task.approve", "after": null },
+          { "next": "done", "on": "reject", "branch": null, "labelKey": "task.reject", "after": null }
         ]
       },
       {
         "name": "registerPurchase",
         "type": "operation",
         "labelKey": null,
-        "transitions": [{ "next": "done", "on": null }]
+        "event": null,
+        "eventLabelKey": null,
+        "transitions": [{ "next": "done", "on": null, "branch": null, "labelKey": null, "after": null }]
       },
-      { "name": "done", "type": "end", "labelKey": null, "transitions": [] }
+      { "name": "done", "type": "end", "labelKey": null, "event": null, "eventLabelKey": null, "transitions": [] }
     ]
   },
   "path": [
