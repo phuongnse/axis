@@ -363,4 +363,5 @@ public static class DiagnosticCodes
     public const string RemovedFieldStillRead = "AXC0375";
     public const string MissingContractLabel = "AXC0376";
     public const string AcceptConflict = "AXC0377";
+    public const string InvalidRecordPage = "AXC0396";
 }

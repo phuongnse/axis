@@ -658,6 +658,60 @@ public sealed class PresentationCompilerTests
         Assert.Null(result.Model);
     }
 
+    private const string OrderDetailId = "55555555-5555-4555-8555-555555555554";
+
+    private const string OrderDetailPage = """{ "type": "detail", "name": "detail", "entity": "Order", "record": "order" }""";
+
+    // A detail's record is a reference, and a reference needs an entity with a display field.
+    private static string OrderWithDisplayField => Order.Replace("\"formatVersion\": 1,", "\"formatVersion\": 1, \"displayField\": \"number\",", StringComparison.Ordinal);
+
+    private const string OrderParameter = """{ "name": "order", "type": "reference", "target": "Order", "required": true }""";
+
+    [Theory]
+    [InlineData("""{ "Invoice": "OrderForm" }""", "/recordPages/Invoice")]
+    [InlineData("""{ "Order": "Missing" }""", "/recordPages/Order")]
+    [InlineData("""{ "Order": "Orders" }""", "/recordPages/Order")]
+    [InlineData("""{ "Order": "CustomerForm" }""", "/recordPages/Order")]
+    [InlineData("""{ "Order": "NoteDetail" }""", "/recordPages/Order")]
+    [InlineData("""{ "Order": "OrderForm", "order": "OrderForm" }""", "/recordPages/order")]
+    public void A_record_page_that_cannot_open_its_entitys_records_is_reported(string recordPages, string path)
+    {
+        using var folder = Folder()
+            .With("entities/order.json", OrderWithDisplayField)
+            .With("sites/sales.json", Site(recordPages: recordPages))
+            // A form page declares no parameters, so only a detail page can have a required one besides its record.
+            .With("pages/note-detail.json", Page("NoteDetail", OrderDetailPage, "55555555-5555-4555-8555-555555555555", "orderForm.title", $$"""{{OrderParameter}}, { "name": "note", "type": "text", "required": true }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidRecordPage, "sites/sales.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_record_page_naming_a_form_page_and_a_detail_page_compiles_into_the_site_model()
+    {
+        using var folder = Folder()
+            .With("entities/order.json", OrderWithDisplayField)
+            .With("sites/sales.json", Site(recordPages: """{ "Order": "OrderDetail", "Customer": "CustomerForm" }"""))
+            .With("pages/order-detail.json", Page("OrderDetail", OrderDetailPage, OrderDetailId, "orderForm.title", OrderParameter));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var site = Assert.Single(result.Model.Sites);
+        var order = Assert.Single(result.Model.Entities, entity => entity.Name == "Order");
+        var customer = Assert.Single(result.Model.Entities, entity => entity.Name == "Customer");
+        Assert.Equal(
+            [
+                new SiteRecordPageModel(new EntityReference(order.Id, "Order"), new PageReference(Guid.Parse(OrderDetailId), "OrderDetail")),
+                new SiteRecordPageModel(new EntityReference(customer.Id, "Customer"), new PageReference(Guid.Parse("55555555-5555-4555-8555-555555555553"), "CustomerForm")),
+            ],
+            site.RecordPages);
+    }
+
     /// <summary>A folder that compiles: a site whose navigation opens a table page of orders, and form pages for orders and customers.</summary>
     internal static TemporaryFolder Folder() =>
         new TemporaryFolder()
@@ -680,10 +734,11 @@ public sealed class PresentationCompilerTests
         string locales = """ "default": "en", "fallback": "en", "available": ["en"] """,
         string navigationPage = "Orders",
         string navigationKey = "nav.orders",
-        string? navigationIcon = null) =>
+        string? navigationIcon = null,
+        string? recordPages = null) =>
         $$"""
         { "id": "{{id}}", "kind": "site", "name": "{{name}}", "formatVersion": 1, "path": "{{path}}",
-          "title": { "textKey": "{{titleKey}}" },{{(descriptionKey is null ? "" : $" \"description\": {{ \"textKey\": \"{descriptionKey}\" }},")}} "locales": { {{locales}} },
+          "title": { "textKey": "{{titleKey}}" },{{(recordPages is null ? "" : $" \"recordPages\": {recordPages},")}}{{(descriptionKey is null ? "" : $" \"description\": {{ \"textKey\": \"{descriptionKey}\" }},")}} "locales": { {{locales}} },
           "navigation": [ { "page": "{{navigationPage}}", "label": { "textKey": "{{navigationKey}}" }{{(navigationIcon is null ? "" : $", \"icon\": \"{navigationIcon}\"")}} } ] }
         """;
 

@@ -61,7 +61,7 @@ internal static class PresentationChecker
         var firstFileByPath = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var site in loaded.Sites)
         {
-            CheckSite(site, loaded, findPage, moduleReferences, references, textLocales, firstFileByPath, diagnostics);
+            CheckSite(site, loaded, findEntity, findPage, findForm, moduleReferences, references, textLocales, firstFileByPath, diagnostics);
         }
     }
 
@@ -1521,7 +1521,9 @@ internal static class PresentationChecker
     private static void CheckSite(
         SiteResource site,
         ApplicationLoadResult loaded,
+        Func<string, EntityResource?> findEntity,
         Func<string, PageResource?> findPage,
+        Func<string, FormResource?> findForm,
         ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         HashSet<string> textLocales,
@@ -1581,6 +1583,84 @@ internal static class PresentationChecker
                     DiagnosticCodes.UnknownNavigationPage,
                     $"The page '{entry.Page}' was not found. No loaded page has that name.",
                     $"{path}/page");
+            }
+        }
+
+        CheckRecordPages(site, loaded, findEntity, findPage, findForm, moduleReferences, Report);
+    }
+
+    /// <summary>
+    /// Checks a site's <c>recordPages</c>: each key names a loaded entity that no earlier key names,
+    /// ignoring letter case, and each value names a loaded page with a <c>form</c> or <c>detail</c> widget over
+    /// that entity, whose only required parameter is the detail's <c>record</c>.
+    /// </summary>
+    private static void CheckRecordPages(
+        SiteResource site,
+        ApplicationLoadResult loaded,
+        Func<string, EntityResource?> findEntity,
+        Func<string, PageResource?> findPage,
+        Func<string, FormResource?> findForm,
+        ModuleReferences moduleReferences,
+        Action<string, string, string> report)
+    {
+        if (site.RecordPages is null)
+        {
+            return;
+        }
+
+        var named = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in site.RecordPages)
+        {
+            var path = $"/recordPages/{ModuleChecker.Escape(key)}";
+            void Invalid(string message) => report(DiagnosticCodes.InvalidRecordPage, message, path);
+
+            var entity = moduleReferences.Find(key, findEntity);
+            if (entity is null)
+            {
+                if (!loaded.UnloadedEntityNames.Contains(key) && !moduleReferences.ReportUndeclared(key, path, report))
+                {
+                    Invalid($"The entity '{key}' was not found. No loaded entity has that name.");
+                }
+
+                continue;
+            }
+
+            if (!named.Add(entity.Name))
+            {
+                Invalid($"The entity '{entity.Name}' already has a record page. Name it once.");
+                continue;
+            }
+
+            var page = moduleReferences.Find(value, findPage);
+            if (page is null)
+            {
+                if (!loaded.UnloadedPageNames.Contains(value) && !moduleReferences.ReportUndeclared(value, path, report))
+                {
+                    Invalid($"The page '{value}' was not found. No loaded page has that name.");
+                }
+
+                continue;
+            }
+
+            // A form widget over a form shows the form's entity.
+            var leaf = Leaves(page.Widgets).FirstOrDefault(widget =>
+                WidgetTypes.Parse(widget.Type) is WidgetType.Form or WidgetType.Detail
+                && (widget.Form is { } formName ? findForm(formName)?.Entity : widget.Entity) is { } name
+                && findEntity(name) is { } shown
+                && string.Equals(shown.Name, entity.Name, StringComparison.OrdinalIgnoreCase));
+            if (leaf is null)
+            {
+                Invalid($"The page '{page.Name}' has no form or detail widget over '{entity.Name}'.");
+                continue;
+            }
+
+            // Only a detail's record is filled from the address, so no other parameter may be required.
+            var record = WidgetTypes.Parse(leaf.Type) == WidgetType.Detail ? leaf.Record : null;
+            var other = page.Parameters.FirstOrDefault(parameter =>
+                parameter.Required == true && !string.Equals(parameter.Name, record, StringComparison.OrdinalIgnoreCase));
+            if (other is not null)
+            {
+                Invalid($"The page '{page.Name}' has the required parameter '{other.Name}', which a record page cannot fill. Only a detail's 'record' may be required.");
             }
         }
     }

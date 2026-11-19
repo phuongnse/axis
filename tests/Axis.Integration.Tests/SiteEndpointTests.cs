@@ -105,7 +105,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         using var site = await GetJsonAsync("/api/sites/RECORDS", HostA);
 
         var root = site.RootElement;
-        Assert.Equal(["path", "titleKey", "locales", "navigation", "notificationsPath", "legal"], root.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["path", "titleKey", "locales", "navigation", "notificationsPath", "recordPages", "legal"], root.EnumerateObject().Select(property => property.Name));
         Assert.Equal("records", root.GetProperty("path").GetString());
         Assert.Equal("site.title", root.GetProperty("titleKey").GetString());
         var locales = root.GetProperty("locales");
@@ -119,6 +119,29 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.All(
             root.GetProperty("navigation").EnumerateArray(),
             entry => Assert.Equal(["page", "labelKey", "icon"], entry.EnumerateObject().Select(property => property.Name)));
+    }
+
+    [Fact]
+    public async Task Site_gives_the_record_page_of_each_entity_named_or_default_and_no_child_entity()
+    {
+        using var site = await GetJsonAsync("/api/sites/records", HostA);
+
+        var recordPages = site.RootElement.GetProperty("recordPages");
+        Assert.Equal("/records/itemform", recordPages.GetProperty("Item").GetString());
+        Assert.Equal("/records/records/department", recordPages.GetProperty("Department").GetString());
+        Assert.DoesNotContain(recordPages.EnumerateObject(), entry => entry.Name == "ItemPart");
+    }
+
+    [Fact]
+    public async Task Record_pages_leave_out_the_entities_the_user_cannot_read()
+    {
+        using var client = fixture.CreateClient().SignedInAs("rita");
+
+        using var site = await GetJsonAsync(client, "/api/sites/records", HostA);
+
+        Assert.Equal(
+            new Dictionary<string, string?> { ["Item"] = "/records/itemform", ["Bundle"] = "/records/records/bundle" },
+            site.RootElement.GetProperty("recordPages").EnumerateObject().ToDictionary(entry => entry.Name, entry => entry.Value.GetString()));
     }
 
     [Fact]

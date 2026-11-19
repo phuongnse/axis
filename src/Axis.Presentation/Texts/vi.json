@@ -1578,6 +1578,8 @@
   "shell.studio.field.site.locales.fallback.help": "Ngôn ngữ mà chữ quay về dùng khi thiếu bản dịch trong ngôn ngữ của người xem.",
   "shell.studio.field.site.locales.available": "Có sẵn",
   "shell.studio.field.site.locales.available.help": "Các ngôn ngữ người xem có thể chọn.",
+  "shell.studio.field.site.recordPages": "Trang bản ghi",
+  "shell.studio.field.site.recordPages.help": "Trang mở bản ghi của từng đối tượng trong trang web này.",
   "shell.studio.field.site.navigation": "Điều hướng",
   "shell.studio.field.site.navigation.help": "Các trang trong menu của trang web, theo thứ tự.",
   "shell.studio.field.site.navigation.page": "Trang",

@@ -23,6 +23,9 @@ public sealed record SiteModel
 
     public required IReadOnlyList<NavigationModel> Navigation { get; init; }
 
+    /// <summary>The site's <c>recordPages</c>, one for each entity the site names a page for. Empty when it names none.</summary>
+    public IReadOnlyList<SiteRecordPageModel> RecordPages { get; init; } = [];
+
     /// <summary>
     /// The names of the identity providers that people may sign in with: the site's <c>signIn</c> list,
     /// or every identity provider of the application when the site has none. Sign-in does not read it yet.

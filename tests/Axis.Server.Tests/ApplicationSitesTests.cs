@@ -347,6 +347,60 @@ public sealed class ApplicationSitesTests
     }
 
     [Fact]
+    public void Record_page_of_a_module_entity_with_no_entry_is_the_default_record_page_in_lower_case()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"axis-sites-{Guid.NewGuid():N}");
+        try
+        {
+            Write(root, "app/application.json", """
+                { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1,
+                  "modules": [{ "id": "people", "version": "1.0.0" }] }
+                """);
+            Write(root, "app/entities/claim.json", """
+                { "id": "55555555-5555-4555-8555-555555555531", "kind": "entity", "name": "Claim", "formatVersion": 1,
+                  "fields": [ { "name": "title", "type": "text" } ] }
+                """);
+            Write(root, "app/identity-providers/accounts.json", """
+                { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e02", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }
+                """);
+            Write(root, "app/texts/en.json", """
+                { "id": "33333333-3333-4333-8333-333333333333", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "site.title": "Desk", "nav.claims": "Claims", "claims.title": "Claims" } }
+                """);
+            Write(root, "app/pages/claims.json", """
+                { "id": "55555555-5555-4555-8555-555555555541", "kind": "page", "name": "Claims", "formatVersion": 1,
+                  "title": { "textKey": "claims.title" }, "widgets": [ { "type": "table", "name": "table", "entity": "Claim" } ] }
+                """);
+            Write(root, "app/sites/desk.json", """
+                { "id": "66666666-6666-4666-8666-666666666661", "kind": "site", "name": "Desk", "formatVersion": 1, "path": "desk",
+                  "title": { "textKey": "site.title" }, "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+                  "navigation": [ { "page": "Claims", "label": { "textKey": "nav.claims" } } ] }
+                """);
+            Write(root, "modules/people/1.0.0/module.json", """{ "kind": "module", "id": "people", "version": "1.0.0", "label": "People" }""");
+            Write(root, "modules/people/1.0.0/Member.json", """
+                { "id": "55555555-5555-4555-8555-555555555532", "kind": "entity", "name": "Member", "formatVersion": 1,
+                  "fields": [ { "name": "nickname", "type": "text" } ] }
+                """);
+            Write(root, "modules/people/1.0.0/texts/en.json", """
+                { "id": "55555555-5555-4555-8555-555555555533", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en", "texts": {} }
+                """);
+
+            var result = ApplicationCompiler.Compile(Path.Combine(root, "app"), null, ModuleCatalog.Load(Path.Combine(root, "modules")).Modules);
+            Assert.Empty(result.Diagnostics);
+            Assert.NotNull(result.Model);
+
+            var recordPages = ApplicationSites.Describe(result.Model, result.Model.Sites[0]).RecordPages;
+
+            Assert.Equal("/desk/records/people/member", recordPages["people/Member"]);
+            Assert.Equal("/desk/records/claim", recordPages["Claim"]);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Form_marks_a_matched_reference_as_read_only()
     {
         var root = Path.Combine(Path.GetTempPath(), $"axis-sites-{Guid.NewGuid():N}");
