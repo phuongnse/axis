@@ -42,6 +42,9 @@ public sealed class NotificationRow
     /// <summary>The raw evaluated page parameters as JSON text, keyed by the parameters' declared names, or null when there is no page.</summary>
     public string? OpenParameters { get; init; }
 
+    /// <summary>The source of the notification: <c>process</c> for a <c>notify</c> step or a task escalation, or <c>quota</c> for a quota notice to administrators.</summary>
+    public string Source { get; init; } = "process";
+
     /// <summary>The start of the storing step's transaction.</summary>
     public DateTimeOffset CreatedAt { get; init; }
 }

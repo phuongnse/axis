@@ -15,6 +15,9 @@ internal static class TenantNotices
     /// <summary>The platform role kind of the tenant's administrators. The server maps it to <c>Users:AdministratorRole</c> when someone reads the notice.</summary>
     public const string AdministratorRole = "administrator";
 
+    /// <summary>The source of a quota notice to the administrators.</summary>
+    public const string QuotaSource = "quota";
+
     public const string EmailsHeldSubjectKey = "notices.emailsHeld.subject";
 
     public const string EmailsHeldBodyKey = "notices.emailsHeld.body";
@@ -32,12 +35,13 @@ internal static class TenantNotices
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.notifications
-                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, created_at)
-            VALUES (@id, NULL, NULL, @kind, @recipient, @subject, @body, @values, @valueTypes, now())
+                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, source, created_at)
+            VALUES (@id, NULL, NULL, @kind, @recipient, @subject, @body, @values, @valueTypes, @source, now())
             """,
             transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
             transaction);
         command.Parameters.AddWithValue("id", Guid.CreateVersion7());
+        command.Parameters.AddWithValue("source", QuotaSource);
         command.Parameters.AddWithValue("kind", PlatformRoleRecipient);
         command.Parameters.AddWithValue("recipient", AdministratorRole);
         command.Parameters.AddWithValue("subject", subjectKey);

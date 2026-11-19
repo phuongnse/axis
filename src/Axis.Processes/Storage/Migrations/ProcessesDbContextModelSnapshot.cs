@@ -463,6 +463,13 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("release_id");
 
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("process")
+                        .HasColumnName("source");
+
                     b.Property<string>("SubjectKey")
                         .IsRequired()
                         .HasColumnType("text")

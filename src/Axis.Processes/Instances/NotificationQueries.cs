@@ -1,3 +1,4 @@
+using Axis.Data.Storage;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -8,7 +9,8 @@ namespace Axis.Processes.Instances;
 /// tenant database, and marks them read. A user sees the notifications addressed to their id, and those addressed to a role they hold. The caller gives the
 /// roles the active release declares, so a role it no longer declares shows nothing. A notification addressed to a user
 /// both ways is one notification. A tenant notice has no application. The user sees the ones addressed to a platform role
-/// kind the caller says the user holds. Read state is kept per user. Ids and role names match exactly, including letter case.
+/// kind the caller says the user holds. A user does not see the sources they turned off in the application, and tenant
+/// notices ignore the preferences, see <c>docs/reference/notifications.md#notification-preferences</c>. Read state is kept per user. Ids and role names match exactly, including letter case.
 /// </summary>
 public static class NotificationQueries
 {
@@ -17,6 +19,7 @@ public static class NotificationQueries
         n.application_id = @application
           AND ((n.recipient_kind = '{ProcessNotifications.UserRecipient}' AND n.recipient = @user)
             OR (n.recipient_kind = '{ProcessNotifications.RoleRecipient}' AND n.recipient = ANY(@roles)))
+          AND n.source <> ALL ({NotificationPreferences.ApplicationOffSourcesSql})
         """;
 
     // A tenant notice has no application and goes to a platform role kind that the caller says the user holds.

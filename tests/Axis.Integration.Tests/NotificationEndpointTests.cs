@@ -49,6 +49,68 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
     }
 
     [Fact]
+    public async Task A_person_who_turned_the_process_source_off_in_the_application_does_not_see_its_notifications_while_others_do()
+    {
+        await ClearAsync();
+        var shared = await InsertAsync(TenantA, ("user", "maria"), ("role", "finance"));
+        var own = await InsertAsync(TenantA, ("user", "maria"));
+        await SavePreferencesAsync("maria", SourcesJson(application: false, email: true));
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        using var fiona = fixture.CreateClient().SignedInAs("fiona");
+
+        using (var list = await GetJsonAsync(maria, Notifications))
+        {
+            Assert.Empty(list.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal(0, list.RootElement.GetProperty("totalCount").GetInt32());
+            Assert.Equal(0, list.RootElement.GetProperty("unreadCount").GetInt32());
+        }
+
+        using (var unread = await GetJsonAsync(maria, $"{Notifications}?unread=true"))
+        {
+            Assert.Equal(0, unread.RootElement.GetProperty("totalCount").GetInt32());
+        }
+
+        using (var hidden = await PostAsync(maria, $"{Notifications}/{shared:D}/read"))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, hidden.StatusCode);
+        }
+
+        using (var all = await PostAsync(maria, $"{Notifications}/read-all"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, all.StatusCode);
+        }
+
+        Assert.Equal(0L, await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.notification_reads"));
+
+        // The role's other holder still sees the notification that maria's choice hides from her.
+        using (var other = await GetJsonAsync(fiona, Notifications))
+        {
+            Assert.Equal([shared], Ids(other));
+            Assert.Equal(1, other.RootElement.GetProperty("unreadCount").GetInt32());
+        }
+
+        // Turning the source back on shows what was stored meanwhile.
+        await SavePreferencesAsync("maria", SourcesJson(application: true, email: true));
+        using var back = await GetJsonAsync(maria, Notifications);
+        Assert.Equal(2, back.RootElement.GetProperty("totalCount").GetInt32());
+        Assert.Equal(2, back.RootElement.GetProperty("unreadCount").GetInt32());
+        Assert.Equal(new[] { own, shared }.Order().ToList(), Ids(back).Order().ToList());
+    }
+
+    [Fact]
+    public async Task A_person_who_turned_other_sources_or_the_email_channel_off_still_sees_process_notifications()
+    {
+        await ClearAsync();
+        var id = await InsertAsync(TenantA, ("user", "maria"));
+        await SavePreferencesAsync("maria", SourcesJson(application: true, email: false, others: false));
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        using var list = await GetJsonAsync(maria, Notifications);
+
+        Assert.Equal([id], Ids(list));
+    }
+
+    [Fact]
     public async Task A_tenant_notice_with_no_application_is_not_listed_by_the_application()
     {
         await ClearAsync();
@@ -358,6 +420,21 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
     }
 
     [Fact]
+    public async Task An_administrator_who_turned_every_source_off_in_both_channels_still_lists_a_quota_notice()
+    {
+        await ClearAsync();
+        var id = await InsertTenantNoticeAsync();
+        await SavePreferencesAsync("maria", SourcesJson(application: false, email: false, others: false));
+        await using var factory = AdministratorFactory();
+        using var maria = factory.CreateClient().SignedInAs("maria");
+
+        using var list = await GetJsonAsync(maria, TenantNotices);
+
+        Assert.Equal([id], Ids(list));
+        Assert.Equal(1, list.RootElement.GetProperty("unreadCount").GetInt32());
+    }
+
+    [Fact]
     public async Task A_tenant_notice_shows_in_english_when_the_profile_locale_has_no_platform_texts()
     {
         await ClearAsync();
@@ -453,16 +530,37 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
             TenantA,
             """
             INSERT INTO axis.notifications
-                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, created_at)
+                (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", value_types, source, created_at)
             VALUES (@id, NULL, NULL, 'platformRole', 'administrator', 'notices.emailsHeld.subject', 'notices.emailsHeld.body',
-                    '{"limit":2}'::jsonb, '{"limit":"integer"}'::jsonb, now())
+                    '{"limit":2}'::jsonb, '{"limit":"integer"}'::jsonb, 'quota', now())
             """,
             ("id", id));
         return id;
     }
 
     private async Task ClearAsync() =>
-        await fixture.ExecuteAsync(TenantA, "DELETE FROM axis.notification_reads; DELETE FROM axis.notifications;");
+        await fixture.ExecuteAsync(TenantA, "DELETE FROM axis.notification_reads; DELETE FROM axis.notifications; DELETE FROM axis.notification_preferences;");
+
+    // The stored preferences of a person, as PUT /api/me/notification-preferences stores them.
+    private async Task SavePreferencesAsync(string userId, string sources) =>
+        await fixture.ExecuteAsync(
+            TenantA,
+            """
+            INSERT INTO axis.notification_preferences (user_id, sources, digest_hour, time_zone)
+            VALUES (@user, @sources::jsonb, 8, 'UTC')
+            ON CONFLICT (user_id) DO UPDATE SET sources = excluded.sources
+            """,
+            ("user", userId),
+            ("sources", sources));
+
+    // All four sources, with the process source's channels as given and the others' channels both as `others`.
+    private static string SourcesJson(bool application, bool email, bool others = true)
+    {
+        static string Source(bool application, bool email) =>
+            $$"""{"channels":{"application":{{(application ? "true" : "false")}},"email":{{(email ? "true" : "false")}}},"digest":false}""";
+
+        return $$"""{"task":{{Source(others, others)}},"mention":{{Source(others, others)}},"process":{{Source(application, email)}},"authoringRequest":{{Source(others, others)}}}""";
+    }
 
     private Task<Guid> InsertAsync(string tenant, params (string Kind, string Recipient)[] recipients) =>
         InsertAsync(tenant, DateTimeOffset.UtcNow, recipients);
