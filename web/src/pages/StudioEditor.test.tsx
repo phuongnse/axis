@@ -2201,9 +2201,9 @@ describe('StudioEditor for an entity', () => {
     )
     renderResource(resources[1])
 
-    // A default and an expression for the one field, and the two validations.
+    // The two validations: the field's default and expression are in its drawer, which is closed.
     await waitFor(() => {
-      expect(screen.getAllByTestId('studio-expression-type')).toHaveLength(4)
+      expect(screen.getAllByTestId('studio-expression-type')).toHaveLength(2)
       for (const editor of document.querySelectorAll('.cm-editor')) {
         expect(editor.closest('[aria-busy]')).toHaveAttribute('aria-busy', 'false')
       }

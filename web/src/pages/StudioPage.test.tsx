@@ -651,7 +651,7 @@ describe('StudioPage', () => {
       await openProblems()
       await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
 
-      const field = await screen.findByTestId('studio-field-/fields/0/type')
+      const field = await screen.findByTestId('studio-field-/fields/0')
       await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
       expect(scrollIntoView.mock.contexts).toEqual([field])
       expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}&path=%2Ffields%2F0%2Ftype`)
@@ -685,7 +685,7 @@ describe('StudioPage', () => {
       await openProblems()
       await userEvent.click(await screen.findByRole('button', { name: /AXC0102/ }))
 
-      await screen.findByTestId('studio-field-/fields/0/name')
+      await screen.findByTestId('studio-field-/fields/0')
       expect(screen.getByTestId('location')).toHaveTextContent(/resource=[^&]+$/)
       expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true')
       expect(scrollIntoView).not.toHaveBeenCalled()
@@ -1200,7 +1200,7 @@ describe('StudioPage', () => {
       stubServer()
       renderPage(`/studio?app=PurchaseRequests&resource=${entityId}&path=%2Ffields%2F1%2FmaxLength`)
 
-      const field = await screen.findByTestId('studio-field-/fields/1/maxLength')
+      const field = await screen.findByTestId('studio-field-/fields/1')
       await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
       expect(scrollIntoView.mock.contexts).toEqual([field])
     } finally {
@@ -1294,7 +1294,7 @@ describe('StudioPage', () => {
       await openProblems()
       await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }, slow))
 
-      const field = await screen.findByTestId('studio-field-/fields/0/type', {}, slow)
+      const field = await screen.findByTestId('studio-field-/fields/0', {}, slow)
       await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }), slow)
       expect(scrollIntoView.mock.contexts).toEqual([field])
       await waitFor(
@@ -1360,7 +1360,8 @@ describe('StudioPage', () => {
     await waitFor(() => expect(loads()).toBe(2))
 
     await openDeleteDialog()
-    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }))
+    // The field drawer is open too, so the dialog is the one that holds Delete.
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(loads()).toBe(3))
   })
 
@@ -1561,7 +1562,8 @@ describe('StudioPage leaving unsaved changes', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete…' }))
-    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }))
+    // The field drawer is open too, so the dialog is the one that holds Delete.
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
 
     await waitFor(() => expect(router.state.location.pathname + router.state.location.search).toBe(overview))
     expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()

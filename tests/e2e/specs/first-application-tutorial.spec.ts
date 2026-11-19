@@ -185,7 +185,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
       await values.fill(value)
       await values.press('Enter')
     }
-    await values.press('Escape')
+    await values.blur()
     const status = page.getByTestId('studio-field-/fields/2/default')
     await expect(status.locator('.cm-editor')).toBeVisible()
     await status.getByRole('textbox').fill("'draft'")

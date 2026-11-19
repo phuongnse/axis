@@ -21,18 +21,17 @@ waits for them or needs them.
    - Links of open issues that the docs audit could not fix: the `Not relinked:` lines in the log of
      its latest run, from `gh run list --workflow docs-audit.yml --branch main --limit 1` and
      `gh run view <id> --log`. The row links that run.
-3. Check the labels and milestones of the open issues:
+3. List the open issues once: `gh issue list --state open --limit 1000 --json number,title,url,labels,milestone`.
+   Take the home labels from the table in [how issues run](../../../docs/delivery.md#how-issues-run)
+   each time. Recognise a kind with no milestone by its home label alone, never by a marker or a link
+   in the body. Then check:
    - **No label:** `gh issue list --state open --search 'no:label' --limit 500 --json number,title,url`.
      The row suggests every label whose description fits, as
      [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue) says.
-   - **No milestone, though one is due:**
-     `gh issue list --state open --search 'no:milestone' --limit 500 --json number,title,url,labels,body`.
-     Leave out an issue of a kind that
-     [how issues run](../../../docs/delivery.md#how-issues-run) puts in no milestone. Recognise those
-     kinds by their labels, such as `nexkit:flaky` for a flaky test issue, by the hidden `docs-audit`
-     marker in the body of a docs audit issue, and by a link to the Design System artifact or a design
-     review in the body of a design issue. The row suggests the milestone that how issues run picks, or none, or
-     the label of its kind when that label is missing.
+   - **No home:** no milestone and no home label. The row suggests the milestone or the home label
+     that how issues run picks.
+   - **Two homes:** a milestone and a home label. The row suggests the one home to keep, and the
+     milestone or label to remove.
 4. Answer with one Markdown table, one row per item, with columns for the
    item, its link and the suggested action. When nothing waits, say so in one
    sentence.

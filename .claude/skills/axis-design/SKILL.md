@@ -9,9 +9,9 @@ The rules are in [Design changes](../../../docs/delivery.md#design-changes) and
 [D57](../../../docs/decisions/d57-a-design-system-published-from-the-repository.md).
 This runbook gives the steps and commands.
 
-- **The artifact's link** is in Design changes. Look it up there each time.
+- **The artifact's link** is in Design changes. Look it up there.
 - **The artifact's file layout and how to publish** are in the Design System
-  type's own instructions in Claude. Follow them each time.
+  type's own instructions in Claude. Follow them.
 - **Token names and the widget list** are in the
   [frontend reference](../../../docs/reference/frontend.md) under "Design
   tokens and previews". The preview names are in
@@ -45,8 +45,9 @@ another. The rules are under "Several changes are a design review" in Design cha
 ### Start
 
 1. Take the review's design issue, or agree a short topic with the owner, such
-   as `field-look`, and open a design issue for it with the `on-hold` label. Its
-   body states the scope and the build notes, and says the review ends
+   as `field-look`, and open a design issue labelled `design` and `on-hold` with no milestone, as
+   [how issues run](../../../docs/delivery.md#how-issues-run) says. Its
+   body states the scope and build notes, and says the review ends
    in a docs change that NexKit writes from the rule comments. Set the body with
    `gh issue edit <n> --body-file <file>`. If an earlier review's issues have not
    built what it touches, say so and stop.

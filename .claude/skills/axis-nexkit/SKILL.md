@@ -71,11 +71,13 @@ marks between issues, in NexKit's `request` skill.
    [concepts.md](../../../docs/domain/concepts.md).
 2. Read the labels with `gh label list` and pick every one whose description
    fits. Every issue gets at least one label.
-3. Create it in the milestone that [how issues run](../../../docs/delivery.md#how-issues-run)
-   picks. If that milestone does not exist on GitHub yet, create it first, titled `Mx <name>`:
-   `gh api repos/{owner}/{repo}/milestones -f title='Mx <name>'`. Then:
+3. Give it one home by the steps of [how issues run](../../../docs/delivery.md#how-issues-run): a
+   home label and no milestone, else the milestone whose [Done when](../../../docs/roadmap.md#milestones)
+   names the work. When no row names new capability, file nothing and propose the roadmap change to the
+   owner. If that milestone does not exist on GitHub yet, create it first, titled `Mx <name>` exactly as
+   its roadmap row: `gh api repos/{owner}/{repo}/milestones -f title='Mx <name>'`. Then:
    `gh issue create --title "<behaviour>" --milestone "<milestone>" --label "<a>,<b>" --body-file <file>`.
-   Leave out `--milestone` for an issue that how issues run puts in no milestone.
+   Leave out `--milestone` for a home label, and pass the label in `--label`.
 4. Mark what it waits for, as NexKit's `request` skill says, before the next
    sweep, or autopilot plans it at once. A milestone's journey gets the
    `journey` label and its docs sweep the `docs-sweep` label, with no
@@ -97,11 +99,12 @@ milestones of the roadmap's current phase only, unless the owner names another,
 as [D117](../../../docs/decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md)
 agrees, and write no issue of a later phase unless the owner asks. On *ready*:
 
-- Create the milestone's issues as in [Writing an issue](#writing-an-issue).
+- Create the milestone's issues as in [Writing an issue](#writing-an-issue). The first one creates
+  the milestone on GitHub, titled exactly as its roadmap row.
 - Find the new screens and new ways of interacting. For each group, open one
-  design issue with the `on-hold` label and mark the issues that build them
-  *blocked by* it, as
-  [Design changes](../../../docs/delivery.md#design-changes) says.
+  design issue with the `design` and `on-hold` labels and no milestone, as
+  [how issues run](../../../docs/delivery.md#how-issues-run) says, and mark the issues that build them
+  *blocked by* it, as [Design changes](../../../docs/delivery.md#design-changes) says.
 - Check that each risky concept the **From** column of
   [concepts.md](../../../docs/domain/concepts.md) lists for the new milestone
   falls under `hard` by its consequence, and that work the platform has not

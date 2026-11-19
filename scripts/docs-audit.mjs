@@ -150,6 +150,8 @@ function body(text, group, key, runId, criteria) {
 }
 
 const codeKinds = ['unbuilt', 'untested-list']
+// Every issue the audit opens has its home label, as docs/delivery.md#how-issues-run says.
+const homeLabel = 'docs-audit'
 
 /**
  * Groups the findings into issues: code and test fixes first, then docs pages. Leaves out what an open issue
@@ -163,7 +165,7 @@ export function issuesFrom(findings, openBodies, runId) {
   const add = (group, key, found, issue) => {
     if (covered(group, key)) return
     built.add(`${group} ${key}`)
-    candidates.push({ found, issue })
+    candidates.push({ found, issue: { ...issue, labels: [...issue.labels, homeLabel] } })
   }
   for (const f of codeKinds.flatMap((kind) => findings.filter((x) => x.kind === kind))) {
     const group = f.kind === 'unbuilt' ? 'code' : 'test'
