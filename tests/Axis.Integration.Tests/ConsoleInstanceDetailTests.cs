@@ -27,7 +27,7 @@ public sealed class ConsoleInstanceDetailTests(TaskApiFixture fixture) : IClassF
         using var _ = body;
         var root = body.RootElement;
         Assert.Equal(
-            ["id", "process", "subjectEntity", "subjectId", "subjectLabel", "releaseId", "releaseNumber", "state", "step", "createdAt", "endedAt", "timerDueAt", "startedBy", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands", "studio"],
+            ["id", "process", "subjectEntity", "subjectId", "subjectLabel", "releaseId", "releaseNumber", "state", "step", "createdAt", "endedAt", "timerDueAt", "startedBy", "input", "result", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands", "studio"],
             root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(instance, root.GetProperty("id").GetGuid());
         Assert.Equal("DepartmentOrder", root.GetProperty("process").GetString());

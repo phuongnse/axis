@@ -74,7 +74,8 @@ internal static class ProcessSteps
 
     /// <summary>
     /// Moves a <c>running</c> instance at <paramref name="revision"/> to <paramref name="state"/> and
-    /// <paramref name="step"/>, with the next revision. A <c>completed</c> instance gets its end time.
+    /// <paramref name="step"/>, with the next revision. A <c>completed</c> instance gets its end time and, when
+    /// <paramref name="result"/> is given, its JSON text as the values it ended with.
     /// Returns <see langword="false"/> when the instance changed since it was loaded. A concurrent
     /// change waits for the other transaction, then finds the newer revision.
     /// </summary>
@@ -84,13 +85,15 @@ internal static class ProcessSteps
         long revision,
         string state,
         string step,
+        string? result,
         CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             """
             UPDATE axis.process_instances
             SET state = @state, step = @step, revision = revision + 1,
-                ended_at = CASE WHEN @state = @completed THEN now() END
+                ended_at = CASE WHEN @state = @completed THEN now() END,
+                result = CASE WHEN @state = @completed THEN @result::jsonb END
             WHERE id = @id AND revision = @revision AND state = @running
             """,
             Connection(transaction),
@@ -99,6 +102,7 @@ internal static class ProcessSteps
         command.Parameters.AddWithValue("revision", revision);
         command.Parameters.AddWithValue("state", state);
         command.Parameters.AddWithValue("step", step);
+        command.Parameters.Add(new NpgsqlParameter("result", NpgsqlDbType.Jsonb) { Value = (object?)result ?? DBNull.Value });
         command.Parameters.AddWithValue("completed", ProcessStarts.Completed);
         command.Parameters.AddWithValue("running", ProcessStarts.Running);
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
@@ -226,8 +230,8 @@ internal static class ProcessSteps
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.process_step_history
-                (id, process_instance_id, step, revision, input, output, decision, error, started_at, finished_at, trace_id)
-            VALUES (@id, @instance, @step, @revision, @input, @output, @decision, @error, @started, clock_timestamp(), @trace)
+                (id, process_instance_id, step, revision, input, output, decision, error, problem, started_at, finished_at, trace_id)
+            VALUES (@id, @instance, @step, @revision, @input, @output, @decision, @error, @problem, @started, clock_timestamp(), @trace)
             """,
             Connection(transaction),
             transaction);
@@ -239,6 +243,7 @@ internal static class ProcessSteps
         command.Parameters.Add(new NpgsqlParameter("output", NpgsqlDbType.Jsonb) { Value = (object?)occurrence.Output?.ToJsonString() ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("decision", NpgsqlDbType.Text) { Value = (object?)occurrence.Decision ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)occurrence.Error ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("problem", NpgsqlDbType.Jsonb) { Value = occurrence.Problem is null ? DBNull.Value : occurrence.Problem.ToJsonString() });
         command.Parameters.AddWithValue("started", occurrence.StartedAt.ToUniversalTime());
         command.Parameters.Add(new NpgsqlParameter("trace", NpgsqlDbType.Text) { Value = (object?)AxisTelemetry.CurrentTraceId() ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -278,6 +283,7 @@ internal sealed record LoadedInstance(
 /// <param name="Decision">
 /// The branch a decision took, its zero-based index or <c>otherwise</c>, or the outcome a task was completed with.
 /// </param>
+/// <param name="Problem">The code of <paramref name="Error"/>, or <see langword="null"/> when it has none or the step did not fail.</param>
 internal sealed record StepOccurrence(
     Guid InstanceId,
     string Step,
@@ -286,4 +292,5 @@ internal sealed record StepOccurrence(
     JsonObject? Output,
     string? Decision,
     string? Error,
-    DateTimeOffset StartedAt);
+    DateTimeOffset StartedAt,
+    StepProblem? Problem = null);

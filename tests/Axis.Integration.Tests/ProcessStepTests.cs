@@ -152,6 +152,9 @@ public sealed class ProcessStepTests(ProcessStepFixture fixture) : IClassFixture
         Assert.Equal("check", row.Step);
         Assert.Equal(1L, row.Revision);
         Assert.Equal("The when of branch 0 of the step 'check' failed: DivisionByZero.", row.Error);
+        Assert.True(JsonNode.DeepEquals(
+            new JsonObject { ["code"] = "expressionFailed", ["values"] = new JsonObject() },
+            JsonNode.Parse(row.Problem!)));
         Assert.Null(row.Output);
         Assert.Null(row.Decision);
         Assert.True(row.FinishedAfterStart);

@@ -74,6 +74,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             instance.Property(i => i.SubjectId).HasColumnName("subject_id");
             instance.Property(i => i.ReleaseId).HasColumnName("release_id");
             instance.Property(i => i.Parameters).HasColumnName("parameters").HasColumnType("jsonb");
+            instance.Property(i => i.Result).HasColumnName("result").HasColumnType("jsonb");
             instance.Property(i => i.State).HasColumnName("state");
             instance.Property(i => i.Revision).HasColumnName("revision");
             instance.Property(i => i.Step).HasColumnName("step");
@@ -117,6 +118,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             history.Property(h => h.Output).HasColumnName("output").HasColumnType("jsonb");
             history.Property(h => h.Decision).HasColumnName("decision");
             history.Property(h => h.Error).HasColumnName("error");
+            history.Property(h => h.Problem).HasColumnName("problem").HasColumnType("jsonb");
             history.Property(h => h.StartedAt).HasColumnName("started_at");
             history.Property(h => h.FinishedAt).HasColumnName("finished_at");
             history.Property(h => h.TraceId).HasColumnName("trace_id");
@@ -253,6 +255,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             attempt.Property(a => a.HttpStatus).HasColumnName("http_status");
             attempt.Property(a => a.Error).HasColumnName("error");
             attempt.Property(a => a.Response).HasColumnName("response").HasColumnType("jsonb");
+            attempt.Property(a => a.Problem).HasColumnName("problem").HasColumnType("jsonb");
             attempt.Property(a => a.TraceId).HasColumnName("trace_id");
 
             // The call is in one of two tables, so there is no foreign key. Each attempt and lookup has its own number.

@@ -61,10 +61,10 @@ decision replaces D25 and D34 and keeps every part of them that still holds, as 
   still follows the grants.
 - **A step error is stored as the exception type or a fixed text,** never the exception's message or
   a value.
-- **A step's error is a code.** _(planned)_ A path entry and an attempt carry `problem`, a code with
+- **A step's error is a code.** A path entry and an attempt carry `problem`, a code with
   its values, such as `timeout` with `seconds`. The page words it through `shell.stepProblem.<code>`
   in the reader's language, and a row with no `problem` shows its stored error.
-- **No stack trace or exception message on an application's pages.** _(planned)_ Errors are
+- **No stack trace or exception message on an application's pages.** Errors are
   structured, so an application's pages never show an exception's message or stack trace.
 - **A `processInspector` widget** lists the instances of one process and draws an instance's path on
   its graph, and the record history links to an instance when the user may inspect it.
@@ -96,7 +96,7 @@ The detail is in
 - **An operator sees each call's traffic.** An operator sees what a call sent and what each
   attempt answered. Each kept body is bounded by the 64 KiB limit, which bounds the tenant database's
   growth per call.
-- **A page words each error.** _(planned)_ A page words an error in the reader's language, and a row
+- **A page words each error.** A page words an error in the reader's language, and a row
   without a code falls back to its stored error.
 
 ## Alternatives

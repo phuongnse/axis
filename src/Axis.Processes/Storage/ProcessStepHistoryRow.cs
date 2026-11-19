@@ -31,6 +31,13 @@ public sealed class ProcessStepHistoryRow
     /// <summary>Why the step failed, or <see langword="null"/> when it succeeded.</summary>
     public string? Error { get; init; }
 
+    /// <summary>
+    /// The error as a code with its values, as JSON text: <c>code</c> and <c>values</c>, see
+    /// docs/reference/process-inspection.md#step-errors-in-inspection. <see langword="null"/> when the
+    /// step succeeded and for a fixed text that has no code.
+    /// </summary>
+    public string? Problem { get; init; }
+
     public required DateTimeOffset StartedAt { get; init; }
 
     public required DateTimeOffset FinishedAt { get; init; }

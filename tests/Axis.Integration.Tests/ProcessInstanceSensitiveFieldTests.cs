@@ -53,11 +53,41 @@ public sealed class ProcessInstanceSensitiveFieldTests(TaskApiFixture fixture) :
         Assert.True(call.GetProperty("inputHidden").GetBoolean());
     }
 
+    [Fact]
+    public async Task A_sensitive_field_that_a_completed_instance_wrote_is_hidden_and_never_stored_even_for_a_user_whose_grants_cover_it()
+    {
+        var release = await fixture.ActivateEditedAsync(TenantA, AddSalary(mapped: false, submits: true));
+        var subject = await fixture.InsertRequestAsync(TenantA, null);
+        var instance = await fixture.StartAsync(TenantA, "Submit", subject, release);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+
+        using var body = await GetOkAsync(TenantA, instance, "Submit");
+
+        var values = body.RootElement.GetProperty("result").GetProperty("values").EnumerateArray().ToList();
+        Assert.Equal(["salary", "status", "submittedAt"], values.Select(value => value.GetProperty("name").GetString()));
+        Assert.Equal(JsonValueKind.Null, values[0].GetProperty("value").ValueKind);
+        Assert.True(values[0].GetProperty("hidden").GetBoolean());
+        Assert.DoesNotContain("100", values[0].ToString(), StringComparison.Ordinal);
+        Assert.Equal("submitted", values[1].GetProperty("value").GetString());
+        Assert.False(values[1].GetProperty("hidden").GetBoolean());
+
+        // No plaintext copy exists: the stored result holds null for the field.
+        var stored = (string?)await fixture.ScalarAsync(TenantA, "SELECT result::text FROM axis.process_instances WHERE id = @id", ("id", instance));
+        using var storedResult = JsonDocument.Parse(stored!);
+        Assert.Equal(JsonValueKind.Null, storedResult.RootElement.GetProperty("salary").ValueKind);
+    }
+
     // Edits the Request entity to add the decimal field "salary", sensitive from the release that adds it, and lets the
     // auditor read it. The DepartmentOrder call maps "salary" as its amount when mapped is true.
-    private static Func<string, string, string?> AddSalary(bool mapped) =>
+    private static Func<string, string, string?> AddSalary(bool mapped, bool submits = false) =>
         (path, content) =>
         {
+            // The Submit process also writes salary, and the auditor may read it, and its status, and inspect Submit.
+            if (path == Path.Combine("processes", "submit.json") && submits)
+            {
+                return content.Replace("\"status\": \"'submitted'\"", "\"status\": \"'submitted'\", \"salary\": \"100\"", StringComparison.Ordinal);
+            }
+
             if (path == Path.Combine("entities", "request.json"))
             {
                 return content.Replace(
@@ -73,16 +103,21 @@ public sealed class ProcessInstanceSensitiveFieldTests(TaskApiFixture fixture) :
 
             if (path == Path.Combine("policies", "auditor-access.json"))
             {
-                return content.Replace("\"fields\": [\"title\", \"amount\"", "\"fields\": [\"title\", \"amount\", \"salary\"", StringComparison.Ordinal);
+                return content
+                    .Replace("\"fields\": [\"title\", \"amount\"", "\"fields\": [\"title\", \"amount\", \"salary\", \"status\"", StringComparison.Ordinal)
+                    .Replace(
+                        "{ \"name\": \"departmentOrderInspect\"",
+                        "{ \"name\": \"submitInspect\", \"process\": \"Submit\", \"actions\": [\"inspect\"] },\n    { \"name\": \"departmentOrderInspect\"",
+                        StringComparison.Ordinal);
             }
 
             return content;
         };
 
-    private async Task<JsonDocument> GetOkAsync(string tenant, Guid instance)
+    private async Task<JsonDocument> GetOkAsync(string tenant, Guid instance, string process = "DepartmentOrder")
     {
         using var client = fixture.CreateClient().SignedInAs("ada");
-        using var request = RecordApiFixture.Request($"/api/apps/StepApp/processes/DepartmentOrder/instances/{instance:D}", Host(tenant));
+        using var request = RecordApiFixture.Request($"/api/apps/StepApp/processes/{process}/instances/{instance:D}", Host(tenant));
         using var response = await client.SendAsync(request, CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));

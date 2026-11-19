@@ -62,6 +62,22 @@ public static class MappingFields
         return fields;
     }
 
+    /// <summary>
+    /// The fields that <paramref name="expression"/> reads over <paramref name="entity"/> of the <paramref name="pinned"/>
+    /// release, as <see cref="Collect(ApplicationModel, EntityModel, IEnumerable{ConnectorInputModel}, IEnumerable{ConnectorOutputModel})"/>
+    /// counts them. Returns null when the expression uses a name, path, call or node type the walker does not resolve, such as a
+    /// name that is a parameter and no field, so the caller hides the value.
+    /// </summary>
+    public static IReadOnlySet<MappedField>? Collect(ApplicationModel pinned, EntityModel entity, ExpressionModel expression)
+    {
+        ArgumentNullException.ThrowIfNull(pinned);
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(expression);
+
+        var fields = new HashSet<MappedField>();
+        return Walk(pinned, expression.Syntax, expression.Check, entity, inItem: false, fields) ? fields : null;
+    }
+
     // An object mapping reads over the same entity. A list mapping reads each item over a row of its child collection.
     private static bool WalkInputs(ApplicationModel pinned, IEnumerable<ConnectorInputModel> inputs, EntityModel entity, bool inItem, HashSet<MappedField> fields)
     {

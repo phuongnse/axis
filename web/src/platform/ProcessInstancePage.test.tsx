@@ -78,6 +78,7 @@ const detailText = `{
       "decision": null,
       "output": { "state": "waiting", "taskId": "0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01" },
       "error": null,
+      "problem": null,
       "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
     }
   ],
@@ -111,6 +112,7 @@ const detailText = `{
           "outcome": "retryable",
           "httpStatus": 503,
           "error": null,
+          "problem": null,
           "traceId": "0af7651916cd43dd8448eb211c80319c"
         }
       ],
@@ -202,6 +204,7 @@ function detailWithRelatives() {
         decision: null,
         output: { state: 'waiting', dueAt },
         error: null,
+        problem: null,
         traceId: null,
       },
     ],
@@ -395,6 +398,54 @@ describe('ProcessInstancePage', () => {
     expect(within(attemptRow).getByText('0af76519')).toBeInTheDocument()
     const historyRow = screen.getByRole('row', { name: /^Manager approval .*4bf92f/ })
     expect(within(historyRow).getByText('4bf92f35')).toBeInTheDocument()
+  })
+
+  it('words a problem in the Error cells, with the seconds of a timeout, and shows the stored error when there is none', async () => {
+    const detail = JSON.parse(detailText) as {
+      path: Record<string, unknown>[]
+      calls: { attempts: Record<string, unknown>[] }[]
+    }
+    detail.path.push({
+      ...detail.path[0],
+      step: 'registerPurchase',
+      traceId: null,
+      error: 'The operation did not finish within its timeout.',
+      problem: { code: 'timeout', values: { seconds: 30 } },
+    })
+    detail.path.push({
+      ...detail.path[0],
+      step: 'done',
+      traceId: null,
+      error: 'System.InvalidOperationException',
+      problem: null,
+    })
+    detail.calls[0].attempts[0].error = "The operation 'createOrder' answered with the status 503."
+    detail.calls[0].attempts[0].problem = { code: 'serverError', values: {} }
+    stubApi({ detail: { status: 200, body: JSON.stringify(detail) } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    const timedOut = screen.getByRole('row', { name: /^registerPurchase / })
+    expect(within(timedOut).getByText('No answer came within 30 sec.')).toBeInTheDocument()
+    expect(within(timedOut).queryByText(/did not finish/)).not.toBeInTheDocument()
+    const stored = screen.getByRole('row', { name: /^done / })
+    expect(within(stored).getByText('System.InvalidOperationException')).toBeInTheDocument()
+    const attempt = screen.getByRole('row', { name: /retryable/ })
+    expect(within(attempt).getByText('The outside system answered with a server error.')).toBeInTheDocument()
+    expect(within(attempt).queryByText(/answered with the status 503/)).not.toBeInTheDocument()
+  })
+
+  it('shows the stored error for a code this build does not know', async () => {
+    const detail = JSON.parse(detailText) as { path: Record<string, unknown>[] }
+    detail.path[0].error = 'A fixed text.'
+    detail.path[0].problem = { code: 'somethingNew', values: {} }
+    stubApi({ detail: { status: 200, body: JSON.stringify(detail) } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    expect(screen.getByText('A fixed text.')).toBeInTheDocument()
   })
 
   it('copies the whole trace ID from the copy button beside its first 8 characters', async () => {

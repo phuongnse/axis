@@ -8,13 +8,14 @@ namespace Axis.Processes.Instances;
 /// </summary>
 internal sealed class ProcessStepException : Exception
 {
-    public ProcessStepException(string message, string step, long revision, DateTimeOffset startedAt, JsonObject input, Exception? innerException = null)
+    public ProcessStepException(string message, string step, long revision, DateTimeOffset startedAt, JsonObject input, StepProblem? problem = null, Exception? innerException = null)
         : base(message, innerException)
     {
         Step = step;
         Revision = revision;
         StartedAt = startedAt;
         Input = input;
+        Problem = problem;
     }
 
     /// <summary>The declared name of the step that failed.</summary>
@@ -28,4 +29,7 @@ internal sealed class ProcessStepException : Exception
 
     /// <summary>The step's input, as its history records it.</summary>
     public JsonObject Input { get; }
+
+    /// <summary>The code of the failure, or <see langword="null"/> for a fixed text that has none.</summary>
+    public StepProblem? Problem { get; }
 }

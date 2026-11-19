@@ -63,7 +63,7 @@ public static class CallQueries
         var attempts = new Dictionary<Guid, List<ProcessCallAttemptDetail>>();
         await using (var command = new NpgsqlCommand(
             """
-            SELECT call_id, kind, number, started_at, finished_at, outcome, http_status, error, trace_id, response::text
+            SELECT call_id, kind, number, started_at, finished_at, outcome, http_status, error, trace_id, response::text, problem::text
             FROM axis.process_call_attempts WHERE call_id = ANY(@ids)
             ORDER BY started_at, id
             """,
@@ -90,6 +90,7 @@ public static class CallQueries
                     Error = reader.IsDBNull(7) ? null : reader.GetString(7),
                     TraceId = reader.IsDBNull(8) ? null : reader.GetString(8),
                     Response = reader.IsDBNull(9) ? null : reader.GetString(9),
+                    Problem = reader.IsDBNull(10) ? null : reader.GetString(10),
                 });
             }
         }
@@ -172,4 +173,7 @@ public sealed class ProcessCallAttemptDetail
 
     /// <summary>The response the outside system answered, as JSON text, or null for a lookup, a package call and an attempt that got no answer.</summary>
     public string? Response { get; init; }
+
+    /// <summary>The error as a code with its values, as JSON text, or null when the row has no code.</summary>
+    public string? Problem { get; init; }
 }

@@ -421,6 +421,28 @@ public static class InstanceQueries
         return await command.ExecuteScalarAsync(cancellationToken) is string json ? ProcessStartedBy.Parse(json) : null;
     }
 
+    /// <summary>
+    /// Reads the JSON text of the parameter values that the instance <paramref name="instanceId"/> started with and of the
+    /// result it completed with. Either is <see langword="null"/> when it is not stored. They are not in the columns of
+    /// <see cref="ProcessInstanceRow"/>'s other reads, because the list reads its own columns by position.
+    /// </summary>
+    public static async Task<(string? Parameters, string? Result)> ValuesAsync(
+        NpgsqlConnection connection,
+        Guid instanceId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand(
+            "SELECT parameters::text, result::text FROM axis.process_instances WHERE id = @id",
+            connection);
+        command.Parameters.AddWithValue("id", instanceId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? (reader.IsDBNull(0) ? null : reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1))
+            : (null, null);
+    }
+
     /// <summary>Reads the step history rows of the instance <paramref name="instanceId"/>, oldest first.</summary>
     public static async Task<IReadOnlyList<ProcessStepHistoryRow>> HistoryAsync(
         NpgsqlConnection connection,
@@ -431,7 +453,7 @@ public static class InstanceQueries
 
         await using var command = new NpgsqlCommand(
             """
-            SELECT id, process_instance_id, step, revision, input::text, output::text, decision, error, started_at, finished_at, trace_id
+            SELECT id, process_instance_id, step, revision, input::text, output::text, decision, error, started_at, finished_at, trace_id, problem::text
             FROM axis.process_step_history WHERE process_instance_id = @id ORDER BY finished_at, id
             """,
             connection);
@@ -453,6 +475,7 @@ public static class InstanceQueries
                 StartedAt = reader.GetFieldValue<DateTimeOffset>(8),
                 FinishedAt = reader.GetFieldValue<DateTimeOffset>(9),
                 TraceId = reader.IsDBNull(10) ? null : reader.GetString(10),
+                Problem = reader.IsDBNull(11) ? null : reader.GetString(11),
             });
         }
 
