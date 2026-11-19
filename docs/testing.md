@@ -247,7 +247,7 @@ its browser and its server when the test ends. Its sign-in, Ask AI and publisher
 **The AI authoring journey spec** runs on the tenant `ai-journey`, on the host `ai-journey.eval.localhost`, with its
 server on the port offset 10. It has the same agent host, certificate and proxy as the Ask AI agent spec. Its author has
 the author role and the publisher role, which `Studio:PublisherRole` reads, so the author may publish. The spec makes an
-application from the built-in `approvals` template and gives the scripted answers, in order: a plan, a read of the
+application from the built-in `approvals` template and gives the first test's scripted answers, in order: a plan, a read of the
 employee role, a `write_layer` that adds the approver kind `director` to the module's `ApprovalStep` with its label, two
 `write_resource` calls that add the same label to the application's `en` and `vi` texts, a scenario, the end of the work
 and the review `PASSED`. The label's text key is `approvalStep.approver.director`, which is not under the module's
@@ -256,12 +256,17 @@ and the review `PASSED`. The label's text key is `approvalStep.approver.director
 request of 500 needs the line manager alone. The diff marks whole fields of a keyed list, not the values of an enum, so
 the layer marks `approver` Changed and not `director`. The spec checks that mark, that `director` is in the opened diff
 of that field, and that the scenario has its own block. It checks these in light mode and, after a reload, in dark mode,
-on the same request, so the request runs once. The three tests are: the author asks for the plan, approves it, and the
-request reaches Ready with Checks Passed; a colleague changes the employee role, and the author's Accept shows the
+on the same request, so the request runs once. The first three tests are: the author asks for the plan, approves it, and
+the request reaches Ready with Checks Passed; a colleague changes the employee role, and the author's Accept shows the
 conflict and the colleague's revision stays the newest; the colleague undoes the change, and the author accepts and
-publishes one active release. The spec stops its agent host once the request reads Ready, because the scripted answers
-are used up by then. Both AI authoring specs hold one exclusive lock, `holdAiSpecLock`, for their whole run, because an
-agent host serves every directory tenant, so the two specs run one after the other in a shard.
+publishes one active release. The fourth test lets a requester decide their own request. A second agent host, with
+`Ai:FixRounds` 1, answers a plan, a `write_layer` that sets the `route` step's `toAdmin` branch of the module's
+`RequestApproval` to `approverUser == null`, the end of the work and a fix round that changes nothing. The contract
+scenario `RequesterCannotDecideOwnRequest` fails in the checks, so the request reads Failed, with its failure and its
+checks, in light and dark mode, and it offers no Accept. The newest revision stays the same, and `RequestApproval` has no
+customization layer in the application. The spec stops each agent host once its request reads Ready or Failed, because
+the scripted answers are used up by then. Both AI authoring specs hold one exclusive lock, `holdAiSpecLock`, for their
+whole run, because an agent host serves every directory tenant, so the two specs run one after the other in a shard.
 
 **The cell console spec** starts a server of its own in `Testing`, on the next port offset, with the
 `Cell:*` settings of a cell, `Cell:ConsoleHost` set to `console.localhost` and the secret of the

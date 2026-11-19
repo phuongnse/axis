@@ -24,7 +24,8 @@ import {
 } from '../../../scripts/lib/ai-eval-stack.mjs'
 
 // The AI authoring journey: an author asks AI for a director's approval above a threshold, a colleague's change meets the
-// author's accept, and the author accepts and publishes. See the AI authoring journey spec in docs/testing.md.
+// author's accept, and the author accepts and publishes. A last request lets a requester decide their own request, and
+// the approvals contract refuses it. See the AI authoring journey spec in docs/testing.md.
 //
 // The tenant is served on the port offset 10, because offsets 0 to 6, 8 and 9 are taken, and offset 7 is the port of the
 // control plane. The agent host and the publisher are the same as the Ask AI agent spec's, see the comments there. The two
@@ -43,6 +44,11 @@ const plan =
 // The application's text key of the director's label. It is not under the module's `approvals.` prefix, see docs/testing.md.
 const directorKey = 'approvalStep.approver.director'
 const scenarioName = 'DirectorApprovesLargeRequests'
+const refusedRequest = 'Let a requester decide their own request when they are its approver.'
+const refusedPlan =
+  'Change the route step, so a request goes to its approver even when that approver is the person who asked for it.'
+// The module's contract scenario that the refused request fails in the checks.
+const refusedScenario = 'RequesterCannotDecideOwnRequest'
 const usage = { input_tokens: 1, output_tokens: 1 }
 
 interface Resource {
@@ -54,6 +60,11 @@ interface Resource {
 interface ApprovalStep {
   id: string
   fields: { name: string; values?: string[]; valueLabels?: Record<string, unknown> }[]
+}
+
+interface Process {
+  id: string
+  steps: ({ name: string; branches?: { name: string; when: string }[] } & Record<string, unknown>)[]
 }
 
 let folder: string
@@ -159,6 +170,29 @@ async function expectReadyDiff(scope: Page | Locator) {
   await expect(step.getByTestId('json-diff-after')).toContainText('"director"')
 
   await expect(scope.getByTestId('studio-changes-file').filter({ hasText: scenarioName })).toHaveCount(1)
+}
+
+/**
+ * Expects the refused request to read Failed, with its failure and its checks. The checks open, and their detail has the
+ * contract scenario that failed. The request offers no Accept. `scope` is the page, or the root of the dark theme.
+ */
+async function expectRefused(scope: Page | Locator) {
+  await expect(scope.getByTestId('studio-ai-request-state')).toHaveText('Failed')
+  const alert = scope.getByTestId('studio-ai-request-failure')
+  await expect(alert).toContainText('AI could not finish this request.')
+  await expect(alert).toContainText('The checks still failed after the last fix round.')
+
+  const checks = scope.getByTestId('studio-ai-request-checks')
+  await expect(checks).toContainText('Failed')
+  await checks.getByRole('button', { name: 'Show the checks', exact: true }).click()
+  const row = scope
+    .getByTestId('studio-ai-request-checks-detail')
+    .getByTestId('studio-test-result')
+    .filter({ hasText: refusedScenario })
+  await expect(row).toHaveCount(1)
+  await expect(row).toHaveAttribute('data-outcome', 'failed')
+
+  await expect(scope.getByRole('button', { name: 'Accept', exact: true })).toHaveCount(0)
 }
 
 test("an author asks AI for a director's approval above a threshold, and the request reaches Ready with the layer and its scenario in its diff, in light and dark mode", async () => {
@@ -519,6 +553,118 @@ test("after the colleague undoes the change, the author accepts the request and 
     const rows = page.getByTestId('studio-release-row')
     await expect(rows).toHaveCount(1)
     await expect(rows).toHaveAttribute('data-active', 'true')
+  } finally {
+    await page.close()
+  }
+})
+
+test("a request that lets a requester decide their own request is refused by the approvals contract: it ends Failed with its checks and no Accept, and nothing is written, in light and dark mode", async () => {
+  // Two rounds of checks run every approvals scenario, and each takes minutes, so the test waits longer than the default.
+  test.setTimeout(1_200_000)
+  const page = await authorContext.newPage()
+  try {
+    await page.goto(`https://${host}/`)
+    const api = `/api/studio/apps/${application}`
+    // The newest revision before the request. The refusal must leave it as the newest one.
+    const before = (await readJson<{ items: { id: string }[] }>(page, `${api}/revisions`)).items[0].id
+
+    // The module's RequestApproval. The layer changes the route step's toAdmin branch and nothing else, so a requester who
+    // is their own step's approver gets the task, and the contract scenario sees it.
+    const approval: Process = JSON.parse(
+      await readFile(
+        path.resolve(import.meta.dirname, '..', '..', '..', 'modules', 'approvals', 'processes', 'request-approval.json'),
+        'utf8',
+      ),
+    )
+    const changed = {
+      ...approval,
+      steps: approval.steps.map((step) =>
+        step.name === 'route'
+          ? {
+              ...step,
+              branches: step.branches?.map((branch) =>
+                branch.name === 'toAdmin' ? { ...branch, when: 'approverUser == null' } : branch,
+              ),
+            }
+          : step,
+      ),
+    }
+
+    // The plan, then the work writes the layer, then its end. The one fix round changes nothing, so the checks fail again.
+    const answersFile = path.join(folder, 'answers-refused.json')
+    await writeFile(
+      answersFile,
+      JSON.stringify([
+        { content: [{ type: 'text', text: refusedPlan }], stop_reason: 'end_turn', usage },
+        {
+          content: [
+            {
+              type: 'tool_use',
+              id: 'layer-refused',
+              name: 'write_layer',
+              input: { application, module: 'approvals', id: approval.id, content: changed },
+            },
+          ],
+          stop_reason: 'tool_use',
+          usage,
+        },
+        { content: [{ type: 'text', text: 'Done.' }], stop_reason: 'end_turn', usage },
+        { content: [{ type: 'text', text: 'Nothing to change.' }], stop_reason: 'end_turn', usage },
+      ]),
+    )
+    agent = await startAgentHost({
+      ...agentHostSettings({
+        healthUrl: `http://127.0.0.1:${await sparePort()}`,
+        platform: required('AXIS_E2E_DATABASE', 'the PostgreSQL connection string of the runtime role'),
+        secretKey: platformSecretKey,
+        proxyUrl: proxy.url,
+        trustDir,
+        answersFile,
+      }),
+      Ai__FixRounds: '1',
+    })
+
+    await askAi(page, host, application, refusedRequest)
+    const requestId = new URL(page.url()).searchParams.get('request')
+    await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Awaiting approval', { timeout: 120_000 })
+    await expect(page.getByText(refusedPlan, { exact: true })).toBeVisible()
+
+    publisher = await startSpecPublisher(applications)
+    try {
+      await page.getByRole('button', { name: 'Approve plan', exact: true }).click()
+      try {
+        await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Failed', { timeout: 600_000 })
+      } catch (error) {
+        // The cause is in what the host and the publisher printed and in the request's steps.
+        const steps = await readText(page, `${api}/authoring-requests/${requestId}`)
+        await test.info().attach('agent-host-output', { body: agent?.output() ?? '', contentType: 'text/plain' })
+        await test.info().attach('publisher-output', { body: publisher.output(), contentType: 'text/plain' })
+        await test.info().attach('request', { body: steps, contentType: 'application/json' })
+        throw error
+      }
+    } finally {
+      await publisher.stop()
+      publisher = undefined
+    }
+    // The scripted answers are used up, so the host stops, as the first test's host does.
+    await agent?.stop()
+    agent = undefined
+
+    // Light mode, then dark mode after a reload, the same checks on the root of the dark theme. The request stays Failed.
+    await expectRefused(page)
+    await chooseTheme(page, 'Dark')
+    await page.reload()
+    const dark = page.locator('[data-theme-mode="dark"]').first()
+    await expect(dark).toBeVisible()
+    await expectRefused(dark)
+    await chooseTheme(page, 'Light')
+
+    // The refusal writes nothing: the newest revision is still the one before the request, and the module's
+    // RequestApproval has no customization layer in the application.
+    const { items } = await readJson<{ items: { id: string }[] }>(page, `${api}/revisions`)
+    expect(items[0].id).toBe(before)
+    const resource = await readJson<{ layer: unknown }>(page, `${api}/modules/approvals/resources/${approval.id}`)
+    expect(resource.layer).toBeNull()
   } finally {
     await page.close()
   }
