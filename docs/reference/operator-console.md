@@ -194,16 +194,16 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
 
 - **Failed work.** Process instances that are `failed`, and connector and package calls whose
   outcome is `unknown`, across every process of every application. An entry opens the
-  [instance detail](process-inspection.md#instance-detail) at `/console/instances/{id}`, with the
-  graph, the history, the tasks and the calls. The page is outside every site, so it has no
-  release texts and shows step names, not their labels. Its tables filter as the
-  [instance page's](process-inspector-widget.md#instance-page) do. It offers the commands that the detail
-  lists. The view is paged on the server. Its table has the toolbar of
+  [instance detail](process-inspection.md#instance-detail) at `/console/instances/{id}`. The page is outside
+  every site, so it has no release texts and shows step names, not their labels. It offers the commands that the
+  detail lists. The view is paged on the server. Its table has the toolbar of
   [tables](actions-and-controls.md#tables) with Filter, and a pager. Each column filters, and the
   Application and Process columns filter by name, so the view has no Application picker. The
   Process filter offers the processes of the active releases. The address keeps the view as
   `failedWork.filter`, `failedWork.page` and `failedWork.pageSize`, because the page has other
   tables.
+- **Instance view** _(planned)_. The console shows the instance as the [instance page](process-inspector-widget.md#instance-page)
+  does, with the process's name in place of its title.
 - **Paths, variables and cancels.** _(planned for M38)_ The instance detail that a failed-work entry opens
   shows the paths, the variables and the cancel of one path or one task, as the
   [instance page](process-inspector-widget.md#instance-page) does.

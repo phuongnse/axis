@@ -139,6 +139,9 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   value in one row of a titled list are one entry, so they share a row too.
 - **One fact to a row** _(planned)_. A list of facts, such as a page's first part through `TermList`, gives each fact
   a row of its own. Two facts share a row only when they belong together, such as a start and an end date.
+- **A strip of facts** _(planned)_. Facts that head a view in use, such as a process instance's page, sit in one line
+  through `TermList`'s `row`. Each fact has its own width, `spacing-xl` apart, wraps when the line is full, and each
+  value stays on one line. It is the one layout the rule above does not cover.
 - **Every required field is marked**. A platform field follows the form widget's
   [required mark](form-widget.md#field-look), in every form and dialog, even where every field is
   required, such as New resource. The sign-in pages mark none, since everyone knows their fields are needed.

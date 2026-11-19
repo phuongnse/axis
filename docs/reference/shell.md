@@ -161,7 +161,7 @@ below it. It says where the person is and what the page is.
   instance, a Studio resource, release or revision, the user page and a cell's tenant page. One `PageHeading` draws
   every one of them, filling `PageLayout`'s name, tags and line, see [which widget](shared-widgets.md#which-widget).
 - **Facts as the first part** _(planned)_. What else the platform keeps of the thing, and the page does not show
-  elsewhere, is the page's first part. It is a list of facts through `TermList`, one fact to a row, see
+  elsewhere, is the page's first part. It is a list of facts through `TermList`, see
   [fields](actions-and-controls.md#fields), above a `borderSubtle` rule. It never sits on the heading's line.
 - **Platform pages.** The platform home page has no band and no breadcrumb, and has its own headings,
   see the [platform home page](#platform-home-page). The Sessions page has the band "Axis › Your
