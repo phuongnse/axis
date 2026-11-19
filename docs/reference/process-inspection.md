@@ -285,16 +285,16 @@ in any state. The body has these parts:
     without a subject and for a row stored before the engine kept it.
   - `made` is always `{ "changes", "event", "notified", "created" }`, and each part is `null` when the run did
     not make it.
-  - `made.changes` is `[{ "field", "before", "after", "hidden" }]` for an `updateRecord` run: each subject
-    field whose stored value differs between the version the run read and the version it wrote, in the
-    entity's field order, so a computed field that the write recomputed counts. It is `[]` when no field
-    differed, and `null` for a run that updates nothing and for a row stored before the engine kept it.
+  - `made.changes` is `[{ "field", "before", "after", "hidden" }]` for a run that wrote the subject record: an
+    `updateRecord` run, a task completion that saves values, a connector or package call that writes its
+    outputs, and an operator's resolve of a call as succeeded. It lists each subject field whose stored value
+    differs between the version the run read and the version it wrote, in the entity's field order, so a
+    computed field that the write recomputed counts. It is `[]` when no field differed, and `null` for a run
+    that writes no subject field, such as a task completed without values, a call with no outputs or a call
+    resolved as failed, and for a row stored before the engine kept it.
 - **Runs, event, notification and created record.** _(planned)_ `made.event` is `{ "name", "fields" }` for a
   `raiseEvent` run, `made.notified` is `{ "to", "channels", "subject" }` for a `notify` run, and `made.created` is
   `{ "entity", "id" }` for a `createRecord` run. Until then, each is `null`.
-- **Runs, changes of tasks and calls.** _(planned)_ `made.changes` is also filled for a task completion that saves
-  values, for a connector or package call that writes its outputs, and for an operator's resolve of a call as
-  succeeded. Until then, it is `null` for them.
 - **Calls.** A connector call has `request`, `{ "method", "url", "query", "headers", "body", "truncated" }`,
   the request of its last attempt that sent one. `url` is the base URL and the path, with no query string,
   and `query` and `headers` are objects that map each name to its text. `body` is text, or `null` when the

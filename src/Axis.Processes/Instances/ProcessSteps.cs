@@ -287,7 +287,7 @@ internal sealed record LoadedInstance(
 /// </param>
 /// <param name="Problem">The code of <paramref name="Error"/>, or <see langword="null"/> when it has none or the step did not fail.</param>
 /// <param name="Read">The subject fields a decision's conditions read, see <c>RunValues.Read</c>, or <see langword="null"/>.</param>
-/// <param name="Changes">The subject fields an <c>updateRecord</c> step changed, see <c>RunValues.Changes</c>, or <see langword="null"/>.</param>
+/// <param name="Changes">The subject fields a run that wrote the subject record changed (an <c>updateRecord</c> step, a task completion with values, a call's outputs or a resolve as succeeded), see <c>RunValues.Changes</c>, or <see langword="null"/>.</param>
 internal sealed record StepOccurrence(
     Guid InstanceId,
     string Step,

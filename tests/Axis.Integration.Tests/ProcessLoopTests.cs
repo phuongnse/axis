@@ -106,6 +106,39 @@ public sealed class ProcessLoopTests(TaskApiFixture fixture) : IClassFixture<Tas
         await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
     }
 
+    [Fact]
+    public async Task Resolving_an_unknown_call_as_succeeded_gives_the_field_its_outputs_changed()
+    {
+        var subject = await fixture.InsertRequestAsync(TenantA, null, amount: 100m);
+        var instance = await fixture.StartAsync(TenantA, "Rework", subject);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        await RunStepAsync();
+        var call = await CallAsync(instance, 1);
+        await ForceUnknownAsync(instance, call);
+        using (var resolved = await ResolveAsync(maria, instance, call))
+        {
+            Assert.Equal(HttpStatusCode.OK, resolved.StatusCode);
+        }
+
+        using var request = RecordApiFixture.Request($"/api/apps/StepApp/processes/Rework/instances/{instance:D}", Host(TenantA));
+        using var response = await maria.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+
+        var run = Assert.Single(
+            body.RootElement.GetProperty("path").EnumerateArray(),
+            entry => entry.GetProperty("step").GetString() == "send"
+                && entry.GetProperty("output").ValueKind == JsonValueKind.Object
+                && entry.GetProperty("output").TryGetProperty("resolved", out var resolvedFlag)
+                && resolvedFlag.GetBoolean());
+        var change = Assert.Single(run.GetProperty("made").GetProperty("changes").EnumerateArray());
+        Assert.Equal("comment", change.GetProperty("field").GetString());
+        Assert.Equal(JsonValueKind.Null, change.GetProperty("before").ValueKind);
+        Assert.Equal("PO-LOOP-1", change.GetProperty("after").GetString());
+        Assert.False(change.GetProperty("hidden").GetBoolean());
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+    }
+
     // Runs the next process step, so no staged call is sent to the unbound connector URL.
     private async Task RunStepAsync() =>
         Assert.True(await fixture.RunNextStepAsync(TenantA, CancellationToken), "No process step is due.");
