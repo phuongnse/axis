@@ -1,6 +1,6 @@
 import { Button, Descriptions, Flex, Result, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { AxisActionRow } from '../platform/AxisButton'
 import { fetchCurrentUser } from '../platform/currentUser'
@@ -11,6 +11,7 @@ import {
   fetchStudioApps,
   fetchStudioDiagnostics,
   fetchStudioNames,
+  fetchStudioPackageFiles,
   fetchStudioResource,
   fetchStudioResourceActivity,
   fetchStudioResources,
@@ -23,6 +24,7 @@ import {
   studioAppTitle,
   type StudioDiagnostic,
   type StudioNames,
+  type StudioPackageFileItem,
   type StudioResource,
   type StudioResourceActivityItem,
   type StudioResourceItem,
@@ -48,6 +50,7 @@ import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioOverview } from './StudioOverview'
 import { StudioPageHeading } from './StudioPageHeading'
+import { StudioPackageList } from './StudioPackageList'
 import { StudioReleasePage } from './StudioReleasePage'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioAskAi } from './StudioAskAi'
@@ -57,6 +60,9 @@ import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishin
 import { StudioPublishPage } from './StudioPublishPage'
 import { studioActiveEntry, studioNavigation } from './studioNavigation'
 import { StudioSidebar } from './StudioSidebar'
+
+// A package's page carries the highlighting of each language, so it loads only when a package opens.
+const LazyStudioPackage = lazy(() => import('./StudioPackage'))
 
 /** The address Publish… was opened from, which the publish page keeps in its navigation state. */
 function publishOrigin(state: unknown): string | null {
@@ -233,12 +239,20 @@ function StudioWorkspace() {
   const revisionId = params.get('revision')
   const requestsView = params.get('view') === 'requests'
   const requestId = params.get('request')
+  const packagesView = params.get('view') === 'packages'
+  const packageId = params.get('package')
+  const packageFile = params.get('file')
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
   const [canPublish, setCanPublish] = useState(false)
   const [canCreate, setCanCreate] = useState(false)
   const [canTest, setCanTest] = useState(false)
   const [canAskAi, setCanAskAi] = useState(false)
+  const [canDevelop, setCanDevelop] = useState(false)
+  const [packageFilesState, setPackageFilesState] = useState<{
+    application: string
+    items: StudioPackageFileItem[]
+  }>()
   const [previewHost, setPreviewHost] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [folderRevision, setFolderRevision] = useState(0)
@@ -260,6 +274,7 @@ function StudioWorkspace() {
         setCanCreate(user?.studioCreate === true)
         setCanTest(user?.studioTest === true)
         setCanAskAi(user?.studioAi === true)
+        setCanDevelop(user?.studioDeveloper === true)
         setPreviewHost(user?.studioPreviewHost ?? null)
         setUserId(user?.id ?? null)
       },
@@ -269,6 +284,7 @@ function StudioWorkspace() {
           setCanCreate(false)
           setCanTest(false)
           setCanAskAi(false)
+          setCanDevelop(false)
           setPreviewHost(null)
           setUserId(null)
         }
@@ -339,6 +355,32 @@ function StudioWorkspace() {
     )
     return () => controller.abort()
   }, [application, generation, folderRevision, lost])
+
+  useEffect(() => {
+    if (application === null) {
+      return
+    }
+    const controller = new AbortController()
+    fetchStudioPackageFiles(application, controller.signal).then(
+      (items) => setPackageFilesState({ application, items }),
+      (error: unknown) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        if (error instanceof ServerUnreachableError) {
+          lost()
+          return
+        }
+        console.warn(`Loading the package files of '${application}' failed`, error)
+        setPackageFilesState({ application, items: [] })
+      },
+    )
+    return () => controller.abort()
+  }, [application, generation, folderRevision, lost])
+  const packageFiles = useMemo(
+    () => (packageFilesState?.application === application ? packageFilesState.items : []),
+    [packageFilesState, application],
+  )
 
   const manifestId = useMemo(
     () =>
@@ -549,7 +591,7 @@ function StudioWorkspace() {
 
   const publishView = requestedPublish && canPublish
   const overviewApp = apps.find((item) => item.name === application)
-  const entries = studioNavigation(application, resources, allModuleGroups, t)
+  const entries = studioNavigation(application, resources, allModuleGroups, t, packageFiles.length > 0)
   const activeKey = studioActiveEntry(
     params,
     resources,
@@ -622,6 +664,29 @@ function StudioWorkspace() {
                     busy={requestBusy || reconnecting}
                     onActivate={(releaseId) => publishing.current?.activate(releaseId)}
                   />
+                ) : packagesView ? (
+                  packageId !== null ? (
+                    <Suspense fallback={null}>
+                      <LazyStudioPackage
+                        key={packageId}
+                        application={application!}
+                        packageId={packageId}
+                        file={packageFile}
+                        files={packageFiles.filter((item) => item.package === packageId)}
+                        developer={canDevelop}
+                        busy={reconnecting}
+                        onSaved={(diagnostics) => {
+                          setFolder({ ...loaded, diagnostics })
+                          setFolderRevision((value) => value + 1)
+                        }}
+                      />
+                    </Suspense>
+                  ) : (
+                    <Flex vertical gap="small">
+                      <StudioPageHeading title={t('shell.studio.nav.packages')} />
+                      <StudioPackageList application={application!} files={packageFiles} />
+                    </Flex>
+                  )
                 ) : releasesView ? (
                   <StudioPageHeading title={t('shell.studio.releases')} />
                 ) : requestsView && requestId !== null ? (

@@ -2,6 +2,9 @@ import { Menu, type MenuProps } from 'antd'
 import { Link } from 'react-router'
 import { navigationIcon } from './navigationIcons'
 
+/** The width of an open navigation menu: the shell's sidebar, and a package's file list beside its editor. */
+export const navigationWidth = 224
+
 /** One entry of the shell's navigation. The label is the text the person reads. */
 export interface ShellNavigationEntry {
   key: string

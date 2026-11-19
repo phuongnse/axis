@@ -816,6 +816,8 @@ const currentUser: CurrentUser = {
   studioPreviewHost: null,
   studioTest: false,
   studioAi: false,
+  // Proposed: the developer role, so the `studio` preview's Package state can edit a package's files, see #3978.
+  studioDeveloper: true,
   console: true,
   users: true,
   tenantStatus: 'active',

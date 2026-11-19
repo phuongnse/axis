@@ -5,14 +5,21 @@ import { tags } from '@lezer/highlight'
 import type { DesignTokens } from '../platform/designTokens'
 import type { ThemeMode } from '../platform/themeMode'
 
-/** The colour of each kind of token in a code editor, from the design tokens. */
+/**
+ * The colour of each kind of token in a code editor, from the design tokens. JSON, an expression and a package file's
+ * language share it.
+ */
 export function codeHighlightStyle(colour: DesignTokens['colour']): HighlightStyle {
   return HighlightStyle.define([
     { tag: [tags.propertyName, tags.variableName, tags.namespace], color: colour.primaryText },
     { tag: tags.string, color: colour.text },
     { tag: tags.number, color: colour.infoText },
-    { tag: [tags.bool, tags.null, tags.keyword], color: colour.warningText },
+    { tag: [tags.bool, tags.null, tags.atom, tags.self, tags.keyword], color: colour.warningText },
     { tag: [tags.punctuation, tags.operator], color: colour.textMuted },
+    // Proposed: a package file's comments, types and annotations, see #3978.
+    { tag: tags.comment, color: colour.textMuted, fontStyle: 'italic' },
+    { tag: [tags.typeName, tags.className], color: colour.successText },
+    { tag: tags.meta, color: colour.textMuted },
   ])
 }
 

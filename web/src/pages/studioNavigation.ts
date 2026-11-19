@@ -1,6 +1,6 @@
 import type { ShellNavigationEntry, ShellNavigationGroup } from '../platform/ShellNavigation'
 import type { ModuleResourceGroup, ModuleResourceItem, StudioResourceItem } from '../platform/studio'
-import { studioResourceAddress } from '../platform/studioAddress'
+import { studioPackageAddress, studioResourceAddress } from '../platform/studioAddress'
 import { kindGroup, kindGroupNames, kindName, studioKind, studioKinds } from '../platform/studioKinds'
 
 /**
@@ -11,6 +11,7 @@ export function studioNavigation(
   resources: readonly StudioResourceItem[],
   moduleGroups: readonly ModuleResourceGroup[],
   t: (key: string) => string,
+  hasPackages = false,
 ): (ShellNavigationEntry | ShellNavigationGroup)[] {
   const path = (extra: Record<string, string> = {}) => `/studio?${new URLSearchParams({ app: application, ...extra })}`
   const manifest = resources.find((item) => item.kind === 'application')
@@ -52,6 +53,15 @@ export function studioNavigation(
     if (name === 'access') {
       groupEntries.push(policyMatrix)
     }
+    // Proposed: the Packages entry ends the Integration group, see docs/reference/studio-packages.md#the-packages-entry.
+    if (name === 'integration' && hasPackages) {
+      groupEntries.push({
+        key: 'packages',
+        path: studioPackageAddress(application),
+        icon: 'tool',
+        label: t('shell.studio.nav.packages'),
+      })
+    }
     if (groupEntries.length > 0) {
       entries.push({ key: `group:${name}`, label: t(`shell.studio.nav.group.${name}`), entries: groupEntries })
     }
@@ -92,7 +102,7 @@ export function studioActiveEntry(
   if (view === 'release') {
     return 'releases'
   }
-  if (view === 'releases' || view === 'history' || view === 'policies') {
+  if (view === 'releases' || view === 'history' || view === 'policies' || view === 'packages') {
     return view
   }
   // A request's page has no entry of its own, so no entry is marked for it, not even Overview.

@@ -10,3 +10,16 @@ export function studioResourceAddress(application: string, resource: string, pat
 export function studioRequestAddress(application: string, id: string): string {
   return `/studio?${new URLSearchParams({ app: application, view: 'requests', request: id })}`
 }
+
+/**
+ * Proposed: the address of an application's packages, `&view=packages`, of one package, `&package=<id>`, and of one of its
+ * files, `&file=<path>`, see #3978 and docs/reference/studio-packages.md#a-packages-files.
+ */
+export function studioPackageAddress(application: string, packageId?: string, file?: string): string {
+  return `/studio?${new URLSearchParams({
+    app: application,
+    view: 'packages',
+    ...(packageId ? { package: packageId } : {}),
+    ...(file ? { file } : {}),
+  })}`
+}

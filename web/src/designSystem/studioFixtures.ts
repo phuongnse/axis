@@ -19,6 +19,8 @@ import type {
   StudioResourceItem,
   StudioResourceReferences,
   StudioRevision,
+  StudioPackageFile,
+  StudioPackageFileItem,
   StudioRevisionDiff,
 } from '../platform/studio'
 import {
@@ -31,6 +33,7 @@ import {
   tableWidget,
 } from './fixtures'
 import type { FixtureRoute } from './fixtureFetch'
+import { typicalPackageFiles } from './packageFixtures'
 
 // The answers of the `studio` preview. Its states answer the same `/api/studio/apps` path, so each state brings its own
 // routes, and the preview shows one state at a time, see docs/reference/widget-previews.md#the-bundle.
@@ -687,8 +690,9 @@ function policyMatrix(folder: Folder) {
  * The routes of the open application, with the state's own applications, resources and names. `answers` holds the
  * diagnostics and releases of the state, and Typical's by default.
  */
-function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers): Record<string, () => unknown> {
+function workspaceRoutes(folder: Folder, answers: StateAnswers = typicalAnswers): Record<string, FixtureRoute> {
   return {
+    ...packageRoutes(folder === typicalFolder ? typicalPackageFiles : [], answers),
     ...Object.fromEntries(
       folder.entities.map((_, index) => [
         `${folderPath}/resources/${id(firstEntityId + index)}`,
@@ -931,6 +935,29 @@ const withExpressions: Record<string, FixtureRoute> = {
   [`${folderPath}/expressions/scope`]: (init) =>
     expressionScopes[expressionPath(init) ?? ''] ??
     ({ type: null, fields: [], functions: [] } satisfies ExpressionScope),
+}
+
+/**
+ * The routes of a folder's package files: the list, and a read and a save of each file, see
+ * docs/reference/studio-packages.md#the-authoring-api. A save answers the file's own version, because the preview keeps
+ * no change, and the state's diagnostics.
+ */
+function packageRoutes(files: readonly StudioPackageFile[], answers: StateAnswers): Record<string, FixtureRoute> {
+  return {
+    [`${folderPath}/package-files`]: () =>
+      ({ items: files.map(({ package: id, path, version }) => ({ package: id, path, version })) }) satisfies {
+        items: StudioPackageFileItem[]
+      },
+    ...Object.fromEntries(
+      files.map((file) => [
+        `${folderPath}/packages/${file.package}/files/${file.path}`,
+        (init?: RequestInit) =>
+          init?.method === 'PUT'
+            ? { version: file.version, diagnostics: answers.diagnostics }
+            : (file satisfies StudioPackageFile),
+      ]),
+    ),
+  }
 }
 
 /** The applications Studio lists in each state, with the routes of the open application where the state opens one. */

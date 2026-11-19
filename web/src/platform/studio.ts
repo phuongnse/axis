@@ -2178,3 +2178,83 @@ export function moduleResources(names: StudioNames | null, search: string, local
 function compareOrdinal(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0
 }
+
+/** The manifest of every package, at the root of its folder, see docs/reference/extension-packages.md#manifest. */
+export const packageManifestFile = 'axis-package.json'
+
+/** A file of one of the application's packages, as `GET /api/studio/apps/{application}/package-files` lists it. */
+export interface StudioPackageFileItem {
+  package: string
+  path: string
+  version: string
+}
+
+/** A package file with its text, see docs/reference/studio-packages.md#the-authoring-api. */
+export interface StudioPackageFile extends StudioPackageFileItem {
+  content: string
+}
+
+function packageFilePath(application: string, packageId: string, path: string): string {
+  const segments = path.split('/').map(encodeURIComponent).join('/')
+  return `/api/studio/apps/${encodeURIComponent(application)}/packages/${encodeURIComponent(packageId)}/files/${segments}`
+}
+
+/** Lists every file of the application's packages, sorted by file. A 401 shows the sign-in prompt and throws, as any other failure does. */
+export async function fetchStudioPackageFiles(
+  application: string,
+  signal?: AbortSignal,
+): Promise<StudioPackageFileItem[]> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/package-files`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return ((await response.json()) as { items: StudioPackageFileItem[] }).items
+}
+
+/** Loads one package file with its text. A 401 shows the sign-in prompt and throws, as any other failure does. */
+export async function fetchStudioPackageFile(
+  application: string,
+  packageId: string,
+  file: string,
+  signal?: AbortSignal,
+): Promise<StudioPackageFile> {
+  const path = packageFilePath(application, packageId, file)
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioPackageFile
+}
+
+/**
+ * Replaces a package file's text, with the version the editor loaded in `If-Match`. A 409 means the file changed since,
+ * and nothing was written. A quota refusal throws a {@link QuotaRefusedError}. A 401 shows the sign-in prompt and throws,
+ * as any other failure does.
+ */
+export async function saveStudioPackageFile(
+  application: string,
+  packageId: string,
+  file: string,
+  version: string,
+  content: string,
+): Promise<PatchResult> {
+  const path = packageFilePath(application, packageId, file)
+  const response = await studioFetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'If-Match': `"${version}"` },
+    body: JSON.stringify({ content }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    throw new QuotaRefusedError(title)
+  }
+  if (!response.ok) {
+    throw new Error(`Saving '${path}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as { version: string; diagnostics: StudioDiagnostic[] }
+  return { status: 'saved', version: body.version, diagnostics: body.diagnostics }
+}

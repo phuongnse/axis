@@ -11,7 +11,7 @@ import { ReadOnlyBanner } from './ReadOnlyBanner'
 import { PreferencesMenu } from './PreferencesMenu'
 import { sizeTokens } from './designTokens'
 import { ShellFooter } from './ShellFooter'
-import { ShellNavigation } from './ShellNavigation'
+import { navigationWidth, ShellNavigation } from './ShellNavigation'
 import { ShellAsideContext } from './shellAsideContext'
 import { ShellSidebarContext } from './shellSidebarContext'
 import { SiteMark } from './SiteMark'
@@ -258,7 +258,7 @@ export function Shell({
             {sidebar && (
               <Layout.Sider
                 id="shell-sidebar"
-                width={224}
+                width={navigationWidth}
                 collapsedWidth={64}
                 collapsible
                 collapsed={collapsed}
