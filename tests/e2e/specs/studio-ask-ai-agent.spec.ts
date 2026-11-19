@@ -2,17 +2,16 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test'
+import { chromium, type Browser, type BrowserContext } from '@playwright/test'
 import { expect, test } from '../test'
 import { sparePort } from '../activate'
-import { runAdmin, startPublisher } from '../admin-tool'
+import { runAdmin } from '../admin-tool'
 import { startAgentHost } from '../agent-host'
+import { askAi, holdAiSpecLock, signIn, startSpecPublisher, type AuthoringAccount } from '../ai-authoring'
 import { csrfHeaders } from '../csrf'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { startDirectoryServer } from '../directory-server'
-import { submitCode, submitPassword } from '../keycloak'
 import { platformSecretKey, required } from '../server-settings'
-import { liveTotp } from '../totp'
 import {
   agentHostSettings,
   issueTenantCertificate,
@@ -48,8 +47,10 @@ const usage = { input_tokens: 1, output_tokens: 1 }
 let folder: string
 let trustDir: string
 let answersFile: string
-let author: { username: string; password: string; secret: string }
-let colleague: { username: string; password: string; secret: string }
+let author: AuthoringAccount
+let colleague: AuthoringAccount
+// The lock of the AI authoring specs, held for the whole run, see holdAiSpecLock.
+let aiLock: { release(): Promise<void> } | undefined
 let server: Awaited<ReturnType<typeof startDirectoryServer>>
 let proxy: Awaited<ReturnType<typeof startTunnelProxy>>
 let browser: Browser
@@ -57,7 +58,7 @@ let agent: Awaited<ReturnType<typeof startAgentHost>> | undefined
 // The folder of the server's applications, which the spec's own publisher serves too.
 let applications: string
 // The publisher that the layer test runs for its checks, see there.
-let publisher: Awaited<ReturnType<typeof startPublisher>> | undefined
+let publisher: Awaited<ReturnType<typeof startSpecPublisher>> | undefined
 // A TOTP code cannot be reused within its period, so the author signs in once and the tests share this context.
 let authorContext: BrowserContext
 // The address of the first request, which the later tests open again.
@@ -69,49 +70,10 @@ let colleagueContext: BrowserContext
 // The id of the approvals application's employee role. The layer test's draft reads it, and the conflict test changes it.
 let employeeRole: string
 
-/** Signs `account` in on the tenant's host in `context` and leaves the page on the tenant's home. */
-async function signIn(context: BrowserContext, account: { username: string; password: string; secret: string }) {
-  const page = await context.newPage()
-  await page.goto(`https://${host}/api/auth/sign-in?returnUrl=/`)
-  await submitPassword(page, account.username, account.password)
-  await submitCode(page, await liveTotp(account.secret))
-  await page.waitForURL(`https://${host}/`)
-  return page
-}
-
-/** Sends `text` from the Ask AI panel of the Studio of `app` and waits until the page of the new request opens. */
-async function askAi(page: Page, text: string, app = application) {
-  await page.goto(`https://${host}/studio?app=${app}`)
-  await page.getByTestId('studio-ask-ai').click()
-  await page.getByRole('textbox', { name: 'Your request', exact: true }).fill(text)
-  await page.getByTestId('studio-ask-ai-send').click()
-  await page.waitForURL(/view=requests&request=/)
-}
-
-/**
- * The spec's own publisher, with the server's Studio settings, the scenario role and the runtime role. The runtime role
- * gives it the write lock that an accept takes, so without it the accept fails with "The draft is not found."
- * It runs alone under the publishers' lock. See the layer test.
- */
-function startSpecPublisher() {
-  return startPublisher(
-    {
-      Studio__ApplicationsPath: applications,
-      Studio__AuthorRole: 'author',
-      ConnectionStrings__Platform: required(
-        'AXIS_E2E_DATABASE',
-        'the PostgreSQL connection string of the runtime role',
-      ),
-      Scenarios__ServerConnectionString: required(
-        'AXIS_E2E_SCENARIO_DATABASE',
-        'the PostgreSQL connection string of the scenario role',
-      ),
-    },
-    { alone: true },
-  )
-}
-
 test.beforeAll(async () => {
+  // The other AI authoring spec may hold the lock for its whole run, see holdAiSpecLock. Waiting for it takes this long.
+  test.setTimeout(1_800_000)
+  aiLock = await holdAiSpecLock()
   const created = await runAdmin(['tenant', 'create', tenant, '--host', host])
   expect(created.status, `${created.stdout}\n${created.stderr}`).toBe(0)
   const admin = await keycloakAdmin({
@@ -167,11 +129,12 @@ test.afterAll(async () => {
   if (folder) {
     await rm(folder, { recursive: true, force: true })
   }
+  await aiLock?.release()
 })
 
 test('an author sends a request from Ask AI, sees it in Planning and then in Awaiting approval with its plan', async () => {
   authorContext = await browser.newContext({ ignoreHTTPSErrors: true })
-  const page = await signIn(authorContext, author)
+  const page = await signIn(authorContext, host, author)
   try {
     // The call runs in the page, because the browser maps the tenant host to the server and the request context does not.
     const made = await page.evaluate(
@@ -187,7 +150,7 @@ test('an author sends a request from Ask AI, sees it in Planning and then in Awa
     )
     expect(made).toBe(201)
 
-    await askAi(page, request)
+    await askAi(page, host, application, request)
     firstRequestUrl = page.url()
     await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Planning')
     await expect(
@@ -218,7 +181,7 @@ test('an author sends a request from Ask AI, sees it in Planning and then in Awa
 test('another author sees the plan and whose approval it waits for, with no actions', async () => {
   const context = await browser.newContext({ ignoreHTTPSErrors: true })
   try {
-    const page = await signIn(context, colleague)
+    const page = await signIn(context, host, colleague)
     await page.goto(firstRequestUrl)
     await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Awaiting approval')
     await expect(page.getByText(plan, { exact: true })).toBeVisible()
@@ -234,7 +197,7 @@ test('another author sees the plan and whose approval it waits for, with no acti
 test('an author asks for another plan with a comment, sees the new plan, and drops the request', async () => {
   const page = await authorContext.newPage()
   try {
-    await askAi(page, secondRequest)
+    await askAi(page, host, application, secondRequest)
     await expect(page.getByText(secondPlan, { exact: true })).toBeVisible({ timeout: 120_000 })
     await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Awaiting approval')
 
@@ -330,7 +293,7 @@ test('a request whose compile check fails in every fix round ends Failed, with w
 
   const page = await authorContext.newPage()
   try {
-    await askAi(page, failingRequest)
+    await askAi(page, host, application, failingRequest)
     await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Awaiting approval', { timeout: 120_000 })
     await expect(page.getByText(failingPlan, { exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Approve plan', exact: true }).click()
@@ -482,11 +445,11 @@ test("a request whose work adds a field to a module entity's layer reaches Ready
 
   const page = await authorContext.newPage()
   try {
-    await askAi(page, layerRequest, approvalsApplication)
+    await askAi(page, host, approvalsApplication, layerRequest)
     await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Awaiting approval', { timeout: 120_000 })
     await expect(page.getByText(layerPlan, { exact: true })).toBeVisible()
 
-    publisher = await startSpecPublisher()
+    publisher = await startSpecPublisher(applications)
     try {
       await page.getByRole('button', { name: 'Approve plan', exact: true }).click()
       try {
@@ -534,7 +497,7 @@ test("a request whose work adds a field to a module entity's layer reaches Ready
 test('another author sees the ready request and its diff, and whose accept it waits for, with no actions', async () => {
   // The colleague's context stays open for the conflict test that follows, which acts as the colleague, so it signs in once.
   colleagueContext = await browser.newContext({ ignoreHTTPSErrors: true })
-  const page = await signIn(colleagueContext, colleague)
+  const page = await signIn(colleagueContext, host, colleague)
   try {
     await page.goto(readyRequestUrl)
     await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Ready')
@@ -585,7 +548,7 @@ test("an author's accept after another author changed a resource the draft read 
     try {
       await page.goto(readyRequestUrl)
       await expect(page.getByTestId('studio-ai-request-state')).toHaveText('Ready')
-      publisher = await startSpecPublisher()
+      publisher = await startSpecPublisher(applications)
       try {
         await page.getByRole('button', { name: 'Accept', exact: true }).click()
         try {
@@ -657,7 +620,7 @@ test('the author accepts the ready layer change, sees Accepted and finds its rev
 
     // The accept is the publisher's work, so the spec's publisher runs from just before Accept until the accept ends.
     let acceptId: string
-    publisher = await startSpecPublisher()
+    publisher = await startSpecPublisher(applications)
     try {
       const sent = page.waitForResponse(
         (response) => response.request().method() === 'POST' && response.url().endsWith('/accept'),

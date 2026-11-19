@@ -116,6 +116,18 @@ export async function confirmPublish(page: Page, label?: string) {
   await expect(page).not.toHaveURL(/view=publish/)
 }
 
+/**
+ * Opens the Releases page of the open application from the sidebar, where the release list is, and waits for the list.
+ * Publish… keeps the page it is clicked on, so it must not be clicked before the Releases page has shown.
+ */
+export async function openReleases(page: Page) {
+  await page
+    .getByRole('navigation', { name: 'Menu', exact: true })
+    .getByRole('link', { name: 'Releases', exact: true })
+    .click()
+  await expect(page.getByTestId('studio-releases')).toBeVisible()
+}
+
 /** Opens the New application… dialog from the application row of the sidebar, on a page that has an application open. */
 export async function openNewApplication(page: Page) {
   await page.getByTestId('studio-application-row').click()
@@ -205,14 +217,16 @@ export async function openEntityField(page: Page, index: number): Promise<Locato
 }
 
 /**
- * Clicks Add field in the open entity, waits until the new row, at `index`, shows, then opens the new field's drawer.
- * It closes an open field first, because a drawer could cover the button.
+ * Clicks Add field in the open entity, waits until the new row, at `index`, shows, then waits for the new field's drawer,
+ * which Add field opens, named "Unnamed field" until the field has a name. It closes an open field first, because a
+ * drawer could cover the button.
  */
 export async function addEntityField(page: Page, index: number): Promise<Locator> {
   await closeEntityField(page)
   await page.getByRole('button', { name: 'Add field', exact: true }).click()
   await expect(page.getByTestId(`studio-field-/fields/${index}`)).toBeVisible()
-  return openEntityField(page, index)
+  await waitForDialog(page, 'Unnamed field')
+  return fieldDrawer(page)
 }
 
 /**

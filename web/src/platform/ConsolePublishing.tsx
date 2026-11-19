@@ -1,4 +1,4 @@
-import { Flex, Select, Tag, Typography } from 'antd'
+import { Flex, Select, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
@@ -11,6 +11,7 @@ import {
 } from './console'
 import { ReleaseOffStandard } from './ReleaseOffStandard'
 import { SectionPart } from './SectionParts'
+import { StatusTag, type StatusTone } from './StatusTag'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { releasePublisher } from './studio'
 import { useText } from './texts'
@@ -32,11 +33,11 @@ interface LoadState {
   failed: boolean
 }
 
-const statusColors: Record<ConsolePublishRequest['status'], string> = {
-  queued: 'processing',
-  running: 'processing',
+const statusTones: Record<ConsolePublishRequest['status'], StatusTone> = {
+  queued: 'neutral',
+  running: 'neutral',
   succeeded: 'success',
-  failed: 'error',
+  failed: 'danger',
 }
 
 /** The columns the requests table's search, filter and sort can name, see docs/reference/operator-console.md#api. */
@@ -129,8 +130,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
         render: (_value, row) => (
           <Flex gap="small" align="center">
             <span>{`#${row.number}`}</span>
-            {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-            {row === activeRow && <Tag color="success">{t('shell.console.publishing.active')}</Tag>}
+            {row === activeRow && <StatusTag tone="neutral">{t('shell.console.publishing.active')}</StatusTag>}
           </Flex>
         ),
       },
@@ -196,7 +196,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
         },
         sorter: true,
         render: (_value, row) => (
-          <Tag color={statusColors[row.status]}>{t(`shell.console.publishing.status.${row.status}`)}</Tag>
+          <StatusTag tone={statusTones[row.status]}>{t(`shell.console.publishing.status.${row.status}`)}</StatusTag>
         ),
       },
       {

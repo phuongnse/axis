@@ -1,4 +1,4 @@
-import { Button, Descriptions, Flex, Form, Space, Tag, Typography } from 'antd'
+import { Button, Descriptions, Flex, Form, Space, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -8,6 +8,7 @@ import { buildCompleteBody } from './recordBody'
 import { fetchRecord, type RecordProblem } from './records'
 import { ReassignDialog } from './ReassignDialog'
 import { requiredMark } from './requiredMark'
+import { StatusTag } from './StatusTag'
 import type { WidgetMetadata } from './site'
 import {
   assignedElsewhere,
@@ -234,8 +235,7 @@ function TaskBody({
             children: (
               <Space size="small">
                 {formatValue(dueAtField, task.dueAt, {}, { locale, text: t })}
-                {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-                {task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>}
+                {task.overdue && <StatusTag tone="attention">{t('shell.tasks.overdue')}</StatusTag>}
               </Space>
             ),
           },

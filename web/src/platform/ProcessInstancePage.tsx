@@ -1,4 +1,4 @@
-import { Button, Descriptions, Flex, Tag, Typography } from 'antd'
+import { Button, Descriptions, Flex, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
@@ -11,6 +11,7 @@ import {
   fetchInstance,
   forbidden,
   instanceCommands,
+  callStateText,
   instanceStates,
   retryWarns,
   sendCommand,
@@ -28,6 +29,7 @@ import {
 import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { ReasonDialog } from './ReasonDialog'
 import { ResolveDialog } from './ResolveDialog'
+import { StatusTag, type StatusTone } from './StatusTag'
 import { SectionPart, SectionParts } from './SectionParts'
 import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
@@ -523,10 +525,8 @@ export function InstanceDetailView({
                 <Flex gap="small" align="center">
                   <Typography.Text strong>{stepLabel(step.name)}</Typography.Text>
                   <Typography.Text type="secondary">{step.type}</Typography.Text>
-                  {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-                  {taken.has(step.name) && <Tag color="green">{t('shell.inspector.taken')}</Tag>}
-                  {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-                  {step.name === instance.step && <Tag color="blue">{t('shell.inspector.current')}</Tag>}
+                  {taken.has(step.name) && <StatusTag tone="muted">{t('shell.inspector.taken')}</StatusTag>}
+                  {step.name === instance.step && <StatusTag tone="neutral">{t('shell.inspector.current')}</StatusTag>}
                 </Flex>
                 {step.transitions.map((transition) => (
                   <Typography.Text key={`${transition.next}|${transition.on ?? ''}`} type="secondary">
@@ -640,6 +640,15 @@ interface CallItemProps {
   attemptColumns: AxisColumn<CallAttempt>[]
 }
 
+const callTones: Record<string, StatusTone> = {
+  pending: 'neutral',
+  sending: 'neutral',
+  unknown: 'attention',
+  succeeded: 'success',
+  failed: 'danger',
+  cancelled: 'muted',
+}
+
 /**
  * One call: where it goes, its state, its input and its attempts. The Attempts table filters on each column and keeps
  * its filter in the address under `attempts.{callId}.`, see docs/reference/process-inspector-widget.md#instance-page.
@@ -668,11 +677,11 @@ function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attem
       style={{ width: '100%', paddingBlock: spacing.sm, borderBlockEnd: `1px solid ${colour.divider}` }}
     >
       <Flex gap="small" align="center" wrap>
-        <Tag>{call.kind}</Tag>
+        <Typography.Text>{call.kind}</Typography.Text>
         <Typography.Text strong>{stepLabel(call.step)}</Typography.Text>
         <Typography.Text>{target}</Typography.Text>
         <Typography.Text>{call.operation}</Typography.Text>
-        <Tag>{call.state}</Tag>
+        <StatusTag tone={callTones[call.state] ?? 'neutral'}>{callStateText(t, call.state)}</StatusTag>
         {call.resolvable && call.outputs && (
           // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           <Button size="small" data-testid={`inspector-resolve-${call.id}`} onClick={() => setResolving(true)}>

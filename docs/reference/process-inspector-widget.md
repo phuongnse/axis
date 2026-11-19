@@ -68,7 +68,8 @@ wrong form show the not-found page, and the instance is not requested.
 
 - **Steps.** The page reads the instance detail and shows the steps as a list in graph order, each with
   its type and its transitions, with no diagram. Steps the instance has run are marked as taken, and
-  the step it is at is marked as current, whatever the instance state.
+  the step it is at is marked as current, whatever the instance state. Taken is a `StatusTag` in `muted` and
+  Current one in `neutral`, so the one current step stands out from the steps already passed.
 - **Every current step.** _(planned for M38)_ A step is marked Current when the root path is at it, or when a
   running or waiting path is at it. A step that several paths are at is marked once, with the number of paths, as in
   "Current, 3 paths". Steps inside a block are listed under the block, indented, each with its branch's name. A
@@ -77,7 +78,9 @@ wrong form show the not-found page, and the instance is not requested.
   decision, the error and the trace ID, then the tasks, then the calls with their attempts. The
   trace ID of a history row and of an attempt is copyable text, and the muted dash when there is none.
   Every other empty cell of an attempt shows the dash too. A call with no attempts shows "No attempts
-  yet." in place of its table, see [Attempts](process-inspection.md#attempts). A call whose
+  yet." in place of its table, see [Attempts](process-inspection.md#attempts). A call's kind is plain text,
+  because it is a category. Its state is a `StatusTag` with the words of the state: `pending` and `sending` are
+  `neutral`, `unknown` is `attention`, `succeeded` is `success`, `failed` is `danger` and `cancelled` is `muted`. A call whose
   `inputHidden` is `true` shows "hidden" in place of its input. A shown input is a list of its
   top-level properties, where a number keeps its source digits.
 - **Filter.** The History, Tasks and Sub-processes tables and each call's Attempts table have Filter on
@@ -195,7 +198,7 @@ The widget shows a failure where it happens, and its words come from the platfor
   shows a generic load error. On the instance list, that error sits under the toolbar in place of the rows,
   so the person can clear the search or filter that caused it.
 - **Texts.** The platform texts `shell.inspector.*` hold the column headers, the section titles, the
-  instance states, the "hidden" text, the "No subject" text, the Due, Parent, Process and Sub-processes
+  instance states, the call states (`shell.inspector.callStates.*`), the "hidden" text, the "No subject" text, the Due, Parent, Process and Sub-processes
   labels, the empty texts and the messages. `shell.inspector.deadLetters.*` hold the dead letter
   section's title, column headers, empty text and load error. `shell.inspector.commands.*` hold the
   command buttons, the dialog's labels, the reason errors, the retry warning and the resolve labels and

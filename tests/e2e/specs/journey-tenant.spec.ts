@@ -5,7 +5,7 @@ import { expect, test } from '../test'
 import { applicationFolder } from '../approvals'
 import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
-import { confirmPublish } from '../studio-resources'
+import { confirmPublish, openReleases } from '../studio-resources'
 import { journeyURL } from '../server-settings'
 import { useJourneySession } from '../sessions'
 
@@ -50,12 +50,8 @@ test.describe('the journey tenant publishes a Studio application', () => {
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`app=${name}$`))
 
-    await page
-      .getByRole('navigation', { name: 'Menu', exact: true })
-      .getByRole('link', { name: 'Releases', exact: true })
-      .click()
-    // Publish… returns to the page it was opened from, so it must open from the releases page, not the overview.
-    await expect(page).toHaveURL(/view=releases$/)
+    // Publish… returns to the page that is drawn when it is clicked, so the release list must have shown first.
+    await openReleases(page)
     await page.getByRole('button', { name: 'Publish…', exact: true }).click()
     await confirmPublish(page)
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {

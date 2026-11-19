@@ -230,7 +230,7 @@ its end.
   [release history](authoring.md#release-history). Publish sends the request with only the filled
   values. It and Cancel replace the page's history entry with the page Publish… was opened from, at its top, or
   the Overview after a link, and the status line follows the request there. Publish is off while a request runs,
-  the reconnect shows, the history loads or nothing is left to publish. A failed history drops `<n>` and the line, and a folder that is all live drops `<n>`.
+  the reconnect shows, the history or the changed files load or nothing is left to publish. A failed history drops `<n>` and the line, and a folder that is all live drops `<n>`.
 - **Preview** shows only when `GET /api/me` answers a `studioPreviewHost` that is not null, and needs
   no `studioPublisher`. It sends `POST .../preview` at once, with no dialog. A succeeded preview shows
   Previewed and a link to each of the application's sites on the preview host, built from the page's
@@ -287,9 +287,9 @@ Studio runs the application's [test scenarios](test-scenarios.md) through the
 - **The status line** shows queued, running and the outcome, as for Validate: Tests passed or Tests
   failed, and never a release number.
 - **Test results.** _(planned for M35)_ Each result reads as [a scenario's result](ai-authoring-in-studio.md#scenario-results)
-  does. The list shows each scenario of the request's `scenarios` field, with passed or failed, its time and, for a
-  failure, the failing step and its message. Steps count from 1, as the scenario editor's step cards do. Opening a
-  failure opens the scenario at the item's `path`, as a diagnostic does.
+  does. The list shows each scenario of the request's `scenarios` field, with a `StatusTag` that reads passed (`success`),
+  failed (`danger`) or skipped (`muted`), its time and, for a failure, the failing step and its message. Steps count from
+  1, as the scenario editor's step cards do. Opening a failure opens the scenario at the item's `path`, as a diagnostic does.
 - **No empty pass.** While the request is queued or running, the list shows a note instead of rows, so
   an empty list never reads as a pass. A failed run with no results says that no scenario ran and
   points to the diagnostics: compile errors, a missing setting and an unknown scenario name fail a run

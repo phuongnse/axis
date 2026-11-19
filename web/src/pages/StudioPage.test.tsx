@@ -1622,7 +1622,7 @@ describe('StudioPage publishing', () => {
     me: () => Response,
     statuses: unknown[] = [],
     history: { folderContentHash: string; active: boolean } = { folderContentHash: 'hash-4', active: true },
-    live: () => Response = () => new Response(null, { status: 404 }),
+    live: () => Response | Promise<Response> = () => new Response(null, { status: 404 }),
     requestAnswers: Record<string, () => Response> = {},
   ) {
     const fetchMock = stubServer()
@@ -1727,7 +1727,7 @@ describe('StudioPage publishing', () => {
     expect(within(group).getByText('What changed and why, for whoever reads the release list.')).toBeInTheDocument()
     expect(await screen.findByText('Goes live as release 4')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
-    expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled()
+    await waitFor(() => expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled())
     expect(screen.queryByTestId('studio-publish')).not.toBeInTheDocument()
     // The page marks no sidebar entry.
     expect(document.querySelector('[aria-current="page"]')).toBeNull()
@@ -1849,6 +1849,34 @@ describe('StudioPage publishing', () => {
         expect(fetchMock.mock.calls.map(([input]) => input)).toContain(`${folder}/releases/live/diff`),
       )
       expect(screen.queryByTestId('studio-section-publish-changes')).toBeNull()
+      await waitFor(() => expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled())
+    })
+
+    it('keeps Publish off while the changed files load, and turns it on when the list shows', async () => {
+      let answer: (response: Response) => void = () => undefined
+      stubPublishing(
+        publisher,
+        [],
+        { folderContentHash: 'hash-4', active: true },
+        () => new Promise<Response>((resolve) => (answer = resolve)),
+      )
+      renderPage('/studio?app=PurchaseRequests&view=publish')
+
+      expect(
+        await screen.findByText('Everything below goes live as a new release, in place of release 3.'),
+      ).toBeVisible()
+      expect(screen.getByTestId('studio-publish-confirm')).toBeDisabled()
+
+      answer(
+        json({
+          release: 3,
+          resources: [liveFile('roles/employee.json', 'changed', 'Employee', [])],
+          cursor: null,
+        }),
+      )
+
+      expect(await screen.findByRole('heading', { name: '1 file changed since the live release' })).toBeVisible()
+      expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled()
     })
   })
 
@@ -1889,7 +1917,7 @@ describe('StudioPage publishing', () => {
     await userEvent.click(publish)
 
     expect(await screen.findByText('Goes live as release 4')).toBeInTheDocument()
-    expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled()
+    await waitFor(() => expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled())
   })
 
   it('goes back to where Publish… was opened when Cancel is chosen, and sends nothing', async () => {
@@ -1920,6 +1948,7 @@ describe('StudioPage publishing', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
     await userEvent.type(screen.getByRole('textbox', { name: 'Note' }), 'Added the approval step')
     await userEvent.click(await screen.findByText('Goes live as release 4'))
+    await waitFor(() => expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled())
     await userEvent.click(screen.getByTestId('studio-publish-confirm'))
 
     expect(await screen.findByTestId('studio-request-status')).toHaveAttribute('data-status', 'queued')
@@ -1956,6 +1985,7 @@ describe('StudioPage publishing', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
     await userEvent.type(screen.getByRole('textbox', { name: 'Label' }), 'May')
     await userEvent.click(await screen.findByText('Goes live as release 4'))
+    await waitFor(() => expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled())
     await userEvent.click(screen.getByTestId('studio-publish-confirm'))
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/)
 
@@ -2010,6 +2040,7 @@ describe('StudioPage publishing', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
     await userEvent.click(await screen.findByText('Goes live as release 3'))
+    await waitFor(() => expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled())
     await userEvent.click(screen.getByTestId('studio-publish-confirm'))
 
     await vi.advanceTimersByTimeAsync(1000)
@@ -2102,6 +2133,7 @@ describe('StudioPage publishing', () => {
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
     await userEvent.click(await screen.findByText('Goes live as release 4'))
+    await waitFor(() => expect(screen.getByTestId('studio-publish-confirm')).toBeEnabled())
     await userEvent.click(screen.getByTestId('studio-publish-confirm'))
 
     expect(await screen.findByTestId('studio-request-error')).toHaveTextContent(

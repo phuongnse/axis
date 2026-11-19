@@ -1,4 +1,4 @@
-import { Flex, Modal, Result, Tag, Typography } from 'antd'
+import { Flex, Modal, Result, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
@@ -6,6 +6,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
+import { StatusTag } from '../platform/StatusTag'
 import { useDesignTokens } from '../platform/themeMode'
 import { changeUserRole, fetchUserRoles, type RoleChange, type UserRoles } from '../platform/users'
 import { usePlatform } from './context'
@@ -46,7 +47,7 @@ type Problem = 'forbidden' | 'conflict' | 'loadFailed' | 'changeFailed'
 export function UserPage() {
   const t = useText()
   const platform = usePlatform()
-  const { colour, size } = useDesignTokens()
+  const { size } = useDesignTokens()
   const { id = '' } = useParams()
   const [roles, setRoles] = useState<UserRoles>()
   const [refusal, setRefusal] = useState<'forbidden' | 'notFound'>()
@@ -140,10 +141,8 @@ export function UserPage() {
                     <Flex key={row.role} align="center" justify="space-between" gap="small" data-testid="user-role">
                       <Flex align="center" gap="small">
                         <Typography.Text>{row.role}</Typography.Text>
-                        {row.given && <Tag style={{ color: colour.successText }}>{t('shell.users.roles.given')}</Tag>}
-                        {!row.declared && (
-                          <Tag style={{ color: colour.warningText }}>{t('shell.users.roles.notDeclared')}</Tag>
-                        )}
+                        {row.given && <StatusTag tone="neutral">{t('shell.users.roles.given')}</StatusTag>}
+                        {!row.declared && <StatusTag tone="attention">{t('shell.users.roles.notDeclared')}</StatusTag>}
                       </Flex>
                       {(row.given || row.declared) && (
                         <AxisButton

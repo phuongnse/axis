@@ -92,7 +92,8 @@ tenant button of the Tenants view and the actions of the Tenant view.
   of Created, Kind, Tenant and State, and a pager with a page size. The server searches, filters, sorts and pages the
   list, 20 jobs to a page by default, see [the job list](tenant-lifecycle.md#routes). The search, the filter, the
   columns, the sort, the page and the page size live in the address, see [tables](actions-and-controls.md#tables).
-  A row shows the time, the kind, the tenant and the state, each
+  A row shows the time, the kind, the tenant and the state, a `StatusTag` in `neutral` for `queued` and `running`, in
+  `success` for `succeeded` and in `danger` for `failed`, each
   step with its state, or one line when no step has run yet, and the error of a failed job or step. A failed job other than a `purge` job has a Run
   again button, with a confirmation that names the job and the tenant, see [actions](#actions).
 - **Tenants.** One row per tenant, with AxisTable's Search, which looks in the id and the hosts, its Filter on every
@@ -101,13 +102,14 @@ tenant button of the Tenants view and the actions of the Tenant view.
   list, 20 tenants to a page by default, see [the tenant list](tenant-lifecycle.md#routes). The search, the filter,
   the columns, the sort, the page and the page size live in the address, see [tables](actions-and-controls.md#tables).
   A row shows:
-  - the id, the status (`active`, `readOnly`, `suspended`, `provisioning` or `deleting`) and the hosts;
+  - the id, the status and the hosts. The status is a `StatusTag`: `active`, `provisioning` and `deleting` are
+    `neutral`, and `readOnly` and `suspended` are `attention`;
   - the counts of failed instances, calls with an unknown outcome and open dead letters, with a dash for a
     tenant that the worker has not counted yet;
   - the usage: the newest storage sample, the users, the applications and the emails sent today, each against
     its quota, with a dash while a count is missing, see [the tenant list](tenant-lifecycle.md#routes);
-  - the time of the newest daily archive, marked when it is more than 26 hours old, with a dash for a tenant
-    that has no archive.
+  - the time of the newest daily archive, marked with an Overdue `StatusTag` in `attention` when it is more than
+    26 hours old, with a dash for a tenant that has no archive.
 - **Tenant.** One tenant's status and hosts, its quotas with the rows that override the cell's
   defaults, its usage and its 50 newest jobs in the same table as the Jobs view, without its toolbar. An id that is neither a tenant nor a purged tenant shows the not-found page.
   The view shows its parts in this order: Details, with the status, the application, the hosts and the actions,

@@ -241,7 +241,27 @@ it exclusively, and the publishers of the cell specs share it. The colleague the
 diff and 'Waiting for its author to accept', with no Accept or Drop…. The accept test runs after that one. The author
 clicks Accept, sees Accepted, and finds the accept's revision first in History, as 'Accept draft' through Studio. The
 author signs in once, because a code cannot be used twice within its period. The spec stops the publisher, the proxy,
-its browser and its server when the test ends.
+its browser and its server when the test ends. Its sign-in, Ask AI and publisher helpers come from
+`tests/e2e/ai-authoring.ts`, and it holds the AI authoring lock for its whole run, see the AI authoring journey spec.
+
+**The AI authoring journey spec** runs on the tenant `ai-journey`, on the host `ai-journey.eval.localhost`, with its
+server on the port offset 10. It has the same agent host, certificate and proxy as the Ask AI agent spec. Its author has
+the author role and the publisher role, which `Studio:PublisherRole` reads, so the author may publish. The spec makes an
+application from the built-in `approvals` template and gives the scripted answers, in order: a plan, a read of the
+employee role, a `write_layer` that adds the approver kind `director` to the module's `ApprovalStep` with its label, two
+`write_resource` calls that add the same label to the application's `en` and `vi` texts, a scenario, the end of the work
+and the review `PASSED`. The label's text key is `approvalStep.approver.director`, which is not under the module's
+`approvals.` prefix, because an application text may not start with the prefix of a module it uses. The scenario,
+`DirectorApprovesLargeRequests`, says that a request of 1500 needs the line manager and then the director, and that a
+request of 500 needs the line manager alone. The diff marks whole fields of a keyed list, not the values of an enum, so
+the layer marks `approver` Changed and not `director`. The spec checks that mark, that `director` is in the opened diff
+of that field, and that the scenario has its own block. It checks these in light mode and, after a reload, in dark mode,
+on the same request, so the request runs once. The three tests are: the author asks for the plan, approves it, and the
+request reaches Ready with Checks Passed; a colleague changes the employee role, and the author's Accept shows the
+conflict and the colleague's revision stays the newest; the colleague undoes the change, and the author accepts and
+publishes one active release. The spec stops its agent host once the request reads Ready, because the scripted answers
+are used up by then. Both AI authoring specs hold one exclusive lock, `holdAiSpecLock`, for their whole run, because an
+agent host serves every directory tenant, so the two specs run one after the other in a shard.
 
 **The cell console spec** starts a server of its own in `Testing`, on the next port offset, with the
 `Cell:*` settings of a cell, `Cell:ConsoleHost` set to `console.localhost` and the secret of the
@@ -249,8 +269,8 @@ its browser and its server when the test ends.
 port 443 to that server. The operator signs in through the `axis-operators` realm with a password and
 a code, and a user of the tenant it creates is refused on the console host. Its server and publisher get the
 `Cell:ExportStorage` settings of the MinIO that `scripts/e2e.sh` starts, and the spec exports a tenant and downloads
-the ZIP after the warning. Both cell specs start their server, publisher and browser through `tests/e2e/cell.ts`. Their publishers take the publisher lock shared, so a cell spec waits while the Ask AI
-agent spec's publisher runs, and the two cell specs run side by side.
+the ZIP after the warning. Both cell specs start their server, publisher and browser through `tests/e2e/cell.ts`. Their publishers take the publisher lock shared, so a cell spec waits while the publisher of either AI
+authoring spec runs, and the two cell specs run side by side.
 
 **The cell quota journey** runs a cell on the port offset after the cell console spec's, with a server that reads the
 tenant directory every 2 seconds, so a new tenant and a changed quota take effect within seconds. It signs in as an

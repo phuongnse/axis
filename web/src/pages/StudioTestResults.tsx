@@ -1,6 +1,7 @@
-import { Button, Flex, Tag, Typography } from 'antd'
+import { Button, Flex, Typography } from 'antd'
 import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
+import { StatusTag } from '../platform/StatusTag'
 import type { StudioRequest, StudioScenarioResult, StudioSkippedScenarioResult } from '../platform/studio'
 import { useText } from '../platform/texts'
 
@@ -55,10 +56,10 @@ function ScenarioRow({
     return (
       <div style={{ padding: '4px 15px' }}>
         <Flex vertical align="flex-start">
-          <span>
-            <Tag>{t('shell.studio.tests.skipped')}</Tag>
+          <Flex gap="small" align="center" wrap>
+            <StatusTag tone="muted">{t('shell.studio.tests.skipped')}</StatusTag>
             <strong>{scenario.name}</strong>
-          </span>
+          </Flex>
           <Typography.Text type="secondary">
             {fillText(t('shell.studio.tests.relaxedPoint'), { point: scenario.point })}
           </Typography.Text>
@@ -69,14 +70,13 @@ function ScenarioRow({
   const failed = scenario.outcome === 'failed'
   const content = (
     <Flex vertical align="flex-start">
-      <span>
-        {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-        <Tag color={failed ? 'error' : 'success'}>
+      <Flex gap="small" align="center" wrap>
+        <StatusTag tone={failed ? 'danger' : 'success'}>
           {t(failed ? 'shell.studio.tests.failed' : 'shell.studio.tests.passed')}
-        </Tag>
-        <strong>{scenario.name}</strong>{' '}
+        </StatusTag>
+        <strong>{scenario.name}</strong>
         <Typography.Text type="secondary">{`${scenario.durationMs} ms`}</Typography.Text>
-      </span>
+      </Flex>
       {failed && scenario.step !== null && (
         <Typography.Text>{fillText(t('shell.studio.tests.step'), { number: scenario.step + 1 })}</Typography.Text>
       )}

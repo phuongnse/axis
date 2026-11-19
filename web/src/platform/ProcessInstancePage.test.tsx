@@ -354,10 +354,12 @@ describe('ProcessInstancePage', () => {
     const [approval, register, done] = steps
     expect(within(approval).getByText('Manager approval')).toBeInTheDocument()
     expect(within(approval).getByText('Taken')).toBeInTheDocument()
+    expect(within(approval).getByText('Taken').closest('[data-tone]')).toHaveAttribute('data-tone', 'muted')
     expect(within(approval).queryByText('Current')).not.toBeInTheDocument()
     expect(within(approval).getByText('→ registerPurchase (approve)')).toBeInTheDocument()
     expect(within(approval).getByText('→ done (reject)')).toBeInTheDocument()
     expect(within(register).getByText('Current')).toBeInTheDocument()
+    expect(within(register).getByText('Current').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
     expect(within(register).queryByText('Taken')).not.toBeInTheDocument()
     expect(within(register).getByText('→ done')).toBeInTheDocument()
     expect(within(done).queryByText('Taken')).not.toBeInTheDocument()
@@ -420,6 +422,35 @@ describe('ProcessInstancePage', () => {
     expect(within(hidden).getByText('PurchasingSystem')).toBeInTheDocument()
     expect(within(hidden).getByText('createOrder')).toBeInTheDocument()
     expect(within(hidden).queryByText('title')).not.toBeInTheDocument()
+  })
+
+  it('shows a call kind as plain text, and its state as a tag in words with the tone of its meaning', async () => {
+    stubApi()
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    const hidden = within(screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8c'))
+    expect(hidden.getByText('connector').closest('.ant-tag')).toBeNull()
+    expect(hidden.getByText('Pending').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
+    const visible = within(screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8d'))
+    expect(visible.getByText('package').closest('.ant-tag')).toBeNull()
+    expect(visible.getByText('Succeeded').closest('[data-tone]')).toHaveAttribute('data-tone', 'success')
+  })
+
+  it('names the tone of each call state, and shows a state it does not know as sent', async () => {
+    const detail = JSON.parse(detailText) as { calls: { state: string }[] }
+    detail.calls[0].state = 'unknown'
+    detail.calls[1].state = 'archived'
+    stubApi({ detail: { status: 200, body: JSON.stringify(detail) } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    const first = within(screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8c'))
+    expect(first.getByText('Outcome unknown').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
+    const second = within(screen.getByTestId('inspector-call-0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8d'))
+    expect(second.getByText('archived').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
   })
 
   it('shows the top-level input properties of a visible input, with numbers as their source digits', async () => {

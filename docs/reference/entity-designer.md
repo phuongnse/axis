@@ -70,17 +70,18 @@ mask, so the table stays in sight and clickable. The drawer ends above the save 
 the top it holds the migration warning, then the name, label, type, help text, Required, Unique and the settings the
 field's type takes. Each is an [`AxisField`](actions-and-controls.md#fields) or `AxisCheckboxField` with its help, at its
 `studio-field-<pointer>` id, and the name and the type show the required mark. Required and Unique show only where the
-type takes them. A read-only designer opens the drawer from the name too, with every input in it off. Move up, Move down
-and Remove close an open drawer, and Add field adds a row without opening it. The drawer does not follow its field on
-Undo, Redo or an edit in the JSON tab, and shows as closed when its row no longer exists.
+type takes them. A read-only designer opens the drawer from the name too, with every input in it off. Add field adds a
+row and opens its drawer at once. Move up and Move down keep the open drawer on its field, at the field's new row.
+Remove closes the drawer when it removes the drawer's own field. When it removes another field, the drawer stays on its
+field, which moves up a row if it came after the removed one. The drawer does not follow its field on Undo, Redo or an
+edit in the JSON tab, and shows as closed when its row no longer exists.
 
 ### The drawer and its groups
 
 _(planned)_
 
 A field's settings open in a drawer with the table still in sight, as Salesforce's Object Manager, Dataverse and
-Strapi have it. The drawer has an address, `&field=<name>`, so Back reopens it and a link can open a field. It follows
-its field when Add field opens it and when the field moves.
+Strapi have it. The drawer has an address, `&field=<name>`, so Back reopens it and a link can open a field.
 
 The settings are in groups, each setting an [`AxisField`](actions-and-controls.md#fields) with its help,
 and the value labels an `AxisFieldGroup` with a label for each value. A setting that the field's type does not take does not show, as the
