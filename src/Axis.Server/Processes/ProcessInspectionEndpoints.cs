@@ -430,8 +430,11 @@ internal static class ProcessInspectionEndpoints
         var pinnedProcess = pinned.Processes.Single(candidate => candidate.Id == process.Id);
         var pinnedSubject = subject is null ? null : pinned.FindEntity(subject.Id);
 
-        // The label and the release number follow the list's rules, so a label the viewer may not read is null.
-        var showsLabel = subject is not null && ShowsSubjectLabel(subject, pinnedSubject, viewer.ReadableFields(active, subject));
+        // The label and the release number follow the list's rules, so a label the viewer may not read is null. The console
+        // falls back to the pinned entity when the active release dropped it, and then the label is not read.
+        var showsLabel = subject is not null
+            && active.FindEntity(subject.Id) is not null
+            && ShowsSubjectLabel(subject, pinnedSubject, viewer.ReadableFields(active, subject));
         var labels = await InstanceQueries.LabelsAsync(connection, row.Id, showsLabel ? subject : null, cancellationToken);
 
         // A user assignee, the one who claimed a role task and the one who completed a task are shown by name.

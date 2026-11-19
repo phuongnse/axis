@@ -108,6 +108,37 @@ public sealed class ConsoleInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.True(call.GetProperty("inputHidden").GetBoolean());
     }
 
+    [Fact]
+    public async Task An_instance_whose_subject_entity_the_active_release_dropped_opens_with_no_label()
+    {
+        var instance = await StartFailedAsync(TenantA);
+        Assert.True(fixture.Model.TryGetProcess("ShipLines", out var shipLines));
+        Assert.True(fixture.Model.TryGetEntity("Shipment", out var shipment));
+        await fixture.ExecuteAsync(
+            TenantA,
+            "UPDATE axis.process_instances SET process_id = @process, subject_entity_id = @entity, subject_id = @subject WHERE id = @id",
+            ("process", shipLines.Id), ("entity", shipment.Id), ("subject", Guid.NewGuid()), ("id", instance));
+        await fixture.ActivateEditedAsync(
+            TenantA,
+            (path, content) => path is "entities/shipment.json" or "entities/shipment-line.json" or "processes/ship-lines.json" ? null : content,
+            added: new Dictionary<string, string>
+            {
+                ["migrations/0001-drop-shipment.json"] =
+                    $$"""
+                    { "id": "{{Guid.NewGuid()}}", "kind": "migration", "name": "DropShipment", "formatVersion": 1, "entity": "Shipment", "changes": [{ "type": "dropEntity" }] }
+                    """,
+            });
+
+        var (status, body) = await GetAsync("pia", TenantA, instance.ToString("D"));
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        using var _ = body;
+        Assert.Equal("ShipLines", body.RootElement.GetProperty("process").GetString());
+        Assert.Equal("Shipment", body.RootElement.GetProperty("subjectEntity").GetString());
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("subjectLabel").ValueKind);
+        Assert.Equal(fixture.ReleaseId(TenantA), body.RootElement.GetProperty("releaseId").GetGuid());
+    }
+
     // Edits the Request entity to add the decimal field "salary", sensitive from the release that adds it. The
     // DepartmentOrder call maps "salary" as its amount.
     private static string? AddSalary(string path, string content)
