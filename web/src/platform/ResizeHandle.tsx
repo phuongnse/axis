@@ -1,11 +1,13 @@
-import type { KeyboardEvent, PointerEvent } from 'react'
+import { useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
 /**
  * The handle on a panel's edge that sets its size: a `separator` that takes the arrow keys, Home and End and a drag. A
  * side panel has it on its start edge and sets its width, and a package's bottom panel has it on its top edge and sets
- * its height, see docs/reference/shell.md#layout. Each arrow moves the edge by `spacing-md`, and the arrow that moves the
+ * its height, see docs/reference/shell.md#layout. Proposed, see #3978: a package's explorer has it on its end edge and
+ * sets its width, and the rule under a handle turns `primary` while the pointer is on it or drags it, as a code
+ * editor's sash does, so a person sees that the edge moves; `labelKey` names what it resizes. Each arrow moves the edge by `spacing-md`, and the arrow that moves the
  * edge away from the panel makes it larger. `measure` gives the size that a pointer at the event's place sets, and
  * `onChange` clamps and keeps it.
  */
@@ -16,9 +18,11 @@ export function ResizeHandle({
   max,
   measure,
   onChange,
+  labelKey = 'shell.sidePanel.resize',
 }: {
   /** The panel's edge that the handle sits on. */
-  edge: 'start' | 'top'
+  edge: 'start' | 'end' | 'top'
+  labelKey?: string
   size: number
   min: number
   max: number
@@ -27,8 +31,9 @@ export function ResizeHandle({
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
-  const grow = edge === 'start' ? 'ArrowLeft' : 'ArrowUp'
-  const shrink = edge === 'start' ? 'ArrowRight' : 'ArrowDown'
+  const [dragging, setDragging] = useState(false)
+  const grow = edge === 'start' ? 'ArrowLeft' : edge === 'end' ? 'ArrowRight' : 'ArrowUp'
+  const shrink = edge === 'start' ? 'ArrowRight' : edge === 'end' ? 'ArrowLeft' : 'ArrowDown'
 
   const onKeyDown = (event: KeyboardEvent) => {
     const target = { [grow]: size + spacing.md, [shrink]: size - spacing.md, Home: min, End: max }[event.key]
@@ -39,6 +44,7 @@ export function ResizeHandle({
   }
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId)
+    setDragging(true)
   }
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -48,25 +54,32 @@ export function ResizeHandle({
 
   return (
     <>
-      <style>{`[data-resize-handle]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: -2px; }`}</style>
+      <style>{`[data-resize-handle]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: -2px; } [data-resize-handle]::after { content: ''; position: absolute; background: transparent; transition: background-color 0.1s 0.15s; } [data-resize-handle][aria-orientation='vertical']::after { inset-block: 0; inset-inline-start: calc(50% - 1px); width: 2px; } [data-resize-handle][aria-orientation='horizontal']::after { inset-inline: 0; top: calc(50% - 1px); height: 2px; } [data-resize-handle]:hover::after, [data-resize-handle][data-dragging]::after { background: ${colour.primary}; }`}</style>
       <div
         role="separator"
-        aria-orientation={edge === 'start' ? 'vertical' : 'horizontal'}
-        aria-label={t('shell.sidePanel.resize')}
+        aria-orientation={edge === 'top' ? 'horizontal' : 'vertical'}
+        aria-label={t(labelKey)}
         aria-valuemin={min}
         aria-valuemax={max}
         aria-valuenow={size}
         tabIndex={0}
         data-resize-handle
+        data-dragging={dragging ? '' : undefined}
         onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
+        onPointerUp={() => setDragging(false)}
+        onPointerCancel={() => setDragging(false)}
         style={{
           position: 'absolute',
           touchAction: 'none',
+          zIndex: 2,
+          // The handle straddles the panel's rule, so the rule it colours is the one it moves.
           ...(edge === 'start'
-            ? { insetBlock: 0, insetInlineStart: 0, width: spacing.xs, cursor: 'col-resize' }
-            : { insetInline: 0, top: 0, height: spacing.xs, cursor: 'row-resize' }),
+            ? { insetBlock: 0, insetInlineStart: -spacing.xs / 2, width: spacing.xs, cursor: 'col-resize' }
+            : edge === 'end'
+              ? { insetBlock: 0, insetInlineEnd: -spacing.xs / 2 - 1, width: spacing.xs, cursor: 'col-resize' }
+              : { insetInline: 0, top: -spacing.xs / 2 - 1, height: spacing.xs, cursor: 'row-resize' }),
         }}
       />
     </>

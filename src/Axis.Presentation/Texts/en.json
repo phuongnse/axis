@@ -922,6 +922,8 @@
   "shell.studio.package.panel": "Output panel",
   "shell.studio.package.panel.show": "Show the output panel",
   "shell.studio.package.panel.hide": "Hide the output panel",
+  "shell.studio.package.resizeFiles": "Resize the files",
+  "shell.studio.package.resizePanel": "Resize the output panel",
   "shell.studio.package.panel.tests": "Tests",
   "shell.studio.package.panel.output": "Output",
   "shell.studio.package.panel.testsNone": "No test has run yet. Run tests builds the package in its sandbox and runs its tests.",

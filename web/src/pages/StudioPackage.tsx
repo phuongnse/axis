@@ -92,6 +92,8 @@ type Dialog =
 
 /** The height of the explorer's title row and of the file tabs, so their rules meet in one line. */
 const rowHeight = 40
+/** The least width of the explorer, so a file's name still reads. */
+const explorerLeast = 160
 const panelLeast = 120
 const panelFirst = 240
 const panelTabs = ['problems', 'output', 'tests', 'run'] as const
@@ -154,6 +156,9 @@ export default function StudioPackage({
   const [dialog, setDialog] = useState<Dialog>(null)
   const [panelOpen, setPanelOpen] = useState(true)
   const [panelHeight, setPanelHeight] = useState(panelFirst)
+  const [explorerWidth, setExplorerWidth] = useState(navigationWidth)
+  const [frameWidth, setFrameWidth] = useState(960)
+  const explorer = useRef<HTMLDivElement>(null)
   const [panelTab, setPanelTab] = useState<PanelTab>('problems')
   const [requests, setRequests] = useState<Partial<Record<Job, StudioRequest>>>({})
   const [lastJob, setLastJob] = useState<Job | null>(null)
@@ -293,6 +298,8 @@ export default function StudioPackage({
       gap: 0,
     })
     setFrameHeight((current) => (current === next ? current : Math.max(next, 420)))
+    const width = Math.round(element.getBoundingClientRect().width)
+    setFrameWidth((current) => (current === width ? current : width))
   }, [])
   useLayoutEffect(fit)
   useEffect(() => {
@@ -533,6 +540,7 @@ export default function StudioPackage({
 
   const activeSteps = steps[file] ?? { undo: 0, redo: 0 }
   const panelMax = Math.max(panelLeast, frameHeight - 160)
+  const explorerMost = () => Math.max(explorerLeast, Math.floor(frameWidth / 2))
   const lastRequest = lastJob === null ? undefined : requests[lastJob]
   const tests = requests.test?.packageTests ?? null
   const failedTests = tests?.filter((test) => test.outcome === 'failed').length ?? 0
@@ -644,7 +652,28 @@ export default function StudioPackage({
           overflow: 'hidden',
         }}
       >
-        <div style={{ width: navigationWidth, flex: 'none', borderInlineEnd: `1px solid ${colour.borderSubtle}` }}>
+        <div
+          ref={explorer}
+          style={{
+            position: 'relative',
+            width: explorerWidth,
+            flex: 'none',
+            borderInlineEnd: `1px solid ${colour.borderSubtle}`,
+          }}
+        >
+          {/* Proposed, see #3978: the explorer's width is set by a handle on its rule, from `explorerLeast` to half the
+              workspace, as the output panel's height is. */}
+          <ResizeHandle
+            edge="end"
+            labelKey="shell.studio.package.resizeFiles"
+            size={explorerWidth}
+            min={explorerLeast}
+            max={explorerMost()}
+            measure={(event) =>
+              explorer.current ? event.clientX - explorer.current.getBoundingClientRect().left : explorerWidth
+            }
+            onChange={(next) => setExplorerWidth(Math.min(explorerMost(), Math.max(explorerLeast, Math.round(next))))}
+          />
           <PackageExplorer
             paths={paths}
             emptyFolders={shownEmptyFolders}
@@ -770,6 +799,7 @@ export default function StudioPackage({
             {panelOpen && (
               <ResizeHandle
                 edge="top"
+                labelKey="shell.studio.package.resizePanel"
                 size={panelHeight}
                 min={panelLeast}
                 max={panelMax}

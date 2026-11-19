@@ -922,6 +922,8 @@
   "shell.studio.package.panel": "Khung kết quả",
   "shell.studio.package.panel.show": "Hiện khung kết quả",
   "shell.studio.package.panel.hide": "Ẩn khung kết quả",
+  "shell.studio.package.resizeFiles": "Đổi độ rộng danh sách tệp",
+  "shell.studio.package.resizePanel": "Đổi chiều cao khung kết quả",
   "shell.studio.package.panel.tests": "Kiểm thử",
   "shell.studio.package.panel.output": "Kết quả build",
   "shell.studio.package.panel.testsNone": "Chưa chạy kiểm thử nào. Chạy kiểm thử sẽ build gói mở rộng trong sandbox rồi chạy các kiểm thử của nó.",
