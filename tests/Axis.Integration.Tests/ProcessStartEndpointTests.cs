@@ -526,6 +526,7 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
     public async Task A_start_of_a_process_without_a_subject_stores_the_person_with_a_null_via()
     {
         var process = NightlyJob();
+        await fixture.EndInstancesAsync(process.Id);
         using var response = await StartJobAsync("""{ "parameters": { "days": 1 } }""", key: Guid.NewGuid().ToString());
         try
         {
