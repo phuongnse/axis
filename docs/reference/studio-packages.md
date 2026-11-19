@@ -17,6 +17,13 @@ see [the workspace](studio-workspace.md#workspace).
   version, one row for each folder under `packages/`.
 - **New package.** The "New package…" action is for a person with the developer role only. It asks for an
   id and a language, and creates the package's manifest, adapter and lock file for that language.
+- **Tested starters.** The files that New package writes come from `web/src/platform/packageStarters.json`,
+  with one starter each for C#, TypeScript and Python. A C# package gets `axis-package.json`, a project file,
+  `EchoOperation.cs` and `packages.lock.json`. A TypeScript package gets `axis-package.json`, `index.js`,
+  `package.json` and `package-lock.json`. A Python package gets `axis-package.json`, `adapter.py` and
+  `requirements.txt`. Each starter has version `0.1.0`, one `echo` operation and a label taken from the id.
+  A Vitest test checks the placeholders and the manifest against its schema. A server test compiles each
+  starter in an application with application packages on, and expects no diagnostic under `packages/<id>/`.
 - **Opening one.** A row opens the package's files, see [a package's files](#a-packages-files).
 
 ## A package's files
