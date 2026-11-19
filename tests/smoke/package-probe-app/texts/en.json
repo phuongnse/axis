@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "processes.packageProbe.title": "Package probe",
     "role.operator": "Operator"
   }
 }

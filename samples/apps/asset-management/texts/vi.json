@@ -15,6 +15,7 @@
     "pages.assetForm.title": "Tài sản",
     "pages.assetDetail.title": "Chi tiết tài sản",
     "pages.dashboard.title": "Tổng quan",
+    "processes.warrantyReminder.title": "Nhắc hết hạn bảo hành",
     "dashboard.warranties.label": "Bảo hành hết hạn trong 30 ngày",
     "dashboard.byStatus.title": "Tài sản theo trạng thái",
     "dashboard.byStatus.count": "Tài sản",

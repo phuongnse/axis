@@ -15,6 +15,7 @@
     "pages.assetForm.title": "Asset",
     "pages.assetDetail.title": "Asset details",
     "pages.dashboard.title": "Dashboard",
+    "processes.warrantyReminder.title": "Warranty reminder",
     "dashboard.warranties.label": "Warranties ending within 30 days",
     "dashboard.byStatus.title": "Assets by status",
     "dashboard.byStatus.count": "Assets",

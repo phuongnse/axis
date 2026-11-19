@@ -10,6 +10,8 @@
     "nav.children": "Children",
     "pages.parents.title": "Parent jobs",
     "pages.children.title": "Child jobs",
+    "processes.parentJob.title": "Parent job",
+    "processes.childJob.title": "Child job",
     "role.operator": "Operator"
   }
 }

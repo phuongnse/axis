@@ -67,6 +67,7 @@ payment reference from the sample extension package, see
   "kind": "process",
   "name": "PurchaseRequestApproval",
   "formatVersion": 1,
+  "title": { "textKey": "processes.purchaseRequestApproval.title" },
   "entity": "PurchaseRequest",
   "startCondition": {
     "expression": "status in ('draft', 'returned') and totalAmount is not null",

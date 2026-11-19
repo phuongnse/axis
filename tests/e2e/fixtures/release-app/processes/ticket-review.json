@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "TicketReview",
   "formatVersion": 1,
+  "title": { "textKey": "processes.ticketReview.title" },
   "entity": "Ticket",
   "start": "review",
   "steps": [

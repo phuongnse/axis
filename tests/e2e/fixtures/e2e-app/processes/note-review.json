@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "NoteReview",
   "formatVersion": 1,
+  "title": { "textKey": "processes.noteReview.title" },
   "entity": "Note",
   "start": "review",
   "steps": [

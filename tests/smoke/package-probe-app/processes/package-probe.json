@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "PackageProbe",
   "formatVersion": 1,
+  "title": { "textKey": "processes.packageProbe.title" },
   "parameters": [{ "name": "mode", "type": "text" }],
   "start": "probe",
   "steps": [

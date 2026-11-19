@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "ItemReview",
   "formatVersion": 1,
+  "title": { "textKey": "processes.itemReview.title" },
   "entity": "Item",
   "start": "done",
   "steps": [{ "name": "done", "type": "end" }]

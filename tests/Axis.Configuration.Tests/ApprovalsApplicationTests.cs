@@ -53,6 +53,25 @@ public sealed class ApprovalsApplicationTests
     }
 
     [Fact]
+    public void The_request_approval_process_of_the_approvals_module_has_a_title_with_an_English_and_a_Vietnamese_text()
+    {
+        var template = Template();
+
+        var compiled = ApplicationCompiler.CompileFiles(template.Files, null, ModuleCatalog.Load(_modulesPath).Modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        var process = Assert.Single(compiled.Model!.Processes, process => process.Name == "approvals/RequestApproval");
+        Assert.NotNull(process.Title);
+        Assert.Equal("approvals.processes.requestApproval.title", process.Title.TextKey);
+        foreach (var locale in new[] { "en", "vi" })
+        {
+            var texts = Assert.Single(compiled.Model.Texts, texts => texts.Locale == locale);
+            Assert.True(texts.Texts.TryGetValue(process.Title.TextKey, out var text), $"The {locale} texts have no {process.Title.TextKey}.");
+            Assert.False(string.IsNullOrWhiteSpace(text));
+        }
+    }
+
+    [Fact]
     public void The_template_holds_no_entity_process_page_or_policy_of_its_own()
     {
         var template = Template();

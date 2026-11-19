@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "ChildJob",
   "formatVersion": 1,
+  "title": { "textKey": "processes.childJob.title" },
   "parameters": [{ "name": "label", "type": "text" }],
   "start": "wait",
   "steps": [
