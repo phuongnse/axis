@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { AccountPage } from '../pages/AccountPage'
 import { HomePage } from '../pages/HomePage'
 import { PageRoute } from '../pages/PageRoute'
 import { PlatformContext, type Platform } from '../pages/context'
@@ -17,7 +18,7 @@ const platform: Platform = {
   development: true,
 }
 
-/** The shell's own routes over the fixtures: the platform home page, Studio, and the pages of an application site. */
+/** The shell's own routes over the fixtures: the platform home page, Studio, the account page, and the pages of an application site. */
 export function ShellPreview() {
   return (
     <PlatformContext.Provider value={platform}>
@@ -35,6 +36,14 @@ export function ShellPreview() {
           element={
             <PlatformShellRoute>
               <StudioPage />
+            </PlatformShellRoute>
+          }
+        />
+        <Route
+          path="account"
+          element={
+            <PlatformShellRoute>
+              <AccountPage />
             </PlatformShellRoute>
           }
         />

@@ -267,6 +267,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 600,
     },
     { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: 600 },
+    { caption: 'Account page', draw: () => <ShellPreview />, entry: '/account', frameHeight: 1400 },
     {
       caption: 'App switcher',
       draw: () => (

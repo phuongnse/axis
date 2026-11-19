@@ -1,3 +1,4 @@
+import type { FixtureRoute } from './fixtureFetch'
 import type { ChartKind } from '../platform/chartOption'
 import type { CurrentUser } from '../platform/currentUser'
 import type { LegalLinks } from '../platform/LegalLine'
@@ -1239,6 +1240,37 @@ export const signUpDocuments = {
 
 export const signUpRegion = { tenantDomain: 'vn.example.com' }
 
+/** The person's own authenticators on the account page, as `GET /api/me/authenticators` answers them. */
+export const ownAuthenticators = {
+  account: true,
+  authenticators: [{ id: 'totp-1', label: 'Phone', createdAt: '2026-02-10T08:15:00Z' }],
+}
+
+/** The person's live sessions on the account page, as `GET /api/me/sessions` answers them. */
+export const ownSessions = {
+  endAllowed: true,
+  sessions: [
+    { id: 'session-1', signedInAt: '2026-03-04T08:30:00Z', lastRequestAt: '2026-03-04T09:42:00Z', current: true },
+    { id: 'session-2', signedInAt: '2026-03-02T14:05:00Z', lastRequestAt: '2026-03-03T17:20:00Z', current: false },
+  ],
+}
+
+/**
+ * The person's notification preferences, as `GET /api/me/notification-preferences` answers them, see
+ * docs/reference/notifications.md#notification-preferences. Proposed: the `authoringRequest` source, which the API's
+ * sources do not hold yet.
+ */
+export const notificationPreferences = {
+  sources: {
+    task: { channels: { application: true, email: true }, digest: true },
+    mention: { channels: { application: true, email: false }, digest: false },
+    process: { channels: { application: true, email: true }, digest: false },
+    authoringRequest: { channels: { application: true, email: false }, digest: false },
+  },
+  digestHour: 8,
+  timeZone: 'Asia/Ho_Chi_Minh',
+}
+
 /** The API paths that the fixtures answer. A request outside them is not a fixture's to answer. */
 export const fixtureScopes = [
   `${apiPath}/`,
@@ -1257,7 +1289,7 @@ export const noTableChoices = { columns: null, views: [] }
  * The answers of the fixture application's APIs, by path or by path and query. The page's own
  * queries (paging, sorting) are answered by the path alone.
  */
-export const routes: Record<string, () => unknown> = {
+export const routes: Record<string, FixtureRoute> = {
   [requestsPath]: () => recordPage,
   [`${requestsPath}/${requestId}`]: () => savedRecord,
   [`${requestsPath}/${requestId}/history`]: () => history,
@@ -1282,6 +1314,10 @@ export const routes: Record<string, () => unknown> = {
   [notificationsPath]: () => notificationPage,
   '/api/sites': () => ({ sites: listedSites }),
   '/api/me': () => currentUser,
+  '/api/me/authenticators': () => ownAuthenticators,
+  '/api/me/sessions': () => ownSessions,
+  '/api/me/notification-preferences': (init) =>
+    init?.method === 'PUT' ? new Response(null, { status: 204 }) : notificationPreferences,
   '/api/about': () => ({ version: '0.1.0' }),
   '/api/notifications': () => tenantNoticePage,
 }

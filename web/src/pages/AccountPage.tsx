@@ -20,6 +20,7 @@ import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
 import { visuallyHidden } from '../platform/visuallyHidden'
+import { AccountNotifications } from './AccountNotifications'
 import { usePlatform } from './context'
 
 const noParameters: string[] = []
@@ -263,6 +264,7 @@ export function AccountPage() {
             )}
           </Flex>
         </SectionPart>
+        <AccountNotifications />
       </SectionParts>
     </PageLayout>
   )
