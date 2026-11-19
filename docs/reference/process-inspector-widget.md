@@ -92,7 +92,7 @@ wrong form show the not-found page, and the instance is not requested.
 
 - **Tabs** _(planned)_. Three tabs, Diagram, History and Data, Diagram first, with no counts. The open tab is kept
   in the address as `tab`, through `useAddressTab`. Its value is `history` or `data`, and Diagram, the first tab,
-  is left out. Diagram shows the process's graph with the steps the instance ran.
+  is left out. Diagram shows the process's graph with the steps the instance ran, see [process graph](#process-graph).
 
 - **Data** _(planned)_. A `TermList` of two facts, each name above its value. Input is the parameters the instance
   started with, as a `ValueTable`, or "It started with no input.". Output is the step that ended the instance and
@@ -182,6 +182,61 @@ wrong form show the not-found page, and the instance is not requested.
 - **Labels.** Step labels come from the texts of the instance's `releaseId`, loaded with
   `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, as the inbox does. A step without a label
   shows its name.
+
+## Process graph
+
+_(planned)_
+
+A process is drawn as one graph, on an instance's Diagram tab and in the [process designer](process-designer.md#canvas),
+with the same layout, cards and controls.
+
+- **One graph.** `ProcessGraphCanvas` draws a process on an instance's Diagram tab and in the process designer. React
+  Flow draws the graph, and ELK lays it out.
+- **Layout.** ELK's layered layout, `elkjs`, places the steps in the process's order from left to right. Every
+  transition is routed in right angles with rounded corners, and no route crosses or runs through a step. A
+  transition back to an earlier step goes round the other steps. No part of a route is shorter than 16 px. The graph
+  is laid out with the heights its cards are drawn at.
+- **Surface and zoom.** The graph lies on `fillSubtle`, with no pattern. It never zooms in past its own size.
+- **What an instance took.** The steps an instance ran and the transitions it took are drawn in `successText`. The
+  rest are muted, and their transitions are dashed and thinner.
+- **A step's card.** A step is a card on `surface`, and every card is one width. Its type's icon sits in a tile on
+  `fillSubtle`, and the type is the icon's tooltip. Its label is bold, at most two lines, then an ellipsis. The whole
+  label is in a tooltip and in the card's accessible name. On an instance, the card shows the duration of the step's
+  last run. A step run more than once shows its run count with that duration, such as "2 runs, last 1 day 17 hr".
+  A duration under a second reads "< 1 sec".
+- **State icon.** On an instance, a step's state is an icon on the card's top-right corner, on a disc of `surface`
+  that cuts into the border. Its words are in its tooltip, and colour is never the only sign:
+  - done, a check in `successText`;
+  - running or waiting for an event, a clock in `infoText`;
+  - waiting for a person, an exclamation mark in `warningText`;
+  - failed, a cross in `dangerText`;
+  - cancelled, a minus in `textMuted`;
+  - not reached, no icon.
+- **Border.** Every card has a `borderSubtle` border, whatever its state. The step the instance is at has a thicker
+  `primary` border, drawn inside the card so the card keeps its size. That step is chosen when the page opens, and
+  the view opens on it. Choosing another step moves the `primary` border to it. In the designer, a step with a
+  diagnostic keeps a `danger` border, see [diagnostics](process-designer.md#diagnostics). A viewer's steps show no
+  handle dots.
+- **Transition labels.** A transition's label sits beside its line, on `fillSubtle`, which cuts the line. The label is
+  the author's `label` of the outcome or branch. Without one, a decision branch shows its name, and the fallback shows
+  Otherwise. A wait for an event shows the event's label. A timeout shows "After {duration}" ("Sau {duration}"). A
+  condition is not written in words, since a generated sentence explains a branch less well than the author's own
+  words. The labels come from the [instance detail](process-inspection.md#instance-detail).
+- **Controls.** `ProcessGraphControls` gives each control a tooltip in the reader's language:
+  - Zoom in and Zoom out.
+  - Show the whole process.
+  - Go to the current step ("Tới bước hiện tại"), on an instance only.
+  - Full screen, the browser's own, left with Esc or Exit full screen.
+  - Find a step, a searchable list of the steps in the process's order, at the graph's top left and as wide as a card.
+    Choosing a step moves the view to it and chooses it. On an instance, it also opens that step's run, see
+    [the instance page](#instance-page).
+- **Overview.** At the graph's corner, an overview draws each step in its state's tone and marks the part in view.
+  Dragging or clicking in it moves the view.
+- **Keys.** While the graph has the focus, + and − zoom, 0 shows the whole process, and F goes full screen. Each
+  button names its key in `aria-keyshortcuts`.
+- **Moves.** Every move of the view is animated over 300 ms. Under [reduced motion](frontend.md#reduced-motion), a
+  move happens at once.
+- **No React Flow controls.** React Flow's own controls and attribution are not drawn, as its MIT licence allows.
 
 ## Commands
 
@@ -277,4 +332,5 @@ The widget shows a failure where it happens, and its words come from the platfor
 - **New texts.** _(planned for M38)_ The Current mark, the Paths and Variables labels and the Path column are platform
   texts under `shell.inspector.*`. The three cancel buttons and their dialog titles are under `shell.inspector.commands.*`.
 - **Page texts** _(planned)_. The tabs, the facts, the Data texts, the timeline's columns and sentences, and the step
-  run panel's tabs and terms are platform texts under `shell.inspector.*`.
+  run panel's tabs and terms are platform texts under `shell.inspector.*`, as are the graph's control names, the
+  state icons' tooltips, a card's run duration and the timeout's label.

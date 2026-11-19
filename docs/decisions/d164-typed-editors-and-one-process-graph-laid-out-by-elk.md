@@ -1,4 +1,4 @@
-# D53. Typed editors and the process graph in Studio
+# D164. Typed editors and one process graph laid out by ELK
 
 Status: **Agreed**
 
@@ -7,7 +7,8 @@ Status: **Agreed**
 Studio's generic form is built from a kind's JSON Schema, and it cannot show maps or `oneOf` parts.
 So pages, process steps, connectors, test scenarios, seeds, text resources and mappings still need
 JSON. An editor that drops a value it cannot show, or writes a shape the compiler refuses, costs the
-author's trust. A process is also hard to follow as a list of steps alone.
+author's trust. A process is also hard to follow as a list of steps alone, and read from left to right
+it needs a layout that routes every transition round the steps it passes.
 
 ## Decision
 
@@ -23,18 +24,23 @@ author's trust. A process is also hard to follow as a list of steps alone.
   places one and the file holds no positions. The graph never invents a node, works with the
   keyboard, and marks the steps that a diagnostic names. The
   [process designer](d74-a-visual-process-designer.md) edits on this graph.
-- **React Flow draws the graph and dagre lays it out,** in a chunk of their own that loads only when
-  a process shows its graph. React Flow brings keyboard support and custom nodes.
+- **React Flow draws the graph and ELK lays it out from left to right,** with every transition routed
+  round the steps. Both load in chunks of their own, only on a page that draws
+  a process. One graph serves the process designer and an instance's page, with no attribution drawn.
 
-What each editor shows is in [Studio](../reference/studio.md) and the
-[process designer](../reference/process-designer.md).
+What each editor shows is in [Studio](../reference/studio.md), the
+[process designer](../reference/process-designer.md) and the
+[process graph](../reference/process-inspector-widget.md#process-graph).
 
 ## Consequences
 
 - Scenarios, mappings, seeds and texts can be written without JSON.
-- The SPA gains two libraries, outside the main bundle.
+- The SPA gains two libraries, outside the main bundle. `elkjs` is about 1.4 MB, so it stays out of
+  the first load.
+- A fix to the graph reaches both the designer and an instance's page.
 
 ## Alternatives
 
-- **ELK for the layout.** It lays out better than dagre but weighs over 400 KB, while dagre handles
-  directed step graphs of the size Axis processes have.
+- **dagre.** It places nodes, but it cannot route a line round a step, so a transition can cross one.
+- **ELK's wrapping of a long row into several rows.** It broke transitions on a long process, so the
+  graph keeps one row.
