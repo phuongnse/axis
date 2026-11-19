@@ -1780,6 +1780,8 @@
   "shell.studio.field.entity.validations.messageText.help": "The text that shows when the validation fails, in each language.",
   "shell.studio.field.process.name": "Name",
   "shell.studio.field.process.name.help": "The name that identifies the process in the file and in Studio.",
+  "shell.studio.field.process.title": "Title",
+  "shell.studio.field.process.title.help": "The title people see for the process, in each language of the application.",
   "shell.studio.field.process.description": "Description",
   "shell.studio.field.process.description.help": "What the process is for, in a sentence or two.",
   "shell.studio.field.process.startCondition": "Start condition",

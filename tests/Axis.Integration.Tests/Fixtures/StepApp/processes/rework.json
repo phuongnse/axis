@@ -2,6 +2,7 @@
   "id": "8bc5e628-abd9-4187-ada2-882f9f15e39d",
   "kind": "process",
   "name": "Rework",
+  "title": { "textKey": "processes.rework.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "send",

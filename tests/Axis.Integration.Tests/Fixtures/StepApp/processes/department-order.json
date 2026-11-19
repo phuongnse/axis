@@ -2,6 +2,7 @@
   "id": "3430efbb-85ed-450d-9779-ee484b8a866a",
   "kind": "process",
   "name": "DepartmentOrder",
+  "title": { "textKey": "processes.departmentOrder.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "createOrder",

@@ -25,6 +25,7 @@ const help = (path: string) => english[`shell.studio.field.process.${path}.help`
 /** Every path of the process file that the editor draws a field or a group for, see docs/reference/studio-resource-form.md#fields. */
 const drawnPaths = [
   'name',
+  'title',
   'description',
   'startCondition',
   'startCondition.expression',
@@ -1052,6 +1053,7 @@ describe('ProcessEditor fields', () => {
   })
 
   const groups: [string, string][] = [
+    ['studio-field-/title', 'title'],
     ['studio-field-/description', 'description'],
     ['studio-field-/steps/0/assignee', 'steps.assignee'],
     ['studio-field-/steps/0/deadline', 'steps.deadline'],
@@ -1114,6 +1116,7 @@ describe('ProcessEditor sections', () => {
       expect(within(section).getByText(english[`${key}.line`])).toBeVisible()
     })
     expect(within(sections[0]).getByTestId('studio-field-/name')).toBeVisible()
+    expect(within(sections[0]).getByTestId('studio-field-/title')).toBeVisible()
     expect(within(sections[0]).getByTestId('studio-field-/description')).toBeVisible()
     expect(within(sections[0]).getByTestId('studio-field-/startCondition')).toBeVisible()
     expect(within(sections[1]).getByRole('radio', { name: /^Entity/ })).toBeChecked()

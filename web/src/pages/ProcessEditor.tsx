@@ -100,7 +100,7 @@ export function ProcessEditor({
   return (
     <div data-testid="studio-process-editor">
       <SectionParts>
-        {/* The form draws the General section: the name, the description and the start condition. */}
+        {/* The form draws the General section: the name, the title, the description and the start condition. */}
         <SchemaForm schema={withoutSubject(schema)} value={value} onChange={onChange} />
         <SectionPart testName="subject" heading={heading('subject')}>
           <Subject value={value} onChange={onChange} />

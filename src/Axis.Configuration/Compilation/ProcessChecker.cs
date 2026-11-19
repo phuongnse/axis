@@ -644,6 +644,8 @@ internal static class ProcessChecker
 
     private static void CheckTextKeys(ProcessResource process, ReferenceIndexBuilder references, List<Diagnostic> diagnostics)
     {
+        ApplicationCompiler.CheckTextKey(process.Title, process, "/title", references, diagnostics);
+
         if (process.StartCondition is { } startCondition)
         {
             ApplicationCompiler.CheckTextKey(startCondition.Message, process, "/startCondition/message", references, diagnostics);
@@ -989,6 +991,7 @@ internal static class ProcessChecker
         {
             Id = process.Id,
             Name = process.Name,
+            Title = process.Title,
             File = process.File,
             Entity = entity is null ? null : new EntityReference(entity.Id, entity.Name),
             Parameters = [.. process.Parameters?.Select(parameter => new ProcessParameterModel(parameter.Name, FieldTypes.Parse(parameter.Type))) ?? []],

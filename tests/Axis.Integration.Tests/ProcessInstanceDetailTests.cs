@@ -24,10 +24,11 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
         var root = body.RootElement;
         Assert.Equal(
-            ["id", "process", "subjectEntity", "subjectId", "subjectLabel", "releaseId", "releaseNumber", "state", "step", "createdAt", "endedAt", "timerDueAt", "startedBy", "input", "result", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands", "studio"],
+            ["id", "process", "processTitleKey", "subjectEntity", "subjectId", "subjectLabel", "releaseId", "releaseNumber", "state", "step", "createdAt", "endedAt", "timerDueAt", "startedBy", "input", "result", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands", "studio"],
             root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(instance, root.GetProperty("id").GetGuid());
         Assert.Equal("Break", root.GetProperty("process").GetString());
+        Assert.Equal("processes.break.title", root.GetProperty("processTitleKey").GetString());
         Assert.Equal("failed", root.GetProperty("state").GetString());
         Assert.Equal(JsonValueKind.Null, root.GetProperty("timerDueAt").ValueKind);
         Assert.Equal(JsonValueKind.Null, root.GetProperty("parent").ValueKind);
@@ -121,6 +122,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
         Assert.Equal("completed", body.RootElement.GetProperty("state").GetString());
         Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("input").ValueKind);
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("processTitleKey").ValueKind);
         var result = body.RootElement.GetProperty("result");
         Assert.Equal(["step", "values"], result.EnumerateObject().Select(property => property.Name));
         Assert.Equal("done", result.GetProperty("step").GetString());
@@ -392,9 +394,10 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
             item =>
             {
                 Assert.Equal(
-                    ["id", "process", "step", "state", "createdAt", "endedAt"],
+                    ["id", "process", "processTitleKey", "step", "state", "createdAt", "endedAt"],
                     item.EnumerateObject().Select(property => property.Name));
                 Assert.Equal("Decide", item.GetProperty("process").GetString());
+                Assert.Equal("processes.decide.title", item.GetProperty("processTitleKey").GetString());
                 Assert.Equal("fulfil", item.GetProperty("step").GetString());
                 Assert.Equal(DateTimeKind.Utc, item.GetProperty("createdAt").GetDateTime().Kind);
             });
@@ -404,9 +407,10 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
         using var child = await GetOkAsync(TenantA, "Decide", first);
         var named = child.RootElement.GetProperty("parent");
-        Assert.Equal(["id", "process", "step"], named.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["id", "process", "processTitleKey", "step"], named.EnumerateObject().Select(property => property.Name));
         Assert.Equal(parent, named.GetProperty("id").GetGuid());
         Assert.Equal("RoleApprove", named.GetProperty("process").GetString());
+        Assert.Equal("processes.roleApprove.title", named.GetProperty("processTitleKey").GetString());
         Assert.Equal("fulfil", named.GetProperty("step").GetString());
         Assert.Empty(child.RootElement.GetProperty("subProcesses").EnumerateArray());
 
@@ -419,6 +423,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal(JsonValueKind.Null, startedBy.GetProperty("via").ValueKind);
         using var root = await GetOkAsync(TenantA, "RoleApprove", parent);
         Assert.Equal(JsonValueKind.Null, root.RootElement.GetProperty("startedBy").ValueKind);
+        Assert.Equal("processes.roleApprove.title", root.RootElement.GetProperty("processTitleKey").GetString());
     }
 
     [Fact]

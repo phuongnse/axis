@@ -7,6 +7,11 @@
   "texts": {
     "nav.tasks": "Tasks",
     "pages.tasks.title": "Tasks",
+    "processes.break.title": "Break a request",
+    "processes.decide.title": "Decide on a request",
+    "processes.departmentOrder.title": "Order for a department",
+    "processes.rework.title": "Rework a request",
+    "processes.roleApprove.title": "Approve by role",
     "request.amountNegative": "The amount cannot be negative.",
     "request.approve": "Approve the request",
     "request.await": "Wait for a note",

@@ -2,6 +2,7 @@
   "id": "d9952a25-79f6-46ce-b8dd-a79b3c18836c",
   "kind": "process",
   "name": "RoleApprove",
+  "title": { "textKey": "processes.roleApprove.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "approve",

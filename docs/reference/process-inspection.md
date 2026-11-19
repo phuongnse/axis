@@ -142,13 +142,13 @@ in any state. The body has these parts:
   reads only the item of the instance's current revision, so a stale item from
   an earlier pass of a loop is not shown. It is `null` in every other case. It
   is the same for every user who may inspect the instance.
-- `parent` is `{ "id", "process", "step" }` for an instance that a `subProcess`
+- `parent` is `{ "id", "process", "processTitleKey", "step" }` for an instance that a `subProcess`
   step started, and `null` for any other instance. `step` is the name of the
   `subProcess` step in the parent that started this instance. It is not the step
   this instance is at.
 - `subProcesses` are the instances that this instance started, ordered by
   `createdAt`, then by `id`. Each is
-  `{ "id", "process", "step", "state", "createdAt", "endedAt" }`. `step` is the
+  `{ "id", "process", "processTitleKey", "step", "state", "createdAt", "endedAt" }`. `step` is the
   name of the `subProcess` step in this instance that started the child.
   - A parent or child appears only when the user holds `inspect` on its process
     in the active release. A parent the user may not inspect, or whose process
@@ -236,7 +236,7 @@ in any state. The body has these parts:
   - It does not run the other checks of a retry: another active instance for
     the record, or a destructive migration since the pinned release. A command
     in the list can still be refused with `409`.
-- **Process title.** _(planned)_ `processTitleKey` is the text key of the process's `title` on the
+- **Process title.** `processTitleKey` is the text key of the process's `title` on the
   detail, on `parent` and on each `subProcesses` entry. It is `null` where the release gives no title.
 - **Record and release.** The detail has `subjectEntity`, the name of the process's subject entity, or
   `null` for a process with no subject. Its `subjectLabel` and `releaseNumber` are as the
@@ -316,6 +316,7 @@ in any state. The body has these parts:
 {
   "id": "0192f4a9-2d3e-7f40-8a1b-2c3d4e5f6a7b",
   "process": "PurchaseRequestApproval",
+  "processTitleKey": "processes.purchaseRequestApproval.title",
   "subjectEntity": "PurchaseRequest",
   "subjectId": "0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b",
   "subjectLabel": "PR-2026-0042",
