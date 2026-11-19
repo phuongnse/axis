@@ -13,4 +13,4 @@ stands on the current `main`. The rule is in
    `scripts/design-system.sh`. Then push the branch.
 4. Edit the state comment so it names the `main` commit the prototype stands on,
    from `git rev-parse --short origin/main`. Use the PATCH command in
-   [SKILL.md](SKILL.md) Start step 3.
+   [SKILL.md](SKILL.md) Start step 4.
