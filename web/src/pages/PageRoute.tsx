@@ -4,6 +4,7 @@ import { PageLayout, type BreadcrumbStep } from '../platform/PageLayout'
 import { PageLeaf, type PageLeafProps } from '../platform/PageLeaf'
 import { detailRecordId, readPageParameters } from '../platform/pageParameters'
 import { ProcessInstancePage } from '../platform/ProcessInstancePage'
+import { RecordList, type RecordListValue } from '../platform/recordList'
 import { fetchPage, type ApplicationSite, type PageMetadata } from '../platform/site'
 import { siteAddress } from '../platform/siteLinks'
 import { TaskPage } from '../platform/TaskPage'
@@ -62,6 +63,20 @@ interface Trail {
   from: string | null
 }
 
+/** The navigation entry of the page the person came from, when that is another page of the site. */
+function navigationOrigin(trail: Trail, pageName: string) {
+  const { site, from } = trail
+  if (!from?.startsWith(siteAddress(site.path, ''))) {
+    return undefined
+  }
+  const pathname = from.split(/[?#]/, 1)[0].toLowerCase()
+  return site.navigation.find(
+    (entry) =>
+      entry.page.toLowerCase() !== pageName.toLowerCase() &&
+      pathname === siteAddress(site.path, entry.page).toLowerCase(),
+  )
+}
+
 /**
  * The breadcrumb of a page: the site, then the navigation page the person came from when that is
  * another page of the site, then the page itself. The `from` address keeps the paging and sorting of
@@ -70,19 +85,26 @@ interface Trail {
 function breadcrumbFor(trail: Trail, pageName: string, titleKey: string, t: (key: string) => string): BreadcrumbStep[] {
   const { site, from } = trail
   const steps: BreadcrumbStep[] = [{ label: t(site.titleKey), to: siteAddress(site.path) }]
-  if (from?.startsWith(siteAddress(site.path, ''))) {
-    const pathname = from.split(/[?#]/, 1)[0].toLowerCase()
-    const origin = site.navigation.find(
-      (entry) =>
-        entry.page.toLowerCase() !== pageName.toLowerCase() &&
-        pathname === siteAddress(site.path, entry.page).toLowerCase(),
-    )
-    if (origin) {
-      steps.push({ label: t(origin.labelKey), to: from })
-    }
+  const origin = navigationOrigin(trail, pageName)
+  if (origin && from) {
+    steps.push({ label: t(origin.labelKey), to: from })
   }
   steps.push({ label: t(titleKey) })
   return steps
+}
+
+/**
+ * The list a record's page links back to: the navigation page the person came from, with its table's search, sort and
+ * page, or else the site, which opens its first page and so is named after the first navigation entry.
+ * See docs/reference/frontend.md#routing.
+ */
+function recordListFor(trail: Trail, pageName: string): RecordListValue {
+  const { site, from } = trail
+  const origin = navigationOrigin(trail, pageName)
+  if (origin && from) {
+    return { labelKey: origin.labelKey, to: from }
+  }
+  return { labelKey: site.navigation[0]?.labelKey ?? site.titleKey, to: siteAddress(site.path) }
 }
 
 interface SitePageProps {
@@ -199,7 +221,9 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
 
   return (
     <PageLayout title={t(page.titleKey)} breadcrumb={breadcrumb}>
-      <WidgetTree widgets={page.widgets} renderLeaf={(widget) => <PageLeaf widget={widget} {...leafProps} />} />
+      <RecordList value={recordListFor(trail, page.name)}>
+        <WidgetTree widgets={page.widgets} renderLeaf={(widget) => <PageLeaf widget={widget} {...leafProps} />} />
+      </RecordList>
     </PageLayout>
   )
 }

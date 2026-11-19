@@ -169,7 +169,7 @@ test("an employee does not see another employee's request in the list or by its 
   await expect(row(page, annaTitle)).toBeVisible();
   await expect(row(page, employeeTitle)).toHaveCount(0);
   await page.goto(`/purchasing/purchaserequestform/${employeeId}`);
-  await expect(page.getByTestId("not-found")).toBeVisible();
+  await expect(page.getByTestId("record-not-found")).toBeVisible();
   await expect(page.getByRole("textbox", { name: /Title/ })).toHaveCount(0);
 
   expect((await page.request.get(`${recordsPath}/${employeeId}`)).status()).toBe(
@@ -204,7 +204,7 @@ test("a department manager does not see another department's request in the list
   await expect(row(page, engineeringTitle)).toBeVisible();
   await expect(row(page, operationsTitle)).toHaveCount(0);
   await page.goto(`/purchasing/purchaserequestform/${operationsId}`);
-  await expect(page.getByTestId("not-found")).toBeVisible();
+  await expect(page.getByTestId("record-not-found")).toBeVisible();
 
   expect(
     (await page.request.get(`${recordsPath}/${engineeringId}`)).status(),

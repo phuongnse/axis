@@ -41,8 +41,8 @@ test('a detail page shows a note read-only, its start button closes the note and
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`Detail ${run}`)
 })
 
-test('a detail page for a note that does not exist shows the not-found page', async ({ page }) => {
+test('a detail page for a note that does not exist shows the missing-record line', async ({ page }) => {
   await page.goto('/e2e/notedetail?note=0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b')
 
-  await expect(page.getByTestId('not-found')).toBeVisible()
+  await expect(page.getByTestId('record-not-found')).toBeVisible()
 })
