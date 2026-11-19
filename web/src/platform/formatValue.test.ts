@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { datePattern, formatValue, referencesLabels, timePattern, type FormatOptions } from './formatValue'
+import { booleanText, datePattern, formatValue, referencesLabels, timePattern, type FormatOptions } from './formatValue'
 import type { FieldMetadata, FieldType } from './site'
 
 function field(name: string, type: FieldType, valueLabelKeys?: Record<string, string>): FieldMetadata {
@@ -110,6 +110,13 @@ describe('formatValue', () => {
   it('shows a boolean as the localized yes or no', () => {
     expect(formatValue(field('done', 'boolean'), true, {}, options)).toBe('Yes')
     expect(formatValue(field('done', 'boolean'), false, {}, options)).toBe('No')
+  })
+
+  it('words a boolean the same as formatValue does, through booleanText', () => {
+    expect(booleanText(true, options.text)).toBe('Yes')
+    expect(booleanText(false, options.text)).toBe('No')
+    expect(formatValue(field('done', 'boolean'), true, {}, options)).toBe(booleanText(true, options.text))
+    expect(formatValue(field('done', 'boolean'), false, {}, options)).toBe(booleanText(false, options.text))
   })
 
   it('groups integers and decimals by the locale and loses no digit', () => {
