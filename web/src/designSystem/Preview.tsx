@@ -1,5 +1,5 @@
 import { ConfigProvider, Segmented } from 'antd'
-import { StrictMode, useState, type CSSProperties, type ReactNode } from 'react'
+import { StrictMode, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { TextProvider } from '../platform/TextProvider'
 import { useDesignTokens } from '../platform/themeMode'
@@ -28,9 +28,23 @@ function Canvas({ children }: { children: ReactNode }) {
  * the middle of what shows. The outer box does not scroll. It holds the popups and dialogs, and the transform keeps
  * them inside it, so several states fit one card.
  */
-function Frame({ height, children }: { height: number; children: ReactNode }) {
-  const { colour } = useDesignTokens()
+function Frame({ height: given, fill, children }: { height: number; fill: boolean; children: ReactNode }) {
+  const { colour, spacing } = useDesignTokens()
   const [frame, setFrame] = useState<HTMLDivElement | null>(null)
+  const [height, setHeight] = useState(given)
+  // Temporary for the review of #4662: a shell state reaches the foot of the window.
+  useEffect(() => {
+    if (!fill || !frame) {
+      return
+    }
+    const measure = () =>
+      setHeight(
+        Math.max(given, window.innerHeight - frame.getBoundingClientRect().top - window.scrollY - spacing.lg - 2),
+      )
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [fill, frame, given, spacing.lg])
   return (
     <div
       ref={setFrame}
@@ -53,13 +67,19 @@ function Frame({ height, children }: { height: number; children: ReactNode }) {
 }
 
 /** One state under its caption. It has its own router, as the table keeps its paging in the URL query. */
-function Figure({ state }: { state: PreviewState }) {
+function Figure({ state, fill = false }: { state: PreviewState; fill?: boolean }) {
   const { colour, spacing } = useDesignTokens()
   const body = <MemoryRouter initialEntries={[state.entry ?? '/ds/page']}>{state.draw()}</MemoryRouter>
   return (
     <figure style={{ margin: 0 }}>
       <figcaption style={{ marginBottom: spacing.xs, color: colour.textMuted }}>{state.caption}</figcaption>
-      {state.frameHeight === undefined ? body : <Frame height={state.frameHeight}>{body}</Frame>}
+      {state.frameHeight === undefined ? (
+        body
+      ) : (
+        <Frame height={state.frameHeight} fill={fill}>
+          {body}
+        </Frame>
+      )}
     </figure>
   )
 }
@@ -93,7 +113,7 @@ function Chooser({ states }: { states: readonly PreviewState[] }) {
           }}
         />
       </div>
-      <Figure key={state.caption} state={state} />
+      <Figure key={state.caption} state={state} fill={states === previews.shell} />
     </>
   )
 }
