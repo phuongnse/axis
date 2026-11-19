@@ -8,6 +8,7 @@ import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { AxisFieldRow } from '../platform/AxisFieldRow'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyDash } from '../platform/EmptyValue'
 import { FilledText } from '../platform/FilledText'
@@ -40,28 +41,26 @@ import { setOwn } from '../platform/ownProperty'
 
 type Content = Record<string, unknown>
 
-/** The settings that the field drawer shows after the help, in the order it shows them. `required` and `unique` come before them. */
-const drawerSettings: FieldSetting[] = [
-  'maxLength',
-  'minLength',
-  'min',
-  'max',
-  'precision',
-  'scale',
-  'maxSize',
-  'accept',
-  'target',
-  'currency',
-  'values',
-  'valueLabels',
-  'expression',
-  'default',
-  'sequence',
-  'creator',
-  'searchable',
-  'sensitive',
-  'exactLookup',
+/**
+ * The groups of the field drawer after General, in the order it shows them, each with the settings it holds, see
+ * docs/reference/entity-designer.md#the-drawer-and-its-groups. A pair shares one row. The type's group is titled by the
+ * type, and a group with no setting the field's type takes is left out.
+ */
+const drawerGroups: {
+  name: 'type' | 'value' | 'validation' | 'searchPrivacy'
+  settings: (FieldSetting | [FieldSetting, FieldSetting])[]
+}[] = [
+  { name: 'type', settings: ['target', 'values', 'valueLabels', 'currency', ['precision', 'scale'], 'maxLength'] },
+  { name: 'value', settings: ['expression', 'default', 'sequence', 'creator'] },
+  { name: 'validation', settings: ['required', 'unique', 'minLength', ['min', 'max'], 'maxSize', 'accept'] },
+  { name: 'searchPrivacy', settings: ['searchable', 'sensitive', 'exactLookup'] },
 ]
+
+/** The titles of a pair's row, by the pair's first setting. */
+const pairTitles = { precision: 'fields.precisionScale', min: 'fields.limits' } as const
+
+/** No field names: a validation drawn at its field has no field picker. */
+const noFieldNames: string[] = []
 
 /** Joins the field names into one text that tells whether the list changed. */
 const nameSeparator = '\u0000'
@@ -151,8 +150,9 @@ const Picker = memo(function Picker({
  * The designer of an entity, in the sections General, Fields, Validations and Indexes, see
  * docs/reference/entity-designer.md#sections. General shows the entity's name, label, description and display field.
  * Fields is a table of name, label, type, Required, Unique and properties, and a field's name opens the field drawer with
- * the field's inputs and the settings its type takes, see docs/reference/entity-designer.md#field-drawer and
- * docs/reference/entity-designer.md#fields. Validations is rows of a name, an
+ * the field's inputs in groups, and the validations at the field, see docs/reference/entity-designer.md#field-drawer,
+ * docs/reference/entity-designer.md#the-drawer-and-its-groups and docs/reference/entity-designer.md#fields.
+ * Validations is rows of a name, an
  * expression, a message key and a field. A field can be
  * added, removed and moved, and a type change drops the settings the new type does not take. A computed field's
  * `expression` and each validation's expression use the expression editor, and so does a field's `default`, which has
@@ -242,6 +242,7 @@ export function EntityDesigner({
           warnings={warnings}
           onOriginsChange={onOriginsChange}
           layer={layer}
+          validations={value.validations}
           onChange={onChange}
         />
         <Validations
@@ -357,6 +358,7 @@ const Fields = memo(function Fields({
   warnings,
   onOriginsChange,
   layer,
+  validations,
   onChange,
 }: {
   fields: unknown[] | undefined
@@ -366,6 +368,7 @@ const Fields = memo(function Fields({
   warnings: Map<number, FieldWarning> | undefined
   onOriginsChange: ((next: FieldOrigin[], touched?: string) => void) | undefined
   layer: DesignerLayer | undefined
+  validations: unknown
   onChange: ChangeHandler
 }) {
   const t = useText()
@@ -571,6 +574,8 @@ const Fields = memo(function Fields({
         }
         readOnly={readOnly}
         warning={shown === null ? undefined : warnings?.get(shown)}
+        validations={validations}
+        layer={layer}
         onChange={onChange}
         onClose={closeDrawer}
       />
@@ -674,8 +679,9 @@ const PropertiesCell = memo(function PropertiesCell({ field }: { field: unknown 
 
 /**
  * The drawer of a field, beside the table and above the save bar, with no mask so the table stays clickable, see
- * docs/reference/entity-designer.md#field-drawer. From the top it holds the migration warning, then the field's name,
- * label, type, help, Required, Unique and the settings its type takes, each an input with its help and its id.
+ * docs/reference/entity-designer.md#field-drawer. From the top it holds the migration warning, then the groups General
+ * (the field's name, label, type and help) and those of its settings, see
+ * docs/reference/entity-designer.md#the-drawer-and-its-groups. Each is an input with its help and its id.
  */
 const FieldDrawer = memo(function FieldDrawer({
   index,
@@ -684,6 +690,8 @@ const FieldDrawer = memo(function FieldDrawer({
   currencyNames,
   readOnly,
   warning,
+  validations,
+  layer,
   onChange,
   onClose,
 }: {
@@ -693,6 +701,8 @@ const FieldDrawer = memo(function FieldDrawer({
   currencyNames: (string | null)[] | undefined
   readOnly: boolean
   warning: FieldWarning | undefined
+  validations: unknown
+  layer: DesignerLayer | undefined
   onChange: ChangeHandler
   onClose: () => void
 }) {
@@ -701,22 +711,7 @@ const FieldDrawer = memo(function FieldDrawer({
   const content = isContent(field) ? field : {}
   const name = text(content.name)
   const type = text(content.type)
-  const taken = fieldSettings(type)
   const pointer = `/fields/${index}`
-
-  function flag(setting: 'required' | 'unique') {
-    return (
-      taken.includes(setting) && (
-        <div data-testid={`studio-field-${pointer}/${setting}`}>
-          <AxisCheckboxField
-            {...fieldTexts(t, `fields.${setting}`)}
-            checked={content[setting] === true}
-            onChange={(checked) => onChange(`${pointer}/${setting}`, checked)}
-          />
-        </div>
-      )
-    )
-  }
 
   return (
     <Drawer
@@ -742,46 +737,50 @@ const FieldDrawer = memo(function FieldDrawer({
               )}
             />
           )}
-          <div data-testid={`studio-field-${pointer}/name`}>
-            <AxisField {...fieldTexts(t, 'fields.name')} required>
-              <Input value={name} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
-            </AxisField>
-          </div>
-          <AxisField {...fieldTexts(t, 'fields.label')}>
-            <FieldLabel
-              name={fieldTexts(t, 'fields.label').label}
-              pointer={`${pointer}/label`}
-              value={content.label}
-              onChange={onChange}
-            />
-          </AxisField>
-          <div data-testid={`studio-field-${pointer}/type`}>
-            <AxisField {...fieldTexts(t, 'fields.type')} required>
-              <Select
-                showSearch
-                optionFilterProp="label"
-                virtual={false}
-                value={type === '' ? undefined : type}
-                options={fieldTypes.map((option) => ({ value: option, label: option }))}
-                onChange={(next: string) => onChange(pointer, changeFieldType(content, next))}
-              />
-            </AxisField>
-          </div>
-          <AxisField {...fieldTexts(t, 'fields.helpText')}>
-            <FieldLabel
-              name={fieldTexts(t, 'fields.helpText').label}
-              pointer={`${pointer}/help`}
-              value={content.help}
-              onChange={onChange}
-            />
-          </AxisField>
-          {flag('required')}
-          {flag('unique')}
+          <AxisFieldGroup {...groupTexts(t, 'fields.group.general')}>
+            <Flex vertical gap="middle">
+              <div data-testid={`studio-field-${pointer}/name`}>
+                <AxisField {...fieldTexts(t, 'fields.name')} required>
+                  <Input value={name} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
+                </AxisField>
+              </div>
+              <AxisField {...fieldTexts(t, 'fields.label')}>
+                <FieldLabel
+                  name={fieldTexts(t, 'fields.label').label}
+                  pointer={`${pointer}/label`}
+                  value={content.label}
+                  onChange={onChange}
+                />
+              </AxisField>
+              <div data-testid={`studio-field-${pointer}/type`}>
+                <AxisField {...fieldTexts(t, 'fields.type')} required>
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    virtual={false}
+                    value={type === '' ? undefined : type}
+                    options={fieldTypes.map((option) => ({ value: option, label: option }))}
+                    onChange={(next: string) => onChange(pointer, changeFieldType(content, next))}
+                  />
+                </AxisField>
+              </div>
+              <AxisField {...fieldTexts(t, 'fields.helpText')}>
+                <FieldLabel
+                  name={fieldTexts(t, 'fields.helpText').label}
+                  pointer={`${pointer}/help`}
+                  value={content.help}
+                  onChange={onChange}
+                />
+              </AxisField>
+            </Flex>
+          </AxisFieldGroup>
           <Settings
             index={index}
             field={content}
             currencyNames={currencyNames}
             readOnly={readOnly}
+            validations={validations}
+            layer={layer}
             onChange={onChange}
           />
         </Flex>
@@ -840,24 +839,44 @@ const FieldLabel = memo(function FieldLabel({
   )
 })
 
-/** The settings of one field that its type takes, each with its own input and id. */
+/**
+ * The settings of one field that its type takes, in the groups the type's settings, Value, Validation, and Search and
+ * privacy, each with its own input and id, see docs/reference/entity-designer.md#the-drawer-and-its-groups. A group with
+ * nothing to show is left out, and a pair of settings shares one row. A named field's Validation group also lists the
+ * validations whose `field` is this field and adds one, see docs/reference/entity-designer.md#settings.
+ */
 function Settings({
   index,
   field,
   currencyNames,
   readOnly,
+  validations,
+  layer,
   onChange,
 }: {
   index: number
   field: Content
   currencyNames: (string | null)[] | undefined
   readOnly: boolean
+  validations: unknown
+  layer: DesignerLayer | undefined
   onChange: ChangeHandler
 }) {
   const t = useText()
   const pointer = `/fields/${index}`
   const taken = editableSettings(field)
-  const shown = drawerSettings.filter((setting) => taken.includes(setting))
+  const type = text(field.type)
+  const name = text(field.name)
+  // A validation's `field` must name a field, so a field with no name has none and adds none.
+  const list: unknown[] | undefined =
+    validations === undefined ? [] : Array.isArray(validations) ? validations : undefined
+  const canAdd = name !== '' && list !== undefined && !readOnly
+  const atField =
+    name === '' || list === undefined
+      ? []
+      : list.flatMap((validation, position) =>
+          isContent(validation) && validation.field === name ? [{ validation, position }] : [],
+        )
 
   const settingTexts = (setting: FieldSetting) => fieldTexts(t, `fields.${setting}`)
 
@@ -873,7 +892,7 @@ function Settings({
   }
 
   /** The yes-or-no setting `setting`: a switch for searchable, a checkbox for the others. */
-  function flag(setting: 'creator' | 'sensitive' | 'exactLookup' | 'searchable') {
+  function flag(setting: 'required' | 'unique' | 'creator' | 'sensitive' | 'exactLookup' | 'searchable') {
     return (
       <AxisCheckboxField
         {...settingTexts(setting)}
@@ -961,40 +980,112 @@ function Settings({
     return control && <AxisField {...settingTexts(setting)}>{control}</AxisField>
   }
 
+  function drawn(setting: FieldSetting) {
+    return setting === 'currency' ? (
+      <CurrencySource
+        key={setting}
+        pointer={pointer}
+        field={field}
+        currencyFields={(currencyNames ?? []).flatMap((name, position) =>
+          position !== index && name !== null ? [name] : [],
+        )}
+        onChange={onChange}
+      />
+    ) : setting === 'target' || setting === 'sequence' ? (
+      <Picker
+        key={setting}
+        pointer={`${pointer}/${setting}`}
+        {...settingTexts(setting)}
+        kind={setting === 'target' ? 'entity' : 'sequence'}
+        value={field[setting]}
+        required={setting === 'target'}
+        onPick={(next) => onChange(`${pointer}/${setting}`, next ?? (setting === 'target' ? '' : undefined))}
+      />
+    ) : (
+      <div key={setting} data-testid={`studio-field-${pointer}/${setting}`}>
+        {setting === 'required' ||
+        setting === 'unique' ||
+        setting === 'creator' ||
+        setting === 'sensitive' ||
+        setting === 'exactLookup' ||
+        setting === 'searchable'
+          ? flag(setting)
+          : setting === 'valueLabels'
+            ? input(setting)
+            : labelled(setting)}
+      </div>
+    )
+  }
+
+  /** A pair that the field's type takes whole shares a row. A type that takes one of them draws that one alone. */
+  function drawnEntry(entry: FieldSetting | [FieldSetting, FieldSetting]) {
+    const entered = (typeof entry === 'string' ? [entry] : entry).filter((setting) => taken.includes(setting))
+    if (typeof entry === 'string' || entered.length < 2) {
+      return entered.map(drawn)
+    }
+    return [
+      <AxisFieldRow key={entry[0]} {...groupTexts(t, pairTitles[entry[0] as keyof typeof pairTitles])}>
+        {entered.map(drawn)}
+      </AxisFieldRow>,
+    ]
+  }
+
   return (
-    <Flex vertical gap="small" style={{ minWidth: 240 }}>
-      {shown.map((setting) =>
-        setting === 'currency' ? (
-          <CurrencySource
-            key={setting}
-            pointer={pointer}
-            field={field}
-            currencyFields={(currencyNames ?? []).flatMap((name, position) =>
-              position !== index && name !== null ? [name] : [],
-            )}
-            onChange={onChange}
-          />
-        ) : setting === 'target' || setting === 'sequence' ? (
-          <Picker
-            key={setting}
-            pointer={`${pointer}/${setting}`}
-            {...settingTexts(setting)}
-            kind={setting === 'target' ? 'entity' : 'sequence'}
-            value={field[setting]}
-            required={setting === 'target'}
-            onPick={(next) => onChange(`${pointer}/${setting}`, next ?? (setting === 'target' ? '' : undefined))}
-          />
-        ) : (
-          <div key={setting} data-testid={`studio-field-${pointer}/${setting}`}>
-            {setting === 'creator' || setting === 'sensitive' || setting === 'exactLookup' || setting === 'searchable'
-              ? flag(setting)
-              : setting === 'valueLabels'
-                ? input(setting)
-                : labelled(setting)}
-          </div>
-        ),
-      )}
-    </Flex>
+    <>
+      {drawerGroups.map(({ name: group, settings }) => {
+        const drawnSettings = settings.flatMap(drawnEntry)
+        const validationBoxes = group === 'validation' && (atField.length > 0 || canAdd)
+        if (drawnSettings.length === 0 && !validationBoxes) {
+          return null
+        }
+        return (
+          <AxisFieldGroup
+            key={group}
+            {...groupTexts(t, group === 'type' ? `fields.group.type.${type}` : `fields.group.${group}`)}
+          >
+            <Flex vertical gap="small" style={{ minWidth: 240 }}>
+              {drawnSettings}
+              {group === 'validation' && (
+                <>
+                  {atField.map(({ validation, position }) => (
+                    <ValidationRow
+                      key={position}
+                      atField
+                      index={position}
+                      validation={validation}
+                      fieldNames={noFieldNames}
+                      readOnly={readOnly}
+                      layer={layer}
+                      onChange={onChange}
+                    />
+                  ))}
+                  {canAdd && list !== undefined && (
+                    <div>
+                      <AxisButton
+                        role="secondary"
+                        onClick={() =>
+                          onChange('/validations', [
+                            ...list,
+                            {
+                              name: uniqueStepName(list, 'validation'),
+                              expression: '',
+                              message: { textKey: '' },
+                              field: name,
+                            },
+                          ])
+                        }
+                      >
+                        {t('shell.studio.entity.addValidation')}
+                      </AxisButton>
+                    </div>
+                  )}
+                </>
+              )}
+            </Flex>
+          </AxisFieldGroup>
+        )
+      })}
+    </>
   )
 }
 
@@ -1368,9 +1459,14 @@ const Validations = memo(function Validations({
   )
 })
 
-/** One validation of the entity, which draws again only when its own validation or the field names change. */
+/**
+ * One validation of the entity, which draws again only when its own validation or the field names change. With
+ * `atField`, as in the field drawer's Validation group, it has no field picker and its message is typed as label texts,
+ * see docs/reference/entity-designer.md#settings.
+ */
 const ValidationRow = memo(function ValidationRow({
   index,
+  atField = false,
   validation,
   fieldNames,
   readOnly,
@@ -1378,6 +1474,7 @@ const ValidationRow = memo(function ValidationRow({
   onChange,
 }: {
   index: number
+  atField?: boolean
   validation: unknown
   fieldNames: string[]
   readOnly: boolean
@@ -1408,22 +1505,32 @@ const ValidationRow = memo(function ValidationRow({
           />
         </AxisField>
       </div>
-      <Picker
-        pointer={`${pointer}/message/textKey`}
-        {...fieldTexts(t, 'validations.message')}
-        kind="text"
-        value={isContent(content.message) ? content.message.textKey : undefined}
-        required
-        onPick={(next) => onChange(`${pointer}/message/textKey`, next ?? '')}
-      />
-      <Picker
-        pointer={`${pointer}/field`}
-        {...fieldTexts(t, 'validations.field')}
-        options={fieldNames}
-        value={content.field}
-        required
-        onPick={(next) => onChange(`${pointer}/field`, next ?? '')}
-      />
+      {atField ? (
+        <div data-testid={`studio-field-${pointer}/message`}>
+          <AxisFieldGroup {...groupTexts(t, 'validations.messageText')}>
+            <LabelTexts pointer={`${pointer}/message`} value={content.message} onChange={onChange} />
+          </AxisFieldGroup>
+        </div>
+      ) : (
+        <>
+          <Picker
+            pointer={`${pointer}/message/textKey`}
+            {...fieldTexts(t, 'validations.message')}
+            kind="text"
+            value={isContent(content.message) ? content.message.textKey : undefined}
+            required
+            onPick={(next) => onChange(`${pointer}/message/textKey`, next ?? '')}
+          />
+          <Picker
+            pointer={`${pointer}/field`}
+            {...fieldTexts(t, 'validations.field')}
+            options={fieldNames}
+            value={content.field}
+            required
+            onPick={(next) => onChange(`${pointer}/field`, next ?? '')}
+          />
+        </>
+      )}
       {readOnly ? null : (
         <AxisButton role="destructive" onClick={() => onChange(pointer, undefined)}>
           {t('shell.studio.entity.removeValidation')}

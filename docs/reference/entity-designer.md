@@ -73,8 +73,9 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
 
 A field's name opens its settings in a drawer of the `medium` width, titled by the name or "Unnamed field", with no
 mask, so the table stays in sight and clickable. The drawer ends above the save bar, whether or not the bar shows. From
-the top it holds the migration warning, then the name, label, type, help text, Required, Unique and the settings the
-field's type takes. Each is an [`AxisField`](actions-and-controls.md#fields) or `AxisCheckboxField` with its help, at its
+the top it holds the migration warning, then the groups General, the type's settings, Value, Validation, and Search and
+privacy, each with a line of help and only those with a setting, see [the drawer and its groups](#the-drawer-and-its-groups).
+Each setting is an [`AxisField`](actions-and-controls.md#fields) or `AxisCheckboxField` with its help, at its
 `studio-field-<pointer>` id, and the name and the type show the required mark. Required and Unique show only where the
 type takes them. A read-only designer opens the drawer from the name too, with every input in it off. Add field adds a
 row and opens its drawer at once. Move up and Move down keep the open drawer on its field, at the field's new row.
@@ -130,14 +131,15 @@ These settings take a control of their own:
 - **Matched** _(planned)_. Find by offers only the target entity's unique fields, from `unique` in the
   [names](authoring.md#names), and From only this entity's fields of the same type that the compiler
   allows (`AXC0362`).
-- **Maximum length is the type's** _(planned)_. `maxLength` is the size of the stored text, which a value the server
+- **Maximum length is the type's**. `maxLength` is the size of the stored text, which a value the server
   sets keeps too, so it is under Text settings, as precision and scale are of a number. Validation holds
   only checks on an entered value.
-- **A validation at its field** _(planned)_. A validation is a rule on the whole record, and its `field` only says
+- **A validation at its field**. A validation is a rule on the whole record, and its `field` only says
   where its message shows. The file stays as it is, and the designer shows it twice: the drawer's
-  Validation group lists the validations at this field, each a box with its name, Delete validation, its
-  expression and its message, typed as texts, and Add validation fills `field`. The entity's
-  [Validations](#validations) section keeps every one.
+  Validation group lists the validations at this field, each a box with its name, Remove validation, its
+  expression and its message, typed as texts, and Add validation fills `field`. A validation is at the field when its
+  `field` is the field's name, letter case included, and a field with no name yet lists none and has no Add validation.
+  The entity's [Validations](#validations) section keeps every one.
 - **A default has no record in scope,** so its editor offers rules and functions but no field names and
   no aggregate functions, and a field name in it is reported as unknown (`AXC0046`).
 - **A money field holds one currency.** From a field writes an empty `currencyField` and removes `currency`, and
