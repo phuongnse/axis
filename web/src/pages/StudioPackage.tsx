@@ -139,7 +139,7 @@ export default function StudioPackage({
 }) {
   const t = useText()
   const navigate = useNavigate()
-  const { colour, spacing, type } = useDesignTokens()
+  const { colour, size, spacing, type } = useDesignTokens()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const [open, setOpen] = useState<Record<string, OpenFile>>({})
   const [tabs, setTabs] = useState<string[]>([])
@@ -1000,6 +1000,7 @@ export default function StudioPackage({
       )}
       <Modal
         open={dialog?.kind === 'delete'}
+        width={size.dialog.small}
         title={
           dialog?.kind === 'delete'
             ? t(
@@ -1025,6 +1026,7 @@ export default function StudioPackage({
       </Modal>
       <Modal
         open={dialog?.kind === 'close'}
+        width={size.dialog.small}
         title={
           dialog?.kind === 'close'
             ? t('shell.studio.package.closeTab.title').replace('{file}', nameOf(dialog.path))
@@ -1045,6 +1047,7 @@ export default function StudioPackage({
       </Modal>
       <Modal
         open={dialog?.kind === 'quickOpen'}
+        width={size.dialog.small}
         title={t('shell.studio.package.quickOpen')}
         footer={null}
         onCancel={() => setDialog(null)}
