@@ -54,6 +54,7 @@ export function Tile({
     alignItems: align,
     gap: spacing.sm,
     minWidth: 0,
+    color: colour.text,
     ...(bordered && {
       padding: spacing.md,
       background: colour.surface,

@@ -298,6 +298,14 @@ describe('KpiWidget', () => {
     expect(tile).toHaveStyle({ borderStyle: 'solid', borderWidth: '1px' })
   })
 
+  it('sets the text colour itself, so its text reads on surface in dark mode too', async () => {
+    stubRows(totalRow('{"openCount":12.50,"urgentCount":3}'))
+
+    renderKpi(withComparison)
+
+    expect(await screen.findByTestId('kpi-tile')).toHaveStyle({ color: designTokensFor('light').colour.text })
+  })
+
   it('gives the navigate action the page values', async () => {
     stubRows(totalRow('{"openCount":12.50,"urgentCount":3}'))
 
