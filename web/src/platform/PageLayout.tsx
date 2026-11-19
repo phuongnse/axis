@@ -54,8 +54,9 @@ function HeaderBand({ steps, children }: { steps?: readonly BreadcrumbStep[]; ch
       style={{
         // Negative margins reach the edges of the content area, whose padding is spacing.lg.
         margin: `-${spacing.lg}px -${spacing.lg}px 0`,
-        // Proposed (#4662): a band with the title alone has spacing.lg on every side, so the title sits evenly in it.
-        padding: steps ? `${spacing.lg}px ${spacing.lg}px ${spacing.md}px` : spacing.lg,
+        // Proposed (#4662): a band with the title alone has spacing.md above and below it, and spacing.lg at its sides,
+        // where the title lines up with the content.
+        padding: steps ? `${spacing.lg}px ${spacing.lg}px ${spacing.md}px` : `${spacing.md}px ${spacing.lg}px`,
         background: colour.surface,
         borderBottom: `1px solid ${colour.borderSubtle}`,
       }}
