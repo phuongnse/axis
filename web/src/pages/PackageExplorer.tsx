@@ -203,6 +203,7 @@ export function PackageExplorer({
             <>
               <AxisButton
                 role="icon"
+                size="small"
                 nameKey="shell.studio.package.newFile"
                 icon={<FileAddOutlined />}
                 data-testid="package-new-file"
@@ -210,6 +211,7 @@ export function PackageExplorer({
               />
               <AxisButton
                 role="icon"
+                size="small"
                 nameKey="shell.studio.package.newFolder"
                 icon={<FolderAddOutlined />}
                 data-testid="package-new-folder"
@@ -219,6 +221,7 @@ export function PackageExplorer({
           )}
           <AxisButton
             role="icon"
+            size="small"
             nameKey="shell.studio.package.refresh"
             icon={<ReloadOutlined />}
             onClick={actions.onRefresh}

@@ -273,11 +273,22 @@ export default function StudioPackage({
     if (!element) {
       return
     }
-    // The workspace takes the page's padding under it, so it ends on the footer's rule.
+    // The workspace takes the page's padding under it, so it ends on the footer's rule. The shell is as tall as the window,
+    // or as the design system's frame that sets `--shell-min-height`, so the workspace measures from the shell's top.
+    const framed = parseFloat(getComputedStyle(element).getPropertyValue('--shell-min-height'))
+    let shellRoot: Element = element
+    for (
+      let outer = element.parentElement?.closest('.ant-layout');
+      outer;
+      outer = outer.parentElement?.closest('.ant-layout')
+    ) {
+      shellRoot = outer
+    }
+    const inFrame = Number.isFinite(framed)
     const next = jsonViewHeight({
-      windowHeight: window.innerHeight,
-      top: element.getBoundingClientRect().top + window.scrollY,
-      footerHeight: document.querySelector('[role=contentinfo]')?.getBoundingClientRect().height ?? 0,
+      windowHeight: inFrame ? framed : window.innerHeight,
+      top: element.getBoundingClientRect().top - (inFrame ? shellRoot.getBoundingClientRect().top : -window.scrollY),
+      footerHeight: shellRoot.querySelector('footer')?.getBoundingClientRect().height ?? 0,
       below: 0,
       gap: 0,
     })
@@ -661,9 +672,12 @@ export default function StudioPackage({
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           {/* The file tabs read as the panel's tabs do: no box round a tab, the open one underlined in `primary`, and one rule
               under the row, level with the explorer's. */}
-          <style>{`.axis-file-tabs > .ant-tabs-nav { margin: 0; height: ${rowHeight}px; padding-inline: ${spacing.sm}px; } .axis-file-tabs > .ant-tabs-nav::before { border-bottom-color: ${colour.borderSubtle}; } .axis-file-tabs .ant-tabs-tab { border: none !important; background: transparent !important; border-radius: 0 !important; margin: 0 !important; padding-inline: ${spacing.sm}px !important; } .axis-file-tabs .ant-tabs-tab-active { box-shadow: inset 0 -2px 0 ${colour.primary}; } .axis-file-tabs .ant-tabs-body-holder { display: none; }`}</style>
+          {/* Proposed, see #3978: the file tabs and the panel's tabs are one row style: as high as the explorer's title row,
+              the same gap between every tab, no box round a tab, the open one underlined in `primary`, and one rule under
+              the row. */}
+          <style>{`.axis-workspace-tabs > .ant-tabs-nav { margin: 0 !important; height: ${rowHeight}px; padding-inline: ${spacing.sm}px; } .axis-workspace-tabs > .ant-tabs-nav::before { border-bottom-color: ${colour.borderSubtle}; } .axis-workspace-tabs .ant-tabs-tab, .axis-workspace-tabs .ant-tabs-tab + .ant-tabs-tab { border: none !important; background: transparent !important; border-radius: 0 !important; margin: 0 !important; padding: 0 ${spacing.sm}px !important; height: ${rowHeight}px; font-size: ${type.fontSize}px; } .axis-workspace-tabs .ant-tabs-ink-bar { display: none; } .axis-workspace-tabs .ant-tabs-tab-active { box-shadow: inset 0 -2px 0 ${colour.primary}; } .axis-file-tabs .ant-tabs-body-holder { display: none; }`}</style>
           <Tabs
-            className="axis-file-tabs"
+            className="axis-workspace-tabs axis-file-tabs"
             type="editable-card"
             hideAdd
             activeKey={file}
@@ -751,7 +765,6 @@ export default function StudioPackage({
               height: panelOpen ? panelHeight : undefined,
               display: 'flex',
               flexDirection: 'column',
-              paddingInline: spacing.md,
             }}
           >
             {panelOpen && (
@@ -774,13 +787,12 @@ export default function StudioPackage({
                 setPanelTab(key as PanelTab)
                 setPanelOpen(true)
               }}
-              size="small"
-              className="axis-package-panel"
+              className="axis-workspace-tabs axis-package-panel"
               style={{ flex: 1, minHeight: 0 }}
-              tabBarStyle={{ marginBottom: panelOpen ? spacing.sm : 0 }}
               tabBarExtraContent={
                 <AxisButton
                   role="icon"
+                  size="small"
                   nameKey={panelOpen ? 'shell.studio.package.panel.hide' : 'shell.studio.package.panel.show'}
                   icon={panelOpen ? <DownOutlined /> : <UpOutlined />}
                   aria-expanded={panelOpen}
@@ -1057,7 +1069,19 @@ export default function StudioPackage({
 
 /** The part of the output panel under its tabs, which scrolls on its own and stops at its end. */
 function PanelBody({ children }: { children: React.ReactNode }) {
-  return <div style={{ height: '100%', overflowY: 'auto', overscrollBehavior: 'contain' }}>{children}</div>
+  const { spacing } = useDesignTokens()
+  return (
+    <div
+      style={{
+        height: '100%',
+        overflowY: 'auto',
+        overscrollBehavior: 'contain',
+        padding: `${spacing.sm}px ${spacing.md}px`,
+      }}
+    >
+      {children}
+    </div>
+  )
 }
 
 /** What a request's state asks of the reader, as its tag's tone. */

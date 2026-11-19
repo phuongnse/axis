@@ -167,8 +167,13 @@ export default function CodeEditor({
           initial.fill
             ? Prec.highest(
                 EditorView.theme({
+                  // The caret and the marked current line show where the focus is, as a code editor's do, so the
+                  // editor draws no ring round itself; the current line is marked only while the editor has the focus.
                   '&': { border: 'none', borderRadius: '0' },
-                  '&.cm-focused': { outlineOffset: '-2px' },
+                  '&.cm-focused': { outline: 'none' },
+                  '&:not(.cm-focused) .cm-activeLine, &:not(.cm-focused) .cm-activeLineGutter': {
+                    backgroundColor: 'transparent',
+                  },
                 }),
               )
             : [],
@@ -287,7 +292,7 @@ export default function CodeEditor({
     const next = jsonViewHeight({
       windowHeight: window.innerHeight,
       top: rect.top + window.scrollY,
-      footerHeight: document.querySelector('[role=contentinfo]')?.getBoundingClientRect().height ?? 0,
+      footerHeight: document.querySelector('footer')?.getBoundingClientRect().height ?? 0,
       below:
         (boundary?.current ? Math.max(boundary.current.getBoundingClientRect().bottom - rect.bottom, 0) : 0) +
         (content ? parseFloat(getComputedStyle(content).paddingBottom) || 0 : 0),
