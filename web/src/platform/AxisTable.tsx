@@ -35,7 +35,7 @@ import { visuallyHidden } from './visuallyHidden'
  * - `fixed`: a value of a fixed form, such as a number, a date, a boolean, an enum or the row's actions, as wide as
  *   its content and never wrapping.
  * - `freeText`: text, a reference or a file. The free-text columns share the width the others leave in equal parts, and
- *   their content wraps at 320 px. A table with none gives that width to its last column.
+ *   their content wraps at the edge of the column. A table with none gives that width to its last column.
  */
 export type ColumnKind = 'fixed' | 'freeText'
 
@@ -192,9 +192,6 @@ function valueCompare(locale: string): (left: string | number, right: string | n
   return (left, right) =>
     typeof left === 'number' && typeof right === 'number' ? left - right : compareNames(String(left), String(right))
 }
-
-/** The most a free-text value is wide before it wraps, in px, see docs/reference/actions-and-controls.md#tables. */
-const freeTextMaxWidth = 320
 
 /** The least a free-text value is wide before a column moves under its row, in px, see docs/reference/actions-and-controls.md#tables. */
 const freeTextMinWidth = 160
@@ -434,7 +431,6 @@ export function AxisTable<T extends object>({
                 <div
                   style={{
                     minWidth: freeTextMinWidth,
-                    maxWidth: freeTextMaxWidth,
                     whiteSpace: 'normal',
                     overflowWrap: 'anywhere',
                   }}

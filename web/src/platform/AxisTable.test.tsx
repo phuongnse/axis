@@ -126,13 +126,15 @@ describe('AxisTable', () => {
       }
     })
 
-    it('shares the width between free-text columns in equal parts and wraps their text at 320 px', () => {
+    it('shares the width between free-text columns in equal parts and wraps their text at the column edge', () => {
       renderTable({ columns: [nameColumn, noteColumn, amountColumn] })
 
       expect(screen.getByRole('columnheader', { name: 'Name' })).toHaveStyle({ width: '50%' })
       expect(screen.getByRole('columnheader', { name: 'Note' })).toHaveStyle({ width: '50%' })
       const cell = screen.getAllByRole('cell', { name: 'Buy paper' })[0]
-      expect(cell.firstElementChild).toHaveStyle({ maxWidth: '320px', whiteSpace: 'normal', overflowWrap: 'anywhere' })
+      const content = cell.firstElementChild as HTMLElement
+      expect(content).toHaveStyle({ whiteSpace: 'normal', overflowWrap: 'anywhere' })
+      expect(content.style.maxWidth).toBe('')
     })
 
     it('gives the last column the rest when no column is free text', () => {

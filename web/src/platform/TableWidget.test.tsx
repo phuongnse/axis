@@ -869,7 +869,7 @@ describe('TableWidget', () => {
     expect(screen.getByRole('columnheader', { name: 'price' })).toHaveStyle({ textAlign: 'right' })
   })
 
-  it('wraps free text at 320 px and fits an enum to its content', async () => {
+  it('wraps free text at its column edge and fits an enum to its content', async () => {
     stubRecords(
       `{"items":[{"id":"${noteId}","version":1,"values":{"title":"Buy paper","status":"open"},"labels":{}}],"page":1,"pageSize":20,"totalCount":1}`,
     )
@@ -883,7 +883,8 @@ describe('TableWidget', () => {
     })
 
     const title = await screen.findByRole('cell', { name: 'Buy paper' })
-    expect(title.firstElementChild).toHaveStyle({ maxWidth: '320px', whiteSpace: 'normal' })
+    expect(title.firstElementChild).toHaveStyle({ whiteSpace: 'normal' })
+    expect((title.firstElementChild as HTMLElement).style.maxWidth).toBe('')
     const status = screen.getByRole('cell', { name: 'open' })
     expect(status).toHaveStyle({ width: '1%', whiteSpace: 'nowrap' })
     expect(status.firstElementChild).toBeNull()
