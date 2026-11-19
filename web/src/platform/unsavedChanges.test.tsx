@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import { followLink, renderGuarded } from '../test/leaveGuard'
-import { leaveWithoutAsking, onlyTableViewChanged, useUnsavedChanges, withoutTableView } from './unsavedChanges'
+import { leaveWithoutAsking, onlyEditorViewChanged, useUnsavedChanges, withoutEditorView } from './unsavedChanges'
 
 function Editor({ counted = false }: { counted?: boolean }) {
   const [unsaved, setUnsaved] = useState(counted)
@@ -99,6 +99,20 @@ describe('useUnsavedChanges', () => {
     expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()
   })
 
+  it('lets a change of the open field through, and still asks for a move to another resource', async () => {
+    const router = renderGuarded(<Editor />)
+    await act(() => router.navigate('/studio?app=A&resource=r1'))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+    await act(() => router.navigate('/studio?app=A&resource=r1&field=code', { replace: true }))
+    expect(router.state.location.search).toBe('?app=A&resource=r1&field=code')
+    expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()
+
+    void router.navigate('/studio?app=A&resource=r2&field=code')
+    expect(await screen.findByText('Leave without saving?')).toBeInTheDocument()
+    expect(router.state.location.search).toBe('?app=A&resource=r1&field=code')
+  })
+
   it('does not ask about a move that keeps the address', async () => {
     const router = renderGuarded(<Editor counted />)
 
@@ -151,12 +165,12 @@ describe('useUnsavedChanges', () => {
   })
 })
 
-describe('onlyTableViewChanged', () => {
+describe('onlyEditorViewChanged', () => {
   const filter = encodeURIComponent(JSON.stringify({ all: [{ field: 'kind', op: 'eq', value: 'form' }] }))
 
   it('treats a change of only the filter as a change of the table view', () => {
     expect(
-      onlyTableViewChanged(
+      onlyEditorViewChanged(
         { pathname: '/studio', search: '?app=A' },
         { pathname: '/studio', search: `?app=A&filter=${filter}` },
       ),
@@ -165,19 +179,19 @@ describe('onlyTableViewChanged', () => {
 
   it('treats a change of only a prefixed table view parameter as a change of the table view', () => {
     expect(
-      onlyTableViewChanged(
+      onlyEditorViewChanged(
         { pathname: '/studio', search: '?app=A' },
         { pathname: '/studio', search: `?app=A&fields.filter=${filter}` },
       ),
     ).toBe(true)
     expect(
-      onlyTableViewChanged(
+      onlyEditorViewChanged(
         { pathname: '/studio', search: '?app=A&records.page=2' },
         { pathname: '/studio', search: `?app=A&records.pageSize=50&fields.sort=name` },
       ),
     ).toBe(true)
     expect(
-      onlyTableViewChanged(
+      onlyEditorViewChanged(
         { pathname: '/studio', search: '?app=A' },
         { pathname: '/studio', search: `?app=B&fields.filter=${filter}` },
       ),
@@ -186,25 +200,40 @@ describe('onlyTableViewChanged', () => {
 
   it('does not treat a change of another parameter as a change of the table view', () => {
     expect(
-      onlyTableViewChanged(
+      onlyEditorViewChanged(
         { pathname: '/studio', search: '?app=A' },
         { pathname: '/studio', search: `?app=B&filter=${filter}` },
       ),
     ).toBe(false)
   })
+
+  it('treats a change of only the open field as a change of the editor view, on the same resource only', () => {
+    expect(
+      onlyEditorViewChanged(
+        { pathname: '/studio', search: '?app=A&resource=r1' },
+        { pathname: '/studio', search: '?app=A&resource=r1&field=code' },
+      ),
+    ).toBe(true)
+    expect(
+      onlyEditorViewChanged(
+        { pathname: '/studio', search: '?app=A&resource=r1' },
+        { pathname: '/studio', search: '?app=A&resource=r2&field=code' },
+      ),
+    ).toBe(false)
+  })
 })
 
-describe('withoutTableView', () => {
-  it('drops the view of the table and of every prefixed table, and keeps the other parameters and the columns', () => {
+describe('withoutEditorView', () => {
+  it('drops the view of the table and of every prefixed table, the open field, and keeps the other parameters and the columns', () => {
     const params = new URLSearchParams(
-      'app=A&resource=r1&search=x&filter=f&sort=name&page=2&pageSize=50&columns=name&fields.search=code&fields.filter=f&text.page=3',
+      'app=A&resource=r1&search=x&filter=f&sort=name&page=2&pageSize=50&columns=name&fields.search=code&fields.filter=f&text.page=3&field=code&x.field=y',
     )
 
-    expect(withoutTableView(params).toString()).toBe('app=A&resource=r1&columns=name')
+    expect(withoutEditorView(params).toString()).toBe('app=A&resource=r1&columns=name&x.field=y')
     expect(params.get('search')).toBe('x')
   })
 
-  it('returns the address as it is when it holds no table view', () => {
-    expect(withoutTableView(new URLSearchParams('app=A&resource=r1')).toString()).toBe('app=A&resource=r1')
+  it('returns the address as it is when it holds no editor view', () => {
+    expect(withoutEditorView(new URLSearchParams('app=A&resource=r1')).toString()).toBe('app=A&resource=r1')
   })
 })

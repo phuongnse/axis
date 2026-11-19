@@ -6,15 +6,16 @@ import { useDesignTokens } from './themeMode'
 import {
   BlockerContext,
   leavesWithoutAsking,
-  onlyTableViewChanged,
+  onlyEditorViewChanged,
   RegisterContext,
   type Register,
 } from './unsavedChanges'
 
 /**
  * The one guard that asks before unsaved changes are left, see docs/reference/studio.md#editor. It needs the data router
- * of docs/reference/frontend.md#routing. It blocks every move to another address while an editor is counted in, except one that only changes a table's view, and
- * cancels the browser's reload and close with its own question.
+ * of docs/reference/frontend.md#routing. It blocks every move to another address while an editor is counted in, except
+ * one that only changes an editor's view, see `onlyEditorViewChanged`, and cancels the browser's reload and close with
+ * its own question.
  */
 export function UnsavedChangesGuard({ children }: { children: ReactNode }): ReactNode {
   const counted = useRef(0)
@@ -24,7 +25,7 @@ export function UnsavedChangesGuard({ children }: { children: ReactNode }): Reac
       counted.current > 0 &&
       !(historyAction !== 'POP' && leavesWithoutAsking(nextLocation.state)) &&
       currentLocation.pathname + currentLocation.search !== nextLocation.pathname + nextLocation.search &&
-      !onlyTableViewChanged(currentLocation, nextLocation),
+      !onlyEditorViewChanged(currentLocation, nextLocation),
   )
 
   useEffect(() => {
