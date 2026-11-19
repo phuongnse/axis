@@ -116,6 +116,18 @@ export async function confirmPublish(page: Page, label?: string) {
   await expect(page).not.toHaveURL(/view=publish/)
 }
 
+/**
+ * Opens the Releases page of the open application from the sidebar, where the release list is, and waits for the list.
+ * Publish… keeps the page it is clicked on, so it must not be clicked before the Releases page has shown.
+ */
+export async function openReleases(page: Page) {
+  await page
+    .getByRole('navigation', { name: 'Menu', exact: true })
+    .getByRole('link', { name: 'Releases', exact: true })
+    .click()
+  await expect(page.getByTestId('studio-releases')).toBeVisible()
+}
+
 /** Opens the New application… dialog from the application row of the sidebar, on a page that has an application open. */
 export async function openNewApplication(page: Page) {
   await page.getByTestId('studio-application-row').click()
