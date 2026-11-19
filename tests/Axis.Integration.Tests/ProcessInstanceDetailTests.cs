@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Server.Tests;
+using Microsoft.AspNetCore.Mvc.Testing;
 using static Axis.Integration.Tests.TaskApiFixture;
 
 namespace Axis.Integration.Tests;
@@ -21,7 +22,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
         var root = body.RootElement;
         Assert.Equal(
-            ["id", "process", "subjectId", "releaseId", "state", "step", "createdAt", "endedAt", "timerDueAt", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands"],
+            ["id", "process", "subjectEntity", "subjectId", "subjectLabel", "releaseId", "releaseNumber", "state", "step", "createdAt", "endedAt", "timerDueAt", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands", "studio"],
             root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(instance, root.GetProperty("id").GetGuid());
         Assert.Equal("Break", root.GetProperty("process").GetString());
@@ -47,6 +48,14 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
     {
         var instance = await StartAndRunAsync(TenantA, "RoleApprove");
         var taskId = await fixture.TaskIdAsync(TenantA, instance);
+        // PostgreSQL keeps microseconds.
+        var due = DateTime.UtcNow.AddDays(2);
+        var dueAt = new DateTime(due.Ticks - (due.Ticks % 10), DateTimeKind.Utc);
+        await fixture.ExecuteAsync(
+            TenantA,
+            "UPDATE axis.process_tasks SET due_at = @due, claimed_by = 'lena', claimed_at = now() WHERE id = @id",
+            ("due", dueAt),
+            ("id", taskId));
 
         using var body = await GetOkAsync(TenantA, "RoleApprove", instance);
 
@@ -56,15 +65,19 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal(JsonValueKind.Null, root.GetProperty("timerDueAt").ValueKind);
         var task = Assert.Single(root.GetProperty("tasks").EnumerateArray());
         Assert.Equal(
-            ["id", "step", "assigneeKind", "assignee", "state", "outcome", "completedBy", "createdAt", "completedAt"],
+            ["id", "step", "assigneeKind", "assignee", "assigneeId", "state", "outcome", "completedBy", "completedById", "createdAt", "dueAt", "completedAt"],
             task.EnumerateObject().Select(property => property.Name));
         Assert.Equal(taskId, task.GetProperty("id").GetGuid());
         Assert.Equal("approve", task.GetProperty("step").GetString());
         Assert.Equal("role", task.GetProperty("assigneeKind").GetString());
         Assert.Equal("finance", task.GetProperty("assignee").GetString());
+        Assert.Equal("lena", task.GetProperty("assigneeId").GetString());
+        Assert.Equal(DateTimeKind.Utc, task.GetProperty("dueAt").GetDateTime().Kind);
+        Assert.Equal(dueAt, task.GetProperty("dueAt").GetDateTime());
         Assert.Equal("open", task.GetProperty("state").GetString());
         Assert.Equal(JsonValueKind.Null, task.GetProperty("outcome").ValueKind);
         Assert.Equal(JsonValueKind.Null, task.GetProperty("completedBy").ValueKind);
+        Assert.Equal(JsonValueKind.Null, task.GetProperty("completedById").ValueKind);
         Assert.Equal(JsonValueKind.Null, task.GetProperty("completedAt").ValueKind);
 
         var path = Assert.Single(root.GetProperty("path").EnumerateArray());
@@ -86,6 +99,82 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
     }
 
     [Fact]
+    public async Task A_completed_task_shows_the_name_and_the_id_of_the_person_who_completed_it()
+    {
+        var instance = await StartAndRunAsync(TenantA, "RoleApprove");
+        var taskId = await fixture.TaskIdAsync(TenantA, instance);
+        await fixture.InsertProfileAsync(TenantA, "maria", "Maria Manager");
+        await fixture.ExecuteAsync(
+            TenantA,
+            "UPDATE axis.process_tasks SET state = 'completed', outcome = 'approve', completed_by = 'maria', completed_at = now() WHERE id = @id",
+            ("id", taskId));
+
+        using var body = await GetOkAsync(TenantA, "RoleApprove", instance);
+
+        var task = Assert.Single(body.RootElement.GetProperty("tasks").EnumerateArray());
+        Assert.Equal("completed", task.GetProperty("state").GetString());
+        Assert.Equal("Maria Manager", task.GetProperty("completedBy").GetString());
+        Assert.Equal("maria", task.GetProperty("completedById").GetString());
+        Assert.Equal("finance", task.GetProperty("assignee").GetString());
+        Assert.Equal(JsonValueKind.Null, task.GetProperty("assigneeId").ValueKind);
+        Assert.Equal(JsonValueKind.Null, task.GetProperty("dueAt").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_user_assignee_shows_by_name_and_a_user_without_a_profile_shows_by_id()
+    {
+        var instance = await StartAndRunAsync(TenantA, "RoleApprove");
+        var taskId = await fixture.TaskIdAsync(TenantA, instance);
+        await fixture.InsertProfileAsync(TenantA, "fiona", "Fiona Finance");
+        await fixture.ExecuteAsync(
+            TenantA,
+            "UPDATE axis.process_tasks SET assignee_kind = 'user', assignee = 'fiona', state = 'completed', outcome = 'approve', completed_by = 'nobody-with-a-profile', completed_at = now() WHERE id = @id",
+            ("id", taskId));
+
+        using var body = await GetOkAsync(TenantA, "RoleApprove", instance);
+
+        var task = Assert.Single(body.RootElement.GetProperty("tasks").EnumerateArray());
+        Assert.Equal("user", task.GetProperty("assigneeKind").GetString());
+        Assert.Equal("Fiona Finance", task.GetProperty("assignee").GetString());
+        Assert.Equal("fiona", task.GetProperty("assigneeId").GetString());
+        Assert.Equal("nobody-with-a-profile", task.GetProperty("completedBy").GetString());
+        Assert.Equal("nobody-with-a-profile", task.GetProperty("completedById").GetString());
+    }
+
+    [Fact]
+    public async Task A_reader_with_the_author_role_gets_the_studio_address_and_one_without_it_gets_null()
+    {
+        var instance = await StartAndRunAsync(TenantA, "RoleApprove");
+        Assert.True(fixture.Model.TryGetProcess("RoleApprove", out var process));
+        var folder = Directory.CreateTempSubdirectory("axis-studio-detail-");
+        try
+        {
+            await using var factory = fixture.Factory.WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("Studio:AuthorRole", "finance");
+                builder.UseSetting("Studio:Folders:0", folder.FullName);
+            });
+
+            using var author = await GetOkAsync(factory, "lena", TenantA, "RoleApprove", instance);
+            using var reader = await GetOkAsync(factory, "ines", TenantA, "RoleApprove", instance);
+
+            var studio = author.RootElement.GetProperty("studio");
+            Assert.Equal(["app", "resource"], studio.EnumerateObject().Select(property => property.Name));
+            Assert.Equal("StepApp", studio.GetProperty("app").GetString());
+            Assert.Equal(process.Id, studio.GetProperty("resource").GetGuid());
+            Assert.Equal(JsonValueKind.Null, reader.RootElement.GetProperty("studio").ValueKind);
+        }
+        finally
+        {
+            folder.Delete(recursive: true);
+        }
+
+        // Studio is off in the default host, so even the user who holds the role has no address.
+        using var off = await GetOkAsync(TenantA, "RoleApprove", instance, "lena");
+        Assert.Equal(JsonValueKind.Null, off.RootElement.GetProperty("studio").ValueKind);
+    }
+
+    [Fact]
     public async Task A_waiting_timer_shows_its_due_time()
     {
         var instance = await StartAndRunAsync(TenantA, "TimerWait");
@@ -99,6 +188,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         var root = body.RootElement;
         Assert.Equal("waiting", root.GetProperty("state").GetString());
         Assert.Equal("pause", root.GetProperty("step").GetString());
+        Assert.Equal("Request", root.GetProperty("subjectEntity").GetString());
         var timerDueAt = root.GetProperty("timerDueAt").GetDateTime();
         Assert.Equal(DateTimeKind.Utc, timerDueAt.Kind);
         Assert.Equal(dueAt.ToUniversalTime(), timerDueAt);
@@ -439,6 +529,15 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
     private async Task<JsonDocument> GetOkAsync(string tenant, string process, Guid instance, string user = "ines")
     {
         using var response = await GetAsync(user, tenant, process, instance.ToString("D"));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+    }
+
+    private static async Task<JsonDocument> GetOkAsync(WebApplicationFactory<Program> factory, string user, string tenant, string process, Guid instance)
+    {
+        using var client = factory.CreateClient().SignedInAs(user);
+        using var request = RecordApiFixture.Request($"/api/apps/StepApp/processes/{process}/instances/{instance:D}", Host(tenant));
+        using var response = await client.SendAsync(request, CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
     }

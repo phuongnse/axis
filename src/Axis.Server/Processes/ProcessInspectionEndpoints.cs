@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
+using Axis.Data.Profiles;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
@@ -15,6 +16,7 @@ using Axis.Server.Http;
 using Axis.Server.Records;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Axis.Studio;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 
@@ -54,7 +56,10 @@ namespace Axis.Server.Processes;
 /// as in the list, before any instance is looked up. A malformed id, an unknown id, an instance of another process, and an instance whose
 /// subject record the user may not read or that no longer exists are one 404. A read filter that
 /// fails at run time for the subject record does not match, so it is a 404 too. The detail writes
-/// no audit record.
+/// no audit record. The detail also names the subject entity (<c>subjectEntity</c>), the label (<c>subjectLabel</c>, under the list's rules) and
+/// the pinned release's number (<c>releaseNumber</c>), and gives <c>studio</c>, <c>{ app, resource }</c>, to a user who holds the author role of
+/// <c>Studio:AuthorRole</c> and null to anyone else. A task gives <c>dueAt</c>, <c>assigneeId</c> and <c>completedById</c>, and its <c>assignee</c>
+/// and <c>completedBy</c> are a person's name, or the user id when there is no profile, and a role assignee keeps its role's name.
 /// </para>
 /// <para>
 /// A process without a subject has no record to read. Its instances are listed and read with the
@@ -289,6 +294,7 @@ internal static class ProcessInspectionEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         PackageCatalog packages,
+        StudioOptions studio,
         SensitiveValues sensitive,
         ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
@@ -365,14 +371,15 @@ internal static class ProcessInspectionEndpoints
         }
 
         return Results.Ok(await DetailAsync(
-            connection, resolver, packages, application, model, entity, row, InspectionViewer.ForUser(user.RolesIn(application)), cancellationToken));
+            connection, resolver, packages, application, model, entity, row, InspectionViewer.ForUser(user.RolesIn(application)), studio.Allows(user.Roles), cancellationToken));
     }
 
     /// <summary>
     /// Builds the detail of <paramref name="row"/> for <paramref name="viewer"/>. <paramref name="active"/> is the active release
     /// of the instance's application, or its pinned release when the application has none. <paramref name="process"/> and
     /// <paramref name="subject"/> are the process and the subject entity in that release. The caller has checked that the viewer
-    /// may read the instance, so this applies no read grant, filter or subject check of its own.
+    /// may read the instance, so this applies no read grant, filter or subject check of its own. <paramref name="author"/> says
+    /// whether the viewer holds the author role, which gives the detail its <c>studio</c> address.
     /// </summary>
     internal static async Task<ProcessInstanceDetailResponse> DetailAsync(
         NpgsqlConnection connection,
@@ -383,6 +390,7 @@ internal static class ProcessInspectionEndpoints
         EntityModel? subject,
         ProcessInstanceRow row,
         InspectionViewer viewer,
+        bool author,
         CancellationToken cancellationToken)
     {
         // The due time shows only while the instance waits, from the timer item of its current revision.
@@ -422,6 +430,21 @@ internal static class ProcessInspectionEndpoints
         var pinnedProcess = pinned.Processes.Single(candidate => candidate.Id == process.Id);
         var pinnedSubject = subject is null ? null : pinned.FindEntity(subject.Id);
 
+        // The label and the release number follow the list's rules, so a label the viewer may not read is null. The console
+        // falls back to the pinned entity when the active release dropped it, and then the label is not read.
+        var showsLabel = subject is not null
+            && active.FindEntity(subject.Id) is not null
+            && ShowsSubjectLabel(subject, pinnedSubject, viewer.ReadableFields(active, subject));
+        var labels = await InstanceQueries.LabelsAsync(connection, row.Id, showsLabel ? subject : null, cancellationToken);
+
+        // A user assignee, the one who claimed a role task and the one who completed a task are shown by name.
+        var userIds = tasks
+            .SelectMany(task => new[] { task.AssigneeKind == ProcessTasks.UserAssignee ? task.Assignee : null, task.ClaimedBy, task.CompletedBy })
+            .OfType<string>()
+            .ToList();
+        var names = await UserProfiles.FindDisplayNamesAsync(connection, userIds, cancellationToken);
+        string Name(string userId) => names.GetValueOrDefault(userId) ?? userId;
+
         // The operator commands do not serve an instance without a subject yet, so the detail
         // offers none of them and no call is resolvable.
         var allowsResolve = subject is not null && viewer.AllowsResolve(active, process);
@@ -442,8 +465,11 @@ internal static class ProcessInspectionEndpoints
         return new ProcessInstanceDetailResponse(
             row.Id,
             process.Name,
+            subject?.Name,
             row.SubjectId,
+            labels.SubjectLabel,
             row.ReleaseId,
+            labels.ReleaseNumber,
             row.State,
             row.Step,
             row.CreatedAt.UtcDateTime,
@@ -467,11 +493,14 @@ internal static class ProcessInspectionEndpoints
                     task.Id,
                     task.Step,
                     task.AssigneeKind,
-                    task.Assignee,
+                    task.AssigneeKind == ProcessTasks.UserAssignee ? Name(task.Assignee) : task.Assignee,
+                    task.AssigneeKind == ProcessTasks.UserAssignee ? task.Assignee : task.ClaimedBy,
                     task.State,
                     task.Outcome,
+                    task.CompletedBy is { } completedBy ? Name(completedBy) : null,
                     task.CompletedBy,
                     task.CreatedAt.UtcDateTime,
+                    task.DueAt?.UtcDateTime,
                     task.CompletedAt?.UtcDateTime))
                 .ToList(),
             calls
@@ -514,7 +543,8 @@ internal static class ProcessInspectionEndpoints
                         outputs);
                 })
                 .ToList(),
-            commands);
+            commands,
+            author ? new ProcessStudioAddress(active.Manifest.Name, process.Id) : null);
     }
 
     // The process in the active release when it exists and the viewer may inspect it, otherwise null.
@@ -732,6 +762,8 @@ internal sealed record ProcessInstanceListItem(
 
 /// <summary>
 /// One instance of a process, the graph of the release it is pinned to, its path, its tasks and its calls.
+/// <paramref name="SubjectEntity"/>, <paramref name="SubjectLabel"/> and <paramref name="ReleaseNumber"/> are as the list gives them.
+/// <paramref name="Studio"/> is the address to open the process in Studio for a user who holds the author role, and null for anyone else.
 /// <paramref name="Commands"/> lists the operator commands (<c>retry</c>, <c>cancel</c>) that the user holds the grant for and
 /// that the instance's state and calls allow. <paramref name="TimerDueAt"/> is the time the timer step that the instance waits on
 /// fires, or null when the instance is not waiting on a timer. The detail names the parent and the sub-processes whose process the user may
@@ -740,8 +772,11 @@ internal sealed record ProcessInstanceListItem(
 internal sealed record ProcessInstanceDetailResponse(
     Guid Id,
     string Process,
+    string? SubjectEntity,
     Guid? SubjectId,
+    string? SubjectLabel,
     Guid ReleaseId,
+    int? ReleaseNumber,
     string State,
     string Step,
     DateTime CreatedAt,
@@ -753,7 +788,11 @@ internal sealed record ProcessInstanceDetailResponse(
     IReadOnlyList<ProcessPathEntry> Path,
     IReadOnlyList<ProcessInstanceTask> Tasks,
     IReadOnlyList<ProcessInstanceCall> Calls,
-    IReadOnlyList<string> Commands);
+    IReadOnlyList<string> Commands,
+    ProcessStudioAddress? Studio);
+
+/// <summary>The application and the process resource that open in Studio, for a viewer who holds the author role.</summary>
+internal sealed record ProcessStudioAddress(string App, Guid Resource);
 
 /// <summary>The instance that started this one, with the sub-process step in the parent that did so.</summary>
 internal sealed record ProcessInstanceParent(Guid Id, string Process, string Step);
@@ -776,16 +815,24 @@ internal sealed record ProcessGraphTransition(string Next, string? On);
 /// </summary>
 internal sealed record ProcessPathEntry(string Step, DateTime StartedAt, DateTime FinishedAt, string? Decision, JsonNode? Output, string? Error, string? TraceId);
 
-/// <summary>A task of the instance, with who it is assigned to and how it ended.</summary>
+/// <summary>
+/// A task of the instance, with who it is assigned to and how it ended. <paramref name="Assignee"/> is a user assignee's name,
+/// or its user id when the user has no profile, and a role assignee's role name. <paramref name="AssigneeId"/> is the user
+/// assignee's id, or the id of the person who claimed a role task, and null while no one holds it. <paramref name="CompletedBy"/>
+/// is the name of the person who completed the task, or their user id when they have no profile.
+/// </summary>
 internal sealed record ProcessInstanceTask(
     Guid Id,
     string Step,
     string AssigneeKind,
     string Assignee,
+    string? AssigneeId,
     string State,
     string? Outcome,
     string? CompletedBy,
+    string? CompletedById,
     DateTime CreatedAt,
+    DateTime? DueAt,
     DateTime? CompletedAt);
 
 /// <summary>

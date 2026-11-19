@@ -98,7 +98,8 @@ header, as the other session routes do. They are checked on the server whatever 
   that is no longer active opens too, and its subject record need not exist. The operator reads
   fields like a `read` grant with no `fields` list, so a call's `input` is hidden only by the
   [masking rules](process-inspection.md#values-and-masking), when its mapping uses a `sensitive`
-  field or a field the active release no longer has. `commands` lists the commands that apply to
+  field or a field the active release no longer has. The operator sees `subjectLabel` unless its display
+  field is `sensitive`, and gets `studio` only when they also hold the author role. `commands` lists the commands that apply to
   the instance and a call is `resolvable`, as for a user who holds the grants, because the
   operator role stands in for them. They are listed only when the application has an active
   release that still has the instance's process, and an instance of a process without a subject
