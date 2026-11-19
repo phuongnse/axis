@@ -91,7 +91,15 @@ const drawnPaths = [
   'fields.expression',
   'fields.default',
   'fields.sequence',
-  'fields.creator',
+  'fields.valueSource',
+  'fields.valueSource.entered',
+  'fields.valueSource.computed',
+  'fields.valueSource.sequence',
+  'fields.valueSource.creator',
+  'fields.valueSource.matched',
+  'fields.userId',
+  'fields.match.field',
+  'fields.match.from',
   'fields.searchable',
   'fields.sensitive',
   'fields.exactLookup',
@@ -204,6 +212,8 @@ const everySetting = {
   expression: 'total * 2',
   sequence: 'InvoiceNumbers',
   creator: true,
+  userId: true,
+  match: { field: 'code', from: 'code' },
   sensitive: true,
   exactLookup: true,
   maxSize: 1048576,
@@ -233,11 +243,11 @@ function fixture(skipped: FieldSetting[]) {
   }))
 }
 
-/** One field of each type, with every setting its type takes. Its computed fields hide `default` and the limits. */
+/** One field of each type, with every setting its type takes. A field with a way other than entered hides the entered value's settings. */
 const typed = fixture([])
 
-/** One field of each type without `expression`, `sequence` or `creator`, so each type shows all its other settings. */
-const plain = fixture(['expression', 'sequence', 'creator'])
+/** One field of each type without `expression`, `sequence`, `creator` or `match`, so each type shows all its other settings. */
+const plain = fixture(['expression', 'sequence', 'creator', 'match'])
 
 function entity(extra: Record<string, unknown> = {}) {
   return {
@@ -626,6 +636,9 @@ describe('EntityDesigner', () => {
           { name: 'total', type: 'decimal', expression: 'total * 2', default: '1' },
           { name: 'number', type: 'text', sequence: 'InvoiceNumbers', creator: true },
           { name: 'plain', type: 'text' },
+          { name: 'author', type: 'text', creator: true },
+          { name: 'owner', type: 'text', userId: true, default: "'x'" },
+          { name: 'supplier', type: 'reference', target: 'Supplier', match: { field: 'code', from: 'code' } },
         ],
       }),
     )
@@ -635,6 +648,9 @@ describe('EntityDesigner', () => {
     expect(fieldTags(2)).toEqual(['Sequence'])
     expect(fieldTags(3)).toEqual([])
     expect(fieldCells(3)[5]).toBe('—')
+    expect(fieldTags(4)).toEqual(['Creator'])
+    expect(fieldTags(5)).toEqual(['User'])
+    expect(fieldTags(6)).toEqual(['Matched'])
   })
 
   it('names each entity input by its label and describes it by its help', async () => {
@@ -706,9 +722,8 @@ describe('EntityDesigner', () => {
 
   it.each([
     ['searchable', 'switch', 'Searchable', undefined],
-    ['creator', 'checkbox', 'Creator', false],
     ['sensitive', 'checkbox', 'Sensitive', false],
-    ['exactLookup', 'checkbox', 'Exact lookup', undefined],
+    ['userId', 'checkbox', 'Holds a user', undefined],
   ] as const)(
     'draws %s as a field with its help and writes its pointer when it is toggled',
     async (setting, role, label, off) => {
@@ -728,6 +743,39 @@ describe('EntityDesigner', () => {
       expect(fields()[0]).toEqual({ name: 'code', type: 'text', ...(off === undefined ? {} : { [setting]: off }) })
     },
   )
+
+  it('shows Exact lookup only on a sensitive field, and unticking Sensitive removes it in one change', async () => {
+    const onChange = renderDesigner(
+      entity({ fields: [{ name: 'code', type: 'text', sensitive: true, exactLookup: true, searchable: true }] }),
+    )
+    const code = within(await openEntityField(0))
+
+    const lookup = code.getByRole('checkbox', { name: labelOf('fields.exactLookup') })
+    expect(lookup).toHaveAccessibleDescription(helpOf('fields.exactLookup'))
+    expect(lookup).toBeChecked()
+
+    await userEvent.click(code.getByRole('checkbox', { name: labelOf('fields.sensitive') }))
+    expect(onChange).toHaveBeenCalledTimes(1)
+    const [pointer, next] = onChange.mock.calls[0]
+    expect(pointer).toBe('/fields/0')
+    expect(next).toEqual({ name: 'code', type: 'text', sensitive: false, searchable: true })
+    expect(Object.keys(next)).toEqual(['name', 'type', 'sensitive', 'searchable'])
+  })
+
+  it('offers Exact lookup once Sensitive is ticked, and writes it as a toggle', async () => {
+    const fields = renderEditing(entity({ fields: [{ name: 'code', type: 'text' }] }))
+    const code = within(await openEntityField(0))
+
+    expect(code.queryByRole('checkbox', { name: labelOf('fields.exactLookup') })).toBeNull()
+    expect(code.queryByTestId('studio-field-/fields/0/exactLookup')).toBeNull()
+    await userEvent.click(code.getByRole('checkbox', { name: labelOf('fields.sensitive') }))
+    expect(fields()[0]).toEqual({ name: 'code', type: 'text', sensitive: true })
+
+    await userEvent.click(code.getByRole('checkbox', { name: labelOf('fields.exactLookup') }))
+    expect(fields()[0]).toEqual({ name: 'code', type: 'text', sensitive: true, exactLookup: true })
+    await userEvent.click(code.getByRole('checkbox', { name: labelOf('fields.exactLookup') }))
+    expect(fields()[0]).toEqual({ name: 'code', type: 'text', sensitive: true })
+  })
 
   it('shows General, Fields, Validations and Indexes as sections in that order, each with its line and a rule before all but the first', () => {
     renderDesigner(entity())
@@ -1795,7 +1843,7 @@ describe('the groups of the field drawer', () => {
     )
   })
 
-  it('shows a boolean field with no group of the type, and a reference field with no Value group', async () => {
+  it('shows a boolean field with no group of the type, and a reference field with a Value group for Matched', async () => {
     renderDesigner(
       entity({
         fields: [
@@ -1807,7 +1855,7 @@ describe('the groups of the field drawer', () => {
 
     expect(groupTitles(await openEntityField(0))).toEqual(['General', 'Value', 'Validation', 'Search and privacy'])
 
-    expect(groupTitles(await openEntityField(1))).toEqual(['General', 'Reference settings', 'Validation'])
+    expect(groupTitles(await openEntityField(1))).toEqual(['General', 'Reference settings', 'Value', 'Validation'])
   })
 
   it('leaves out the Validation group of a child collection that has no validation to list and none to add', async () => {
@@ -1929,6 +1977,345 @@ describe('the groups of the field drawer', () => {
       renderDesigner(entity({ validations: 'y' }))
 
       expect(within(await openEntityField(0)).queryByRole('button', { name: 'Add validation' })).toBeNull()
+    })
+  })
+})
+
+/** The names with the fields of Supplier, which a matched reference is found by: its unique ones and the rest. */
+const withSupplierFields = {
+  ...names,
+  entities: [
+    names.entities[0],
+    {
+      id: 'e2',
+      name: 'Supplier',
+      module: null,
+      fields: [
+        { name: 'code', type: 'text', target: null, values: null, unique: true },
+        { name: 'vatId', type: 'text', target: null, values: null, unique: true },
+        { name: 'title', type: 'text', target: null, values: null, unique: false },
+        { name: 'rank', type: 'integer', target: null, values: null, unique: true },
+        { name: 'parent', type: 'reference', target: 'Supplier', values: null, unique: true },
+      ],
+    },
+  ],
+} as unknown as StudioNames
+
+describe('where the value of a field comes from', () => {
+  const sourceLabels = ['Entered by people', 'Computed', 'Sequence', 'Creator', 'Matched']
+  const radio = (drawer: HTMLElement, label: string) =>
+    within(drawer).getByRole('radio', { name: new RegExp(`^${label}`) })
+  const radioLabels = (drawer: HTMLElement) =>
+    within(within(drawer).getByRole('radiogroup', { name: labelOf('fields.valueSource') }))
+      .getAllByRole('radio')
+      .map((input) => sourceLabels.find((label) => within(input.closest('label')!).queryByText(label) !== null))
+
+  it('offers a text field Entered by people, Computed, Sequence and Creator, each with its help', async () => {
+    renderDesigner(entity({ fields: [{ name: 'code', type: 'text', required: true, default: "'a'" }] }))
+    const drawer = await openEntityField(0)
+
+    const group = within(drawer).getByRole('radiogroup', { name: labelOf('fields.valueSource') })
+    expect(group).toHaveAccessibleDescription(helpOf('fields.valueSource'))
+    expect(radioLabels(drawer)).toEqual(['Entered by people', 'Computed', 'Sequence', 'Creator'])
+    for (const [way, label] of [
+      ['entered', 'Entered by people'],
+      ['computed', 'Computed'],
+      ['sequence', 'Sequence'],
+      ['creator', 'Creator'],
+    ] as const) {
+      expect(radio(drawer, label)).toHaveAccessibleDescription(helpOf(`fields.valueSource.${way}`))
+    }
+    expect(radio(drawer, 'Entered by people')).toBeChecked()
+    expect(within(drawer).getByTestId('studio-field-/fields/0/required')).toBeVisible()
+    expect(within(drawer).getByTestId('studio-field-/fields/0/default')).toBeVisible()
+    expect(within(drawer).getByTestId('studio-field-/fields/0/userId')).toBeVisible()
+  })
+
+  it.each([
+    ['integer', ['Entered by people', 'Computed']],
+    ['decimal', ['Entered by people', 'Computed']],
+    ['boolean', ['Entered by people', 'Computed']],
+    ['date', ['Entered by people', 'Computed']],
+    ['enum', ['Entered by people', 'Computed']],
+    ['money', ['Entered by people', 'Computed']],
+    ['reference', ['Entered by people', 'Matched']],
+  ])('offers a %s field only the ways its type takes', async (type, expected) => {
+    renderDesigner(entity({ fields: [{ name: 'f', type, target: 'Supplier' }] }))
+
+    expect(radioLabels(await openEntityField(0))).toEqual(expected)
+  })
+
+  it.each(['references', 'file', 'child-collection'])(
+    'offers a %s field no choice, which only has an entered value',
+    async (type) => {
+      renderDesigner(entity({ fields: [{ name: 'f', type, target: 'Supplier' }] }))
+
+      expect(
+        within(await openEntityField(0)).queryByRole('radiogroup', { name: labelOf('fields.valueSource') }),
+      ).toBeNull()
+    },
+  )
+
+  it('rewrites the field once when Computed is chosen, with no default and no Required', async () => {
+    const onChange = renderDesigner(
+      entity({
+        fields: [
+          { name: 'code', type: 'text', required: true, default: "'a'", minLength: 2, maxLength: 20, userId: true },
+        ],
+      }),
+    )
+    const drawer = await openEntityField(0)
+
+    await userEvent.click(radio(drawer, 'Computed'))
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith('/fields/0', { name: 'code', type: 'text', maxLength: 20, expression: '' })
+  })
+
+  it('shows only the settings of the chosen way, and Required only for an entered value', async () => {
+    const fields = renderEditing(
+      entity({ fields: [{ name: 'code', type: 'text', required: true, default: "'a'", maxLength: 20 }] }),
+    )
+    const drawer = await openEntityField(0)
+    const shown = (setting: string) => within(drawer).queryByTestId(`studio-field-/fields/0/${setting}`) !== null
+
+    await userEvent.click(radio(drawer, 'Computed'))
+    expect(fields()[0]).toEqual({ name: 'code', type: 'text', maxLength: 20, expression: '' })
+    expect(radio(drawer, 'Computed')).toBeChecked()
+    expect(['expression', 'default', 'userId', 'sequence', 'required', 'minLength'].filter(shown)).toEqual([
+      'expression',
+    ])
+    expect(
+      within(drawer).getByTestId('studio-field-/fields/0/expression').querySelector('[aria-hidden="true"]'),
+    ).toHaveTextContent('*')
+
+    await userEvent.click(radio(drawer, 'Sequence'))
+    expect(fields()[0]).toEqual({ name: 'code', type: 'text', maxLength: 20, sequence: '' })
+    expect(['expression', 'default', 'userId', 'sequence', 'required', 'minLength'].filter(shown)).toEqual(['sequence'])
+
+    await userEvent.click(radio(drawer, 'Creator'))
+    expect(fields()[0]).toEqual({ name: 'code', type: 'text', maxLength: 20, creator: true })
+    expect(['expression', 'default', 'userId', 'sequence', 'creator', 'required', 'minLength'].filter(shown)).toEqual(
+      [],
+    )
+    expect(radio(drawer, 'Creator')).toBeChecked()
+
+    await userEvent.click(radio(drawer, 'Entered by people'))
+    expect(fields()[0]).toEqual({ name: 'code', type: 'text', maxLength: 20 })
+    expect(['default', 'userId', 'required', 'minLength'].filter(shown)).toEqual([
+      'default',
+      'userId',
+      'required',
+      'minLength',
+    ])
+  })
+
+  it('changes nothing when the way the field has is chosen again', async () => {
+    const onChange = renderDesigner(
+      entity({ fields: [{ name: 'code', type: 'text', expression: 'a', default: "'x'" }] }),
+    )
+    const drawer = await openEntityField(0)
+
+    await userEvent.click(radio(drawer, 'Computed'))
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('leaves an emptied expression or sequence empty, so the field keeps its way', async () => {
+    const onChange = renderDesigner(entity({ fields: [{ name: 'code', type: 'text', expression: 'a' }] }))
+    const drawer = await openEntityField(0)
+
+    await userEvent.clear(within(within(drawer).getByTestId('studio-field-/fields/0/expression')).getByRole('textbox'))
+
+    expect(onChange).toHaveBeenLastCalledWith('/fields/0/expression', '')
+  })
+
+  it('shows the sequence picker, marked required, for a field with a sequence', async () => {
+    renderDesigner(entity({ fields: [{ name: 'code', type: 'text', sequence: 'InvoiceNumbers' }] }))
+    const drawer = await openEntityField(0)
+
+    const picker = within(drawer).getByTestId('studio-field-/fields/0/sequence')
+    expect(within(picker).getByText('InvoiceNumbers')).toBeVisible()
+    expect(picker).toHaveTextContent('*')
+  })
+
+  it('writes userId for Holds a user and removes it when it is unticked', async () => {
+    const fields = renderEditing(entity({ fields: [{ name: 'owner', type: 'text' }] }))
+    const drawer = await openEntityField(0)
+    const holds = () => within(drawer).getByRole('checkbox', { name: labelOf('fields.userId') })
+
+    expect(holds()).toHaveAccessibleDescription(helpOf('fields.userId'))
+    await userEvent.click(holds())
+    expect(fields()[0]).toEqual({ name: 'owner', type: 'text', userId: true })
+    await userEvent.click(holds())
+    expect(fields()[0]).toEqual({ name: 'owner', type: 'text' })
+  })
+
+  it('shows Holds a user and Default only for a text field that is entered', async () => {
+    renderDesigner(entity({ fields: [{ name: 'count', type: 'integer' }] }))
+    const drawer = await openEntityField(0)
+
+    expect(within(drawer).queryByTestId('studio-field-/fields/0/userId')).toBeNull()
+    expect(within(drawer).getByTestId('studio-field-/fields/0/default')).toBeVisible()
+  })
+
+  describe('Matched', () => {
+    function renderMatched(fields: unknown[], index = 0) {
+      const onChange = vi.fn()
+      render(
+        <Providers loaded={withSupplierFields}>
+          <EntityDesigner value={entity({ fields })} onChange={onChange} application="Shop" />
+        </Providers>,
+      )
+      return { onChange, open: () => openEntityField(index) }
+    }
+
+    it('writes an empty match for Matched and drops Required', async () => {
+      const { onChange, open } = renderMatched([
+        { name: 'supplier', type: 'reference', target: 'Supplier', required: true },
+      ])
+      const drawer = await open()
+
+      await userEvent.click(radio(drawer, 'Matched'))
+
+      expect(onChange).toHaveBeenCalledTimes(1)
+      expect(onChange).toHaveBeenCalledWith('/fields/0', {
+        name: 'supplier',
+        type: 'reference',
+        target: 'Supplier',
+        match: { field: '', from: '' },
+      })
+    })
+
+    it("offers Find by only the target entity's unique fields", async () => {
+      const { open } = renderMatched([
+        { name: 'supplier', type: 'reference', target: 'supplier', match: { field: '', from: '' } },
+      ])
+      const drawer = await open()
+
+      const findBy = within(drawer).getByTestId('studio-field-/fields/0/match/field')
+      expect(findBy).toHaveTextContent('*')
+      await userEvent.click(within(findBy).getByRole('combobox'))
+      expect(optionTexts(await openDropdown())).toEqual(['code', 'vatId', 'rank', 'parent'])
+    })
+
+    it("offers From only this entity's fields of the Find by field's type, without sensitive, matched or computed ones", async () => {
+      const { onChange, open } = renderMatched([
+        { name: 'supplier', type: 'reference', target: 'Supplier', match: { field: 'code', from: '' } },
+        { name: 'sku', type: 'text' },
+        { name: 'barcode', type: 'text', maxLength: 5 },
+        { name: 'quantity', type: 'integer' },
+        { name: 'secret', type: 'text', sensitive: true },
+        { name: 'derived', type: 'text', expression: "'a'" },
+        { name: 'other', type: 'reference', target: 'Supplier', match: { field: 'code', from: 'sku' } },
+        { name: '', type: 'text' },
+      ])
+      const drawer = await open()
+
+      const from = within(drawer).getByTestId('studio-field-/fields/0/match/from')
+      expect(from).toHaveTextContent('*')
+      await userEvent.click(within(from).getByRole('combobox'))
+      expect(optionTexts(await openDropdown())).toEqual(['sku', 'barcode'])
+
+      await chooseOption('barcode')
+      expect(onChange).toHaveBeenLastCalledWith('/fields/0/match/from', 'barcode')
+    })
+
+    it('offers From only a reference to the same target when Find by is a reference, and never the field itself', async () => {
+      const { open } = renderMatched([
+        { name: 'supplier', type: 'reference', target: 'Supplier', match: { field: 'parent', from: '' } },
+        { name: 'partner', type: 'reference', target: 'supplier' },
+        { name: 'invoice', type: 'reference', target: 'Invoice' },
+        { name: 'sku', type: 'text' },
+      ])
+      const drawer = await open()
+
+      await userEvent.click(
+        within(within(drawer).getByTestId('studio-field-/fields/0/match/from')).getByRole('combobox'),
+      )
+      expect(optionTexts(await openDropdown())).toEqual(['partner'])
+    })
+
+    it('offers From nothing when Find by names no unique field of the target', async () => {
+      const { open } = renderMatched([
+        { name: 'supplier', type: 'reference', target: 'Supplier', match: { field: 'title', from: '' } },
+        { name: 'sku', type: 'text' },
+      ])
+      const drawer = await open()
+
+      await userEvent.click(
+        within(within(drawer).getByTestId('studio-field-/fields/0/match/from')).getByRole('combobox'),
+      )
+      expect(optionTexts(await openDropdown())).toEqual([])
+    })
+
+    it('writes the picked Find by into the match', async () => {
+      const { onChange, open } = renderMatched([
+        { name: 'supplier', type: 'reference', target: 'Supplier', match: { field: 'code', from: 'sku' } },
+        { name: 'sku', type: 'text' },
+      ])
+      const drawer = await open()
+      const findBy = within(drawer).getByTestId('studio-field-/fields/0/match/field')
+
+      await chooseOption('vatId', findBy)
+      expect(onChange).toHaveBeenLastCalledWith('/fields/0/match/field', 'vatId')
+    })
+
+    it('draws Find by and From as plain boxes until the names have loaded', async () => {
+      const onChange = vi.fn()
+      render(
+        <Providers loaded={null}>
+          <EntityDesigner
+            value={entity({
+              fields: [
+                { name: 'supplier', type: 'reference', target: 'Supplier', match: { field: 'code', from: 'sku' } },
+              ],
+            })}
+            onChange={onChange}
+            application="Shop"
+          />
+        </Providers>,
+      )
+      const drawer = await openEntityField(0)
+
+      expect(within(within(drawer).getByTestId('studio-field-/fields/0/match/field')).getByRole('textbox')).toHaveValue(
+        'code',
+      )
+      await userEvent.type(
+        within(within(drawer).getByTestId('studio-field-/fields/0/match/from')).getByRole('textbox'),
+        'x',
+      )
+      expect(onChange).toHaveBeenLastCalledWith('/fields/0/match/from', 'skux')
+    })
+  })
+
+  describe('a hidden key already in the file', () => {
+    it('stays hidden, and its diagnostic opens the drawer with focus on the drawer, with no change', async () => {
+      const onChange = vi.fn()
+      const value = entity({
+        fields: [{ name: 'total', type: 'decimal', expression: 'a', default: '1', required: true }],
+      })
+      renderRouted(<EntityDesigner value={value} onChange={onChange} application="Shop" path="/fields/0/default" />, [
+        '/studio?app=Shop',
+      ])
+
+      const drawer = await screen.findByTestId('studio-field-drawer')
+
+      expect(drawer).toHaveFocus()
+      expect(within(drawer).queryByTestId('studio-field-/fields/0/default')).toBeNull()
+      expect(within(drawer).queryByTestId('studio-field-/fields/0/required')).toBeNull()
+      expect(onChange).not.toHaveBeenCalled()
+    })
+
+    it('goes only when the author changes the way', async () => {
+      const fields = renderEditing(
+        entity({ fields: [{ name: 'total', type: 'decimal', expression: 'a', default: '1', required: true }] }),
+      )
+      const drawer = await openEntityField(0)
+
+      await userEvent.click(radio(drawer, 'Entered by people'))
+
+      expect(fields()[0]).toEqual({ name: 'total', type: 'decimal', default: '1', required: true })
     })
   })
 })
@@ -2106,7 +2493,7 @@ describe('typing in the entity designer', () => {
     renderStable()
     await settled(3)
     const drawer = await openEntityField(1)
-    await settled(5)
+    await settled(4)
 
     await userEvent.type(within(within(drawer).getByTestId('studio-field-/fields/1/label')).getByRole('textbox'), 'x')
 

@@ -9,6 +9,7 @@ import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
 import {
   addEntityField,
+  chooseValueSource,
   closeEntityField,
   createResource,
   openEntityField,
@@ -156,6 +157,7 @@ test.describe('Studio creates a resource from a starter', () => {
     )
 
     await addField(page, 4, 'nameLength', 'integer')
+    await chooseValueSource(page, 'Computed')
     const field = page.getByTestId('studio-field-/fields/4/expression')
     // The read-only fallback is replaced once CodeMirror loads, so wait for the editor before typing.
     await expect(field.locator('.cm-editor')).toBeVisible()

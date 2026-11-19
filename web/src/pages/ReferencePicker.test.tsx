@@ -20,15 +20,15 @@ const names: StudioNames = {
       name: 'Order',
       module: null,
       fields: [
-        { name: 'Id', type: 'integer', target: null, values: null },
-        { name: 'Total', type: 'decimal', target: null, values: null },
+        { name: 'Id', type: 'integer', target: null, values: null, unique: false },
+        { name: 'Total', type: 'decimal', target: null, values: null, unique: false },
       ],
     },
     {
       id: '2',
       name: 'Customer',
       module: null,
-      fields: [{ name: 'Email', type: 'text', target: null, values: null }],
+      fields: [{ name: 'Email', type: 'text', target: null, values: null, unique: false }],
     },
     { id: '5', name: 'Supplier', labelKey: 'entities.supplier.label', module: null, fields: [] },
     { id: '6', name: 'Vendor', labelKey: 'entities.vendor.label', module: null, fields: [] },

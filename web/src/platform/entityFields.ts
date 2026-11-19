@@ -38,6 +38,8 @@ export const fieldSettingNames = [
   'expression',
   'sequence',
   'creator',
+  'userId',
+  'match',
   'searchable',
   'default',
   'sensitive',
@@ -56,6 +58,7 @@ export const fieldTypeSettings: Record<FieldType, FieldSetting[]> = {
     'expression',
     'sequence',
     'creator',
+    'userId',
     'searchable',
     'default',
     'sensitive',
@@ -78,7 +81,7 @@ export const fieldTypeSettings: Record<FieldType, FieldSetting[]> = {
   date: ['required', 'unique', 'min', 'max', 'expression', 'default', 'sensitive', 'exactLookup'],
   'date-time': ['required', 'unique', 'min', 'max', 'expression', 'default', 'sensitive', 'exactLookup'],
   enum: ['required', 'unique', 'values', 'valueLabels', 'expression', 'default', 'sensitive', 'exactLookup'],
-  reference: ['required', 'unique', 'target'],
+  reference: ['required', 'unique', 'target', 'match'],
   references: ['required', 'target'],
   'child-collection': ['target'],
   money: [
@@ -104,8 +107,6 @@ export const fieldKeysEditedElsewhere: Record<string, string> = {
   type: 'the field drawer',
   label: 'the field drawer',
   help: 'the field drawer',
-  match: 'the JSON tab',
-  userId: 'the JSON tab',
 }
 
 /** The settings a field type takes. An unknown type takes none. */
@@ -113,17 +114,85 @@ export function fieldSettings(type: string): FieldSetting[] {
   return Object.hasOwn(fieldTypeSettings, type) ? fieldTypeSettings[type as FieldType] : []
 }
 
-const valueSettings: FieldSetting[] = ['default', 'min', 'max', 'minLength']
+/** Where a field's value comes from, see docs/reference/entity-designer.md#settings. */
+export type ValueSource = 'entered' | 'computed' | 'sequence' | 'creator' | 'matched'
+
+/** The key that marks each way a value can come from other than being entered by people. */
+const wayKeys = { computed: 'expression', sequence: 'sequence', creator: 'creator', matched: 'match' } as const
+
+/** The keys only an entered value may have, because the compiler refuses them beside another way (`AXC0013`). */
+const enteredOnly = ['required', 'default', 'userId', 'min', 'max', 'minLength']
+
+/** The ways a field's type takes: entered by people first, then each way whose key the type takes. An unknown type takes none. */
+export function valueSourcesOf(type: string): ValueSource[] {
+  const settings = fieldSettings(type)
+  if (settings.length === 0) {
+    return []
+  }
+  return [
+    'entered',
+    ...(Object.entries(wayKeys) as [Exclude<ValueSource, 'entered'>, FieldSetting][])
+      .filter(([, key]) => settings.includes(key))
+      .map(([source]) => source),
+  ]
+}
+
+/** The way a field's value comes from: the first of its way keys that holds a value, else entered by people. */
+export function valueSourceOf(field: Record<string, unknown>): ValueSource {
+  return typeof field.expression === 'string'
+    ? 'computed'
+    : typeof field.sequence === 'string'
+      ? 'sequence'
+      : field.creator === true
+        ? 'creator'
+        : typeof field.match === 'object' && field.match !== null && !Array.isArray(field.match)
+          ? 'matched'
+          : 'entered'
+}
 
 /**
- * The settings the designer offers for a field. A field that computes its value with an `expression`, a `sequence` or
- * `creator` takes no `default`, `min`, `max` or `minLength`, because the compiler refuses that combination. A key
- * already in the file stays there, and Validate reports it.
+ * The field with a new way for its value. It drops every way's key and, unless the way is entered by people, the keys
+ * only an entered value may have, and it writes the empty key of the chosen way, which Validate reports until the author
+ * fills it. It keeps every other key in its order. The way the field has already changes nothing.
+ */
+export function withValueSource(field: Record<string, unknown>, source: ValueSource): Record<string, unknown> {
+  if (valueSourceOf(field) === source) {
+    return field
+  }
+  const ways: string[] = Object.values(wayKeys)
+  const next: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(field)) {
+    if (!ways.includes(key) && (source === 'entered' || !enteredOnly.includes(key))) {
+      setOwn(next, key, value)
+    }
+  }
+  if (source !== 'entered') {
+    setOwn(
+      next,
+      wayKeys[source],
+      source === 'computed' || source === 'sequence' ? '' : source === 'creator' ? true : { field: '', from: '' },
+    )
+  }
+  return next
+}
+
+/**
+ * The settings the designer offers for a field, as docs/reference/entity-designer.md#settings says. A way other than the
+ * one the field has is not offered, and `creator` only as a way. Required, `default`, `userId`, `min`, `max` and
+ * `minLength` show only for an entered value, and `exactLookup` only once the field is sensitive. A key already in the
+ * file that a setting hides stays there, and Validate reports it.
  */
 export function editableSettings(field: Record<string, unknown>): FieldSetting[] {
-  const settings = fieldSettings(typeof field.type === 'string' ? field.type : '')
-  const computed = typeof field.expression === 'string' || typeof field.sequence === 'string' || field.creator === true
-  return computed ? settings.filter((setting) => !valueSettings.includes(setting)) : settings
+  const source = valueSourceOf(field)
+  const ways: string[] = Object.values(wayKeys)
+  const own = source === 'entered' ? undefined : wayKeys[source]
+  return fieldSettings(typeof field.type === 'string' ? field.type : '').filter(
+    (setting) =>
+      setting !== 'creator' &&
+      (setting === own || !ways.includes(setting)) &&
+      (source === 'entered' || !enteredOnly.includes(setting)) &&
+      (setting !== 'exactLookup' || field.sensitive === true),
+  )
 }
 
 /** The format of a `min` or `max`: a number, a date or a date-time. Other types take no limit. */

@@ -230,6 +230,17 @@ export async function addEntityField(page: Page, index: number): Promise<Locator
 }
 
 /**
+ * Chooses where the open field's value comes from, such as "Computed", "Sequence" or "Creator", in its drawer's Value
+ * group, and waits until the choice shows as made, see docs/reference/entity-designer.md#settings. The field's other ways
+ * and the settings of an entered value go with the choice.
+ */
+export async function chooseValueSource(page: Page, way: string) {
+  const radio = fieldDrawer(page).getByRole('radio', { name: new RegExp(`^${way}`) })
+  await radio.check()
+  await expect(radio).toBeChecked()
+}
+
+/**
  * Chooses Move up, Move down or Remove in the "…" menu of the row of field `index` of the open entity. It closes an open
  * field first. It presses Enter on the entry instead of clicking it: the row's expression checks finish after the menu
  * opens, add lines and move the menu, so a click can miss the entry. It waits until the menu has closed, so its entries

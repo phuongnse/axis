@@ -697,7 +697,7 @@ function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attem
         />
       )}
       {call.inputHidden && (
-        <Typography.Text type="secondary">{`${t('shell.inspector.input')}: ${t('shell.inspector.hidden')}`}</Typography.Text>
+        <Typography.Text type="secondary">{`${t('shell.inspector.input')}: ${t('shell.value.hidden')}`}</Typography.Text>
       )}
       {input !== null && input.length > 0 && (
         <Descriptions

@@ -37,6 +37,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       colorBgLayout: colour.canvas,
       colorBgContainer: colour.surface,
       colorText: colour.text,
+      // Ant Design's secondary and tertiary text are the one muted text colour, see docs/reference/shared-widgets.md#which-widget.
+      colorTextSecondary: colour.textMuted,
       colorTextTertiary: colour.textMuted,
       // A placeholder is text that a person reads, so it meets 4.5:1 contrast as well.
       colorTextPlaceholder: colour.textMuted,
@@ -219,8 +221,10 @@ export function selectedItemTint(mode: ThemeMode): string {
 /**
  * The cell padding of a table, see docs/reference/actions-and-controls.md#tables. A row is `spacing-xs` above and below
  * a line of the `smallControl` size, which a line of text and a small icon button both fill, and `spacing-lg` on each
- * side keeps columns apart. `AxisTable` applies it through a nested ConfigProvider.
+ * side keeps columns apart. A compact table has `spacing-sm` on each side. `AxisTable` applies it through a nested
+ * ConfigProvider.
  */
-export function tableTheme(tokens: DesignTokens): ThemeConfig {
-  return { components: { Table: { cellPaddingBlock: tokens.spacing.xs, cellPaddingInline: tokens.spacing.lg } } }
+export function tableTheme(tokens: DesignTokens, compact = false): ThemeConfig {
+  const inline = compact ? tokens.spacing.sm : tokens.spacing.lg
+  return { components: { Table: { cellPaddingBlock: tokens.spacing.xs, cellPaddingInline: inline } } }
 }
