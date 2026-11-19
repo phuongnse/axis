@@ -15,13 +15,13 @@ page that is.
   application that opens a record of that entity at `/{site}/{page}/{id}`, through a form or a detail. The compiler
   checks it, as [sites](../reference/configuration.md#sites) says. A detail named as a record page takes its record
   from that `id` segment, as [routing](../reference/frontend.md#routing) says.
-- **An entity with no named page opens on the default record page** _(planned)_. Its address is
+- **An entity with no named page opens on the default record page**. Its address is
   `/{site}/records/{entity}/{id}`, and it shows the entity's form over every field, as [routing](../reference/frontend.md#routing)
   says.
 - **The site lists the record page of each entity the person may read**. `GET /api/sites/{path}` gives
   `recordPages` for those entities only, as [site endpoints](../reference/frontend.md#site-endpoints) says, so the SPA
   links only what the person can open.
-- **A record page reads under the person's grants** _(planned)_. It reads the record through the record API, so it
+- **A record page reads under the person's grants**. It reads the record through the record API, so it
   opens no data the person could not read before, as [D12](d12-authorization-is-server-side-and-default-deny.md) says.
 
 ## Consequences

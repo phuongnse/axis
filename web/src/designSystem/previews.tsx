@@ -29,6 +29,7 @@ import {
 import {
   application,
   blankDetailWidget,
+  categoryId,
   chartWidget,
   columnsFormRoutes,
   columnsRequestForm,
@@ -272,6 +273,12 @@ export const previews: Record<string, readonly PreviewState[]> = {
       caption: 'Form page',
       draw: () => <ShellPreview />,
       entry: { pathname: '/sample/request/new', state: { from: '/sample/requests' } },
+      frameHeight: shellFrameHeight,
+    },
+    {
+      caption: 'Default record page',
+      draw: () => <ShellPreview />,
+      entry: { pathname: `/sample/records/category/${categoryId}`, state: { from: '/sample/requests' } },
       frameHeight: shellFrameHeight,
     },
     { caption: 'Dashboard', draw: () => <ShellPreview />, entry: '/sample/dashboard', frameHeight: shellFrameHeight },

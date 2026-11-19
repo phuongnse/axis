@@ -70,6 +70,7 @@ describe('design-system previews', () => {
         'Application site',
         'Navigation collapsed',
         'Form page',
+        'Default record page',
         'Dashboard',
         'Platform site',
         'App switcher',

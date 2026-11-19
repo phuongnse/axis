@@ -176,6 +176,7 @@ public sealed class QueryTimeoutTests(RecordApiFixture fixture) : IClassFixture<
         "/api/apps/{app}/entities/",
         "/api/apps/{app}/data-sources/",
         "/api/sites/{path}/pages/",
+        "/api/sites/{path}/records/",
     ];
 
     private static bool IsExport(RouteEndpoint route) => route.RoutePattern.RawText!.EndsWith("/export", StringComparison.Ordinal);

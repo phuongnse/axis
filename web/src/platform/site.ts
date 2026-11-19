@@ -503,9 +503,26 @@ export async function fetchPage(path: string, page: string, signal?: AbortSignal
   )
 }
 
-async function fetchOrNull<T>(url: string, signal?: AbortSignal): Promise<T | null> {
+/**
+ * Loads the default record page of an entity, a module entity written `{module id}/{name}`. The answer is `null` when the
+ * site or the entity does not exist, or the person may not read the entity, so no page opens.
+ * See docs/reference/frontend.md#site-endpoints.
+ */
+export async function fetchRecordPage(
+  path: string,
+  entity: string,
+  signal?: AbortSignal,
+): Promise<PageMetadata | null> {
+  return fetchOrNull<PageMetadata>(
+    `/api/sites/${encodeURIComponent(path)}/records/${entity.split('/').map(encodeURIComponent).join('/')}`,
+    signal,
+    [403, 404],
+  )
+}
+
+async function fetchOrNull<T>(url: string, signal?: AbortSignal, absent: readonly number[] = [404]): Promise<T | null> {
   const response = await apiFetch(url, { signal })
-  if (response.status === 404) {
+  if (absent.includes(response.status)) {
     return null
   }
   if (!response.ok) {

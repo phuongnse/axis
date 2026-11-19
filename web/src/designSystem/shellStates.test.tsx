@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { installFixtureFetch } from './fixtureFetch'
-import { fixtureScopes, requestId, routes } from './fixtures'
+import { categoryId, fixtureScopes, requestId, routes } from './fixtures'
 import { Preview } from './Preview'
 import { ShellPreview } from './ShellPreview'
 import { chosenRoutes, previews, stateRoutes } from './previews'
@@ -44,5 +44,20 @@ describe('the design-system shell states', () => {
     render(<Preview states={[saved]} />)
 
     expect(await screen.findByDisplayValue('Standing desks for the new office', {}, { timeout: 15000 })).toBeVisible()
+  }, 30000)
+
+  it('opens a category on the default record page, with a breadcrumb back to Requests', async () => {
+    const recordPage = {
+      caption: 'Default record page',
+      draw: () => <ShellPreview />,
+      entry: { pathname: `/sample/records/category/${categoryId}`, state: { from: '/sample/requests' } },
+      frameHeight: 800,
+    }
+
+    render(<Preview states={[recordPage]} />)
+
+    expect(await screen.findByDisplayValue('Office furniture', {}, { timeout: 15000 })).toBeVisible()
+    const breadcrumb = within(screen.getByRole('navigation', { name: 'Breadcrumb' }))
+    expect(breadcrumb.getByRole('link', { name: 'Requests' })).toHaveAttribute('href', '/sample/requests')
   }, 30000)
 })
