@@ -1,9 +1,9 @@
-import { Flex, Progress, Tag, Typography } from 'antd'
+import { Flex, Progress, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { TenantUsageDayTable } from '../platform/TenantUsageDayTable'
 import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
-import { useDesignTokens } from '../platform/themeMode'
+import { StatusTag } from '../platform/StatusTag'
 import { fetchTenantUsage, formatBytes, type TenantQuotaUse, type TenantUsage } from '../platform/tenantUsage'
 import { usePlatform } from './context'
 
@@ -14,7 +14,6 @@ import { usePlatform } from './context'
 export function TenantUsageSection() {
   const t = useText()
   const { locale } = usePlatform().current
-  const { colour } = useDesignTokens()
   const [usage, setUsage] = useState<TenantUsage | null>(null)
 
   useEffect(() => {
@@ -66,14 +65,7 @@ export function TenantUsageSection() {
               <Typography.Text key={index}>{line}</Typography.Text>
             ))}
           </Flex>
-          {atLimit && (
-            <Tag
-              variant="outlined"
-              style={{ color: colour.dangerText, borderColor: colour.danger, background: 'transparent' }}
-            >
-              {t('shell.users.usage.atLimit')}
-            </Tag>
-          )}
+          {atLimit && <StatusTag tone="attention">{t('shell.users.usage.atLimit')}</StatusTag>}
         </Flex>
       </Flex>
     )

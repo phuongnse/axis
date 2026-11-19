@@ -1,11 +1,12 @@
 import { PlayCircleOutlined } from '@ant-design/icons'
-import { Flex, Modal, Spin, Tag, Typography } from 'antd'
+import { Flex, Modal, Spin, Typography } from 'antd'
 import { useContext, useEffect, useState, type HTMLAttributes } from 'react'
 import { Link } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { ReleaseOffStandard } from '../platform/ReleaseOffStandard'
+import { StatusTag } from '../platform/StatusTag'
 import {
   fetchStudioRelease,
   fetchStudioReleaseList,
@@ -26,8 +27,7 @@ import { PlatformContext } from './context'
 /** The Live tag of the release that runs, in the release list and on the release page's heading. */
 export function StudioLiveTag() {
   const t = useText()
-  // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
-  return <Tag color="success">{t('shell.studio.releases.live')}</Tag>
+  return <StatusTag tone="neutral">{t('shell.studio.releases.live')}</StatusTag>
 }
 
 /** The sentence that says release `release` cannot replace live release `live`: the dialog's title and the release page's lead. */

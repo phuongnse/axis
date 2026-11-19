@@ -158,6 +158,7 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     expect(screen.getAllByText('Live')).toHaveLength(1)
     const releaseCell = within(rows[2]).getAllByRole('cell')[0]
     expect(within(releaseCell).getByText('Live')).toBeInTheDocument()
+    expect(within(releaseCell).getByText('Live').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
     expect(releaseCell).toHaveTextContent('2')
   })
 

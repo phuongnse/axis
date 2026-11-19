@@ -114,6 +114,7 @@ describe('TenantUsageSection', () => {
     const users = await screen.findByTestId('tenant-usage-quota-users')
     expect(within(users).getByText('5 of 5')).toBeVisible()
     expect(within(users).getByText('At limit')).toBeVisible()
+    expect(within(users).getByText('At limit').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
     expect(screen.getAllByText('At limit')).toHaveLength(1)
     expect(within(screen.getByTestId('tenant-usage-quota-applications')).queryByText('At limit')).toBeNull()
   })

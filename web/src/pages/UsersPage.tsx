@@ -1,4 +1,4 @@
-import { Button, Flex, Modal, Result, Tabs, Tag, Typography } from 'antd'
+import { Button, Flex, Modal, Result, Tabs, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
@@ -8,6 +8,7 @@ import { SectionParts } from '../platform/SectionParts'
 import { recordPageSize, recordQuery, tablePageSizes } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { fetchTenantOutsideClients, type TenantOutsideClients } from '../platform/tenantOutsideClients'
+import { StatusTag, type StatusTone } from '../platform/StatusTag'
 import { useDesignTokens } from '../platform/themeMode'
 import { useTableView } from '../platform/useTableView'
 import {
@@ -42,10 +43,10 @@ const noParameters: readonly string[] = []
 
 const userStatuses: UserListItem['status'][] = ['invited', 'active', 'disabled']
 
-const statusColors: Record<UserListItem['status'], string> = {
-  invited: 'blue',
-  active: 'green',
-  disabled: 'default',
+const statusTones: Record<UserListItem['status'], StatusTone> = {
+  invited: 'attention',
+  active: 'neutral',
+  disabled: 'muted',
 }
 
 type Command = 'resend' | 'disable' | 'enable' | 'reset'
@@ -201,7 +202,9 @@ export function UsersPage() {
         title: t('shell.users.status'),
         sorter: true,
         filter: { kind: 'enum', options: statusOptions },
-        render: (_value, row) => <Tag color={statusColors[row.status]}>{t(`shell.users.status.${row.status}`)}</Tag>,
+        render: (_value, row) => (
+          <StatusTag tone={statusTones[row.status]}>{t(`shell.users.status.${row.status}`)}</StatusTag>
+        ),
       },
       {
         key: 'lastSignedInAt',

@@ -79,6 +79,7 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     expect(rows[0]).toHaveAttribute('data-outcome', 'passed')
     expect(rows[0]).toHaveTextContent('FinanceApproval')
     expect(rows[0]).toHaveTextContent('1234 ms')
+    expect(within(rows[0]).getByText('passed').closest('[data-tone]')).toHaveAttribute('data-tone', 'success')
     expect(within(rows[0]).queryByRole('button')).not.toBeInTheDocument()
   })
 
@@ -90,6 +91,7 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     const failed = rows[1]
     expect(failed).toHaveAttribute('data-outcome', 'failed')
     expect(failed).toHaveTextContent('ApprovalBelowThreshold')
+    expect(within(failed).getByText('failed').closest('[data-tone]')).toHaveAttribute('data-tone', 'danger')
     expect(within(failed).getByText('Step 6')).toBeInTheDocument()
     expect(failed).toHaveTextContent('The record status is approved, not rejected.')
 
@@ -114,6 +116,7 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     expect(rows).toHaveLength(2)
     expect(rows[0]).toHaveAttribute('data-outcome', 'skipped')
     expect(rows[0]).toHaveTextContent('skipped')
+    expect(within(rows[0]).getByText('skipped').closest('[data-tone]')).toHaveAttribute('data-tone', 'muted')
     expect(rows[0]).toHaveTextContent('department-budgets/ApprovalRecordsDecision')
     expect(within(rows[0]).getByText('Relaxed point: Budget/effects/decisionRecorded')).toBeInTheDocument()
     expect(within(rows[0]).queryByRole('button')).not.toBeInTheDocument()

@@ -1,4 +1,3 @@
-import { Tag } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
@@ -9,6 +8,7 @@ import {
   type ConsoleWebhookDeliveryPage,
 } from './console'
 import { SectionPart } from './SectionParts'
+import { StatusTag, type StatusTone } from './StatusTag'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { useText } from './texts'
 import { useTableView } from './useTableView'
@@ -20,11 +20,11 @@ interface ConsoleWebhookDeliveriesProps {
   locale: string
 }
 
-const stateColors: Record<ConsoleWebhookDelivery['state'], string> = {
-  delivered: 'green',
-  pending: 'blue',
-  deadLettered: 'red',
-  discarded: 'default',
+const stateTones: Record<ConsoleWebhookDelivery['state'], StatusTone> = {
+  delivered: 'success',
+  pending: 'neutral',
+  deadLettered: 'danger',
+  discarded: 'muted',
 }
 
 /** The columns the view's search, filter and sort can name, see docs/reference/operator-console.md#api. */
@@ -117,7 +117,7 @@ export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhoo
         },
         sorter: true,
         render: (_value, row) => (
-          <Tag color={stateColors[row.state]}>{t(`shell.console.webhooks.state.${row.state}`)}</Tag>
+          <StatusTag tone={stateTones[row.state]}>{t(`shell.console.webhooks.state.${row.state}`)}</StatusTag>
         ),
       },
       {

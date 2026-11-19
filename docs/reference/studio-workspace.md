@@ -215,7 +215,7 @@ Live tag is right after an activation.
 
 | Column       | Shows                                                                                                                                                       |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Release      | The number, with the Live tag beside the release that runs and the Off-standard tag beside an [off-standard release](module-contracts.md#off-standard-releases) |
+| Release      | The number, with the Live `StatusTag` in `neutral` beside the release that runs and the Off-standard tag beside an [off-standard release](module-contracts.md#off-standard-releases) |
 | Label        | The label the publish gave, or the dash                                                                                                                     |
 | Published    | When it was published                                                                                                                                       |
 | Published by | Who published it, see [names](#names)                                                                                                                       |

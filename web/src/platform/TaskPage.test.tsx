@@ -523,6 +523,7 @@ describe('TaskPage', () => {
     const { unmount } = renderPage()
 
     expect(await screen.findByText('Overdue')).toBeInTheDocument()
+    expect(screen.getByText('Overdue').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
     unmount()
 
     stubTaskApi()

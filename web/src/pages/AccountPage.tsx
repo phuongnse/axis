@@ -1,4 +1,4 @@
-import { Button, Flex, Tag } from 'antd'
+import { Button, Flex } from 'antd'
 import dayjs from 'dayjs'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useCallback, useEffect, useState } from 'react'
@@ -15,6 +15,7 @@ import {
 } from '../platform/ownSessions'
 import { PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { StatusTag } from '../platform/StatusTag'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
@@ -248,7 +249,7 @@ export function AccountPage() {
                       title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
                       render: (_value, session) =>
                         session.current ? (
-                          <Tag>{t('shell.account.sessions.current')}</Tag>
+                          <StatusTag tone="neutral">{t('shell.account.sessions.current')}</StatusTag>
                         ) : (
                           // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                           <Button size="small" disabled={!endAllowed} onClick={() => end(() => endSession(session.id))}>

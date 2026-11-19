@@ -1,4 +1,4 @@
-import { Flex, Result, Tag } from 'antd'
+import { Flex, Result } from 'antd'
 import dayjs from 'dayjs'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
@@ -8,9 +8,9 @@ import { ConsolePublishing } from '../platform/ConsolePublishing'
 import { ConsoleWebhookDeliveries } from '../platform/ConsoleWebhookDeliveries'
 import { PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { StatusTag } from '../platform/StatusTag'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
-import { useDesignTokens } from '../platform/themeMode'
 import { useTableView } from '../platform/useTableView'
 import { ConsoleDeadLetters } from './ConsoleDeadLetters'
 import { ConsoleFailedWork } from './ConsoleFailedWork'
@@ -48,7 +48,6 @@ function releaseText(row: ConsoleApplication): string | null {
 export function ConsolePage() {
   const t = useText()
   const platform = usePlatform()
-  const { colour } = useDesignTokens()
   const { locale } = platform.current
   const [tenant, setTenant] = useState<ConsoleTenant>()
   const [forbidden, setForbidden] = useState(false)
@@ -100,14 +99,9 @@ export function ConsolePage() {
             <Flex vertical gap="middle">
               <Flex gap="small" align="center">
                 <span>{t('shell.console.tenant.status')}</span>
-                <Tag
-                  style={{
-                    color: tenant.status === 'readOnly' ? colour.warningText : colour.successText,
-                    borderColor: tenant.status === 'readOnly' ? colour.warning : colour.success,
-                  }}
-                >
+                <StatusTag tone={tenant.status === 'readOnly' ? 'attention' : 'neutral'}>
                   {t(`shell.console.tenant.status.${tenant.status}`)}
-                </Tag>
+                </StatusTag>
               </Flex>
               <AxisTable<ConsoleApplication>
                 rowKey={(row) => row.id}
