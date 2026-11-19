@@ -150,9 +150,9 @@ public static class ProcessStarts
             """
             INSERT INTO axis.process_instances
                 (id, application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step, parameters,
-                 parent_instance_id, parent_step, accountable_user, decision_task)
+                 parent_instance_id, parent_step, accountable_user, started_by, decision_task)
             VALUES (@id, @application, @process, @entity, @subject, @release, @state, 1, @step, @parameters,
-                    @parentInstance, @parentStep, @accountableUser, @decisionTask)
+                    @parentInstance, @parentStep, @accountableUser, @startedBy, @decisionTask)
             """,
             Connection(transaction),
             transaction);
@@ -168,6 +168,7 @@ public static class ProcessStarts
         command.Parameters.Add(new NpgsqlParameter("parentInstance", NpgsqlDbType.Uuid) { Value = (object?)instance.ParentInstanceId ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("parentStep", NpgsqlDbType.Text) { Value = (object?)instance.ParentStep ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("accountableUser", NpgsqlDbType.Text) { Value = (object?)instance.AccountableUser ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("startedBy", NpgsqlDbType.Jsonb) { Value = (object?)instance.StartedBy ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("decisionTask", NpgsqlDbType.Uuid) { Value = (object?)instance.DecisionTask ?? DBNull.Value });
         try
         {

@@ -113,7 +113,7 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
       startKeys.current.set(action.instancesPath, key)
       let result
       try {
-        result = await startProcess(action.instancesPath, recordId, key)
+        result = await startProcess(action.instancesPath, recordId, key, action.labelKey)
       } catch (error) {
         console.warn(`Starting the process '${action.process}' for '${recordId}' failed`, error)
         setErrors([t('shell.form.startFailed')])

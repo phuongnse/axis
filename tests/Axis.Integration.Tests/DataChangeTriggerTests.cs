@@ -45,6 +45,13 @@ public sealed class DataChangeTriggerTests(TriggerApiFixture fixture) : IClassFi
             """,
             ("record", id)));
         Assert.Equal(1L, await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE record_id = @record AND action = 'process.started'", ("record", id)));
+        Assert.Equal(1L, await fixture.CountAsync(
+            """
+            SELECT count(*) FROM axis.process_instances
+            WHERE subject_id = @record AND process_id = @process
+              AND started_by = '{ "kind": "trigger", "name": "ReviewNewTickets", "id": null, "via": null }'::jsonb
+            """,
+            ("record", id), ("process", fixture.ProcessId("Review"))));
         Assert.Equal(instancesBefore + 1, await fixture.CountAsync("SELECT count(*) FROM axis.process_instances"));
 
         var ticketsBefore = await fixture.CountAsync($"SELECT count(*) FROM {fixture.TicketTable}");
@@ -231,6 +238,12 @@ public sealed class DataChangeTriggerTests(TriggerApiFixture fixture) : IClassFi
         await fixture.RunUntilIdleAsync(CancellationToken);
 
         Assert.Equal(1L, await CountInstancesAsync(id, "Notify"));
+        Assert.Equal(1L, await fixture.CountAsync(
+            """
+            SELECT count(*) FROM axis.process_instances
+            WHERE subject_id = @record AND process_id = @process AND started_by->>'kind' = 'trigger' AND started_by->>'name' = 'NotifyEscalated'
+            """,
+            ("record", id), ("process", fixture.ProcessId("Notify"))));
         const string accountable = "SELECT accountable_user FROM axis.process_instances WHERE subject_id = @record AND process_id = @process";
         Assert.Equal("cara", await fixture.ScalarAsync(accountable, ("record", id), ("process", fixture.ProcessId("Escalate"))));
         Assert.Equal("cara", await fixture.ScalarAsync(accountable, ("record", id), ("process", fixture.ProcessId("Notify"))));

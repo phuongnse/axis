@@ -241,11 +241,19 @@ in any state. The body has these parts:
   `null` for a process with no subject. Its `subjectLabel` and `releaseNumber` are as the
   [instance list](#instance-list) defines them. With `subjectId`, `subjectEntity` addresses the subject record, see
   [routing](frontend.md#routing).
-- **Who started it.** _(planned)_ `startedBy` is `{ "kind", "name", "id", "via" }`. `kind` is `person`,
+- **Who started it.** `startedBy` is `{ "kind", "name", "id", "via" }`. `kind` is `person`,
   `trigger`, `endpoint`, `schedule` or `parent`. `name` is the person's name, the resource's name for a
   trigger, endpoint or schedule, or the parent process's name for `parent`. `id` is the user's id, or the
   parent instance's id, and `null` otherwise. `via` is the text key of the action's label for a person,
-  and `null` otherwise.
+  and `null` otherwise. A start through the [start endpoint](processes.md#start-endpoint) by a user or a
+  service account, and a test scenario's start, is `person`, and `via` is `null` when the request names no
+  action. `trigger` covers data change and event triggers, and `schedule` covers schedule triggers. A
+  person's `name` is read from their user profile each time the detail is built, so it is their current name,
+  and `null` when they have none. The other names are the ones stored at the start, so a later release that
+  renames a trigger, endpoint or process does not change them. `startedBy` is `null` for an instance
+  started before Axis recorded its starter, see [process tables](process-tables.md#process-instances).
+  For `parent`, `name` and `id` follow the rule of `parent` above: a parent the user may not inspect, or
+  whose process the active release no longer has, gives `null` for both, and `kind` stays `parent`.
 - **Input and result.** _(planned)_ `input` holds the parameters the instance started with, or `null`,
   and follows [values and masking](#values-and-masking). `result` is `{ "step", "values" }` once the
   instance completed, and `null` before. Its `values` follow the same rule.
@@ -303,6 +311,7 @@ in any state. The body has these parts:
   "createdAt": "2026-10-10T02:05:00.123456Z",
   "endedAt": null,
   "timerDueAt": null,
+  "startedBy": { "kind": "person", "name": "Ada Lovelace", "id": "ada", "via": "purchaseRequest.submit" },
   "parent": null,
   "subProcesses": [],
   "graph": {

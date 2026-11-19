@@ -1422,7 +1422,7 @@ describe('TableWidget', () => {
       expect(posts).toHaveLength(1)
       const [url, init] = posts[0]
       expect(url).toBe(closeNote.instancesPath)
-      expect(init?.body).toBe(JSON.stringify({ subjectId: noteId }))
+      expect(init?.body).toBe(JSON.stringify({ subjectId: noteId, via: 'note.close' }))
       expect(new Headers(init?.headers).get('Idempotency-Key')).toBeTruthy()
       expect(screen.queryByTestId('table-action-error')).not.toBeInTheDocument()
     })

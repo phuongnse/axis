@@ -6,7 +6,9 @@ import { newUuid } from './uuid'
 export type StartResult = { ok: true } | { ok: false; problem: RecordProblem }
 
 /**
- * Starts a process for one subject record by posting to the start endpoint at `instancesPath`. A
+ * Starts a process for one subject record by posting to the start endpoint at `instancesPath`.
+ * `via` is the text key of the label of the start action the person started from, which the server
+ * checks against the application's start actions and keeps as who started the instance. A
  * 201 is a start. A 400, 404, 409 or 422 is a final answer and comes back as the problem. Any other
  * answer, and a network error, throws, so the caller may retry with the same `idempotencyKey`.
  */
@@ -14,11 +16,12 @@ export async function startProcess(
   instancesPath: string,
   subjectId: string,
   idempotencyKey: string,
+  via: string,
 ): Promise<StartResult> {
   const response = await apiFetch(instancesPath, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey },
-    body: JSON.stringify({ subjectId }),
+    body: JSON.stringify({ subjectId, via }),
   })
   if (response.status === 201) {
     return { ok: true }

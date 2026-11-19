@@ -405,6 +405,22 @@ public static class InstanceQueries
             : null;
     }
 
+    /// <summary>
+    /// Reads who or what started the instance <paramref name="instanceId"/>, or returns <see langword="null"/> for an instance
+    /// that started before Axis recorded its starter. A person's <c>Name</c> is not stored, so it is <see langword="null"/> here.
+    /// </summary>
+    public static async Task<ProcessStartedBy?> StartedByAsync(
+        NpgsqlConnection connection,
+        Guid instanceId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand("SELECT started_by::text FROM axis.process_instances WHERE id = @id", connection);
+        command.Parameters.AddWithValue("id", instanceId);
+        return await command.ExecuteScalarAsync(cancellationToken) is string json ? ProcessStartedBy.Parse(json) : null;
+    }
+
     /// <summary>Reads the step history rows of the instance <paramref name="instanceId"/>, oldest first.</summary>
     public static async Task<IReadOnlyList<ProcessStepHistoryRow>> HistoryAsync(
         NpgsqlConnection connection,

@@ -241,7 +241,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
       startKeys.current.set(action.instancesPath, key)
       let result
       try {
-        result = await startProcess(action.instancesPath, recordId, key)
+        result = await startProcess(action.instancesPath, recordId, key, action.labelKey)
       } catch (error) {
         console.warn(`Starting the process '${action.process}' for '${recordId}' failed`, error)
         setFormErrors([t('shell.form.startFailed')])
