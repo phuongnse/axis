@@ -187,10 +187,14 @@ describe('UsersPage', () => {
     expect(within(row).getByText('ann@axis.local')).toBeVisible()
     expect(within(row).getByText('Account')).toBeVisible()
     expect(within(row).getByText('Invited')).toBeVisible()
+    expect(within(row).getByText('Invited').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
     expect(within(row).getByText('—')).toBeVisible()
     const other = screen.getByText('Bob Active').closest('tr')!
     expect(within(other).getByText('google')).toBeVisible()
     expect(within(other).getByText('Active')).toBeVisible()
+    expect(within(other).getByText('Active').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
+    const disabled = screen.getByText('Cid Disabled').closest('tr')!
+    expect(within(disabled).getByText('Disabled').closest('[data-tone]')).toHaveAttribute('data-tone', 'muted')
   })
 
   it('shows the Connected apps tab next to People when the outside clients route answers 200', async () => {

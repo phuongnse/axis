@@ -116,6 +116,8 @@ describe('AccountPage', () => {
 
     const current = (await screen.findByText('This session')).closest('tr')!
 
+    expect(within(current).getByText('This session').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
+
     expect(within(current).queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Sign in again' })).not.toBeInTheDocument()
   })

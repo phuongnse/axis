@@ -146,16 +146,22 @@ describe('ConsolePublishing', () => {
     expect(within(rows[1]!).getByText('System')).toBeVisible()
     expect(within(releases).getAllByText('Live')).toHaveLength(1)
     expect(within(rows[0]!).getByText('Live')).toBeVisible()
+    expect(within(rows[0]!).getByText('Live').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
 
     const requests = screen.getByTestId('console-publishing-requests')
     const requestRows = within(requests).getAllByRole('row').slice(1)
     expect(requestRows).toHaveLength(2)
     expect(within(requestRows[0]!).getByText('activate')).toBeVisible()
     expect(within(requestRows[0]!).getByText('Failed')).toBeVisible()
+    expect(within(requestRows[0]!).getByText('Failed').closest('[data-tone]')).toHaveAttribute('data-tone', 'danger')
     expect(within(requestRows[0]!).getByText('Undo')).toBeVisible()
     expect(within(requestRows[0]!).getByText('Alan Author')).toBeVisible()
     expect(within(requestRows[1]!).getByText('u9')).toBeVisible()
     expect(within(requestRows[1]!).getByText('Succeeded')).toBeVisible()
+    expect(within(requestRows[1]!).getByText('Succeeded').closest('[data-tone]')).toHaveAttribute(
+      'data-tone',
+      'success',
+    )
   })
 
   it('names who activated each release in words, and never shows an id that has no name', async () => {
@@ -242,6 +248,7 @@ describe('ConsolePublishing', () => {
     expect(calls.at(-1)).toEqual({ url: '/api/console/applications/a2/publishing?', method: 'GET' })
     expect(within(view).getByText('Pia Publisher')).toBeVisible()
     expect(within(view).getByText('Queued')).toBeVisible()
+    expect(within(view).getByText('Queued').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
     expect(within(view).queryByText('Back again')).toBeNull()
     expect(within(view).getAllByText('Live')).toHaveLength(1)
   })

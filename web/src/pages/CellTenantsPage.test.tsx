@@ -217,6 +217,9 @@ describe('CellTenantsPage', () => {
     const rows = dataRows()
     expect(rows).toHaveLength(3)
     expect(rows[0]).toHaveTextContent('Active')
+    expect(within(rows[0]).getByText('Active').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
+    expect(within(rows[1]).getByText('Suspended').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
+    expect(within(rows[2]).getByText('Read only').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
     expect(rows[0]).toHaveTextContent('crm')
     expect(rows[0]).toHaveTextContent('acme.example.com, portal.acme.test')
     expect(
@@ -261,6 +264,7 @@ describe('CellTenantsPage', () => {
     await loadedTable()
     const rows = dataRows()
     expect(within(rows[0]).getByTestId('cell-tenants-archive-stale')).toHaveTextContent('Overdue')
+    expect(within(rows[0]).getByTestId('cell-tenants-archive-stale')).toHaveAttribute('data-tone', 'attention')
     expect(within(rows[1]).queryByTestId('cell-tenants-archive-stale')).toBeNull()
     expect(within(rows[1]).getAllByRole('cell')[11]).toHaveTextContent('—')
     expect(within(rows[2]).queryByTestId('cell-tenants-archive-stale')).toBeNull()

@@ -18,6 +18,14 @@ export function stateText(t: (key: string) => string, state: string): string {
   return (instanceStates as readonly string[]).includes(state) ? t(`shell.inspector.states.${state}`) : state
 }
 
+/** The states of a process call, see docs/reference/process-inspection.md#instance-detail. */
+export const callStates = ['pending', 'sending', 'unknown', 'succeeded', 'failed', 'cancelled'] as const
+
+/** The platform text of a call state. A state this build does not know shows as the API sends it. */
+export function callStateText(t: (key: string) => string, state: string): string {
+  return (callStates as readonly string[]).includes(state) ? t(`shell.inspector.callStates.${state}`) : state
+}
+
 /**
  * The process and the instance an instance detail path names, such as
  * `/api/apps/StepApp/processes/Submit/instances/{id}`, or `null` when the path is not one.

@@ -1,6 +1,7 @@
-import { Flex, Tag, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
 import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
+import { StatusTag } from '../platform/StatusTag'
 import type { StudioRequest, StudioScenarioResult, StudioSkippedScenarioResult } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { ResourceReference } from './ResourceReference'
@@ -58,10 +59,10 @@ function ScenarioRow({
     return (
       <div style={{ padding: '4px 15px' }}>
         <Flex vertical align="flex-start">
-          <span>
-            <Tag>{t('shell.studio.tests.skipped')}</Tag>
+          <Flex gap="small" align="center" wrap>
+            <StatusTag tone="muted">{t('shell.studio.tests.skipped')}</StatusTag>
             <strong>{scenario.name}</strong>
-          </span>
+          </Flex>
           <Typography.Text type="secondary">
             {fillText(t('shell.studio.tests.relaxedPoint'), { point: scenario.point })}
           </Typography.Text>
@@ -73,18 +74,17 @@ function ScenarioRow({
   return (
     <div style={{ padding: '4px 15px' }}>
       <Flex vertical align="flex-start">
-        <span>
-          {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-          <Tag color={failed ? 'error' : 'success'}>
+        <Flex gap="small" align="center" wrap>
+          <StatusTag tone={failed ? 'danger' : 'success'}>
             {t(failed ? 'shell.studio.tests.failed' : 'shell.studio.tests.passed')}
-          </Tag>
+          </StatusTag>
           <ResourceReference
             resource={{ kind: 'scenario', name: scenario.name }}
             file={scenario.file}
             onOpen={onSelect && (() => onSelect(scenario.resourceId, scenario.path ?? ''))}
-          />{' '}
+          />
           <Typography.Text type="secondary">{`${scenario.durationMs} ms`}</Typography.Text>
-        </span>
+        </Flex>
         {failed && scenario.step !== null && (
           <Typography.Text>{fillText(t('shell.studio.tests.step'), { number: scenario.step + 1 })}</Typography.Text>
         )}

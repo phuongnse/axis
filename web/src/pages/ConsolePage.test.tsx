@@ -11,7 +11,6 @@ import type {
   ConsoleWebhookDelivery,
   ConsoleWebhookDeliveryPage,
 } from '../platform/console'
-import { designTokensFor } from '../platform/designTokens'
 import { TextProvider } from '../platform/TextProvider'
 import { optionTexts } from '../test/antd'
 import { clickInDialog, dialog, pick } from '../test/tableFilter'
@@ -253,9 +252,7 @@ describe('ConsolePage', () => {
     const view = await screen.findByTestId('console-tenant')
     expect(fetchMock.mock.calls[0]).toEqual(['/api/console/tenant', expect.anything()])
     expect(within(view).getByText('Active')).toBeVisible()
-    expect(within(view).getByText('Active').closest('.ant-tag')).toHaveStyle({
-      color: designTokensFor('light').colour.successText,
-    })
+    expect(within(view).getByText('Active').closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral')
     for (const title of ['Application', 'Live release', 'Activated']) {
       expect(within(view).getByRole('columnheader', { name: title })).toBeVisible()
     }
@@ -282,9 +279,7 @@ describe('ConsolePage', () => {
 
     const view = await screen.findByTestId('console-tenant')
     expect(within(view).getByText('Read-only')).toBeVisible()
-    expect(within(view).getByText('Read-only').closest('.ant-tag')).toHaveStyle({
-      color: designTokensFor('light').colour.warningText,
-    })
+    expect(within(view).getByText('Read-only').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
     expect(within(view).queryByText('Active')).toBeNull()
   })
 
@@ -418,9 +413,11 @@ describe('ConsolePage', () => {
     }
     const leave = (await within(view).findByText('LeaveHook')).closest('tr')!
     expect(within(leave).getByText('Delivered', { selector: '.ant-tag' })).toBeVisible()
+    expect(within(leave).getByText('Delivered').closest('[data-tone]')).toHaveAttribute('data-tone', 'success')
     expect(within(leave).getByText('200')).toBeVisible()
     const order = within(view).getByText('OrderHook').closest('tr')!
     expect(within(order).getByText('Dead-lettered')).toBeVisible()
+    expect(within(order).getByText('Dead-lettered').closest('[data-tone]')).toHaveAttribute('data-tone', 'danger')
     expect(within(order).getByText('5')).toBeVisible()
     expect(within(order).getByText('503')).toBeVisible()
     expect(within(order).getByText('—')).toBeVisible()
@@ -475,9 +472,11 @@ describe('ConsolePage', () => {
     expect(within(webhook).getByText('Purchasing')).toBeVisible()
     expect(within(webhook).getByText('w-d2')).toBeVisible()
     expect(within(webhook).getByText('Open')).toBeVisible()
+    expect(within(webhook).getByText('Open').closest('[data-tone]')).toHaveAttribute('data-tone', 'attention')
     expect(within(view).getByTestId('console-dead-letter-redeliver-d2')).toBeVisible()
     const discarded = within(view).getByText('trigger.fanOut').closest('tr')!
     expect(within(discarded).getByText('Discarded')).toBeVisible()
+    expect(within(discarded).getByText('Discarded').closest('[data-tone]')).toHaveAttribute('data-tone', 'muted')
     expect(within(discarded).queryByRole('button')).toBeNull()
   })
 
