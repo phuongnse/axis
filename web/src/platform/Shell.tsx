@@ -38,6 +38,19 @@ function useRegionClaim() {
   return { claimed: claims > 0, target, setTarget, claim }
 }
 
+/** What a page that claims the right column needs: the claims in the order they came, which one shows, the element that holds its content, and how to claim. */
+function useAsideClaim() {
+  const [claims, setClaims] = useState<{ id: string; closable: boolean }[]>([])
+  const [target, setTarget] = useState<HTMLElement | null>(null)
+  const claim = useCallback((id: string, closable: boolean) => {
+    setClaims((all) => [...all, { id, closable }])
+    return () => setClaims((all) => all.filter((claimed) => claimed.id !== id))
+  }, [])
+  // The newest panel that a person opened shows, else the newest.
+  const current = (claims.findLast((claimed) => claimed.closable) ?? claims.at(-1))?.id
+  return { claimed: claims.length > 0, target, setTarget, claim, current }
+}
+
 interface ShellProps {
   titleKey: string
   navigation: readonly NavigationItem[]
@@ -78,7 +91,7 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * and the sidebar's navigation stays under it with a scroll of its own. A site with two or more navigation entries
  * has a sidebar of labels that collapses to a strip of icons. A page can claim the sidebar with `ShellSidebar` and
  * draw its own navigation there, even on a one-page site, and then the page gets the tighter workspace padding.
- * A page can claim a column on the right with `ShellAside`, `sidePanel` wide, beside the content column, from under the header to the footer.
+ * A page can claim a column on the right with `ShellAside`, as wide as the panel it holds, beside the content column, from under the header to the footer.
  * A footer runs under the page, with the copyright at the start and the legal links at the end. Without a sidebar it
  * runs across the bottom. Beside one it runs under the content column only, so the sidebar reaches the bottom of the window.
  * The page area draws on `surface`, flush with the frame, see docs/reference/shell.md#layout.
@@ -102,7 +115,7 @@ export function Shell({
   const t = useText()
   const { mode } = useThemeMode()
   const { pathname } = useLocation()
-  const { colour, size, spacing } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const activeKey = activeNavigationKey(navigation, pathname)
   const narrow = useNarrowWidth()
   // The panel is open for the path it was opened on, so following a link or leaving narrow width closes it.
@@ -113,13 +126,22 @@ export function Shell({
   const [collapsed, setCollapsed] = useState(false)
   // A page claims the sidebar by rendering ShellSidebar, which draws its content into `target`.
   const { claimed, target, setTarget, claim } = useRegionClaim()
-  // A page claims the right column by rendering ShellAside, in the same way.
-  const { claimed: asideClaimed, target: asideTarget, setTarget: setAsideTarget, claim: claimAside } = useRegionClaim()
+  // A page claims the right column by rendering ShellAside, which says which claim shows.
+  const {
+    claimed: asideClaimed,
+    target: asideTarget,
+    setTarget: setAsideTarget,
+    claim: claimAside,
+    current,
+  } = useAsideClaim()
   const sidebarContext = useMemo(
     () => ({ target, collapsed: collapsed && !narrow, claim }),
     [target, collapsed, narrow, claim],
   )
-  const asideContext = useMemo(() => ({ target: asideTarget, claim: claimAside }), [asideTarget, claimAside])
+  const asideContext = useMemo(
+    () => ({ target: asideTarget, claim: claimAside, current }),
+    [asideTarget, claimAside, current],
+  )
   const hasSidebar = claimed || navigation.length > 1
   const sidebar = hasSidebar && !narrow
   const home = navigation[0]?.path ?? '/'
@@ -275,7 +297,6 @@ export function Shell({
                     id="shell-aside"
                     style={{
                       flex: 'none',
-                      width: size.sidePanel,
                       background: colour.surface,
                       borderInlineStart: `1px solid ${colour.borderSubtle}`,
                     }}

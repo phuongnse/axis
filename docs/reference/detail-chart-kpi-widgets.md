@@ -92,7 +92,7 @@ as the [widget binding](data-sources.md#widget-binding) says.
   draw, and the tooltip and the data table keep the source text.
 - **Look.** The shared chart component in `web/src/platform/Chart.tsx` draws bar, line and pie charts from categories
   and labelled series, with series colours from the theme tokens in light and dark mode.
-- **A tile** _(planned)_. A chart is a tile: on `surface` with a `borderSubtle` border, `radius-base` corners and
+- **A tile.** A chart is a tile: on `surface` with a `borderSubtle` border, `radius-base` corners and
   `spacing-md` padding, as a home page tile is. Its title is a heading at the `heading5` size, `spacing-sm` above the
   chart, with no header bar and no rule.
 - **Loading the library.** The SPA loads the chart library lazily in its own chunk, as it loads React Flow, so a page
@@ -101,7 +101,7 @@ as the [widget binding](data-sources.md#widget-binding) says.
 - **Accessibility.** The title is the chart's accessible name. Screen readers get the data as a table that only they
   reach, with the category and each measure as columns. The loading, empty, error, null category and
   more-than-100-groups texts are platform texts.
-- **Hidden table** _(planned)_. The table that only screen readers reach hides in a `div` with `visuallyHidden`, never
+- **Hidden table.** The table that only screen readers reach hides in a `div` with `visuallyHidden`, never
   on the table itself, because a table sizes to its rows and would spill out of its tile.
 
 ### Drill-down
@@ -166,10 +166,10 @@ A `kpi` widget shows one measure of a data source as a tile, with its label.
 - **Look.** The label sits above, in the field label style of the [form widget](form-widget.md)'s field look. The
   measure is below it, large and semibold, in tabular figures. The comparison sits under it at body size, with its
   label muted, no colon between the label and the value, and the value in tabular figures.
-- **A tile** _(planned)_. A KPI is a tile in the same way: on `surface` with a `borderSubtle` border, `radius-base`
+- **A tile.** A KPI is a tile in the same way: on `surface` with a `borderSubtle` border, `radius-base`
   corners and `spacing-md` padding. Tiles in `columns` sit `spacing-md` apart.
 - **Click and reading.** With a `navigate`, the tile is a link to the target page, and the navigate label is the tile's
   last line, inside the link. The tile reads as `<label>: <value>`, and a comparison adds
   `<comparison label>: <comparison value>`. Loading and error states use platform texts.
-- **A link tile** _(planned)_. With a `navigate`, the whole tile is the link. Its link words are in `primaryText`, hover
+- **A link tile.** With a `navigate`, the whole tile is the link. Its link words are in `primaryText`, hover
   changes nothing, and keyboard focus draws the `focusRing` outline, as a home page tile does.

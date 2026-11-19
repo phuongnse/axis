@@ -139,7 +139,9 @@ removal.
 
 Selecting a node opens the step's card of the Form tab beside the canvas, with Move up, Move down and
 Remove. Each move is one change of `steps`, so one Undo reverses it, and an edit in the panel redraws the
-graph. With no step selected, the panel says "Select a step on the canvas."
+graph. With no step selected, the panel says "Select a step on the canvas." The panel is drawn in
+[`SidePanel`](shell.md#layout), titled Step, with no close button, and it gives way while the Problems or Ask AI panel
+is open and comes back when that panel closes.
 
 The type picker in the panel and the Add step choice list every type in
 `$defs.step.properties.type.enum` of the process schema. Changing a step's type removes the keys that the

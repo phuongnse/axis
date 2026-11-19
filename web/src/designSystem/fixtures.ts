@@ -490,6 +490,26 @@ export const kpiWidget: WidgetMetadata = {
   },
 }
 
+/** The kpi tile with a navigate action, so the whole tile is a link to the Requests page. */
+export const linkedKpiWidget: WidgetMetadata = {
+  ...kpiWidget,
+  kpi: {
+    measure: 'requests',
+    labelKey: 'kpi.requests',
+    comparison: null,
+    navigate: {
+      type: 'navigate',
+      page: 'Requests',
+      labelKey: 'kpi.showRequests',
+      parameters: {},
+      record: null,
+      opensForm: false,
+      paths: {},
+      visibleWhen: null,
+    },
+  },
+}
+
 /** The kpi tile over a data source with no rows, so it shows its empty value. */
 export const emptyKpiWidget: WidgetMetadata = {
   ...kpiWidget,
@@ -750,6 +770,7 @@ export const applicationSite: ApplicationSite = {
   navigation: [
     { page: 'Requests', labelKey: 'nav.requests', icon: 'list' },
     { page: 'Tasks', labelKey: 'nav.tasks', icon: 'tasks' },
+    { page: 'Dashboard', labelKey: 'nav.dashboard', icon: 'dashboard' },
   ],
   notificationsPath,
 }
@@ -759,6 +780,23 @@ const requestsPage: PageMetadata = {
   titleKey: 'page.requests',
   parameters: [],
   widgets: [tableWidget],
+}
+
+/** A dashboard: two kpi tiles side by side, one of them a link, and a bar chart under them. */
+const dashboardPage: PageMetadata = {
+  name: 'Dashboard',
+  titleKey: 'page.dashboard',
+  parameters: [],
+  widgets: [
+    {
+      type: 'columns',
+      columns: [
+        { width: 6, widgets: [kpiWidget] },
+        { width: 6, widgets: [linkedKpiWidget] },
+      ],
+    },
+    chartWidget('bar'),
+  ],
 }
 
 const requestPage: PageMetadata = {
@@ -1196,6 +1234,7 @@ export const siteTexts: Record<string, string> = {
   'chart.urgentRequests': 'Urgent requests',
   'kpi.amount': 'Total amount',
   'kpi.requests': 'Requests',
+  'kpi.showRequests': 'Show requests',
   'preview.requests': 'Requests',
   'preview.tasks': 'Tasks',
   'preview.help': 'A short note that explains the field.',
@@ -1205,7 +1244,9 @@ export const siteTexts: Record<string, string> = {
   'site.title': 'Purchase requests',
   'nav.requests': 'Requests',
   'nav.tasks': 'Tasks',
+  'nav.dashboard': 'Dashboard',
   'page.requests': 'Requests',
+  'page.dashboard': 'Dashboard',
 }
 
 export const signUpApplications = {
@@ -1278,6 +1319,7 @@ export const routes: Record<string, () => unknown> = {
   [`/api/sites/${sitePath}`]: () => applicationSite,
   [`/api/sites/${sitePath}/pages/requests`]: () => requestsPage,
   [`/api/sites/${sitePath}/pages/request`]: () => requestPage,
+  [`/api/sites/${sitePath}/pages/dashboard`]: () => dashboardPage,
   [formStatePath('RequestForm')]: noStateAnswer,
   [notificationsPath]: () => notificationPage,
   '/api/sites': () => ({ sites: listedSites }),

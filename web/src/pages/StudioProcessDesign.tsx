@@ -2,6 +2,7 @@ import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type Dra
 import { Button, Flex, Menu, Typography } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Announcement } from '../platform/Announcement'
+import { SidePanel } from '../platform/SidePanel'
 import { fillText } from '../platform/fillText'
 import { markOf } from '../platform/layerMarks'
 import type { JsonSchema } from '../platform/studioSchemas'
@@ -24,8 +25,9 @@ function nameAt(list: unknown[], index: number): string {
 }
 
 /**
- * The Design tab of a process: the graph of the draft, and beside it the card of the selected step, which is the one
- * the Form tab shows. A node selects a step, and an edge selects itself and the step it leaves. An edit in the card
+ * The Design tab of a process: the graph of the draft, and the card of the selected step, which is the one the Form tab
+ * shows. The card is in the panel `SidePanel` draws in the shell's right column, titled Step, with no close button. It
+ * gives way while the Problems or Ask AI panel is open, see docs/reference/process-designer.md#step-panel. A node selects a step, and an edge selects itself and the step it leaves. An edit in the card
  * draws the graph again. With an edge selected, the panel offers Remove line above the card, which clears the
  * transition's target and keeps its branch or outcome. Removing a step leaves the transitions that named it, for the
  * checker to report. Delete in the canvas removes the selected edge, or else the selected step. A hidden live region
@@ -303,7 +305,7 @@ export default function StudioProcessDesign({
             ) : null}
             <RemovedRows layer={layer} list="/steps" />
           </div>
-          <aside style={{ width: 420, flexShrink: 0 }}>
+          <SidePanel id="studio-process-panel" testId="studio-process-panel" title={t('shell.studio.process.panel')}>
             <Flex vertical gap="middle">
               <ProcessPalette onInsert={insertAfterSelection} />
               {selected !== null && stepSelected ? (
@@ -333,7 +335,7 @@ export default function StudioProcessDesign({
                 <Typography.Text type="secondary">{t('shell.studio.design.selectStep')}</Typography.Text>
               )}
             </Flex>
-          </aside>
+          </SidePanel>
         </Flex>
         <Announcement testId="studio-process-announcement">{announcement}</Announcement>
       </div>

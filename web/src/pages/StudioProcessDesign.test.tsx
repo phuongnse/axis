@@ -10,6 +10,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
+import { ShellAsideHost } from '../test/shellAsideHost'
 import type { DesignerLayer } from './LayerMarkViews'
 import { paletteEntries } from './processPalette'
 import StudioProcessDesign from './StudioProcessDesign'
@@ -71,21 +72,23 @@ function renderDesign(start: number | null, layer?: DesignerLayer) {
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <StudioNamesContext.Provider value={names}>
-            <StudioProcessDesign
-              schema={schema}
-              draft={draft}
-              diagnosticPaths={[]}
-              layer={layer}
-              selected={selected}
-              onSelect={(index) => {
-                calls.selected.push(index)
-                setSelected(index)
-              }}
-              onChange={(pointer, next) => {
-                calls.changes.push([pointer, next])
-                setDraft((current) => setAt(current, pointer, next) as Record<string, unknown>)
-              }}
-            />
+            <ShellAsideHost>
+              <StudioProcessDesign
+                schema={schema}
+                draft={draft}
+                diagnosticPaths={[]}
+                layer={layer}
+                selected={selected}
+                onSelect={(index) => {
+                  calls.selected.push(index)
+                  setSelected(index)
+                }}
+                onChange={(pointer, next) => {
+                  calls.changes.push([pointer, next])
+                  setDraft((current) => setAt(current, pointer, next) as Record<string, unknown>)
+                }}
+              />
+            </ShellAsideHost>
           </StudioNamesContext.Provider>
         </TextProvider>
       </ThemeModeProvider>

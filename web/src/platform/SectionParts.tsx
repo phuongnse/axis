@@ -5,6 +5,11 @@ import { useDesignTokens } from './themeMode'
 /** Whether the part that reads it draws a `divider` rule above itself. */
 const RuleAbove = createContext(false)
 
+/** A boundary a part does not draw its rule across, such as a tile: a part inside it draws no rule above itself. */
+export function PartBoundary({ children }: { children: ReactNode }) {
+  return <RuleAbove.Provider value={false}>{children}</RuleAbove.Provider>
+}
+
 /**
  * The column of a page's parts or a Studio section's parts, one above another, see docs/reference/shell.md#layout and
  * docs/reference/studio-resource-form.md#sections. Each part draws the `divider` rule above itself, so a child that renders

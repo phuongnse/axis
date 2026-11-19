@@ -1,13 +1,13 @@
 import { Flex, Tag } from 'antd'
 import { EmptyState } from '../platform/EmptyState'
+import { SidePanel } from '../platform/SidePanel'
 import type { StudioDiagnostic, StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { problemsPanelId } from './StudioBand'
 import { ResourceReference } from './ResourceReference'
-import { StudioSidePanel } from './StudioSidePanel'
 
 /**
- * The Problems panel of the open application, drawn in `StudioSidePanel`: a column on the right, under the header, that
+ * The Problems panel of the open application, drawn in `SidePanel`: a column on the right, under the header, that
  * is not modal. It lists every error, then every warning, each with its code, message and resource. A problem's resource
  * is a link when it names one, and `onSelect` opens that resource at the problem's path while the panel stays open.
  * `onClose` runs from the close button. With no problem, it says so.
@@ -26,7 +26,7 @@ export function StudioProblems({
   const t = useText()
 
   return (
-    <StudioSidePanel
+    <SidePanel
       id={problemsPanelId}
       testId="studio-diagnostics"
       closeTestId="studio-problems-close"
@@ -39,7 +39,7 @@ export function StudioProblems({
       ) : (
         <StudioProblemList diagnostics={diagnostics} resources={resources} onSelect={onSelect} />
       )}
-    </StudioSidePanel>
+    </SidePanel>
   )
 }
 

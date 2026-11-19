@@ -41,6 +41,14 @@ afterEach(() => {
 })
 
 describe('StudioProblems', () => {
+  it('draws in the side panel frame, in the right column, with its resize handle', () => {
+    renderProblems([error])
+
+    const panel = screen.getByRole('complementary', { name: 'Problems' })
+    expect(aside).toContainElement(panel)
+    expect(within(panel).getByRole('separator', { name: 'Resize panel' })).toBeInTheDocument()
+  })
+
   it('says there are no problems when there is no diagnostic', () => {
     renderProblems([])
 

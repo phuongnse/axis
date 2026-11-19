@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
+import { designTokensFor } from './designTokens'
 import { KpiWidget } from './KpiWidget'
 import type { KpiMetadata, NavigateAction, WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
@@ -259,6 +260,42 @@ describe('KpiWidget', () => {
     expect(link).toHaveTextContent('Show notes')
     await user.click(link)
     expect(screen.getByTestId('path')).toHaveTextContent('/e2e/notes')
+  })
+
+  it('is exactly one link, the tile itself, with no link inside it', async () => {
+    stubRows(totalRow('{"openCount":12.50,"urgentCount":3}'))
+
+    renderKpi({ ...withComparison, navigate: showNotes })
+
+    const tile = await screen.findByTestId('kpi-tile')
+    expect(screen.getAllByRole('link')).toEqual([tile])
+    expect(tile.tagName).toBe('A')
+    expect(tile).toHaveAttribute('data-tile')
+    expect(tile.querySelector('a')).toBeNull()
+    expect(within(tile).getByText('Show notes')).toHaveStyle({ color: designTokensFor('light').colour.primaryText })
+  })
+
+  it('draws the focus ring of a link tile on keyboard focus', async () => {
+    stubRows(totalRow('{"openCount":12.50,"urgentCount":3}'))
+
+    renderKpi({ ...withComparison, navigate: showNotes })
+
+    await screen.findByTestId('kpi-tile')
+    const rule = Array.from(document.querySelectorAll('style'))
+      .map((element) => element.textContent ?? '')
+      .find((text) => text.includes('[data-tile]:focus-visible'))
+    expect(rule).toContain(`outline: 2px solid ${designTokensFor('light').colour.focusRing}`)
+  })
+
+  it('is a tile on a border, not a card', async () => {
+    stubRows(totalRow('{"openCount":12.50,"urgentCount":3}'))
+
+    renderKpi(withComparison)
+
+    const tile = await screen.findByTestId('kpi-tile')
+    expect(tile.tagName).not.toBe('A')
+    expect(tile.querySelector('.ant-card')).toBeNull()
+    expect(tile).toHaveStyle({ borderStyle: 'solid', borderWidth: '1px' })
   })
 
   it('gives the navigate action the page values', async () => {

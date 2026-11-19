@@ -1,7 +1,6 @@
-import { Button, Card, Flex } from 'antd'
+import { Button, Flex } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link } from 'react-router'
 import { boundParameterQuery } from './boundParameters'
 import { useCanvasActions } from './canvasActions'
 import { formatValue } from './formatValue'
@@ -9,6 +8,7 @@ import { navigatePath } from './navigateAction'
 import { fetchRecords, type RecordItem, type RecordValue } from './records'
 import type { WidgetMetadata } from './site'
 import { useText } from './texts'
+import { Tile, TileFocusStyle } from './Tile'
 import { useDesignTokens } from './themeMode'
 import { useEmptyStyle } from './useEmptyStyle'
 import { visuallyHidden } from './visuallyHidden'
@@ -132,15 +132,22 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
             </Button>
           </div>
         )}
-        {navigate && !canvas.active && path && <div>{t(navigate.labelKey)}</div>}
+        {navigate && !canvas.active && path && <div style={{ color: colour.primaryText }}>{t(navigate.labelKey)}</div>}
       </Flex>
     )
   }
 
-  const tile = (
-    <Card data-testid="kpi-tile" aria-busy={loading} hoverable={Boolean(path)}>
-      {content}
-    </Card>
+  return (
+    <>
+      <TileFocusStyle />
+      <Tile
+        testId="kpi-tile"
+        busy={loading}
+        to={path && !canvas.active ? path : undefined}
+        style={{ display: 'block' }}
+      >
+        {content}
+      </Tile>
+    </>
   )
-  return path && !canvas.active ? <Link to={path}>{tile}</Link> : tile
 }
