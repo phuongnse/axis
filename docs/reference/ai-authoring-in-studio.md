@@ -26,6 +26,7 @@ request opens its own page.
 - **The panel lists no requests.** The panel has no list.
 - **The bell and the sidebar** _(planned for M35)_. The [bell](notifications.md#the-bell) tells an author when a
   request of theirs waits for them or ends, and the sidebar's AI requests entry, below, leads to every request.
+- **Notification preferences** _(planned for M43)_. The author's [notification preferences](notifications.md#notification-preferences) decide whether these notices show in the bell and come by email.
 - **Before a key** _(planned for M35)_. Until the author has connected their own AI, the panel shows two ways to ask AI, in
   place of the form. Whether the author has connected one comes from the [AI status](authoring-requests.md#routes) route.
   - **With your own API key.** "Add your AI provider's API key, and the requests you send here run on it.
