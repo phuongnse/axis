@@ -60,6 +60,14 @@ describe('BodyView', () => {
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
   })
 
+  it('shows a JSON number in a code block, as a table needs names', () => {
+    const { container } = renderBody('42')
+
+    expect(container.querySelector('pre')).toHaveTextContent('42')
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
+
   it('keeps the digits of a long number in the table', () => {
     renderBody('{"id":12345678901234567890}')
 

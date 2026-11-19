@@ -18,7 +18,7 @@ function parsedBody(body: string): { value: object; pretty: string } | null {
       typeof member === 'number' && context?.source !== undefined
         ? new JsonNumber(context.source)
         : member) as Parameters<typeof JSON.parse>[1])
-    if (value === null || typeof value !== 'object') {
+    if (value === null || typeof value !== 'object' || value instanceof JsonNumber) {
       return null
     }
     return { value, pretty: JSON.stringify(JSON.parse(body), null, 2) }
