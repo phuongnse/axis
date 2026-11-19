@@ -141,8 +141,8 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * toolbar always shows. Its right side has a Refresh button that loads the current page of rows again, then Import,
  * Export and the toolbar actions, with the first toolbar action last. The table is drawn on `AxisTable`, which owns the
  * toolbar order, the column widths, the 40 px rows, the folding of row actions, the paging and the em dash of an empty
- * cell. Text, reference and file columns are free text: they share the width left in equal parts and wrap at 320 px.
- * Every other column, an enum too, fits its content.
+ * cell. Text, reference and file columns are free text: they share the width left in equal parts and wrap at the
+ * edge of their column. Every other column, an enum too, fits its content.
  * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
  * and the back button keep them. A table with a column the builder offers has a Filter button, and its filter
  * lives in the URL as `filter` and goes to the rows and export routes as it is. A measure column of a grouped data
