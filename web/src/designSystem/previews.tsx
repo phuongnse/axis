@@ -268,7 +268,17 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 600,
     },
     { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: 600 },
-    { caption: 'Account page', draw: () => <ShellPreview />, entry: '/account', frameHeight: 1400 },
+    { caption: 'Account page', draw: () => <ShellPreview />, entry: '/account', frameHeight: 800 },
+    {
+      caption: 'Account notifications',
+      draw: () => (
+        <ClickOnMount selector='[role="tab"][id$="-tab-notifications"]'>
+          <ShellPreview />
+        </ClickOnMount>
+      ),
+      entry: '/account',
+      frameHeight: 800,
+    },
     {
       caption: 'App switcher',
       draw: () => (

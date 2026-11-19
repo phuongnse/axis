@@ -1,9 +1,10 @@
-import { Checkbox, Flex, Select, Typography } from 'antd'
+import { Flex, Select, Switch, Typography } from 'antd'
 import { useEffect, useState } from 'react'
+import { Announcement } from '../platform/Announcement'
 import { AxisAlert } from '../platform/AxisAlert'
-import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
-import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { AxisTable } from '../platform/AxisTable'
+import { fetchCurrentUser } from '../platform/currentUser'
 import { fillText } from '../platform/fillText'
 import {
   fetchNotificationPreferences,
@@ -16,151 +17,210 @@ import {
 import { SectionPart } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { usePlatform } from './context'
 
-type Choice = 'application' | 'email' | 'digest'
+/** How a source's emails go: not at all, as each notice comes, or gathered in the daily digest. */
+type EmailChoice = 'off' | 'now' | 'digest'
+
+/** A row of the table: a source the person chooses for, or the tenant notices, which always show in the application. */
+type Row = { key: NotificationSource; locked: false } | { key: 'tenant'; locked: true }
 
 const hours = Array.from({ length: 24 }, (_, hour) => hour)
 
-/** The choices a source's checkbox group holds, from its preference. */
-function choicesOf(preference: SourcePreference): Choice[] {
-  return [
-    ...(preference.channels.application ? (['application'] as const) : []),
-    ...(preference.channels.email ? (['email'] as const) : []),
-    ...(preference.digest && preference.channels.email ? (['digest'] as const) : []),
-  ]
+function emailChoice(preference: SourcePreference): EmailChoice {
+  return !preference.channels.email ? 'off' : preference.digest ? 'digest' : 'now'
+}
+
+/** The time zone in words in the page's locale, such as "Indochina Time", else its IANA name. */
+function timeZoneName(timeZone: string, locale: string): string {
+  try {
+    const part = new Intl.DateTimeFormat(locale, { timeZone, timeZoneName: 'longGeneric' })
+      .formatToParts(new Date())
+      .find((candidate) => candidate.type === 'timeZoneName')
+    return part?.value ?? timeZone
+  } catch {
+    return timeZone
+  }
 }
 
 /**
- * Proposed: the account page's Notifications part, where a person chooses how each source of notices reaches them, in
- * the application, by email and in the daily digest, and the hour of the digest, see
- * docs/reference/notifications.md#notification-preferences. Tenant notices always show in the application.
+ * Proposed: the account page's Notifications tab, see docs/reference/notifications.md#notification-preferences. A table
+ * has a row for each source, a switch for the application and a choice for email: off, as each notice comes, or in the
+ * daily digest. A change is saved at once. The digest's hour shows while a source uses the digest. An administrator also
+ * sees the tenant notices, locked on in the application.
  */
 export function AccountNotifications() {
   const t = useText()
-  const { colour } = useDesignTokens()
-  const [saved, setSaved] = useState<NotificationPreferences>()
+  const { colour, spacing } = useDesignTokens()
+  const { locale } = usePlatform().current
   const [preferences, setPreferences] = useState<NotificationPreferences>()
+  const [administrator, setAdministrator] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
   const [saveFailed, setSaveFailed] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useState<string>()
+  const [announcement, setAnnouncement] = useState('')
 
   useEffect(() => {
     const controller = new AbortController()
-    fetchNotificationPreferences(controller.signal).then(
-      (loaded) => {
-        setSaved(loaded)
-        setPreferences(loaded)
-      },
-      (error: unknown) => {
-        if (!controller.signal.aborted) {
-          console.warn('Loading the notification preferences failed', error)
-          setLoadFailed(true)
-        }
-      },
+    fetchNotificationPreferences(controller.signal).then(setPreferences, (error: unknown) => {
+      if (!controller.signal.aborted) {
+        console.warn('Loading the notification preferences failed', error)
+        setLoadFailed(true)
+      }
+    })
+    fetchCurrentUser(controller.signal).then(
+      (user) => setAdministrator(user?.users ?? false),
+      () => setAdministrator(false),
     )
     return () => controller.abort()
   }, [])
 
-  const choose = (source: NotificationSource, choices: Choice[]) =>
-    setPreferences((current) =>
-      current === undefined
-        ? current
-        : {
-            ...current,
-            sources: {
-              ...current.sources,
-              [source]: {
-                channels: { application: choices.includes('application'), email: choices.includes('email') },
-                digest: choices.includes('email') && choices.includes('digest'),
-              },
-            },
-          },
-    )
-
-  const save = () => {
-    if (preferences === undefined) {
-      return
-    }
-    setSaving(true)
+  /** Saves the next preferences at once, and puts the last ones back when the save is refused. */
+  const save = (next: NotificationPreferences, what: string) => {
+    const previous = preferences
+    setPreferences(next)
+    setSaving(what)
     setSaveFailed(false)
-    saveNotificationPreferences(preferences).then(
+    setAnnouncement('')
+    saveNotificationPreferences(next).then(
       (status) => {
-        setSaving(false)
+        setSaving(undefined)
         if (status === 204) {
-          setSaved(preferences)
+          setAnnouncement(t('shell.account.notifications.saved'))
         } else {
+          setPreferences(previous)
           setSaveFailed(true)
         }
       },
       (error: unknown) => {
         console.warn('Saving the notification preferences failed', error)
-        setSaving(false)
+        setSaving(undefined)
+        setPreferences(previous)
         setSaveFailed(true)
       },
     )
   }
 
-  const changed = JSON.stringify(preferences) !== JSON.stringify(saved)
+  const choose = (source: NotificationSource, preference: SourcePreference, what: string) =>
+    preferences && save({ ...preferences, sources: { ...preferences.sources, [source]: preference } }, what)
+
+  const rows: Row[] = [
+    ...notificationSources.map((key): Row => ({ key, locked: false })),
+    ...(administrator ? [{ key: 'tenant', locked: true } as const] : []),
+  ]
+  const name = (row: Row) => t(`shell.account.notifications.source.${row.key}`)
+  const cellName = (row: Row, channel: string) =>
+    fillText(t('shell.account.notifications.cell'), { notice: name(row), channel })
   const anyDigest =
-    preferences !== undefined && notificationSources.some((source) => preferences.sources[source].digest)
+    preferences !== undefined &&
+    notificationSources.some((source) => emailChoice(preferences.sources[source]) === 'digest')
 
   return (
-    <SectionPart
-      testName="notifications"
-      heading={{ title: t('shell.account.notifications.title'), line: t('shell.account.notifications.line') }}
-    >
-      <Flex vertical gap="middle" align="flex-start">
+    <SectionPart testName="notifications">
+      <Announcement>{announcement}</Announcement>
+      <Flex vertical gap="middle">
+        <Typography.Text style={{ color: colour.textMuted }}>{t('shell.account.notifications.line')}</Typography.Text>
         {loadFailed && <AxisAlert kind="error" message={t('shell.account.notifications.loadFailed')} />}
-        {preferences !== undefined &&
-          notificationSources.map((source) => {
-            const preference = preferences.sources[source]
-            return (
-              <AxisFieldGroup
-                key={source}
-                title={t(`shell.account.notifications.source.${source}`)}
-                help={t(`shell.account.notifications.source.${source}.help`)}
-              >
-                <Checkbox.Group<Choice>
-                  data-testid={`account-notifications-${source}`}
-                  value={choicesOf(preference)}
-                  onChange={(choices) => choose(source, choices)}
-                  options={[
-                    { value: 'application', label: t('shell.account.notifications.application') },
-                    { value: 'email', label: t('shell.account.notifications.email') },
-                    {
-                      value: 'digest',
-                      label: t('shell.account.notifications.digest'),
-                      disabled: !preference.channels.email,
-                    },
-                  ]}
-                />
-              </AxisFieldGroup>
-            )
-          })}
-        {preferences !== undefined && (
-          <AxisField
-            label={t('shell.account.notifications.digestHour')}
-            help={fillText(t('shell.account.notifications.digestHour.help'), { timeZone: preferences.timeZone })}
-          >
-            <Select
-              style={{ width: 160 }}
-              disabled={!anyDigest}
-              value={preferences.digestHour}
-              onChange={(digestHour: number) => setPreferences({ ...preferences, digestHour })}
-              options={hours.map((hour) => ({ value: hour, label: `${String(hour).padStart(2, '0')}:00` }))}
-            />
-          </AxisField>
-        )}
-        {preferences !== undefined && (
-          <Typography.Text style={{ color: colour.textMuted }}>
-            {t('shell.account.notifications.tenantNotices')}
-          </Typography.Text>
-        )}
         {saveFailed && <AxisAlert kind="error" message={t('shell.account.notifications.saveFailed')} />}
         {preferences !== undefined && (
-          <AxisButton role="main" disabled={!changed} loading={saving} onClick={save}>
-            {t('shell.account.notifications.save')}
-          </AxisButton>
+          <AxisTable<Row>
+            testId="account-notifications"
+            rowKey={(row) => row.key}
+            dataSource={rows}
+            pagination={false}
+            columns={[
+              {
+                key: 'notice',
+                kind: 'freeText',
+                title: t('shell.account.notifications.notice'),
+                render: (_value, row) => (
+                  <Flex vertical>
+                    <span>{name(row)}</span>
+                    <Typography.Text style={{ color: colour.textMuted, fontSize: 12, lineHeight: '20px' }}>
+                      {t(`shell.account.notifications.source.${row.key}.help`)}
+                    </Typography.Text>
+                  </Flex>
+                ),
+              },
+              {
+                key: 'application',
+                kind: 'fixed',
+                title: t('shell.account.notifications.application'),
+                render: (_value, row) =>
+                  row.locked ? (
+                    <Flex gap="small" align="center">
+                      <Switch
+                        checked
+                        disabled
+                        size="small"
+                        aria-label={cellName(row, t('shell.account.notifications.application'))}
+                      />
+                      <span style={{ color: colour.textMuted }}>{t('shell.account.notifications.alwaysOn')}</span>
+                    </Flex>
+                  ) : (
+                    <Switch
+                      size="small"
+                      checked={preferences.sources[row.key].channels.application}
+                      loading={saving === `${row.key}.application`}
+                      aria-label={cellName(row, t('shell.account.notifications.application'))}
+                      onChange={(application) => {
+                        const current = preferences.sources[row.key]
+                        choose(
+                          row.key,
+                          { ...current, channels: { ...current.channels, application } },
+                          `${row.key}.application`,
+                        )
+                      }}
+                    />
+                  ),
+              },
+              {
+                key: 'email',
+                kind: 'fixed',
+                title: t('shell.account.notifications.email'),
+                render: (_value, row) =>
+                  row.locked ? null : (
+                    <Select<EmailChoice>
+                      style={{ width: 220 }}
+                      value={emailChoice(preferences.sources[row.key])}
+                      loading={saving === `${row.key}.email`}
+                      aria-label={cellName(row, t('shell.account.notifications.email'))}
+                      onChange={(choice) => {
+                        const current = preferences.sources[row.key]
+                        choose(
+                          row.key,
+                          { channels: { ...current.channels, email: choice !== 'off' }, digest: choice === 'digest' },
+                          `${row.key}.email`,
+                        )
+                      }}
+                      options={[
+                        { value: 'off', label: t('shell.account.notifications.email.off') },
+                        { value: 'now', label: t('shell.account.notifications.email.now') },
+                        { value: 'digest', label: t('shell.account.notifications.email.digest') },
+                      ]}
+                    />
+                  ),
+              },
+            ]}
+          />
+        )}
+        {preferences !== undefined && anyDigest && (
+          <div style={{ marginTop: spacing.xs }}>
+            <AxisField
+              label={t('shell.account.notifications.digestHour')}
+              help={fillText(t('shell.account.notifications.digestHour.help'), {
+                timeZone: timeZoneName(preferences.timeZone, locale),
+              })}
+            >
+              <Select<number>
+                style={{ width: 120 }}
+                value={preferences.digestHour}
+                loading={saving === 'digestHour'}
+                onChange={(digestHour) => save({ ...preferences, digestHour }, 'digestHour')}
+                options={hours.map((hour) => ({ value: hour, label: `${String(hour).padStart(2, '0')}:00` }))}
+              />
+            </AxisField>
+          </div>
         )}
       </Flex>
     </SectionPart>
