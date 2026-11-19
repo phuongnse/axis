@@ -17,7 +17,7 @@ seed's `entity`, and the JSON view stays as the second view of the same draft.
 - **No column.** A computed field, a `sequence` field, a `creator` field and a `child-collection` field
   get no column, because seeding rejects a value for the first three, and child collections stay as the
   file has them. A value the grid does not show, an unknown key included, is saved unchanged.
-- **Rows.** _(planned for M35)_ Add record adds a row with a new record id, and Delete deletes the record from the draft.
+- **Rows.** Add record adds a row with a new record id, and Delete deletes the record from the draft.
   Clearing a cell removes its key from the record's `values`, so the grid never writes `null`.
 - **Filter.** The grid has a Filter on the Id and every column, each by its kind of value: text for `text`,
   `reference` and the Id, number for `integer`, `decimal` and `money`, a choice of Yes or No for `boolean`, a choice
