@@ -21,10 +21,9 @@ import {
   type RowLabels,
 } from './records'
 import type { EntityWidgetMetadata, FieldMetadata, NavigateAction, StartProcessAction } from './site'
+import { TermList } from './TermList'
 import { useText } from './texts'
-import { useDesignTokens } from './themeMode'
 import { sectionsOf } from './useRecordForm'
-import { useNarrowWidth } from './useNarrowWidth'
 
 interface DetailWidgetProps {
   /** A detail widget: it has an entity, maybe a form, and its `detail` metadata. */
@@ -62,8 +61,6 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
   const navigate = useNavigate()
   const location = useLocation()
   const canvas = useCanvasActions()
-  const { spacing, colour, type } = useDesignTokens()
-  const narrow = useNarrowWidth()
   const { entity } = widget
   const sections = useMemo(() => sectionsOf(entity, widget.form), [entity, widget.form])
   const [load, setLoad] = useState<LoadState>('loading')
@@ -235,30 +232,14 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
       {sections.map((section, index) => (
         <Fragment key={index}>
           {section.titleKey !== null && <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>}
-          <dl
-            style={{
-              margin: 0,
-              display: 'grid',
-              gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
-              columnGap: spacing.md,
-              rowGap: spacing.md,
-              alignItems: 'start',
-            }}
-          >
-            {section.fields.map(({ field, width }) => (
-              <div
-                key={field.name}
-                style={{ gridColumn: `span ${narrow || width < 1 || width > 12 ? 12 : width}`, minWidth: 0 }}
-              >
-                <dt style={{ fontWeight: 500, color: colour.textMuted, fontSize: type.fontSize, lineHeight: '22px' }}>
-                  {field.labelKey ? t(field.labelKey) : field.name}
-                </dt>
-                <dd style={{ margin: '6px 0 0', fontSize: type.fontSize, lineHeight: '22px', color: colour.text }}>
-                  {valueOf(field)}
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <TermList
+            terms={section.fields.map(({ field, width }) => ({
+              key: field.name,
+              term: field.labelKey ? t(field.labelKey) : field.name,
+              value: valueOf(field),
+              width,
+            }))}
+          />
         </Fragment>
       ))}
       {buttons.length > 0 && <Flex gap="small">{buttons}</Flex>}

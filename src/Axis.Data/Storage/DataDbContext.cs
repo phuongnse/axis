@@ -53,6 +53,8 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
 
     public DbSet<TableColumnsRow> TableColumns => Set<TableColumnsRow>();
 
+    public DbSet<NotificationPreferenceRow> NotificationPreferences => Set<NotificationPreferenceRow>();
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
         optionsBuilder.UseNpgsql(npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema));
 
@@ -228,6 +230,17 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             columns.Property(c => c.TableKey).HasColumnName("table_key");
             columns.Property(c => c.Columns).HasColumnName("columns").HasColumnType("text[]");
             columns.Property(c => c.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
+        });
+
+        modelBuilder.Entity<NotificationPreferenceRow>(preferences =>
+        {
+            preferences.ToTable("notification_preferences");
+            preferences.HasKey(p => p.UserId).HasName("pk_notification_preferences");
+            preferences.Property(p => p.UserId).HasColumnName("user_id");
+            preferences.Property(p => p.Sources).HasColumnName("sources").HasColumnType("jsonb");
+            preferences.Property(p => p.DigestHour).HasColumnName("digest_hour").HasColumnType("smallint");
+            preferences.Property(p => p.TimeZone).HasColumnName("time_zone");
+            preferences.Property(p => p.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()");
         });
 
         modelBuilder.Entity<GivenRoleRow>(given =>

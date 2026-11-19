@@ -463,10 +463,10 @@ describe('the Design tab of a form', () => {
     const canvas = await openDesign()
     const title = await within(canvas).findByRole('group', { name: 'title' }, slow)
 
-    expect(title.closest('.ant-col')).toHaveClass('ant-col-xs-24', 'ant-col-lg-8')
+    expect(title.closest('[data-testid^="field-column-"]')).toHaveStyle({ gridColumn: 'span 4' })
     await userEvent.click(within(await screen.findByTestId('studio-form-steps', {}, slow)).getByText('Add details'))
     const status = await within(canvas).findByRole('group', { name: 'status' }, slow)
-    expect(status.closest('.ant-col')).toHaveClass('ant-col-lg-24')
+    expect(status.closest('[data-testid^="field-column-"]')).toHaveStyle({ gridColumn: 'span 12' })
   })
 
   it('writes the width of the selected field into the draft and posts it', async () => {

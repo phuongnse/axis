@@ -1,6 +1,7 @@
-import { Col, Collapse, Flex, Row, Tabs } from 'antd'
+import { Collapse, Flex, Tabs } from 'antd'
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
+import { ColumnGrid, ColumnGridCell } from './ColumnGrid'
 import {
   isPlaceholder,
   type ColumnsWidgetMetadata,
@@ -11,8 +12,6 @@ import {
   type WidgetMetadata,
 } from './site'
 import { useText } from './texts'
-import { useDesignTokens } from './themeMode'
-import { useNarrowWidth } from './useNarrowWidth'
 import { tabParameters } from './widgetTree'
 
 type RenderLeaf = (widget: WidgetMetadata) => ReactNode
@@ -119,25 +118,23 @@ function drawWidget(
   }
 }
 
-// Ant Design's grid has 24 parts and an Axis column width is in twelfths. Below narrow width, 992 px, the columns
-// stack. The hook decides, not the grid's own breakpoints, so a page designer can force the stack.
+// The columns sit on the shared grid of twelve columns, and an Axis column width is in twelfths. Below narrow width,
+// 992 px, the columns stack. The grid's cells decide through `useNarrowWidth`, so a page designer can force the stack.
 // A widget wider than its column, such as a table with many fields, scrolls inside the column instead of
 // running under the next one.
 function Columns({ widget, renderLeaf }: { widget: ColumnsWidgetMetadata; renderLeaf: RenderLeaf }) {
-  const { spacing } = useDesignTokens()
-  const narrow = useNarrowWidth()
   return (
-    <Row gutter={[spacing.md, spacing.md]}>
+    <ColumnGrid>
       {widget.columns.map((column, index) => (
-        <Col key={index} span={narrow ? 24 : column.width * 2} style={{ overflowX: 'auto' }} data-testid="column">
+        <ColumnGridCell key={index} width={column.width} style={{ overflowX: 'auto' }} data-testid="column">
           <WidgetList
             widgets={column.widgets}
             renderLeaf={renderLeaf}
             pointer={listPointer(widget, `columns/${index}/widgets`)}
           />
-        </Col>
+        </ColumnGridCell>
       ))}
-    </Row>
+    </ColumnGrid>
   )
 }
 

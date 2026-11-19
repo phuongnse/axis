@@ -1,9 +1,19 @@
 /**
- * The address of a Studio resource, optionally at a path, see docs/reference/studio.md#route-and-address. Every link
- * to a resource is built here.
+ * The address of a Studio resource, optionally at a path and with a field's drawer open, see
+ * docs/reference/studio.md#route-and-address. Every link to a resource is built here.
  */
-export function studioResourceAddress(application: string, resource: string, path?: string | null): string {
-  return `/studio?${new URLSearchParams({ app: application, resource, ...(path ? { path } : {}) })}`
+export function studioResourceAddress(
+  application: string,
+  resource: string,
+  path?: string | null,
+  field?: string | null,
+): string {
+  return `/studio?${new URLSearchParams({
+    app: application,
+    resource,
+    ...(path ? { path } : {}),
+    ...(field ? { field } : {}),
+  })}`
 }
 
 /** The address of an AI request's page, `&view=requests&request=<id>`, see docs/reference/ai-authoring-in-studio.md. */

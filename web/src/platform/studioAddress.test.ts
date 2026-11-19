@@ -17,6 +17,19 @@ describe('studioResourceAddress', () => {
     expect(studioResourceAddress('PurchaseRequests', 'abc', '')).toBe('/studio?app=PurchaseRequests&resource=abc')
   })
 
+  it('adds the field whose drawer is open, with or without a path', () => {
+    expect(studioResourceAddress('PurchaseRequests', 'abc', null, 'code')).toBe(
+      '/studio?app=PurchaseRequests&resource=abc&field=code',
+    )
+    expect(studioResourceAddress('PurchaseRequests', 'abc', '/fields/0/name', 'code')).toBe(
+      '/studio?app=PurchaseRequests&resource=abc&path=%2Ffields%2F0%2Fname&field=code',
+    )
+  })
+
+  it('leaves out a missing or empty field', () => {
+    expect(studioResourceAddress('PurchaseRequests', 'abc', null, '')).toBe('/studio?app=PurchaseRequests&resource=abc')
+  })
+
   it('encodes a name with a space', () => {
     expect(studioResourceAddress('Leave Requests', 'a&b')).toBe('/studio?app=Leave+Requests&resource=a%26b')
   })

@@ -29,8 +29,8 @@ opens the same view.
   `&view=policies` the [policy matrix](#policy-matrix), `&view=publish` the [publish page](#publishing)
   and `&view=requests&request=<id>` one [AI request's page](ai-authoring-in-studio.md#a-requests-page).
 - **The AI requests table** _(planned for M35)_. `&view=requests` shows the [AI requests](ai-authoring-in-studio.md#the-request-panel) table.
-- **A field** _(planned)_. `&field=<name>` opens a field's
-  [drawer](entity-designer.md#field-drawer) on an entity's page.
+- **A field.** `&field=<name>` opens a field's [drawer](entity-designer.md#field-drawer) on an entity's page. Opening and
+  closing add a history entry, a rename replaces the name, and a name no field has opens nothing and is dropped.
 - **Back is the browser's.** Studio has no Back or Next of its own and no breadcrumb.
   Every view has its own address and each move is a history entry, except that a search replaces its
   entry, so the browser's Back and Forward step through it. A second Back would be one concern with two
@@ -163,8 +163,8 @@ what changed.
   join it. A reload or closing the tab asks the browser's own question. A link opened in a new tab is not
   asked about, and neither is the move that Studio makes after a delete, because the draft went with the resource.
   A move that only changes the `search`, `filter`, `sort`, `page` or `pageSize` of a
-  [table](actions-and-controls.md#tables), under the table's prefix too, such as `fields.filter`, is not asked about
-  either, because the editor stays on screen.
+  [table](actions-and-controls.md#tables), under the table's prefix too, such as `fields.filter`, or the `field` of an
+  open [field drawer](entity-designer.md#field-drawer), is not asked about either, because the editor stays on screen.
 
 ## References
 

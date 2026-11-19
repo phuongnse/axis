@@ -654,9 +654,10 @@ describe('StudioPage', () => {
       const panel = await openProblems()
       await userEvent.click(await within(panel).findByRole('button', { name: 'PurchaseRequest' }))
 
+      // The editor scrolls the row of the field, then the designer scrolls the setting inside the field's drawer.
       const field = await screen.findByTestId('studio-field-/fields/0')
-      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
-      expect(scrollIntoView.mock.contexts).toEqual([field])
+      const setting = await screen.findByTestId('studio-field-/fields/0/type')
+      await waitFor(() => expect(scrollIntoView.mock.contexts).toEqual([field, setting]))
       expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}&path=%2Ffields%2F0%2Ftype`)
     } finally {
       delete (Element.prototype as Partial<Element>).scrollIntoView
@@ -1213,9 +1214,10 @@ describe('StudioPage', () => {
       stubServer()
       renderPage(`/studio?app=PurchaseRequests&resource=${entityId}&path=%2Ffields%2F1%2FmaxLength`)
 
+      // The editor scrolls the row of the field, then the designer scrolls the setting inside the field's drawer.
       const field = await screen.findByTestId('studio-field-/fields/1')
-      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
-      expect(scrollIntoView.mock.contexts).toEqual([field])
+      const setting = await screen.findByTestId('studio-field-/fields/1/maxLength')
+      await waitFor(() => expect(scrollIntoView.mock.contexts).toEqual([field, setting]))
     } finally {
       delete (Element.prototype as Partial<Element>).scrollIntoView
     }
@@ -1307,9 +1309,10 @@ describe('StudioPage', () => {
       const panel = await openProblems()
       await userEvent.click(await within(panel).findByRole('button', { name: 'PurchaseRequest' }, slow))
 
+      // The editor scrolls the row of the field, then the designer scrolls the setting inside the field's drawer.
       const field = await screen.findByTestId('studio-field-/fields/0', {}, slow)
-      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }), slow)
-      expect(scrollIntoView.mock.contexts).toEqual([field])
+      const setting = await screen.findByTestId('studio-field-/fields/0/type', {}, slow)
+      await waitFor(() => expect(scrollIntoView.mock.contexts).toEqual([field, setting]), slow)
       await waitFor(
         () => expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true'),
         slow,
@@ -1491,6 +1494,8 @@ describe('StudioPage', () => {
 describe('StudioPage leaving unsaved changes', () => {
   const overview = '/studio?app=PurchaseRequests'
   const entityAddress = `${overview}&resource=${entityId}`
+  // Field 1 is `title`. Its drawer is open while the draft is edited, so the address holds its `field`.
+  const titleAddress = `${entityAddress}&field=title`
 
   async function editMaxLength() {
     await openEntityField(1)
@@ -1514,7 +1519,7 @@ describe('StudioPage leaving unsaved changes', () => {
     await userEvent.click(screen.getByRole('link', { name: 'Home' }))
     await stay()
 
-    expect(router.state.location.pathname + router.state.location.search).toBe(entityAddress)
+    expect(router.state.location.pathname + router.state.location.search).toBe(titleAddress)
     expect(maxLength).toHaveValue('250')
     expect(screen.getByTestId('studio-save-bar')).toHaveTextContent('Unsaved changes')
   })
@@ -1539,22 +1544,30 @@ describe('StudioPage leaving unsaved changes', () => {
     await userEvent.click(await within(panel).findByRole('button', { name: 'PurchaseRequest' }))
     await stay()
 
-    expect(router.state.location.pathname + router.state.location.search).toBe(entityAddress)
+    expect(router.state.location.pathname + router.state.location.search).toBe(titleAddress)
     expect(maxLength).toHaveValue('250')
   })
 
   it('asks before Back, and Stay keeps the address and the draft', async () => {
     stubServer()
     const router = renderGuardedPage([overview, entityAddress])
-    const maxLength = await editMaxLength()
+    await editMaxLength()
 
+    // The first Back only closes the field's drawer, which the editor's own view does not ask about.
+    act(() => {
+      void router.navigate(-1)
+    })
+    await waitFor(() => expect(router.state.location.pathname + router.state.location.search).toBe(entityAddress))
+    expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()
+
+    // The second Back leaves the resource, so it is asked.
     act(() => {
       void router.navigate(-1)
     })
     await stay()
 
     expect(router.state.location.pathname + router.state.location.search).toBe(entityAddress)
-    expect(maxLength).toHaveValue('250')
+    expect(screen.getByTestId('studio-save-bar')).toHaveTextContent('Unsaved changes')
   })
 
   it('does not ask before a link while nothing is unsaved', async () => {
@@ -1867,12 +1880,12 @@ describe('StudioPage publishing', () => {
 
     it('keeps Publish off while the changed files load, and turns it on when the list shows', async () => {
       let answer: (response: Response) => void = () => undefined
-      stubPublishing(
-        publisher,
-        [],
-        { folderContentHash: 'hash-4', active: true },
-        () => new Promise<Response>((resolve) => (answer = resolve)),
-      )
+      let requested: () => void = () => undefined
+      const diffRequested = new Promise<void>((resolve) => (requested = resolve))
+      stubPublishing(publisher, [], { folderContentHash: 'hash-4', active: true }, () => {
+        requested()
+        return new Promise<Response>((resolve) => (answer = resolve))
+      })
       renderPage('/studio?app=PurchaseRequests&view=publish')
 
       expect(
@@ -1880,6 +1893,8 @@ describe('StudioPage publishing', () => {
       ).toBeVisible()
       expect(screen.getByTestId('studio-publish-confirm')).toBeDisabled()
 
+      // The diff request starts after the intro text shows, so wait for it: an answer sent before it is lost.
+      await diffRequested
       answer(
         json({
           release: 3,
