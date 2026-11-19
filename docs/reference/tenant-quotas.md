@@ -110,6 +110,9 @@ nothing:
 - **Table views and columns.** A person's writes under `/api/me/tables/{key}` are never refused over
   the `storage` quota. Each row is small and bounded by the route's limits, and a person can always tidy their views,
   see [table views and columns](frontend.md#table-views-and-columns).
+- **Notification preferences.** A person's `PUT /api/me/notification-preferences` is never refused over the
+  `storage` quota, because it keeps one small row for that person, see
+  [notification preferences](notifications.md#notification-preferences).
 - **Form drafts** _(planned for M42)_. A person's writes of a [form draft](record-form-state.md#form-drafts) are
   never refused over the `storage` quota. Each person has one draft for each form, and it is bounded by the
   route's size limit.
