@@ -138,9 +138,10 @@ Studio shows words, never an internal code, see [text](actions-and-controls.md#t
   [label texts](studio.md#label-texts).
 - **A kind** has a name for its list, such as Entities, and one for a single resource, such as Entity,
   in the author's language.
-- **A person**, such as who activated a release, is named by their name. The server's activation at
-  startup reads "System", the platform operator "The platform operator", and an id with no name left
-  "Someone no longer known". The console names people the same way.
+- **A person**, such as who activated a release, is named by their name, drawn by `PersonName`: a link to
+  [the user's page](platform-pages.md#a-users-roles) for an administrator, and followed by "(you)" for the reader's
+  own name. The server's activation at startup reads "System", the platform operator "The platform operator", and an
+  id with no name left "Someone no longer known", all plain words. The console names people the same way.
 
 ## New resource
 

@@ -6,6 +6,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { NotSet } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { StudioLink } from '../platform/StudioLink'
 import { useText } from '../platform/texts'
 import { StatusTag } from '../platform/StatusTag'
 import { TermList } from '../platform/TermList'
@@ -26,6 +27,8 @@ interface Section {
   key: string
   title: string
   applicationId: string | null
+  /** The application's manifest name, which Studio opens it by. `null` for the platform and for an application that is not active. */
+  application: string | null
   rows: RoleRow[]
 }
 
@@ -138,7 +141,18 @@ export function UserPage() {
               </SectionPart>
             )}
             {sections.map((section) => (
-              <SectionPart key={section.key} testName={`user-roles-${section.key}`} heading={{ title: section.title }}>
+              <SectionPart
+                key={section.key}
+                testName={`user-roles-${section.key}`}
+                heading={{
+                  title:
+                    section.application === null ? (
+                      section.title
+                    ) : (
+                      <StudioLink application={section.application}>{section.title}</StudioLink>
+                    ),
+                }}
+              >
                 <Flex vertical gap="small">
                   {section.rows.map((row) => (
                     <Flex key={row.role} align="center" justify="space-between" gap="small" data-testid="user-role">
@@ -201,6 +215,7 @@ function sectionsOf(roles: UserRoles, platformTitle: string): Section[] {
     key: application.id,
     title: application.name,
     applicationId: application.id,
+    application: application.name,
     rows: rowsOf(
       application.roles,
       roles.given.filter((row) => row.applicationId === application.id),
@@ -216,6 +231,7 @@ function sectionsOf(roles: UserRoles, platformTitle: string): Section[] {
       key: id,
       title: id,
       applicationId: id,
+      application: null,
       rows: rowsOf(
         [],
         roles.given.filter((row) => row.applicationId === id),
@@ -226,6 +242,7 @@ function sectionsOf(roles: UserRoles, platformTitle: string): Section[] {
     key: 'platform',
     title: platformTitle,
     applicationId: null,
+    application: null,
     rows: rowsOf(
       roles.platformRoles,
       roles.given.filter((row) => row.applicationId === null),

@@ -247,7 +247,8 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   the tenant sits above both tables and starts on the first one. The picker is not kept in the
   address, so a link with a `publishRequests.` view opens the first application. A releases table
   shows the number, label, note, who activated it and when, and marks the active release. Who
-  activated it is named in words, as [names](studio-workspace.md#names) says for Studio. It marks
+  activated it is named as [names](studio-workspace.md#names) says for Studio. A reader who may use Studio
+  opens the release's page in Studio from its number. It marks
   an [off-standard release](module-contracts.md#off-standard-releases) with the Off-standard tag and
   the module, point and reason of each relaxed entry, as Studio does. The active release shows a
   Live `StatusTag` in `neutral`. The releases are never paged.
@@ -256,7 +257,8 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   [tables](actions-and-controls.md#tables), with Search, Filter, Columns and Refresh, a sort on
   Status, Label, Requested by, Requested and Finished, and a pager with a page size. Kind and Target
   filter by their values and do not sort. Requested by filters, searches and sorts on the name
-  stored with the request, so it can differ from the name the cell shows after a person is renamed.
+  stored with the request, so it can differ from the name the cell shows after a person is renamed. Who asked is
+  drawn by `PersonName`, a link to the user's page for an administrator.
   The Status column is a `StatusTag`: `queued` and `running` are `neutral`, `succeeded` is `success`
   and `failed` is `danger`.
   The address keeps the requests view as `publishRequests.search`, `publishRequests.filter`,
@@ -266,7 +268,8 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
   table keeps its toolbar. It offers no publish or activate button.
 - **Tenant.** The tenant's status, a `StatusTag` in `neutral` when `active` and in `attention` when
   `readOnly`, and each application's active release, as a table with the
-  application, the release number and label, and the activation time. The table has Filter on
+  application, the release number and label, and the activation time. A reader who may use Studio opens the
+  application in Studio from its name, and its release page from the release. The table has Filter on
   Application, Release and Activated (the day), kept in the address as `applications.filter`. It
   shows every row with no pager.
 

@@ -2476,7 +2476,6 @@
   "shell.studio.aiRequest.state.accepted": "Accepted",
   "shell.studio.aiRequest.state.dropped": "Dropped",
   "shell.studio.aiRequest.state.failed": "Failed",
-  "shell.studio.aiRequest.sentByYou": "Sent by you on {time}",
   "shell.studio.aiRequest.sentBy": "Sent by {name} on {time}",
   "shell.studio.aiRequest.notFound": "This request does not exist.",
   "shell.studio.aiRequest.askAi": "Ask AI",

@@ -1,8 +1,9 @@
 import { RedoOutlined } from '@ant-design/icons'
 import { Flex, Typography } from 'antd'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 import { AxisTable, type AxisColumn, type AxisTableView } from './AxisTable'
-import type { CellJob } from './cell'
+import { cellTenantAddress, type CellJob } from './cell'
 import { EmptyDash } from './EmptyValue'
 import { StatusTag, type StatusTone } from './StatusTag'
 import { useText } from './texts'
@@ -14,11 +15,14 @@ import { useEmptyStyle } from './useEmptyStyle'
  * With a `view`, the table has the full toolbar of a table paged on the server: a header sort on Created, Kind, Tenant and State,
  * a filter on every column but Steps, Search, Columns and the pager, see `docs/reference/actions-and-controls.md#tables`, and
  * `loading`, `failure` and `onRefresh` give its loading, load failure and Refresh. Without one, the table shows its rows as given.
+ * With `linkTenants`, each job's tenant links to the tenant's page, as the Jobs view does. A tenant's own page and the Create tenant
+ * dialog leave it plain, because there the link would lead back to the same page or to a tenant that may not exist yet.
  * With `onRunAgain`, a failed job other than a `purge` job has the Run again row action: the publisher queues a failed purge again on its own.
  */
 export function CellJobTable({
   jobs,
   locale,
+  linkTenants,
   onRunAgain,
   view,
   loading,
@@ -27,6 +31,7 @@ export function CellJobTable({
 }: {
   jobs: readonly CellJob[]
   locale: string
+  linkTenants?: boolean
   onRunAgain?: (job: CellJob) => void
   view?: AxisTableView
   loading?: boolean
@@ -68,6 +73,9 @@ export function CellJobTable({
       kind: 'fixed',
       title: t('shell.cell.jobs.tenant'),
       dataIndex: 'tenantId',
+      ...(linkTenants && {
+        render: (_value: unknown, job: CellJob) => <Link to={cellTenantAddress(job.tenantId)}>{job.tenantId}</Link>,
+      }),
       ...sorter,
       ...(view && { filter: { kind: 'text' } }),
     },
