@@ -60,8 +60,8 @@ async function loadPublishChanges(application: string, signal: AbortSignal): Pro
  * stays on, as the old dialog did. "The release" holds the Label and the Note. Under it, unless everything is live or
  * nothing is live yet, the page lists the files that differ from the live release, each with "Changed by", as
  * docs/reference/ai-authoring-in-studio.md#revisions describes. The action bar at the foot says which
- * number the publish gets, unless everything is live, and holds Cancel and Publish. Publish is off while `busy`, while the history loads and when
- * the folder already is the live release. Publish calls `onPublish` with the trimmed values, then `onLeave`, which
+ * number the publish gets, unless everything is live, and holds Cancel and Publish. Publish is off while `busy`, while
+ * the history or the changed files load and when the folder already is the live release. Publish calls `onPublish` with the trimmed values, then `onLeave`, which
  * Cancel calls alone.
  */
 export function StudioPublishPage({
@@ -84,7 +84,7 @@ export function StudioPublishPage({
   const t = useText()
   const [label, setLabel] = useState('')
   const [note, setNote] = useState('')
-  const [loadedChanges, setLoadedChanges] = useState<PublishChanges | null>(null)
+  const [loadedChanges, setLoadedChanges] = useState<{ history: StudioReleases; changes: PublishChanges | null }>()
   const loaded = history !== undefined && history !== 'failed' ? history : null
   const allLive = loaded !== null && loaded.active !== null && loaded.folderContentHash === loaded.active.contentHash
   const live = loaded !== null && loaded.active !== null && !allLive
@@ -96,12 +96,14 @@ export function StudioPublishPage({
     const controller = new AbortController()
     loadPublishChanges(application, controller.signal).then((next) => {
       if (!controller.signal.aborted) {
-        setLoadedChanges(next)
+        setLoadedChanges({ history: loaded, changes: next })
       }
     })
     return () => controller.abort()
   }, [application, live, loaded])
-  const changes = live ? loadedChanges : null
+  const changes = live ? (loadedChanges?.changes ?? null) : null
+  // The list appears above the action bar and pushes Publish down, so a click while it loads can miss the button.
+  const changesLoading = live && loadedChanges?.history !== loaded
 
   let line = ''
   if (loaded !== null) {
@@ -168,7 +170,7 @@ export function StudioPublishPage({
             <AxisButton
               role="finish"
               data-testid="studio-publish-confirm"
-              disabled={busy || history === undefined || allLive}
+              disabled={busy || history === undefined || allLive || changesLoading}
               onClick={() => {
                 onPublish({ label: label.trim(), note: note.trim() })
                 onLeave()
