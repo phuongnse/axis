@@ -12,6 +12,7 @@
     { "name": "submitInspect", "process": "Submit", "actions": ["inspect"] },
     { "name": "divideInspect", "process": "Divide", "actions": ["inspect"] },
     { "name": "departmentOrderInspect", "process": "DepartmentOrder", "actions": ["inspect"] },
-    { "name": "timerWaitInspect", "process": "TimerWait", "actions": ["inspect"] }
+    { "name": "timerWaitInspect", "process": "TimerWait", "actions": ["inspect"] },
+    { "name": "waitEventInspect", "process": "WaitEvent", "actions": ["inspect"] }
   ]
 }
