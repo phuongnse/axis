@@ -152,9 +152,8 @@ public static partial class PackageCallResults
         }
 
         var output = ((PackageCallResult.Succeeded)result).Output;
-        var values = PackageCallRecords.DecodeRunnerOutput(target.Operation, output) is { } decoded
-            ? PackageCallRecords.Fit(decoded, target.Operation, target.Step, target.Entity)
-            : null;
+        var decoded = PackageCallRecords.DecodeRunnerOutput(target.Operation, output);
+        var values = decoded is null ? null : PackageCallRecords.Fit(decoded, target.Operation, target.Step, target.Entity);
         if (values is null)
         {
             return await FailAsync(
@@ -182,6 +181,7 @@ public static partial class PackageCallResults
                 target.Entity,
                 target.Step,
                 values,
+                RunnerValues.Encode(target.Operation.Output, decoded!),
                 cipher,
                 async (applicationId, token) =>
                     await StartLock.TakeSharedAsync(transaction, applicationId, token) is { } releaseId ? (releaseId, await releaseOf(releaseId, token)) : null,

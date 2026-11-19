@@ -379,7 +379,7 @@ internal sealed partial class PackageCallHandler(
             return await FailAsync(item, connection, attempt, misfit, PackageCallRecords.AttemptRow(attempt, CallAttempts.Failed, misfit), cancellationToken);
         }
 
-        return await SucceedAsync(item, connection, attempt, target, values, cancellationToken);
+        return await SucceedAsync(item, connection, attempt, target, values, RunnerValues.Encode(target.Operation.Output, run.Output!), cancellationToken);
     }
 
     /// <summary>
@@ -686,8 +686,8 @@ internal sealed partial class PackageCallHandler(
     /// <summary>
     /// Records a fitting output in one transaction: the output fields with the record update rules,
     /// the call <c>succeeded</c>, the instance <c>running</c> on <c>next</c>, the history row, the
-    /// audit records, the next step's work item and the attempt row. A refused write or any other
-    /// error rolls it back and fails the call instead, and the attempt row then says it failed.
+    /// audit records, the next step's work item, the attempt row and the values <paramref name="returned"/> that the call
+    /// keeps. A refused write or any other error rolls it back and fails the call instead, and the attempt row then says it failed.
     /// </summary>
     private async Task<WorkItemOutcome> SucceedAsync(
         ClaimedWorkItem item,
@@ -695,6 +695,7 @@ internal sealed partial class PackageCallHandler(
         PackageCallAttempt attempt,
         Target target,
         List<KeyValuePair<FieldModel, object?>> values,
+        JsonObject returned,
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
@@ -728,6 +729,7 @@ internal sealed partial class PackageCallHandler(
                     target.Entity,
                     target.Step,
                     values,
+                    returned,
                     cipher,
                     (applicationId, token) => models.FindActiveAsync(new WorkItemContext(item, connection, transaction), applicationId, token),
                     logger,

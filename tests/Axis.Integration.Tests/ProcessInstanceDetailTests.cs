@@ -412,7 +412,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         var calls = body.RootElement.GetProperty("calls").EnumerateArray().ToList();
         var item = Assert.Single(calls);
         Assert.Equal(
-            ["id", "kind", "step", "connector", "operation", "state", "attempts", "input", "inputHidden", "resolvable"],
+            ["id", "kind", "step", "connector", "operation", "state", "attempts", "input", "inputHidden", "request", "returned", "resolvable"],
             item.EnumerateObject().Select(property => property.Name));
         Assert.Equal(call, item.GetProperty("id").GetGuid());
         Assert.Equal("connector", item.GetProperty("kind").GetString());
@@ -429,7 +429,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
                 attempt.GetProperty("outcome").GetString()!,
                 attempt.GetProperty("httpStatus").GetInt32())));
         Assert.Equal(
-            ["kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "traceId"],
+            ["kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "traceId", "response"],
             attempts[0].EnumerateObject().Select(property => property.Name));
         Assert.Equal(JsonValueKind.Null, attempts[0].GetProperty("error").ValueKind);
         Assert.Equal(JsonValueKind.Null, attempts[0].GetProperty("traceId").ValueKind);

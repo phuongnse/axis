@@ -73,6 +73,11 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         Assert.Equal(2L, record.Version);
         Assert.Equal((PackageCalls.Succeeded, 1, (string?)null, (string?)null), await CallAsync(callId));
 
+        // The call keeps the values its operation returned, though its input is cleared.
+        Assert.True(JsonNode.DeepEquals(
+            JsonNode.Parse("""{"total":"5"}"""),
+            JsonNode.Parse((string)(await tenant.ScalarAsync("SELECT returned::text FROM axis.package_calls WHERE id = @id", ("id", callId)))!)));
+
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("sum", 2L, (string?)null), (row.Step, row.Revision, row.Error));
         Assert.True(JsonNode.DeepEquals(

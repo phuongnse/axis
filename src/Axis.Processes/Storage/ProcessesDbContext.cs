@@ -178,6 +178,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.Attempts).HasColumnName("attempts");
             call.Property(c => c.Lookups).HasColumnName("lookups").HasDefaultValue(0);
             call.Property(c => c.Input).HasColumnName("input").HasColumnType("jsonb");
+            call.Property(c => c.Request).HasColumnName("request").HasColumnType("jsonb");
             call.Property(c => c.LastStatus).HasColumnName("last_status");
             call.Property(c => c.LastError).HasColumnName("last_error");
             call.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
@@ -214,6 +215,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.RetryBackoff).HasColumnName("retry_backoff").HasColumnType("interval").HasDefaultValueSql("'30 seconds'::interval");
             call.Property(c => c.Idempotent).HasColumnName("idempotent").HasDefaultValue(false);
             call.Property(c => c.Input).HasColumnName("input").HasColumnType("jsonb");
+            call.Property(c => c.Returned).HasColumnName("returned").HasColumnType("jsonb");
             call.Property(c => c.LastError).HasColumnName("last_error");
             call.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             call.Property(c => c.SettledAt).HasColumnName("settled_at");
@@ -249,6 +251,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             attempt.Property(a => a.Outcome).HasColumnName("outcome");
             attempt.Property(a => a.HttpStatus).HasColumnName("http_status");
             attempt.Property(a => a.Error).HasColumnName("error");
+            attempt.Property(a => a.Response).HasColumnName("response").HasColumnType("jsonb");
             attempt.Property(a => a.TraceId).HasColumnName("trace_id");
 
             // The call is in one of two tables, so there is no foreign key. Each attempt and lookup has its own number.
