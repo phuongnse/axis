@@ -17,6 +17,8 @@ export interface CurrentUser {
   studioTest: boolean
   /** Whether Studio shows Ask AI: true for an author when the server's `Ai:DefaultBinding` is set. */
   studioAi: boolean
+  /** Whether Studio shows New package…: true for a person with the author and developer roles in a tenant with application packages on. */
+  studioDeveloper: boolean
   /** Whether the user may use the operator console: the user holds the role that the server's `Console:OperatorRole` names. */
   console: boolean
   /** Whether the user may administer users: the user holds the role that the server's `Users:AdministratorRole` names, and the tenant is not a preview tenant. */

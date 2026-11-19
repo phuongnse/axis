@@ -816,6 +816,7 @@ const currentUser: CurrentUser = {
   studioPreviewHost: null,
   studioTest: false,
   studioAi: false,
+  studioDeveloper: false,
   console: true,
   users: true,
   tenantStatus: 'active',
