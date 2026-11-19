@@ -620,44 +620,55 @@ internal static class ProcessInspectionEndpoints
     internal static ProcessGraph Graph(ProcessModel model) =>
         new(model.Start, model.Steps.Select(GraphStep).ToList());
 
-    // A transition's On is text: a decision branch gives its index and the fallback gives "otherwise".
+    // A transition's On is text: a decision branch gives its index and the fallback gives "otherwise". A step's label key is its own
+    // for every type. A decision branch's and a task outcome's transition gives the label's key, and a decision branch also its name.
     private static ProcessGraphStep GraphStep(ProcessStepModel step) =>
         step switch
         {
             DecisionStepModel decision => new(
                 decision.Name,
                 "decision",
+                step.Label?.TextKey,
+                null,
                 null,
                 decision.Branches
-                    .Select((branch, index) => new ProcessGraphTransition(branch.Next, index.ToString(CultureInfo.InvariantCulture)))
-                    .Append(new ProcessGraphTransition(decision.Otherwise, "otherwise"))
+                    .Select((branch, index) => new ProcessGraphTransition(branch.Next, index.ToString(CultureInfo.InvariantCulture), branch.Name, branch.Label?.TextKey, null))
+                    .Append(new ProcessGraphTransition(decision.Otherwise, "otherwise", null, null, null))
                     .ToList()),
             TaskStepModel task => new(
                 task.Name,
                 "task",
                 task.Label.TextKey,
-                task.Outcomes.Select(outcome => new ProcessGraphTransition(outcome.Next, outcome.Name)).ToList()),
-            OperationStepModel operation => Operation(operation.Name, operation.Next),
-            CallConnectorStepModel call => Operation(call.Name, call.Next),
-            PackageOperationStepModel package => Operation(package.Name, package.Next),
-            RaiseEventStepModel raise => Operation(raise.Name, raise.Next),
-            TimerStepModel timer => new(timer.Name, "timer", null, [new ProcessGraphTransition(timer.Next, null)]),
+                null,
+                null,
+                task.Outcomes.Select(outcome => new ProcessGraphTransition(outcome.Next, outcome.Name, null, outcome.Label.TextKey, null)).ToList()),
+            OperationStepModel operation => Operation(step, operation.Name, operation.Next),
+            CallConnectorStepModel call => Operation(step, call.Name, call.Next),
+            PackageOperationStepModel package => Operation(step, package.Name, package.Next),
+            RaiseEventStepModel raise => Operation(step, raise.Name, raise.Next),
+            TimerStepModel timer => new(timer.Name, "timer", step.Label?.TextKey, null, null, [Next(timer.Next)]),
+            // An event has no label, so EventLabelKey is null.
             WaitEventStepModel wait => new(
                 wait.Name,
                 "waitEvent",
+                step.Label?.TextKey,
+                wait.Event,
                 null,
                 wait.Timeout is { } timeout
-                    ? [new ProcessGraphTransition(wait.Next, null), new ProcessGraphTransition(timeout.Next, "timeout")]
-                    : [new ProcessGraphTransition(wait.Next, null)]),
-            CreateRecordStepModel create => Operation(create.Name, create.Next),
-            NotifyStepModel notify => Operation(notify.Name, notify.Next),
-            SubProcessStepModel sub => Operation(sub.Name, sub.Next),
-            EndStepModel end => new(end.Name, "end", null, []),
+                    ? [Next(wait.Next), new ProcessGraphTransition(timeout.Next, "timeout", null, null, timeout.AfterText)]
+                    : [Next(wait.Next)]),
+            CreateRecordStepModel create => Operation(step, create.Name, create.Next),
+            NotifyStepModel notify => Operation(step, notify.Name, notify.Next),
+            SubProcessStepModel sub => Operation(step, sub.Name, sub.Next),
+            EndStepModel end => new(end.Name, "end", step.Label?.TextKey, null, null, []),
             _ => throw new InvalidOperationException($"Unexpected step type {step.GetType().Name}."),
         };
 
-    private static ProcessGraphStep Operation(string name, string next) =>
-        new(name, "operation", null, [new ProcessGraphTransition(next, null)]);
+    private static ProcessGraphStep Operation(ProcessStepModel step, string name, string next) =>
+        new(name, "operation", step.Label?.TextKey, null, null, [Next(next)]);
+
+    private static ProcessGraphTransition Next(string next) =>
+        new(next, null, null, null, null);
 
     private static IResult InstanceNotFound() =>
         NotFound("No instance of this process exists with this id.");
@@ -764,11 +775,25 @@ internal sealed record ProcessSubProcess(Guid Id, string Process, string Step, s
 /// <summary>The steps of a process, in declaration order, and the name of the first.</summary>
 internal sealed record ProcessGraph(string Start, IReadOnlyList<ProcessGraphStep> Steps);
 
-/// <summary>A step of the graph: its type (<c>decision</c>, <c>task</c>, <c>operation</c> or <c>end</c>), its label for a task, and where it leads.</summary>
-internal sealed record ProcessGraphStep(string Name, string Type, string? LabelKey, IReadOnlyList<ProcessGraphTransition> Transitions);
+/// <summary>
+/// A step of the graph: its type (<c>decision</c>, <c>task</c>, <c>operation</c>, <c>timer</c>, <c>waitEvent</c>, <c>end</c>), the text key of its
+/// label or null, where it leads, and for a <c>waitEvent</c> step the name of the event it waits for. <paramref name="EventLabelKey"/>
+/// is always null, since an event has no label. <paramref name="Event"/> and <paramref name="EventLabelKey"/> are null for any other step.
+/// </summary>
+internal sealed record ProcessGraphStep(
+    string Name,
+    string Type,
+    string? LabelKey,
+    string? Event,
+    string? EventLabelKey,
+    IReadOnlyList<ProcessGraphTransition> Transitions);
 
-/// <summary>A transition to the step <paramref name="Next"/>, taken on a decision branch or a task outcome, or null for an operation.</summary>
-internal sealed record ProcessGraphTransition(string Next, string? On);
+/// <summary>
+/// A transition to the step <paramref name="Next"/>, taken on a decision branch or a task outcome, or null for any other transition.
+/// <paramref name="Branch"/> is a decision branch's name, and <paramref name="LabelKey"/> the text key of the label of the branch or the task outcome.
+/// <paramref name="After"/> is the timeout's duration as the process file writes it, on a <c>waitEvent</c> step's timeout transition. Each is null where it does not apply.
+/// </summary>
+internal sealed record ProcessGraphTransition(string Next, string? On, string? Branch, string? LabelKey, string? After);
 
 /// <summary>
 /// One occurrence of a step in the instance's history. A failed step has an error and no output.

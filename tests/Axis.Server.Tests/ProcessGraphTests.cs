@@ -1,4 +1,5 @@
 using Axis.Configuration.Model;
+using Axis.Configuration.Resources;
 using Axis.Server.Processes;
 
 namespace Axis.Server.Tests;
@@ -27,8 +28,8 @@ public sealed class ProcessGraphTests
         Assert.Equal("fulfil", graph.Start);
         Assert.Equal(
             [
-                new ProcessGraphStep("fulfil", "operation", null, [new ProcessGraphTransition("done", null)]),
-                new ProcessGraphStep("done", "end", null, []),
+                new ProcessGraphStep("fulfil", "operation", null, null, null, [new ProcessGraphTransition("done", null, null, null, null)]),
+                new ProcessGraphStep("done", "end", null, null, null, []),
             ],
             graph.Steps,
             new GraphStepComparer());
@@ -45,7 +46,7 @@ public sealed class ProcessGraphTests
             Start = "wait",
             Steps =
             [
-                new WaitEventStepModel("wait", "OrderPlaced", null, new WaitTimeoutModel(TimeSpan.FromDays(2), "expired"), "done"),
+                new WaitEventStepModel("wait", "OrderPlaced", null, new WaitTimeoutModel(TimeSpan.FromDays(2), "P2D", "expired"), "done"),
                 new EndStepModel("done"),
                 new EndStepModel("expired"),
             ],
@@ -55,9 +56,15 @@ public sealed class ProcessGraphTests
 
         Assert.Equal(
             [
-                new ProcessGraphStep("wait", "waitEvent", null, [new ProcessGraphTransition("done", null), new ProcessGraphTransition("expired", "timeout")]),
-                new ProcessGraphStep("done", "end", null, []),
-                new ProcessGraphStep("expired", "end", null, []),
+                new ProcessGraphStep(
+                    "wait",
+                    "waitEvent",
+                    null,
+                    "OrderPlaced",
+                    null,
+                    [new ProcessGraphTransition("done", null, null, null, null), new ProcessGraphTransition("expired", "timeout", null, null, "P2D")]),
+                new ProcessGraphStep("done", "end", null, null, null, []),
+                new ProcessGraphStep("expired", "end", null, null, null, []),
             ],
             graph.Steps,
             new GraphStepComparer());
@@ -77,7 +84,30 @@ public sealed class ProcessGraphTests
 
         var graph = ProcessInspectionEndpoints.Graph(model);
 
-        Assert.Equal([new ProcessGraphTransition("done", null)], graph.Steps[0].Transitions);
+        Assert.Equal([new ProcessGraphTransition("done", null, null, null, null)], graph.Steps[0].Transitions);
+    }
+
+    [Fact]
+    public void A_step_that_is_not_a_task_gives_its_own_label_key()
+    {
+        var model = new ProcessModel
+        {
+            Id = Guid.Parse("77777777-7777-4777-8777-777777777705"),
+            Name = "OrderReview",
+            File = "processes/order-review.json",
+            Start = "pause",
+            Steps =
+            [
+                new TimerStepModel("pause", TimeSpan.FromHours(1), null, "wait") { Label = new TextReference("step.pause") },
+                new WaitEventStepModel("wait", "OrderPlaced", null, null, "done") { Label = new TextReference("step.wait") },
+                new EndStepModel("done") { Label = new TextReference("step.done") },
+            ],
+        };
+
+        var graph = ProcessInspectionEndpoints.Graph(model);
+
+        Assert.Equal(["step.pause", "step.wait", "step.done"], graph.Steps.Select(step => step.LabelKey));
+        Assert.Null(graph.Steps[1].EventLabelKey);
     }
 
     // The records hold lists, which a record compares by reference, so the steps are compared by their parts.
@@ -85,7 +115,7 @@ public sealed class ProcessGraphTests
     {
         public bool Equals(ProcessGraphStep? x, ProcessGraphStep? y) =>
             x is not null && y is not null
-            && (x.Name, x.Type, x.LabelKey) == (y.Name, y.Type, y.LabelKey)
+            && (x.Name, x.Type, x.LabelKey, x.Event, x.EventLabelKey) == (y.Name, y.Type, y.LabelKey, y.Event, y.EventLabelKey)
             && x.Transitions.SequenceEqual(y.Transitions);
 
         public int GetHashCode(ProcessGraphStep obj) => obj.Name.GetHashCode(StringComparison.Ordinal);

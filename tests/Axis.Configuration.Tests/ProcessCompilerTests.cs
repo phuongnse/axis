@@ -64,7 +64,9 @@ public sealed class ProcessCompilerTests
     private const string Texts = """
         { "id": "55555555-5555-4555-8555-555555555555", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
           "texts": {
+            "order.big": "Large order",
             "order.cannotStart": "This order cannot be started.",
+            "order.pause": "Cooling off",
             "order.review": "Review the order",
             "role.finance": "Finance",
             "task.approve": "Approve",
@@ -1864,6 +1866,56 @@ public sealed class ProcessCompilerTests
             [
                 (DiagnosticCodes.MissingTextKey, "/steps/0/label/textKey", "No locale has the text key 'order.nope'."),
                 (DiagnosticCodes.MissingTextKey, "/steps/0/outcomes/1/label/textKey", "No locale has the text key 'task.nope'."),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path, diagnostic.Message)));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_timer_label_and_a_decision_branch_label_compile_into_the_model()
+    {
+        using var folder = Folder(Process(
+            "Order",
+            """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "name": "big", "label": { "textKey": "order.big" }, "when": "amount > 100", "next": "pause" }], "otherwise": "done" },
+              { "name": "pause", "type": "timer", "label": { "textKey": "order.pause" }, "wait": "PT1H", "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var steps = Assert.Single(result.Model.Processes).Steps;
+        var decision = Assert.IsType<DecisionStepModel>(steps[0]);
+        var branch = Assert.Single(decision.Branches);
+        Assert.Equal(("big", new TextReference("order.big")), (branch.Name, branch.Label));
+        Assert.Null(decision.Label);
+        Assert.Equal(new TextReference("order.pause"), Assert.IsType<TimerStepModel>(steps[1]).Label);
+        Assert.Null(steps[2].Label);
+    }
+
+    [Fact]
+    public void Missing_timer_and_branch_label_keys_are_reported_at_their_text_keys()
+    {
+        using var folder = Folder(Process(
+            "Order",
+            """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "name": "big", "label": { "textKey": "order.nope" }, "when": "amount > 100", "next": "pause" }], "otherwise": "done" },
+              { "name": "pause", "type": "timer", "label": { "textKey": "order.gone" }, "wait": "PT1H", "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.MissingTextKey, "/steps/0/branches/0/label/textKey", "No locale has the text key 'order.nope'."),
+                (DiagnosticCodes.MissingTextKey, "/steps/1/label/textKey", "No locale has the text key 'order.gone'."),
             ],
             result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path, diagnostic.Message)));
         Assert.Null(result.Model);

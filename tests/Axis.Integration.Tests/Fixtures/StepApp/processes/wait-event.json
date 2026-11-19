@@ -9,6 +9,7 @@
     {
       "name": "await",
       "type": "waitEvent",
+      "label": { "textKey": "request.await" },
       "event": "RequestNoted",
       "when": "ratio > 1",
       "timeout": { "after": "PT1H", "next": "timedOut" },
