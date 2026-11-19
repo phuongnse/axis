@@ -19,23 +19,7 @@ This runbook gives the steps and commands.
 
 ## A requested change
 
-Use this when the owner asks for a change in words, for example "give a
-section more space".
-
-1. Restate the request in Axis terms. Name each token, such as `primary` or
-   `spacing-md`, and each widget, such as `table`, `form` or `section`. Ask the
-   owner when the request is ambiguous.
-2. Open the artifact and make the change. Show the owner the result.
-3. When the owner accepts it, write the NexKit issue as
-   [Writing an issue](../axis-nexkit/SKILL.md#writing-an-issue) says. The
-   issue:
-   - links the artifact
-   - names the tokens and widgets it changes
-   - links the "Design tokens and previews" section of the frontend reference
-   - has 2–5 criteria that a test or command verifies, for example the new
-     token value in `web/src/platform/designTokens.ts`
-4. Add a change note to the artifact that names the issue by number and link.
-   The note is the last one, so a later sync can find the issue.
+For a change the owner asks for in words, follow [requested-change.md](requested-change.md).
 
 ## A design review
 
@@ -47,8 +31,8 @@ another. The rules are under "Several changes are a design review" in Design cha
 1. Take the review's design issue, or agree a short topic with the owner, such
    as `field-look`, and open a design issue labelled `design` and `on-hold` with no milestone, as
    [how issues run](../../../docs/delivery.md#how-issues-run) says. Its
-   body states the scope and build notes, and says the review ends
-   in a docs change that NexKit writes from the rule comments. Set the body with
+   body states the scope and build notes, and says NexKit writes the docs change
+   from the rule comments. Set the body with
    `gh issue edit <n> --body-file <file>`. If an earlier review's issues have not
    built what it touches, say so and stop.
 2. Put the prototype branch on the current `origin/main`, named as
@@ -62,8 +46,9 @@ another. The rules are under "Several changes are a design review" in Design cha
      `git switch -c design/<yyyy-mm-dd>-<topic> origin/main`, then
      `git push -u origin design/<yyyy-mm-dd>-<topic>`.
 3. Post one state comment with `gh issue comment <n> --body-file <file>`. It
-   names the branch, the `main` commit it stands on, what is done, what waits for
-   the owner, what comes next and each change's parts list. Its id is the
+   names the branch, the `main` commit it stands on, each agreed step with a link
+   to its rule comment, what waits for the owner, what comes next and the parts
+   list of the step in hand. It holds the present only. Its id is the
    `#issuecomment-<id>` at the end of the URL. Edit it from then on:
    `gh api --method PATCH repos/{owner}/{repo}/issues/comments/<id> -F body=@<file>`.
 
@@ -72,7 +57,10 @@ another. The rules are under "Several changes are a design review" in Design cha
 Take one change at a time. Start the next only after the owner has seen this
 one. What the build must do beyond the docs goes in the design
 issue's body, with `gh issue edit`. What you find outside the review's topic
-becomes an issue.
+becomes an issue. A new screen or platform concept becomes its own design issue,
+held and blocked by the review: `gh issue create ... --label design,on-hold`, with
+the blocked-by mark as [Writing an issue](../axis-nexkit/SKILL.md#writing-an-issue)
+step 4 says. The step goes on without it.
 
 1. Follow [merging-main.md](merging-main.md), so the prototype stands on the
    current `main`.
@@ -86,17 +74,25 @@ becomes an issue.
    `web/src/designSystem/`, so the artifact shows the real widgets. Mark each
    new behaviour with a `Proposed:` comment for its issue to find.
 4. Add each look-changing state and each needed fixture to the widget's preview
-   in this step. Open no issue for other missing fixtures.
+   in this step. Check each added or changed fixture against the API's reference
+   page and the server code that answers it, such as
+   `src/Axis.Server/Processes/ProcessInspectionEndpoints.cs`. A value no API gives
+   is a field marked `Proposed:`, named in the build notes. Open no issue for other
+   missing fixtures.
 5. Run `scripts/design-system.sh`, which writes
    `artifacts/design-system/axis-design-system.js` and checks it.
-6. Check every changed card as [checking-a-card.md](checking-a-card.md) says.
+6. Check every changed card as [checking-a-card.md](checking-a-card.md) says,
+   including the rules for every screen.
 7. Commit with a message that says what it shows, and push the branch.
 8. Tell the owner what changed and which preview to open, and ask for a
    verdict: keep, change or drop it. Write the rules agreed in this step as one
    comment, as [Design changes](../../../docs/delivery.md#design-changes) says.
    Post it, or edit the screen's rule comment if it has one, with the commands
-   in Start step 3. Then edit the state comment in place, with this change's
-   parts list from step 2.
+   in Start step 3. When the owner agrees, have an agent audit this step's diff,
+   `git diff <step's first commit>^..HEAD -- web/src`, for one concern done by two
+   mechanisms. Merge what it finds, then commit and push before the next step.
+   Then edit the state comment in place: link this step's rule comment and hold
+   the present only.
 
 ### End
 
@@ -105,22 +101,7 @@ When the owner has agreed every change, follow
 
 ## A sync
 
-Use this after a merged change to the tokens or a widget, or when the owner
-asks. The rule is "A sync follows the repository" in
-[Design changes](../../../docs/delivery.md#design-changes).
-
-1. Run `scripts/design-system.sh`, which builds the bundle from source. If
-   `web/node_modules` is missing, run `scripts/setup.sh` first.
-2. Read the tokens from `web/src/platform/designTokens.ts`.
-3. For each issue the change notes name, run
-   `gh issue view <number> --json state,title`. Keep the changes of open issues.
-4. Compare the artifact with the repository. List each other difference the
-   sync would overwrite, and each token the code no longer defines.
-5. Show that list to the owner and publish only after they confirm, unless the
-   sync ends a review and every difference comes from what merged.
-6. Publish the previews and tokens to the same artifact, keeping open issues'
-   changes. Add a change note with the commit you synced from
-   (`git rev-parse --short HEAD`) and the open issues kept.
+After a merged change to the tokens or a widget, or when the owner asks, follow [sync.md](sync.md).
 
 ## When something fails
 

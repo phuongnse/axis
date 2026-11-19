@@ -2,9 +2,10 @@
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createLogger, createServer, type IndexHtmlTransformContext, type ViteDevServer } from 'vite'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 const webFolder = resolve(fileURLToPath(import.meta.url), '../../..')
+const textsFolder = resolve(webFolder, '../src/Axis.Presentation/Texts')
 const timeout = 60_000
 const devToolsPath = '/.well-known/appspecific/com.chrome.devtools.json'
 
@@ -70,6 +71,28 @@ describe('the design-system dev server', () => {
       const response = await fetchText(devToolsPath)
       expect(response.status).toBe(404)
       expect(errors).toEqual([])
+    },
+    timeout,
+  )
+})
+
+describe('the text reload of the design-system dev server', () => {
+  it(
+    'reloads the open page when a platform text changes',
+    async () => {
+      await vi.waitFor(() => {
+        expect(Object.keys(server.watcher.getWatched())).toContain(textsFolder)
+      })
+      // The change is announced to the watcher only, so the real en.json stays as it is.
+      const send = vi.spyOn(server.environments.client.hot, 'send')
+      try {
+        server.watcher.emit('change', resolve(textsFolder, 'en.json'))
+        await vi.waitFor(() => {
+          expect(send).toHaveBeenCalledWith(expect.objectContaining({ type: 'full-reload' }))
+        })
+      } finally {
+        send.mockRestore()
+      }
     },
     timeout,
   )

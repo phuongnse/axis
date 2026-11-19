@@ -1,5 +1,8 @@
-import { defineConfig, mergeConfig, type Plugin } from 'vite'
+import { defineConfig, mergeConfig, normalizePath, type Plugin } from 'vite'
+import { fileURLToPath } from 'node:url'
 import config from './vite.config.ts'
+
+const textsFolder = normalizePath(fileURLToPath(new URL('../src/Axis.Presentation/Texts', import.meta.url)))
 
 // React Router loads route modules with a dynamic import in its framework mode, which the previews never
 // use. A classic script that a page loads must hold no import, so the bundle rejects that call instead.
@@ -86,6 +89,28 @@ function serveBundleFromSource(): Plugin {
   }
 }
 
+// The widgets read the platform texts, so a partial Fast Refresh swap can leave some of them with the old
+// text. An edit to a text reloads the open page, which shows the new text as a restart did, see
+// docs/development.md#widget-previews. Vite watches a file outside the root only once a page loads it, so
+// the folder joins the watcher.
+function reloadOnTextChange(): Plugin {
+  return {
+    name: 'reload-on-text-change',
+    apply: 'serve',
+    configureServer(server) {
+      server.watcher.add(textsFolder)
+    },
+    hotUpdate({ file }) {
+      if (this.environment.name !== 'client' || !normalizePath(file).startsWith(`${textsFolder}/`)) {
+        return
+      }
+      this.environment.hot.send({ type: 'full-reload', path: '*' })
+      // No module takes the update, so Fast Refresh does not swap the previews either.
+      return []
+    },
+  }
+}
+
 // Builds the design-system bundle: one classic script that sets `window.Axis`, never into the server's
 // web root. `vite build` with the main config builds only index.html, so the previews stay out of the
 // production bundle. scripts/design-system.sh checks the result. Under `vite`, it serves the harness
@@ -95,7 +120,13 @@ export default defineConfig(({ command }) =>
     // Library mode does not replace this, and React and Ant Design read it. The dev server runs React in
     // development mode.
     define: command === 'build' ? { 'process.env.NODE_ENV': JSON.stringify('production') } : {},
-    plugins: [dropRouteModuleImport(), inlineStyleSheets(), escapeScriptEndings(), serveBundleFromSource()],
+    plugins: [
+      dropRouteModuleImport(),
+      inlineStyleSheets(),
+      escapeScriptEndings(),
+      serveBundleFromSource(),
+      reloadOnTextChange(),
+    ],
     // Vite answers 404 for unknown paths instead of serving index.html. Library mode builds ignore appType.
     appType: 'mpa',
     server: { port: 5174, strictPort: true },
