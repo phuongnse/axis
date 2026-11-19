@@ -262,52 +262,11 @@ internal sealed partial class NotificationEmailHandler(
 
         if (digestUserId is not null)
         {
-            await QueueNextDigestAsync(item, connection, transaction, digestUserId, cancellationToken);
+            await EmailDigests.QueueNextAsync(connection, transaction, item.TenantId, digestUserId, cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);
         return WorkItemOutcome.Completed;
-    }
-
-    private static async Task QueueNextDigestAsync(
-        ClaimedWorkItem item,
-        NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
-        string userId,
-        CancellationToken cancellationToken)
-    {
-        Guid nextId;
-        Guid? instanceId;
-        await using (var command = new NpgsqlCommand(
-            "SELECT id, process_instance_id FROM axis.email_outbox WHERE digest_user_id = @user AND state = 'pending' ORDER BY created_at, id LIMIT 1",
-            connection,
-            transaction))
-        {
-            command.Parameters.AddWithValue("user", userId);
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            if (!await reader.ReadAsync(cancellationToken))
-            {
-                return;
-            }
-
-            nextId = reader.GetGuid(0);
-            instanceId = reader.IsDBNull(1) ? null : reader.GetGuid(1);
-        }
-
-        var choices = await NotificationPreferences.FindEmailChoicesAsync(
-            connection, transaction, ProcessNotifications.ProcessSource, [userId], cancellationToken);
-        var (hour, zone) = choices.TryGetValue(userId, out var choice)
-            ? (choice.DigestHour, choice.TimeZone)
-            : (EmailDigests.DefaultHour, EmailDigests.DefaultTimeZone);
-        await WorkItemQueue.EnqueueAsync(
-            connection,
-            transaction,
-            item.TenantId,
-            ProcessStarts.NotificationEmailWorkItemKind,
-            EmailDigests.NextAt(DateTimeOffset.UtcNow, hour, zone),
-            cancellationToken,
-            processInstanceId: instanceId,
-            emailId: nextId);
     }
 
     /// <summary>

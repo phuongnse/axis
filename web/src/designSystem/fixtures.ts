@@ -2,6 +2,9 @@ import type { ChartKind } from '../platform/chartOption'
 import type { CurrentUser } from '../platform/currentUser'
 import type { LegalLinks } from '../platform/LegalLine'
 import type { NotificationPage } from '../platform/notifications'
+import type { OwnAuthenticators } from '../platform/ownAuthenticators'
+import type { OwnNotificationPreferences } from '../platform/ownNotificationPreferences'
+import type { OwnSessions } from '../platform/ownSessions'
 import type { HistoryPage, RecordItem, RecordPage } from '../platform/records'
 import type { DeadLetterPage, InstancePage } from '../platform/inspection'
 import type {
@@ -44,6 +47,7 @@ import type {
   UpdateProfileContext,
   UpdateProfileTexts,
 } from '../identitySignIn/signInContext'
+import type { FixtureRoute } from './fixtureFetch'
 
 /** The fixture application. Its name is also the marker that tells a design-system build from the production SPA. */
 export const application = 'DesignSystemSample'
@@ -824,6 +828,44 @@ const currentUser: CurrentUser = {
   tenantExports: false,
 }
 
+const ownAuthenticators: OwnAuthenticators = {
+  account: true,
+  authenticators: [
+    { id: '7a1f0c2e-3b4d-4e5f-8a6b-7c8d9e0f1a2b', label: 'Phone', createdAt: '2026-10-02T09:15:00Z' },
+    { id: '8b2e1d3f-4c5a-4f6b-9b7c-8d9e0f1a2b3c', label: 'Tablet', createdAt: '2026-11-04T14:30:00Z' },
+  ],
+}
+
+const ownSessions: OwnSessions = {
+  endAllowed: true,
+  sessions: [
+    {
+      id: '9c3f2e4a-5d6b-4a7c-8c8d-9e0f1a2b3c4d',
+      signedInAt: '2026-11-19T07:45:00Z',
+      lastRequestAt: '2026-11-19T08:10:00Z',
+      current: true,
+    },
+    {
+      id: 'ad4a3f5b-6e7c-4b8d-9d9e-0f1a2b3c4d5e',
+      signedInAt: '2026-11-17T18:20:00Z',
+      lastRequestAt: '2026-11-18T21:05:00Z',
+      current: false,
+    },
+  ],
+}
+
+// Process has the daily digest on, so the hour shows. Authoring requests have no email.
+const ownNotificationPreferences: OwnNotificationPreferences = {
+  sources: {
+    task: { channels: { application: true, email: true }, digest: false },
+    mention: { channels: { application: true, email: true }, digest: false },
+    process: { channels: { application: true, email: true }, digest: true },
+    authoringRequest: { channels: { application: true, email: false }, digest: false },
+  },
+  digestHour: 8,
+  timeZone: 'UTC',
+}
+
 const purchaseApplication = {
   name: application,
   titles: { [locale]: 'Purchase requests' },
@@ -1299,7 +1341,7 @@ export const noTableChoices = { columns: null, views: [] }
  * The answers of the fixture application's APIs, by path or by path and query. The page's own
  * queries (paging, sorting) are answered by the path alone.
  */
-export const routes: Record<string, () => unknown> = {
+export const routes: Record<string, FixtureRoute> = {
   [requestsPath]: () => recordPage,
   [`${requestsPath}/${requestId}`]: () => savedRecord,
   [`${requestsPath}/${requestId}/history`]: () => history,
@@ -1325,6 +1367,11 @@ export const routes: Record<string, () => unknown> = {
   [notificationsPath]: () => notificationPage,
   '/api/sites': () => ({ sites: listedSites }),
   '/api/me': () => currentUser,
+  '/api/me/authenticators': () => ownAuthenticators,
+  '/api/me/sessions': () => ownSessions,
+  // A save is a PUT, which the page answers with its status alone, so 204 is enough.
+  '/api/me/notification-preferences': (init) =>
+    init?.method === 'PUT' ? new Response(null, { status: 204 }) : ownNotificationPreferences,
   '/api/about': () => ({ version: '0.1.0' }),
   '/api/notifications': () => tenantNoticePage,
 }

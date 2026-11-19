@@ -9,6 +9,7 @@
       "API",
       "AXC codes such as AXC0035",
       "Axis",
+      "C",
       "CSV",
       "HTML",
       "ID",
@@ -17,8 +18,10 @@
       "PDF",
       "PIN",
       "placeholders such as {count}",
+      "Python",
       "Studio",
       "TOTP",
+      "TypeScript",
       "URL",
       "XLSX",
       "ZIP"

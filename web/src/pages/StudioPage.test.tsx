@@ -25,7 +25,7 @@ import { releasePage } from '../designSystem/studioFixtures'
 import { PlatformContext, type Platform } from './context'
 import { StudioPage } from './StudioPage'
 import { editJson, jsonText } from '../test/jsonView'
-import { isRequiredLabel } from '../test/antd'
+import { chooseOption, isRequiredLabel } from '../test/antd'
 import { openEntityField } from '../test/entityFields'
 
 vi.mock('../platform/navigation', () => ({ assignLocation: vi.fn() }))
@@ -311,6 +311,9 @@ function stubServer(
     }
     if (input === `${folder}/policy-matrix`) {
       return json({ targets: [], roles: [] })
+    }
+    if (input === `${folder}/package-files`) {
+      return json({ items: [] })
     }
     if (input === `${folder}/expressions/check` && expressions.check) {
       checkCalls++
@@ -2756,5 +2759,115 @@ describe('StudioPage process graph marks', () => {
 
     await screen.findByTestId('studio-graph-node-0', {}, slow)
     expect(screen.getByTestId('studio-process-graph').querySelector('[data-marked]')).toBeNull()
+  })
+})
+
+describe('StudioPage Packages', () => {
+  const packageRoute = (id: string, path: string) => `${folder}/packages/${id}/files/${path}`
+  const toolsManifest = JSON.stringify({ id: 'tools', language: 'node', label: 'Purchasing tools', version: '0.1.0' })
+
+  /** Stubs `/api/me` with `me` and one package, `tools`, which `written` files add to once a write arrives. */
+  function stubPackages(me: Record<string, unknown>) {
+    const written: { path: string; ifNoneMatch: string | null }[] = []
+    const fetchMock = stubServer()
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input === '/api/me') {
+        return json({ id: 'author', studio: true, ...me })
+      }
+      if (input === `${folder}/package-files`) {
+        const created = written.filter((write) => write.path.startsWith('new-tools/'))
+        return json({
+          items: [
+            { package: 'tools', path: 'axis-package.json', version: 'v1' },
+            { package: 'tools', path: 'index.js', version: 'v2' },
+            ...created.map((write) => ({
+              package: 'new-tools',
+              path: write.path.slice('new-tools/'.length),
+              version: 'v3',
+            })),
+          ],
+        })
+      }
+      if (input === packageRoute('tools', 'axis-package.json') && init?.method === undefined) {
+        return json({ package: 'tools', path: 'axis-package.json', version: 'v1', content: toolsManifest })
+      }
+      if (input.startsWith(`${folder}/packages/`) && init?.method === 'PUT') {
+        const path = input.slice(`${folder}/packages/`.length).replace('/files/', '/')
+        written.push({ path, ifNoneMatch: new Headers(init.headers).get('If-None-Match') })
+        return json({ version: 'v3', diagnostics: [] })
+      }
+      if (input.startsWith(`${folder}/packages/new-tools/`)) {
+        return json({ package: 'new-tools', path: 'axis-package.json', version: 'v3', content: '{}' })
+      }
+      return base(input, init)
+    })
+    return written
+  }
+
+  it('ends the Integration group of the sidebar with Packages, which opens the list', async () => {
+    stubPackages({})
+    renderPage('/studio?app=PurchaseRequests')
+
+    const link = await within(sidebar!).findByRole('link', { name: 'Packages' })
+    const links = within(sidebar!).getAllByRole('link')
+    // The Integration group has no resource of its own in this application, so Packages is all of it.
+    expect(links[links.indexOf(link) - 1]).toHaveTextContent('Policy matrix')
+    expect(within(sidebar!).getByText('Integration')).toBeInTheDocument()
+
+    await userEvent.click(link)
+
+    expect(await screen.findByRole('heading', { level: 4, name: 'Packages' })).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests&view=packages')
+    expect(await screen.findByTestId('studio-package-tools')).toHaveTextContent('Purchasing tools')
+  })
+
+  it('opens a package from its row, under the Packages entry, headed with its label and listing its files', async () => {
+    stubPackages({})
+    renderPage('/studio?app=PurchaseRequests&view=packages')
+
+    await userEvent.click(await screen.findByTestId('studio-package-tools'))
+
+    expect(await screen.findByRole('heading', { level: 4, name: 'Purchasing tools' })).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests&view=packages&package=tools')
+    const files = screen.getByTestId('studio-package-files')
+    expect(
+      within(files)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => row.textContent),
+    ).toEqual(['axis-package.json', 'index.js'])
+    expect(within(sidebar!).getByRole('link', { name: 'Packages' }).closest('li')).toHaveClass('ant-menu-item-selected')
+  })
+
+  it.each([
+    ['without studioDeveloper', {}],
+    ['with studioDeveloper false', { studioDeveloper: false }],
+  ])('shows no New package… %s', async (_name, me) => {
+    stubPackages(me)
+    renderPage('/studio?app=PurchaseRequests&view=packages')
+
+    await screen.findByTestId('studio-package-tools')
+    expect(screen.queryByRole('button', { name: 'New package…' })).not.toBeInTheDocument()
+  })
+
+  it('shows New package… when /api/me answers studioDeveloper, and a created package joins the list', async () => {
+    const written = stubPackages({ studioDeveloper: true })
+    renderPage('/studio?app=PurchaseRequests&view=packages')
+
+    await screen.findByTestId('studio-package-tools')
+    expect(screen.queryByTestId('studio-package-new-tools')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'New package…' }))
+    await userEvent.type(screen.getByRole('textbox', { name: 'ID' }), 'new-tools')
+    await chooseOption(
+      'TypeScript',
+      screen.getByRole('combobox', { name: 'Language' }).closest('.ant-form-item') as HTMLElement,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+    expect(await screen.findByTestId('studio-package-new-tools')).toBeInTheDocument()
+    expect(written[0].path).toBe('new-tools/axis-package.json')
+    expect(written.every((write) => write.ifNoneMatch === '*')).toBe(true)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 })

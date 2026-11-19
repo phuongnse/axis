@@ -6,6 +6,8 @@ import { QuotaRefusedError } from './quota'
 import {
   changeRows,
   checkStudioExpression,
+  createStudioPackageFile,
+  fetchStudioPackageFile,
   fetchAuthoringRequestDiff,
   fetchStudioExpressionScope,
   fetchStudioLiveDiff,
@@ -790,5 +792,65 @@ describe('revisionAuthor and revisionClient', () => {
     expect(revisionClient(revision({ client: 'studio' }), t)).toBe('Studio')
     expect(revisionClient(revision({ client: null }), t)).toBeNull()
     expect(revisionClient(revision({ client: 'claude-desktop' }), t)).toBe('claude-desktop')
+  })
+})
+
+describe('package files', () => {
+  const problem = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
+  it('creates a file with If-None-Match, under the route of the package with each path segment encoded', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(problem(200, { version: 'v1', diagnostics: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await createStudioPackageFile('Shop', 'tools', 'src/My File.cs', 'text')
+
+    expect(result).toEqual({ status: 'created', version: 'v1', diagnostics: [] })
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(path).toBe('/api/studio/apps/Shop/packages/tools/files/src/My%20File.cs')
+    expect(init.method).toBe('PUT')
+    expect(new Headers(init.headers).get('If-None-Match')).toBe('*')
+    expect(JSON.parse(init.body as string)).toEqual({ content: 'text' })
+  })
+
+  it('answers conflict on a 409 and invalid on a 400', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(problem(409, { title: 'It exists.' }))
+        .mockResolvedValueOnce(problem(400, { title: 'Not a path.' })),
+    )
+
+    expect(await createStudioPackageFile('Shop', 'tools', 'a', '')).toEqual({ status: 'conflict' })
+    expect(await createStudioPackageFile('Shop', 'tools', 'a', '')).toEqual({ status: 'invalid' })
+  })
+
+  it('throws a quota refusal and any other failure', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(problem(403, { reason: 'quota-exceeded', title: 'Storage is full.' }))
+        .mockResolvedValueOnce(problem(403, { title: 'No.' })),
+    )
+
+    await expect(createStudioPackageFile('Shop', 'tools', 'a', '')).rejects.toBeInstanceOf(QuotaRefusedError)
+    const refused = await createStudioPackageFile('Shop', 'tools', 'a', '').catch((reason: unknown) => reason)
+    expect(refused).toBeInstanceOf(Error)
+    expect(refused).not.toBeInstanceOf(QuotaRefusedError)
+  })
+
+  it('reads a file as its content and version, and answers null for a file that is not there', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(problem(200, { package: 'tools', path: 'a', version: 'v1', content: 'text' }))
+        .mockResolvedValueOnce(new Response(null, { status: 404 })),
+    )
+
+    expect(await fetchStudioPackageFile('Shop', 'tools', 'a')).toEqual({ content: 'text', version: 'v1' })
+    expect(await fetchStudioPackageFile('Shop', 'tools', 'a')).toBeNull()
   })
 })

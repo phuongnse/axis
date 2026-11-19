@@ -136,6 +136,67 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
     }
 
     [Fact]
+    public async Task Discarding_the_dead_letter_of_a_digest_queues_the_persons_next_digest_item_with_a_fresh_failure_count_and_the_waiting_rows_are_sent_later()
+    {
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, UniqueAddress());
+        var now = DateTimeOffset.UtcNow;
+        var hour = HourAhead(now, 2);
+        var (title, key) = await StageDigestAsync(releaseId, model, hour);
+        var row = Assert.Single(await WaitingAsync(title));
+        var target = ("id", (object)row.ToString("D"));
+        await using (var failing = Worker(
+            new LogCollector(),
+            [
+                ("Email:Smtp:Host", "127.0.0.1"),
+                ("Email:Smtp:Port", UnusedPort().ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                ("Email:Smtp:UseTls", "false"),
+                ("Email:From", Sender),
+                ("Worker:DeliveryAttempts", "2"),
+            ]))
+        {
+            for (var run = 1; run <= 2; run++)
+            {
+                await MakeDueAsync([row]);
+                await RunUntilIdleAsync(failing);
+            }
+        }
+
+        var deadLetterId = (Guid)(await fixture.ScalarAsync("SELECT id FROM axis.dead_letters WHERE kind = 'notification.email' AND email_id = @id AND state = 'open'", ("id", row)))!;
+        var (_, processId, _, _) = await DeadLetterAsync(deadLetterId);
+        Assert.Equal(0L, await ItemCountAsync([row]));
+
+        // A digest email staged while the dead letter is open waits, and queues no item of its own.
+        await StageDigestAsync(releaseId, model, hour, title);
+        Assert.Equal(2, (await WaitingAsync(title)).Count);
+        Assert.Equal(0L, await ItemCountAsync(await WaitingAsync(title)));
+
+        DeadLetterResult result;
+        await using (var connection = await fixture.DataSource.OpenConnectionAsync(CancellationToken))
+        await using (var transaction = await connection.BeginTransactionAsync(CancellationToken))
+        {
+            result = await DeadLetterCommand.DiscardAsync(
+                connection, transaction, fixture.Tenant, model, processId, deadLetterId, "maria", "The address was wrong.", CancellationToken);
+            await transaction.CommitAsync(CancellationToken);
+        }
+
+        Assert.Equal(DeadLetterOutcome.Settled, result.Outcome);
+        Assert.Equal("discarded", (string?)await fixture.ScalarAsync("SELECT state FROM axis.dead_letters WHERE id = @id", ("id", deadLetterId)));
+        Assert.Equal(0L, await fixture.CountAsync("SELECT count(*) FROM axis.delivery_failures WHERE kind = 'notification.email' AND target = @id", target));
+        var waiting = await WaitingAsync(title);
+        Assert.Equal(1L, await ItemCountAsync(waiting));
+        Assert.Equal(NextLocalHour(DateTimeOffset.UtcNow, hour), await DueAtAsync(waiting[0]));
+
+        await MakeDueAsync(waiting);
+        await using var worker = Worker(new LogCollector(), await MailpitSettingsAsync("Email"));
+        await RunUntilIdleAsync(worker);
+
+        var digest = Assert.Single(await mailpit.MessagesToAsync($"digest.{key}", CancellationToken));
+        Assert.Equal(2, digest.Text.Split($"Request {title}").Length - 1);
+        Assert.Empty(await WaitingAsync(title));
+        Assert.Equal(0L, await ItemCountAsync(waiting));
+    }
+
+    [Fact]
     public async Task Tenant_Email_block_replaces_the_host_settings_so_the_email_goes_through_the_tenant_server()
     {
         var address = UniqueAddress();

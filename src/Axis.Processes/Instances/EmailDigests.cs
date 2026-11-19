@@ -1,4 +1,6 @@
 using Axis.Configuration.Model;
+using Axis.Data.Storage;
+using Axis.Processes.Work;
 using Npgsql;
 
 namespace Axis.Processes.Instances;
@@ -45,5 +47,51 @@ internal static class EmailDigests
             transaction);
         command.Parameters.AddWithValue("user", userId);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Queues the next <c>notification.email</c> item of <paramref name="userId"/>'s digest, for the oldest row of theirs
+    /// that still waits, at their next digest hour. It queues nothing when no row waits. The caller holds
+    /// <see cref="LockAsync"/> and has no queued item of the person's digest.
+    /// </summary>
+    internal static async Task QueueNextAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        string userId,
+        CancellationToken cancellationToken)
+    {
+        Guid nextId;
+        Guid? instanceId;
+        await using (var command = new NpgsqlCommand(
+            "SELECT id, process_instance_id FROM axis.email_outbox WHERE digest_user_id = @user AND state = 'pending' ORDER BY created_at, id LIMIT 1",
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue("user", userId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return;
+            }
+
+            nextId = reader.GetGuid(0);
+            instanceId = reader.IsDBNull(1) ? null : reader.GetGuid(1);
+        }
+
+        var choices = await NotificationPreferences.FindEmailChoicesAsync(
+            connection, transaction, ProcessNotifications.ProcessSource, [userId], cancellationToken);
+        var (hour, zone) = choices.TryGetValue(userId, out var choice)
+            ? (choice.DigestHour, choice.TimeZone)
+            : (DefaultHour, DefaultTimeZone);
+        await WorkItemQueue.EnqueueAsync(
+            connection,
+            transaction,
+            tenantId,
+            ProcessStarts.NotificationEmailWorkItemKind,
+            NextAt(DateTimeOffset.UtcNow, hour, zone),
+            cancellationToken,
+            processInstanceId: instanceId,
+            emailId: nextId);
     }
 }
