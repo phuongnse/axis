@@ -32,26 +32,29 @@ description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The
 - **Name, Label and Type.** The Name cell is the field's name as a link that opens the [field drawer](#field-drawer),
   with the field's layer mark beside it, and reads "Unnamed field" while the name is empty. The Label cell is the
   label in the author's language, or its text key where the key has no text, and the dash where the field has no
-  label. The Type cell is the field's type as written. The table has no input.
+  label. The table has no input.
 - **Columns** _(planned)_. Its columns are Name, Label, Type, Required, Unique and
   Properties. It has a search, and Add field sits in the section's heading. A field's name opens the
   [field drawer](#field-drawer), beside the table, so every field stays in sight however many settings it has.
-- **Filter.** The table has a Filter on Name, Label and Type, and none on the row's menu. Name and Label filter as
-  text, Label on its text key, which is what the file holds. Type filters as a choice of the field types. The filter
+- **Filter.** The table has a Filter on Name, Label, Type, Required and Unique, and none on the row's menu.
+  Name and Label filter as text, Label on its text key, which is what the file holds. Type filters as a choice of
+  the field types. Required and Unique filter as a choice of Yes and No. A field whose type does not take the
+  setting counts as empty. Properties has no filter, as a list of tags has no single value. The filter
   lives in the address as `fields.filter`. It only hides rows: every row shows on one page with no pager, and an edit to
   a hidden row stays in the draft. A field whose origin is new, one added since the last save, stays shown. The table
   has no search, sort or Columns.
-- **Type in words** _(planned)_. The cell reads the type's name, and for a reference, references or child
+- **Type in words.** The cell reads the type's name, and for a reference, references or child
   collection the entity it points to, by its label, as "Reference to Department" or "Child collection
   of Line item". The name shows only where that entity has no label. Enum and every other type read as
-  their name alone, with no count.
+  their name alone, with no count. A reference with no target yet reads "Reference to" and the dash in
+  place of the target.
 - **The target is a link** _(planned)_. In the Type cell the target's label is a link that opens the entity, and a
   module's entity at its module view. The field's name stays the control that opens the drawer.
-- **Required and Unique read Yes or No** _(planned)_, the words a record's boolean reads, as a No is a value and
+- **Required and Unique read Yes or No**, the words a record's boolean reads, as a No is a value and
   the dash means none. They are columns because every field has them and an author compares them down
   the table. A setting only some fields have is a tag under Properties.
-- **Properties** _(planned)_. The tags say where a field's value comes from, at most one of Computed, Sequence,
-  Creator, Matched, User and Default, then Searchable and Sensitive.
+- **Properties.** The tags say where a field's value comes from, at most one of Computed, Sequence,
+  Creator, Matched, User and Default, then Searchable and Sensitive. A field with none shows the dash.
 - **Types.** The type picker offers every
   [field type](resource-files.md#entity-field-types-and-constraints), `money`, `file` and `references`
   among them, and a child entity's fields may be `reference`. A `references` field has the same target

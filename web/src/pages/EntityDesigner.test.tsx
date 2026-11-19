@@ -224,6 +224,28 @@ function renderDesigner(
   return onChange
 }
 
+/** The text of each column header of the Fields table, in column order, without the header of the row menu. */
+function columnHeaders(): string[] {
+  return screen
+    .getAllByRole('columnheader')
+    .map((header) => header.textContent ?? '')
+    .filter((text) => text !== '' && text !== 'Actions')
+}
+
+/** The text of each cell of field `index`'s row in the Fields table, in column order, without the row menu's cell. */
+function fieldCells(index: number): string[] {
+  return within(screen.getByTestId(`studio-field-/fields/${index}`))
+    .getAllByRole('cell')
+    .slice(0, 6)
+    .map((cell) => cell.textContent ?? '')
+}
+
+/** The tags in the Properties cell of field `index`'s row, in order. */
+function fieldTags(index: number): string[] {
+  const cell = within(screen.getByTestId(`studio-field-/fields/${index}`)).getAllByRole('cell')[5]
+  return Array.from(cell.querySelectorAll('.ant-tag'), (tag) => tag.textContent ?? '')
+}
+
 function Providers({ loaded, children }: { loaded: StudioNames | null; children: ReactNode }) {
   return (
     <MemoryRouter>
@@ -364,6 +386,74 @@ describe('EntityDesigner', () => {
     expect(
       within(within(await openEntityField(0)).getByTestId('studio-field-/fields/0/name')).getByRole('textbox'),
     ).toHaveValue('total')
+  })
+
+  it('shows the columns Name, Label, Type, Required, Unique and Properties, with Yes, No or the dash for Required and Unique', () => {
+    renderDesigner(
+      entity({
+        fields: [
+          { name: 'total', type: 'decimal', required: true, unique: true },
+          { name: 'code', type: 'text', maxLength: 20 },
+          { name: 'lines', type: 'child-collection', target: 'Supplier' },
+          { name: 'scan', type: 'file' },
+        ],
+      }),
+    )
+
+    expect(columnHeaders()).toEqual(['Field name', 'Field label', 'Field type', 'Required', 'Unique', 'Properties'])
+    expect(fieldCells(0)).toEqual(['total', '—', 'Decimal', 'Yes', 'Yes', '—'])
+    expect(fieldCells(1)).toEqual(['code', '—', 'Text', 'No', 'No', '—'])
+    expect(fieldCells(2)).toEqual(['lines', '—', 'Child collection of Supplier', '—', '—', '—'])
+    expect(fieldCells(3)).toEqual(['scan', '—', 'File', 'No', '—', '—'])
+  })
+
+  it('reads a reference as Reference to its target label, its name where the entity has no label, and a text as Text', () => {
+    const withLabel = {
+      ...names,
+      entities: [
+        ...names.entities,
+        { id: 'e3', name: 'OrgUnit', labelKey: 'entity.department', module: null, fields: [] },
+      ],
+      texts: [...names.texts, { key: 'entity.department', texts: { en: 'Department', vi: 'Phòng ban' }, usedBy: 1 }],
+    } as unknown as StudioNames
+    renderDesigner(
+      entity({
+        fields: [
+          { name: 'unit', type: 'reference', target: 'OrgUnit' },
+          { name: 'vendor', type: 'reference', target: 'Supplier' },
+          { name: 'lower', type: 'reference', target: 'orgunit' },
+          { name: 'empty', type: 'reference' },
+          { name: 'note', type: 'text' },
+        ],
+      }),
+      vi.fn(),
+      withLabel,
+    )
+
+    expect(fieldCells(0)[2]).toBe('Reference to Department')
+    expect(fieldCells(1)[2]).toBe('Reference to Supplier')
+    expect(fieldCells(2)[2]).toBe('Reference to Department')
+    expect(fieldCells(3)[2]).toBe('Reference to —')
+    expect(fieldCells(4)[2]).toBe('Text')
+  })
+
+  it('shows the properties of a field as tags in their order, with one source of its value, and the dash for none', () => {
+    renderDesigner(
+      entity({
+        fields: [
+          { name: 'stamp', type: 'text', default: "'draft'", searchable: true, sensitive: true },
+          { name: 'total', type: 'decimal', expression: 'total * 2', default: '1' },
+          { name: 'number', type: 'text', sequence: 'InvoiceNumbers', creator: true },
+          { name: 'plain', type: 'text' },
+        ],
+      }),
+    )
+
+    expect(fieldTags(0)).toEqual(['Default', 'Searchable', 'Sensitive'])
+    expect(fieldTags(1)).toEqual(['Computed'])
+    expect(fieldTags(2)).toEqual(['Sequence'])
+    expect(fieldTags(3)).toEqual([])
+    expect(fieldCells(3)[5]).toBe('—')
   })
 
   it('names each entity input by its label and describes it by its help', async () => {
@@ -997,19 +1087,30 @@ describe('EntityDesigner', () => {
       )
     }
 
-    it('offers the name, label and type columns, and applying Type is integer leaves only the integer fields', async () => {
+    it('offers the name, label, type, required and unique columns, and applying Type is integer leaves only the integer fields', async () => {
       renderFiltered(['count', 'code', 'size', 'total'])
       expect(rows()).toHaveLength(4)
 
       await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
       await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
-      expect(optionTexts()).toEqual(['Field name', 'Field label', 'Field type'])
+      expect(optionTexts()).toEqual(['Field name', 'Field label', 'Field type', 'Required', 'Unique'])
       await chooseOption('Field type')
       await pick('Value', 0, 'integer')
       await clickInDialog('Apply')
 
       expect(entityFieldNames()).toEqual(['count', 'size'])
       expect(screen.queryByRole('list')).not.toBeInTheDocument()
+    })
+
+    it('filters on Required as Yes and leaves only the fields that are required', async () => {
+      renderFiltered(['count', 'code', 'size', 'total'])
+
+      await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+      await pick('Column', 0, 'Required')
+      await pick('Value', 0, 'Yes')
+      await clickInDialog('Apply')
+
+      expect(entityFieldNames()).toEqual(['count'])
     })
 
     it('keeps a field added since the last save shown, and hides a saved field that does not match', async () => {

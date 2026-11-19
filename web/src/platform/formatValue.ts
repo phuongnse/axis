@@ -11,6 +11,11 @@ export interface FormatOptions {
   text: (key: string) => string
 }
 
+/** Yes or No, the words a record's boolean reads, see docs/reference/frontend.md. */
+export function booleanText(value: boolean, text: (key: string) => string): string {
+  return text(value ? 'shell.table.yes' : 'shell.table.no')
+}
+
 /** An enum value's label in the current locale, or the value itself when it has no label key. */
 export function enumLabel(
   field: Pick<FieldMetadata, 'valueLabelKeys'>,
@@ -165,7 +170,7 @@ export function formatValue(
   const { locale, timeZone, text } = options
   switch (field.type) {
     case 'boolean':
-      return text(value === true ? 'shell.table.yes' : 'shell.table.no')
+      return booleanText(value === true, text)
     case 'money':
       return moneyText(field, String(value), locale, row)
     case 'enum':

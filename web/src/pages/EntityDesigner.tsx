@@ -1,4 +1,4 @@
-import { Button, ConfigProvider, Drawer, Flex, Input, InputNumber, Select, Typography, DatePicker } from 'antd'
+import { Button, ConfigProvider, Drawer, Flex, Input, InputNumber, Select, Tag, Typography, DatePicker } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import dayjs from 'dayjs'
@@ -8,6 +8,9 @@ import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { EmptyDash } from '../platform/EmptyValue'
+import { FilledText } from '../platform/FilledText'
+import { booleanText } from '../platform/formatValue'
 import {
   changeFieldType,
   editableSettings,
@@ -144,8 +147,9 @@ const Picker = memo(function Picker({
 /**
  * The designer of an entity, in the sections General, Fields, Validations and Indexes, see
  * docs/reference/entity-designer.md#sections. General shows the entity's name, label, description and display field.
- * Fields is a table of name, label and type, and a field's name opens the field drawer with the field's inputs and the
- * settings its type takes, see docs/reference/entity-designer.md#field-drawer. Validations is rows of a name, an
+ * Fields is a table of name, label, type, Required, Unique and properties, and a field's name opens the field drawer with
+ * the field's inputs and the settings its type takes, see docs/reference/entity-designer.md#field-drawer and
+ * docs/reference/entity-designer.md#fields. Validations is rows of a name, an
  * expression, a message key and a field. A field can be
  * added, removed and moved, and a type change drops the settings the new type does not take. A computed field's
  * `expression` and each validation's expression use the expression editor, and so does a field's `default`, which has
@@ -257,22 +261,79 @@ function rowOrigins(fields: unknown[], origins: FieldOrigin[] | undefined): Fiel
   return fields.map((_, index) => origins?.[index] ?? null)
 }
 
-/** The columns of the Fields table, all of which have a filter, by the name their filter has in the address. */
+/** The columns of the Fields table that have a filter, by the name their filter has in the address. Properties has none. */
 const fieldTableFields = [
   { name: 'name', type: 'text' },
   { name: 'label', type: 'text' },
   { name: 'type', type: 'enum' },
+  { name: 'required', type: 'enum' },
+  { name: 'unique', type: 'enum' },
 ] as const
+
+/** Whether a field's type takes a yes-or-no setting, with its value, or `null` where the type does not take it. */
+function yesNoSetting(field: unknown, setting: 'required' | 'unique'): boolean | null {
+  if (!isContent(field) || !fieldSettings(text(field.type)).includes(setting)) {
+    return null
+  }
+  return field[setting] === true
+}
+
+/**
+ * A column of a yes-or-no setting, Yes or No, with the dash where the field's type does not take it. It filters as a
+ * choice of Yes and No, and the dash is empty for the filter.
+ */
+function yesNoColumn(setting: 'required' | 'unique', title: string, t: (key: string) => string): AxisColumn<FieldRow> {
+  return {
+    key: setting,
+    kind: 'fixed',
+    title,
+    filter: {
+      kind: 'enum',
+      value: ({ field }) => {
+        const value = yesNoSetting(field, setting)
+        return value === null ? null : value ? 'yes' : 'no'
+      },
+      options: [
+        { value: 'yes', label: booleanText(true, t) },
+        { value: 'no', label: booleanText(false, t) },
+      ],
+    },
+    render: (_, { field }) => {
+      const value = yesNoSetting(field, setting)
+      return value === null ? null : booleanText(value, t)
+    },
+  }
+}
+
+/** The sources of a field's value, in the order the Properties column takes the first one a field has. */
+const valueSources: [string, (field: Content) => boolean][] = [
+  ['computed', (field) => typeof field.expression === 'string'],
+  ['sequence', (field) => typeof field.sequence === 'string'],
+  ['creator', (field) => field.creator === true],
+  ['matched', (field) => isContent(field.match)],
+  ['user', (field) => field.userId === true],
+  ['default', (field) => typeof field.default === 'string'],
+]
+
+/** The property names a field shows as tags: at most one source of its value, then Searchable and Sensitive. */
+function fieldProperties(field: unknown): string[] {
+  if (!isContent(field)) {
+    return []
+  }
+  const source = valueSources.find(([, has]) => has(field))
+  return [...(source ? [source[0]] : []), ...['searchable', 'sensitive'].filter((name) => field[name] === true)]
+}
 
 /** The Fields table keeps no data source parameter in the address, only its view. */
 const noParameters: string[] = []
 
 /**
  * The fields of the entity as a table, in the Fields section, with Add field on the right of its heading. A row reads the
- * field's name as a link with its layer mark, its label and its type, and the name opens the field drawer, which holds
- * the field's inputs, see docs/reference/entity-designer.md#field-drawer. Every cell is a memo component of stable
+ * field's name as a link with its layer mark, its label, its type in words, Required and Unique as Yes or No, and its
+ * properties as tags, see docs/reference/entity-designer.md#fields. The name opens the field drawer, which holds the
+ * field's inputs, see docs/reference/entity-designer.md#field-drawer. Every cell is a memo component of stable
  * props, so a key in one row draws that row's cells and no other. Only the row has an id in the table, so a diagnostic
- * inside a field opens at its row. The table has a Filter on Name, Label and Type, kept in the address as
+ * inside a field opens at its row. The table has a Filter on Name, Label, Type, Required and Unique, kept in the address as
  * `fields.filter`. A filter only hides rows: every row shows on one page, an edit to a hidden row stays in the draft, and
  * a field whose origin is `null`, one added since the last save, stays shown. Add field opens the new field's drawer.
  * Move up and Move down keep the open drawer on its field at the field's new index, and Remove closes the drawer only
@@ -409,14 +470,22 @@ const Fields = memo(function Fields({
     },
     {
       key: 'type',
-      kind: 'fixed',
+      kind: 'freeText',
       title: t('shell.studio.entity.fieldType'),
       filter: {
         kind: 'enum',
         value: ({ field }) => text(isContent(field) ? field.type : undefined) || null,
         options: fieldTypes.map((option) => ({ value: option, label: option })),
       },
-      render: (_, { field }) => text(isContent(field) ? field.type : undefined) || null,
+      render: (_, { field }) => <TypeCell field={field} />,
+    },
+    yesNoColumn('required', t('shell.studio.entity.required'), t),
+    yesNoColumn('unique', t('shell.studio.entity.unique'), t),
+    {
+      key: 'properties',
+      kind: 'fixed',
+      title: t('shell.studio.entity.properties'),
+      render: (_, { field }) => <PropertiesCell field={field} />,
     },
   ]
 
@@ -525,9 +594,51 @@ const LabelCell = memo(function LabelCell({ field }: { field: unknown }) {
   const label = isContent(field) ? field.label : undefined
   const key = (isContent(label) ? text(label.textKey) : '') || undefined
   if (key === undefined) {
-    return null
+    return <EmptyDash />
   }
   return (names && labelText(names, key, locale)) || key
+})
+
+/**
+ * The type of a field in words. For a reference, references or child collection, the target's label fills in its
+ * place, or the target's name where the entity has no label. The target is matched by name, ignoring letter case, and a
+ * name the application does not have reads as written. A type the designer does not know reads as written too, see
+ * docs/reference/entity-designer.md#fields.
+ */
+const TypeCell = memo(function TypeCell({ field }: { field: unknown }) {
+  const t = useText()
+  const names = useContext(StudioNamesContext)
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const type = text(isContent(field) ? field.type : undefined)
+  if (type === '') {
+    return <EmptyDash />
+  }
+  if (!(fieldTypes as readonly string[]).includes(type)) {
+    return type
+  }
+  const target = text(isContent(field) ? field.target : undefined)
+  if (target === '') {
+    return <FilledText text={t(`shell.studio.entity.typeOf.${type}`)} parts={{ target: <EmptyDash /> }} />
+  }
+  const entity = names?.entities.find((other) => other.name.toLowerCase() === target.toLowerCase())
+  const label = names && entity ? labelText(names, entity.labelKey, locale) : undefined
+  return <FilledText text={t(`shell.studio.entity.typeOf.${type}`)} parts={{ target: label || target }} />
+})
+
+/** The properties of a field as tags, or the dash when it has none, see docs/reference/entity-designer.md#fields. */
+const PropertiesCell = memo(function PropertiesCell({ field }: { field: unknown }) {
+  const t = useText()
+  const properties = fieldProperties(field)
+  if (properties.length === 0) {
+    return <EmptyDash />
+  }
+  return (
+    <Flex gap="small" wrap>
+      {properties.map((name) => (
+        <Tag key={name}>{t(`shell.studio.entity.property.${name}`)}</Tag>
+      ))}
+    </Flex>
+  )
 })
 
 /**
