@@ -177,10 +177,11 @@ A site belongs to one application, and its `path` and locales are checked here.
   [contrast thresholds](frontend.md#design-tokens-and-previews) in either mode. Those are `primaryText` at 4.5:1 on
   `surface` and `canvas`, `onPrimary` at 4.5:1 on `primary`, and `focusRing` at 3:1 on `surface` and `canvas`. The rule
   is [D159](../decisions/d159-pages-show-related-lists-boards-and-calendars-forms-take-context-and-drafts-and-each-site-has-its-brand.md).
-- **Record pages** _(planned)_. Each `recordPages` key names a loaded entity. Its value names a loaded page of the
+- **Record pages**. Each `recordPages` key names a loaded entity. Its value names a loaded page of the
   application that opens a record of that entity at `/{site}/{page}/{id}`, through a `form` or `detail` widget over
-  that entity. The page needs no required page parameter except the detail's `record`. Otherwise the entry is refused
-  at `/recordPages/<entity>`, with no code. The rule is
+  that entity. The page needs no required page parameter except the detail's `record`. A second key that names the
+  same entity, ignoring letter case, is refused too. Otherwise the entry is refused
+  at `/recordPages/<entity>` as `AXC0396`. The rule is
   [D162](../decisions/d162-each-entitys-records-open-on-one-record-page-in-each-site.md).
 
 ### Pages and widgets

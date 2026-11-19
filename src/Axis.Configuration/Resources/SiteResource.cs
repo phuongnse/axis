@@ -20,4 +20,10 @@ public sealed record SiteResource : Resource
     /// provider of the application.
     /// </summary>
     public IReadOnlyList<string>? SignIn { get; init; }
+
+    /// <summary>
+    /// The page that opens each entity's records, by entity name and page name. The compiler checks that each
+    /// names a loaded entity and a page with a form or detail over it. Null names none.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? RecordPages { get; init; }
 }

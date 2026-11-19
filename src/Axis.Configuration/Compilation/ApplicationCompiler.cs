@@ -1023,7 +1023,7 @@ public static partial class ApplicationCompiler
             Manifest = loaded.Application,
             TimeZone = timeZone,
             Entities = entities,
-            Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName, loaded.IdentityProviders)).ToList(),
+            Sites = loaded.Sites.Select(site => BuildSite(site, entitiesByName, pagesByName, loaded.IdentityProviders)).ToList(),
             Pages = loaded.Pages.Select(page => BuildPage(pagesByName[page.Name], entitiesByName, pagesByName, dataSourcesByName, formsByName, processesByName)).ToList(),
             Texts = texts,
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
@@ -3290,6 +3290,7 @@ public static partial class ApplicationCompiler
 
     private static SiteModel BuildSite(
         SiteResource site,
+        Dictionary<string, EntityResource> entitiesByName,
         Dictionary<string, PageResource> pagesByName,
         IReadOnlyList<IdentityProviderResource> providers) =>
         new()
@@ -3303,6 +3304,11 @@ public static partial class ApplicationCompiler
             File = site.File,
             Navigation = site.Navigation
                 .Select(entry => new NavigationModel(PageReferenceTo(pagesByName[entry.Page]), entry.Label, entry.Icon))
+                .ToList(),
+            // The checker has resolved every entity and page that recordPages names, so the lookups always succeed.
+            RecordPages = (site.RecordPages ?? new Dictionary<string, string>())
+                .Select(entry => (Entity: entitiesByName[entry.Key], Page: pagesByName[entry.Value]))
+                .Select(entry => new SiteRecordPageModel(new EntityReference(entry.Entity.Id, entry.Entity.Name), PageReferenceTo(entry.Page)))
                 .ToList(),
             // The checker has resolved every name in signIn, so the lookup always succeeds.
             SignIn = site.SignIn is { } names

@@ -56,7 +56,26 @@ public static class ApplicationSites
             site.Title.TextKey,
             new SiteLocales(site.Locales.Default, site.Locales.Fallback, site.Locales.Available),
             [.. site.Navigation.Select(entry => new SiteNavigationItem(entry.Page.Name, entry.Label.TextKey, entry.Icon))],
-            $"/api/apps/{application.Manifest.Name}/notifications");
+            $"/api/apps/{application.Manifest.Name}/notifications",
+            RecordPages(application, site));
+    }
+
+    /// <summary>
+    /// The address of the record page of each entity that has records of its own, in the order of the application's entities.
+    /// A child entity has none. The endpoint leaves out the entities the user cannot read.
+    /// </summary>
+    private static Dictionary<string, string> RecordPages(ApplicationModel application, SiteModel site)
+    {
+        var recordPages = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var entity in application.Entities.Where(entity => !application.IsChildEntity(entity)))
+        {
+            var named = site.RecordPages.FirstOrDefault(entry => entry.Entity.Id == entity.Id);
+            recordPages[entity.Name] = named is not null
+                ? $"/{site.Path}/{named.Page.Name.ToLowerInvariant()}"
+                : $"/{site.Path}/records/{entity.Name.ToLowerInvariant()}";
+        }
+
+        return recordPages;
     }
 
     /// <summary>The texts of <paramref name="locale"/>, ignoring letter case, or null when the application has none.</summary>

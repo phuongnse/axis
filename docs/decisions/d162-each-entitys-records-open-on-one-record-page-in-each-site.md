@@ -18,7 +18,7 @@ page that is.
 - **An entity with no named page opens on the default record page** _(planned)_. Its address is
   `/{site}/records/{entity}/{id}`, and it shows the entity's form over every field, as [routing](../reference/frontend.md#routing)
   says.
-- **The site lists the record page of each entity the person may read** _(planned)_. `GET /api/sites/{path}` gives
+- **The site lists the record page of each entity the person may read**. `GET /api/sites/{path}` gives
   `recordPages` for those entities only, as [site endpoints](../reference/frontend.md#site-endpoints) says, so the SPA
   links only what the person can open.
 - **A record page reads under the person's grants** _(planned)_. It reads the record through the record API, so it

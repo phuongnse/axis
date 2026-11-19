@@ -1576,6 +1576,8 @@
   "shell.studio.field.site.locales.fallback.help": "The language a text falls back to when it has no translation in the visitor's language.",
   "shell.studio.field.site.locales.available": "Available",
   "shell.studio.field.site.locales.available.help": "The languages that visitors can choose from.",
+  "shell.studio.field.site.recordPages": "Record pages",
+  "shell.studio.field.site.recordPages.help": "The page that opens each entity's records in this site.",
   "shell.studio.field.site.navigation": "Navigation",
   "shell.studio.field.site.navigation.help": "The pages in the site's menu, in order.",
   "shell.studio.field.site.navigation.page": "Page",
