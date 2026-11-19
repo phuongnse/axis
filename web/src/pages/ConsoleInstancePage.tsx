@@ -16,7 +16,8 @@ type InstanceState = InstanceDetail | null | typeof forbidden | 'failed'
  * One instance of the operator console, opened from an entry of Failed work. It shows the same steps, history, tasks
  * and calls as the process inspector, from `GET /api/console/instances/{id}`. The page is outside every site, so it has
  * no release texts and shows the names of the steps. The detail offers the commands the server lists, which the
- * operator sends to the console routes. A user without the operator role sees the forbidden page.
+ * operator sends to the console routes. It is headed by its process's name, with Instance as its line, see
+ * docs/reference/shell.md#page-header. A user without the operator role sees the forbidden page.
  */
 export function ConsoleInstancePage() {
   const t = useText()
@@ -45,7 +46,8 @@ export function ConsoleInstancePage() {
 
   return (
     <PageLayout
-      title={t('shell.console.instance.title')}
+      title={typeof instance === 'object' && instance !== null ? instance.process : id}
+      line={t('shell.console.instance.kind')}
       breadcrumb={[
         { label: t(platform.site.titleKey), to: '/' },
         { label: t('shell.console.title'), to: '/console' },

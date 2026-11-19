@@ -124,7 +124,7 @@ describe('StudioPackagePage', () => {
     stubPackages()
     renderInRouter(<StudioPackagePage application="Shop" packageId="tools" folderRevision={0} />)
 
-    expect(await screen.findByRole('heading', { level: 4, name: 'Purchasing tools' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Purchasing tools' })).toBeInTheDocument()
     const table = screen.getByTestId('studio-package-files')
     expect(
       within(table)
@@ -138,7 +138,7 @@ describe('StudioPackagePage', () => {
     stubPackages()
     renderInRouter(<StudioPackagePage application="Shop" packageId="broken" folderRevision={0} />)
 
-    expect(await screen.findByRole('heading', { level: 4, name: 'broken' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'broken' })).toBeInTheDocument()
   })
 
   it('warns when the application has no such package', async () => {

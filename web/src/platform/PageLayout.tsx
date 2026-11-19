@@ -1,5 +1,6 @@
 import { Breadcrumb, Flex, Typography } from 'antd'
-import type { ReactNode } from 'react'
+import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -10,32 +11,85 @@ export interface BreadcrumbStep {
   to?: string
 }
 
+/** The element of the page's heading that {@link PageActions} draws into: `null` before it is drawn, `undefined` outside a page. */
+const ActionsSlot = createContext<HTMLElement | null | undefined>(undefined)
+
 /**
- * The layout of a page: its title as the page's level-one heading, drawn at the size of a level-four one, with
- * the page's sections stacked below it. With a breadcrumb, the title sits under it in a band on the surface colour that spans the page area, and
- * the last step is marked as the current page. It replaces the old page container. Pages add no
- * spacing or styling of their own.
+ * The layout of a page, see docs/reference/shell.md#page-header: its title as the page's level-one heading, drawn at the
+ * size of a level-four one, with its `tags` beside it and its `line`, the kind of the thing, under it in `textMuted`,
+ * and the page's sections stacked below. The page's own actions sit on the heading's right, which any component inside
+ * the page fills through {@link PageActions}. With a breadcrumb, the heading sits under it in a band on the surface colour
+ * that spans the page area, and the last step is marked as the current page. It replaces the old page container. Pages
+ * add no spacing or styling of their own.
  */
 export function PageLayout({
   title,
+  tags,
+  line,
   breadcrumb,
   children,
 }: {
   title: string
+  /** The state of the thing, as `StatusTag`s beside the title. */
+  tags?: ReactNode
+  /** The kind of the thing alone, under the title. Empty draws nothing. */
+  line?: string | null
   breadcrumb?: readonly BreadcrumbStep[]
-  children: ReactNode
+  children?: ReactNode
 }) {
-  const heading = (
-    // Level one for the outline, at the 20px and 28px that a level-four heading has.
-    <Typography.Title level={1} style={{ margin: 0, fontSize: 20, lineHeight: '28px' }}>
-      {title}
-    </Typography.Title>
-  )
+  const [slot, setSlot] = useState<HTMLElement | null>(null)
+  const heading = <PageHeading title={title} tags={tags} line={line} setActionsSlot={setSlot} />
 
   return (
-    <Flex vertical gap="middle">
-      {breadcrumb ? <HeaderBand steps={breadcrumb}>{heading}</HeaderBand> : heading}
-      {children}
+    <ActionsSlot.Provider value={slot}>
+      <Flex vertical gap="middle">
+        {breadcrumb ? <HeaderBand steps={breadcrumb}>{heading}</HeaderBand> : heading}
+        {children}
+      </Flex>
+    </ActionsSlot.Provider>
+  )
+}
+
+/**
+ * The page's own actions, drawn on the right of its heading from wherever in the page they are written, so a widget
+ * fills it as a page does, see docs/reference/shell.md#page-header. Outside a `PageLayout` they draw where they stand.
+ */
+export function PageActions({ children }: { children: ReactNode }) {
+  const slot = useContext(ActionsSlot)
+  if (slot === undefined) return <>{children}</>
+  return slot ? createPortal(children, slot) : null
+}
+
+/**
+ * The heading of a page that shows one thing, which only {@link PageLayout} draws, so a page never does: the title with its tags beside it, the
+ * line under it and the actions' slot on the right.
+ */
+export function PageHeading({
+  title,
+  tags,
+  line,
+  setActionsSlot,
+}: {
+  title: string
+  tags?: ReactNode
+  line?: string | null
+  setActionsSlot: (slot: HTMLElement | null) => void
+}) {
+  const { colour } = useDesignTokens()
+
+  return (
+    <Flex justify="space-between" align="center" gap="middle" data-testid="page-heading">
+      <Flex vertical style={{ minWidth: 0 }}>
+        <Flex gap="small" align="center">
+          {/* Level one for the outline, at the 20px and 28px that a level-four heading has. */}
+          <Typography.Title level={1} style={{ margin: 0, fontSize: 20, lineHeight: '28px' }}>
+            {title}
+          </Typography.Title>
+          {tags}
+        </Flex>
+        {line ? <Typography.Text style={{ color: colour.textMuted }}>{line}</Typography.Text> : null}
+      </Flex>
+      <div data-testid="page-actions" ref={setActionsSlot} />
     </Flex>
   )
 }

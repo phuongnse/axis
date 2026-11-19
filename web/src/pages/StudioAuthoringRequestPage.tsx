@@ -6,6 +6,7 @@ import { AxisButton, type AxisFoldAction } from '../platform/AxisButton'
 import { FilledText } from '../platform/FilledText'
 import { fillText } from '../platform/fillText'
 import { formatValue } from '../platform/formatValue'
+import { PageLayout } from '../platform/PageLayout'
 import { ReasonDialog } from '../platform/ReasonDialog'
 import { StatusTag } from '../platform/StatusTag'
 import { useStudioConnection } from '../platform/studioConnection'
@@ -35,7 +36,6 @@ import {
   requestResult,
 } from './studioAuthoringRequest'
 import { StudioAuthoringRequestResult } from './StudioAuthoringRequestResult'
-import { StudioPageHeading } from './StudioPageHeading'
 import { StudioRequestStatus } from './StudioRequestStatus'
 
 const workingStates: ReadonlySet<AuthoringRequestState> = new Set<AuthoringRequestState>([
@@ -239,118 +239,119 @@ export function StudioAuthoringRequestPage({
   }
 
   return (
-    <Flex vertical gap={spacing.xs} data-testid="studio-ai-request">
-      <StudioPageHeading
+    <div data-testid="studio-ai-request">
+      <PageLayout
         title={requestName(request.text)}
         tags={
           <StatusTag tone={state.tone} data-testid="studio-ai-request-state">
             {t(state.word)}
           </StatusTag>
         }
-      />
-      <Typography.Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{request.text}</Typography.Paragraph>
-      <Typography.Text style={{ color: colour.textMuted }}>{sender}</Typography.Text>
-      {actionError && (
-        <AxisAlert data-testid="studio-ai-request-error" kind="error" message={t('shell.studio.aiRequest.failed')} />
-      )}
-      {(request.state === 'planning' || request.plan !== null) && (
-        <Flex vertical gap={spacing.xs} data-testid="studio-ai-request-plan">
-          <Typography.Text strong>{t('shell.studio.aiRequest.plan')}</Typography.Text>
-          {request.state === 'planning' ? (
-            <Flex gap="small" align="center">
-              <Spin size="small" />
-              <Typography.Text>{t('shell.studio.aiRequest.plan.writing')}</Typography.Text>
-            </Flex>
-          ) : (
-            <Typography.Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{request.plan}</Typography.Paragraph>
-          )}
-        </Flex>
-      )}
-      {result.failureKey !== null && (
-        <AxisAlert
-          kind="error"
-          data-testid="studio-ai-request-failure"
-          message={t('shell.studio.aiRequest.failure')}
-          description={t(result.failureKey)}
-        />
-      )}
-      {showResult && <StudioAuthoringRequestResult application={application} request={request} isAuthor={isAuthor} />}
-      {followed !== null &&
-        (conflicted ? (
-          <AcceptConflict conflicts={conflicts} resources={resources} />
-        ) : (
-          <StudioRequestStatus request={followed} releaseNumber={null} />
-        ))}
-      {words !== null && (
-        <ActionBar
-          docked
-          data-testid="studio-ai-request-guide"
-          start={<span>{t(words)}</span>}
-          fold={fold}
-          end={
-            isAuthor && request.state === 'awaitingApproval' ? (
-              <AxisButton
-                role="finish"
-                data-testid="studio-ai-request-approve"
-                disabled={acting}
-                onClick={() => void act(() => approveAuthoringRequest(application, requestId), adopt)}
-              >
-                {t('shell.studio.aiRequest.approve')}
-              </AxisButton>
-            ) : isAuthor && request.state === 'ready' && !accepting && !conflicted ? (
-              <AxisButton
-                role="finish"
-                data-testid="studio-ai-request-accept"
-                disabled={acting}
-                onClick={() =>
-                  void act(
-                    () => acceptAuthoringRequest(application, requestId),
-                    (sent) => setAccept({ requestId, value: sent }),
-                  )
-                }
-              >
-                {t('shell.studio.aiRequest.accept')}
-              </AxisButton>
-            ) : undefined
-          }
-        />
-      )}
-      {changePlanOpen && (
-        <ReasonDialog
-          size="medium"
-          title={t('shell.studio.aiRequest.changePlan.title')}
-          label={t('shell.studio.aiRequest.changePlan.label')}
-          help=""
-          okText={t('shell.studio.aiRequest.changePlan.send')}
-          cancelText={t('shell.studio.cancel')}
-          requiredMessage={t('shell.studio.aiRequest.changePlan.required')}
-          tooLongMessage={t('shell.studio.aiRequest.changePlan.tooLong')}
-          maxLength={2000}
-          failedText={t('shell.studio.aiRequest.failed')}
-          onSend={async (comment) => {
-            adopt(await changeAuthoringRequestPlan(application, requestId, comment))
-            return { ok: true }
-          }}
-          onClose={() => setChangePlanOpen(false)}
-          onChanged={() => setActionError(false)}
-        />
-      )}
-      <Modal
-        open={dropOpen}
-        width={size.dialog.small}
-        title={t('shell.studio.aiRequest.drop.title')}
-        okText={t('shell.studio.aiRequest.drop.confirm')}
-        okButtonProps={{ danger: true }}
-        cancelText={t('shell.studio.cancel')}
-        onOk={() => {
-          setDropOpen(false)
-          void act(() => dropAuthoringRequest(application, requestId), adopt)
-        }}
-        onCancel={() => setDropOpen(false)}
       >
-        {t('shell.studio.aiRequest.drop.body')}
-      </Modal>
-    </Flex>
+        <Typography.Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{request.text}</Typography.Paragraph>
+        <Typography.Text style={{ color: colour.textMuted }}>{sender}</Typography.Text>
+        {actionError && (
+          <AxisAlert data-testid="studio-ai-request-error" kind="error" message={t('shell.studio.aiRequest.failed')} />
+        )}
+        {(request.state === 'planning' || request.plan !== null) && (
+          <Flex vertical gap={spacing.xs} data-testid="studio-ai-request-plan">
+            <Typography.Text strong>{t('shell.studio.aiRequest.plan')}</Typography.Text>
+            {request.state === 'planning' ? (
+              <Flex gap="small" align="center">
+                <Spin size="small" />
+                <Typography.Text>{t('shell.studio.aiRequest.plan.writing')}</Typography.Text>
+              </Flex>
+            ) : (
+              <Typography.Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{request.plan}</Typography.Paragraph>
+            )}
+          </Flex>
+        )}
+        {result.failureKey !== null && (
+          <AxisAlert
+            kind="error"
+            data-testid="studio-ai-request-failure"
+            message={t('shell.studio.aiRequest.failure')}
+            description={t(result.failureKey)}
+          />
+        )}
+        {showResult && <StudioAuthoringRequestResult application={application} request={request} isAuthor={isAuthor} />}
+        {followed !== null &&
+          (conflicted ? (
+            <AcceptConflict conflicts={conflicts} resources={resources} />
+          ) : (
+            <StudioRequestStatus request={followed} releaseNumber={null} />
+          ))}
+        {words !== null && (
+          <ActionBar
+            docked
+            data-testid="studio-ai-request-guide"
+            start={<span>{t(words)}</span>}
+            fold={fold}
+            end={
+              isAuthor && request.state === 'awaitingApproval' ? (
+                <AxisButton
+                  role="finish"
+                  data-testid="studio-ai-request-approve"
+                  disabled={acting}
+                  onClick={() => void act(() => approveAuthoringRequest(application, requestId), adopt)}
+                >
+                  {t('shell.studio.aiRequest.approve')}
+                </AxisButton>
+              ) : isAuthor && request.state === 'ready' && !accepting && !conflicted ? (
+                <AxisButton
+                  role="finish"
+                  data-testid="studio-ai-request-accept"
+                  disabled={acting}
+                  onClick={() =>
+                    void act(
+                      () => acceptAuthoringRequest(application, requestId),
+                      (sent) => setAccept({ requestId, value: sent }),
+                    )
+                  }
+                >
+                  {t('shell.studio.aiRequest.accept')}
+                </AxisButton>
+              ) : undefined
+            }
+          />
+        )}
+        {changePlanOpen && (
+          <ReasonDialog
+            size="medium"
+            title={t('shell.studio.aiRequest.changePlan.title')}
+            label={t('shell.studio.aiRequest.changePlan.label')}
+            help=""
+            okText={t('shell.studio.aiRequest.changePlan.send')}
+            cancelText={t('shell.studio.cancel')}
+            requiredMessage={t('shell.studio.aiRequest.changePlan.required')}
+            tooLongMessage={t('shell.studio.aiRequest.changePlan.tooLong')}
+            maxLength={2000}
+            failedText={t('shell.studio.aiRequest.failed')}
+            onSend={async (comment) => {
+              adopt(await changeAuthoringRequestPlan(application, requestId, comment))
+              return { ok: true }
+            }}
+            onClose={() => setChangePlanOpen(false)}
+            onChanged={() => setActionError(false)}
+          />
+        )}
+        <Modal
+          open={dropOpen}
+          width={size.dialog.small}
+          title={t('shell.studio.aiRequest.drop.title')}
+          okText={t('shell.studio.aiRequest.drop.confirm')}
+          okButtonProps={{ danger: true }}
+          cancelText={t('shell.studio.cancel')}
+          onOk={() => {
+            setDropOpen(false)
+            void act(() => dropAuthoringRequest(application, requestId), adopt)
+          }}
+          onCancel={() => setDropOpen(false)}
+        >
+          {t('shell.studio.aiRequest.drop.body')}
+        </Modal>
+      </PageLayout>
+    </div>
   )
 }
 

@@ -201,7 +201,7 @@ test('the operator exports the tenant over its quota, downloads the ZIP after th
   await confirmDialog(page, 'Delete')
   await expect(jobs.getByRole('row').nth(1)).toContainText('delete', { timeout: 60_000 })
   await expect(jobs.getByRole('row').nth(1)).toContainText('Succeeded', { timeout: 60_000 })
-  await expect(page.getByTestId('cell-tenant')).toContainText('Deleting', { timeout: 60_000 })
+  await expect(page.getByTestId('page-heading')).toContainText('Deleting', { timeout: 60_000 })
 })
 
 test('after the purge the host of the deleted tenant answers 404 and the other tenant still answers', async () => {

@@ -3,10 +3,12 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
+import { NotSet } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { useText } from '../platform/texts'
 import { StatusTag } from '../platform/StatusTag'
+import { TermList } from '../platform/TermList'
 import { useDesignTokens } from '../platform/themeMode'
 import { changeUserRole, fetchUserRoles, type RoleChange, type UserRoles } from '../platform/users'
 import { usePlatform } from './context'
@@ -37,8 +39,8 @@ interface Pending {
 type Problem = 'forbidden' | 'conflict' | 'loadFailed' | 'changeFailed'
 
 /**
- * The page of one user, opened from the name on the users page. Its title is the person's display name, with the email
- * under it. Below are the roles given to the person and the roles that can be given, one section for each active
+ * The page of one user, opened from the name on the users page. Its title is the person's display name, with User as its
+ * line, see docs/reference/shell.md#page-header. Its first part is the email as a fact. Below are the roles given to the person and the roles that can be given, one section for each active
  * application and one for the platform. A role the active release no longer declares is tagged. Give and Remove ask for
  * a confirmation, then call the role routes and load the roles again. A refusal shows its reason. The page loads
  * everything from the roles route, so a reload or a shared link shows it. A person without user administration sees that
@@ -112,6 +114,7 @@ export function UserPage() {
   return (
     <PageLayout
       title={roles?.displayName ?? t('shell.users.title')}
+      line={roles ? t('shell.users.user.kind') : null}
       breadcrumb={[
         { label: t(platform.site.titleKey), to: '/' },
         { label: t('shell.users.title'), to: '/users' },
@@ -125,15 +128,15 @@ export function UserPage() {
       )}
       {!refusal && (
         <Flex vertical gap="middle" data-testid="user-roles">
-          {roles && (
-            <Typography.Text data-testid="user-email">
-              {t('shell.users.email')}: {roles.email ?? t('shell.value.notSet')}
-            </Typography.Text>
-          )}
           {problem && (
             <AxisAlert data-testid="user-roles-problem" kind="error" message={t(`shell.users.roles.${problem}`)} />
           )}
           <SectionParts>
+            {roles && (
+              <SectionPart testId="user-email">
+                <TermList terms={[{ key: 'email', term: t('shell.users.email'), value: roles.email ?? <NotSet /> }]} />
+              </SectionPart>
+            )}
             {sections.map((section) => (
               <SectionPart key={section.key} testName={`user-roles-${section.key}`} heading={{ title: section.title }}>
                 <Flex vertical gap="small">

@@ -157,9 +157,10 @@ afterEach(() => {
   localStorage.clear()
 })
 
+/** The fact of the page's first part, a term over its value. */
 function fact(name: string) {
-  const label = screen.getByText(name, { selector: '.ant-descriptions-item-label' })
-  return within(label.closest('.ant-descriptions-item') as HTMLElement)
+  const term = within(screen.getByTestId('studio-section-facts')).getByText(name, { selector: 'dt' })
+  return within(term.parentElement as HTMLElement)
 }
 
 describe('StudioReleasePage', () => {
@@ -167,13 +168,13 @@ describe('StudioReleasePage', () => {
     answer(release)
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Release 3' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Release 3' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-heading')).getByText('Release', { exact: true })).toBeInTheDocument()
     expect(screen.getByTestId('release-off-standard')).toHaveTextContent('Off-standard')
     expect(screen.queryByText('Live')).not.toBeInTheDocument()
     expect(screen.queryByTestId('release-relaxed-point')).not.toBeInTheDocument()
 
     for (const name of [
-      'Details',
       'Relaxed points',
       'If you activate it, compared with live release 4',
       'Modules and packages',
@@ -181,7 +182,8 @@ describe('StudioReleasePage', () => {
     ]) {
       expect(screen.getByRole('region', { name })).toBeInTheDocument()
     }
-    expect(section('Details').getByText('Label')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Details' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('studio-section-facts')).toBeInTheDocument()
     expect(fact('Label').getByText('Third')).toBeInTheDocument()
     expect(fact('Status').getByText(`Replaced on ${time('2026-05-05T10:00:00Z')}`)).toBeInTheDocument()
     expect(fact('Published').getByText(time('2026-05-02T10:00:00Z'))).toBeInTheDocument()
@@ -287,7 +289,7 @@ describe('StudioReleasePage', () => {
     renderPage({ number: '4' })
 
     expect(await screen.findByRole('heading', { name: 'Release 4' })).toBeInTheDocument()
-    expect(screen.getByText('Live')).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-heading')).getByText('Live')).toBeInTheDocument()
     expect(screen.queryByTestId('release-off-standard')).not.toBeInTheDocument()
     expect(fact('Status').getByText(`Live since ${time('2026-05-05T10:00:00Z')}`)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Changes from release 3' })).toBeInTheDocument()
@@ -474,6 +476,14 @@ describe('StudioReleasePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Activate' }))
 
     await waitFor(() => expect(onActivate).toHaveBeenCalledWith('r3'))
+  })
+
+  it('puts Activate… in the page actions on the right of the heading', async () => {
+    answer(release)
+    renderPage()
+
+    const actions = within(await screen.findByTestId('page-actions'))
+    expect(await actions.findByRole('button', { name: 'Activate…' })).toBeInTheDocument()
   })
 
   it('turns Activate… off while a request runs', async () => {

@@ -1,4 +1,4 @@
-import { Descriptions, Flex, Spin, Typography } from 'antd'
+import { Flex, Spin, Typography } from 'antd'
 import { type HTMLAttributes, useContext, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
@@ -6,6 +6,7 @@ import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyState } from '../platform/EmptyState'
 import { EmptyDash } from '../platform/EmptyValue'
 import { sortByName } from '../platform/listOrder'
+import { PageActions, PageLayout } from '../platform/PageLayout'
 import { ReleaseOffStandard } from '../platform/ReleaseOffStandard'
 import {
   changeRows,
@@ -29,9 +30,9 @@ import { useTableView } from '../platform/useTableView'
 import { PlatformContext } from './context'
 import { relaxedPointLabel } from './relaxEntries'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { TermList } from '../platform/TermList'
 import { StudioActivateDialog, StudioLiveTag, StudioReleaseBlockers } from './StudioReleases'
 import { StudioChangeList } from './StudioChangeList'
-import { StudioPageHeading } from './StudioPageHeading'
 
 /** One activation of the release, as a row of the Activations table. */
 interface ActivationRow {
@@ -205,7 +206,6 @@ function ReleaseContent({
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const { spacing } = useDesignTokens()
   const time = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' })
   const format = (value: string) => time.format(new Date(value))
   const partView = useTableView(partFields, recordPageSize, noParameters, false, true)
@@ -316,8 +316,8 @@ function ReleaseContent({
   ]
 
   return (
-    <Flex vertical gap={spacing.lg} data-testid="studio-release">
-      <StudioPageHeading
+    <div data-testid="studio-release">
+      <PageLayout
         title={t('shell.studio.release.title').replace('{release}', String(release.number))}
         tags={
           <>
@@ -325,9 +325,10 @@ function ReleaseContent({
             <ReleaseOffStandard tagOnly relaxed={first.relaxed} locale={locale} />
           </>
         }
-        actions={
-          canActivate &&
-          !release.live && (
+        line={t('shell.studio.release.kind')}
+      >
+        {canActivate && !release.live && (
+          <PageActions>
             <AxisButton
               role="secondary"
               data-testid="studio-release-activate"
@@ -336,82 +337,81 @@ function ReleaseContent({
             >
               {t('shell.studio.activate.button')}
             </AxisButton>
-          )
-        }
-      />
-      {!release.live && release.blockers.length > 0 && history.active && (
-        <StudioReleaseBlockers
-          release={release.number}
-          liveNumber={history.active.number}
-          blockers={release.blockers}
-        />
-      )}
-      <SectionParts>
-        <SectionPart testName="details" heading={{ title: t('shell.studio.release.details') }}>
-          <Descriptions
-            column={1}
-            items={[
-              { key: 'label', label: t('shell.studio.releases.label'), children: first.label || <EmptyDash /> },
-              { key: 'status', label: t('shell.studio.release.status'), children: status ?? <EmptyDash /> },
-              { key: 'published', label: t('shell.studio.releases.published'), children: format(first.activatedAt) },
-              {
-                key: 'publishedBy',
-                label: t('shell.studio.releases.publishedBy'),
-                children: releasePublisher(first, t),
-              },
-              { key: 'note', label: t('shell.studio.releases.note'), children: first.note || <EmptyDash /> },
-            ]}
-          />
-        </SectionPart>
-        {release.modules.length > 0 && (
-          <SectionPart testName="relaxed" heading={{ title: t('shell.studio.release.relaxed') }}>
-            <RelaxedPoints relaxed={first.relaxed} locale={locale} />
-          </SectionPart>
+          </PageActions>
         )}
-        <SectionPart testName="changes" heading={{ title: compareTitle(release, t) }}>
-          {release.previous === null || release.changes === null ? (
-            <Typography.Text>{t('shell.studio.release.changes.first')}</Typography.Text>
-          ) : (
-            <>
-              {release.changes.length === 0 && (
-                <EmptyState
-                  text={t('shell.studio.release.changes.none').replace('{previous}', String(release.previous))}
-                />
-              )}
-              <StudioChangeList
-                plainChanged
-                rows={changeRows(release.changes, resources, locale, t)}
-                parts={release.partChanges ?? []}
-                application={application}
-              />
-            </>
+        {!release.live && release.blockers.length > 0 && history.active && (
+          <StudioReleaseBlockers
+            release={release.number}
+            liveNumber={history.active.number}
+            blockers={release.blockers}
+          />
+        )}
+        <SectionParts>
+          <SectionPart testName="facts">
+            <TermList
+              terms={[
+                { key: 'label', term: t('shell.studio.releases.label'), value: first.label || <EmptyDash /> },
+                { key: 'status', term: t('shell.studio.release.status'), value: status ?? <EmptyDash /> },
+                { key: 'published', term: t('shell.studio.releases.published'), value: format(first.activatedAt) },
+                {
+                  key: 'publishedBy',
+                  term: t('shell.studio.releases.publishedBy'),
+                  value: releasePublisher(first, t),
+                },
+                { key: 'note', term: t('shell.studio.releases.note'), value: first.note || <EmptyDash /> },
+              ]}
+            />
+          </SectionPart>
+          {release.modules.length > 0 && (
+            <SectionPart testName="relaxed" heading={{ title: t('shell.studio.release.relaxed') }}>
+              <RelaxedPoints relaxed={first.relaxed} locale={locale} />
+            </SectionPart>
           )}
-        </SectionPart>
-        <SectionPart testName="parts" heading={{ title: t('shell.studio.release.parts') }}>
-          <AxisTable<PartRow>
-            columns={partColumns}
-            rowKey={(row) => row.key}
-            dataSource={parts}
-            loading={false}
-            emptyText={t('shell.studio.release.parts.none')}
-            view={{ query: partView.view, onChange: partView.setView }}
-            toolbar={{}}
-          />
-        </SectionPart>
-        <SectionPart testName="activations" heading={{ title: t('shell.studio.release.activations') }}>
-          <AxisTable<ActivationRow>
-            columns={activationColumns}
-            rowKey={(row) => row.key}
-            dataSource={activations}
-            loading={false}
-            emptyText={t('shell.studio.releases.empty')}
-            view={{ query: activationView.view, onChange: activationView.setView }}
-            toolbar={{}}
-            rowAttributes={() => ({ 'data-testid': 'studio-release-activation' }) as HTMLAttributes<HTMLElement>}
-          />
-        </SectionPart>
-      </SectionParts>
-    </Flex>
+          <SectionPart testName="changes" heading={{ title: compareTitle(release, t) }}>
+            {release.previous === null || release.changes === null ? (
+              <Typography.Text>{t('shell.studio.release.changes.first')}</Typography.Text>
+            ) : (
+              <>
+                {release.changes.length === 0 && (
+                  <EmptyState
+                    text={t('shell.studio.release.changes.none').replace('{previous}', String(release.previous))}
+                  />
+                )}
+                <StudioChangeList
+                  plainChanged
+                  rows={changeRows(release.changes, resources, locale, t)}
+                  parts={release.partChanges ?? []}
+                  application={application}
+                />
+              </>
+            )}
+          </SectionPart>
+          <SectionPart testName="parts" heading={{ title: t('shell.studio.release.parts') }}>
+            <AxisTable<PartRow>
+              columns={partColumns}
+              rowKey={(row) => row.key}
+              dataSource={parts}
+              loading={false}
+              emptyText={t('shell.studio.release.parts.none')}
+              view={{ query: partView.view, onChange: partView.setView }}
+              toolbar={{}}
+            />
+          </SectionPart>
+          <SectionPart testName="activations" heading={{ title: t('shell.studio.release.activations') }}>
+            <AxisTable<ActivationRow>
+              columns={activationColumns}
+              rowKey={(row) => row.key}
+              dataSource={activations}
+              loading={false}
+              emptyText={t('shell.studio.releases.empty')}
+              view={{ query: activationView.view, onChange: activationView.setView }}
+              toolbar={{}}
+              rowAttributes={() => ({ 'data-testid': 'studio-release-activation' }) as HTMLAttributes<HTMLElement>}
+            />
+          </SectionPart>
+        </SectionParts>
+      </PageLayout>
+    </div>
   )
 }
 
