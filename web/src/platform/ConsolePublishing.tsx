@@ -9,11 +9,13 @@ import {
   type ConsolePublishing,
   type ConsoleReleaseItem,
 } from './console'
+import { PersonName } from './PersonName'
 import { ReleaseOffStandard } from './ReleaseOffStandard'
+import { ReleasePublisher } from './ReleasePublisher'
 import { SectionPart } from './SectionParts'
 import { StatusTag, type StatusTone } from './StatusTag'
+import { StudioLink } from './StudioLink'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
-import { releasePublisher } from './studio'
 import { useText } from './texts'
 import { useTableView } from './useTableView'
 
@@ -121,6 +123,9 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
       ? undefined
       : load.publishing?.releases.find((row) => row.releaseId === activeReleaseId)
 
+  // Studio opens an application by its manifest name, which the picker keeps apart from its id.
+  const applicationName = applications.find((candidate) => candidate.id === application)?.name
+
   const releaseColumns = useMemo<AxisColumn<ConsoleReleaseItem>[]>(
     () => [
       {
@@ -129,7 +134,11 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
         title: t('shell.console.publishing.number'),
         render: (_value, row) => (
           <Flex gap="small" align="center">
-            <span>{`#${row.number}`}</span>
+            {applicationName === undefined ? (
+              <span>{`#${row.number}`}</span>
+            ) : (
+              <StudioLink application={applicationName} release={row.number}>{`#${row.number}`}</StudioLink>
+            )}
             {row === activeRow && <StatusTag tone="neutral">{t('shell.console.publishing.active')}</StatusTag>}
           </Flex>
         ),
@@ -150,7 +159,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
         key: 'activatedBy',
         kind: 'freeText',
         title: t('shell.console.publishing.activatedBy'),
-        render: (_value, row) => releasePublisher(row, t),
+        render: (_value, row) => <ReleasePublisher row={row} />,
       },
       {
         key: 'activatedAt',
@@ -166,7 +175,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
           row.offStandard ? <ReleaseOffStandard relaxed={row.relaxed} locale={locale} /> : null,
       },
     ],
-    [activeRow, locale, t],
+    [activeRow, applicationName, locale, t],
   )
 
   // Kind and target have no order a person uses, so their headers do not sort. The other columns sort on the server.
@@ -213,7 +222,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
         title: t('shell.console.publishing.requestedBy'),
         filter: { kind: 'text' },
         sorter: true,
-        render: (_value, row) => row.requestedByName ?? row.requestedBy,
+        render: (_value, row) => <PersonName id={row.requestedBy} name={row.requestedByName ?? row.requestedBy} />,
       },
       {
         key: 'requestedAt',

@@ -8,6 +8,7 @@ import { EmptyDash } from '../platform/EmptyValue'
 import { sortByName } from '../platform/listOrder'
 import { PageActions, PageLayout } from '../platform/PageLayout'
 import { ReleaseOffStandard } from '../platform/ReleaseOffStandard'
+import { ReleasePublisher } from '../platform/ReleasePublisher'
 import {
   changeRows,
   fetchStudioRelease,
@@ -39,6 +40,8 @@ interface ActivationRow {
   key: string
   when: string
   by: string
+  actor: string
+  actorName: string | null
   replaced: number | null
   until: string | null
   /** The local calendar day of `when`, `YYYY-MM-DD`, which the When filter compares. */
@@ -238,6 +241,8 @@ function ReleaseContent({
       key: `${index}`,
       when: format(item.activatedAt),
       by: releasePublisher(item, t),
+      actor: item.actor,
+      actorName: item.actorName,
       replaced: sorted[index - 1]?.number ?? null,
       until: next !== undefined ? format(next.activatedAt) : release.live ? t('shell.studio.release.now') : null,
       whenDay: localDay(item.activatedAt)!,
@@ -256,7 +261,7 @@ function ReleaseContent({
       key: 'by',
       kind: 'freeText',
       title: t('shell.studio.release.by'),
-      render: (_, row) => row.by,
+      render: (_, row) => <ReleasePublisher row={row} />,
       filter: { kind: 'text', value: (row) => row.by },
     },
     {
@@ -356,7 +361,7 @@ function ReleaseContent({
                 {
                   key: 'publishedBy',
                   term: t('shell.studio.releases.publishedBy'),
-                  value: releasePublisher(first, t),
+                  value: <ReleasePublisher row={first} />,
                 },
                 { key: 'note', term: t('shell.studio.releases.note'), value: first.note || <EmptyDash /> },
               ]}

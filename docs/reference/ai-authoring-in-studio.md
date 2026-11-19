@@ -73,7 +73,7 @@ A request's page shows one request: its heading, [the feed](#the-feed) and [the 
   [the states](#the-states).
 - Under the name, `spacing-xs` apart, come the request's words in full. Then, in `textMuted`, comes the
   sender's line.
-- **The sender's line** _(planned)_. It reads "Sent by <name> on <time>", the name read as
+- **The sender's line**. It reads "Sent by <name> on <time>", the name read as
   [a person's name](actions-and-controls.md#text) is, so the reader's own is followed by "(you)".
 - **Co-authors** _(planned for M35)_. The line ends with ", co-authored with <AIs>". The co-authors are the AIs
   that made the change, in the order they first worked. Axis's agent is named by the model its author's AI

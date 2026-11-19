@@ -11,6 +11,7 @@ import {
   type CellTenantPage,
   type CellTenantStatus,
   type CellTenantUsage,
+  cellTenantAddress,
   cellTenantStatusTones,
 } from '../platform/cell'
 import { EmptyDash } from '../platform/EmptyValue'
@@ -126,7 +127,7 @@ export function CellTenantsPage() {
         kind: 'fixed',
         title: t('shell.cell.tenants.id'),
         sorter: true,
-        render: (_value, tenant) => <Link to={`/tenants/${encodeURIComponent(tenant.id)}`}>{tenant.id}</Link>,
+        render: (_value, tenant) => <Link to={cellTenantAddress(tenant.id)}>{tenant.id}</Link>,
         filter: { kind: 'text' },
       },
       {

@@ -92,6 +92,8 @@ tenant button of the Tenants view and the actions of the Tenant view.
   of Created, Kind, Tenant and State, and a pager with a page size. The server searches, filters, sorts and pages the
   list, 20 jobs to a page by default, see [the job list](tenant-lifecycle.md#routes). The search, the filter, the
   columns, the sort, the page and the page size live in the address, see [tables](actions-and-controls.md#tables).
+  The tenant of a job links to that tenant's Tenant view. On a tenant's own page and in the Create tenant
+  dialog it is plain text, because there the link would lead back to the same page or to a tenant that may not exist yet.
   A row shows the time, the kind, the tenant and the state, a `StatusTag` in `neutral` for `queued` and `running`, in
   `success` for `succeeded` and in `danger` for `failed`, each
   step with its state, or one line when no step has run yet, and the error of a failed job or step. A failed job other than a `purge` job has a Run

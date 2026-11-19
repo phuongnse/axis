@@ -20,3 +20,13 @@ export function studioResourceAddress(
 export function studioRequestAddress(application: string, id: string): string {
   return `/studio?${new URLSearchParams({ app: application, view: 'requests', request: id })}`
 }
+
+/** The address of an application in Studio, `/studio?app=<name>`, where `application` is its manifest name. */
+export function studioApplicationAddress(application: string): string {
+  return `/studio?${new URLSearchParams({ app: application })}`
+}
+
+/** The address of a release's page in Studio, `&view=release&release=<number>`. */
+export function studioReleaseAddress(application: string, number: number): string {
+  return `/studio?${new URLSearchParams({ app: application, view: 'release', release: String(number) })}`
+}

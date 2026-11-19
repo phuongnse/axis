@@ -147,6 +147,15 @@ describe('CellJobsPage', () => {
     expect(within(rows[2]).queryByTestId('cell-job-step-error')).not.toBeInTheDocument()
   })
 
+  it("links each job's tenant to the tenant's page", async () => {
+    stubJobs(200, [failed, succeeded])
+    renderPage()
+
+    const table = await loadedTable()
+    expect(within(table).getByRole('link', { name: 'acme' })).toHaveAttribute('href', '/tenants/acme')
+    expect(within(table).getByRole('link', { name: 'beta' })).toHaveAttribute('href', '/tenants/beta')
+  })
+
   it('keeps the search, filter, sort and page size in the address and the request', async () => {
     const filter = JSON.stringify({ all: [{ field: 'state', op: 'eq', value: 'failed' }] })
     const urls = stubJobs(200, [failed], 45)

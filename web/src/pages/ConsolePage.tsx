@@ -9,6 +9,7 @@ import { ConsoleWebhookDeliveries } from '../platform/ConsoleWebhookDeliveries'
 import { PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { StatusTag } from '../platform/StatusTag'
+import { StudioLink } from '../platform/StudioLink'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
@@ -114,13 +115,21 @@ export function ConsolePage() {
                     kind: 'freeText',
                     title: t('shell.console.tenant.application'),
                     dataIndex: 'name',
+                    render: (_value, row) => <StudioLink application={row.name}>{row.name}</StudioLink>,
                     filter: { kind: 'text', value: (row) => row.name },
                   },
                   {
                     key: 'release',
                     kind: 'freeText',
                     title: t('shell.console.tenant.release'),
-                    render: (_value, row) => releaseText(row),
+                    render: (_value, row) =>
+                      row.releaseNumber === null ? (
+                        releaseText(row)
+                      ) : (
+                        <StudioLink application={row.name} release={row.releaseNumber}>
+                          {releaseText(row)}
+                        </StudioLink>
+                      ),
                     filter: { kind: 'text', value: releaseText },
                   },
                   {

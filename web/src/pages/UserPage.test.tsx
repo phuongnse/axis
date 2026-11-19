@@ -38,12 +38,15 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-/** Answers the roles by their address, a GET with `answer`, and any POST with `change`. */
+/** Answers the roles by their address, a GET with `answer`, any POST with `change` and `/api/me` with `me`. */
 function stubRoles(
   change: () => Response = () => new Response(null, { status: 204 }),
   answer: () => Response = () => json(roles),
+  me: { studio: boolean } = { studio: false },
 ) {
-  const fetchMock = vi.fn(async (_input: string, init?: RequestInit) => (init?.method === 'POST' ? change() : answer()))
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
+    input === '/api/me' ? json({ id: 'admin', ...me }) : init?.method === 'POST' ? change() : answer(),
+  )
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
 }
@@ -216,5 +219,34 @@ describe('UserPage', () => {
     renderPage()
 
     expect(await screen.findByTestId('not-found')).toBeVisible()
+  })
+
+  it("links an active application's section title to it in Studio for a reader who may use Studio", async () => {
+    stubRoles(undefined, undefined, { studio: true })
+    const page = await openAnn()
+
+    const link = await within(page).findByRole('link', { name: 'Purchasing' })
+    expect(link).toHaveAttribute('href', '/studio?app=Purchasing')
+    expect(within(page).queryByRole('link', { name: 'Platform' })).not.toBeInTheDocument()
+  })
+
+  it('leaves the section titles plain text for a reader who may not use Studio', async () => {
+    const fetchMock = stubRoles(undefined, undefined, { studio: false })
+    const page = await openAnn()
+
+    expect(await within(page).findByRole('heading', { name: 'Purchasing' })).toBeVisible()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/me', expect.anything()))
+    expect(within(page).queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('leaves the section of an application that is not active plain text, even for a reader who may use Studio', async () => {
+    const gone = 'gone-application'
+    stubRoles(undefined, () => json({ ...roles, given: [{ applicationId: gone, role: 'buyer', declared: false }] }), {
+      studio: true,
+    })
+    const page = await openAnn()
+
+    expect(await within(page).findByRole('heading', { name: gone })).toBeVisible()
+    expect(within(page).queryByRole('link', { name: gone })).not.toBeInTheDocument()
   })
 })

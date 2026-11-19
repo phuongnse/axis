@@ -54,6 +54,11 @@ export const cellTenantStatusTones: Record<CellTenantStatus, StatusTone> = {
   deleting: 'neutral',
 }
 
+/** The address of a tenant's page in the cell console, which the tenants list and the Jobs view link to. */
+export function cellTenantAddress(id: string): string {
+  return `/tenants/${encodeURIComponent(id)}`
+}
+
 /** The failed work of a tenant, as the worker counted it. */
 export interface CellFailedWork {
   instances: number

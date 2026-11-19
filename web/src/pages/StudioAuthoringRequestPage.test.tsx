@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { formatValue } from '../platform/formatValue'
@@ -202,13 +203,15 @@ function renderPage(props: { onAskAi?: () => void; userId?: string; resources?: 
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioAuthoringRequestPage
-          application={application}
-          requestId="r1"
-          userId={props.userId ?? 'u1'}
-          onAskAi={props.onAskAi}
-          resources={props.resources}
-        />
+        <MemoryRouter>
+          <StudioAuthoringRequestPage
+            application={application}
+            requestId="r1"
+            userId={props.userId ?? 'u1'}
+            onAskAi={props.onAskAi}
+            resources={props.resources}
+          />
+        </MemoryRouter>
       </TextProvider>
     </ThemeModeProvider>,
   )
@@ -294,15 +297,31 @@ describe('StudioAuthoringRequestPage', () => {
     expect(screen.getByText(`Sent by Linh Nguyen on ${time}`)).toBeVisible()
   })
 
-  it("names the sender as you when the request is the reader's own", async () => {
+  /** Answers `/api/me` with the signed-in person, and every other read with the request. */
+  function stubAs(me: { id: string; users: boolean }, body = request({ author: 'u1' })) {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => answer(request({ author: 'u1' }))),
+      vi.fn(async (input: string) => (input === '/api/me' ? new Response(JSON.stringify(me)) : answer(body))),
     )
+  }
+  const sentTime = () =>
+    formatValue({ name: 'sentAt', type: 'date-time' }, sentAt, {}, { locale: 'en', text: (key) => key })
+
+  it("names the author in the sender's line, followed by (you), when the request is the reader's own", async () => {
+    stubAs({ id: 'u1', users: false })
     renderPage()
 
-    const time = formatValue({ name: 'sentAt', type: 'date-time' }, sentAt, {}, { locale: 'en', text: (key) => key })
-    expect(await screen.findByText(`Sent by you on ${time}`)).toBeVisible()
+    const you = await screen.findByText('(you)')
+    expect(you.parentElement).toHaveTextContent(`Sent by Linh Nguyen (you) on ${sentTime()}`)
+    expect(screen.queryByText(/Sent by you/)).not.toBeInTheDocument()
+  })
+
+  it("links the author's name to the user page for a reader who may administer users", async () => {
+    stubAs({ id: 'u9', users: true }, request({ author: 'u1' }))
+    renderPage({ userId: 'u9' })
+
+    expect(await screen.findByRole('link', { name: 'Linh Nguyen' })).toHaveAttribute('href', '/users/u1')
+    expect(screen.queryByText('(you)')).not.toBeInTheDocument()
   })
 })
 

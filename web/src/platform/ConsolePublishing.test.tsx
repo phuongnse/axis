@@ -94,8 +94,8 @@ function stubServer(answer: (url: string) => Response) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string, init?: RequestInit) => {
-      // The table's own choices of columns are not a request for its rows.
-      if (!input.startsWith('/api/me/tables/')) {
+      // The table's own choices of columns and the signed-in person are not a request for its rows.
+      if (input !== '/api/me' && !input.startsWith('/api/me/tables/')) {
         calls.push({ url: input, method: init?.method ?? 'GET' })
       }
       return answer(input)
@@ -233,6 +233,42 @@ describe('ConsolePublishing', () => {
     expect(points[1]).toHaveTextContent('Approvers decide alone')
     expect(within(rows[1]!).queryByTestId('release-off-standard')).toBeNull()
     expect(within(rows[1]!).queryByTestId('release-relaxed-point')).toBeNull()
+  })
+
+  it('names the people of the history, linking them to the user page for an administrator, and opens a release in Studio', async () => {
+    stubServer((url) => (url === '/api/me' ? answer({ id: 'admin', users: true, studio: true }) : answer(leave)))
+    renderView()
+
+    const releases = await screen.findByTestId('console-publishing-releases')
+    expect(await within(releases).findByRole('link', { name: 'Rita Reader' })).toHaveAttribute('href', '/users/u1')
+    // The newest row of release 2 is the active one, and the system's and the operator's activations stay plain words.
+    expect(within(releases).getAllByRole('link', { name: '#2' })[0]).toHaveAttribute(
+      'href',
+      '/studio?app=Leave&view=release&release=2',
+    )
+    expect(within(releases).getByRole('link', { name: '#1' })).toHaveAttribute(
+      'href',
+      '/studio?app=Leave&view=release&release=1',
+    )
+    expect(within(releases).getByText('System')).toBeVisible()
+    expect(within(releases).getByText('The platform operator')).toBeVisible()
+    expect(within(releases).queryByRole('link', { name: 'System' })).toBeNull()
+    const requests = screen.getByTestId('console-publishing-requests')
+    expect(within(requests).getByRole('link', { name: 'Alan Author' })).toHaveAttribute('href', '/users/u1')
+  })
+
+  it('shows the people and the release numbers as plain text for a reader who may neither administer users nor use Studio', async () => {
+    const calls = stubServer((url) =>
+      url === '/api/me' ? answer({ id: 'reader', users: false, studio: false }) : answer(leave),
+    )
+    renderView()
+
+    const view = await screen.findByTestId('console-publishing')
+    expect(await within(view).findByText('#1')).toBeVisible()
+    expect(within(view).getByText('Rita Reader')).toBeVisible()
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/me', expect.anything()))
+    expect(within(view).queryByRole('link')).toBeNull()
+    expect(calls).toHaveLength(1)
   })
 
   it('loads the publishing of the application that is chosen', async () => {

@@ -33,6 +33,16 @@ import { StudioChanges } from './StudioChanges'
 /** What an undo left on the page: the later revisions that block it, or why it failed. */
 type UndoOutcome = { kind: 'blocked'; revisions: StudioRevision[] } | { kind: 'failed'; message: string }
 
+/** Who made a revision: a person by name through `PersonName`, or "System" for a revision the server made. */
+function RevisionAuthor({ revision }: { revision: StudioRevision }) {
+  const t = useText()
+  return revision.userId === null ? (
+    <>{revisionAuthor(revision, t)}</>
+  ) : (
+    <PersonName id={revision.userId} name={revision.author} />
+  )
+}
+
 /** The address of the History view, or of one revision's page. */
 function historyAddress(application: string, revision?: string): string {
   return `/studio?${new URLSearchParams({ app: application, view: 'history', ...(revision ? { revision } : {}) })}`
@@ -153,7 +163,7 @@ export function StudioHistory({
       title: t('shell.studio.history.who'),
       filter: { kind: 'text' },
       sorter: true,
-      render: (_, row) => revisionAuthor(row, t),
+      render: (_, row) => <RevisionAuthor revision={row} />,
     },
     {
       key: 'time',
@@ -208,7 +218,9 @@ export function StudioHistory({
                   {outcome.revisions.map((blocker) => (
                     <Flex key={blocker.id} vertical data-testid="studio-history-blocker" data-id={blocker.id}>
                       <Typography.Text>{blocker.summary}</Typography.Text>
-                      <Typography.Text>{revisionAuthor(blocker, t)}</Typography.Text>
+                      <Typography.Text>
+                        <RevisionAuthor revision={blocker} />
+                      </Typography.Text>
                       <Typography.Text>{time(blocker.time)}</Typography.Text>
                     </Flex>
                   ))}
@@ -301,12 +313,7 @@ export function StudioRevisionPage({
     {
       key: 'who',
       term: t('shell.studio.history.who'),
-      value:
-        revision.userId === null ? (
-          revisionAuthor(revision, t)
-        ) : (
-          <PersonName id={revision.userId} name={revision.author} />
-        ),
+      value: <RevisionAuthor revision={revision} />,
     },
     { key: 'when', term: t('shell.studio.history.when'), value: <EventTime value={revision.time} /> },
     ...(client === null ? [] : [{ key: 'through', term: t('shell.studio.history.through'), value: client }]),

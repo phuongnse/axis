@@ -4,7 +4,7 @@ import { ActionBar } from '../platform/ActionBar'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton, type AxisFoldAction } from '../platform/AxisButton'
 import { FilledText } from '../platform/FilledText'
-import { fillText } from '../platform/fillText'
+import { PersonName } from '../platform/PersonName'
 import { formatValue } from '../platform/formatValue'
 import { PageLayout } from '../platform/PageLayout'
 import { ReasonDialog } from '../platform/ReasonDialog'
@@ -191,9 +191,11 @@ export function StudioAuthoringRequestPage({
     request.state === 'accepted' ||
     ((request.state === 'ready' || request.state === 'failed') && result.checks !== null)
   const time = formatValue({ name: 'sentAt', type: 'date-time' }, request.sentAt, {}, { locale, text: t })
-  const sender = fillText(
-    t(request.author === userId ? 'shell.studio.aiRequest.sentByYou' : 'shell.studio.aiRequest.sentBy'),
-    { name: request.authorName ?? request.author, time },
+  const sender = (
+    <FilledText
+      text={t('shell.studio.aiRequest.sentBy')}
+      parts={{ name: <PersonName id={request.author} name={request.authorName ?? request.author} />, time }}
+    />
   )
 
   /** Keeps the request that an action answered and follows it again. */

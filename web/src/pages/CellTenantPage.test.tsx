@@ -263,6 +263,8 @@ describe('CellTenantPage', () => {
     const jobRows = within(await screen.findByTestId('cell-jobs')).getAllByRole('row')
     expect(jobRows).toHaveLength(2)
     expect(jobRows[1]).toHaveTextContent('suspend')
+    // The tenant's own jobs name the tenant of the page, so it is not a link back to it.
+    expect(within(jobRows[1]).queryByRole('link')).toBeNull()
     expect(fetchMock).toHaveBeenCalledWith('/api/cell/jobs?tenant=acme&pageSize=50', expect.anything())
   })
 
