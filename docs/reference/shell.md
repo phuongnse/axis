@@ -412,7 +412,7 @@ to the frame shows in every state. How previews work is in
   verification to Error are the same components that the theme draws.
 - **A frame is a screen.** A shell preview draws the shell in a frame exactly as tall as its height, and
   the page scrolls inside it as in a window, so a dialog opens in the middle of what shows.
-- **The State control** _(planned)_. `shell`, `signIn` and `identitySignIn` show one state at a time under a State
+- **The State control.** `shell`, `signIn` and `identitySignIn` show one state at a time under a State
   control, as `studio` does, and `&state=<slug>` opens one.
 - **Account states.** The `shell` preview gains Account page, the platform's `/account` on its
   Security tab, and Account notifications, the same page on its Notifications tab. Both use fixtures of

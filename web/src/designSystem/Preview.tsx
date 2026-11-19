@@ -26,7 +26,7 @@ function Canvas({ children }: { children: ReactNode }) {
 /**
  * A screen exactly as tall as its height. The page scrolls inside it, as it scrolls in a window, so a dialog opens in
  * the middle of what shows. The outer box does not scroll. It holds the popups and dialogs, and the transform keeps
- * them inside it, so several states fit one card.
+ * them inside it.
  */
 function Frame({ height, children }: { height: number; children: ReactNode }) {
   const { colour } = useDesignTokens()
@@ -65,8 +65,9 @@ function Figure({ state }: { state: PreviewState }) {
 }
 
 /**
- * The states of a preview that answers the same paths in each of them, one at a time under a Fixtures control. The
- * `state` query of the page, a state's caption in kebab case, picks the first one shown, else the first state does.
+ * The states of a preview that draws one state at a time under a State control, see
+ * docs/reference/widget-previews.md#the-bundle. The `state` query of the page, a state's caption in kebab case, picks
+ * the first one shown, else the first state does.
  */
 function Chooser({ states }: { states: readonly PreviewState[] }) {
   const { colour, spacing } = useDesignTokens()
@@ -78,11 +79,11 @@ function Chooser({ states }: { states: readonly PreviewState[] }) {
   })
   return (
     <>
-      <style>{'[data-fixtures] .ant-segmented-group { flex-wrap: wrap; }'}</style>
-      <div data-fixtures style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm }}>
-        <span style={{ color: colour.textMuted }}>Fixtures</span>
+      <style>{'[data-state] .ant-segmented-group { flex-wrap: wrap; }'}</style>
+      <div data-state style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm }}>
+        <span style={{ color: colour.textMuted }}>State</span>
         <Segmented
-          aria-label="Fixtures"
+          aria-label="State"
           style={{ maxWidth: '100%' }}
           options={states.map(({ caption }) => caption)}
           value={state.caption}
@@ -98,6 +99,18 @@ function Chooser({ states }: { states: readonly PreviewState[] }) {
   )
 }
 
+/**
+ * Whether a preview draws one state at a time: its states share fixture paths, or it has several states and each one is
+ * a screen in a frame. A frame is a screen, so a card of several framed states would be long, see
+ * docs/reference/widget-previews.md#the-bundle.
+ */
+function oneAtATime(states: readonly PreviewState[]): boolean {
+  return (
+    states.some((state) => state.fixtures) ||
+    (states.length > 1 && states.every((state) => state.frameHeight !== undefined))
+  )
+}
+
 /** What the bundle mounts for a preview: each state of the widget under its caption on a canvas, in the mode of the page. */
 export function Preview({ states }: { states: readonly PreviewState[] }) {
   return (
@@ -105,7 +118,7 @@ export function Preview({ states }: { states: readonly PreviewState[] }) {
       <PageTheme>
         <TextProvider catalogs={catalogs} development>
           <Canvas>
-            {states.some((state) => state.fixtures) ? (
+            {oneAtATime(states) ? (
               <Chooser states={states} />
             ) : (
               states.map((state) => <Figure key={state.caption} state={state} />)

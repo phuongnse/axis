@@ -108,6 +108,12 @@ describe('design-system previews', () => {
     }
   })
 
+  test('every shell state draws in an 800px frame', () => {
+    for (const state of previews.shell) {
+      expect(state.frameHeight, state.caption).toBe(800)
+    }
+  })
+
   test('the cards have the 30 names of the Design System artifact, in group order', () => {
     expect(cardGroups.flatMap(({ previews: group }) => group).map(cardName)).toEqual([
       'TextField',
