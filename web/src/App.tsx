@@ -12,7 +12,7 @@ import { HomePage } from './pages/HomePage'
 import { LicencesPage } from './pages/LicencesPage'
 import { ShellError } from './pages/LocaleLoadFailed'
 import { NotFoundPage } from './pages/NotFoundPage'
-import { PageRoute } from './pages/PageRoute'
+import { PageRoute, RecordPageRoute } from './pages/PageRoute'
 import { PlatformContext, usePlatform, type Platform, type PlatformTexts } from './pages/context'
 import { PlatformShellRoute } from './pages/PlatformShellRoute'
 import { SiteIndex, SiteRoute } from './pages/SiteRoute'
@@ -124,6 +124,8 @@ function PlatformRoutes() {
       <Routes>
         <Route element={<SiteRoute path={hostSite} />}>
           <Route index element={<SiteIndex />} />
+          <Route path="records/:entity/:id" element={<RecordPageRoute />} />
+          <Route path="records/:module/:entity/:id" element={<RecordPageRoute />} />
           <Route path=":page" element={<PageRoute />} />
           <Route path=":page/new" element={<PageRoute form="new" />} />
           <Route path=":page/:id" element={<PageRoute form="edit" />} />
@@ -211,6 +213,8 @@ function PlatformRoutes() {
       />
       <Route path=":site" element={<SiteRoute />}>
         <Route index element={<SiteIndex />} />
+        <Route path="records/:entity/:id" element={<RecordPageRoute />} />
+        <Route path="records/:module/:entity/:id" element={<RecordPageRoute />} />
         <Route path=":page" element={<PageRoute />} />
         <Route path=":page/new" element={<PageRoute form="new" />} />
         <Route path=":page/:id" element={<PageRoute form="edit" />} />

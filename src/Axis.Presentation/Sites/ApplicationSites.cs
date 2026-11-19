@@ -92,18 +92,50 @@ public static class ApplicationSites
         ArgumentNullException.ThrowIfNull(application);
 
         var page = application.Pages.FirstOrDefault(candidate => string.Equals(candidate.Name, pageName, StringComparison.OrdinalIgnoreCase));
-        return page is null
-            ? null
-            : new PageMetadata(
-                page.Name,
-                page.Title.TextKey,
-                [.. page.Parameters.Select(parameter => new PageParameterMetadata(
-                    parameter.Name,
-                    FieldTypes.Name(parameter.Type),
-                    parameter.Required,
-                    parameter.Values,
-                    parameter.Target is { } target ? Target(application, target.Name) : null))],
-                [.. page.Widgets.Select(widget => Widget(application, widget))]);
+        return page is null ? null : DescribePage(application, page);
+    }
+
+    /// <summary>The metadata of <paramref name="page"/>, with every widget as the application declares it.</summary>
+    public static PageMetadata DescribePage(ApplicationModel application, PageModel page)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(page);
+
+        return new PageMetadata(
+            page.Name,
+            page.Title.TextKey,
+            [.. page.Parameters.Select(parameter => new PageParameterMetadata(
+                parameter.Name,
+                FieldTypes.Name(parameter.Type),
+                parameter.Required,
+                parameter.Values,
+                parameter.Target is { } target ? Target(application, target.Name) : null))],
+            [.. page.Widgets.Select(widget => Widget(application, widget))]);
+    }
+
+    /// <summary>
+    /// The default record page of the entity named <paramref name="entityName"/>, ignoring letter case: one form widget
+    /// over the entity and every field of it, see <c>docs/reference/frontend.md#routing</c>. The title is
+    /// the entity's label, or its name when it has none. The page is not in the application, and its name
+    /// <c>records/{entity}</c> never names a page. Null when the application has no such entity, or the entity is a child entity.
+    /// </summary>
+    public static PageModel? RecordPage(ApplicationModel application, string entityName)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+
+        if (!application.TryGetEntity(entityName, out var entity) || application.IsChildEntity(entity))
+        {
+            return null;
+        }
+
+        return new PageModel
+        {
+            Id = entity.Id,
+            Name = $"records/{entity.Name}",
+            Title = new TextReference(entity.Label?.TextKey ?? entity.Name),
+            File = entity.File,
+            Widgets = [new WidgetModel(WidgetType.Form, new EntityReference(entity.Id, entity.Name))],
+        };
     }
 
     private static TextResource? FindText(ApplicationModel application, string locale) =>

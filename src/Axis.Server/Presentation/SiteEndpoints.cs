@@ -24,6 +24,8 @@ namespace Axis.Server.Presentation;
 /// it is given a <c>release</c> id, so a task page can show the texts of the release it started on.
 /// A page of a module is written <c>{module id}/{page name}</c>, as two path segments, for example
 /// <c>/api/sites/{path}/pages/departments/Departments</c>. It has the same checks as any other page.
+/// The record page route <c>/api/sites/{path}/records/{entity}</c>, or <c>/records/{module}/{entity}</c> for a module entity, describes
+/// the default record page of an entity: it answers 404 for an unknown or a child entity and 403 when the user may not read the entity.
 /// </summary>
 internal static class SiteEndpoints
 {
@@ -127,6 +129,11 @@ internal static class SiteEndpoints
         {
             sites.MapGet(pattern, PageAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
         }
+
+        foreach (var pattern in new[] { "/{path}/records/{entity}", "/{path}/records/{module}/{entity}" })
+        {
+            sites.MapGet(pattern, RecordPageAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
+        }
     }
 
     private static async Task<IResult> PageAsync(
@@ -163,6 +170,42 @@ internal static class SiteEndpoints
         var model = active.Application.Pages.First(candidate => candidate.Name == metadata.Name);
         return PageAccess.CanRead(active.Application, user.RolesIn(active.Application), model)
             ? Results.Ok(PageAccess.Shape(active.Application, user.RolesIn(active.Application), model, metadata))
+            : Grants.Forbidden();
+    }
+
+    private static async Task<IResult> RecordPageAsync(
+        HttpContext context,
+        string path,
+        string entity,
+        ActiveApplicationResolver resolver,
+        SiteSignIn signIn,
+        ITenantContextAccessor tenants,
+        CancellationToken cancellationToken)
+    {
+        var name = context.GetRouteValue("module") is string module ? $"{module}/{entity}" : entity;
+        if (await CurrentUsers.FindAsync(context) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
+        if (!await ServesSessionAsync(context, signIn, tenants, path, cancellationToken))
+        {
+            return Grants.SignInRequired();
+        }
+
+        if (await resolver.ResolveBySitePathAsync(path, cancellationToken) is not { } active)
+        {
+            return SiteNotFound();
+        }
+
+        if (ApplicationSites.RecordPage(active.Application, name) is not { } page)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The site's application has no entity with this name.");
+        }
+
+        var roles = user.RolesIn(active.Application);
+        return PageAccess.CanRead(active.Application, roles, page)
+            ? Results.Ok(PageAccess.Shape(active.Application, roles, page, ApplicationSites.DescribePage(active.Application, page)))
             : Grants.Forbidden();
     }
 

@@ -35,6 +35,22 @@ public sealed class ModulePageTests(ModuleAppFixture fixture) : IClassFixture<Mo
     }
 
     [Fact]
+    public async Task A_module_entity_has_a_default_record_page_at_its_two_segment_address_for_a_person_who_may_read_it()
+    {
+        using var client = fixture.CreateClient().SignedInAs("requester");
+        using var manager = fixture.CreateClient().SignedInAs("manager");
+
+        using var page = await GetAsync(client, $"{Site}/records/departments/Department", HttpStatusCode.OK);
+
+        Assert.Equal("records/departments/Department", page.RootElement.GetProperty("name").GetString());
+        var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
+        Assert.Equal("form", widget.GetProperty("type").GetString());
+        Assert.Equal("departments/Department", widget.GetProperty("entity").GetProperty("name").GetString());
+        using var forbidden = await GetAsync(manager, $"{Site}/records/departments/Department", HttpStatusCode.Forbidden);
+        Assert.Equal("You have no grant for this action.", forbidden.RootElement.GetProperty("title").GetString());
+    }
+
+    [Fact]
     public async Task The_site_lists_the_module_page_in_its_navigation_for_an_employee()
     {
         using var client = fixture.CreateClient().SignedInAs("requester");

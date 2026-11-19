@@ -326,6 +326,66 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
     }
 
     [Fact]
+    public async Task Record_page_is_one_form_over_the_entity_with_the_fields_and_access_the_user_holds()
+    {
+        using var client = fixture.CreateClient().SignedInAs("fia");
+
+        using var page = await GetJsonAsync(client, "/api/sites/records/records/item", HostA);
+
+        Assert.Equal("records/Item", page.RootElement.GetProperty("name").GetString());
+        Assert.Equal("Item", page.RootElement.GetProperty("titleKey").GetString());
+        Assert.Empty(page.RootElement.GetProperty("parameters").EnumerateArray());
+        var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
+        Assert.Equal("form", widget.GetProperty("type").GetString());
+        Assert.Equal(JsonValueKind.Null, widget.GetProperty("form").ValueKind);
+        Assert.Empty(widget.GetProperty("actions").EnumerateArray());
+        Assert.Equal(["name", "department"], EntityFieldNames(page));
+        Assert.Equal(
+            """{"actions":["read","create","update"],"createFields":["name","quantity"],"updateFields":["name","quantity"]}""",
+            widget.GetProperty("access").GetRawText());
+    }
+
+    [Theory]
+    [InlineData("rita", "department")]
+    [InlineData("manager", "item")]
+    public async Task Record_page_the_user_cannot_read_is_a_403_problem(string user, string entity)
+    {
+        using var client = fixture.CreateClient().SignedInAs(user);
+        using var request = Request($"/api/sites/records/records/{entity}", HostA);
+
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.Forbidden);
+        Assert.Equal("You have no grant for this action.", problem.RootElement.GetProperty("title").GetString());
+    }
+
+    [Theory]
+    [InlineData("Unknown")]
+    [InlineData("itempart")]
+    public async Task Record_page_of_an_unknown_or_a_child_entity_is_a_404_problem_before_the_grants_are_checked(string entity)
+    {
+        using var client = fixture.CreateClient().SignedInAs("manager");
+        using var request = Request($"/api/sites/records/records/{entity}", HostA);
+
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.NotFound);
+        Assert.Equal("The site's application has no entity with this name.", problem.RootElement.GetProperty("title").GetString());
+    }
+
+    [Fact]
+    public async Task Record_page_of_an_unknown_site_is_a_404_problem()
+    {
+        using var client = fixture.CreateClient().SignedInAs("fia");
+        using var request = Request("/api/sites/unknown/records/item", HostA);
+
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.NotFound);
+        Assert.Equal("No site is active under this path.", problem.RootElement.GetProperty("title").GetString());
+    }
+
+    [Fact]
     public async Task Task_inbox_page_has_the_task_api_path_and_no_binding()
     {
         using var page = await GetJsonAsync("/api/sites/records/pages/mytasks", HostA);
@@ -344,6 +404,8 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
     [InlineData("/api/sites/records/texts/en")]
     [InlineData("/api/sites/records/texts/en?release=6f1c2a40-7a3b-4c52-9d0e-1b2c3d4e5f60")]
     [InlineData("/api/sites/records/pages/items")]
+    [InlineData("/api/sites/records/records/item")]
+    [InlineData("/api/sites/records/records/Unknown")]
     [InlineData("/api/sites/unknown")]
     [InlineData("/api/sites/unknown/texts/en")]
     [InlineData("/api/sites/records/pages/Unknown")]
