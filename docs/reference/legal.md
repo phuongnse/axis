@@ -42,7 +42,7 @@ The legal line closes every page with the copyright and the legal links.
   narrow width the links wrap and stay at the end. The links sit in a navigation landmark named Legal.
 - **Labels.** Privacy, Terms and Licences, in Vietnamese Quyền riêng tư, Điều khoản and Giấy phép. The landmark's name is Legal, in Vietnamese Pháp lý. The page that
   Licences opens keeps its full title.
-- **Not in the account menu** _(planned for M35)_. The account menu holds no legal line, because the footer holds it on
+- **Not in the account menu**. The account menu holds no legal line, because the footer holds it on
   every page.
 
 ## Open source licences

@@ -123,7 +123,7 @@ removal.
 
 - **A step** is removed by its panel's Delete button, or by Delete or Backspace in the canvas.
   Removing the selected step clears the selection.
-- **An edge.** _(planned for M35)_ With an edge selected, the panel shows a Remove line button above the step's panel,
+- **An edge.** With an edge selected, the panel shows a Remove line button above the step's panel,
   and Delete or Backspace in the canvas clears that transition instead of removing the step.
 - **A block.** _(planned for M38)_ Removing a block removes the steps in its branches or body too, in one edit, so
   one Undo brings them all back.
