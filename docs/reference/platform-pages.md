@@ -182,7 +182,7 @@ one for the platform, where the administrator gives and removes them. Their text
 
 - **A page of its own.** The platform route `/users/{id}` is the user's page, as
   [opening things](actions-and-controls.md#opening-things) says, and holds these sections. Its title is the
-  display name, with the email under it, or "Not set" when the person has none. It loads the name, the email and
+  display name, with User as its line, and its first part is the email as a fact, or "Not set" when the person has none. It loads the name, the email and
   the roles from the roles route, so a reload or a shared link shows it. A `403` shows that the page is for
   administrators, and a `404` shows the not-found page.
 - **Tags.** Each role shows the "Given" `StatusTag` in `neutral` when the person has it. A given role that is not

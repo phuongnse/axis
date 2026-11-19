@@ -1,4 +1,4 @@
-import { Descriptions, Flex, Input, Modal, Typography } from 'antd'
+import { Flex, Input, Modal, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
@@ -7,6 +7,7 @@ import { useParams } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { CellJobTable } from '../platform/CellJobTable'
 import {
+  cellTenantStatusTones,
   downloadCellTenantExport,
   fetchCellDeletedTenant,
   fetchCellJobs,
@@ -23,10 +24,12 @@ import { EmptyDash } from '../platform/EmptyValue'
 import { saveFile } from '../platform/exports'
 import { HostRequestDialog } from '../platform/HostRequestDialog'
 import { HostRequestTable } from '../platform/HostRequestTable'
-import { PageLayout } from '../platform/PageLayout'
+import { PageActions, PageLayout } from '../platform/PageLayout'
 import { newIdempotencyKey } from '../platform/processes'
 import { recordPageSize } from '../platform/tableQuery'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { StatusTag } from '../platform/StatusTag'
+import { TermList } from '../platform/TermList'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useFollowCellJob } from '../platform/useFollowCellJob'
@@ -91,8 +94,9 @@ const actionTexts = {
 } as const
 
 /**
- * The Tenant view of the cell console, in parts a rule apart, see docs/reference/shell.md#layout: Details with one tenant's
- * status, application, hosts and actions, then Host verification with the state of each host that was asked for,
+ * The Tenant view of the cell console, headed by the tenant's id with its status as a tag, its kind as the line and its
+ * actions on the right, see docs/reference/shell.md#page-header. Its parts are a rule apart, see
+ * docs/reference/shell.md#layout: the facts of the application and the hosts, then Host verification with the state of each host that was asked for,
  * Quotas with the ones it overrides, Usage of the last 13 months by day in the table of the users page's "Usage" section, paged on the server from the tenant's own usage days route,
  * and Jobs in the shared job table. A `deleting` tenant shows its purge date after its status. An id that is no tenant
  * but a purged one shows only Deleted, the date of the purge, the date its deletion is complete and its jobs, with no
@@ -317,125 +321,131 @@ export function CellTenantPage() {
   ]
 
   return (
-    <PageLayout title={id}>
+    <PageLayout
+      title={id}
+      tags={
+        tenant ? (
+          <StatusTag tone={cellTenantStatusTones[tenant.status]}>
+            {t(`shell.cell.tenants.status.${tenant.status}`)}
+          </StatusTag>
+        ) : deleted ? (
+          <StatusTag tone="muted">{t('shell.cell.tenant.deleted')}</StatusTag>
+        ) : null
+      }
+      line={t('shell.cell.tenant.kind')}
+    >
       {tenantFailed && (
         <AxisAlert data-testid="cell-tenant-error" kind="error" message={t('shell.cell.tenant.loadFailed')} />
       )}
+      {tenant && (
+        <PageActions>
+          <Flex gap="small">
+            {canSuspend && (
+              <AxisButton
+                role="secondary"
+                data-testid="cell-tenant-suspend"
+                disabled={following !== null}
+                onClick={() => openConfirmation('suspend')}
+              >
+                {t(actionTexts.suspend.button)}
+              </AxisButton>
+            )}
+            {canResume && (
+              <AxisButton
+                role="secondary"
+                data-testid="cell-tenant-resume"
+                disabled={following !== null}
+                onClick={() => openConfirmation('resume')}
+              >
+                {t(actionTexts.resume.button)}
+              </AxisButton>
+            )}
+            {canExport && (
+              <AxisButton
+                role="secondary"
+                data-testid="cell-tenant-export"
+                disabled={following !== null}
+                onClick={() => openConfirmation('export')}
+              >
+                {t(actionTexts.export.button)}
+              </AxisButton>
+            )}
+            {canDelete && (
+              <AxisButton
+                role="secondary"
+                data-testid="cell-tenant-delete"
+                disabled={following !== null}
+                onClick={() => openConfirmation('delete')}
+              >
+                {t(actionTexts.delete.button)}
+              </AxisButton>
+            )}
+            {canCancelDeletion && (
+              <AxisButton
+                role="secondary"
+                data-testid="cell-tenant-cancel-deletion"
+                disabled={following !== null}
+                onClick={() => openConfirmation('cancel-deletion')}
+              >
+                {t(actionTexts['cancel-deletion'].button)}
+              </AxisButton>
+            )}
+            {ready && (
+              <AxisButton
+                role="secondary"
+                data-testid="cell-tenant-download"
+                disabled={following !== null}
+                onClick={() => {
+                  setDownloadError(null)
+                  setDownloading(true)
+                }}
+              >
+                {t('shell.cell.tenant.download')}
+              </AxisButton>
+            )}
+            <AxisButton role="secondary" data-testid="cell-tenant-set-quotas" onClick={() => setOpenDialog('quotas')}>
+              {t('shell.cell.tenant.setQuotas')}
+            </AxisButton>
+            <AxisButton role="secondary" data-testid="cell-tenant-add-host" onClick={() => setOpenDialog('host')}>
+              {t('shell.cell.tenant.addHost')}
+            </AxisButton>
+          </Flex>
+        </PageActions>
+      )}
       <SectionParts>
         {tenant && (
-          <SectionPart testName="cell-tenant-details" heading={{ title: t('shell.cell.tenant.details') }}>
-            <Descriptions
-              data-testid="cell-tenant"
-              column={1}
-              items={[
-                {
-                  key: 'status',
-                  label: t('shell.cell.tenant.status'),
-                  children: t(`shell.cell.tenants.status.${tenant.status}`),
-                },
+          <SectionPart testId="cell-tenant">
+            <TermList
+              terms={[
                 ...(tenant.status === 'deleting' && tenant.deleteAfter
                   ? [
                       {
                         key: 'deleteAfter',
-                        label: t('shell.cell.tenant.deleteAfter'),
-                        children: when(tenant.deleteAfter),
+                        term: t('shell.cell.tenant.deleteAfter'),
+                        value: when(tenant.deleteAfter),
                       },
                     ]
                   : []),
                 {
                   key: 'application',
-                  label: t('shell.cell.tenant.application'),
-                  children: tenant.application ?? <EmptyDash />,
+                  term: t('shell.cell.tenant.application'),
+                  value: tenant.application ?? <EmptyDash />,
                 },
                 {
                   key: 'hosts',
-                  label: t('shell.cell.tenant.hosts'),
-                  children: tenant.hosts.length > 0 ? tenant.hosts.join(', ') : <EmptyDash />,
+                  term: t('shell.cell.tenant.hosts'),
+                  value: tenant.hosts.length > 0 ? tenant.hosts.join(', ') : <EmptyDash />,
                 },
               ]}
             />
-            <Flex gap="small">
-              {canSuspend && (
-                <AxisButton
-                  role="secondary"
-                  data-testid="cell-tenant-suspend"
-                  disabled={following !== null}
-                  onClick={() => openConfirmation('suspend')}
-                >
-                  {t(actionTexts.suspend.button)}
-                </AxisButton>
-              )}
-              {canResume && (
-                <AxisButton
-                  role="secondary"
-                  data-testid="cell-tenant-resume"
-                  disabled={following !== null}
-                  onClick={() => openConfirmation('resume')}
-                >
-                  {t(actionTexts.resume.button)}
-                </AxisButton>
-              )}
-              {canExport && (
-                <AxisButton
-                  role="secondary"
-                  data-testid="cell-tenant-export"
-                  disabled={following !== null}
-                  onClick={() => openConfirmation('export')}
-                >
-                  {t(actionTexts.export.button)}
-                </AxisButton>
-              )}
-              {canDelete && (
-                <AxisButton
-                  role="secondary"
-                  data-testid="cell-tenant-delete"
-                  disabled={following !== null}
-                  onClick={() => openConfirmation('delete')}
-                >
-                  {t(actionTexts.delete.button)}
-                </AxisButton>
-              )}
-              {canCancelDeletion && (
-                <AxisButton
-                  role="secondary"
-                  data-testid="cell-tenant-cancel-deletion"
-                  disabled={following !== null}
-                  onClick={() => openConfirmation('cancel-deletion')}
-                >
-                  {t(actionTexts['cancel-deletion'].button)}
-                </AxisButton>
-              )}
-              {ready && (
-                <AxisButton
-                  role="secondary"
-                  data-testid="cell-tenant-download"
-                  disabled={following !== null}
-                  onClick={() => {
-                    setDownloadError(null)
-                    setDownloading(true)
-                  }}
-                >
-                  {t('shell.cell.tenant.download')}
-                </AxisButton>
-              )}
-              <AxisButton role="secondary" data-testid="cell-tenant-set-quotas" onClick={() => setOpenDialog('quotas')}>
-                {t('shell.cell.tenant.setQuotas')}
-              </AxisButton>
-              <AxisButton role="secondary" data-testid="cell-tenant-add-host" onClick={() => setOpenDialog('host')}>
-                {t('shell.cell.tenant.addHost')}
-              </AxisButton>
-            </Flex>
           </SectionPart>
         )}
         {deleted && (
-          <SectionPart testName="cell-tenant-details" heading={{ title: t('shell.cell.tenant.details') }}>
-            <Descriptions
-              data-testid="cell-tenant-deleted"
-              column={1}
-              items={[
-                { key: 'status', label: t('shell.cell.tenant.status'), children: t('shell.cell.tenant.deleted') },
-                { key: 'purgedAt', label: t('shell.cell.tenant.purgedAt'), children: when(deleted.deletedAt) },
-                { key: 'completeAt', label: t('shell.cell.tenant.completeAt'), children: when(deleted.completeAt) },
+          <SectionPart testId="cell-tenant-deleted">
+            <TermList
+              terms={[
+                { key: 'purgedAt', term: t('shell.cell.tenant.purgedAt'), value: when(deleted.deletedAt) },
+                { key: 'completeAt', term: t('shell.cell.tenant.completeAt'), value: when(deleted.completeAt) },
               ]}
             />
           </SectionPart>

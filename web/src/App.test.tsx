@@ -666,7 +666,7 @@ describe('App', () => {
     const tools = await screen.findByRole('heading', { name: 'Tools' })
     const main = screen.getByRole('main')
     expect(screen.queryByText('Open an application below to start working.')).not.toBeInTheDocument()
-    expect(within(main).queryByRole('heading', { level: 4 })).not.toBeInTheDocument()
+    expect(within(main).queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
     // Nothing sits beside a heading: the next element is the first tile or the grid, not a count.
     expect(applications.textContent).toBe('Applications')
     expect(applications.nextElementSibling).toBe(screen.getAllByRole('region')[0])

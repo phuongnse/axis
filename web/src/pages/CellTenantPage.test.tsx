@@ -3,7 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import type { CellJob, CellTenantDetail, CellTenantUsageDayPage } from '../platform/cell'
+import {
+  cellTenantStatusTones,
+  type CellJob,
+  type CellTenantDetail,
+  type CellTenantUsageDayPage,
+} from '../platform/cell'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { CellTenantPage } from './CellTenantPage'
@@ -229,6 +234,11 @@ function cellTexts(row: HTMLElement) {
     .map((cell) => cell.textContent)
 }
 
+/** The tag of the tenant's status, on the page's heading. */
+function statusTag(text: string) {
+  return within(screen.getByTestId('page-heading')).getByText(text).closest('[data-tone]')
+}
+
 describe('CellTenantPage', () => {
   afterEach(() => vi.unstubAllGlobals())
 
@@ -237,7 +247,7 @@ describe('CellTenantPage', () => {
     renderPage('/tenants/acme')
 
     const details = await screen.findByTestId('cell-tenant')
-    expect(details).toHaveTextContent('Active')
+    expect(details).not.toHaveTextContent('Status')
     expect(details).toHaveTextContent('crm')
     expect(details).toHaveTextContent('acme.example.com, portal.acme.test')
 
@@ -470,12 +480,47 @@ describe('CellTenantPage', () => {
     expect(screen.queryByTestId('cell-tenant-quotas')).not.toBeInTheDocument()
   })
 
+  it('heads the page with the tenant id, its status as a tag in the tone of the tenants list and its kind as the line', async () => {
+    stubRoutes(ok(acme))
+    renderPage('/tenants/acme')
+
+    await screen.findByTestId('cell-tenant')
+    const heading = within(screen.getByTestId('page-heading'))
+    expect(heading.getByRole('heading', { level: 1, name: 'acme' })).toBeInTheDocument()
+    expect(heading.getByText('Tenant')).toBeInTheDocument()
+    expect(statusTag('Active')).toHaveAttribute('data-tone', cellTenantStatusTones.active)
+    expect(statusTag('Active')).toHaveAttribute('data-tone', 'neutral')
+  })
+
+  it.each([
+    ['suspended', 'Suspended', 'attention'],
+    ['readOnly', 'Read only', 'attention'],
+    ['provisioning', 'Provisioning', 'neutral'],
+  ] as const)('tags a %s tenant in the tone of the tenants list', async (status, words, tone) => {
+    stubRoutes(ok({ ...acme, status }))
+    renderPage('/tenants/acme')
+
+    await screen.findByTestId('cell-tenant')
+    expect(statusTag(words)).toHaveAttribute('data-tone', tone)
+  })
+
+  it('puts the actions on the right of the heading', async () => {
+    stubRoutes(ok(acme))
+    renderPage('/tenants/acme')
+
+    const actions = within(await screen.findByTestId('page-actions'))
+    expect(await actions.findByTestId('cell-tenant-suspend')).toBeInTheDocument()
+    expect(actions.getByTestId('cell-tenant-export')).toBeInTheDocument()
+    expect(actions.getByTestId('cell-tenant-set-quotas')).toBeInTheDocument()
+    expect(actions.getByTestId('cell-tenant-add-host')).toBeInTheDocument()
+  })
+
   it('shows the purge date of a deleting tenant next to its status', async () => {
     stubRoutes(ok({ ...acme, status: 'deleting', deleteAfter: '2026-11-12T10:00:00Z' }))
     renderPage('/tenants/acme')
 
     const details = await screen.findByTestId('cell-tenant')
-    expect(details).toHaveTextContent('Deleting')
+    expect(statusTag('Deleting')).toHaveAttribute('data-tone', 'neutral')
     expect(details).toHaveTextContent(`Purge after${new Date('2026-11-12T10:00:00Z').toLocaleString('en')}`)
   })
 
@@ -495,7 +540,8 @@ describe('CellTenantPage', () => {
     renderPage('/tenants/gone')
 
     const details = await screen.findByTestId('cell-tenant-deleted')
-    expect(details).toHaveTextContent('Deleted')
+    expect(statusTag('Deleted')).toHaveAttribute('data-tone', 'muted')
+    expect(within(screen.getByTestId('page-actions')).queryByRole('button')).not.toBeInTheDocument()
     expect(details).toHaveTextContent(`Purged${new Date('2026-11-01T00:00:00Z').toLocaleString('en')}`)
     expect(details).toHaveTextContent(`Deletion complete${new Date('2026-11-08T00:00:00Z').toLocaleString('en')}`)
     expect(await screen.findByText('purge')).toBeInTheDocument()
@@ -549,11 +595,11 @@ describe('CellTenantPage', () => {
     expect(await screen.findByTestId('cell-tenant')).toBeInTheDocument()
   })
 
-  it('shows Details, Host verification, Quotas, Usage and Jobs as parts with no card', async () => {
+  it('shows the facts, then Host verification, Quotas, Usage and Jobs as parts with no card', async () => {
     stubRoutes(ok(acme))
     renderPage('/tenants/acme')
 
-    for (const name of ['Details', 'Host verification', 'Quotas', 'Usage', 'Jobs']) {
+    for (const name of ['Host verification', 'Quotas', 'Usage', 'Jobs']) {
       const region = await screen.findByRole('region', { name })
       expect(within(region).getByRole('heading', { level: 2, name })).toBeInTheDocument()
     }
@@ -622,12 +668,12 @@ describe('CellTenantPage', () => {
     expect(await screen.findByTestId('cell-tenant-action-error')).toHaveTextContent('Try again.')
     await user.click(await within(dialog).findByRole('button', { name: /Suspend$/ }))
 
-    await waitFor(() => expect(screen.getByTestId('cell-tenant')).toHaveTextContent('Suspended'))
+    await waitFor(() => expect(statusTag('Suspended')).toBeInTheDocument())
     expect(screen.queryByTestId('cell-tenant-suspend')).not.toBeInTheDocument()
     await user.click(screen.getByTestId('cell-tenant-resume'))
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Resume$/ }))
 
-    await waitFor(() => expect(screen.getByTestId('cell-tenant')).toHaveTextContent('Active'))
+    await waitFor(() => expect(statusTag('Active')).toBeInTheDocument())
     expect(keys).toHaveLength(3)
     expect(keys[0]).toBeTruthy()
     expect(keys[1]).toBe(keys[0])
@@ -1069,7 +1115,7 @@ describe('CellTenantPage', () => {
     await user.type(within(dialog).getByLabelText('Type acme to confirm'), 'acme')
     await user.click(within(dialog).getByRole('button', { name: /Delete$/ }))
 
-    await waitFor(() => expect(screen.getByTestId('cell-tenant')).toHaveTextContent('Deleting'))
+    await waitFor(() => expect(statusTag('Deleting')).toBeInTheDocument())
     expect(sent).toEqual(['DELETE /api/cell/tenants/acme'])
     expect(keys).toHaveLength(1)
     expect(keys[0]).toBeTruthy()
@@ -1098,7 +1144,7 @@ describe('CellTenantPage', () => {
     expect(within(dialog).queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: /Cancel deletion$/ }))
 
-    await waitFor(() => expect(screen.getByTestId('cell-tenant')).toHaveTextContent('Suspended'))
+    await waitFor(() => expect(statusTag('Suspended')).toBeInTheDocument())
     expect(sent).toEqual(['POST /api/cell/tenants/acme/deletion/cancel'])
     expect(keys[0]).toBeTruthy()
   })
