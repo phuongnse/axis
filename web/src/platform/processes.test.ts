@@ -10,12 +10,12 @@ describe('startProcess', () => {
     const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => new Response('{}', { status: 201 }))
     vi.stubGlobal('fetch', fetchMock)
 
-    expect(await startProcess(instancesPath, subjectId, 'key-1')).toEqual({ ok: true })
+    expect(await startProcess(instancesPath, subjectId, 'key-1', 'note.close')).toEqual({ ok: true })
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe(instancesPath)
     expect(init?.method).toBe('POST')
-    expect(init?.body).toBe(`{"subjectId":"${subjectId}"}`)
+    expect(init?.body).toBe(`{"subjectId":"${subjectId}","via":"note.close"}`)
     expect(new Headers(init?.headers).get('Idempotency-Key')).toBe('key-1')
     expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
   })
@@ -26,7 +26,7 @@ describe('startProcess', () => {
       vi.fn(async () => new Response(`{"title":"No","status":${status},"errors":{"/subjectId":["x"]}}`, { status })),
     )
 
-    expect(await startProcess(instancesPath, subjectId, 'key-1')).toEqual({
+    expect(await startProcess(instancesPath, subjectId, 'key-1', 'note.close')).toEqual({
       ok: false,
       problem: { status, title: 'No', errors: { '/subjectId': ['x'] } },
     })
@@ -38,7 +38,7 @@ describe('startProcess', () => {
       vi.fn(async () => new Response('', { status: 503 })),
     )
 
-    await expect(startProcess(instancesPath, subjectId, 'key-1')).rejects.toThrow('503')
+    await expect(startProcess(instancesPath, subjectId, 'key-1', 'note.close')).rejects.toThrow('503')
   })
 })
 

@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Audit;
+using Axis.Processes.Instances;
 
 namespace Axis.Integration.Tests;
 
@@ -37,6 +38,9 @@ public sealed class ProcessSubProcessStepTests(ProcessStepFixture fixture) : ICl
         Assert.Equal(first, await fixture.ScalarAsync("SELECT release_id FROM axis.process_instances WHERE id = @id", ("id", childId)));
         Assert.Equal(parentId, await fixture.ScalarAsync("SELECT parent_instance_id FROM axis.process_instances WHERE id = @id", ("id", childId)));
         Assert.Equal("fulfil", await fixture.ScalarAsync("SELECT parent_step FROM axis.process_instances WHERE id = @id", ("id", childId)));
+        Assert.True(JsonNode.DeepEquals(
+            JsonNode.Parse(ProcessStartedBy.Parent("ReleaseParent", parentId).ToJson()),
+            JsonNode.Parse((string)(await fixture.ScalarAsync("SELECT started_by::text FROM axis.process_instances WHERE id = @id", ("id", childId)))!)));
         var child = await fixture.InstanceAsync(childId);
         Assert.Equal(("completed", "finish", true), (child.State, child.Step, child.Ended));
         Assert.Equal(["finish"], (await fixture.HistoryAsync(childId)).Select(row => row.Step));

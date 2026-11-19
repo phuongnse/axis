@@ -58,6 +58,12 @@ public sealed class ProcessInstanceRow
     /// </summary>
     public string? AccountableUser { get; init; }
 
+    /// <summary>
+    /// The JSON text of who or what started the instance, as <see cref="Instances.ProcessStartedBy"/> writes it, or
+    /// <see langword="null"/> for an instance that started before Axis recorded its starter.
+    /// </summary>
+    public string? StartedBy { get; init; }
+
     /// <summary>The task whose completion last moved the instance on, or <see langword="null"/> until one completes.</summary>
     public Guid? DecisionTask { get; init; }
 

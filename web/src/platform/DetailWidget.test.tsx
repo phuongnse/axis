@@ -482,7 +482,7 @@ describe('DetailWidget', () => {
     expect(await screen.findByText('Closed by the process')).toBeInTheDocument()
     expect(requests()).toEqual([
       { url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined },
-      { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}"}` },
+      { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}","via":"noteClose.action"}` },
       { url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined },
     ])
   })

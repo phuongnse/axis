@@ -25,6 +25,11 @@ and revision, and `step`, the step it runs next.
 - An instance that a sub-process step started holds the `parent_instance_id` and the `parent_step` of
   its parent, and both are null for any other instance. An index on `parent_instance_id` finds the
   children of a parent.
+- A `started_by` `jsonb` column holds who or what started the instance, as the detail's
+  [`startedBy`](process-inspection.md#instance-detail) gives it: `{ "kind", "name", "id", "via" }`, always with
+  all four keys. Every start path writes it in the start transaction, with the instance. A person's `name` is
+  stored as `null`, because the detail reads it from their profile. The column is null for an instance that
+  started before Axis recorded its starter.
 - An `accountable_user` `text` column, null for none, holds the instance's
   [accountable user](module-contracts.md#the-accountable-user): its starter at the start, then the
   user of each task completion, written in the completion's transaction. A `decision_task` `uuid`

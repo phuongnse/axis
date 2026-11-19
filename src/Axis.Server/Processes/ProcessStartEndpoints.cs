@@ -25,7 +25,10 @@ namespace Axis.Server.Processes;
 /// The endpoint that starts a process instance for one subject record. The instance is pinned to
 /// the release active when the request is resolved. A request is checked in order: session or service account bearer token (401),
 /// application and process (404), the user's <c>start</c> grant on the process (403), content type
-/// (415), body (400), <c>Idempotency-Key</c> (400). Then one transaction claims the key's receipt,
+/// (415), body (400), the body's <c>via</c> (400), <c>Idempotency-Key</c> (400). The body is <c>{ "subjectId" }</c>,
+/// with an optional <c>via</c>, the label text key of the start action the person started from, which
+/// some <c>startProcess</c> action of the process on a page of the application must have. The instance stores it
+/// with the user's id as its starter. Then one transaction claims the key's receipt,
 /// locks the subject record, checks that the user may read it and reads it (400), checks the start
 /// condition (400), inserts the instance (409) and its first work item, and appends the audit
 /// record <c>process.started</c>, whose actor is the session user or the service account. A record the user may not read
@@ -43,6 +46,10 @@ internal static class ProcessStartEndpoints
     private const string SubjectIdProperty = "subjectId";
 
     private const string SubjectIdPointer = "/" + SubjectIdProperty;
+
+    private const string ViaProperty = "via";
+
+    private const string ViaPointer = "/" + ViaProperty;
 
     private const string ParametersProperty = "parameters";
 
@@ -142,9 +149,17 @@ internal static class ProcessStartEndpoints
             return JsonRequest.UnsupportedMediaType();
         }
 
-        if (!TryReadSubjectId(await ReadBodyAsync(request, cancellationToken), out var subjectId))
+        if (!TryReadSubjectId(await ReadBodyAsync(request, cancellationToken), out var subjectId, out var via))
         {
             return SubjectProblem("Must be the id of a record of the process's entity.");
+        }
+
+        if (via is not null && !HasStartAction(application, model, via))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [ViaPointer] = ["Must be the label text key of a start action of this process."],
+            });
         }
 
         if (!TryReadIdempotencyKey(request.Headers[IdempotencyKeyHeader], out var key))
@@ -236,6 +251,7 @@ internal static class ProcessStartEndpoints
             instanceId,
             user.Id,
             user.Id,
+            ProcessStartedBy.Person(user.Id, via),
             details: null,
             cancellationToken);
         if (started.Outcome != ProcessStartOutcome.Started)
@@ -319,6 +335,7 @@ internal static class ProcessStartEndpoints
             instanceId,
             user.Id,
             user.Id,
+            ProcessStartedBy.Person(user.Id, null),
             details: null,
             cancellationToken);
         if (started.Outcome != ProcessStartOutcome.Started)
@@ -357,12 +374,25 @@ internal static class ProcessStartEndpoints
         });
 
     /// <summary>
-    /// Reads a body that is exactly <c>{ "subjectId": "&lt;uuid&gt;" }</c>. Only the hyphenated
-    /// form names a record.
+    /// Whether a <c>startProcess</c> action of <paramref name="process"/>, in the actions or row actions of a widget on a
+    /// page of the application, has the label text key <paramref name="via"/>. Every site of the application serves every page.
     /// </summary>
-    private static bool TryReadSubjectId(byte[] utf8Body, out Guid subjectId)
+    private static bool HasStartAction(ApplicationModel application, ProcessModel process, string via) =>
+        application.Pages
+            .SelectMany(page => page.Leaves())
+            .SelectMany(widget => widget.Actions.Concat(widget.RowActions))
+            .OfType<StartProcessActionModel>()
+            .Any(action => action.Process.Id == process.Id && string.Equals(action.Label.TextKey, via, StringComparison.Ordinal));
+
+    /// <summary>
+    /// Reads a body that is exactly <c>{ "subjectId": "&lt;uuid&gt;" }</c>, with an optional <c>via</c> that is a
+    /// non-empty string. Only the hyphenated form names a record. <paramref name="via"/> is
+    /// <see langword="null"/> when the body has none.
+    /// </summary>
+    private static bool TryReadSubjectId(byte[] utf8Body, out Guid subjectId, out string? via)
     {
         subjectId = Guid.Empty;
+        via = null;
         if (!Utf8.IsValid(utf8Body))
         {
             return false;
@@ -378,10 +408,22 @@ internal static class ProcessStartEndpoints
             }
 
             var properties = root.EnumerateObject().ToList();
-            return properties is [{ Value.ValueKind: JsonValueKind.String } property]
-                && property.NameEquals(SubjectIdProperty)
-                && property.Value.GetString() is { Length: 36 } text
-                && Guid.TryParseExact(text, "D", out subjectId);
+            var subject = properties.Count is 1 or 2 ? properties.FirstOrDefault(property => property.NameEquals(SubjectIdProperty)) : default;
+            if (subject.Value.ValueKind != JsonValueKind.String
+                || subject.Value.GetString() is not { Length: 36 } text
+                || !Guid.TryParseExact(text, "D", out subjectId))
+            {
+                return false;
+            }
+
+            if (properties.Count == 1)
+            {
+                return true;
+            }
+
+            var other = properties.Single(property => !property.NameEquals(SubjectIdProperty));
+            via = other.NameEquals(ViaProperty) && other.Value.ValueKind == JsonValueKind.String ? other.Value.GetString() : null;
+            return via is { Length: > 0 };
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException)
         {

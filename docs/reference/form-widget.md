@@ -387,7 +387,7 @@ A click runs these steps, and the button is disabled while they run:
 1. It saves the changed fields first, as the save button does. If the save fails, its errors show as
    for a save, and nothing starts. When no field has changed, the save is skipped, so the record's
    version and history do not change for nothing.
-2. It posts `{ "subjectId" }` to the [start endpoint](processes.md#start-endpoint) with an
+2. It posts `{ "subjectId", "via" }`, with the action's label text key as `via`, to the [start endpoint](processes.md#start-endpoint) with an
    `Idempotency-Key`. When a click got no final answer, a network error or a `5xx`, the next click
    sends the same key, so a lost response cannot start a second instance. Any other answer ends the
    key, and the next click sends a new one.

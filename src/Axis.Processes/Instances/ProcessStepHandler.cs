@@ -978,6 +978,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
             child.Id,
             instance.Id,
             stepName,
+            model.Processes.First(parent => parent.Id == instance.ProcessId).Name,
             instance.AccountableUser,
             instance.DecisionTask,
             cancellationToken);
