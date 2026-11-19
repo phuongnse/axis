@@ -1,9 +1,10 @@
 import { RedoOutlined } from '@ant-design/icons'
-import { Flex, Tag, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
 import type { ReactNode } from 'react'
 import { AxisTable, type AxisColumn, type AxisTableView } from './AxisTable'
 import type { CellJob } from './cell'
 import { EmptyDash } from './EmptyValue'
+import { StatusTag, type StatusTone } from './StatusTag'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useEmptyStyle } from './useEmptyStyle'
@@ -35,11 +36,11 @@ export function CellJobTable({
   const t = useText()
   const { colour } = useDesignTokens()
   const emptyStyle = useEmptyStyle()
-  const stateColours: Record<CellJob['state'], string> = {
-    queued: colour.textMuted,
-    running: colour.infoText,
-    succeeded: colour.successText,
-    failed: colour.dangerText,
+  const stateTones: Record<CellJob['state'], StatusTone> = {
+    queued: 'neutral',
+    running: 'neutral',
+    succeeded: 'success',
+    failed: 'danger',
   }
   const states: CellJob['state'][] = ['queued', 'running', 'succeeded', 'failed']
   const kinds = ['suspend', 'resume', 'read-only', 'create', 'export', 'delete', 'cancel-deletion', 'purge']
@@ -82,12 +83,7 @@ export function CellJobTable({
         },
       }),
       render: (_value, job) => (
-        <Tag
-          variant="outlined"
-          style={{ color: stateColours[job.state], borderColor: stateColours[job.state], background: 'transparent' }}
-        >
-          {t(`shell.cell.jobs.state.${job.state}`)}
-        </Tag>
+        <StatusTag tone={stateTones[job.state]}>{t(`shell.cell.jobs.state.${job.state}`)}</StatusTag>
       ),
     },
     {

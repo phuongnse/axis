@@ -33,7 +33,7 @@ of a brokered provider, and the page shows the sessions only.
 The page lists the person's live sessions on the tenant's own hosts from `GET /api/me/sessions`, newest
 sign-in first. A signed-out visit shows the sign-in prompt, because the list call is not exempt.
 
-- **Rows.** A row shows Signed in and Last active, in the current locale. A This session tag marks the
+- **Rows.** A row shows Signed in and Last active, in the current locale. A This session `StatusTag` in `neutral` marks the
   session in use now. It has no End button, because the person ends it with Sign out, which also ends
   the identity provider's session.
 - **Filter.** The sessions table has Filter on Signed in and Last active, each by the day in the person's
@@ -91,8 +91,8 @@ The page lists the tenant's users from `GET /api/users`, 20 to a page. The serve
 sorts and pages them, see [the list route](user-administration.md#read-routes).
 
 - **Columns.** Each row has the display name, which links to [the user's page](#a-users-roles), the email, how the person signs in (the provider's alias
-  as the [list route](user-administration.md#read-routes) sends it, or "Account"), the status as a tag
-  (`invited`, `active` or `disabled`) and the last sign-in. A header sorts by its column. Columns, in the
+  as the [list route](user-administration.md#read-routes) sends it, or "Account"), the status as a
+  `StatusTag` (`invited` is `attention`, `active` is `neutral` and `disabled` is `muted`) and the last sign-in. A header sorts by its column. Columns, in the
   toolbar, chooses which columns show.
 - **Search.** The table's own Search box, in the toolbar, looks in the name and the email. A search starts
   on Enter or on the search button and goes back to page 1.
@@ -154,8 +154,9 @@ one for the platform, where the administrator gives and removes them. Their text
   display name, with the email under it, or "Not set" when the person has none. It loads the name, the email and
   the roles from the roles route, so a reload or a shared link shows it. A `403` shows that the page is for
   administrators, and a `404` shows the not-found page.
-- **Tags.** Each role shows the "Given" tag when the person has it. A given role that is not declared
-  any more has a "Not declared" tag, and its section lists it even when its application is not active.
+- **Tags.** Each role shows the "Given" `StatusTag` in `neutral` when the person has it. A given role that is not
+  declared any more has a "Not declared" `StatusTag` in `attention`, and its section lists it even when its
+  application is not active.
 - **Give and Remove.** A Give or Remove button asks for confirmation, names the role, the place and the
   person, then calls the give-role or remove-role route and loads the roles again. A `403` shows as
   "Sign in again to change a platform role." and a `409` as "An administrator cannot remove their own
@@ -195,7 +196,7 @@ unless the route answers `200`. That keeps it hidden outside a cell and from a u
 are `shell.users.usage.*`.
 
 - **Quotas.** Each quota is a row with its name, a bar and "{used} of {limit}". A quota that has reached its limit also
-  shows an "At limit" tag, so the state is not shown by colour alone. A quota with no limit shows "No limit", with its
+  shows an "At limit" `StatusTag` in `attention`, so the state is not shown by colour alone. A quota with no limit shows "No limit", with its
   use on a line of its own when the server counts it. A quota whose use the server does not count shows its limit only, with no bar.
 - **Days.** A table lists the tenant's rows of the last 30 days, newest first: the database and file sizes, users,
   applications, emails sent, connector calls and work items run. A count the server does not keep shows the em dash. The cell console's Tenant view shows the same table.

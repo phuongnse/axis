@@ -1,4 +1,4 @@
-import { Flex, Tag } from 'antd'
+import { Flex } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
@@ -14,8 +14,8 @@ import {
 } from '../platform/cell'
 import { EmptyDash } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
+import { StatusTag, type StatusTone } from '../platform/StatusTag'
 import { useText } from '../platform/texts'
-import { useDesignTokens } from '../platform/themeMode'
 import { recordPageSize, recordQuery, tablePageSizes } from '../platform/tableQuery'
 import { formatBytes } from '../platform/tenantUsage'
 import { useTableView } from '../platform/useTableView'
@@ -24,6 +24,14 @@ import { useCellConsole } from './cellConsoleContext'
 import { CreateCellTenantModal } from './CreateCellTenantModal'
 
 const statuses: CellTenantStatus[] = ['active', 'readOnly', 'suspended', 'provisioning', 'deleting']
+
+const statusTones: Record<CellTenantStatus, StatusTone> = {
+  active: 'neutral',
+  readOnly: 'attention',
+  suspended: 'attention',
+  provisioning: 'neutral',
+  deleting: 'neutral',
+}
 
 /** The columns the view's filter and sort can name, in table order, see `docs/reference/tenant-lifecycle.md#routes`. */
 const tenantFields = [
@@ -58,7 +66,6 @@ export function CellTenantsPage() {
   const t = useText()
   const { onRefused } = useCellConsole()
   const { locale } = usePlatform().current
-  const { colour } = useDesignTokens()
   const { view, setView } = useTableView(tenantFields, recordPageSize, noParameters, true, true, true)
   const query = recordQuery(view)
   const [tenants, setTenants] = useState<CellTenantPage | 'failed'>()
@@ -112,13 +119,9 @@ export function CellTenantsPage() {
         <Flex gap="small" align="center" wrap>
           {new Date(tenant.newestArchiveAt).toLocaleString(locale)}
           {stale && (
-            <Tag
-              data-testid="cell-tenants-archive-stale"
-              variant="outlined"
-              style={{ color: colour.dangerText, borderColor: colour.danger, background: 'transparent' }}
-            >
+            <StatusTag tone="attention" data-testid="cell-tenants-archive-stale">
               {t('shell.cell.tenants.archiveStale')}
-            </Tag>
+            </StatusTag>
           )}
         </Flex>
       )
@@ -138,7 +141,9 @@ export function CellTenantsPage() {
         kind: 'fixed',
         title: t('shell.cell.tenants.status'),
         sorter: true,
-        render: (_value, tenant) => t(`shell.cell.tenants.status.${tenant.status}`),
+        render: (_value, tenant) => (
+          <StatusTag tone={statusTones[tenant.status]}>{t(`shell.cell.tenants.status.${tenant.status}`)}</StatusTag>
+        ),
         filter: { kind: 'enum', options: statusOptions },
       },
       {
@@ -221,7 +226,7 @@ export function CellTenantsPage() {
         filter: { kind: 'date' },
       },
     ]
-  }, [colour, locale, t])
+  }, [locale, t])
   const page = typeof tenants === 'object' ? tenants : undefined
 
   return (

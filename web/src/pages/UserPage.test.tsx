@@ -93,9 +93,17 @@ describe('UserPage', () => {
     expect(within(page).getByTestId('user-email')).toHaveTextContent('Email: ann@axis.local')
     expect(fetchMock.mock.calls.map(([input]) => input)).toContain('/api/users/u1/roles')
     expect(within(roleRow(page, 'buyer')).getByText('Given')).toBeVisible()
+    expect(within(roleRow(page, 'buyer')).getByText('Given').closest('[data-tone]')).toHaveAttribute(
+      'data-tone',
+      'neutral',
+    )
     expect(within(roleRow(page, 'buyer')).queryByText('Not declared')).toBeNull()
     expect(within(roleRow(page, 'dropped')).getByText('Given')).toBeVisible()
     expect(within(roleRow(page, 'dropped')).getByText('Not declared')).toBeVisible()
+    expect(within(roleRow(page, 'dropped')).getByText('Not declared').closest('[data-tone]')).toHaveAttribute(
+      'data-tone',
+      'attention',
+    )
     expect(within(roleRow(page, 'approver')).getByRole('button', { name: 'Give' })).toBeVisible()
     expect(within(page).getByText('Platform')).toBeVisible()
     expect(within(roleRow(page, 'administrator')).getByRole('button', { name: 'Give' })).toBeVisible()

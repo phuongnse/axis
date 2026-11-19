@@ -1,5 +1,4 @@
 import { DeleteOutlined, SendOutlined } from '@ant-design/icons'
-import { Tag } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
@@ -14,6 +13,7 @@ import { formatValue } from '../platform/formatValue'
 import { deadLetterCommands, forbidden, sendDeadLetterCommand, type DeadLetterCommand } from '../platform/inspection'
 import { ReasonDialog } from '../platform/ReasonDialog'
 import { SectionPart } from '../platform/SectionParts'
+import { StatusTag, type StatusTone } from '../platform/StatusTag'
 import { recordPageSize, recordQuery, tablePageSizes } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
@@ -47,6 +47,8 @@ const deadLetterFields = [
 // The view has no parameters of its own. A stable empty array keeps useTableView from recomputing on each render.
 const noParameters: readonly string[] = []
 const deadLetterStates = ['open', 'redelivered', 'discarded']
+
+const deadLetterTones: Record<string, StatusTone> = { open: 'attention', redelivered: 'success', discarded: 'muted' }
 
 /**
  * The Dead letters view of the operator console: the dead letters of every application of the tenant in every state,
@@ -145,7 +147,11 @@ export function ConsoleDeadLetters({ applications, locale }: ConsoleDeadLettersP
           options: deadLetterStates.map((value) => ({ value, label: t(`shell.console.deadLetters.state.${value}`) })),
         },
         sorter: true,
-        render: (_value, item) => <Tag>{t(`shell.console.deadLetters.state.${item.state}`)}</Tag>,
+        render: (_value, item) => (
+          <StatusTag tone={deadLetterTones[item.state] ?? 'neutral'}>
+            {t(`shell.console.deadLetters.state.${item.state}`)}
+          </StatusTag>
+        ),
       },
       {
         key: 'createdAt',
