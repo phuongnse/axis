@@ -571,7 +571,8 @@ below answers `200`.
   bar and no record action shows. Such a page is mostly opened from an email, a bookmark or a shared link, so no entry
   is marked, and at narrow width the sidebar is hidden, so the link stays. A task page whose well-formed task id the
   task API answers `404` for shows the same line under its inbox page's heading, see
-  [task page](task-inbox-widget.md#task-page).
+  [task page](task-inbox-widget.md#task-page). An instance page whose well-formed id the inspection API answers `404`
+  for shows the same line under its heading, see [instance page](process-inspector-widget.md#instance-page).
 - **The default record page** _(planned)_. `/{site}/records/{entity}/{id}` shows the entity's form over every field, in
   declaration order, as an `entity` form does. It has the heading, the save bar, the history and a missing record's
   line, as any record's page does, and the person's write grants decide which fields are read-only. A module entity's

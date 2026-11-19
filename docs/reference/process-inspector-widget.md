@@ -56,53 +56,118 @@ step, release and times.
 - **Release.** The Release column shows `releaseNumber`, the release's number such as 3, never its
   id. A `null` `releaseNumber`, for a release with no history row, shows the muted dash.
 - **Ended.** An instance still running shows a muted "—" under Ended.
+- **States as tags** _(planned)_. The State column shows each state as a `StatusTag` in its tone, see [which widget](shared-widgets.md#which-widget).
 
 ## Instance page
 
 A row opens `/{site}/{page}/{instanceId}`, with the page name in lower case. `new` and an id in the
 wrong form show the not-found page, and the instance is not requested.
 
-- **Parts.** The page is a column of parts, see [layout](shell.md#layout). A Details part comes first,
-  with the commands, then the state, step, record, release and times. Steps, History, Tasks, Calls
-  and Sub-processes follow as parts, each under its heading.
+- **Heading** _(planned)_. The heading is the process's title, through `processTitle`, which gives the process's name
+  where its release gives no title. Its state is a `StatusTag` beside the title, and Process ("Quy trình") is the
+  line under it, see [page header](shell.md#page-header). The commands sit on the heading's right, through
+  `PageActions`: Open in Studio ("Mở trong Studio"), a secondary button, then Cancel instance and Retry, see
+  [commands](#commands). Studio is another site, so Open in Studio is a named button, never a link in the data,
+  see [opening things](actions-and-controls.md#opening-things). It shows only when the detail's `studio` is not
+  `null`, which is for a person who may author the application.
 
-- **Steps.** The page reads the instance detail and shows the steps as a list in graph order, each with
-  its type and its transitions, with no diagram. Steps the instance has run are marked as taken, and
-  the step it is at is marked as current, whatever the instance state. Taken is a `StatusTag` in `muted` and
-  Current one in `neutral`, so the one current step stands out from the steps already passed.
+- **Failure banner** _(planned)_. Only a failed instance has a banner. It is an `AxisAlert` with `role="alert"`
+  under the heading, in one line that says the step where the instance stopped and why, worded from `problem`,
+  see [step errors](process-inspection.md#step-errors-in-inspection). A waiting or running instance has none, as
+  its state tag says what it is.
+
+- **Facts** _(planned)_. Under the heading and above the tabs, a strip of facts through `TermList`'s `row`, in view
+  whichever tab is open. Each fact sits at its own width, `spacing-xl` apart, wraps when the line is full, and each
+  value stays on one line. The facts are, in order, Record, Started by, Started via, Started, Ended, Duration,
+  Release and Instance ID. Record is a `RecordLink`, named as the instance list's Record column names it, and is
+  left out for a process with no subject. Started by names a person through `PersonName`, or the trigger's,
+  endpoint's or schedule's name, or the parent process's title, which opens the parent instance where the site has
+  a page that inspects it. Started via says how: the action's label, such as Submit for approval, or Trigger,
+  Endpoint, Schedule or Parent process ("Bắt đầu qua"). Started shows the date and time as data, in the system's
+  format. Ended and Duration read Not set until the instance ends. Release is the release's number as plain text.
+  Instance ID is the copyable id. A fact the instance always has always shows, Not set while empty. The facts come
+  from the [instance detail](process-inspection.md#instance-detail). The page reads the navigation pages' metadata
+  only when the instance has a parent or a child. A relative whose process no navigation page inspects shows
+  without a link.
+
+- **Tabs** _(planned)_. Three tabs, Diagram, History and Data, Diagram first, with no counts. The open tab is kept
+  in the address as `tab`, through `useAddressTab`. Its value is `history` or `data`, and Diagram, the first tab,
+  is left out. Diagram shows the process's graph with the steps the instance ran.
+
+- **Data** _(planned)_. A `TermList` of two facts, each name above its value. Input is the parameters the instance
+  started with, as a `ValueTable`, or "It started with no input.". Output is the step that ended the instance and
+  the values it ended with, as `result` gives them, or "The instance has not ended yet." while it runs or waits.
+  Output reads Not set for an instance that failed or was cancelled. A hidden value follows
+  [values and masking](process-inspection.md#values-and-masking).
+
+- **History** _(planned)_. One timeline of the instance's runs, newest first, through `AxisTable`'s group rows, in
+  place of separate history, task, call and sub-process tables. A run of a step is a row. It opens to a row for each
+  task, call and sub-process it started, in the same columns, and a call opens to a row for each attempt. A call's
+  row holds its Resolve button, see [Resolve](#resolve). Its columns are:
+  - **Step**, the step's label with its kind under it, and "(run 2)" after the kind where the step ran more than once.
+  - **What happened**, one sentence from fixed texts through `useRunWords`, never free text, such as "createPurchaseOrder (ERP) succeeded on attempt 3."
+  - **State**, a `StatusTag` in the tone that `stateText` gives. A kind, such as a call's, is plain text.
+  - **Started**, through `EventTime`, and **Duration**.
+
+  The toolbar's search, filter, sort and page are in the address under the `history.` prefix. Search goes through the
+  words of a run and of the rows inside it. Filter has Step, State, Started and Duration, shown as chips, and a date
+  filters on the local day of its time. Sort is by State, in the order Failed, Waiting, Running and Done, or by Started
+  or Duration. Paging and Refresh complete the toolbar. The timeline holds its rows and does these itself. A click on
+  a run's step opens that run in the side panel, as the step's run rule below says.
+
+- **A step's run** _(planned)_. A click on a step, or on a run's step in History, chooses the step and opens
+  `StepRunPanel` in the page's `SidePanel`, see [layout](shell.md#layout). The page opens no panel at first, and
+  Close shuts the panel while the step stays chosen. The address keeps `step`, the step's name, `run`, the run's
+  number, left out for the latest run, and `stepTab`, the panel's tab, left out for the first tab. The panel's title
+  is the step's label, with the run's state as a `StatusTag` beside it. Its line is the step's kind alone, or its
+  operation's when it has one, such as Calls a connector. A step run more than once has a run chooser on top. Its
+  tabs are Overview, Input, Output, Attempts and Error, only those that apply, and Error only for a failed run. A run
+  with one part has no tab bar.
+
+- **Overview** _(planned)_. The run's facts, each a term above its value in `TermList`, each on a row of its own
+  unless two belong together:
+  - Started beside Ended, then Duration.
+  - A task's Assigned to, Due, with Overdue while it is open past its due time, and Completed by.
+  - A call's Connector ("Bộ kết nối") or Extension package ("Gói mở rộng"), with its version after a space, beside
+    Operation ("Thao tác"), then Attempts.
+  - A sub-process's instance, by its process title, a link where the site inspects it, with its state. The detail
+    names only the children whose process the user may inspect.
+  - A wait's Waits for and the event's label, then Gives up at, beside Then goes to. A timer's Goes on at. A time set
+    ahead is the system's date and time alone.
+  - Came from, then a decision's Branch ("Nhánh") or a task's Outcome, beside Went to. With no such fact, Came from
+    sits beside Went to. A decision's branch shows only where its author labelled it.
+  - Trace ID, its first 8 characters, copying whole.
+
+  A step named here is an inline link to its run, with "(run 2)" after it where it ran more than once. Connector and
+  operation are plain text, see [opening things](actions-and-controls.md#opening-things). A fact the run always has
+  reads Not set while empty, Ended and Went to included, see [fields](actions-and-controls.md#fields).
+
+- **Input and Output** _(planned)_. Both are terms, each name above its value, and a value's table is `ValueTable`.
+  A JSON body is a `BodyView`. Hidden values follow [values and masking](process-inspection.md#values-and-masking)
+  and [call input kept](process-inspection.md#call-input-kept).
+  - Input: a connector call's Request, its method, then `spacing-xs`, then its address on one line, then Query
+    parameters, Headers and Body. A package call's input by its values. A decision's the values its conditions read.
+  - Output: a connector call's answer from the attempt that settled it, with Status as plain text, then Headers and
+    Body. A package call's returned values. The record's changed fields as a diff: the value before on a "−" line on
+    the `danger` tint, and the value after on a "+" line on the `success` tint, read as "Changed from X to Y". An
+    event it raised, as Event raised and Event fields, which only a `raiseEvent` step raises. The people it
+    notified, as Notified, Channels and Subject. A record it created.
+
+  A step that makes nothing has no Output tab.
+
+- **Attempts** _(planned)_. One `compact` table, its columns #, Result (a `StatusTag`), HTTP and Duration, newest
+  first. A row folds open through `details` to its Started, Trace ID, error and answer. The tab shows the attempts
+  made, never the step's retry policy, which is the author's setting. A call with no attempts shows "No attempts
+  yet." in place of the table. An empty cell shows `EmptyDash`.
+
+- **Error** _(planned)_. The run's `problem` worded through `shell.stepProblem.<code>` in the reader's language,
+  falling back to the stored error. No stack trace or exception message shows, see
+  [step errors](process-inspection.md#step-errors-in-inspection).
+
 - **Every current step.** _(planned for M38)_ A step is marked Current when the root path is at it, or when a
   running or waiting path is at it. A step that several paths are at is marked once, with the number of paths, as in
   "Current, 3 paths". Steps inside a block are listed under the block, indented, each with its branch's name. A
   repeat's steps show no branch.
-- **History, tasks and calls.** Below the steps come the history rows with the step, the times, the
-  decision, the error and the trace ID, then the tasks, then the calls with their attempts. The
-  trace ID of a history row and of an attempt is copyable text, and the muted dash when there is none.
-  Every other empty cell of an attempt shows the dash too. A call with no attempts shows "No attempts
-  yet." in place of its table, see [Attempts](process-inspection.md#attempts). A call's kind is plain text,
-  because it is a category. Its state is a `StatusTag` with the words of the state: `pending` and `sending` are
-  `neutral`, `unknown` is `attention`, `succeeded` is `success`, `failed` is `danger` and `cancelled` is `muted`. A call whose
-  `inputHidden` is `true` shows "hidden" in place of its input. A shown input is a list of its
-  top-level properties, where a number keeps its source digits.
-- **Filter.** The History, Tasks and Sub-processes tables and each call's Attempts table have Filter on
-  each column that holds a value, of the column's kind, as [tables](actions-and-controls.md#tables)
-  say. The Open link has none. Each table holds its rows and filters them itself, with no pager. Its
-  filter is in the address under its own prefix: `history.`, `tasks.`, `subProcesses.` and
-  `attempts.{callId}.`. A date filters on the local day of its time. A step and an assignee filter on
-  the text the cell shows. A task state, an attempt kind, an attempt outcome and a sub-process state
-  filter as a choice.
-- **Subject, timer and parent.** An instance without a subject shows "No subject" in place of the
-  subject id. An instance that is `waiting` at a `timer` step shows a Due row with the `dueAt` of that
-  step's latest history row, and the row is left out in any other case. An instance that a sub-process
-  step started shows a Parent row with the parent's process name.
-- **Sub-processes.** After the calls, a Sub-processes section lists the instances that this instance
-  started, from the detail's `subProcesses`. Each row shows the child's process, the step of this
-  instance that started it, its state, and its start and end times. With none, the section shows an
-  empty text, as the tasks and the calls do. The detail names only the parent and the children whose
-  process the user may inspect.
-- **Links to relatives.** A child's Open link and the Parent row open the instance on the first
-  navigation page whose process inspector names its process, with the same lookup as the record
-  history's links. A relative whose process no navigation page inspects shows without a link. The page
-  loads the pages' metadata only when the instance has a parent or a child.
 - **Paths.** _(planned for M38)_ After the calls, a Paths part is a table of the instance's `paths`. Its columns are
   Branch or pass, Step, State, Revision, Started and Ended. A branch shows its name, and a pass shows "Pass 3". Step
   shows the step's label, as the Steps list does. Each column has Filter under the `paths.` prefix.
@@ -125,6 +190,8 @@ The instance page runs the operator's commands on the instance and its calls, ea
 - **Buttons.** The page has a Cancel instance and a Retry button for each of those commands that the
   instance detail's `commands` lists. With none listed, it has no button, and a command name the SPA
   does not know is left out.
+- **On the heading** _(planned)_. Cancel instance and Retry are secondary `AxisButton`s on the heading's right, after
+  Open in Studio, through `PageActions`.
 - **Reason.** A button opens a dialog that asks for a reason. The reason is required, must not be
   blank and has at most 500 characters, and Send is blocked until it is valid.
 - **Answer.** On success, the dialog closes and the page reads the instance detail again, so it shows
@@ -193,10 +260,14 @@ it was dead-lettered.
 The widget shows a failure where it happens, and its words come from the platform texts.
 
 - **Errors.** With nobody signed in, the API answers `401` and the widget shows the sign-in prompt like
-  any other call. A `403` shows a message that the user may not inspect the process. A `404` on the
-  instance page shows a message that the instance does not exist, inside the page. Any other failure
+  any other call. A `403` shows a message that the user may not inspect the process. Any other failure
   shows a generic load error. On the instance list, that error sits under the toolbar in place of the rows,
   so the person can clear the search or filter that caused it.
+- **A missing instance** _(planned)_. A well-formed id that the inspection API answers `404` for keeps the page's
+  heading. Under it, one line of body text says "This process instance does not exist, or you cannot open it."
+  ("Lượt chạy quy trình này không tồn tại hoặc bạn không có quyền mở.", `shell.inspector.notFound`). On the same line,
+  one link, "Go to {page}" ("Đi tới {page}", `shell.record.goToList`), as a missing record's line does, see
+  [routing](frontend.md#routing). No save bar and no action shows.
 - **Texts.** The platform texts `shell.inspector.*` hold the column headers, the section titles, the
   instance states, the call states (`shell.inspector.callStates.*`), the "hidden" text, the "No subject" text, the Due, Parent, Process and Sub-processes
   labels, the empty texts and the messages. `shell.inspector.deadLetters.*` hold the dead letter
@@ -205,3 +276,5 @@ The widget shows a failure where it happens, and its words come from the platfor
   errors.
 - **New texts.** _(planned for M38)_ The Current mark, the Paths and Variables labels and the Path column are platform
   texts under `shell.inspector.*`. The three cancel buttons and their dialog titles are under `shell.inspector.commands.*`.
+- **Page texts** _(planned)_. The tabs, the facts, the Data texts, the timeline's columns and sentences, and the step
+  run panel's tabs and terms are platform texts under `shell.inspector.*`.

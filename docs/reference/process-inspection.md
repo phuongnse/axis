@@ -231,6 +231,10 @@ in any state. The body has these parts:
     in the list can still be refused with `409`.
 - **Process title.** _(planned)_ `processTitleKey` is the text key of the process's `title` on the
   detail, on `parent` and on each `subProcesses` entry. It is `null` where the release gives no title.
+- **Record and release.** _(planned)_ The detail has `subjectEntity`, the name of the process's subject entity, or
+  `null` for a process with no subject. Its `subjectLabel` and `releaseNumber` are as the
+  [instance list](#instance-list) defines them. With `subjectId`, `subjectEntity` addresses the subject record, see
+  [routing](frontend.md#routing).
 - **Labels.** _(planned)_ Each `graph` step's `labelKey` is the key of its `label`, or `null`. Each
   transition's `labelKey` is the key of its outcome's or branch's `label`, or `null`. A `waitEvent` step
   has `event`, the event's name, and `eventLabelKey`, the key of the event's `label`, or `null`.

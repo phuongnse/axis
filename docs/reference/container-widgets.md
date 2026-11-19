@@ -32,6 +32,8 @@ widget has no heading, so it is not a part, and no rule sits above it.
 - **Positions.** The position comes from the metadata the user is served. A policy can remove a tab, so a shared link
   can open another tab.
 - **A page parameter named `tab`** clashes with the tab state.
+- **One mechanism** _(planned)_. The widget keeps its tab through `useAddressTab`, which a process instance's page
+  takes too, see [which widget](shared-widgets.md#which-widget).
 
 ## Sections
 
