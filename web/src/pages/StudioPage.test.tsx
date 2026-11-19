@@ -608,37 +608,40 @@ describe('StudioPage', () => {
     expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(0)
   })
 
-  it('shows each diagnostic with its file and path', async () => {
+  it('shows each diagnostic with its resource as a link, and no path', async () => {
     stubServer()
     renderPage()
 
     const panel = await openProblems()
     expect(within(panel).getByText('AXC0101')).toBeInTheDocument()
     expect(within(panel).getByText('The field type is unknown.')).toBeInTheDocument()
-    expect(within(panel).getByText(/entities\/purchase-request\.json, Path: \/fields\/0\/type/)).toBeInTheDocument()
-    expect(within(panel).getByText(/application\.json, Path: \/description/)).toBeInTheDocument()
+    expect(await within(panel).findByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
+    expect(within(panel).getByText('application.json')).toBeInTheDocument()
+    expect(within(panel).queryByText(/Path:/)).not.toBeInTheDocument()
   })
 
   it('selects the resource of a clicked diagnostic and shows its file', async () => {
     stubServer()
     renderPage()
 
-    await openProblems()
-    await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
+    const panel = await openProblems()
+    await userEvent.click(await within(panel).findByRole('button', { name: 'PurchaseRequest' }))
 
     expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('entities/purchase-request.json')
     expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}`)
   })
 
-  it('does not make a diagnostic without a resource clickable', async () => {
+  it('does not make a diagnostic without a resource clickable, and shows its file', async () => {
     stubServer()
     renderPage()
 
-    await openProblems()
-    await screen.findByText('The application has no description.')
+    const panel = await openProblems()
+    await within(panel).findByText('The application has no description.')
 
-    expect(screen.queryByRole('button', { name: /AXC0001/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /AXC0101/ })).toBeInTheDocument()
+    const item = within(panel).getByText('AXC0001').closest('li')!
+    expect(within(item).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(item).getByText('application.json')).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
   })
 
   it('opens the resource of a clicked diagnostic at its path and scrolls to that field', async () => {
@@ -648,8 +651,8 @@ describe('StudioPage', () => {
       stubServer()
       renderPage()
 
-      await openProblems()
-      await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
+      const panel = await openProblems()
+      await userEvent.click(await within(panel).findByRole('button', { name: 'PurchaseRequest' }))
 
       const field = await screen.findByTestId('studio-field-/fields/0')
       await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
@@ -682,8 +685,8 @@ describe('StudioPage', () => {
       })
       renderPage()
 
-      await openProblems()
-      await userEvent.click(await screen.findByRole('button', { name: /AXC0102/ }))
+      const panel = await openProblems()
+      await userEvent.click(await within(panel).findByRole('button', { name: 'PurchaseRequest' }))
 
       await screen.findByTestId('studio-field-/fields/0')
       expect(screen.getByTestId('location')).toHaveTextContent(/resource=[^&]+$/)
@@ -692,6 +695,16 @@ describe('StudioPage', () => {
     } finally {
       delete (Element.prototype as Partial<Element>).scrollIntoView
     }
+  })
+
+  it('shows no path in the details of a resource opened at a path', async () => {
+    stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}&path=%2Ffields%2F0%2Ftype`)
+
+    const details = await screen.findByTestId('studio-resource-details')
+    expect(within(details).getByText('entities/purchase-request.json')).toBeInTheDocument()
+    expect(within(details).queryByText('Path')).not.toBeInTheDocument()
+    expect(details).not.toHaveTextContent('/fields/0/type')
   })
 
   it('lists the only application as a tile and stays on the list', async () => {
@@ -981,7 +994,7 @@ describe('StudioPage', () => {
       expect(items[0]).toHaveTextContent('AXC0101')
       expect(items[1]).toHaveTextContent('AXC0001')
 
-      await userEvent.click(within(panel).getByRole('button', { name: /AXC0101/ }))
+      await userEvent.click(within(panel).getByRole('button', { name: 'PurchaseRequest' }))
 
       expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}`)
       expect(await screen.findByTestId('studio-editor')).toBeInTheDocument()
@@ -1167,7 +1180,7 @@ describe('StudioPage', () => {
     await userEvent.click(await within(usedBy).findByRole('link', { name: 'PurchaseRequest' }))
 
     expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}&path=%2Ffields%2F3%2Ftarget`)
-    expect(await screen.findByTestId('studio-resource-details')).toHaveTextContent('/fields/3/target')
+    expect(within(await screen.findByTestId('studio-resource-details')).queryByText('Path')).not.toBeInTheDocument()
   })
 
   it.each([
@@ -1291,8 +1304,8 @@ describe('StudioPage', () => {
         slow,
       )
 
-      await openProblems()
-      await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }, slow))
+      const panel = await openProblems()
+      await userEvent.click(await within(panel).findByRole('button', { name: 'PurchaseRequest' }, slow))
 
       const field = await screen.findByTestId('studio-field-/fields/0', {}, slow)
       await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }), slow)
@@ -1522,8 +1535,8 @@ describe('StudioPage leaving unsaved changes', () => {
     const router = renderGuardedPage([entityAddress])
     const maxLength = await editMaxLength()
 
-    await openProblems()
-    await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
+    const panel = await openProblems()
+    await userEvent.click(await within(panel).findByRole('button', { name: 'PurchaseRequest' }))
     await stay()
 
     expect(router.state.location.pathname + router.state.location.search).toBe(entityAddress)

@@ -1,16 +1,19 @@
-import { Button, Flex, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
 import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
 import { StatusTag } from '../platform/StatusTag'
 import type { StudioRequest, StudioScenarioResult, StudioSkippedScenarioResult } from '../platform/studio'
 import { useText } from '../platform/texts'
+import { ResourceReference } from './ResourceReference'
 
 /**
  * The results of a test request, or the contract scenarios of a publish or validate: each scenario with passed or
- * failed, its time and, for a failure, its step and message. Selecting a failure calls `onSelect` with the scenario's
- * resource and the path of its failing step, and without `onSelect` a failure is plain text. A skipped contract scenario
- * shows the relaxed point it covers and opens nothing. While the request is queued or running it shows a note instead of
- * rows, so an empty list never reads as a pass. An ended request with no scenario results says that no scenario ran.
+ * failed, its time and, for a failure, its step and message. A scenario's name is its only link, with "Test scenario"
+ * muted after it, see docs/reference/actions-and-controls.md#buttons. Selecting it calls `onSelect` with the scenario's
+ * resource and the path of its failing step, or an empty path for a pass, so a pass opens at its top. Without `onSelect`
+ * the name is plain text. A skipped contract scenario shows the relaxed point it covers and opens nothing. While the
+ * request is queued or running it shows a note instead of rows, so an empty list never reads as a pass. An ended request
+ * with no scenario results says that no scenario ran.
  */
 export function StudioTestResults({
   request,
@@ -68,32 +71,25 @@ function ScenarioRow({
     )
   }
   const failed = scenario.outcome === 'failed'
-  const content = (
-    <Flex vertical align="flex-start">
-      <Flex gap="small" align="center" wrap>
-        <StatusTag tone={failed ? 'danger' : 'success'}>
-          {t(failed ? 'shell.studio.tests.failed' : 'shell.studio.tests.passed')}
-        </StatusTag>
-        <strong>{scenario.name}</strong>
-        <Typography.Text type="secondary">{`${scenario.durationMs} ms`}</Typography.Text>
-      </Flex>
-      {failed && scenario.step !== null && (
-        <Typography.Text>{fillText(t('shell.studio.tests.step'), { number: scenario.step + 1 })}</Typography.Text>
-      )}
-      {failed && scenario.message !== null && <Typography.Text type="danger">{scenario.message}</Typography.Text>}
-    </Flex>
-  )
-  if (!failed || onSelect === undefined) {
-    return <div style={{ padding: '4px 15px' }}>{content}</div>
-  }
   return (
-    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-    <Button
-      type="text"
-      style={{ height: 'auto', textAlign: 'left' }}
-      onClick={() => onSelect(scenario.resourceId, scenario.path ?? '')}
-    >
-      {content}
-    </Button>
+    <div style={{ padding: '4px 15px' }}>
+      <Flex vertical align="flex-start">
+        <Flex gap="small" align="center" wrap>
+          <StatusTag tone={failed ? 'danger' : 'success'}>
+            {t(failed ? 'shell.studio.tests.failed' : 'shell.studio.tests.passed')}
+          </StatusTag>
+          <ResourceReference
+            resource={{ kind: 'scenario', name: scenario.name }}
+            file={scenario.file}
+            onOpen={onSelect && (() => onSelect(scenario.resourceId, scenario.path ?? ''))}
+          />
+          <Typography.Text type="secondary">{`${scenario.durationMs} ms`}</Typography.Text>
+        </Flex>
+        {failed && scenario.step !== null && (
+          <Typography.Text>{fillText(t('shell.studio.tests.step'), { number: scenario.step + 1 })}</Typography.Text>
+        )}
+        {failed && scenario.message !== null && <Typography.Text type="danger">{scenario.message}</Typography.Text>}
+      </Flex>
+    </div>
   )
 }

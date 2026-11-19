@@ -10,6 +10,7 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { Button, Flex } from 'antd'
 import { useState } from 'react'
+import type { StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { outlineCollision, silent } from './designDrag'
 import { FormOutline } from './FormOutline'
@@ -44,6 +45,7 @@ export default function StudioFormDesign({
   onChange,
   usedOn,
   onOpen,
+  resources,
   layer,
 }: {
   application: string
@@ -60,6 +62,8 @@ export default function StudioFormDesign({
   /** The list of uses. A module form has none. */
   usedOn?: FormUse[] | 'failed' | undefined
   onOpen?: OpenResource
+  /** The application's resources, which name the pages and process steps of the list of uses. */
+  resources?: readonly StudioResourceItem[]
   /** The application's layer on a module form: its marks go on the outline rows. */
   layer?: DesignerLayer
 }) {
@@ -93,7 +97,7 @@ export default function StudioFormDesign({
     >
       <div data-testid="studio-form-design">
         <Flex vertical gap="middle">
-          {onOpen && <StudioFormUsedOn entries={usedOn} onOpen={onOpen} />}
+          {onOpen && <StudioFormUsedOn entries={usedOn} onOpen={onOpen} resources={resources ?? []} />}
           <StudioFormCanvas
             application={application}
             module={module}

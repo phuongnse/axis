@@ -1,9 +1,15 @@
-import { Button, Flex, Tag, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { EmptyState } from '../platform/EmptyState'
-import { fillText } from '../platform/fillText'
-import type { StudioReference, StudioReferenceNode } from '../platform/studio'
+import {
+  relationTextKey,
+  type StudioReference,
+  type StudioReferenceNode,
+  type StudioResourceItem,
+} from '../platform/studio'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
+import { ResourceReference } from './ResourceReference'
 
 /** Opens a resource. `path` is set for a reference entry, where the reference sits in that resource. */
 export type OpenResource = (id: string, path: string | null) => void
@@ -11,15 +17,21 @@ export type OpenResource = (id: string, path: string | null) => void
 /** A `widget form` or `task form` reference whose holder is a resource. */
 export type FormUse = StudioReference & { node: Extract<StudioReferenceNode, { type: 'resource' }> }
 
-/** The pages and process steps that use a form. An entry opens its resource at the reference's path. */
+/**
+ * The pages and process steps that use a form. An entry is its resource as a link, with its kind muted, and then its
+ * relation in words, as the Used by tab says it. The link opens the resource at the reference's path.
+ */
 export function StudioFormUsedOn({
   entries,
   onOpen,
+  resources,
 }: {
   entries: FormUse[] | 'failed' | undefined
   onOpen: OpenResource
+  resources: readonly StudioResourceItem[]
 }) {
   const t = useText()
+  const { spacing } = useDesignTokens()
   if (entries === undefined) {
     return null
   }
@@ -34,25 +46,13 @@ export function StudioFormUsedOn({
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {entries.map((entry, index) => (
             <li key={index} data-testid="studio-form-used-on-entry">
-              <Flex vertical gap={4}>
-                <Flex align="center" gap="small" wrap>
-                  <Tag>{entry.relation}</Tag>
-                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                  <Button
-                    type="link"
-                    style={{ padding: 0, height: 'auto' }}
-                    onClick={() => onOpen(entry.node.id, entry.path)}
-                  >
-                    {entry.node.name ?? entry.node.file}
-                  </Button>
-                </Flex>
-                <Typography.Text type="secondary">
-                  {fillText(t('shell.studio.design.usedOnPlace'), {
-                    file: entry.file,
-                    label: t('shell.studio.path'),
-                    path: entry.path,
-                  })}
-                </Typography.Text>
+              <Flex align="center" gap={spacing.sm} wrap>
+                <ResourceReference
+                  resource={resources.find((item) => item.id === entry.node.id) ?? entry.node}
+                  file={entry.file}
+                  onOpen={() => onOpen(entry.node.id, entry.path)}
+                />
+                <Typography.Text>{t(relationTextKey(entry.relation))}</Typography.Text>
               </Flex>
             </li>
           ))}

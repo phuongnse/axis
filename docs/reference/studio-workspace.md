@@ -101,8 +101,9 @@ comes first, so it is never next to Publish….
 
 The band's errors and warnings open a Problems panel on the right, under the header. It is
 not modal, so the page stays usable while it is open. It lists every error and then every warning, each
-with its message and where it is. Opening one opens its resource at the place it names and leaves the
-panel open, so an author can fix one problem after another. The panel scrolls on its own and stops at its
+with its severity, code and message, then its resource as a link, with the kind muted after it. A problem
+that names no resource shows its file in muted text. Opening the link opens its resource at the place the
+problem names and leaves the panel open, so an author can fix one problem after another. The panel scrolls on its own and stops at its
 end, as [scroll areas](actions-and-controls.md#scroll-areas) say.
 
 - **The shared frame** _(planned)_. The panel is drawn in `SidePanel`, the one side panel frame of every page, at the

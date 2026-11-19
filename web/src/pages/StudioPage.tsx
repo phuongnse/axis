@@ -696,7 +696,6 @@ function StudioWorkspace() {
                           { key: 'kind', label: t('shell.studio.kind'), children: kindSingular(selected.kind, t) },
                           { key: 'id', label: t('shell.studio.id'), children: selected.id },
                           { key: 'file', label: t('shell.studio.file'), children: selected.file },
-                          ...(path ? [{ key: 'path', label: t('shell.studio.path'), children: path }] : []),
                         ]}
                       />
                       <StudioNamesContext.Provider value={names ?? undefined}>
@@ -811,6 +810,7 @@ function StudioWorkspace() {
             {openPanel === 'problems' && (
               <StudioProblems
                 diagnostics={loaded.diagnostics}
+                resources={loaded.resources}
                 onSelect={selectDiagnostic}
                 onClose={() => setOpenPanel(null)}
               />

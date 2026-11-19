@@ -1,22 +1,25 @@
-import { Button, Flex, Tag, Typography } from 'antd'
+import { Flex, Tag } from 'antd'
 import { EmptyState } from '../platform/EmptyState'
-import type { StudioDiagnostic } from '../platform/studio'
+import type { StudioDiagnostic, StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { problemsPanelId } from './StudioBand'
+import { ResourceReference } from './ResourceReference'
 import { StudioSidePanel } from './StudioSidePanel'
 
 /**
  * The Problems panel of the open application, drawn in `StudioSidePanel`: a column on the right, under the header, that
- * is not modal. It lists every error, then every warning, each with its code, message, file and path. A problem that names a
- * resource is a button, and `onSelect` opens that resource at the problem's path while the panel stays open.
+ * is not modal. It lists every error, then every warning, each with its code, message and resource. A problem's resource
+ * is a link when it names one, and `onSelect` opens that resource at the problem's path while the panel stays open.
  * `onClose` runs from the close button. With no problem, it says so.
  */
 export function StudioProblems({
   diagnostics,
+  resources,
   onSelect,
   onClose,
 }: {
   diagnostics: StudioDiagnostic[]
+  resources?: readonly StudioResourceItem[]
   onSelect: (resourceId: string, path: string) => void
   onClose: () => void
 }) {
@@ -34,23 +37,25 @@ export function StudioProblems({
       {diagnostics.length === 0 ? (
         <EmptyState text={t('shell.studio.problems.none')} />
       ) : (
-        <StudioProblemList diagnostics={diagnostics} onSelect={onSelect} />
+        <StudioProblemList diagnostics={diagnostics} resources={resources} onSelect={onSelect} />
       )}
     </StudioSidePanel>
   )
 }
 
 /**
- * The problems of a draft or a check, errors first, then warnings, each with its severity, code, message, file and path.
- * A problem that names a resource is a button when `onSelect` is given, and `onSelect` opens that resource at the problem's
- * path. Without `onSelect`, every problem is plain text. The list has no margin of its own, see
- * docs/reference/shared-widgets.md#which-widget.
+ * The problems of a draft or a check, errors first, then warnings, each with its severity, code, message and resource. A
+ * problem's resource is a link when `onSelect` is given, see {@link ResourceReference}, and `onSelect` opens that resource
+ * at the problem's path. Without `onSelect`, the resource is plain text. A problem that names no resource shows its file.
+ * The list has no margin of its own, see docs/reference/shared-widgets.md#which-widget.
  */
 export function StudioProblemList({
   diagnostics,
+  resources,
   onSelect,
 }: {
   diagnostics: StudioDiagnostic[]
+  resources?: readonly StudioResourceItem[]
   onSelect?: (resourceId: string, path: string) => void
 }) {
   const ordered = [
@@ -61,46 +66,39 @@ export function StudioProblemList({
     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
       {ordered.map((diagnostic, index) => (
         <li key={index}>
-          <DiagnosticRow diagnostic={diagnostic} onSelect={onSelect} />
+          <DiagnosticRow diagnostic={diagnostic} resources={resources} onSelect={onSelect} />
         </li>
       ))}
     </ul>
   )
 }
 
-/** One problem: severity, code, message, file and path. It is a button when it names a resource and `onSelect` is given. */
+/** One problem: severity, code and message, then its resource, or its file when it names none. */
 function DiagnosticRow({
   diagnostic,
+  resources,
   onSelect,
 }: {
   diagnostic: StudioDiagnostic
+  resources?: readonly StudioResourceItem[]
   onSelect?: (resourceId: string, path: string) => void
 }) {
-  const t = useText()
-  const content = (
-    <Flex vertical align="flex-start" style={{ minWidth: 0, whiteSpace: 'normal' }}>
-      <span>
-        {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-        <Tag color={diagnostic.severity === 'error' ? 'error' : 'warning'}>{diagnostic.severity}</Tag>
-        <strong>{diagnostic.code}</strong> {diagnostic.message}
-      </span>
-      <Typography.Text type="secondary">
-        {diagnostic.file}
-        {diagnostic.path !== '' && `, ${t('shell.studio.path')}: ${diagnostic.path}`}
-      </Typography.Text>
-    </Flex>
-  )
   const resourceId = diagnostic.resourceId
-  return resourceId === null || onSelect === undefined ? (
-    <div style={{ padding: '4px 15px' }}>{content}</div>
-  ) : (
-    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-    <Button
-      type="text"
-      style={{ height: 'auto', textAlign: 'left', width: '100%' }}
-      onClick={() => onSelect(resourceId, diagnostic.path)}
-    >
-      {content}
-    </Button>
+  const resource = resourceId === null ? undefined : resources?.find((item) => item.id === resourceId)
+  return (
+    <div style={{ padding: '4px 15px' }}>
+      <Flex vertical align="flex-start" style={{ minWidth: 0, whiteSpace: 'normal' }}>
+        <span>
+          {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
+          <Tag color={diagnostic.severity === 'error' ? 'error' : 'warning'}>{diagnostic.severity}</Tag>
+          <strong>{diagnostic.code}</strong> {diagnostic.message}
+        </span>
+        <ResourceReference
+          resource={resource}
+          file={diagnostic.file}
+          onOpen={resourceId !== null && onSelect ? () => onSelect(resourceId, diagnostic.path) : undefined}
+        />
+      </Flex>
+    </div>
   )
 }

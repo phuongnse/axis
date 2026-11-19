@@ -661,10 +661,26 @@ describe('the Used on list of a form', () => {
     const section = await screen.findByTestId('studio-form-used-on', {}, slow)
     const entries = await within(section).findAllByTestId('studio-form-used-on-entry')
     expect(entries).toHaveLength(2)
-    expect(within(entries[0]).getByText('widget form')).toBeInTheDocument()
-    expect(within(entries[0]).getByText('/widgets/0/form', { exact: false })).toBeInTheDocument()
-    expect(within(entries[1]).getByText('task form')).toBeInTheDocument()
-    expect(within(entries[1]).getByText('/steps/1/form', { exact: false })).toBeInTheDocument()
+    expect(within(entries[0]).getByRole('button', { name: 'Tickets' })).toBeInTheDocument()
+    expect(within(entries[0]).getByText('Page')).toBeInTheDocument()
+    expect(within(entries[0]).getByText('Shows it in a widget')).toBeInTheDocument()
+    expect(within(entries[1]).getByRole('button', { name: 'Triage' })).toBeInTheDocument()
+    expect(within(entries[1]).getByText('Process')).toBeInTheDocument()
+    expect(within(entries[1]).getByText('Shows it in a task')).toBeInTheDocument()
+  })
+
+  it('shows no file and no path for an entry', async () => {
+    stub(undefined, undefined, { uses: [], usedBy: [pageUse, processUse] })
+    renderEditor()
+
+    await openDesign()
+    const section = await screen.findByTestId('studio-form-used-on', {}, slow)
+    const entries = await within(section).findAllByTestId('studio-form-used-on-entry')
+    expect(within(section).queryByText('pages/tickets.json')).not.toBeInTheDocument()
+    expect(within(section).queryByText('processes/triage.json')).not.toBeInTheDocument()
+    expect(within(section).queryByText(/Path/)).not.toBeInTheDocument()
+    expect(entries[0]).not.toHaveTextContent('/widgets/0/form')
+    expect(entries[1]).not.toHaveTextContent('/steps/1/form')
   })
 
   it('opens the process at the path of its entry when the entry is clicked', async () => {
