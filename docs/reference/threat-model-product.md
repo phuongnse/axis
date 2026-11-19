@@ -590,7 +590,7 @@ flowchart LR
     Mcp -->|checks Origin, audience and the author role| Api
 ```
 
-**Author and agent host** _(planned for M35)_
+**Author and agent host**
 
 ```mermaid
 flowchart LR
@@ -616,7 +616,7 @@ flowchart LR
     Agent -->|calls /mcp with the exchanged token| Studio
 ```
 
-**Agent host and model provider** _(planned for M35)_
+**Agent host and model provider**
 
 ```mermaid
 flowchart LR

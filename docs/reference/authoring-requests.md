@@ -396,7 +396,7 @@ only [publishing](authoring.md#publishing) does.
 - **Who.** The author of a `ready` request accepts its draft through the accept route, see
   [routes](#routes). The route stores an `accept` with the client `studio`, and the request stays
   `ready` until the accept succeeds.
-- **In Studio** _(planned for M35)_. Studio gives the author an Accept button for the route.
+- **In Studio**. Studio gives the author an Accept button for the route.
 - **By the agent.** The agent, or any MCP client of the author, asks through `accept_draft`, see
   [tools](mcp-server.md#tools). The tool stores an `accept` with the client's id only when all of these hold:
   - the application's auto-accept setting is on, see
