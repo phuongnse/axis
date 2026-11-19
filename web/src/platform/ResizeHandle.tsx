@@ -7,7 +7,8 @@ import { useDesignTokens } from './themeMode'
  * side panel has it on its start edge and sets its width, and a package's bottom panel has it on its top edge and sets
  * its height, see docs/reference/shell.md#layout. Proposed, see #3978: a package's explorer has it on its end edge and
  * sets its width, and the rule under a handle turns `primary` while the pointer is on it or drags it, as a code
- * editor's sash does, so a person sees that the edge moves; `labelKey` names what it resizes. Each arrow moves the edge by `spacing-md`, and the arrow that moves the
+ * editor's sash does, and a short grip in `textMuted` sits at the middle of the rule at all times, as a split view's
+ * grip does, so a person sees that the edge moves before pointing at it; `labelKey` names what it resizes. Each arrow moves the edge by `spacing-md`, and the arrow that moves the
  * edge away from the panel makes it larger. `measure` gives the size that a pointer at the event's place sets, and
  * `onChange` clamps and keeps it.
  */
@@ -54,7 +55,7 @@ export function ResizeHandle({
 
   return (
     <>
-      <style>{`[data-resize-handle]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: -2px; } [data-resize-handle]::after { content: ''; position: absolute; background: transparent; transition: background-color 0.1s 0.15s; } [data-resize-handle][aria-orientation='vertical']::after { inset-block: 0; inset-inline-start: calc(50% - 1px); width: 2px; } [data-resize-handle][aria-orientation='horizontal']::after { inset-inline: 0; top: calc(50% - 1px); height: 2px; } [data-resize-handle]:hover::after, [data-resize-handle][data-dragging]::after { background: ${colour.primary}; }`}</style>
+      <style>{`[data-resize-handle]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: -2px; } [data-resize-handle]::after { content: ''; position: absolute; background: transparent; transition: background-color 0.1s 0.15s; } [data-resize-handle][aria-orientation='vertical']::after { inset-block: 0; inset-inline-start: calc(50% - 1px); width: 2px; } [data-resize-handle][aria-orientation='horizontal']::after { inset-inline: 0; top: calc(50% - 1px); height: 2px; } [data-resize-handle]::before { content: ''; position: absolute; z-index: 1; border-radius: 2px; background: ${colour.textMuted}; transition: background-color 0.1s 0.15s; } [data-resize-handle][aria-orientation='vertical']::before { top: calc(50% - 12px); inset-inline-start: calc(50% - 1.5px); width: 3px; height: 24px; } [data-resize-handle][aria-orientation='horizontal']::before { inset-inline-start: calc(50% - 12px); top: calc(50% - 1.5px); width: 24px; height: 3px; } [data-resize-handle]:hover::after, [data-resize-handle][data-dragging]::after, [data-resize-handle]:hover::before, [data-resize-handle][data-dragging]::before { background: ${colour.primary}; }`}</style>
       <div
         role="separator"
         aria-orientation={edge === 'top' ? 'horizontal' : 'vertical'}
