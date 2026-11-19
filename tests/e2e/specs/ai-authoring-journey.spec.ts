@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -10,22 +10,28 @@ import { startAgentHost } from '../agent-host'
 import { askAi, holdAiSpecLock, signIn, startSpecPublisher, type AuthoringAccount } from '../ai-authoring'
 import { csrfHeaders } from '../csrf'
 import { startDirectoryServer } from '../directory-server'
+import { addAuthenticator, submitCode, submitPassword } from '../keycloak'
 import { platformSecretKey, required } from '../server-settings'
 import { chooseTheme } from '../shell'
 import { confirmPublish } from '../studio-resources'
+import { setRealmPassword } from '../tenant-realm'
+import { liveTotp } from '../totp'
 import {
   addAuthoringAccount,
   agentHostSettings,
   issueTenantCertificate,
   keycloakAdmin,
+  mapPlatformRoles,
   prepareAuthoringRealm,
   startTunnelProxy,
   tenantHost,
 } from '../../../scripts/lib/ai-eval-stack.mjs'
 
 // The AI authoring journey: an author asks AI for a director's approval above a threshold, a colleague's change meets the
-// author's accept, and the author accepts and publishes. A last request lets a requester decide their own request, and
-// the approvals contract refuses it. See the AI authoring journey spec in docs/testing.md.
+// author's accept, and the author accepts and publishes. A next request lets a requester decide their own request, and
+// the approvals contract refuses it. The last test is an outside MCP client: it registers once the tenant administrator
+// allows all clients, and a developer's change through it passes its checks but cannot be accepted. See the AI authoring
+// journey spec in docs/testing.md.
 //
 // The tenant is served on the port offset 10, because offsets 0 to 6, 8 and 9 are taken, and offset 7 is the port of the
 // control plane. The agent host and the publisher are the same as the Ask AI agent spec's, see the comments there. The two
@@ -49,6 +55,11 @@ const refusedPlan =
   'Change the route step, so a request goes to its approver even when that approver is the person who asked for it.'
 // The module's contract scenario that the refused request fails in the checks.
 const refusedScenario = 'RequesterCannotDecideOwnRequest'
+// The outside client: its registration, the approver kind it adds and the scenario of that kind.
+const clientName = 'Journey helper'
+const clientRedirect = 'https://ai-journey.test/callback'
+const generalDirectorKey = 'approvalStep.approver.generalDirector'
+const clientScenarioName = 'GeneralDirectorApprovesLargeRequests'
 const usage = { input_tokens: 1, output_tokens: 1 }
 
 interface Resource {
@@ -71,6 +82,8 @@ let folder: string
 let trustDir: string
 let author: AuthoringAccount
 let colleague: AuthoringAccount
+// The developer who signs in through the outside client, an account of its own so that no other account's TOTP code is reused.
+let developer: AuthoringAccount
 let server: Awaited<ReturnType<typeof startDirectoryServer>>
 let proxy: Awaited<ReturnType<typeof startTunnelProxy>>
 let browser: Browser
@@ -92,7 +105,8 @@ test.beforeAll(async () => {
   // The other AI authoring spec may hold the lock for its whole run, see holdAiSpecLock. Waiting for it takes this long.
   test.setTimeout(1_800_000)
   aiLock = await holdAiSpecLock()
-  const created = await runAdmin(['tenant', 'create', tenant, '--host', host])
+  // The first administrator changes the tenant's Connected apps in the last test.
+  const created = await runAdmin(['tenant', 'create', tenant, '--host', host, '--administrator', `first-admin@${tenant}.test`])
   expect(created.status, `${created.stdout}\n${created.stderr}`).toBe(0)
   const admin = await keycloakAdmin({
     keycloakUrl: required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak'),
@@ -107,6 +121,7 @@ test.beforeAll(async () => {
     username: `author@${tenant}.test`,
   })
   colleague = await addAuthoringAccount({ admin, realm: tenant, roles: ['author'], username: `colleague@${tenant}.test` })
+  developer = await addAuthoringAccount({ admin, realm: tenant, roles: ['author'], username: `developer@${tenant}.test` })
 
   // The spec's own certificate for `*.eval.localhost`: OpenSSL in the agent host refuses the run's `*.localhost` wildcard, see tenantDomain.
   folder = await mkdtemp(path.join(os.tmpdir(), 'axis-ai-journey-'))
@@ -150,6 +165,98 @@ async function readJson<T>(page: Page, url: string): Promise<T> {
 /** Reads `url` in `page`, with the page's session, and answers its text. */
 function readText(page: Page, url: string): Promise<string> {
   return page.evaluate(async (target) => (await fetch(target)).text(), url)
+}
+
+/** The content of a texts resource with the text `key` set to `label`. */
+function withText(content: Record<string, unknown>, key: string, label: string) {
+  return { ...content, texts: { ...(content.texts as Record<string, string>), [key]: label } }
+}
+
+/**
+ * A scenario for the approvals application: a request type with the line manager as its first step and the approver kind
+ * `approver` as its second step, which a request from `minAmount` on needs, and which `dan` decides. The request of the
+ * amount `amounts.large` goes to the line manager and then to that step, and the one of `amounts.small` to the manager alone.
+ */
+function largeRequestScenario(name: string, approver: string, minAmount: number, amounts: { large: number; small: number }) {
+  return {
+    id: randomUUID(),
+    kind: 'scenario',
+    name,
+    formatVersion: 1,
+    now: '2026-11-02T09:00:00Z',
+    users: { admin: ['admin'], ann: ['employee'], mia: ['employee'], dan: ['employee'] },
+    steps: [
+      {
+        type: 'createRecord',
+        entity: 'organization/Employee',
+        as: 'admin',
+        save: 'mia',
+        values: { fullName: 'Mia Tran', workEmail: 'mia@example.com', user: 'mia' },
+      },
+      {
+        type: 'createRecord',
+        entity: 'organization/Employee',
+        as: 'admin',
+        save: 'dan',
+        values: { fullName: 'Dan Pham', workEmail: 'dan@example.com', user: 'dan' },
+      },
+      {
+        type: 'createRecord',
+        entity: 'organization/Employee',
+        as: 'admin',
+        save: 'annEmployee',
+        values: { fullName: 'Ann Nguyen', workEmail: 'ann@example.com', user: 'ann', manager: 'mia' },
+      },
+      {
+        type: 'createRecord',
+        entity: 'approvals/RequestType',
+        as: 'admin',
+        save: 'purchase',
+        values: {
+          name: 'Purchase',
+          code: 'PURCHASE',
+          steps: [
+            { sequence: 1, approver: 'lineManager' },
+            { sequence: 2, approver, employee: 'dan', minAmount },
+          ],
+        },
+      },
+      {
+        type: 'createRecord',
+        entity: 'approvals/Request',
+        as: 'ann',
+        save: 'large',
+        values: { type: 'purchase', title: 'Monitor', amount: amounts.large },
+      },
+      { type: 'startProcess', process: 'approvals/RequestApproval', record: 'large', as: 'ann' },
+      { type: 'expectTask', record: 'large', step: 'decide', assignee: { user: 'mia' } },
+      { type: 'completeTask', record: 'large', step: 'decide', outcome: 'approve', as: 'mia' },
+      { type: 'expectTask', record: 'large', step: 'decide', assignee: { user: 'dan' } },
+      { type: 'completeTask', record: 'large', step: 'decide', outcome: 'approve', as: 'dan' },
+      { type: 'expectInstance', process: 'approvals/RequestApproval', record: 'large', state: 'completed' },
+      {
+        type: 'expectRecord',
+        record: 'large',
+        values: { status: 'approved', stepsRequired: 2, step: 2 },
+      },
+      {
+        type: 'createRecord',
+        entity: 'approvals/Request',
+        as: 'ann',
+        save: 'small',
+        values: { type: 'purchase', title: 'Keyboard', amount: amounts.small },
+      },
+      { type: 'startProcess', process: 'approvals/RequestApproval', record: 'small', as: 'ann' },
+      { type: 'expectTask', record: 'small', step: 'decide', assignee: { user: 'mia' } },
+      { type: 'completeTask', record: 'small', step: 'decide', outcome: 'approve', as: 'mia' },
+      { type: 'expectInstance', process: 'approvals/RequestApproval', record: 'small', state: 'completed' },
+      {
+        type: 'expectRecord',
+        record: 'small',
+        values: { status: 'approved', stepsRequired: 1, step: 1 },
+      },
+    ],
+  }
 }
 
 /**
@@ -243,91 +350,8 @@ test("an author asks AI for a director's approval above a threshold, and the req
           : field,
       ),
     }
-    const withLabel = (content: Record<string, unknown>, label: string) => ({
-      ...content,
-      texts: { ...(content.texts as Record<string, string>), [directorKey]: label },
-    })
-
     // The scenario: a 1500 request goes to the line manager and then to the director, and a 500 request to the manager alone.
-    const scenario = {
-      id: randomUUID(),
-      kind: 'scenario',
-      name: scenarioName,
-      formatVersion: 1,
-      now: '2026-11-02T09:00:00Z',
-      users: { admin: ['admin'], ann: ['employee'], mia: ['employee'], dan: ['employee'] },
-      steps: [
-        {
-          type: 'createRecord',
-          entity: 'organization/Employee',
-          as: 'admin',
-          save: 'mia',
-          values: { fullName: 'Mia Tran', workEmail: 'mia@example.com', user: 'mia' },
-        },
-        {
-          type: 'createRecord',
-          entity: 'organization/Employee',
-          as: 'admin',
-          save: 'dan',
-          values: { fullName: 'Dan Pham', workEmail: 'dan@example.com', user: 'dan' },
-        },
-        {
-          type: 'createRecord',
-          entity: 'organization/Employee',
-          as: 'admin',
-          save: 'annEmployee',
-          values: { fullName: 'Ann Nguyen', workEmail: 'ann@example.com', user: 'ann', manager: 'mia' },
-        },
-        {
-          type: 'createRecord',
-          entity: 'approvals/RequestType',
-          as: 'admin',
-          save: 'purchase',
-          values: {
-            name: 'Purchase',
-            code: 'PURCHASE',
-            steps: [
-              { sequence: 1, approver: 'lineManager' },
-              { sequence: 2, approver: 'director', employee: 'dan', minAmount: 1000 },
-            ],
-          },
-        },
-        {
-          type: 'createRecord',
-          entity: 'approvals/Request',
-          as: 'ann',
-          save: 'large',
-          values: { type: 'purchase', title: 'Monitor', amount: 1500 },
-        },
-        { type: 'startProcess', process: 'approvals/RequestApproval', record: 'large', as: 'ann' },
-        { type: 'expectTask', record: 'large', step: 'decide', assignee: { user: 'mia' } },
-        { type: 'completeTask', record: 'large', step: 'decide', outcome: 'approve', as: 'mia' },
-        { type: 'expectTask', record: 'large', step: 'decide', assignee: { user: 'dan' } },
-        { type: 'completeTask', record: 'large', step: 'decide', outcome: 'approve', as: 'dan' },
-        { type: 'expectInstance', process: 'approvals/RequestApproval', record: 'large', state: 'completed' },
-        {
-          type: 'expectRecord',
-          record: 'large',
-          values: { status: 'approved', stepsRequired: 2, step: 2 },
-        },
-        {
-          type: 'createRecord',
-          entity: 'approvals/Request',
-          as: 'ann',
-          save: 'small',
-          values: { type: 'purchase', title: 'Keyboard', amount: 500 },
-        },
-        { type: 'startProcess', process: 'approvals/RequestApproval', record: 'small', as: 'ann' },
-        { type: 'expectTask', record: 'small', step: 'decide', assignee: { user: 'mia' } },
-        { type: 'completeTask', record: 'small', step: 'decide', outcome: 'approve', as: 'mia' },
-        { type: 'expectInstance', process: 'approvals/RequestApproval', record: 'small', state: 'completed' },
-        {
-          type: 'expectRecord',
-          record: 'small',
-          values: { status: 'approved', stepsRequired: 1, step: 1 },
-        },
-      ],
-    }
+    const scenario = largeRequestScenario(scenarioName, 'director', 1000, { large: 1500, small: 500 })
 
     // The plan, then the work reads the employee role, writes the layer and the two texts and the scenario, then its end,
     // then the review. The conflict test changes the role after AI reads it, and the accept then meets that change.
@@ -361,7 +385,7 @@ test("an author asks AI for a director's approval above a threshold, and the req
               type: 'tool_use',
               id: 'texts-en',
               name: 'write_resource',
-              input: { application, content: withLabel(textsEn, 'Director') },
+              input: { application, content: withText(textsEn, directorKey, 'Director') },
             },
           ],
           stop_reason: 'tool_use',
@@ -373,7 +397,7 @@ test("an author asks AI for a director's approval above a threshold, and the req
               type: 'tool_use',
               id: 'texts-vi',
               name: 'write_resource',
-              input: { application, content: withLabel(textsVi, 'Giám đốc') },
+              input: { application, content: withText(textsVi, directorKey, 'Giám đốc') },
             },
           ],
           stop_reason: 'tool_use',
@@ -667,5 +691,288 @@ test("a request that lets a requester decide their own request is refused by the
     expect(resource.layer).toBeNull()
   } finally {
     await page.close()
+  }
+})
+
+test("an outside MCP client registers once the administrator allows all clients, and a developer's change through it passes its checks but cannot be accepted", async () => {
+  // The checks run every approvals scenario, which takes minutes, so the test waits longer than the default.
+  test.setTimeout(1_200_000)
+  const contexts: BrowserContext[] = []
+  const newContext = async () => {
+    const context = await browser.newContext({ ignoreHTTPSErrors: true })
+    contexts.push(context)
+    return context
+  }
+  const api = `/api/studio/apps/${application}`
+  // The id of the application's newest revision, read in a page of the author's session.
+  const newestRevision = async () => {
+    const page = await authorContext.newPage()
+    try {
+      await page.goto(`https://${host}/`)
+      return (await readJson<{ items: { id: string }[] }>(page, `${api}/revisions`)).items[0].id
+    } finally {
+      await page.close()
+    }
+  }
+
+  try {
+    const before = await newestRevision()
+    const keycloak = required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak')
+    const realmUrl = `${keycloak}/realms/${tenant}`
+    // A public client that asks for the code flow and the scope of the MCP server, the registration that the realm allows.
+    const register = () =>
+      fetch(`${realmUrl}/clients-registrations/openid-connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_name: clientName,
+          redirect_uris: [clientRedirect],
+          grant_types: ['authorization_code', 'refresh_token'],
+          response_types: ['code'],
+          token_endpoint_auth_method: 'none',
+          scope: 'axis:authoring',
+        }),
+      })
+
+    // Under the default `none` the realm refuses the registration.
+    expect((await register()).status).toBe(403)
+
+    // The tenant administrator that tenant create invited chooses All, and the choice survives a reload in dark mode.
+    const firstAdmin = await setRealmPassword(tenant, `first-admin@${tenant}.test`)
+    const adminPage = await (await newContext()).newPage()
+    await adminPage.goto(`https://${host}/api/auth/sign-in?returnUrl=/`)
+    await submitPassword(adminPage, firstAdmin.username, firstAdmin.password)
+    await addAuthenticator(adminPage)
+    await adminPage.waitForURL(`https://${host}/`)
+    await adminPage.goto(`https://${host}/users`)
+    await adminPage.getByRole('tab', { name: 'Connected apps', exact: true }).click()
+    // The pattern does not match "Allow list".
+    const all = adminPage.getByTestId('connected-apps').getByRole('radio', { name: /^All\b/ })
+    await all.check()
+    await adminPage.getByTestId('connected-apps').getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(adminPage.getByTestId('connected-apps-notice')).toHaveText('The setting was saved.')
+
+    await chooseTheme(adminPage, 'Dark')
+    await adminPage.reload()
+    await adminPage.getByRole('tab', { name: 'Connected apps', exact: true }).click()
+    const dark = adminPage.locator('[data-theme-mode="dark"]').first()
+    await expect(dark.getByTestId('connected-apps').getByRole('radio', { name: /^All\b/ })).toBeChecked()
+    await chooseTheme(adminPage, 'Light')
+
+    // Registration now answers 201. The client's tokens get the developer's roles through the shared stand-in.
+    const registered = await register()
+    expect(registered.status).toBe(201)
+    const clientId = ((await registered.json()) as { client_id: string }).client_id
+    await mapPlatformRoles({
+      admin: await keycloakAdmin({
+        keycloakUrl: keycloak,
+        adminSecret: required('AXIS_E2E_IDENTITY_ADMIN_SECRET', 'the secret of the axis-admin client'),
+      }),
+      realm: tenant,
+      clientId,
+    })
+
+    // The developer signs in through the client with PKCE and allows it, and the client gets a code.
+    const verifier = randomBytes(32).toString('base64url')
+    const query = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: clientRedirect,
+      response_type: 'code',
+      scope: 'openid axis:authoring',
+      state: 's',
+      code_challenge: createHash('sha256').update(verifier).digest('base64url'),
+      code_challenge_method: 'S256',
+    })
+    const personPage = await (await newContext()).newPage()
+    await personPage.goto(`${realmUrl}/protocol/openid-connect/auth?${query}`)
+    await submitPassword(personPage, developer.username, developer.password)
+    await submitCode(personPage, await liveTotp(developer.secret))
+    // Nothing serves the redirect address, so the page fails to load and the test reads the request.
+    const redirected = personPage.waitForRequest((candidate) => candidate.url().startsWith(clientRedirect))
+    await personPage.getByRole('button', { name: 'Allow', exact: true }).click()
+    const code = new URL((await redirected).url()).searchParams.get('code')
+    expect(code).toBeTruthy()
+
+    const exchanged = await fetch(`${realmUrl}/protocol/openid-connect/token`, {
+      method: 'POST',
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: clientId,
+        code: code!,
+        redirect_uri: clientRedirect,
+        code_verifier: verifier,
+      }),
+    })
+    expect(exchanged.status).toBe(200)
+    const tokens = (await exchanged.json()) as { access_token: string; refresh_token: string }
+    let accessToken = tokens.access_token
+    let refreshToken = tokens.refresh_token
+
+    // The client's calls to /mcp, made from a page on the tenant's origin, because Node's fetch refuses the self-signed
+    // certificate. An access token lives 5 minutes and the checks take longer, so a 401 refreshes the token once.
+    const mcpPage = await (await newContext()).newPage()
+    await mcpPage.goto(`https://${host}/.well-known/oauth-protected-resource/mcp`)
+    let session: string | undefined
+    let nextId = 0
+    const post = (token: string, payload: Record<string, unknown>) =>
+      mcpPage.evaluate(
+        async ({ token, session, payload }) => {
+          const headers: Record<string, string> = {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream',
+          }
+          if (session) {
+            headers['Mcp-Session-Id'] = session
+            headers['MCP-Protocol-Version'] = '2025-11-25'
+          }
+          const response = await fetch('/mcp', { method: 'POST', headers, body: JSON.stringify(payload) })
+          const text = await response.text()
+          return {
+            status: response.status,
+            session: response.headers.get('Mcp-Session-Id'),
+            body: text.startsWith('{') ? JSON.parse(text) : null,
+          }
+        },
+        { token, session, payload },
+      )
+    const call = async (method: string, params: Record<string, unknown>, notification = false) => {
+      const payload = { jsonrpc: '2.0', method, params, ...(notification ? {} : { id: ++nextId }) }
+      let answer = await post(accessToken, payload)
+      if (answer.status === 401) {
+        const refreshed = await fetch(`${realmUrl}/protocol/openid-connect/token`, {
+          method: 'POST',
+          body: new URLSearchParams({ grant_type: 'refresh_token', client_id: clientId, refresh_token: refreshToken }),
+        })
+        expect(refreshed.status).toBe(200)
+        const renewed = (await refreshed.json()) as { access_token: string; refresh_token: string }
+        accessToken = renewed.access_token
+        refreshToken = renewed.refresh_token
+        answer = await post(accessToken, payload)
+      }
+      return answer
+    }
+    interface ToolAnswer {
+      isError: boolean
+      text: string
+      // The tool's output, which an error does not have.
+      output: any
+    }
+    const tool = async (name: string, input: Record<string, unknown>): Promise<ToolAnswer> => {
+      const answer = await call('tools/call', { name, arguments: input })
+      expect(answer.status, `${name} answered ${answer.status}`).toBe(200)
+      const result = answer.body.result
+      return { isError: result.isError === true, text: result.content[0].text, output: result.structuredContent }
+    }
+    // A call that must not be refused.
+    const run = async (name: string, input: Record<string, unknown>) => {
+      const answer = await tool(name, input)
+      expect(answer.isError, `${name}: ${answer.text}`).toBe(false)
+      return answer.output
+    }
+
+    const initialized = await call('initialize', {
+      protocolVersion: '2025-11-25',
+      capabilities: {},
+      clientInfo: { name: 'e2e', version: '1' },
+    })
+    expect(initialized.status).toBe(200)
+    expect(initialized.session).toBeTruthy()
+    session = initialized.session!
+    expect((await call('notifications/initialized', {}, true)).status).toBe(202)
+
+    // The client makes a draft and adds the approver kind generalDirector to the module's ApprovalStep, the whole resource as
+    // read, which already holds the accepted director. The two texts and a scenario follow.
+    const { id: draft } = await run('create_draft', { application })
+    const approvalStepId = (
+      JSON.parse(
+        await readFile(
+          path.resolve(import.meta.dirname, '..', '..', '..', 'modules', 'approvals', 'entities', 'approval-step.json'),
+          'utf8',
+        ),
+      ) as ApprovalStep
+    ).id
+    const { content: current } = (await run('read_module_resource', {
+      application,
+      module: 'approvals',
+      id: approvalStepId,
+    })) as { content: ApprovalStep }
+    const layer = {
+      ...current,
+      fields: current.fields.map((field) =>
+        field.name === 'approver'
+          ? {
+              ...field,
+              values: [...(field.values ?? []), 'generalDirector'],
+              valueLabels: { ...field.valueLabels, generalDirector: { textKey: generalDirectorKey } },
+            }
+          : field,
+      ),
+    }
+    await run('write_layer', { application, draft, module: 'approvals', id: approvalStepId, content: layer })
+
+    // The ids of the application's texts, read through the resources route as the first test reads them.
+    const page = await authorContext.newPage()
+    let textsIds: Record<string, string>
+    try {
+      await page.goto(`https://${host}/`)
+      const { items } = await readJson<{ items: Resource[] }>(page, `${api}/resources`)
+      const idOf = (name: string) => items.find((item) => item.kind === 'text' && item.name === name)!.id
+      textsIds = { 'General director': idOf('TextsEn'), 'Tổng giám đốc': idOf('TextsVi') }
+    } finally {
+      await page.close()
+    }
+    for (const [label, id] of Object.entries(textsIds)) {
+      const { content } = (await run('read_resource', { application, id, draft })) as { content: Record<string, unknown> }
+      await run('write_resource', { application, draft, content: withText(content, generalDirectorKey, label) })
+    }
+    // A request from 5000 on needs the general director after the line manager.
+    await run('write_resource', {
+      application,
+      draft,
+      content: largeRequestScenario(clientScenarioName, 'generalDirector', 5000, { large: 6000, small: 500 }),
+    })
+
+    const validated = (await run('validate_draft', { application, draft })) as { diagnostics: { severity: string }[] }
+    expect(validated.diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([])
+
+    // run_scenarios stores a test request that the publisher runs, so the publisher runs until the request ends.
+    publisher = await startSpecPublisher(applications)
+    try {
+      const started = (await run('run_scenarios', { application, draft })) as { request: string }
+      type Run = { status: string; scenarios: { name: string; outcome: string }[] }
+      let finished: Run | undefined
+      try {
+        await expect
+          .poll(
+            async () => {
+              const read = (await run('run_scenarios', { application, draft, request: started.request })) as Run
+              finished = read
+              return read.status
+            },
+            { timeout: 600_000, intervals: [5_000] },
+          )
+          .toMatch(/^(succeeded|failed)$/)
+      } catch (error) {
+        await test.info().attach('publisher-output', { body: publisher.output(), contentType: 'text/plain' })
+        throw error
+      }
+      expect(finished?.status, JSON.stringify(finished)).toBe('succeeded')
+      expect(finished?.scenarios.filter((scenario) => scenario.outcome === 'failed')).toEqual([])
+      expect(finished?.scenarios.find((scenario) => scenario.name === clientScenarioName)?.outcome).toBe('passed')
+    } finally {
+      await publisher.stop()
+      publisher = undefined
+    }
+
+    // No ready authoring request owns this draft, so the accept is refused and nothing is written.
+    const accepted = await tool('accept_draft', { application, draft })
+    expect(accepted.isError).toBe(true)
+    expect(accepted.text).toBe('No ready authoring request of yours has this draft.')
+    expect(await newestRevision()).toBe(before)
+  } finally {
+    for (const context of contexts) {
+      await context.close()
+    }
   }
 })
