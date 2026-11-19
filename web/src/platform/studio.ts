@@ -381,6 +381,8 @@ export interface StudioNameField {
   type: string
   target: string | null
   values: string[] | null
+  /** Whether the entity file marks the field `unique`, see docs/reference/authoring.md#names. */
+  unique: boolean
 }
 
 /** The names of one kind in `GET .../names`. `module` is the module id, or `null` for the application's own. */

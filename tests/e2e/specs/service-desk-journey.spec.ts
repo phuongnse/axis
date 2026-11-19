@@ -11,10 +11,11 @@ import { journeyApplications, journeyURL, serviceDesk } from '../server-settings
 import { useJourneySession } from '../sessions'
 import { expectForm, pick, pickLabelled, save, sample } from '../service-desk-studio'
 import {
+  addEntityField,
   addListItem,
   addListRow,
-  addEntityField,
   addMapping,
+  chooseValueSource,
   closeEntityField,
   confirmPublish,
   createResource,
@@ -309,6 +310,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByTestId('studio-field-/fields/0/name').getByRole('textbox').fill('number')
     await page.getByTestId('studio-field-/fields/0/unique').getByRole('checkbox').check()
     await page.getByTestId('studio-field-/fields/0/maxLength').getByRole('spinbutton').fill('20')
+    await chooseValueSource(page, 'Sequence')
     await pick(page, 'studio-field-/fields/0/sequence', 'TicketNumber')
     await pick(page, 'studio-field-/fields/0/label', 'ticket.number', 'ticket.number')
 
@@ -329,7 +331,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     await addField(5, 'requester')
     await page.getByTestId('studio-field-/fields/5/maxLength').getByRole('spinbutton').fill('100')
-    await page.getByTestId('studio-field-/fields/5/creator').getByRole('checkbox').check()
+    await chooseValueSource(page, 'Creator')
 
     await addField(6, 'assignedAgent')
     await page.getByTestId('studio-field-/fields/6/maxLength').getByRole('spinbutton').fill('100')
