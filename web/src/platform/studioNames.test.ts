@@ -83,11 +83,11 @@ describe('getAt', () => {
 describe('referenceOptions', () => {
   it('lists the names of a kind', () => {
     expect(referenceOptions(names, 'entity', {}, '/entity')).toEqual([
-      { name: 'Order', labelKey: 'entities.order.label' },
-      { name: 'hr/Department', labelKey: 'hr.entities.department.label' },
+      { name: 'Order', labelKey: 'entities.order.label', id: '1' },
+      { name: 'hr/Department', labelKey: 'hr.entities.department.label', id: '7' },
     ])
     expect(referenceOptions(names, 'role', {}, '/roles/0')).toEqual([
-      { name: 'manager', labelKey: 'roles.manager.label' },
+      { name: 'manager', labelKey: 'roles.manager.label', id: '3' },
     ])
     expect(referenceOptions(names, 'page', {}, '/page')).toEqual([])
   })
@@ -98,7 +98,9 @@ describe('referenceOptions', () => {
       { name: 'entities.order.label' },
       { name: 'hr.entities.department.label' },
     ])
-    expect(referenceOptions(names, 'connector', {}, '/connector')).toEqual([{ name: 'Crm', labelKey: undefined }])
+    expect(referenceOptions(names, 'connector', {}, '/connector')).toEqual([
+      { name: 'Crm', labelKey: undefined, id: '5' },
+    ])
   })
 
   it('shows the label of a module entity from the merged texts, in the locale, else in en', () => {

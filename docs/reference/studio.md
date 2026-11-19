@@ -253,7 +253,7 @@ its end.
   ones, for a failed request and for a succeeded one that holds warnings.
 - **Contract scenarios.** A publish, validate or preview request that stored contract scenarios lists
   them under the status line, see [module contracts in Studio](module-contracts.md#in-studio). A failed
-  row opens as a [test failure](#running-tests) does, and a skipped row shows its relaxed point and
+  row opens as a [test failure](studio-running-tests.md#running-tests) does, and a skipped row shows its relaxed point and
   opens nothing.
 - **While a request runs.** The buttons are off while a request runs and while the reconnect message
   shows. When the server does not answer during a request, Studio checks the request again after the
@@ -273,29 +273,6 @@ The Releases entry lists the releases from `GET .../release-list`, as
   shows.
 - **Loading.** The history loads when the application opens, and again after a request ends, a save, a
   text write, a delete or a reconnect, because the folder may then differ from the live release.
-
-## Running tests
-
-Studio runs the application's [test scenarios](test-scenarios.md) through the
-[test route](authoring.md#test) and lists each scenario's result.
-
-- **Two buttons.** Run tests, on the band, sends `POST .../test` with no body, so every scenario runs.
-  Run, on an open `scenario` resource, sends `{ "scenarios": ["<name>"] }`, so only that scenario runs.
-  Both run the saved files, not an unsaved draft, as Validate does.
-- **Who sees them.** Both show only when `GET /api/me` answers `studioTest: true`, and not when it
-  answers `false` or fails. They are off while a request runs and while the reconnect message shows.
-- **The status line** shows queued, running and the outcome, as for Validate: Tests passed or Tests
-  failed, and never a release number.
-- **Test results.** _(planned for M35)_ Each result reads as [a scenario's result](ai-authoring-in-studio.md#scenario-results)
-  does. Each scenario of the request's `scenarios` field shows a `StatusTag` that reads passed (`success`), failed (`danger`)
-  or skipped (`muted`), its time and, for a failure, the failing step and its message. Steps count from 1, as the scenario
-  editor's step cards do. The name is the only link, with its kind muted after it. A failure opens at the item's `path`, a pass at its top.
-- **No empty pass.** While the request is queued or running, the list shows a note instead of rows, so
-  an empty list never reads as a pass. A failed run with no results says that no scenario ran and
-  points to the diagnostics: compile errors, a missing setting and an unknown scenario name fail a run
-  this way.
-- **Not kept.** The list is not kept across a reload, and the request's diagnostics go in the Problems
-  panel.
 
 ## Reconnect
 
@@ -335,6 +312,11 @@ picks what exists.
 - **Unknown values.** A value that is not one of the names stays in the select as the first option,
   tagged unknown, so nothing is lost. The select takes only the listed names, so a name that is not
   listed is set in the JSON view.
+- **Open.** A chosen name that is a resource of the folder or of a module has an Open icon button joined
+  after the select, named "Open" and the property's name. It covers every kind that the names list with
+  an id, roles and events included. The button is a real link to the resource's Studio address, so
+  Ctrl+click opens a new tab. An empty value, an unknown value, or a field, step, column, parameter,
+  operation, outcome or text key has no button. A picker outside Studio's editor has none.
 - **Loading.** Until the names load, the property is a text box. The names load with the application,
   and again after a save, a text write, a delete and a reconnect.
 - **Maps with marked keys.** A map whose keys carry a mark, such as a trigger's `parameters`, shows one

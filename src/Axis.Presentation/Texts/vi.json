@@ -2105,6 +2105,7 @@
   "shell.studio.field.identityProvider.acr": "Mức đảm bảo",
   "shell.studio.field.identityProvider.acr.help": "Mức đảm bảo nhà cung cấp phải dùng khi đăng nhập cho người dùng, như urn:level2. Axis từ chối lần đăng nhập ở mức khác.",
   "shell.studio.unknownName": "không tồn tại",
+  "shell.studio.reference.open": "Mở",
   "shell.studio.versionRange.version": "Bản",
   "shell.studio.versionRange.updates": "Cập nhật",
   "shell.studio.versionRange.newest": "{version} (mới nhất)",

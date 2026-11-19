@@ -1,6 +1,10 @@
-import { Select, Tag } from 'antd'
+import { ExportOutlined } from '@ant-design/icons'
+import { Select, Space, Tag } from 'antd'
 import { useContext } from 'react'
-import { labelText, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
+import { useHref, useLinkClickHandler } from 'react-router'
+import { AxisButton } from '../platform/AxisButton'
+import { studioResourceAddress } from '../platform/studioAddress'
+import { labelText, StudioApplicationContext, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
@@ -10,7 +14,8 @@ import { PlatformContext } from './context'
  * in `en`, else its name, and muted after the label when choices share one. The search finds a choice by its label or
  * its name, and the value written is the name, see [reference pickers](docs/reference/studio.md#reference-pickers). A
  * plain string is a choice with no label. A value that is not one of the choices stays visible and is tagged unknown,
- * so a file that names something gone still shows it. The picker takes no other text.
+ * so a file that names something gone still shows it. A chosen resource of the application Studio has open gets an Open
+ * link joined after the select, see [reference pickers](docs/reference/studio.md#reference-pickers).
  */
 export function ReferencePicker({
   name,
@@ -35,10 +40,12 @@ export function ReferencePicker({
   const t = useText()
   const { colour } = useDesignTokens()
   const names = useContext(StudioNamesContext)
+  const application = useContext(StudioApplicationContext)
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const entries = options.map((option) => {
-    const { name, labelKey } = typeof option === 'string' ? { name: option, labelKey: undefined } : option
-    return { name, label: names === undefined ? undefined : labelText(names, labelKey, locale) }
+    const { name, labelKey, id } =
+      typeof option === 'string' ? { name: option, labelKey: undefined, id: undefined } : option
+    return { name, id, label: names === undefined ? undefined : labelText(names, labelKey, locale) }
   })
   const shared = new Set<string>()
   const seen = new Set<string>()
@@ -51,10 +58,9 @@ export function ReferencePicker({
     }
   }
   const current = value === undefined || value === '' ? undefined : value
-  const match =
-    current === undefined
-      ? undefined
-      : entries.find((entry) => entry.name.toLowerCase() === current.toLowerCase())?.name
+  const chosen =
+    current === undefined ? undefined : entries.find((entry) => entry.name.toLowerCase() === current.toLowerCase())
+  const match = chosen?.name
   const choices = [
     ...(current !== undefined && match === undefined
       ? [
@@ -85,7 +91,7 @@ export function ReferencePicker({
     })),
   ]
 
-  return (
+  const select = (
     <Select
       aria-label={name}
       id={id}
@@ -106,6 +112,33 @@ export function ReferencePicker({
         )
       }}
       onChange={(next: string | undefined) => onChange(next ?? (required ? '' : undefined))}
+    />
+  )
+  if (application === undefined || chosen?.id === undefined) {
+    return select
+  }
+  return (
+    <Space.Compact>
+      {select}
+      <OpenResource application={application} id={chosen.id} name={name} />
+    </Space.Compact>
+  )
+}
+
+/** The Open button joined after the select: a real link to the resource in Studio, so Ctrl+click opens a new tab. */
+function OpenResource({ application, id, name }: { application: string; id: string; name: string }) {
+  const address = studioResourceAddress(application, id)
+  const href = useHref(address)
+  const open = useLinkClickHandler<HTMLElement>(address)
+  return (
+    <AxisButton
+      role="icon"
+      joined
+      nameKey="shell.studio.reference.open"
+      nameSuffix={name}
+      icon={<ExportOutlined />}
+      href={href}
+      onClick={open}
     />
   )
 }
