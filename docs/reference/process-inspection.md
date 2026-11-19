@@ -231,7 +231,7 @@ in any state. The body has these parts:
     in the list can still be refused with `409`.
 - **Process title.** _(planned)_ `processTitleKey` is the text key of the process's `title` on the
   detail, on `parent` and on each `subProcesses` entry. It is `null` where the release gives no title.
-- **Record and release.** _(planned)_ The detail has `subjectEntity`, the name of the process's subject entity, or
+- **Record and release.** The detail has `subjectEntity`, the name of the process's subject entity, or
   `null` for a process with no subject. Its `subjectLabel` and `releaseNumber` are as the
   [instance list](#instance-list) defines them. With `subjectId`, `subjectEntity` addresses the subject record, see
   [routing](frontend.md#routing).
@@ -248,12 +248,14 @@ in any state. The body has these parts:
 - **Input and result.** _(planned)_ `input` holds the parameters the instance started with, or `null`,
   and follows [values and masking](#values-and-masking). `result` is `{ "step", "values" }` once the
   instance completed, and `null` before. Its `values` follow the same rule.
-- **Studio.** _(planned)_ `studio` is `{ "app", "resource" }`, from which the SPA builds Studio's address
-  for the process. It is `null` for a reader who may not author the application.
-- **Tasks.** _(planned)_ Each task has `dueAt`, the time it is due as UTC like `createdAt`, or `null`
+- **Studio.** `studio` is `{ "app", "resource" }`, from which the SPA builds Studio's address
+  for the process. It is `null` for a reader who may not author the application, which is a reader
+  without the author role, the one rule that Studio's own routes use.
+- **Tasks.** Each task has `dueAt`, the time it is due as UTC like `createdAt`, or `null`
   when its step has no `dueIn`. It has `assigneeId`, the id of a user assignee or of the person who
   claimed it, else `null`, and `completedById`, the id of the person who completed it, else `null`.
-  `assignee` and `completedBy` hold a person's name, and a role assignee keeps its role's name.
+  `assignee` and `completedBy` hold a person's name, or the user id when that person has no profile,
+  and a role assignee keeps its role's name.
 - **Runs.** _(planned)_ Each `path` entry has `read`, the values that a decision's conditions read, as
   `[{ "name", "value", "hidden" }]`, and `made`, a `RunOutput`:
   `{ "changes": [{ "field", "before", "after", "hidden" }], "event": { "name", "fields" }, "notified": { "to", "channels", "subject" }, "created": { "entity", "id" } }`.
@@ -290,8 +292,11 @@ in any state. The body has these parts:
 {
   "id": "0192f4a9-2d3e-7f40-8a1b-2c3d4e5f6a7b",
   "process": "PurchaseRequestApproval",
+  "subjectEntity": "PurchaseRequest",
   "subjectId": "0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b",
+  "subjectLabel": "PR-2026-0042",
   "releaseId": "0192f49a-1b2c-7d3e-8f40-5b6c7d8e9f01",
+  "releaseNumber": 7,
   "state": "waiting",
   "step": "registerPurchase",
   "createdAt": "2026-10-10T02:05:00.123456Z",
@@ -337,10 +342,13 @@ in any state. The body has these parts:
       "step": "managerApproval",
       "assigneeKind": "role",
       "assignee": "manager",
+      "assigneeId": "mai",
       "state": "completed",
       "outcome": "approve",
-      "completedBy": "manager",
+      "completedBy": "Mai Manager",
+      "completedById": "mai",
       "createdAt": "2026-10-10T02:05:00.123456Z",
+      "dueAt": "2026-10-12T02:05:00.123456Z",
       "completedAt": "2026-10-10T04:00:00.000000Z"
     }
   ],
@@ -369,15 +377,16 @@ in any state. The body has these parts:
       "resolvable": false
     }
   ],
-  "commands": []
+  "commands": [],
+  "studio": { "app": "PurchaseRequests", "resource": "0192f49b-5c6d-7e8f-9a01-2b3c4d5e6f70" }
 }
 ```
 
-The example shortens the lists. The graph, the path, the tasks and `timerDueAt` are the
-same for every user who may inspect the instance. A call's `input`,
+The example shortens the lists. The graph, the path, the tasks, `subjectEntity`, `releaseNumber` and `timerDueAt` are the
+same for every user who may inspect the instance. `subjectLabel`, `studio`, a call's `input`,
 `commands`, `parent` and `subProcesses`, and each call's `resolvable` and `outputs` differ between users.
 
-**Values by user.** _(planned)_ `studio`, the values that the masking rule hides, and a call's `request`,
+**Values by user.** _(planned)_ The values that the masking rule hides, and a call's `request`,
 `response` and `returned` also differ between users.
 
 **Paths and variables.** _(planned for M38)_ The `variables`, and the `commands` of each path and task,

@@ -212,6 +212,40 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
     }
 
     [Fact]
+    public async Task The_detail_names_the_subject_entity_the_label_and_the_release_number_as_the_list_does()
+    {
+        var (id, subjectId) = await StartAsync();
+        var activeRelease = await fixture.ActiveReleaseIdAsync();
+        var releaseNumber = await fixture.CountAsync(
+            "SELECT number::bigint FROM axis.release_activations WHERE release_id = @release LIMIT 1", ("release", activeRelease));
+
+        using var response = await GetAsync($"{Instances}/{id:D}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = await ReadJsonAsync(response);
+        var root = body.RootElement;
+        Assert.Equal("Request", root.GetProperty("subjectEntity").GetString());
+        Assert.Equal(subjectId, root.GetProperty("subjectId").GetGuid());
+        Assert.Equal($"Request {subjectId:N}", root.GetProperty("subjectLabel").GetString());
+        Assert.Equal(releaseNumber, root.GetProperty("releaseNumber").GetInt64());
+    }
+
+    [Fact]
+    public async Task A_user_who_may_not_read_the_display_field_gets_a_null_subject_label_in_the_detail()
+    {
+        var (id, _) = await StartAsync();
+        using var sam = fixture.CreateClient().SignedInAs("sam");
+
+        using var response = await GetAsync($"{Instances}/{id:D}", sam);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = await ReadJsonAsync(response);
+        Assert.Equal("Request", body.RootElement.GetProperty("subjectEntity").GetString());
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("subjectLabel").ValueKind);
+        Assert.Equal(JsonValueKind.Number, body.RootElement.GetProperty("releaseNumber").ValueKind);
+    }
+
+    [Fact]
     public async Task A_user_with_inspect_reads_an_instance_of_a_process_without_a_subject_with_no_commands()
     {
         var id = await StartJobAsync();
@@ -223,6 +257,8 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
         var root = body.RootElement;
         Assert.Equal(id, root.GetProperty("id").GetGuid());
         Assert.Equal(JsonValueKind.Null, root.GetProperty("subjectId").ValueKind);
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("subjectEntity").ValueKind);
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("subjectLabel").ValueKind);
         Assert.Equal("NightlyJob", root.GetProperty("process").GetString());
         Assert.Equal("check", root.GetProperty("graph").GetProperty("start").GetString());
         Assert.Equal(0, root.GetProperty("commands").GetArrayLength());

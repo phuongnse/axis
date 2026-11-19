@@ -19,6 +19,7 @@ public sealed class ConsoleInstanceDetailTests(TaskApiFixture fixture) : IClassF
     public async Task An_operator_with_no_application_role_reads_the_detail_of_a_failed_instance()
     {
         var instance = await StartFailedAsync(TenantA);
+        var subject = (Guid)(await fixture.ScalarAsync(TenantA, "SELECT subject_id FROM axis.process_instances WHERE id = @id", ("id", instance)))!;
 
         var (status, body) = await GetAsync("pia", TenantA, instance.ToString("D"));
 
@@ -26,11 +27,15 @@ public sealed class ConsoleInstanceDetailTests(TaskApiFixture fixture) : IClassF
         using var _ = body;
         var root = body.RootElement;
         Assert.Equal(
-            ["id", "process", "subjectId", "releaseId", "state", "step", "createdAt", "endedAt", "timerDueAt", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands"],
+            ["id", "process", "subjectEntity", "subjectId", "subjectLabel", "releaseId", "releaseNumber", "state", "step", "createdAt", "endedAt", "timerDueAt", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands", "studio"],
             root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(instance, root.GetProperty("id").GetGuid());
         Assert.Equal("DepartmentOrder", root.GetProperty("process").GetString());
         Assert.Equal("failed", root.GetProperty("state").GetString());
+        Assert.Equal("Request", root.GetProperty("subjectEntity").GetString());
+        Assert.Equal(RequestTitle(subject), root.GetProperty("subjectLabel").GetString());
+        Assert.Equal(fixture.ReleaseId(TenantA), root.GetProperty("releaseId").GetGuid());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("studio").ValueKind);
         Assert.NotEmpty(root.GetProperty("graph").GetProperty("steps").EnumerateArray());
         Assert.Equal(["retry"], root.GetProperty("commands").EnumerateArray().Select(command => command.GetString()));
 
