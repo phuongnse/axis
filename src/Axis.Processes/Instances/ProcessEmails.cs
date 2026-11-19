@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Profiles;
+using Axis.Data.Storage;
 using Axis.Processes.Work;
 using Axis.Tenancy;
 using Npgsql;
@@ -52,7 +53,8 @@ internal static class ProcessEmails
     /// one <c>pending</c> outbox row for each address and one queued <c>notification.email</c> item for each row. The
     /// addresses are those of the <c>user</c> recipients' profiles, then those of the <c>email</c> recipients. An address
     /// is used once, ignoring letter case, with the locale of its first recipient. A <c>user</c> recipient with no profile
-    /// or no email gets none, and <paramref name="noAddress"/> is called with the user id, never the address. An
+    /// or no email gets none, and <paramref name="noAddress"/> is called with the user id, never the address. A <c>user</c>
+    /// recipient who turned the <c>process</c> source's email off gets none, and <paramref name="noAddress"/> is not called for them. An
     /// <c>email</c> recipient gets the release's first locale. <paramref name="step"/> is the name of the <c>notify</c>
     /// step, or of the task step whose escalation notified.
     /// </summary>
@@ -70,6 +72,9 @@ internal static class ProcessEmails
             .Where(recipient => recipient.Kind == ProcessNotifications.UserRecipient)
             .Select(recipient => recipient.Recipient)
             .ToArray();
+        var emailOff = await NotificationPreferences.FindEmailOffAsync(
+            context.Connection, context.Transaction, ProcessNotifications.ProcessSource, userIds, cancellationToken);
+        userIds = [.. userIds.Where(userId => !emailOff.Contains(userId))];
         var contacts = await UserProfiles.FindContactsAsync(context.Connection, context.Transaction, userIds, cancellationToken);
         var targets = new List<(string Address, string? Locale)>();
         foreach (var userId in userIds)

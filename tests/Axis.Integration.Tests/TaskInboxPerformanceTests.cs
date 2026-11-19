@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
 
@@ -125,6 +126,12 @@ public sealed class TaskInboxPerformanceTests(ProcessStepFixture fixture) : ICla
         await AnalyzeAsync("axis.notification_reads");
         string[] roles = ["approver"];
         await using var connection = await fixture.DataSource.OpenConnectionAsync(CancellationToken);
+
+        // The user saved preferences with only the task source off, so the filter reads a row and hides none of these.
+        var sources = NotificationPreferences.Defaults.Sources.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        sources["task"] = new NotificationPreferences.Source(false, true, false);
+        await NotificationPreferences.ReplaceAsync(
+            connection, "requester", new NotificationPreferences.Preferences(sources, 8, "UTC"), CancellationToken);
 
         var page = await BestOfAsync(
             "notification list",

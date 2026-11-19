@@ -115,9 +115,11 @@ period.
   notification stored before the types were kept has none, so its numbers are still formatted and its
   text shows as written.
 - **Who sees one.** A user sees the notifications addressed to their user id, and those addressed to a
-  role they hold that the active release declares, checked when read, as a role task is.
+  role they hold that the active release declares, checked when read, as a role task is. They do not
+  see a source they turned off in the application, see [notification preferences](#notification-preferences).
 - **Read state.** `axis.notification_reads` holds one row per notification and user who read it.
-- **Source and kind** _(planned for M35)_. Each row keeps its source and its kind. A `notify` step or a task escalation gives the source `process`, with the kind its step gives, see [the `notify` operation](#notify-operation). A quota notice gives `quota` and is a `warning`. An AI request notice gives `authoringRequest`, see [tenant notices](#tenant-notices).
+- **Source.** Each row keeps its source. It is `process` for a `notify` step or a task escalation, and `quota` for a quota notice.
+- **Kind** _(planned for M35)_. Each row keeps its kind. A `notify` step or a task escalation gives the kind its step gives, see [the `notify` operation](#notify-operation). A quota notice is a `warning`. An AI request notice gives the source `authoringRequest`, see [tenant notices](#tenant-notices).
 - **Read is not done** _(planned for M35)_. Reading a notification marks nothing done. An `info` or `warning` notification is always done. A process's `action` notification is done only when it is cleared, because Axis cannot tell whether its action was taken. An AI request's `action` notice is done when its request leaves the state it waits on, see [tenant notices](#tenant-notices).
 - **Clearing** _(planned for M35)_. A clear sets `cleared_at` on the caller's read row, and sets `read_at` too when it is missing. A cleared notification is no longer listed or counted for that caller. Other recipients see no change, and nothing is deleted before the retention period ends.
 - **Kept for.** The worker deletes the notifications whose `created_at` is older than
@@ -270,9 +272,10 @@ A person chooses on the account page's [Notifications tab](platform-pages.md#not
 - **Own preferences only.** The routes read and write the signed-in person's preferences. No route names another person.
 - **Digest hour and time zone.** `digestHour` is a whole hour from 0 to 23. `timeZone` is an IANA time zone name. The account page sends the browser's time zone, because a tenant has no time zone of its own, as [absences](user-administration.md#absences) do.
 - **Refusals.** A bad value is a `400` keyed by its path, such as `/digestHour` for an hour outside 0 to 23, or `/timeZone` for a name that is not an IANA time zone.
-- **In-app off.** _(planned for M43)_ A source with the `application` channel off does not show in the person's bell or its counts.
-- **Email and digest.** _(planned for M43)_ An email for a source with `email` on is sent as [email](#email) says. With `digest` on, the email waits in `axis.email_outbox` for the digest. The worker then sends the waiting emails as one digest, at `digestHour` in `timeZone`. The digest lists the subject and link of each waiting email.
-- **Notices to administrators.** _(planned for M43)_ A tenant notice to the administrators always shows in the application, whatever the preferences say, and is never emailed. An AI request notice follows the `authoringRequest` source. See [tenant notices](#tenant-notices).
+- **In-app off.** A source with the `application` channel off does not show in the person's bell list or its counts, for the notifications sent to them and to a role they hold. Other people still see them. A notification they do not see is not there for marking read either: marking it alone is a `404`, and read-all skips it. It shows again when they turn the channel on, until the retention period deletes it.
+- **Email.** A `notify` step or a task escalation stages no email for a `user` recipient whose `process` source has `email` off. An `email` recipient, a bare address, is still sent. Otherwise an email is sent as [email](#email) says.
+- **Digest.** _(planned for M43)_ With `digest` on, an email waits in `axis.email_outbox` for the digest. The worker then sends the waiting emails as one digest, at `digestHour` in `timeZone`. The digest lists the subject and link of each waiting email.
+- **Notices to administrators.** A tenant notice to the administrators always shows in the application, whatever the preferences say, and is never emailed. See [tenant notices](#tenant-notices).
 - **Storage.** `axis.notification_preferences` holds one row for each person who has saved a choice. `user_id` is the primary key, `sources` (`jsonb`) holds the four sources in the shape of the body, and `digest_hour`, `time_zone` and `updated_at` hold the rest. A new source needs no migration.
 
 ## Email
@@ -334,7 +337,8 @@ own transaction, and the worker sends it later over SMTP, at least once.
   application has no site, so in a test scenario, where the tenant has no host, emails have no link.
 - **Logs.** A `user` recipient without a profile or an email gets no email. The step logs it at
   Information level with the step and the user id, never the address. An escalation logs it with the
-  task and the escalation index.
+  task and the escalation index. A `user` recipient whose `process` email is off gets no email and no
+  log, see [notification preferences](#notification-preferences).
 - **Scenarios.** In a test scenario, `advanceTime` runs the `notification.email` items with no mail
   host, so each stays queued and nothing is sent. Each scenario user has a profile with the address
   `<user>@scenario.invalid`, so a `user` recipient gets an email. An `expectNotification` step checks

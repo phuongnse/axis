@@ -333,7 +333,7 @@ filtered index of the same columns without `application_id`,
 | `recipient` | `text` | The user id or the role name. For `platformRole`, the platform role kind, `administrator` |
 | `subject_key` | `text` | The text key of the subject |
 | `body_key` | `text` | The text key of the body |
-| `source` _(planned for M35)_ | `text` | What made the notification, such as a `notify` step or a quota notice, see [In-app notifications](notifications.md#in-app-notifications) |
+| `source` | `text` | What made the notification: `process` for a `notify` step or a task escalation, the default, or `quota` for a quota notice to the administrators, see [In-app notifications](notifications.md#in-app-notifications) |
 | `kind` _(planned for M35)_ | `text` | The kind of the notification, see [In-app notifications](notifications.md#in-app-notifications) |
 | `values` | `jsonb` | The raw evaluated placeholder values, keyed by the placeholders' names. Dates are ISO text, as in an event payload. They are formatted when read |
 | `value_types` | `jsonb` | The type name of each value, keyed like `values`, such as `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` or `reference`. A value of type null or file has none. `{}` for a notification stored before the column existed |

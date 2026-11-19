@@ -27,6 +27,18 @@ public static class NotificationPreferences
         SET "sources" = excluded."sources", "digest_hour" = excluded."digest_hour", "time_zone" = excluded."time_zone", "updated_at" = now()
         """;
 
+    /// <summary>
+    /// SQL for an array of the sources that <c>@user</c> turned off in the application. It is empty when they saved nothing.
+    /// A query that uses it binds <c>@user</c>, and the planner runs it once for the query, not for each row.
+    /// </summary>
+    public const string ApplicationOffSourcesSql =
+        """ARRAY(SELECT s.key FROM "axis"."notification_preferences" p CROSS JOIN LATERAL jsonb_each(p."sources") s WHERE p."user_id" = @user AND s.value #>> '{channels,application}' = 'false')""";
+
+    private const string EmailOffSql =
+        """
+        SELECT "user_id" FROM "axis"."notification_preferences" WHERE "user_id" = ANY(@users) AND "sources" #>> ARRAY[@source, 'channels', 'email'] = 'false'
+        """;
+
     /// <summary>How one source reaches a person: in the application, by email, and whether the email waits for the daily digest.</summary>
     public sealed record Source(bool Application, bool Email, bool Digest);
 
@@ -70,6 +82,38 @@ public static class NotificationPreferences
         command.Parameters.Add(new NpgsqlParameter("hour", NpgsqlDbType.Smallint) { Value = (short)preferences.DigestHour });
         command.Parameters.AddWithValue("zone", preferences.TimeZone);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// The people among <paramref name="userIds"/> who turned the email channel of <paramref name="source"/> off.
+    /// It is empty, with no query, when no ids are given.
+    /// </summary>
+    public static async Task<IReadOnlySet<string>> FindEmailOffAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string source,
+        IReadOnlyCollection<string> userIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(userIds);
+
+        var off = new HashSet<string>(StringComparer.Ordinal);
+        if (userIds.Count == 0)
+        {
+            return off;
+        }
+
+        await using var command = new NpgsqlCommand(EmailOffSql, connection, transaction);
+        command.Parameters.Add(new NpgsqlParameter("users", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = userIds.ToArray() });
+        command.Parameters.AddWithValue("source", source);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            off.Add(reader.GetString(0));
+        }
+
+        return off;
     }
 
     // The stored shape is the API body's: { "task": { "channels": { "application": true, "email": true }, "digest": false }, ... }.

@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Profiles;
+using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Microsoft.Extensions.Logging;
 
@@ -45,6 +46,9 @@ public sealed class ProcessNotifyStepTests(ProcessStepFixture fixture) : IClassF
             Assert.Equal("decimal", types["amount"]!.GetValue<string>());
             Assert.Equal("{}", row.OpenParameters);
         });
+        Assert.Equal(
+            0L,
+            await fixture.CountAsync("SELECT count(*) FROM axis.notifications WHERE id = @id AND source <> 'process'", ("id", notificationId)));
     }
 
     [Fact]
@@ -164,6 +168,53 @@ public sealed class ProcessNotifyStepTests(ProcessStepFixture fixture) : IClassF
             entry => entry.StartsWith($"{LogLevel.Information}: Step tell of process instance {instanceId} sends no email", StringComparison.Ordinal));
         Assert.Contains($"user {title}", entry, StringComparison.Ordinal);
         Assert.DoesNotContain('@', entry);
+    }
+
+    [Fact]
+    public async Task Notify_step_stages_no_email_and_no_log_for_a_user_whose_process_email_is_off_but_still_sends_the_others()
+    {
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken);
+        var optedOutId = await fixture.InsertRequestAsync(500m, 4);
+        var defaultsId = await fixture.InsertRequestAsync(500m, 4);
+        var optedOut = $"Request {optedOutId:N}";
+        var defaults = $"Request {defaultsId:N}";
+        await NotifyMailApp.UpsertProfileAsync(fixture, optedOut, "vi", $"vi.{optedOutId:N}@example.test", CancellationToken);
+        await NotifyMailApp.UpsertProfileAsync(fixture, defaults, "vi", $"vi.{defaultsId:N}@example.test", CancellationToken);
+        await SaveProcessChannelsAsync(optedOut, application: true, email: false);
+        var optedOutInstance = await fixture.StartAsync("NotifyMail", optedOutId, releaseId, model);
+        var defaultsInstance = await fixture.StartAsync("NotifyMail", defaultsId, releaseId, model);
+
+        await fixture.RunUntilIdleAsync(CancellationToken);
+
+        Assert.Equal(ProcessStarts.Completed, (await fixture.InstanceAsync(optedOutInstance)).State);
+        Assert.Equal(ProcessStarts.Completed, (await fixture.InstanceAsync(defaultsInstance)).State);
+
+        // Only the bare address is sent for the person who turned email off, and no log says that they have no address.
+        var skipped = await EmailsAsync($"%{optedOut}%");
+        Assert.Equal(["ops@example.test"], skipped.Select(email => email.Address));
+        Assert.Equal(skipped.Select(email => email.Id), await EmailItemsAsync(optedOutInstance));
+        Assert.DoesNotContain(
+            fixture.Logs.Entries,
+            entry => entry.Contains($"process instance {optedOutInstance} sends no email", StringComparison.Ordinal));
+
+        var sent = await EmailsAsync($"%{defaults}%");
+        Assert.Equal(["ops@example.test", $"vi.{defaultsId:N}@example.test"], sent.Select(email => email.Address));
+
+        // The choice is about email only: the in-app row for the same person is still stored.
+        Assert.Equal(
+            1L,
+            await fixture.CountAsync(
+                "SELECT count(*) FROM axis.notifications WHERE recipient_kind = 'user' AND recipient = @user", ("user", optedOut)));
+    }
+
+    // Saves the process source's channels of one person, and the other sources with both channels on.
+    private async Task SaveProcessChannelsAsync(string userId, bool application, bool email)
+    {
+        var sources = NotificationPreferences.Defaults.Sources.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        sources["process"] = new NotificationPreferences.Source(application, email, false);
+        await using var connection = await fixture.DataSource.OpenConnectionAsync(CancellationToken);
+        await NotificationPreferences.ReplaceAsync(
+            connection, userId, new NotificationPreferences.Preferences(sources, 8, "UTC"), CancellationToken);
     }
 
     [Fact]
