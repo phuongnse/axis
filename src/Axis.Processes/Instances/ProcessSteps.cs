@@ -74,7 +74,8 @@ internal static class ProcessSteps
 
     /// <summary>
     /// Moves a <c>running</c> instance at <paramref name="revision"/> to <paramref name="state"/> and
-    /// <paramref name="step"/>, with the next revision. A <c>completed</c> instance gets its end time.
+    /// <paramref name="step"/>, with the next revision. A <c>completed</c> instance gets its end time and, when
+    /// <paramref name="result"/> is given, its JSON text as the values it ended with.
     /// Returns <see langword="false"/> when the instance changed since it was loaded. A concurrent
     /// change waits for the other transaction, then finds the newer revision.
     /// </summary>
@@ -84,13 +85,15 @@ internal static class ProcessSteps
         long revision,
         string state,
         string step,
+        string? result,
         CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             """
             UPDATE axis.process_instances
             SET state = @state, step = @step, revision = revision + 1,
-                ended_at = CASE WHEN @state = @completed THEN now() END
+                ended_at = CASE WHEN @state = @completed THEN now() END,
+                result = CASE WHEN @state = @completed THEN @result::jsonb END
             WHERE id = @id AND revision = @revision AND state = @running
             """,
             Connection(transaction),
@@ -99,6 +102,7 @@ internal static class ProcessSteps
         command.Parameters.AddWithValue("revision", revision);
         command.Parameters.AddWithValue("state", state);
         command.Parameters.AddWithValue("step", step);
+        command.Parameters.Add(new NpgsqlParameter("result", NpgsqlDbType.Jsonb) { Value = (object?)result ?? DBNull.Value });
         command.Parameters.AddWithValue("completed", ProcessStarts.Completed);
         command.Parameters.AddWithValue("running", ProcessStarts.Running);
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;

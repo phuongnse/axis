@@ -37,6 +37,12 @@ and revision, and `step`, the step it runs next.
   [variables](processes.md#variables) by name. A variable starts as `null`, or as an empty list for a
   list variable. The column is never copied to history, audit records or logs, and inspection shows it
   only under the [masking rule](process-inspection.md#values-and-masking).
+- A `result` `jsonb` column, null until the instance completes, holds the subject fields that the process's steps
+  write, by declared name, as they were when the instance completed, see
+  [instance detail](process-inspection.md#instance-detail). It is `{}` for a process without a subject. A sensitive
+  field of the pinned release holds `null`, never its value. An instance that completed before the column keeps
+  null. The column is never copied to history, audit records or logs, and inspection shows it only under the
+  [masking rule](process-inspection.md#values-and-masking).
 - Three more indexes serve the inspector's instance list: one by application, process and start time,
   newest first, one by application, process, state and start time, and one by subject record.
 

@@ -6,6 +6,7 @@
   "roles": ["status-reader"],
   "grants": [
     { "name": "requestRead", "entity": "Request", "actions": ["read"], "fields": ["status"] },
-    { "name": "submitInspect", "process": "Submit", "actions": ["inspect"] }
+    { "name": "submitInspect", "process": "Submit", "actions": ["inspect"] },
+    { "name": "titledJobInspect", "process": "TitledJob", "actions": ["inspect"] }
   ]
 }

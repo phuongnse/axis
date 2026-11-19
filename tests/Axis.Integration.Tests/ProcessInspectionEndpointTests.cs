@@ -10,6 +10,7 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
 {
     private const string Instances = "/api/apps/ProcessApp/processes/Submit/instances";
     private const string JobInstances = "/api/apps/ProcessApp/processes/NightlyJob/instances";
+    private const string TitledInstances = "/api/apps/ProcessApp/processes/TitledJob/instances";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -265,6 +266,66 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
     }
 
     [Fact]
+    public async Task The_input_of_an_instance_of_a_process_without_a_subject_lists_each_parameter_and_is_null_with_a_subject()
+    {
+        var job = await StartJobAsync();
+        var (withSubject, _) = await StartAsync();
+
+        using var jobResponse = await GetAsync($"{JobInstances}/{job:D}");
+        using var subjectResponse = await GetAsync($"{Instances}/{withSubject:D}");
+
+        using var jobBody = await ReadJsonAsync(jobResponse);
+        var input = Assert.Single(jobBody.RootElement.GetProperty("input").EnumerateArray());
+        Assert.Equal(["name", "value", "hidden"], input.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("days", input.GetProperty("name").GetString());
+        Assert.Equal(3, input.GetProperty("value").GetInt32());
+        Assert.False(input.GetProperty("hidden").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, jobBody.RootElement.GetProperty("result").ValueKind);
+        using var subjectBody = await ReadJsonAsync(subjectResponse);
+        Assert.Equal(JsonValueKind.Null, subjectBody.RootElement.GetProperty("input").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_completed_instance_of_a_process_without_a_subject_has_an_empty_list_of_values()
+    {
+        var job = await StartJobAsync();
+        await fixture.SetInstanceStateAsync(job, "completed");
+        await fixture.SetInstanceResultAsync(job, "{}");
+
+        using var response = await GetAsync($"{JobInstances}/{job:D}");
+
+        using var body = await ReadJsonAsync(response);
+        var result = body.RootElement.GetProperty("result");
+        // The test completes the instance by hand, so its step is the one it was at.
+        Assert.Equal("check", result.GetProperty("step").GetString());
+        Assert.Equal(JsonValueKind.Array, result.GetProperty("values").ValueKind);
+        Assert.Equal(0, result.GetProperty("values").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task A_parameter_that_a_sub_process_step_fills_from_a_field_the_user_may_not_read_is_hidden()
+    {
+        var instance = await StartTitledAsync("Quarterly review");
+        using var sam = fixture.CreateClient().SignedInAs("sam");
+        using var olga = fixture.CreateClient().SignedInAs("olga");
+
+        using var hiddenResponse = await GetAsync($"{TitledInstances}/{instance:D}", sam);
+        using var shownResponse = await GetAsync($"{TitledInstances}/{instance:D}", olga);
+
+        Assert.Equal(HttpStatusCode.OK, hiddenResponse.StatusCode);
+        using var hiddenBody = await ReadJsonAsync(hiddenResponse);
+        var hidden = Assert.Single(hiddenBody.RootElement.GetProperty("input").EnumerateArray());
+        Assert.Equal("title", hidden.GetProperty("name").GetString());
+        Assert.Equal(JsonValueKind.Null, hidden.GetProperty("value").ValueKind);
+        Assert.True(hidden.GetProperty("hidden").GetBoolean());
+        Assert.DoesNotContain("Quarterly review", hiddenBody.RootElement.ToString(), StringComparison.Ordinal);
+        using var shownBody = await ReadJsonAsync(shownResponse);
+        var shown = Assert.Single(shownBody.RootElement.GetProperty("input").EnumerateArray());
+        Assert.Equal("Quarterly review", shown.GetProperty("value").GetString());
+        Assert.False(shown.GetProperty("hidden").GetBoolean());
+    }
+
+    [Fact]
     public async Task A_user_without_inspect_on_a_process_without_a_subject_is_a_403_on_the_list_and_the_detail()
     {
         var id = await StartJobAsync();
@@ -464,6 +525,17 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
         Assert.True(fixture.Model.TryGetProcess("NightlyJob", out var process));
         await fixture.EndInstancesAsync(process.Id);
         using var request = Request(HttpMethod.Post, JobInstances, ProcessStartFixture.Host, """{ "parameters": { "days": 3 } }""");
+        using var response = await fixture.Client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var body = await ReadJsonAsync(response);
+        return body.RootElement.GetProperty("id").GetGuid();
+    }
+
+    private async Task<Guid> StartTitledAsync(string title)
+    {
+        Assert.True(fixture.Model.TryGetProcess("TitledJob", out var process));
+        await fixture.EndInstancesAsync(process.Id);
+        using var request = Request(HttpMethod.Post, TitledInstances, ProcessStartFixture.Host, $$"""{ "parameters": { "title": "{{title}}" } }""");
         using var response = await fixture.Client.SendAsync(request, CancellationToken);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var body = await ReadJsonAsync(response);

@@ -38,6 +38,14 @@ public sealed class ProcessInstanceRow
     /// </summary>
     public string? Parameters { get; init; }
 
+    /// <summary>
+    /// The JSON text of the subject fields that the process's steps write, by declared name, as they were when the
+    /// instance completed, or <see langword="null"/> before it completes and for an instance that completed before the
+    /// engine kept them. A sensitive field is stored as <c>null</c>. See
+    /// <see href="docs/reference/process-tables.md#process-instances">process tables</see>.
+    /// </summary>
+    public string? Result { get; init; }
+
     /// <summary>The instance of the process that started this one with a sub-process step, or <see langword="null"/> for any other start.</summary>
     public Guid? ParentInstanceId { get; init; }
 

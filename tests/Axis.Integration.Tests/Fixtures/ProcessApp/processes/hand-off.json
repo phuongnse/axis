@@ -1,0 +1,12 @@
+{
+  "id": "b4f7c2d9-3e61-4a85-9d0b-7c1a5e8f2b63",
+  "kind": "process",
+  "name": "HandOff",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "run",
+  "steps": [
+    { "name": "run", "type": "subProcess", "process": "TitledJob", "parameters": { "title": "title" }, "next": "done" },
+    { "name": "done", "type": "end" }
+  ]
+}

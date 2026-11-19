@@ -74,6 +74,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             instance.Property(i => i.SubjectId).HasColumnName("subject_id");
             instance.Property(i => i.ReleaseId).HasColumnName("release_id");
             instance.Property(i => i.Parameters).HasColumnName("parameters").HasColumnType("jsonb");
+            instance.Property(i => i.Result).HasColumnName("result").HasColumnType("jsonb");
             instance.Property(i => i.State).HasColumnName("state");
             instance.Property(i => i.Revision).HasColumnName("revision");
             instance.Property(i => i.Step).HasColumnName("step");
