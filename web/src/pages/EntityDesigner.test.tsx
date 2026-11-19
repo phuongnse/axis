@@ -3,7 +3,7 @@ import { EditorView } from '@codemirror/view'
 import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react'
-import { MemoryRouter } from 'react-router'
+import { createMemoryRouter, RouterProvider, type DataRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
@@ -283,27 +283,49 @@ function fieldTags(index: number): string[] {
   return Array.from(cell.querySelectorAll('.ant-tag'), (tag) => tag.textContent ?? '')
 }
 
-function Providers({ loaded, children }: { loaded: StudioNames | null; children: ReactNode }) {
+/**
+ * The providers of the designer's tests. The designer sits in a data router, so a test moves through the address with
+ * `router`. Without one, the providers make a router at `/` that draws `children`.
+ */
+function Providers({
+  loaded,
+  router,
+  children,
+}: {
+  loaded: StudioNames | null
+  router?: DataRouter
+  children?: ReactNode
+}) {
+  const [fallback] = useState(() =>
+    router === undefined ? createMemoryRouter([{ path: '*', element: children }]) : undefined,
+  )
   return (
-    <MemoryRouter>
-      <ThemeModeProvider>
-        <ThemeRoot>
-          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-            <StudioNamesContext.Provider value={loaded ?? undefined}>
-              <LabelTextsContext.Provider value={labelContext}>{children}</LabelTextsContext.Provider>
-            </StudioNamesContext.Provider>
-          </TextProvider>
-        </ThemeRoot>
-      </ThemeModeProvider>
-    </MemoryRouter>
+    <ThemeModeProvider>
+      <ThemeRoot>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioNamesContext.Provider value={loaded ?? undefined}>
+            <LabelTextsContext.Provider value={labelContext}>
+              <RouterProvider router={(router ?? fallback)!} />
+            </LabelTextsContext.Provider>
+          </StudioNamesContext.Provider>
+        </TextProvider>
+      </ThemeRoot>
+    </ThemeModeProvider>
   )
 }
 
+/** Renders `element` in a data router at `initialEntries`, and returns the router, so a test moves through its history. */
+function renderRouted(element: ReactNode, initialEntries: string[] = ['/']) {
+  const router = createMemoryRouter([{ path: '*', element }], { initialEntries })
+  render(<Providers loaded={names} router={router} />)
+  return router
+}
+
 /**
- * The designer over an entity that it edits, as the editor does: each change is applied with `setAt`. It returns the
- * whole content of the entity.
+ * The designer over an entity that it edits, as the editor does: each change is applied with `setAt`, and the test
+ * moves through the address at `initialEntries`. It returns the whole content of the entity, and the router.
  */
-function renderContent(initial: Record<string, unknown>) {
+function renderAddressed(initial: Record<string, unknown>, initialEntries: string[] = ['/']) {
   function Harness() {
     const [value, setValue] = useState(initial)
     return (
@@ -317,12 +339,14 @@ function renderContent(initial: Record<string, unknown>) {
       </>
     )
   }
-  render(
-    <Providers loaded={names}>
-      <Harness />
-    </Providers>,
-  )
-  return () => JSON.parse(screen.getByTestId('entity-content').textContent ?? '') as Record<string, unknown>
+  const router = renderRouted(<Harness />, initialEntries)
+  const content = () => JSON.parse(screen.getByTestId('entity-content').textContent ?? '') as Record<string, unknown>
+  return { content, router }
+}
+
+/** The designer over an entity that it edits, as `renderAddressed` does, at the address `/`. */
+function renderContent(initial: Record<string, unknown>) {
+  return renderAddressed(initial).content
 }
 
 /** The fields of the entity that the designer edits. */
@@ -765,6 +789,93 @@ describe('EntityDesigner', () => {
     // The table keeps every row, and only the row has a `studio-field-` id in it.
     expect(screen.getAllByTestId(/^studio-field-\/fields\/\d+$/)).toHaveLength(3)
     expect(entityFieldNames()).toEqual(['total', 'code', 'note'])
+  })
+
+  describe('the address of the field drawer', () => {
+    it('opens a field by its name as &field=<name>, with focus in its name, and Back closes it', async () => {
+      const { router } = renderAddressed(entity(), ['/studio?app=Shop'])
+
+      const drawer = await openEntityField(1)
+
+      expect(drawer).toBe(screen.getByRole('dialog', { name: 'code' }))
+      expect(router.state.location.search).toBe('?app=Shop&field=code')
+      expect(router.state.historyAction).toBe('PUSH')
+      expect(within(drawer).getByRole('textbox', { name: 'Name' })).toHaveFocus()
+
+      await act(() => router.navigate(-1))
+      await waitFor(() => expect(screen.queryByTestId('studio-field-drawer')).toBeNull())
+      expect(router.state.location.search).toBe('?app=Shop')
+    })
+
+    it('opens the drawer of the field at an address that names it, and of no other', async () => {
+      renderAddressed(entity(), ['/studio?app=Shop&field=code'])
+
+      expect(await screen.findByRole('dialog', { name: 'code' })).toBeVisible()
+    })
+
+    it('opens nothing for a name that no field has, and drops it from the address with a replace', async () => {
+      const { router } = renderAddressed(entity(), ['/studio?app=Shop&field=nope'])
+
+      await waitFor(() => expect(router.state.location.search).toBe('?app=Shop'))
+      expect(router.state.historyAction).toBe('REPLACE')
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    it('removes field from the address when Close is pressed, and returns focus to the name of the field', async () => {
+      const { router } = renderAddressed(entity(), ['/studio?app=Shop'])
+      const drawer = await openEntityField(1)
+
+      await userEvent.click(within(drawer).getByRole('button', { name: 'Close' }))
+
+      await waitFor(() => expect(screen.queryByTestId('studio-field-drawer')).toBeNull())
+      expect(router.state.location.search).toBe('?app=Shop')
+      expect(within(screen.getByTestId('studio-field-/fields/1')).getAllByRole('button')[0]).toHaveFocus()
+    })
+
+    it('follows a rename of the open field in the address, and keeps the drawer open', async () => {
+      const { router } = renderAddressed(entity(), ['/studio?app=Shop'])
+      const drawer = await openEntityField(1)
+      const name = within(drawer).getByRole('textbox', { name: 'Name' })
+
+      await userEvent.clear(name)
+      await userEvent.type(name, 'sku')
+
+      await waitFor(() => expect(router.state.location.search).toBe('?app=Shop&field=sku'))
+      expect(router.state.historyAction).toBe('REPLACE')
+      expect(screen.getByRole('dialog', { name: 'sku' })).toBe(drawer)
+    })
+
+    it('opens the drawer of an added field, which has no name, with no field in the address', async () => {
+      const { router } = renderAddressed(entity(), ['/studio?app=Shop'])
+
+      await addEntityField()
+
+      expect(await screen.findByRole('dialog', { name: 'Unnamed field' })).toBeVisible()
+      expect(router.state.location.search).toBe('?app=Shop')
+    })
+
+    it('opens the drawer of a diagnostic inside a field, with focus at that setting', async () => {
+      const fields = entity().fields
+      const value = entity({ fields: [...fields.slice(0, 2), { name: 'note', type: 'text', maxLength: 30 }] })
+      const router = renderRouted(
+        <EntityDesigner value={value} onChange={vi.fn()} application="Shop" path="/fields/2/maxLength" />,
+        ['/studio?app=Shop'],
+      )
+
+      const drawer = await screen.findByRole('dialog', { name: 'note' })
+
+      expect(router.state.location.search).toBe('?app=Shop&field=note')
+      expect(within(drawer).getByRole('spinbutton', { name: 'Max length' })).toHaveFocus()
+    })
+
+    it('focuses the drawer when the drawer shows no element for the path of a diagnostic', async () => {
+      const value = entity({ fields: [...entity().fields.slice(0, 2), { name: 'note', type: 'text' }] })
+      renderRouted(<EntityDesigner value={value} onChange={vi.fn()} application="Shop" path="/fields/2/bogus" />, [
+        '/studio?app=Shop',
+      ])
+
+      expect(await screen.findByTestId('studio-field-drawer')).toHaveFocus()
+    })
   })
 
   it('reads an empty name as Unnamed field in the table and in the drawer title', async () => {

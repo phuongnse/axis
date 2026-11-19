@@ -2,8 +2,8 @@ import { Button, ConfigProvider, Drawer, Flex, Input, InputNumber, Select, Tag, 
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import dayjs from 'dayjs'
-import { memo, useCallback, useContext, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
@@ -35,6 +35,7 @@ import { PlatformContext } from './context'
 import { Expression } from './ProcessFields'
 import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
+import { fieldElement } from './studioFieldElement'
 import type { ChangeHandler } from './SchemaForm'
 import { setOwn } from '../platform/ownProperty'
 
@@ -162,8 +163,9 @@ const Picker = memo(function Picker({
  * list of the entity's fields and a Unique choice. The name of an index or a validation is shown as plain text, and an added one gets `index1` or
  * `validation1`, the first name its list does not use. The designer edits the draft through `onChange`, so a key it
  * does not show, such as `id`, `kind` or an unknown key on a field, stays as it is. Every input has the id
- * `studio-field-<pointer>`, and each row of the table has the id of its field, so a diagnostic opens at its input or
- * at the row of a setting inside a field, which the drawer, drawn outside the form, holds. Clearing an optional value
+ * `studio-field-<pointer>`, and each row of the table has the id of its field. A diagnostic at a setting inside a field
+ * opens that field's drawer with focus at the setting, see docs/reference/entity-designer.md#diagnostics, and `path` is
+ * that diagnostic's path, or none. Clearing an optional value
  * removes its key. With `application`, the name of the application, a reference's target is a link to its entity, see
  * docs/reference/entity-designer.md#fields. With `readOnly`, as for an entity of a module, every input is off, the label
  * is its plain text key, and there are no buttons that
@@ -180,6 +182,7 @@ export function EntityDesigner({
   value,
   onChange,
   application,
+  path,
   readOnly = false,
   origins,
   warnings,
@@ -189,6 +192,7 @@ export function EntityDesigner({
   value: Content
   onChange: ChangeHandler
   application: string
+  path?: string | null
   readOnly?: boolean
   origins?: FieldOrigin[]
   warnings?: Map<number, FieldWarning>
@@ -237,6 +241,7 @@ export function EntityDesigner({
         <Fields
           fields={fields}
           application={application}
+          path={path}
           readOnly={readOnly}
           origins={origins}
           warnings={warnings}
@@ -262,6 +267,11 @@ export function EntityDesigner({
 interface FieldRow {
   index: number
   field: unknown
+}
+
+/** A field's name, or `null` where the field has none, as an address's `field` names it. */
+function fieldName(field: unknown): string | null {
+  return text(isContent(field) ? field.name : undefined) || null
 }
 
 /** The origin of each row, `null` for a row that has none. */
@@ -340,18 +350,24 @@ const noParameters: string[] = []
  * field's name as a link with its layer mark, its label, its type in words, Required and Unique as Yes or No, and its
  * properties as tags, see docs/reference/entity-designer.md#fields. The name opens the field drawer, which holds the
  * field's inputs, see docs/reference/entity-designer.md#field-drawer. Every cell is a memo component of stable
- * props, so a key in one row draws that row's cells and no other. Only the row has an id in the table, so a diagnostic
- * inside a field opens at its row. The table has a search over Name and Label, as the Label cell shows it, kept in the
+ * props, so a key in one row draws that row's cells and no other. Only the row has an id in the table, and the drawer
+ * has the ids of its inputs. The table has a search over Name and Label, as the Label cell shows it, kept in the
  * address as `fields.search`. It also has a Filter on Name, Label, Type, Required and Unique, kept as `fields.filter`.
  * A filter only hides rows: every row shows on one page, an edit to a hidden row stays in the draft, and
  * a field whose origin is `null`, one added since the last save, stays shown. Add field opens the new field's drawer.
  * Move up and Move down keep the open drawer on its field at the field's new index, and Remove closes the drawer only
  * when it removes that field, see docs/reference/entity-designer.md#field-drawer. A read-only designer has no "…" menu,
  * see docs/reference/entity-designer.md#fields.
+ *
+ * The open drawer's field is in the address as `field=<name>`, see docs/reference/studio.md#route-and-address. Opening
+ * and closing it add a history entry, and a rename or a removal replaces the entry. A `field` that names no field opens
+ * nothing and is dropped. `path` is a diagnostic's path: one inside a field, such as `/fields/2/maxLength`, opens that
+ * field's drawer with focus at the setting, see docs/reference/entity-designer.md#diagnostics.
  */
 const Fields = memo(function Fields({
   fields,
   application,
+  path,
   readOnly,
   origins,
   warnings,
@@ -361,6 +377,7 @@ const Fields = memo(function Fields({
 }: {
   fields: unknown[] | undefined
   application: string
+  path: string | null | undefined
   readOnly: boolean
   origins: FieldOrigin[] | undefined
   warnings: Map<number, FieldWarning> | undefined
@@ -369,20 +386,119 @@ const Fields = memo(function Fields({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const addressed = searchParams.get('field')
   // The row of the field whose drawer is open or leaving. The drawer keeps its field while it closes, and shows as
   // closed when its row is gone, as after an Undo.
   const [drawer, setDrawer] = useState<{ index: number; open: boolean } | null>(null)
   const shown = drawer !== null && fields !== undefined && drawer.index < fields.length ? drawer.index : null
-  const openDrawer = useCallback((index: number) => setDrawer({ index, open: true }), [])
-  const closeDrawer = useCallback(() => setDrawer((current) => current && { ...current, open: false }), [])
+  // The name of the open drawer's field, or `null` while the drawer is closed or its field has no name.
+  const drawerName = shown !== null && drawer?.open === true && fields !== undefined ? fieldName(fields[shown]) : null
+  // The address and the path that the drawer last followed. A change of either is followed while drawing, as the editor
+  // follows its path, so the drawer never draws the field of a stale address.
+  const [seenAddress, setSeenAddress] = useState<string | null | undefined>(undefined)
+  const [seenPath, setSeenPath] = useState<string | null | undefined>(undefined)
+  // The path inside the field that the drawer focuses once it has opened.
+  const [focusPath, setFocusPath] = useState<string | null>(null)
+  // The name of the open field that the address holds, as this component last wrote it or followed it.
+  const written = useRef<string | null | undefined>(undefined)
+  // The row whose name takes focus once its drawer has closed, set by Close and not by a removal or by Back.
+  const returnFocus = useRef<number | null>(null)
+  // What the handlers below read when they are pressed, so they stay the same between draws.
+  const latest = useRef({ fields, origins, onOriginsChange, onChange, searchParams, setSearchParams, shown })
+  useLayoutEffect(() => {
+    latest.current = { fields, origins, onOriginsChange, onChange, searchParams, setSearchParams, shown }
+  })
   const names = useContext(StudioNamesContext)
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { view, setView } = useTableView(fieldTableFields, recordPageSize, noParameters, true, true, false, 'fields.')
-  // What the entries of a row's menu read when they are pressed, so they stay the same between draws.
-  const latest = useRef({ fields, origins, onOriginsChange, onChange })
-  useLayoutEffect(() => {
-    latest.current = { fields, origins, onOriginsChange, onChange }
-  })
+
+  /**
+   * Writes the open field's name as `field` into the address, or removes `field` for no name, and remembers the name.
+   * A write that changes nothing adds no history entry.
+   */
+  const writeField = useCallback((name: string | null, replace: boolean) => {
+    const { searchParams, setSearchParams } = latest.current
+    written.current = name
+    const next = new URLSearchParams(searchParams)
+    if (name === null) {
+      next.delete('field')
+    } else {
+      next.set('field', name)
+    }
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace, preventScrollReset: true })
+    }
+  }, [])
+
+  /** Opens the drawer of the field at `index`, and adds its name to the address as a history entry. */
+  const openDrawer = useCallback(
+    (index: number) => {
+      setDrawer({ index, open: true })
+      writeField(fieldName(latest.current.fields?.[index]), false)
+    },
+    [writeField],
+  )
+
+  const closeDrawer = useCallback(() => {
+    setDrawer((current) => current && { ...current, open: false })
+    returnFocus.current = latest.current.shown
+    writeField(null, false)
+  }, [writeField])
+
+  const clearFocusPath = useCallback(() => setFocusPath(null), [])
+
+  // The drawer follows an address that changed from outside, such as Back, a link or a reload. An address that names
+  // the drawer's field already, or that is no name while the drawer's field has none, leaves the drawer as it is.
+  if (fields !== undefined && addressed !== seenAddress) {
+    setSeenAddress(addressed)
+    if (addressed !== drawerName) {
+      const index = addressed === null ? -1 : fields.findIndex((field) => fieldName(field) === addressed)
+      setDrawer(index === -1 ? (current) => current && { ...current, open: false } : { index, open: true })
+    }
+  }
+
+  // A path inside a field opens that field's drawer at the setting, once for each path. The drawer's name then goes
+  // into the address with a replace, see the effect below.
+  if (fields !== undefined && path !== seenPath) {
+    setSeenPath(path)
+    const match = path ? /^\/fields\/(\d+)\/.+/.exec(path) : null
+    if (path && match && Number(match[1]) < fields.length) {
+      setDrawer({ index: Number(match[1]), open: true })
+      setFocusPath(path)
+    }
+  }
+
+  // A `field` that the address holds from outside is the name this component follows. A name that no field has is
+  // dropped from the address with a replace, so it opens nothing and leaves no history entry.
+  useEffect(() => {
+    if (fields === undefined || addressed === written.current) {
+      return
+    }
+    written.current = addressed
+    if (addressed !== null && !fields.some((field) => fieldName(field) === addressed)) {
+      writeField(null, true)
+    }
+  }, [addressed, fields, writeField])
+
+  // The open drawer's name is the address's `field`. A rename, an Undo or the removal of the open field changes the
+  // address with a replace, and an edit that names the drawer's field already writes nothing.
+  useEffect(() => {
+    if (fields !== undefined && drawerName !== written.current) {
+      writeField(drawerName, true)
+    }
+  }, [drawerName, fields, writeField])
+
+  // Focus returns to the row's name once its drawer has closed, see docs/reference/entity-designer.md#field-drawer.
+  const drawerOpen = drawer?.open === true
+  useEffect(() => {
+    if (drawerOpen || returnFocus.current === null) {
+      return
+    }
+    document.querySelector<HTMLElement>(`[data-testid="studio-field-/fields/${returnFocus.current}"] button`)?.focus()
+    returnFocus.current = null
+  }, [drawerOpen])
+
   // The names a money field can take its currency from, by row: a text or enum field's name, else `null`.
   const currencySignature = (fields ?? [])
     .map((other) =>
@@ -562,7 +678,9 @@ const Fields = memo(function Fields({
       </div>
       <FieldDrawer
         index={shown}
-        open={drawer?.open === true}
+        open={drawerOpen}
+        focusPath={focusPath}
+        onFocused={clearFocusPath}
         field={shown === null ? undefined : fields[shown]}
         currencyNames={
           shown !== null && isContent(fields[shown]) && editableSettings(fields[shown]).includes('currency')
@@ -672,14 +790,35 @@ const PropertiesCell = memo(function PropertiesCell({ field }: { field: unknown 
   )
 })
 
+/** The inputs that take focus in a drawer's field, in the order a path's element is searched for one. */
+const focusableInput = 'input, textarea, [contenteditable="true"]'
+
+/**
+ * Moves focus into the drawer: to the input of the field at `path`, scrolled to, or to the drawer when the path shows no
+ * input. Without a path it is the name input, unless the drawer is read-only, when it is the drawer. The drawer takes
+ * focus when no input does, see docs/reference/actions-and-controls.md#fields.
+ */
+function focusInDrawer(root: HTMLElement, path: string | null, pointer: string, readOnly: boolean) {
+  const target = path === null && readOnly ? undefined : fieldElement(root, path ?? `${pointer}/name`)
+  if (path !== null) {
+    target?.scrollIntoView?.({ block: 'center' })
+  }
+  const input = target?.querySelector<HTMLElement>(focusableInput)
+  ;(input && !input.matches(':disabled') ? input : root).focus()
+}
+
 /**
  * The drawer of a field, beside the table and above the save bar, with no mask so the table stays clickable, see
  * docs/reference/entity-designer.md#field-drawer. From the top it holds the migration warning, then the field's name,
- * label, type, help, Required, Unique and the settings its type takes, each an input with its help and its id.
+ * label, type, help, Required, Unique and the settings its type takes, each an input with its help and its id. Opening
+ * it moves focus into it, at the name or, for a `focusPath` inside the field, at that setting. Its `focusPath` is
+ * reported back through `onFocused` once focus has moved.
  */
 const FieldDrawer = memo(function FieldDrawer({
   index,
   open,
+  focusPath,
+  onFocused,
   field,
   currencyNames,
   readOnly,
@@ -689,6 +828,8 @@ const FieldDrawer = memo(function FieldDrawer({
 }: {
   index: number | null
   open: boolean
+  focusPath: string | null
+  onFocused: () => void
   field: unknown
   currencyNames: (string | null)[] | undefined
   readOnly: boolean
@@ -703,6 +844,30 @@ const FieldDrawer = memo(function FieldDrawer({
   const type = text(content.type)
   const taken = fieldSettings(type)
   const pointer = `/fields/${index}`
+  // The drawer's root, set once its content has drawn, so the focus effect below runs after the drawer has opened.
+  const [root, setRoot] = useState<HTMLElement | null>(null)
+  const wasOpen = useRef(false)
+  const wantFocus = useRef(false)
+
+  useEffect(() => {
+    if (!open) {
+      wasOpen.current = false
+      wantFocus.current = false
+      return
+    }
+    if (!wasOpen.current) {
+      wasOpen.current = true
+      wantFocus.current = true
+    }
+    if (root === null || !(wantFocus.current || focusPath !== null) || index === null) {
+      return
+    }
+    wantFocus.current = false
+    focusInDrawer(root, focusPath, pointer, readOnly)
+    if (focusPath !== null) {
+      onFocused()
+    }
+  }, [open, root, focusPath, index, pointer, readOnly, onFocused])
 
   function flag(setting: 'required' | 'unique') {
     return (
@@ -730,7 +895,7 @@ const FieldDrawer = memo(function FieldDrawer({
       onClose={onClose}
     >
       {index !== null && (
-        <Flex vertical gap="middle" data-testid="studio-field-drawer" key={index}>
+        <Flex vertical gap="middle" data-testid="studio-field-drawer" key={index} ref={setRoot} tabIndex={-1}>
           {warning && (
             <AxisAlert
               kind="warning"

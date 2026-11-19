@@ -80,14 +80,20 @@ type takes them. A read-only designer opens the drawer from the name too, with e
 row and opens its drawer at once. Move up and Move down keep the open drawer on its field, at the field's new row.
 Remove closes the drawer when it removes the drawer's own field. When it removes another field, the drawer stays on its
 field, which moves up a row if it came after the removed one. The drawer does not follow its field on Undo, Redo or an
-edit in the JSON tab, and shows as closed when its row no longer exists.
+edit in the JSON tab: it stays on its row, and shows as closed when its row no longer exists.
+
+The drawer has an address, `&field=<name>`, so Back closes it, Forward reopens it, and a link can open a field. Opening
+and closing it each add a history entry. Renaming the open field replaces the name in the address, and a field with no
+name has no `field`. A name that no field has opens nothing and is dropped from the address with a replace, see
+[route and address](studio.md#route-and-address). Focus moves into the drawer when it opens, to the name (to the drawer
+itself when it is read-only), and back to the field's name in the table when Close is pressed.
 
 ### The drawer and its groups
 
 _(planned)_
 
 A field's settings open in a drawer with the table still in sight, as Salesforce's Object Manager, Dataverse and
-Strapi have it. The drawer has an address, `&field=<name>`, so Back reopens it and a link can open a field.
+Strapi have it.
 
 The settings are in groups, each setting an [`AxisField`](actions-and-controls.md#fields) with its help,
 and the value labels an `AxisFieldGroup` with a label for each value. A setting that the field's type does not take does not show, as the
@@ -182,11 +188,10 @@ letter case.
 ## Diagnostics
 
 Every input keeps its `studio-field-<pointer>` id, and each row has the id of its field, so a diagnostic
-opens at its input, or at the row when the row does not show the setting. The [field drawer](#field-drawer) is drawn
-outside the form, so a diagnostic at a setting inside a field opens at the field's row.
+opens at its input, or at the row when the row does not show the setting.
 
-- **Inside a field** _(planned)_. A diagnostic inside a field opens the
-  [field drawer](#field-drawer) at the setting.
+A diagnostic at a setting inside a field, such as `/fields/2/maxLength`, opens that field's [drawer](#field-drawer)
+with focus at the setting. When the drawer does not show the setting, focus goes to the drawer.
 
 ## Migrations
 
