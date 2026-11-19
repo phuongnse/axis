@@ -38,13 +38,19 @@ export type AxisButtonProps =
       nameSuffix?: string
       /** Draws a bordered default button, to sit joined to an input in a Space.Compact. */
       joined?: boolean
+      /**
+       * The text key of what the button says right after it did its work, such as Copied. While it is set, the tooltip
+       * opens with that text, even after a pointer click. The accessible name stays the name. The caller clears it to go
+       * back to normal.
+       */
+      doneKey?: string
     })
 
 const ActionRowContext = createContext(false)
 
 type IconButtonProps = Extract<AxisButtonProps, { role: 'icon' }>
 
-/** Opens on hover and Tab focus, and a click hides it until the pointer comes back. */
+/** Opens on hover and Tab focus, and a click hides it until the pointer comes back, except to say `doneKey`. */
 function IconButton(props: IconButtonProps) {
   const t = useText()
   const { colour } = useDesignTokens()
@@ -54,6 +60,7 @@ function IconButton(props: IconButtonProps) {
     destructive,
     nameSuffix,
     joined,
+    doneKey,
     icon,
     style,
     disabled,
@@ -63,13 +70,21 @@ function IconButton(props: IconButtonProps) {
     ...rest
   } = props
   const [open, setOpen] = useState(false)
+  const [shownDone, setShownDone] = useState(doneKey)
+  // The click that did the work has hushed the tooltip, so saying it is done opens it again.
+  if (shownDone !== doneKey) {
+    setShownDone(doneKey)
+    if (doneKey !== undefined) {
+      setOpen(true)
+    }
+  }
   const pointerOver = useRef(false)
   const hushed = useRef(false)
   const name = t(nameKey)
   const tint: CSSProperties = destructive && !disabled ? { color: colour.dangerText } : {}
   return (
     <Tooltip
-      title={name}
+      title={doneKey === undefined ? name : t(doneKey)}
       trigger={['hover', 'focus']}
       open={open}
       onOpenChange={(next) =>

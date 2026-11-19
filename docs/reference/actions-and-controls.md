@@ -61,7 +61,8 @@ widget names a role, never an Ant Design button type.
   whose words show and that opens a dialog, such as New entity….
 - **A tooltip goes with the pointer**. A click on an icon-only button closes its
   tooltip until the pointer comes back, and focus that a click or a closing dialog gives the button
-  opens none. Keyboard focus still shows it.
+  opens none. Keyboard focus still shows it. A copy button is the one exception: right after the click its tooltip says
+  Copied, see [shown values](frontend.md#shown-values).
 
 ## Menus
 

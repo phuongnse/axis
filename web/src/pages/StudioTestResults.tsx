@@ -1,9 +1,12 @@
 import { Flex, Typography } from 'antd'
+import { useContext } from 'react'
 import { EmptyState } from '../platform/EmptyState'
 import { fillText } from '../platform/fillText'
+import { formatDuration } from '../platform/formatValue'
 import { StatusTag } from '../platform/StatusTag'
 import type { StudioRequest, StudioScenarioResult, StudioSkippedScenarioResult } from '../platform/studio'
 import { useText } from '../platform/texts'
+import { PlatformContext } from './context'
 import { ResourceReference } from './ResourceReference'
 
 /**
@@ -55,6 +58,7 @@ function ScenarioRow({
   onSelect?: (resourceId: string, path: string) => void
 }) {
   const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   if (scenario.outcome === 'skipped') {
     return (
       <div style={{ padding: '4px 15px' }}>
@@ -83,7 +87,7 @@ function ScenarioRow({
             file={scenario.file}
             onOpen={onSelect && (() => onSelect(scenario.resourceId, scenario.path ?? ''))}
           />
-          <Typography.Text type="secondary">{`${scenario.durationMs} ms`}</Typography.Text>
+          <Typography.Text type="secondary">{formatDuration(scenario.durationMs, locale, t)}</Typography.Text>
         </Flex>
         {failed && scenario.step !== null && (
           <Typography.Text>{fillText(t('shell.studio.tests.step'), { number: scenario.step + 1 })}</Typography.Text>

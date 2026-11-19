@@ -417,12 +417,19 @@ describe.each(['light', 'dark'])('EntityDesigner in %s mode', (mode) => {
   it('shows default, min, max and minLength on every type that takes them when the field computes nothing', async () => {
     renderDesigner(entity({ fields: plain, displayField: undefined }))
 
-    for (const setting of ['default', 'min', 'max', 'minLength'] as const) {
-      const types: string[] = []
-      for (const [index, field] of plain.entries()) {
-        await openEntityField(index)
-        if (screen.queryByTestId(`studio-field-/fields/${index}/${setting}`) !== null) types.push(field.type)
+    // Each field opens once, because opening a drawer is the slow step of this test.
+    const settings = ['default', 'min', 'max', 'minLength'] as const
+    const typesBySetting = new Map<string, string[]>(settings.map((setting) => [setting, []]))
+    for (const [index, field] of plain.entries()) {
+      await openEntityField(index)
+      for (const setting of settings) {
+        if (screen.queryByTestId(`studio-field-/fields/${index}/${setting}`) !== null) {
+          typesBySetting.get(setting)?.push(field.type)
+        }
       }
+    }
+    for (const setting of settings) {
+      const types = typesBySetting.get(setting) ?? []
       expect(types, setting).toEqual(
         plain.filter((field) => fieldSettings(field.type).includes(setting)).map((f) => f.type),
       )
@@ -433,24 +440,22 @@ describe.each(['light', 'dark'])('EntityDesigner in %s mode', (mode) => {
   it('offers no sensitive setting on reference, references and file fields, and still offers it on text', async () => {
     renderDesigner(entity({ fields: plain, displayField: undefined }))
 
-    const offered = async (type: string) => {
-      const indexes: number[] = []
-      for (const [index, field] of plain.entries()) {
-        await openEntityField(index)
-        if (field.type === type && screen.queryByTestId(`studio-field-/fields/${index}/sensitive`) !== null) {
-          indexes.push(index)
-        }
+    // Each field opens once, because opening a drawer is the slow step of this test.
+    const offeredOn = new Map<string, number[]>()
+    for (const [index, field] of plain.entries()) {
+      await openEntityField(index)
+      if (screen.queryByTestId(`studio-field-/fields/${index}/sensitive`) !== null) {
+        offeredOn.set(field.type, [...(offeredOn.get(field.type) ?? []), index])
       }
-      return indexes
     }
     for (const type of ['reference', 'references', 'file']) {
       expect(
         plain.some((field) => field.type === type),
         type,
       ).toBe(true)
-      expect(await offered(type), type).toEqual([])
+      expect(offeredOn.get(type) ?? [], type).toEqual([])
     }
-    expect((await offered('text')).length).toBeGreaterThan(0)
+    expect((offeredOn.get('text') ?? []).length).toBeGreaterThan(0)
   })
 })
 
