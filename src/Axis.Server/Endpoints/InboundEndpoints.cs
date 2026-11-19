@@ -293,6 +293,7 @@ internal static class InboundEndpoints
                 instanceId!.Value,
                 caller.Id,
                 caller.Id,
+                ProcessStartedBy.Endpoint(endpoint.Name),
                 details,
                 cancellationToken);
             if (started.Outcome != ProcessStartOutcome.Started)

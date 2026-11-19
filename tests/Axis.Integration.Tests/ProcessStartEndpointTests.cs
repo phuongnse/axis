@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Axis.Configuration.Model;
+using Axis.Data.Profiles;
 using Axis.Server.Tests;
 using static Axis.Integration.Tests.RecordApiFixture;
 
@@ -431,6 +432,118 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
     }
 
     [Fact]
+    public async Task A_start_from_a_site_action_stores_the_person_and_the_action_and_the_detail_gives_them_with_the_current_name()
+    {
+        var subject = await fixture.InsertRequestAsync(status: null);
+        await using (var connection = await fixture.OpenConnectionAsync())
+        {
+            await UserProfiles.UpsertAsync(connection, "requester", "Rita Requester", null, null, CancellationToken);
+        }
+
+        using var response = await StartAsync(subject, via: "request.submit");
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var started = await ReadJsonAsync(response);
+        var id = started.RootElement.GetProperty("id").GetGuid();
+        using var detail = await GetDetailAsync(id);
+        var startedBy = detail.RootElement.GetProperty("startedBy");
+        Assert.Equal(["kind", "name", "id", "via"], startedBy.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("person", startedBy.GetProperty("kind").GetString());
+        Assert.Equal("Rita Requester", startedBy.GetProperty("name").GetString());
+        Assert.Equal("requester", startedBy.GetProperty("id").GetString());
+        Assert.Equal("request.submit", startedBy.GetProperty("via").GetString());
+
+        // The name is read from the profile each time, so a rename shows at once.
+        await using (var connection = await fixture.OpenConnectionAsync())
+        {
+            await UserProfiles.UpsertAsync(connection, "requester", "Rita Renamed", null, null, CancellationToken);
+        }
+
+        using var renamed = await GetDetailAsync(id);
+        Assert.Equal("Rita Renamed", renamed.RootElement.GetProperty("startedBy").GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public async Task A_start_with_no_action_stores_the_person_with_a_null_via()
+    {
+        var subject = await fixture.InsertRequestAsync(status: null);
+
+        using var response = await StartAsync(subject);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var started = await ReadJsonAsync(response);
+        using var detail = await GetDetailAsync(started.RootElement.GetProperty("id").GetGuid());
+        var startedBy = detail.RootElement.GetProperty("startedBy");
+        Assert.Equal("person", startedBy.GetProperty("kind").GetString());
+        Assert.Equal("requester", startedBy.GetProperty("id").GetString());
+        Assert.Equal(JsonValueKind.Null, startedBy.GetProperty("via").ValueKind);
+    }
+
+    [Fact]
+    public async Task An_instance_with_no_stored_starter_has_a_null_started_by()
+    {
+        var id = await fixture.InsertInstanceAsync(await fixture.InsertRequestAsync(status: null));
+
+        using var detail = await GetDetailAsync(id);
+
+        Assert.Equal(JsonValueKind.Null, detail.RootElement.GetProperty("startedBy").ValueKind);
+    }
+
+    [Theory]
+    [InlineData("nope.nope")]
+    [InlineData("REQUEST.SUBMIT")]
+    public async Task A_start_with_a_via_that_no_start_action_of_the_process_has_is_a_400_at_via_and_stores_nothing(string via)
+    {
+        var subject = await fixture.InsertRequestAsync(status: null);
+
+        using var response = await StartAsync(subject, key: Guid.NewGuid().ToString(), via: via);
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        AssertErrors(problem, ("/via", "Must be the label text key of a start action of this process."));
+        await AssertNothingStoredAsync(subject);
+    }
+
+    [Theory]
+    [InlineData("""{ "subjectId": "SUBJECT", "via": 1 }""")]
+    [InlineData("""{ "subjectId": "SUBJECT", "via": null }""")]
+    [InlineData("""{ "subjectId": "SUBJECT", "via": "" }""")]
+    [InlineData("""{ "subjectId": "SUBJECT", "via": "request.submit", "other": 1 }""")]
+    [InlineData("""{ "subjectId": "SUBJECT", "subjectId": "SUBJECT" }""")]
+    [InlineData("""{ "via": "request.submit" }""")]
+    public async Task A_body_with_a_via_that_is_not_a_string_or_with_another_property_is_the_subject_id_400(string template)
+    {
+        var subject = await fixture.InsertRequestAsync(status: null);
+        using var request = Request(HttpMethod.Post, Instances, ProcessStartFixture.Host, template.Replace("SUBJECT", subject.ToString("D"), StringComparison.Ordinal));
+
+        using var response = await fixture.Client.SendAsync(request, CancellationToken);
+
+        using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        AssertSubjectError(problem, "Must be the id of a record of the process's entity.");
+        await AssertNothingStoredAsync(subject);
+    }
+
+    [Fact]
+    public async Task A_start_of_a_process_without_a_subject_stores_the_person_with_a_null_via()
+    {
+        var process = NightlyJob();
+        using var response = await StartJobAsync("""{ "parameters": { "days": 1 } }""", key: Guid.NewGuid().ToString());
+        try
+        {
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            Assert.Equal(1L, await fixture.CountAsync(
+                """
+                SELECT count(*) FROM axis.process_instances
+                WHERE process_id = @process AND started_by->>'kind' = 'person' AND started_by->>'id' = 'requester' AND started_by->'via' = 'null'::jsonb
+                """,
+                ("process", process.Id)));
+        }
+        finally
+        {
+            await fixture.EndInstancesAsync(process.Id);
+        }
+    }
+
+    [Fact]
     public async Task A_body_that_is_not_json_is_a_415()
     {
         var subject = await fixture.InsertRequestAsync(status: null);
@@ -456,9 +569,12 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
         await AssertNothingStoredAsync(subject);
     }
 
-    private async Task<HttpResponseMessage> StartAsync(Guid subject, string? key = null, HttpClient? client = null, string path = Instances)
+    private async Task<HttpResponseMessage> StartAsync(Guid subject, string? key = null, HttpClient? client = null, string path = Instances, string? via = null)
     {
-        using var request = Request(HttpMethod.Post, path, ProcessStartFixture.Host, $$"""{ "subjectId": "{{subject:D}}" }""");
+        var body = via is null
+            ? $$"""{ "subjectId": "{{subject:D}}" }"""
+            : $$"""{ "subjectId": "{{subject:D}}", "via": "{{via}}" }""";
+        using var request = Request(HttpMethod.Post, path, ProcessStartFixture.Host, body);
         if (key is not null)
         {
             request.Headers.TryAddWithoutValidation("Idempotency-Key", key);
@@ -476,6 +592,14 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
         }
 
         return await (client ?? fixture.Client).SendAsync(request, CancellationToken);
+    }
+
+    private async Task<JsonDocument> GetDetailAsync(Guid instance)
+    {
+        using var request = Request(HttpMethod.Get, $"{Instances}/{instance:D}", ProcessStartFixture.Host);
+        using var response = await fixture.Client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await ReadJsonAsync(response);
     }
 
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response) =>

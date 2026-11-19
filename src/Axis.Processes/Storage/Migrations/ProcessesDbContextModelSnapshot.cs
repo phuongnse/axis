@@ -766,6 +766,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("revision");
 
+                    b.Property<string>("StartedBy")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("started_by");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .HasColumnType("text")

@@ -2293,7 +2293,7 @@ describe('FormWidget', () => {
       await waitFor(() => expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Closed by the process'))
       expect(requests()).toEqual([
         { url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined },
-        { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}"}` },
+        { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}","via":"noteClose.action"}` },
         { url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined },
       ])
       expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/noteform/${noteId}`)
@@ -2317,7 +2317,7 @@ describe('FormWidget', () => {
       await waitFor(() => expect(requests()).toHaveLength(4))
       expect(requests().slice(1, 3)).toEqual([
         { url: `${recordsPath}/${noteId}`, method: 'PATCH', body: '{"version":1,"values":{"title":"New"}}' },
-        { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}"}` },
+        { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}","via":"noteClose.action"}` },
       ])
     })
 

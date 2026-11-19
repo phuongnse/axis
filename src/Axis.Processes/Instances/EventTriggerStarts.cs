@@ -116,6 +116,7 @@ internal static class EventTriggerStarts
             instanceId,
             AuditActors.System,
             occurrence.AccountableUser,
+            ProcessStartedBy.Trigger(trigger.Name),
             new JsonObject { ["trigger"] = trigger.Name, ["eventId"] = occurrence.Id },
             cancellationToken);
         return started.Outcome switch

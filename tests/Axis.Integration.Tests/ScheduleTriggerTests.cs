@@ -80,6 +80,14 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
             Assert.Equal((ProcessStarts.Waiting, tenant.FirstReleaseId), (instance.State, instance.ReleaseId));
             Assert.Equal(("started", (Guid?)instance.Id), await ReceiptAsync(tenant, id, occurrence));
 
+            // The starter is the schedule trigger, named as the trigger is.
+            Assert.Equal(
+                1L,
+                await tenant.CountAsync(
+                    "SELECT count(*) FROM axis.process_instances WHERE id = @id AND started_by = @startedBy::jsonb",
+                    ("id", instance.Id),
+                    ("startedBy", $$"""{ "kind": "schedule", "name": "{{Trigger}}", "id": null, "via": null }""")));
+
             // No user stands behind a schedule, so its instance has no accountable user and no deciding task.
             Assert.Equal(
                 1L,

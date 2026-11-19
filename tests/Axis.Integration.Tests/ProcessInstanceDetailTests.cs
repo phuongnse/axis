@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Axis.Configuration.Diagnostics;
+using Axis.Processes.Instances;
 using Axis.Server.Tests;
 using static Axis.Integration.Tests.TaskApiFixture;
 
@@ -21,7 +22,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
         var root = body.RootElement;
         Assert.Equal(
-            ["id", "process", "subjectId", "releaseId", "state", "step", "createdAt", "endedAt", "timerDueAt", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands"],
+            ["id", "process", "subjectId", "releaseId", "state", "step", "createdAt", "endedAt", "timerDueAt", "startedBy", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands"],
             root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(instance, root.GetProperty("id").GetGuid());
         Assert.Equal("Break", root.GetProperty("process").GetString());
@@ -193,6 +194,16 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal("RoleApprove", named.GetProperty("process").GetString());
         Assert.Equal("fulfil", named.GetProperty("step").GetString());
         Assert.Empty(child.RootElement.GetProperty("subProcesses").EnumerateArray());
+
+        // The child names its parent as its starter, with no action. An instance with no stored starter has none.
+        var startedBy = child.RootElement.GetProperty("startedBy");
+        Assert.Equal(["kind", "name", "id", "via"], startedBy.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("parent", startedBy.GetProperty("kind").GetString());
+        Assert.Equal("RoleApprove", startedBy.GetProperty("name").GetString());
+        Assert.Equal(parent.ToString(), startedBy.GetProperty("id").GetString());
+        Assert.Equal(JsonValueKind.Null, startedBy.GetProperty("via").ValueKind);
+        using var root = await GetOkAsync(TenantA, "RoleApprove", parent);
+        Assert.Equal(JsonValueKind.Null, root.RootElement.GetProperty("startedBy").ValueKind);
     }
 
     [Fact]
@@ -421,9 +432,10 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         var child = await fixture.StartAsync(tenant, process, subject);
         await fixture.ExecuteAsync(
             tenant,
-            "UPDATE axis.process_instances SET parent_instance_id = @parent, parent_step = @step WHERE id = @id",
+            "UPDATE axis.process_instances SET parent_instance_id = @parent, parent_step = @step, started_by = @startedBy::jsonb WHERE id = @id",
             ("parent", parent),
             ("step", step),
+            ("startedBy", ProcessStartedBy.Parent("RoleApprove", parent).ToJson()),
             ("id", child));
         return child;
     }

@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
+using Axis.Data.Profiles;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
@@ -44,7 +45,8 @@ namespace Axis.Server.Processes;
 /// The detail at <c>GET /api/apps/{app}/processes/{process}/instances/{id}</c> shows one instance:
 /// its properties, the graph of the release it is pinned to, its path (the history rows in order),
 /// its tasks, its calls and the operator <c>commands</c> the user may take on it. While the instance waits on a timer step, the
-/// detail also has <c>timerDueAt</c>, the due time of the timer's work item. A call lists its attempts and lookups, and its stored input only when
+/// detail also has <c>timerDueAt</c>, the due time of the timer's work item, and <c>startedBy</c>, who or what started the instance, with a person's
+/// current name read from their profile, or null for an instance that started before Axis recorded it. A call lists its attempts and lookups, and its stored input only when
 /// the user may read every field that the step's input and output mapping reads or writes, on any
 /// entity, and none of them is sensitive in the pinned or the active release. Otherwise the input is
 /// null and marked hidden. The commands come from the user's <c>retry</c> and <c>cancel</c> grants and the states, and a call is
@@ -390,6 +392,16 @@ internal static class ProcessInspectionEndpoints
             ? await InstanceQueries.TimerDueAtAsync(connection, row.Id, row.Revision, cancellationToken)
             : null;
 
+        // A person's name is read from their profile now, so it shows their current name. No profile gives a null name.
+        var startedBy = await InstanceQueries.StartedByAsync(connection, row.Id, cancellationToken) is { } stored
+            ? new ProcessInstanceStartedBy(stored.Kind, stored.Name, stored.Id, stored.Via)
+            : null;
+        if (startedBy is { Kind: ProcessStartedBy.PersonKind, Id: { } personId })
+        {
+            var names = await UserProfiles.FindDisplayNamesAsync(connection, [personId], cancellationToken);
+            startedBy = startedBy with { Name = names.GetValueOrDefault(personId) };
+        }
+
         // A parent or sub-process is named only when the user may inspect its process in the active release.
         // The subject record's read filters do not apply, and no subject id is shown.
         var relatives = await InstanceQueries.RelativesAsync(connection, row.ApplicationId, row.Id, cancellationToken);
@@ -449,6 +461,7 @@ internal static class ProcessInspectionEndpoints
             row.CreatedAt.UtcDateTime,
             row.EndedAt?.UtcDateTime,
             timerDueAt?.UtcDateTime,
+            startedBy,
             parent,
             subProcesses,
             graph,
@@ -747,6 +760,7 @@ internal sealed record ProcessInstanceDetailResponse(
     DateTime CreatedAt,
     DateTime? EndedAt,
     DateTime? TimerDueAt,
+    ProcessInstanceStartedBy? StartedBy,
     ProcessInstanceParent? Parent,
     IReadOnlyList<ProcessSubProcess> SubProcesses,
     ProcessGraph Graph,
@@ -754,6 +768,13 @@ internal sealed record ProcessInstanceDetailResponse(
     IReadOnlyList<ProcessInstanceTask> Tasks,
     IReadOnlyList<ProcessInstanceCall> Calls,
     IReadOnlyList<string> Commands);
+
+/// <summary>
+/// Who or what started the instance, as "Who started it" in <c>docs/reference/process-inspection.md#instance-detail</c> says.
+/// <paramref name="Kind"/> is <c>person</c>, <c>trigger</c>, <c>endpoint</c>, <c>schedule</c> or <c>parent</c>.
+/// <paramref name="Name"/> is a person's current name, or the trigger's, endpoint's or parent process's name.
+/// </summary>
+internal sealed record ProcessInstanceStartedBy(string Kind, string? Name, string? Id, string? Via);
 
 /// <summary>The instance that started this one, with the sub-process step in the parent that did so.</summary>
 internal sealed record ProcessInstanceParent(Guid Id, string Process, string Step);

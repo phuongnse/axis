@@ -102,6 +102,12 @@ public sealed class EndpointCallTests(EndpointCallFixture fixture) : IClassFixtu
             ("record", recordId), ("entity", note.Id)));
         Assert.Equal(1L, await fixture.CountAsync(
             """
+            SELECT count(*) FROM axis.process_instances
+            WHERE id = @instance AND started_by = '{ "kind": "endpoint", "name": "ImportNote", "id": null, "via": null }'::jsonb
+            """,
+            ("instance", instanceId)));
+        Assert.Equal(1L, await fixture.CountAsync(
+            """
             SELECT count(*) FROM axis.audit_records
             WHERE action = 'process.started' AND record_id = @record AND process_instance_id = @instance
               AND actor = 'importer-system' AND actor_name IS NULL
