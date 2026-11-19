@@ -18,7 +18,11 @@ import {
   editableSettings,
   fieldSettings,
   fieldTypes,
+  valueSourceOf,
+  valueSourcesOf,
+  withValueSource,
   type FieldSetting,
+  type ValueSource,
 } from '../platform/entityFields'
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
@@ -52,7 +56,7 @@ const drawerGroups: {
   settings: (FieldSetting | [FieldSetting, FieldSetting])[]
 }[] = [
   { name: 'type', settings: ['target', 'values', 'valueLabels', 'currency', ['precision', 'scale'], 'maxLength'] },
-  { name: 'value', settings: ['expression', 'default', 'sequence', 'creator'] },
+  { name: 'value', settings: ['default', 'userId', 'expression', 'sequence', 'match'] },
   { name: 'validation', settings: ['required', 'unique', 'minLength', ['min', 'max'], 'maxSize', 'accept'] },
   { name: 'searchPrivacy', settings: ['searchable', 'sensitive', 'exactLookup'] },
 ]
@@ -65,6 +69,16 @@ const noFieldNames: string[] = []
 
 /** Joins the field names into one text that tells whether the list changed. */
 const nameSeparator = '\u0000'
+
+/** Joins the parts of one field in such a text. */
+const partSeparator = '\u0001'
+
+/** A field that a matched reference may take its value from: its name, its type and, for a reference, its target. */
+interface MatchSource {
+  name: string
+  type: string
+  target: string
+}
 
 function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -158,8 +172,8 @@ const Picker = memo(function Picker({
  * added, removed and moved, and a type change drops the settings the new type does not take. A computed field's
  * `expression` and each validation's expression use the expression editor, and so does a field's `default`, which has
  * no field in scope. A field's settings also include `min` and `max` in the type of the field, `minLength` and
- * `searchable`, and they hide `default`, `min`, `max` and `minLength` next to an `expression`, a `sequence` or
- * `creator`. The Indexes section, after Validations, adds, moves and removes the entity's `indexes`, each a name, a
+ * `searchable`. The drawer's Value group is one choice of where the value comes from, and only the chosen way's settings
+ * follow, see docs/reference/entity-designer.md#settings. The Indexes section, after Validations, adds, moves and removes the entity's `indexes`, each a name, a
  * list of the entity's fields and a Unique choice. The name of an index or a validation is shown as plain text, and an added one gets `index1` or
  * `validation1`, the first name its list does not use. The designer edits the draft through `onChange`, so a key it
  * does not show, such as `id`, `kind` or an unknown key on a field, stays as it is. Every input has the id
@@ -324,23 +338,24 @@ function yesNoColumn(setting: 'required' | 'unique', title: string, t: (key: str
   }
 }
 
-/** The sources of a field's value, in the order the Properties column takes the first one a field has. */
-const valueSources: [string, (field: Content) => boolean][] = [
-  ['computed', (field) => typeof field.expression === 'string'],
-  ['sequence', (field) => typeof field.sequence === 'string'],
-  ['creator', (field) => field.creator === true],
-  ['matched', (field) => isContent(field.match)],
-  ['user', (field) => field.userId === true],
-  ['default', (field) => typeof field.default === 'string'],
-]
-
-/** The property names a field shows as tags: at most one source of its value, then Searchable and Sensitive. */
+/**
+ * The property names a field shows as tags: the way its value comes from, which for an entered value is User or Default
+ * when it has one, then Searchable and Sensitive.
+ */
 function fieldProperties(field: unknown): string[] {
   if (!isContent(field)) {
     return []
   }
-  const source = valueSources.find(([, has]) => has(field))
-  return [...(source ? [source[0]] : []), ...['searchable', 'sensitive'].filter((name) => field[name] === true)]
+  const source = valueSourceOf(field)
+  const way =
+    source !== 'entered'
+      ? source
+      : field.userId === true
+        ? 'user'
+        : typeof field.default === 'string'
+          ? 'default'
+          : null
+  return [...(way ? [way] : []), ...['searchable', 'sensitive'].filter((name) => field[name] === true)]
 }
 
 /** The Fields table keeps no data source parameter in the address, only its view. */
@@ -518,6 +533,29 @@ const Fields = memo(function Fields({
     [currencySignature],
   )
 
+  // The fields a matched reference may take its value from, by row: a named field that is neither sensitive, matched nor
+  // computed, else `null`. The drawer filters them by the Find by field's type.
+  const matchSignature = (fields ?? [])
+    .map((other) =>
+      isContent(other) &&
+      typeof other.name === 'string' &&
+      other.name !== '' &&
+      other.sensitive !== true &&
+      !isContent(other.match) &&
+      typeof other.expression !== 'string'
+        ? [other.name, text(other.type), text(other.target)].join(partSeparator)
+        : '',
+    )
+    .join(nameSeparator)
+  const matchSources = useMemo(
+    () =>
+      matchSignature.split(nameSeparator).map((row): MatchSource | null => {
+        const [name, type, target] = row.split(partSeparator)
+        return row === '' ? null : { name, type, target }
+      }),
+    [matchSignature],
+  )
+
   const onMove = useCallback((index: number, offset: number) => {
     const { fields, origins, onOriginsChange, onChange } = latest.current
     // The drawer's field moves with it, and a closed drawer keeps its index in step, so it never opens on another field.
@@ -690,6 +728,11 @@ const Fields = memo(function Fields({
             ? currencyNames
             : undefined
         }
+        matchSources={
+          shown !== null && isContent(fields[shown]) && editableSettings(fields[shown]).includes('match')
+            ? matchSources
+            : undefined
+        }
         readOnly={readOnly}
         warning={shown === null ? undefined : warnings?.get(shown)}
         validations={validations}
@@ -827,6 +870,7 @@ const FieldDrawer = memo(function FieldDrawer({
   onFocused,
   field,
   currencyNames,
+  matchSources,
   readOnly,
   warning,
   validations,
@@ -840,6 +884,7 @@ const FieldDrawer = memo(function FieldDrawer({
   onFocused: () => void
   field: unknown
   currencyNames: (string | null)[] | undefined
+  matchSources: (MatchSource | null)[] | undefined
   readOnly: boolean
   warning: FieldWarning | undefined
   validations: unknown
@@ -943,6 +988,7 @@ const FieldDrawer = memo(function FieldDrawer({
             index={index}
             field={content}
             currencyNames={currencyNames}
+            matchSources={matchSources}
             readOnly={readOnly}
             validations={validations}
             layer={layer}
@@ -1007,13 +1053,15 @@ const FieldLabel = memo(function FieldLabel({
 /**
  * The settings of one field that its type takes, in the groups the type's settings, Value, Validation, and Search and
  * privacy, each with its own input and id, see docs/reference/entity-designer.md#the-drawer-and-its-groups. A group with
- * nothing to show is left out, and a pair of settings shares one row. A named field's Validation group also lists the
+ * nothing to show is left out, and a pair of settings shares one row. Value starts with one choice of the ways the type
+ * takes, and only the chosen way's settings follow, see docs/reference/entity-designer.md#settings. A named field's Validation group also lists the
  * validations whose `field` is this field and adds one, see docs/reference/entity-designer.md#settings.
  */
 function Settings({
   index,
   field,
   currencyNames,
+  matchSources,
   readOnly,
   validations,
   layer,
@@ -1022,6 +1070,7 @@ function Settings({
   index: number
   field: Content
   currencyNames: (string | null)[] | undefined
+  matchSources: (MatchSource | null)[] | undefined
   readOnly: boolean
   validations: unknown
   layer: DesignerLayer | undefined
@@ -1031,6 +1080,7 @@ function Settings({
   const pointer = `/fields/${index}`
   const taken = editableSettings(field)
   const type = text(field.type)
+  const sources = valueSourcesOf(type)
   const name = text(field.name)
   // A validation's `field` must name a field, so a field with no name has none and adds none.
   const list: unknown[] | undefined =
@@ -1057,19 +1107,34 @@ function Settings({
   }
 
   /** The yes-or-no setting `setting`: a switch for searchable, a checkbox for the others. */
-  function flag(setting: 'required' | 'unique' | 'creator' | 'sensitive' | 'exactLookup' | 'searchable') {
+  function flag(setting: 'required' | 'unique' | 'userId' | 'sensitive' | 'exactLookup' | 'searchable') {
     return (
       <AxisCheckboxField
         {...settingTexts(setting)}
         kind={setting === 'searchable' ? 'switch' : 'checkbox'}
         checked={field[setting] === true}
-        // Even a false exactLookup is refused on a field that is not sensitive, so unchecking removes it, as it does for searchable.
-        onChange={(checked) =>
+        onChange={(checked) => {
+          if (setting === 'sensitive' && !checked && Object.hasOwn(field, 'exactLookup')) {
+            // Unticking Sensitive takes Exact lookup with it, as one change, because a field that is not sensitive may not
+            // have it, even as false.
+            const rebuilt: Content = {}
+            for (const [key, value] of Object.entries(field)) {
+              if (key !== 'exactLookup') {
+                setOwn(rebuilt, key, key === 'sensitive' ? false : value)
+              }
+            }
+            onChange(pointer, rebuilt)
+            return
+          }
+          // Even a false exactLookup is refused on a field that is not sensitive, and a false userId on a field that is
+          // not text, so unchecking removes them, as it does for searchable.
           onChange(
             `${pointer}/${setting}`,
-            (setting === 'exactLookup' || setting === 'searchable') && !checked ? undefined : checked,
+            (setting === 'exactLookup' || setting === 'userId' || setting === 'searchable') && !checked
+              ? undefined
+              : checked,
           )
-        }
+        }}
       />
     )
   }
@@ -1130,7 +1195,7 @@ function Settings({
             pointer={`${pointer}/expression`}
             name={settingTexts(setting).label}
             value={text(field.expression)}
-            required={false}
+            required
             readOnly={readOnly}
             onChange={onChange}
           />
@@ -1142,7 +1207,13 @@ function Settings({
 
   function labelled(setting: FieldSetting) {
     const control = input(setting)
-    return control && <AxisField {...settingTexts(setting)}>{control}</AxisField>
+    return (
+      control && (
+        <AxisField {...settingTexts(setting)} required={setting === 'expression'}>
+          {control}
+        </AxisField>
+      )
+    )
   }
 
   function drawn(setting: FieldSetting) {
@@ -1156,6 +1227,15 @@ function Settings({
         )}
         onChange={onChange}
       />
+    ) : setting === 'match' ? (
+      <MatchedSource
+        key={setting}
+        pointer={pointer}
+        index={index}
+        field={field}
+        matchSources={matchSources}
+        onChange={onChange}
+      />
     ) : setting === 'target' || setting === 'sequence' ? (
       <Picker
         key={setting}
@@ -1163,14 +1243,15 @@ function Settings({
         {...settingTexts(setting)}
         kind={setting === 'target' ? 'entity' : 'sequence'}
         value={field[setting]}
-        required={setting === 'target'}
-        onPick={(next) => onChange(`${pointer}/${setting}`, next ?? (setting === 'target' ? '' : undefined))}
+        required
+        // An emptied sequence stays an empty key, so the field keeps its way and Validate reports it.
+        onPick={(next) => onChange(`${pointer}/${setting}`, next ?? '')}
       />
     ) : (
       <div key={setting} data-testid={`studio-field-${pointer}/${setting}`}>
         {setting === 'required' ||
         setting === 'unique' ||
-        setting === 'creator' ||
+        setting === 'userId' ||
         setting === 'sensitive' ||
         setting === 'exactLookup' ||
         setting === 'searchable'
@@ -1199,8 +1280,9 @@ function Settings({
     <>
       {drawerGroups.map(({ name: group, settings }) => {
         const drawnSettings = settings.flatMap(drawnEntry)
+        const choice = group === 'value' && sources.length > 1
         const validationBoxes = group === 'validation' && (atField.length > 0 || canAdd)
-        if (drawnSettings.length === 0 && !validationBoxes) {
+        if (drawnSettings.length === 0 && !choice && !validationBoxes) {
           return null
         }
         return (
@@ -1209,6 +1291,17 @@ function Settings({
             {...groupTexts(t, group === 'type' ? `fields.group.type.${type}` : `fields.group.${group}`)}
           >
             <Flex vertical gap="small" style={{ minWidth: 240 }}>
+              {choice && (
+                <AxisChoiceField
+                  {...fieldTexts(t, 'fields.valueSource')}
+                  value={valueSourceOf(field)}
+                  options={sources.map((source) => ({
+                    value: source,
+                    ...fieldTexts(t, `fields.valueSource.${source}`),
+                  }))}
+                  onChange={(next) => onChange(pointer, withValueSource(field, next as ValueSource))}
+                />
+              )}
               {drawnSettings}
               {group === 'validation' && (
                 <>
@@ -1251,6 +1344,73 @@ function Settings({
         )
       })}
     </>
+  )
+}
+
+/**
+ * The Find by and From of a matched reference, see docs/reference/entity-designer.md#settings. Find by offers only the
+ * target entity's fields that are `unique`, from the application's names. From offers only this entity's fields of the
+ * Find by field's type, and of its target for a reference, without the field itself, as `matchSources` lists them. Both
+ * are plain boxes while the names have not loaded, and Find by names no field that the names know, so From offers none.
+ * Clearing either leaves it empty and Validate reports it.
+ */
+function MatchedSource({
+  pointer,
+  index,
+  field,
+  matchSources,
+  onChange,
+}: {
+  pointer: string
+  index: number
+  field: Content
+  matchSources: (MatchSource | null)[] | undefined
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const names = useContext(StudioNamesContext)
+  const match = isContent(field.match) ? field.match : {}
+  const same = (left: string, right: string) => left.toLowerCase() === right.toLowerCase()
+  const targetFields = names?.entities.find((entity) => same(entity.name, text(field.target)))?.fields ?? []
+  const findBy = targetFields.find((other) => other.unique && same(other.name, text(match.field)))
+  return (
+    <div data-testid={`studio-field-${pointer}/match`}>
+      <Flex vertical gap="small">
+        <Picker
+          pointer={`${pointer}/match/field`}
+          {...fieldTexts(t, 'fields.match.field')}
+          options={
+            names === undefined
+              ? undefined
+              : targetFields.flatMap(({ name, labelKey, unique }) => (unique ? [{ name, labelKey }] : []))
+          }
+          value={match.field}
+          required
+          onPick={(next) => onChange(`${pointer}/match/field`, next ?? '')}
+        />
+        <Picker
+          pointer={`${pointer}/match/from`}
+          {...fieldTexts(t, 'fields.match.from')}
+          options={
+            names === undefined
+              ? undefined
+              : findBy === undefined
+                ? []
+                : (matchSources ?? []).flatMap((source, position) =>
+                    source !== null &&
+                    position !== index &&
+                    source.type === findBy.type &&
+                    (findBy.type !== 'reference' || same(source.target, findBy.target ?? ''))
+                      ? [source.name]
+                      : [],
+                  )
+          }
+          value={match.from}
+          required
+          onPick={(next) => onChange(`${pointer}/match/from`, next ?? '')}
+        />
+      </Flex>
+    </div>
   )
 }
 
