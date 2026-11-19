@@ -106,7 +106,7 @@ test('the operator opens an instance waiting for the manager and sees the path a
     const approval = shell.getByTestId('inspector-step-managerApproval')
     await expect(approval).toContainText('Manager approval')
     await expect(approval).toContainText('Current')
-    await expect(shell.getByRole('row', { name: /Manager approval.*user: manager-2.*open/ })).toBeVisible()
+    await expect(shell.getByRole('row', { name: /Manager approval.*user: Manager 2 User.*open/ })).toBeVisible()
   }
 })
 

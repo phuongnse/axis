@@ -8,6 +8,7 @@ using Axis.Server.Http;
 using Axis.Server.Processes;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Axis.Studio;
 
 namespace Axis.Server.Console;
 
@@ -298,6 +299,8 @@ internal static class ConsoleEndpoints
 
     private static async Task<IResult> GetInstanceAsync(
         string id,
+        HttpContext httpContext,
+        StudioOptions studio,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         PackageCatalog packages,
@@ -335,8 +338,11 @@ internal static class ConsoleEndpoints
         var viewer = activeRelease is not null && active.Processes.Any(candidate => candidate.Id == row.ProcessId)
             ? InspectionViewer.Operator
             : InspectionViewer.OperatorReadOnly;
+
+        // The operator sees the studio address only when they also hold the author role.
+        var author = await CurrentUsers.FindAsync(httpContext) is { } user && studio.Allows(user.Roles);
         return Results.Ok(await ProcessInspectionEndpoints.DetailAsync(
-            connection, resolver, packages, active, process, subject, row, viewer, cancellationToken));
+            connection, resolver, packages, active, process, subject, row, viewer, author, cancellationToken));
     }
 }
 
