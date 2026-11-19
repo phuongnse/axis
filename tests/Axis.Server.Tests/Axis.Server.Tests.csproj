@@ -32,6 +32,7 @@
     <None Include="..\..\modules\organization\**\*" Link="SampleModules\organization\1.0.1\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\Axis.Integration.Tests\Fixtures\FilesApp\**\*" Link="Fixtures\FilesApp\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\web\src\platform\studioStarters.json" Link="Starters\studioStarters.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\web\src\platform\packageStarters.json" Link="Starters\packageStarters.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <Import Project="..\..\samples\packages\SamplePackages.targets" />
