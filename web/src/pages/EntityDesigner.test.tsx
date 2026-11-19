@@ -100,7 +100,21 @@ const drawnPaths = [
   'validations.expression',
   'validations.message',
   'validations.field',
+  'validations.messageText',
+  'fields.group.general',
+  'fields.group.value',
+  'fields.group.validation',
+  'fields.group.searchPrivacy',
+  'fields.precisionScale',
+  'fields.limits',
 ]
+
+/** The types whose settings include one that the type's group holds, which is titled by the type. */
+const typesWithOwnGroup = fieldTypes.filter((type) =>
+  fieldSettings(type).some((setting) =>
+    ['target', 'values', 'valueLabels', 'currency', 'precision', 'scale', 'maxLength'].includes(setting),
+  ),
+)
 
 const names = {
   locales: ['en', 'vi'],
@@ -1643,7 +1657,182 @@ describe('EntityDesigner', () => {
   })
 })
 
+/** The titles of the groups in the drawer, in order, without those of the groups inside them. */
+function groupTitles(drawer: HTMLElement): string[] {
+  const body = within(drawer).getByTestId('studio-field-drawer')
+  return Array.from(body.children)
+    .filter((child) => child.tagName === 'FIELDSET')
+    .map((group) => group.querySelector('legend')?.textContent ?? '')
+}
+
+describe('the groups of the field drawer', () => {
+  it('shows a text field in the groups General, Text settings, Value, Validation, and Search and privacy, with Max length in Text settings', async () => {
+    renderDesigner(entity())
+
+    const drawer = await openEntityField(1)
+
+    expect(groupTitles(drawer)).toEqual(['General', 'Text settings', 'Value', 'Validation', 'Search and privacy'])
+    const settings = within(drawer).getByRole('group', { name: 'Text settings' })
+    expect(within(settings).getByRole('spinbutton', { name: 'Max length' })).toHaveValue('20')
+    expect(
+      within(within(drawer).getByRole('group', { name: 'Validation' })).queryByRole('spinbutton', {
+        name: 'Max length',
+      }),
+    ).toBeNull()
+    expect(within(drawer).getByRole('group', { name: 'Validation' })).toContainElement(
+      screen.getByTestId('studio-field-/fields/1/required'),
+    )
+  })
+
+  it('shows a boolean field with no group of the type, and a reference field with no Value group', async () => {
+    renderDesigner(
+      entity({
+        fields: [
+          { name: 'active', type: 'boolean' },
+          { name: 'supplier', type: 'reference', target: 'Supplier' },
+        ],
+      }),
+    )
+
+    expect(groupTitles(await openEntityField(0))).toEqual(['General', 'Value', 'Validation', 'Search and privacy'])
+
+    expect(groupTitles(await openEntityField(1))).toEqual(['General', 'Reference settings', 'Validation'])
+  })
+
+  it('leaves out the Validation group of a child collection that has no validation to list and none to add', async () => {
+    renderDesigner(entity({ fields: [{ type: 'child-collection', target: 'Supplier' }] }))
+    expect(groupTitles(await openEntityField(0))).toEqual(['General', 'Child collection settings'])
+  })
+
+  it('shows precision and scale in one row, and min and max in another', async () => {
+    renderDesigner(
+      entity({
+        fields: [
+          { name: 'total', type: 'decimal', precision: 18, scale: 2, min: 0, max: 10 },
+          { name: 'count', type: 'integer', min: 1, max: 5 },
+        ],
+      }),
+    )
+
+    const decimal = await openEntityField(0)
+    const precision = within(decimal).getByRole('group', { name: 'Precision and scale' })
+    expect(within(precision).getByRole('spinbutton', { name: 'Precision' })).toHaveValue('18')
+    expect(within(precision).getByRole('spinbutton', { name: 'Scale' })).toHaveValue('2')
+    expect(within(precision).queryByRole('spinbutton', { name: 'Min' })).toBeNull()
+    const range = within(decimal).getByRole('group', { name: 'Range' })
+    expect(within(range).getByRole('spinbutton', { name: 'Min' })).toHaveValue('0')
+    expect(within(range).getByRole('spinbutton', { name: 'Max' })).toHaveValue('10')
+
+    const integer = await openEntityField(1)
+    expect(within(integer).queryByRole('group', { name: 'Precision and scale' })).toBeNull()
+    expect(
+      within(within(integer).getByRole('group', { name: 'Range' })).getByRole('spinbutton', { name: 'Min' }),
+    ).toHaveValue('1')
+  })
+
+  describe('the validations at the field', () => {
+    const validation = (name: string, field: string) => ({
+      name,
+      expression: 'total > 0',
+      message: { textKey: 'validation.total' },
+      field,
+    })
+    const validations = [validation('first', 'total'), validation('second', 'code'), validation('third', 'total')]
+
+    it('lists only the validations whose field is this field, and the Validations section lists every one', async () => {
+      renderDesigner(entity({ validations }))
+
+      const drawer = await openEntityField(0)
+      const box = (index: number) => within(drawer).queryByTestId(`studio-field-/validations/${index}`)
+
+      expect(within(drawer).getByTestId('studio-field-/validations/0/name')).toHaveTextContent('first')
+      expect(box(1)).toBeNull()
+      expect(within(drawer).getByTestId('studio-field-/validations/2/name')).toHaveTextContent('third')
+      // A validation at the field has no field picker, and its message is typed as texts.
+      expect(within(drawer).queryByTestId('studio-field-/validations/0/field')).toBeNull()
+      expect(within(box(0)!).getByRole('textbox', { name: 'English' })).toBeInTheDocument()
+      expect(within(box(0)!).getByRole('group', { name: 'Message' })).toBeInTheDocument()
+      const section = within(screen.getByTestId('studio-field-/validations'))
+      for (const [index, name] of ['first', 'second', 'third'].entries()) {
+        expect(section.getByTestId(`studio-field-/validations/${index}/name`)).toHaveTextContent(name)
+      }
+    })
+
+    it('removes a validation from the drawer', async () => {
+      const onChange = renderDesigner(entity({ validations }))
+
+      const drawer = await openEntityField(0)
+      await userEvent.click(
+        within(within(drawer).getByTestId('studio-field-/validations/2')).getByRole('button', {
+          name: 'Remove validation',
+        }),
+      )
+
+      expect(onChange).toHaveBeenLastCalledWith('/validations/2', undefined)
+    })
+
+    it('adds a validation at the field, with its name in field', async () => {
+      const content = renderContent(entity({ validations }))
+
+      await userEvent.click(within(await openEntityField(0)).getByRole('button', { name: 'Add validation' }))
+
+      expect(content().validations).toEqual([
+        ...validations,
+        { name: 'validation1', expression: '', message: { textKey: '' }, field: 'total' },
+      ])
+      expect(
+        within(screen.getByTestId('studio-field-drawer')).getByTestId('studio-field-/validations/3/name'),
+      ).toHaveTextContent('validation1')
+    })
+
+    it('adds the first validation of an entity that has none', async () => {
+      const onChange = renderDesigner(entity())
+
+      await userEvent.click(within(await openEntityField(1)).getByRole('button', { name: 'Add validation' }))
+
+      expect(onChange).toHaveBeenLastCalledWith('/validations', [
+        { name: 'validation1', expression: '', message: { textKey: '' }, field: 'code' },
+      ])
+    })
+
+    it('has no Add validation for a field with no name, and lists no validation of a blank field', async () => {
+      renderDesigner(entity({ fields: [{ type: 'text' }], validations: [validation('blank', '')] }))
+
+      const drawer = await openEntityField(0)
+
+      expect(within(drawer).queryByRole('button', { name: 'Add validation' })).toBeNull()
+      expect(within(drawer).queryByTestId('studio-field-/validations/0')).toBeNull()
+    })
+
+    it('lists the validations in a read-only designer but has no Add validation or Remove validation', async () => {
+      renderDesigner(entity({ validations }), vi.fn(), names, true)
+
+      const drawer = await openEntityField(0)
+
+      expect(within(drawer).getByTestId('studio-field-/validations/0/name')).toHaveTextContent('first')
+      expect(within(drawer).queryByRole('button', { name: 'Add validation' })).toBeNull()
+      expect(within(drawer).queryByRole('button', { name: 'Remove validation' })).toBeNull()
+    })
+
+    it('has no Add validation where the validations are not a list', async () => {
+      renderDesigner(entity({ validations: 'y' }))
+
+      expect(within(await openEntityField(0)).queryByRole('button', { name: 'Add validation' })).toBeNull()
+    })
+  })
+})
+
 describe('the texts of the entity designer', () => {
+  it.each(typesWithOwnGroup)(
+    'has a title and a help for the settings of a %s field in English and Vietnamese',
+    (type) => {
+      for (const catalogue of [platformEnglish, platformVietnamese] as Record<string, string>[]) {
+        expect(catalogue[`shell.studio.field.entity.fields.group.type.${type}`]).toBeTruthy()
+        expect(catalogue[`shell.studio.field.entity.fields.group.type.${type}.help`]).toBeTruthy()
+      }
+    },
+  )
+
   it.each(drawnPaths)('has a label and a help for %s in English and Vietnamese', (path) => {
     for (const catalogue of [platformEnglish, platformVietnamese] as Record<string, string>[]) {
       expect(catalogue[`shell.studio.field.entity.${path}`]).toBeTruthy()
