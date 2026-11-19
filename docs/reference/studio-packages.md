@@ -36,7 +36,8 @@ package's page as `&view=packages&package=<id>`.
 
 ## A package's files
 
-An author reads and edits the text of each file of a package, so a package can be written in the browser.
+An open package lists its files. Reading and editing the text of a file, so that a package can be written in the
+browser, is planned, see the marked bullets below.
 
 - **The file list.** An open package lists its files by path, the manifest, the adapter, the lock file and
   the tests among them. The page is headed with the package's label, and its table has a filter and a sort on
