@@ -68,6 +68,7 @@ public sealed class ProcessCompilerTests
             "order.cannotStart": "This order cannot be started.",
             "order.pause": "Cooling off",
             "order.review": "Review the order",
+            "order.title": "Order review",
             "role.finance": "Finance",
             "task.approve": "Approve",
             "task.reject": "Reject"
@@ -100,6 +101,7 @@ public sealed class ProcessCompilerTests
         Assert.Equal(
             (Guid.Parse(ProcessId), "OrderReview", "processes/order-review.json", new EntityReference(Guid.Parse(OrderId), "Order"), "check"),
             (process.Id, process.Name, process.File, process.Entity, process.Start));
+        Assert.Null(process.Title);
         Assert.NotNull(process.StartCondition);
         Assert.Equal("status is null", process.StartCondition.Expression.Expression);
         Assert.Equal(new TextReference("order.cannotStart"), process.StartCondition.Message);
@@ -864,6 +866,33 @@ public sealed class ProcessCompilerTests
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void A_process_title_compiles_into_the_model()
+    {
+        using var folder = Folder(Process("Order", ReviewSteps, title: "order.title"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetProcess("orderReview", out var process));
+        Assert.Equal(new TextReference("order.title"), process.Title);
+    }
+
+    [Fact]
+    public void A_missing_process_title_key_is_reported_at_its_text_key()
+    {
+        using var folder = Folder(Process("Order", ReviewSteps, title: "order.nope"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MissingTextKey, "processes/order-review.json", "/title/textKey"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
     }
 
     [Fact]
@@ -2398,13 +2427,15 @@ public sealed class ProcessCompilerTests
 
     /// <summary>The process <c>OrderReview</c> over <paramref name="entity"/>, with an optional start condition.</summary>
     private static string Process(
-        string entity, string steps, string start = "check", string? startCondition = null, string textKey = "order.cannotStart")
+        string entity, string steps, string start = "check", string? startCondition = null, string textKey = "order.cannotStart",
+        string? title = null)
     {
         var condition = startCondition is null
             ? ""
             : $$""" "startCondition": { "expression": "{{startCondition}}", "message": { "textKey": "{{textKey}}" } }, """;
+        var titleText = title is null ? "" : $$""" "title": { "textKey": "{{title}}" }, """;
         return $$"""
-            { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", "formatVersion": 1,
+            { "id": "{{ProcessId}}", "kind": "process", "name": "OrderReview", {{titleText}} "formatVersion": 1,
               "entity": "{{entity}}", {{condition}} "start": "{{start}}", "steps": {{steps}} }
             """;
     }

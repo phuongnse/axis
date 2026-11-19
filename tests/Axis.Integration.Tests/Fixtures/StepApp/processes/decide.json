@@ -2,6 +2,7 @@
   "id": "f4a6bf11-bc47-4165-9fec-eedbaa5a778f",
   "kind": "process",
   "name": "Decide",
+  "title": { "textKey": "processes.decide.title" },
   "formatVersion": 1,
   "entity": "Request",
   "start": "decide",

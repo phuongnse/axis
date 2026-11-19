@@ -1780,6 +1780,8 @@
   "shell.studio.field.entity.validations.messageText.help": "Văn bản hiện ra khi quy tắc kiểm tra không đạt, theo từng ngôn ngữ.",
   "shell.studio.field.process.name": "Tên",
   "shell.studio.field.process.name.help": "Tên xác định quy trình trong tệp và trong Studio.",
+  "shell.studio.field.process.title": "Tiêu đề",
+  "shell.studio.field.process.title.help": "Tiêu đề mà mọi người thấy của quy trình, bằng từng ngôn ngữ của ứng dụng.",
   "shell.studio.field.process.description": "Mô tả",
   "shell.studio.field.process.description.help": "Quy trình dùng để làm gì, trong một hai câu.",
   "shell.studio.field.process.startCondition": "Điều kiện bắt đầu",
