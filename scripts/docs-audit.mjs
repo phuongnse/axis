@@ -175,7 +175,7 @@ export function issuesFrom(findings, openBodies, runId) {
         f.kind === 'unbuilt'
           ? `The code follows the rule at ${f.page}:${f.line}`
           : `A test compares the list at ${f.page}:${f.line} with the code`,
-      labels: f.kind === 'unbuilt' ? ['bug'] : ['documentation', 'enhancement'],
+      labels: f.kind === 'unbuilt' ? ['bug'] : ['documentation'],
       body: body(
         `${kindNames[f.kind]}. ${link(f.page, f.line)}: ${f.statement}\n\nEvidence: ${evidence(f)}.` +
           (f.recommendation ? `\n\nRecommended: ${f.recommendation}` : ''),

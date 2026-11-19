@@ -221,7 +221,7 @@ describe('issuesFrom', () => {
       issues.map((i) => [i.title, i.labels]),
       [
         ['The code follows the rule at docs/a.md:5', ['bug', 'docs-audit']],
-        ['A test compares the list at docs/b.md:7 with the code', ['documentation', 'enhancement', 'docs-audit']],
+        ['A test compares the list at docs/b.md:7 with the code', ['documentation', 'docs-audit']],
       ],
     )
   })
@@ -241,6 +241,8 @@ describe('issuesFrom', () => {
     for (const issue of issues) assert.ok(issue.labels.includes('docs-audit'), issue.title)
     const unbuilt = issues.find((i) => i.title === 'The code follows the rule at docs/c.md:5')
     assert.deepEqual(unbuilt.labels, ['bug', 'docs-audit'])
+    const untested = issues.find((i) => i.title === 'A test compares the list at docs/d.md:7 with the code')
+    assert.deepEqual(untested.labels, ['documentation', 'docs-audit'])
   })
 
   test('leaves out what an open issue already covers', () => {
