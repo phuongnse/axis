@@ -1209,6 +1209,36 @@ describe('EntityDesigner', () => {
     expect(onChange).toHaveBeenLastCalledWith('/fields', [...fields, { name: '', type: 'text' }])
   })
 
+  it('opens a new field in its drawer, and the drawer follows its field on a move and closes on its own removal', async () => {
+    renderContent(entity())
+
+    await addEntityField()
+    const added = await screen.findByRole('dialog', { name: 'Unnamed field' })
+    expect(within(within(added).getByTestId('studio-field-/fields/3/name')).getByRole('textbox')).toHaveValue('')
+
+    await openEntityField(1)
+    await entityFieldAction(1, 'Move up')
+    let drawer = screen.getByRole('dialog', { name: 'code' })
+    expect(within(within(drawer).getByTestId('studio-field-/fields/0/name')).getByRole('textbox')).toHaveValue('code')
+
+    await entityFieldAction(0, 'Move down')
+    drawer = screen.getByRole('dialog', { name: 'code' })
+    expect(within(within(drawer).getByTestId('studio-field-/fields/1/name')).getByRole('textbox')).toHaveValue('code')
+    expect(entityFieldNames()).toEqual(['total', 'code', 'note', 'Unnamed field'])
+
+    // Removing another field before the drawer's field moves the drawer up an index.
+    await entityFieldAction(0, 'Remove')
+    drawer = screen.getByRole('dialog', { name: 'code' })
+    expect(within(within(drawer).getByTestId('studio-field-/fields/0/name')).getByRole('textbox')).toHaveValue('code')
+    expect(entityFieldNames()).toEqual(['code', 'note', 'Unnamed field'])
+
+    // Removing the drawer's own field closes the drawer.
+    await entityFieldAction(0, 'Remove')
+    await waitFor(() => expect(screen.queryByTestId('studio-field-drawer')).toBeNull())
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(entityFieldNames()).toEqual(['note', 'Unnamed field'])
+  })
+
   it('adds and removes a validation, with a message key and a field of the draft', async () => {
     const validation = {
       name: 'totalPositive',
