@@ -214,6 +214,29 @@ describe('ChartWidget', () => {
     ])
   })
 
+  it('hides the data table in a wrapper, so the table itself never spills out of its tile', async () => {
+    stubRows(twoGroups)
+
+    renderChart()
+
+    const table = await screen.findByRole('table', { name: 'Notes by category' })
+    expect(table.parentElement).toHaveStyle({ position: 'absolute', width: '1px', height: '1px', overflow: 'hidden' })
+    expect(table).not.toHaveStyle({ position: 'absolute' })
+  })
+
+  it('is a tile whose title is a part heading above the chart, not a card', async () => {
+    stubRows(twoGroups)
+
+    renderChart()
+
+    await screen.findByRole('img', { name: 'Notes by category' })
+    const tile = screen.getByTestId('chart-widget')
+    expect(within(tile).getByRole('heading', { level: 2, name: 'Notes by category' })).toBeInTheDocument()
+    expect(tile.closest('.ant-card')).toBeNull()
+    expect(tile.querySelector('.ant-card')).toBeNull()
+    expect(within(tile).queryByRole('separator')).toBeNull()
+  })
+
   it('names the category column after its name when the data source gives it no label', async () => {
     stubRows(twoGroups)
     const widget = chartWidget(bar)

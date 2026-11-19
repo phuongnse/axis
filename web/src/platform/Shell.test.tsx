@@ -537,7 +537,7 @@ describe('Shell sidebar claimed by a page', () => {
 })
 
 describe('Shell right column claimed by a page', () => {
-  it('draws the children of a page in a column as wide as a side panel, and removes the column with the page', async () => {
+  it('draws the children of a page in a column, and removes the column with the page', async () => {
     const view = renderShell(
       'en',
       ['/'],
@@ -553,12 +553,41 @@ describe('Shell right column claimed by a page', () => {
       return found!
     })
     expect(column).toContainElement(await screen.findByText('Side'))
-    expect(column).toHaveStyle({ width: `${sizeTokens.sidePanel}px` })
+    expect(column).not.toHaveStyle({ width: `${sizeTokens.sidePanel}px` })
 
     view.rerender(shellFor(notesNavigation.slice(0, 1), <p>No claim</p>))
 
     expect(document.getElementById('shell-aside')).toBeNull()
     expect(screen.queryByText('Side')).toBeNull()
+  })
+
+  it('shows the newest panel a person opened over a panel with no close button, which returns when it ends', async () => {
+    function Panels({ opened }: { opened: boolean }) {
+      return (
+        <>
+          <ShellAside closable={false}>
+            <p>Step</p>
+          </ShellAside>
+          {opened && (
+            <ShellAside>
+              <p>Problems</p>
+            </ShellAside>
+          )}
+        </>
+      )
+    }
+    const view = renderShell('en', ['/'], notesNavigation.slice(0, 1), <Panels opened={false} />)
+    await screen.findByText('Step')
+
+    view.rerender(shellFor(notesNavigation.slice(0, 1), <Panels opened />))
+
+    await screen.findByText('Problems')
+    expect(screen.queryByText('Step')).toBeNull()
+
+    view.rerender(shellFor(notesNavigation.slice(0, 1), <Panels opened={false} />))
+
+    await screen.findByText('Step')
+    expect(screen.queryByText('Problems')).toBeNull()
   })
 
   it('mounts a page that claims the right column once', async () => {

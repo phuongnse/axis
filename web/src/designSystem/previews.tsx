@@ -266,6 +266,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
       entry: { pathname: '/sample/request/new', state: { from: '/sample/requests' } },
       frameHeight: 600,
     },
+    { caption: 'Dashboard', draw: () => <ShellPreview />, entry: '/sample/dashboard', frameHeight: 600 },
     { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: 600 },
     {
       caption: 'App switcher',

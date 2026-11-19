@@ -2,6 +2,7 @@ import { Flex, Form, Input, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
+import { SidePanel } from '../platform/SidePanel'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisField } from '../platform/AxisField'
@@ -11,7 +12,6 @@ import { fetchStudioSettings, sendAuthoringRequest, ServerUnreachableError } fro
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { StudioSidePanel } from './StudioSidePanel'
 
 /** The id of the request panel, which Ask AI on the band names in `aria-controls`. */
 export const askAiPanelId = 'studio-ask-ai-panel'
@@ -21,7 +21,7 @@ const maxTextLength = 4000
 type Values = { text: string; autoAccept?: boolean }
 
 /**
- * The request panel of the open application, drawn in `StudioSidePanel`, see
+ * The request panel of the open application, drawn in `SidePanel`, see
  * docs/reference/ai-authoring-in-studio.md#the-request-panel. The author writes a request of up to 4,000 characters and
  * sends it. The check box "Accept when checks and review pass" shows only when the application's auto-accept setting is
  * on, which `fetchStudioSettings` reads, and a failed read hides it. Send posts the trimmed text and the check box's
@@ -78,7 +78,7 @@ export function StudioAskAi({ application, onClose }: { application: string; onC
   }
 
   return (
-    <StudioSidePanel
+    <SidePanel
       id={askAiPanelId}
       testId="studio-ask-ai-panel"
       closeTestId="studio-ask-ai-close"
@@ -125,6 +125,6 @@ export function StudioAskAi({ application, onClose }: { application: string; onC
           </span>
         </Flex>
       </Flex>
-    </StudioSidePanel>
+    </SidePanel>
   )
 }

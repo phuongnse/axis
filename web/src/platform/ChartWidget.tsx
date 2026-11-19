@@ -1,12 +1,13 @@
-import { Card } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { boundParameterQuery } from './boundParameters'
 import { Chart } from './Chart'
 import { formatValue, type FormatOptions } from './formatValue'
+import { SectionPart } from './SectionParts'
 import { fetchRecords, type RecordItem, type RecordValue } from './records'
 import type { DataSourceColumn, WidgetMetadata } from './site'
 import { useText } from './texts'
+import { Tile } from './Tile'
 import { visuallyHidden } from './visuallyHidden'
 
 interface ChartWidgetProps {
@@ -52,7 +53,8 @@ function cellText(
  * the page size and the value of each page parameter the widget binds, under the data source parameter's name,
  * and asks again when one changes. The compiler makes every parameter that the widget leaves unbound
  * optional. It draws at most 100 groups and says so when the data source has more. A null category
- * shows the platform text for an empty value. The chart's data is also in a table that only screen readers
+ * shows the platform text for an empty value. The chart is a `Tile` with its title as a part heading above it, see
+ * docs/reference/detail-chart-kpi-widgets.md. The chart's data is also in a table, inside a hidden wrapper, that only screen readers
  * reach, with the category and each measure as columns, and its values look as they do in a table cell.
  */
 export function ChartWidget({ widget, locale, pageValues }: ChartWidgetProps) {
@@ -121,43 +123,47 @@ export function ChartWidget({ widget, locale, pageValues }: ChartWidgetProps) {
         {state.totalCount > maxGroups && (
           <AxisAlert data-testid="chart-truncated" kind="info" message={t('shell.chart.truncated')} />
         )}
-        <table style={visuallyHidden}>
-          <caption>{title}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{categoryColumn?.labelKey ? t(categoryColumn.labelKey) : category}</th>
-              {measures.map((measure) => (
-                <th key={measure.name} scope="col">
-                  {t(measure.labelKey)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((item, index) => (
-              <tr key={index}>
-                <th scope="row">{categories[index]}</th>
+        <div style={visuallyHidden}>
+          <table>
+            <caption>{title}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{categoryColumn?.labelKey ? t(categoryColumn.labelKey) : category}</th>
                 {measures.map((measure) => (
-                  <td key={measure.name}>
-                    {cellText(
-                      columns.find((candidate) => candidate.name === measure.name),
-                      item,
-                      measure.name,
-                      { locale, text: t },
-                    )}
-                  </td>
+                  <th key={measure.name} scope="col">
+                    {t(measure.labelKey)}
+                  </th>
                 ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((item, index) => (
+                <tr key={index}>
+                  <th scope="row">{categories[index]}</th>
+                  {measures.map((measure) => (
+                    <td key={measure.name}>
+                      {cellText(
+                        columns.find((candidate) => candidate.name === measure.name),
+                        item,
+                        measure.name,
+                        { locale, text: t },
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </>
     )
   }
 
   return (
-    <Card data-testid="chart-widget" title={title} aria-busy={loading}>
-      {content}
-    </Card>
+    <Tile testId="chart-widget" busy={loading} style={{ display: 'block' }}>
+      <SectionPart testId="chart-part" heading={{ title }}>
+        {content}
+      </SectionPart>
+    </Tile>
   )
 }

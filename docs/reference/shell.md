@@ -58,14 +58,15 @@ their own controls where they expect them.
   workspace, with `spacing-md` round its content, compact sidebar entries and a compact band, see
   [Studio workspace](studio-workspace.md#workspace). The sidebar and its collapse button show even on a
   one-page site.
-- **One side panel frame** _(planned)_. Every page draws its side panel in `SidePanel`, in a column on the right
+- **One side panel frame.** Every page draws its side panel in `SidePanel`, in a column on the right
   from under the header to the footer. One shows at a time, so opening one, such as the problems panel or the Ask AI
   request panel, closes the other. It holds details or tools for what is chosen, while the page stays in use. A task
   to finish or cancel is a dialog, and what stands alone is a page. A handle on its edge, a `separator` that takes the
   arrow keys, Home and End, sets its width from `sidePanel` to half the shell, and the browser keeps that width, so
   every side panel opens at the width last chosen. Its title can carry a `status`, such as a `StatusTag`. Its head
   stays in place and its body scrolls on its own, keeping room for its scrollbar, so its content keeps its width when
-  a scrollbar comes. The page keeps the browser's scroll.
+  a scrollbar comes. A panel with no close button, such as the process designer's step panel, gives way while a panel
+  the person opened is open, and comes back when that one closes. The page keeps the browser's scroll.
 - **Collapsed sidebar.** The header's button collapses the sidebar to a narrow strip of the entries'
   icons, each centred and named by a tooltip, and opens it again. Collapsed, a group's title gives way
   to a thin rule. The button names what it does, "Collapse navigation" or "Expand navigation", and has
@@ -257,7 +258,7 @@ The page has two parts, each under a `heading5` title with no count beside it: "
 - **A tile** is a panel on `surface` with a `borderSubtle` border, `radius-base` corners and
   `spacing-md` padding, its mark and its text `spacing-sm` apart. A title with no description under it
   is centred on its mark. Applications are `spacing-md` apart.
-- **Every tile is a `Tile`** _(planned)_. The home page's applications and tools, Studio's application tiles, and a
+- **Every tile is a `Tile`.** The home page's applications and tools, Studio's application tiles, and a
   dashboard's KPI and chart are all drawn through one shared tile, so they keep one look.
 - **A tile that is a link** shows it only by its title in `primaryText`, as every link: hover changes
   nothing, and keyboard focus draws the `focusRing` outline.
@@ -391,7 +392,7 @@ to the frame shows in every state. How previews work is in
 
   | Preview          | States                                                                                                                                                                                                                                                                                                                                                                                        |
   | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `shell`          | Application site, Navigation collapsed, Form page, Platform site, App switcher, and Language and theme                                                                                                                                                                                                                                                                                        |
+  | `shell`          | Application site, Navigation collapsed, Form page, Dashboard, Platform site, App switcher, and Language and theme                                                                                                                                                                                                                                                                                        |
   | `signIn`         | Sign-in refused, Signed out and Session ended, with the organization's heading over the cards                                                                                                                                                                                                                                                                                                 |
   | `identitySignIn` | The sign-in page of [Axis's identity provider](identity-provider.md#theme) in Sign in, Wrong password, Fields left empty, Organization sign-in only, Two-step verification, Forgot password, Set password, Add an authenticator, Choose how to sign in, Update your profile, Terms and privacy, Terms not accepted, Sign out, Notice, Error, and Language and theme with the gear's menu open |
 

@@ -64,7 +64,7 @@ component holds a number of its own.
   `spacing-xl`, and radius has the base radius.
 - **Sizes.** The size group holds `bar`, the height of the shell's header, a page's band and Studio's application row,
   `smallControl`, a small icon button and the line of text beside it, `tableRow`, a table's row and header, and
-  `sidePanel`, the width of a side panel, see [layout](shell.md#layout).
+  `sidePanel`, the width a side panel opens at until a person sets one and its least width, see [layout](shell.md#layout).
 - **Dialog sizes.** The size group also holds `dialog`, the dialog widths `small` (400 px), `medium` (560 px) and
   `large` (880 px), see [dialogs](actions-and-controls.md#dialogs).
 - **No value of its own.** No size, space, type, radius or colour is a number of its own in a component, and a layout
@@ -171,10 +171,11 @@ The person picks a locale and a theme in the shell's [language and theme](shell.
 and the SPA keeps both in the browser.
 
 - **Browser storage.** The chosen locale is kept in `localStorage` under `axis.locale`, beside the theme mode that
-  [themes](shell.md#app-switcher-and-preferences) keeps. The only other key the SPA keeps in browser storage is
-  `axis.tenantExport`, the id of the last [export](platform-pages.md#export-data-and-usage). The id is not sensitive
-  data, because the export routes still need an administrator session. Sign-out clears all three through
-  `Clear-Site-Data`, so the next sign-in starts in the system theme and the site's default locale.
+  [themes](shell.md#app-switcher-and-preferences) keeps. The only other keys the SPA keeps in browser storage are
+  `axis.sidePanelWidth`, the width the person last gave a [side panel](shell.md#layout), and `axis.tenantExport`, the id
+  of the last [export](platform-pages.md#export-data-and-usage). Neither is sensitive data, and the export routes still
+  need an administrator session. Sign-out clears all four through `Clear-Site-Data`, so the next sign-in starts in the
+  system theme, the site's default locale and the side panel's least width.
 - **One key for every site.** A site starts in the stored locale when it offers it, and in its default locale
   otherwise.
 - **Changing the locale.** The shell keeps the current texts until the chosen locale's texts have loaded. If they fail

@@ -6,9 +6,9 @@ import { fetchSites, type SiteListItem } from '../platform/site'
 import { changeRows, type StudioReleases, type StudioResourceItem } from '../platform/studio'
 import { kindName, studioKinds } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
+import { TileFocusStyle } from '../platform/Tile'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
-import { HomeTileStyle } from './HomeTileStyle'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { SiteTiles } from './SiteTiles'
 import { StudioChangeList } from './StudioChangeList'
@@ -55,7 +55,7 @@ export function StudioOverview({
 
   return (
     <Flex vertical gap={spacing.lg}>
-      <HomeTileStyle />
+      <TileFocusStyle />
       <StudioPageHeading title={title} line={description} />
       <SectionParts>
         {getStarted && (

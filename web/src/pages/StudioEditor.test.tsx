@@ -13,6 +13,7 @@ import { colourTokens } from '../platform/designTokens'
 import { setAt } from '../platform/jsonPatch'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
+import { ShellAsideHost } from '../test/shellAsideHost'
 import { loadKindSchema } from '../platform/studioSchemas'
 import { chooseOption, selectRoot } from '../test/antd'
 import {
@@ -96,17 +97,19 @@ function renderEditor() {
     <MemoryRouter>
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioEditor
-            application="Shop"
-            item={resources[0]}
-            resources={resources}
-            path={null}
-            diagnosticPaths={[]}
-            onOpen={vi.fn()}
-            onSaved={vi.fn()}
-            onTextsWritten={vi.fn()}
-            onDeleted={vi.fn()}
-          />
+          <ShellAsideHost>
+            <StudioEditor
+              application="Shop"
+              item={resources[0]}
+              resources={resources}
+              path={null}
+              diagnosticPaths={[]}
+              onOpen={vi.fn()}
+              onSaved={vi.fn()}
+              onTextsWritten={vi.fn()}
+              onDeleted={vi.fn()}
+            />
+          </ShellAsideHost>
         </TextProvider>
       </ThemeModeProvider>
     </MemoryRouter>,
@@ -518,17 +521,19 @@ function renderResource(
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <StudioNamesContext.Provider value={names}>
-            <StudioEditor
-              application="Shop"
-              item={item}
-              resources={[item]}
-              path={current}
-              diagnosticPaths={diagnosticPaths}
-              onOpen={vi.fn()}
-              onSaved={vi.fn()}
-              onTextsWritten={onTextsWritten}
-              onDeleted={vi.fn()}
-            />
+            <ShellAsideHost>
+              <StudioEditor
+                application="Shop"
+                item={item}
+                resources={[item]}
+                path={current}
+                diagnosticPaths={diagnosticPaths}
+                onOpen={vi.fn()}
+                onSaved={vi.fn()}
+                onTextsWritten={onTextsWritten}
+                onDeleted={vi.fn()}
+              />
+            </ShellAsideHost>
           </StudioNamesContext.Provider>
         </TextProvider>
       </ThemeModeProvider>
@@ -1118,7 +1123,7 @@ describe('StudioEditor for a process', () => {
         expect(node).toHaveAccessibleName(`${step.name}, ${step.type}`)
         await userEvent.keyboard('{Enter}')
         expect(
-          within(screen.getByTestId('studio-process-design')).getByTestId(`studio-step-${index}`),
+          within(screen.getByTestId('studio-process-panel')).getByTestId(`studio-step-${index}`),
         ).toBeInTheDocument()
         expect(node).toHaveAttribute('aria-current', 'true')
       }
@@ -1131,9 +1136,9 @@ describe('StudioEditor for a process', () => {
     stubResource(processItem, processContent)
     renderResource(processItem)
 
-    const design = await screen.findByTestId('studio-process-design', {}, slow)
-    expect(within(design).getByText('Select a step on the canvas.')).toBeInTheDocument()
-    expect(within(design).queryByTestId('studio-step-0')).not.toBeInTheDocument()
+    const panel = within(await screen.findByTestId('studio-process-panel', {}, slow))
+    expect(panel.getByText('Select a step on the canvas.')).toBeInTheDocument()
+    expect(panel.queryByTestId('studio-step-0')).not.toBeInTheDocument()
   })
 
   it('selects a step when its node is clicked, and no other', async () => {
@@ -1160,8 +1165,8 @@ describe('StudioEditor for a process', () => {
     renderResource(processItem)
 
     fireEvent.click(await screen.findByTestId('rf__edge-/steps/2/otherwise', {}, slow))
-    const design = screen.getByTestId('studio-process-design')
-    expect(within(design).getByTestId('studio-step-2')).toBeInTheDocument()
+    const panel = screen.getByTestId('studio-process-panel')
+    expect(within(panel).getByTestId('studio-step-2')).toBeInTheDocument()
     expect(screen.getByTestId('studio-graph-node-2')).toHaveAttribute('aria-current', 'true')
   })
 
@@ -1175,7 +1180,7 @@ describe('StudioEditor for a process', () => {
     const oldName = `submit to ${processContent.steps[oldTarget].name}, next`
     expect(edge()).toHaveAccessibleName(oldName)
 
-    const panel = within(screen.getByTestId('studio-process-design'))
+    const panel = within(screen.getByTestId('studio-process-panel'))
     await chooseOption('done', panel.getByTestId('studio-field-/steps/0/next'))
     expect(edge()).toHaveAccessibleName('submit to done, next')
 
@@ -1226,17 +1231,18 @@ describe('StudioEditor for a process', () => {
     await userEvent.keyboard('{Enter}')
 
     const design = within(screen.getByTestId('studio-process-design'))
+    const panel = within(screen.getByTestId('studio-process-panel'))
     expect(screen.getByTestId('rf__edge-/steps/2/otherwise')).toHaveAttribute('aria-current', 'true')
     expect(screen.getByTestId('studio-graph-node-2')).toHaveAttribute('aria-current', 'true')
-    expect(design.getByRole('button', { name: 'Remove line' })).toBeInTheDocument()
+    expect(panel.getByRole('button', { name: 'Remove line' })).toBeInTheDocument()
 
     await userEvent.keyboard('{Delete}')
 
     expect(screen.queryByTestId('rf__edge-/steps/2/otherwise')).not.toBeInTheDocument()
     expect(screen.getByTestId('studio-graph-node-4')).toBeInTheDocument()
-    expect(within(design.getByTestId('studio-field-/steps/2/otherwise')).queryByText('markApproved')).toBeNull()
-    expect(design.queryByRole('button', { name: 'Remove line' })).not.toBeInTheDocument()
-    expect(design.getByTestId('studio-step-2')).toBeInTheDocument()
+    expect(within(panel.getByTestId('studio-field-/steps/2/otherwise')).queryByText('markApproved')).toBeNull()
+    expect(panel.queryByRole('button', { name: 'Remove line' })).not.toBeInTheDocument()
+    expect(panel.getByTestId('studio-step-2')).toBeInTheDocument()
     expect(design.getByTestId('studio-process-announcement')).toHaveTextContent(
       'Removed the line financeCheck to markApproved, otherwise.',
     )
@@ -1248,7 +1254,9 @@ describe('StudioEditor for a process', () => {
 
     fireEvent.click(await screen.findByTestId('rf__edge-/steps/1/outcomes/0', {}, slow))
     const design = within(screen.getByTestId('studio-process-design'))
-    await userEvent.click(design.getByRole('button', { name: 'Remove line' }))
+    await userEvent.click(
+      within(screen.getByTestId('studio-process-panel')).getByRole('button', { name: 'Remove line' }),
+    )
 
     expect(screen.queryByTestId('rf__edge-/steps/1/outcomes/0')).not.toBeInTheDocument()
     expect(screen.getByTestId('rf__edge-/steps/1/outcomes/1')).toBeInTheDocument()
@@ -1267,7 +1275,9 @@ describe('StudioEditor for a process', () => {
     fireEvent.click(node)
     act(() => node.focus())
     const design = within(screen.getByTestId('studio-process-design'))
-    expect(design.queryByRole('button', { name: 'Remove line' })).not.toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('studio-process-panel')).queryByRole('button', { name: 'Remove line' }),
+    ).not.toBeInTheDocument()
     await userEvent.keyboard('{Delete}')
 
     expect(screen.queryByRole('button', { name: 'markRejected, operation' })).not.toBeInTheDocument()
@@ -1281,7 +1291,9 @@ describe('StudioEditor for a process', () => {
 
     fireEvent.click(await screen.findByTestId('studio-graph-node-9', {}, slow))
     const design = within(screen.getByTestId('studio-process-design'))
-    await userEvent.click(design.getByRole('textbox', { name: 'Step name' }))
+    await userEvent.click(
+      within(screen.getByTestId('studio-process-panel')).getByRole('textbox', { name: 'Step name' }),
+    )
     await userEvent.keyboard('{Backspace}{Delete}')
 
     expect(screen.getByTestId('studio-graph-node-9')).toBeInTheDocument()

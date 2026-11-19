@@ -769,10 +769,10 @@ describe('App', () => {
     const { colour } = designTokensFor('light')
     const rule = Array.from(document.querySelectorAll('style'))
       .map((element) => element.textContent ?? '')
-      .find((text) => text.includes('[data-home-tile]:focus-visible'))
+      .find((text) => text.includes('[data-tile]:focus-visible'))
     expect(rule).toContain(`outline: 2px solid ${colour.focusRing}; outline-offset: 2px;`)
-    expect(screen.getByRole('link', { name: /^Studio/ })).toHaveAttribute('data-home-tile')
-    expect(screen.getByRole('link', { name: 'Customer portal' })).toHaveAttribute('data-home-tile')
+    expect(screen.getByRole('link', { name: /^Studio/ })).toHaveAttribute('data-tile')
+    expect(screen.getByRole('link', { name: 'Customer portal' })).toHaveAttribute('data-tile')
   })
 
   it('opens a site from its application tile', async () => {

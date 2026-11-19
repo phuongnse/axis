@@ -1,7 +1,7 @@
 import { Button, Descriptions, Flex, Result, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
+import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { AxisActionRow } from '../platform/AxisButton'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
@@ -34,11 +34,11 @@ import { studioResourceAddress } from '../platform/studioAddress'
 import { starterKinds } from '../platform/studioStarters'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
+import { Tile, TileFocusStyle } from '../platform/Tile'
 import { leaveWithoutAsking } from '../platform/unsavedChanges'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import { useHomeGrid } from './homeGrid'
-import { HomeTileStyle } from './HomeTileStyle'
 import { StudioAuthoringRequestPage } from './StudioAuthoringRequestPage'
 import { StudioEditor, type StudioEditorHandle } from './StudioEditor'
 import { StudioHistory, StudioRevisionPage } from './StudioHistory'
@@ -68,7 +68,7 @@ function publishOrigin(state: unknown): string | null {
 /** The tiles of the applications Studio may edit, in the UI locale with `en` as the fallback. Each opens its application. */
 function StudioApplicationTiles({ apps }: { apps: StudioApplication[] }) {
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const { colour, radius, spacing } = useDesignTokens()
+  const { colour } = useDesignTokens()
   const grid = useHomeGrid()
   return (
     <div data-testid="studio-apps" style={grid}>
@@ -76,21 +76,11 @@ function StudioApplicationTiles({ apps }: { apps: StudioApplication[] }) {
         const title = studioAppTitle(app, locale)
         const description = studioAppDescription(app, locale)
         return (
-          <Link
+          <Tile
             key={app.name}
             to={`/studio?app=${encodeURIComponent(app.name)}`}
-            data-home-tile
-            data-testid={`studio-app-${app.name}`}
-            style={{
-              display: 'flex',
-              alignItems: description === null ? 'center' : 'flex-start',
-              gap: spacing.sm,
-              minWidth: 0,
-              padding: spacing.md,
-              background: colour.surface,
-              border: `1px solid ${colour.borderSubtle}`,
-              borderRadius: radius.base,
-            }}
+            testId={`studio-app-${app.name}`}
+            align={description === null ? 'center' : 'flex-start'}
           >
             <SiteMark title={title} size={32} />
             <Flex vertical style={{ minWidth: 0 }}>
@@ -106,7 +96,7 @@ function StudioApplicationTiles({ apps }: { apps: StudioApplication[] }) {
                 </Typography.Paragraph>
               )}
             </Flex>
-          </Link>
+          </Tile>
         )
       })}
     </div>
@@ -535,7 +525,7 @@ function StudioWorkspace() {
   if (application === null) {
     return (
       <Flex vertical gap="middle">
-        <HomeTileStyle />
+        <TileFocusStyle />
         <StudioPageHeading
           title={t('shell.studio.title')}
           actions={canCreate && <StudioNewApplication primary onCreated={onApplicationCreated} />}

@@ -60,7 +60,7 @@ test.describe('Studio redraws a large process after a panel edit', () => {
     const index = firstFiller + 14
     await page.getByTestId(`studio-graph-node-${index}`).click()
     const name = page
-      .getByTestId('studio-process-design')
+      .getByTestId('studio-process-panel')
       .getByRole('textbox', { name: 'Step name', exact: true })
     await expect(name).toHaveValue('filler15')
 

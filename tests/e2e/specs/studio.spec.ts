@@ -670,13 +670,13 @@ test.describe('Studio on a copy of its own', () => {
     const ids = await edges.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-testid')))
     expect(ids.sort()).toEqual(expected.map((transitionPath) => `rf__edge-${transitionPath}`).sort())
 
-    const design = page.getByTestId('studio-process-design')
+    const panel = page.getByTestId('studio-process-panel')
     await page.getByRole('button', { name: 'financeApproval, task', exact: true }).click()
-    await expect(design.getByTestId('studio-step-3')).toBeVisible()
+    await expect(panel.getByTestId('studio-step-3')).toBeVisible()
     await expect(page.getByTestId('studio-graph-node-3')).toHaveAttribute('aria-current', 'true')
 
     await page.getByTestId('rf__edge-/steps/3/outcomes/0').click()
-    await expect(design.getByTestId('studio-step-3')).toBeVisible()
+    await expect(panel.getByTestId('studio-step-3')).toBeVisible()
     await expect(page.getByTestId('studio-graph-node-3')).toHaveAttribute('aria-current', 'true')
   })
 
