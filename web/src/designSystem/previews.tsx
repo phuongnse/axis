@@ -182,6 +182,9 @@ function studioDesignerStates(resourceId: string): readonly PreviewState[] {
   ]
 }
 
+/** The height of every `shell` state's frame, so more of each page shows. */
+const shellFrameHeight = 800
+
 /** What a preview draws: its states, each the shared widget component over fixture metadata. */
 export const previews: Record<string, readonly PreviewState[]> = {
   table: [
@@ -249,7 +252,12 @@ export const previews: Record<string, readonly PreviewState[]> = {
     ]),
   ),
   shell: [
-    { caption: 'Application site', draw: () => <ShellPreview />, entry: '/sample/requests', frameHeight: 600 },
+    {
+      caption: 'Application site',
+      draw: () => <ShellPreview />,
+      entry: '/sample/requests',
+      frameHeight: shellFrameHeight,
+    },
     {
       caption: 'Navigation collapsed',
       draw: () => (
@@ -258,16 +266,16 @@ export const previews: Record<string, readonly PreviewState[]> = {
         </ClickOnMount>
       ),
       entry: '/sample/requests',
-      frameHeight: 600,
+      frameHeight: shellFrameHeight,
     },
     {
       caption: 'Form page',
       draw: () => <ShellPreview />,
       entry: { pathname: '/sample/request/new', state: { from: '/sample/requests' } },
-      frameHeight: 600,
+      frameHeight: shellFrameHeight,
     },
-    { caption: 'Dashboard', draw: () => <ShellPreview />, entry: '/sample/dashboard', frameHeight: 600 },
-    { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: 600 },
+    { caption: 'Dashboard', draw: () => <ShellPreview />, entry: '/sample/dashboard', frameHeight: shellFrameHeight },
+    { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: shellFrameHeight },
     {
       caption: 'App switcher',
       draw: () => (
@@ -276,7 +284,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
         </ClickOnMount>
       ),
       entry: '/sample/requests',
-      frameHeight: 600,
+      frameHeight: shellFrameHeight,
     },
     {
       caption: 'Language and theme',
@@ -286,9 +294,9 @@ export const previews: Record<string, readonly PreviewState[]> = {
         </ClickOnMount>
       ),
       entry: '/sample/requests',
-      frameHeight: 600,
+      frameHeight: shellFrameHeight,
     },
-    { caption: 'Account page', draw: () => <ShellPreview />, entry: '/account', frameHeight: 640 },
+    { caption: 'Account page', draw: () => <ShellPreview />, entry: '/account', frameHeight: shellFrameHeight },
     {
       caption: 'Account notifications',
       draw: () => (
@@ -297,7 +305,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
         </ClickOnMount>
       ),
       entry: '/account',
-      frameHeight: 640,
+      frameHeight: shellFrameHeight,
     },
   ],
   studio: [
