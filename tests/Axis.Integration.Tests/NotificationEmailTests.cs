@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using Axis.Configuration.Model;
+using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
@@ -62,6 +63,76 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
             [("sent", true), ("sent", true)],
             (await EmailsAsync(title)).Select(email => (email.State, email.SentAt is not null)));
         Assert.Equal(0L, await ItemCountAsync(emails.Select(email => email.Id)));
+    }
+
+    [Fact]
+    public async Task Process_email_of_a_user_with_the_digest_on_waits_pending_with_one_item_due_at_the_next_digest_hour_while_the_bare_address_is_sent_right_away()
+    {
+        var address = UniqueAddress();
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, address);
+        var now = DateTimeOffset.UtcNow;
+        var hour = HourAhead(now, 2);
+        var (title, key) = await StageDigestAsync(releaseId, model, hour);
+        await using var worker = Worker(new LogCollector(), await MailpitSettingsAsync("Email"));
+
+        await RunUntilIdleAsync(worker);
+
+        Assert.Single(await mailpit.MessagesToAsync(address, CancellationToken));
+        Assert.Empty(await mailpit.MessagesToAsync($"digest.{key}", CancellationToken));
+        var waiting = await WaitingAsync(title);
+        var row = Assert.Single(waiting);
+        Assert.Equal(1L, await ItemCountAsync([row]));
+        Assert.Equal(NextLocalHour(now, hour), await DueAtAsync(row));
+        Assert.Equal("pending", await fixture.ScalarAsync("SELECT state FROM axis.email_outbox WHERE id = @id", ("id", row)));
+    }
+
+    [Fact]
+    public async Task Two_waiting_emails_of_a_person_are_sent_as_one_digest_listing_both_subjects_and_links_with_both_rows_sent_and_no_item_left()
+    {
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, UniqueAddress());
+        var (title, key) = await StageDigestAsync(releaseId, model, HourAhead(DateTimeOffset.UtcNow, 2));
+        await StageDigestAsync(releaseId, model, HourAhead(DateTimeOffset.UtcNow, 2), title);
+        var waiting = await WaitingAsync(title);
+        Assert.Equal(2, waiting.Count);
+        Assert.Equal(1L, await ItemCountAsync(waiting));
+        await MakeDueAsync(waiting);
+        await using var worker = Worker(new LogCollector(), await MailpitSettingsAsync("Email"));
+
+        await RunUntilIdleAsync(worker);
+
+        var digest = Assert.Single(await mailpit.MessagesToAsync($"digest.{key}", CancellationToken));
+        Assert.Equal("Your daily digest", digest.Subject);
+        Assert.StartsWith("These notifications waited for your daily digest.", digest.Text, StringComparison.Ordinal);
+        Assert.Equal(2, digest.Text.Split($"Request {title}").Length - 1);
+        Assert.Equal(2, digest.Text.Split($"https://{fixture.Tenant}.example.test/steps/tasks").Length - 1);
+        Assert.Equal(
+            2L,
+            await fixture.CountAsync("SELECT count(*) FROM axis.email_outbox WHERE digest_user_id = @user AND state = 'sent' AND sent_at IS NOT NULL", ("user", title)));
+        Assert.Equal(0L, await ItemCountAsync(waiting));
+    }
+
+    [Fact]
+    public async Task Email_staged_after_a_sent_digest_queues_a_new_item_due_at_the_next_days_digest_hour()
+    {
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, UniqueAddress());
+        var now = DateTimeOffset.UtcNow;
+
+        // The hour is the current hour in the person's zone, so the next digest is always at that hour tomorrow.
+        var hour = TimeZoneInfo.ConvertTime(now, TimeZoneInfo.FindSystemTimeZoneById(DigestZone)).Hour;
+        var (title, key) = await StageDigestAsync(releaseId, model, hour);
+        var first = await WaitingAsync(title);
+        await MakeDueAsync(first);
+        await using var worker = Worker(new LogCollector(), await MailpitSettingsAsync("Email"));
+        await RunUntilIdleAsync(worker);
+        Assert.Single(await mailpit.MessagesToAsync($"digest.{key}", CancellationToken));
+        Assert.Equal(0L, await ItemCountAsync(first));
+
+        await StageDigestAsync(releaseId, model, hour, title);
+
+        var second = Assert.Single(await WaitingAsync(title));
+        Assert.Equal(1L, await ItemCountAsync([second]));
+        Assert.Equal(NextLocalHour(DateTimeOffset.UtcNow, hour), await DueAtAsync(second));
+        Assert.True(await DueAtAsync(second) > now.AddHours(1));
     }
 
     [Fact]
@@ -592,6 +663,74 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         ($"{prefix}:Smtp:UseTls", "false"),
         ($"{prefix}:From", Sender),
     ];
+
+    /// <summary>The time zone the digest tests save, which has no daylight saving time, so its offset is the same all year.</summary>
+    private const string DigestZone = "Asia/Ho_Chi_Minh";
+
+    private static readonly TimeSpan _digestOffset = TimeSpan.FromHours(7);
+
+    /// <summary>The hour in <see cref="DigestZone"/> that is <paramref name="ahead"/> whole hours after the hour of <paramref name="now"/> there.</summary>
+    private static int HourAhead(DateTimeOffset now, int ahead) => (now.ToOffset(_digestOffset).Hour + ahead) % 24;
+
+    /// <summary>The first instant after <paramref name="now"/> at which it is <paramref name="hour"/> o'clock in <see cref="DigestZone"/>.</summary>
+    private static DateTimeOffset NextLocalHour(DateTimeOffset now, int hour)
+    {
+        var local = now.ToOffset(_digestOffset);
+        var next = new DateTimeOffset(local.Year, local.Month, local.Day, hour, 0, 0, _digestOffset);
+        return next > now ? next.ToUniversalTime() : next.AddDays(1).ToUniversalTime();
+    }
+
+    /// <summary>
+    /// Starts a request for NotifyMail and runs its steps. The title user, whose profile has an address of its own in
+    /// <c>en</c>, saves the <c>process</c> email and digest on at <paramref name="hour"/> in <see cref="DigestZone"/>. With
+    /// <paramref name="title"/> the request has that title, so its email goes to the same person.
+    /// </summary>
+    private async Task<(string Title, string Key)> StageDigestAsync(Guid releaseId, ApplicationModel model, int hour, string? title = null)
+    {
+        var subjectId = await fixture.InsertRequestAsync(500m, 4);
+        if (title is not null)
+        {
+            await fixture.SetTitleAsync(subjectId, title);
+        }
+
+        var userId = title ?? $"Request {subjectId:N}";
+        var key = userId["Request ".Length..];
+        await NotifyMailApp.UpsertProfileAsync(fixture, userId, "en", $"digest.{key}@example.test", CancellationToken);
+        var sources = NotificationPreferences.Defaults.Sources.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        sources["process"] = new NotificationPreferences.Source(true, true, true);
+        await using (var connection = await fixture.DataSource.OpenConnectionAsync(CancellationToken))
+        {
+            await NotificationPreferences.ReplaceAsync(
+                connection, userId, new NotificationPreferences.Preferences(sources, hour, DigestZone), CancellationToken);
+        }
+
+        await fixture.StartAsync("NotifyMail", subjectId, releaseId, model);
+        while (await fixture.RunNextStepAsync(CancellationToken))
+        {
+        }
+
+        return (userId, key);
+    }
+
+    /// <summary>The ids of the rows that wait for the digest of <paramref name="userId"/>, oldest first.</summary>
+    private async Task<IReadOnlyList<Guid>> WaitingAsync(string userId)
+    {
+        await using var command = fixture.DataSource.CreateCommand(
+            "SELECT id FROM axis.email_outbox WHERE digest_user_id = @user AND state = 'pending' ORDER BY created_at, id");
+        command.Parameters.AddWithValue("user", userId);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        var ids = new List<Guid>();
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            ids.Add(reader.GetGuid(0));
+        }
+
+        return ids;
+    }
+
+    /// <summary>Makes the items of <paramref name="emailIds"/> due now, as the digest hour does.</summary>
+    private async Task MakeDueAsync(IEnumerable<Guid> emailIds) =>
+        await fixture.ScalarAsync("UPDATE axis.process_work_items SET due_at = now() WHERE email_id = ANY(@ids)", ("ids", emailIds.ToArray()));
 
     /// <summary>
     /// Starts a request for the process NotifyMail and runs its steps, which stage the emails and queue their items.

@@ -58,7 +58,7 @@ work item that processes queue are described with their step:
 | `package.call`       | Runs the operation that a package operation step staged, and ends a runner's lease      | [Staging a package call](#staging-a-package-call)                                                                  |
 | `process.resume`     | Resumes the parent of a `subProcess` step when its child completes                      | [Sub-process step](process-flow.md#sub-process-step)                                                               |
 | `event.deliver`      | Delivers an event to its `async` triggers and wakes the `waitEvent` steps that wait for it | [Event delivery](process-events.md#event-delivery)                                                                 |
-| `notification.email` | Sends one email that a `notify` step staged                                             | [Email](notifications.md#email)                                                                                    |
+| `notification.email` | Sends one email that a `notify` step staged, or a person's digest                       | [Email](notifications.md#email)                                                                                    |
 | `task.deadline`      | Expires the task of a task step that has a `deadline`                                   | [Task deadlines](task-deadlines.md#escalations-and-deadline)                                                       |
 | `task.escalate`      | Runs one of the `escalations` of a task step                                            | [Task deadlines](task-deadlines.md#escalations-and-deadline)                                                       |
 
@@ -169,10 +169,10 @@ After the instance's new state, step 5 stores what the step adds or writes:
   id, see [In-app notifications](notifications.md#in-app-notifications). It inserts none when it has
   no recipient.
 - **Emails.** A `notify` step with the `email` channel stages one email for each address, in the same
-  transaction: a row in `axis.email_outbox` and a queued `notification.email` work item that names it.
-  The addresses are those of the `user` recipients' profiles and the `email` recipients, each once. A
-  `user` with no profile or no email gets none, and is logged with the step and the user id. See
-  [Email](notifications.md#email).
+  transaction: a row in `axis.email_outbox` and a queued `notification.email` work item that names it,
+  or, for a person's daily digest, a row that shares the person's one item. The addresses are those of
+  the `user` recipients' profiles and the `email` recipients, each once. A `user` with no profile or no
+  email gets none, and is logged with the step and the user id. See [Email](notifications.md#email).
 - **Record update.** An `updateRecord` operation writes the values the way a record update does. Each
   value must fit its field, and a `null` for a required field is refused. Computed fields are
   recomputed, validations run, and the record's version goes up by one. A refused write is an error,

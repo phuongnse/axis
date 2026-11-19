@@ -239,6 +239,16 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         return id;
     }
 
+    /// <summary>Sets the <c>title</c> of the request <paramref name="id"/>.</summary>
+    public async Task SetTitleAsync(Guid id, string title)
+    {
+        await using var command = DataSource.CreateCommand(
+            $"UPDATE {RequestTable} SET {Column("title")} = @title WHERE {Column("id")} = @id");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("title", title);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
     /// <summary>Sets the <c>divisor</c> of the request <paramref name="id"/>.</summary>
     public async Task SetDivisorAsync(Guid id, long divisor)
     {

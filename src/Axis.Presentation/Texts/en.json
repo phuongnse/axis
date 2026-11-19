@@ -2908,5 +2908,7 @@
   "notices.emailsHeld.subject": "Emails are held until tomorrow",
   "notices.emailsHeld.body": "Today's limit of {limit} emails is reached. The other emails wait until 00:00 UTC.",
   "notices.packagesHeld.subject": "Extension package calls are held until tomorrow",
-  "notices.packagesHeld.body": "Today's limit of {limit} seconds of extension package run time is reached. The other extension package calls wait until 00:00 UTC."
+  "notices.packagesHeld.body": "Today's limit of {limit} seconds of extension package run time is reached. The other extension package calls wait until 00:00 UTC.",
+  "notices.emailDigest.subject": "Your daily digest",
+  "notices.emailDigest.body": "These notifications waited for your daily digest."
 }
