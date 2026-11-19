@@ -439,14 +439,14 @@ describe('the Design tab of a page', () => {
     await openTab('Design')
     const canvas = await screen.findByTestId('studio-page-canvas', {}, slow)
     const cells = await within(canvas).findAllByTestId('column', {}, slow)
-    expect(cells[0]).toHaveClass('ant-col-8')
-    expect(cells[1]).toHaveClass('ant-col-16')
+    expect(cells[0]).toHaveStyle({ gridColumn: 'span 4' })
+    expect(cells[1]).toHaveStyle({ gridColumn: 'span 8' })
 
     await userEvent.click(screen.getByText('Phone'))
 
     expect(within(canvas).getByTestId('studio-canvas-frame')).toHaveStyle({ width: '375px' })
     for (const cell of cells) {
-      expect(cell).toHaveClass('ant-col-24')
+      expect(cell).toHaveStyle({ gridColumn: 'span 12' })
     }
   })
 
