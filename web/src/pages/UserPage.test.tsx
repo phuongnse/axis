@@ -89,8 +89,12 @@ describe('UserPage', () => {
     const page = await openAnn()
 
     expect(await within(page).findByText('Purchasing')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Ann Invited' })).toBeVisible()
-    expect(within(page).getByTestId('user-email')).toHaveTextContent('Email: ann@axis.local')
+    const heading = within(screen.getByTestId('page-heading'))
+    expect(heading.getByRole('heading', { level: 1, name: 'Ann Invited' })).toBeVisible()
+    expect(heading.getByText('User')).toBeVisible()
+    const email = within(within(page).getByTestId('user-email'))
+    expect(email.getByText('Email', { selector: 'dt' })).toBeVisible()
+    expect(email.getByText('ann@axis.local', { selector: 'dd' })).toBeVisible()
     expect(fetchMock.mock.calls.map(([input]) => input)).toContain('/api/users/u1/roles')
     expect(within(roleRow(page, 'buyer')).getByText('Given')).toBeVisible()
     expect(within(roleRow(page, 'buyer')).getByText('Given').closest('[data-tone]')).toHaveAttribute(
@@ -119,7 +123,8 @@ describe('UserPage', () => {
       expect(within(region).getByRole('heading', { level: 2, name })).toBeVisible()
     }
     expect(within(within(page).getByRole('region', { name: 'Purchasing' })).getByText('buyer')).toBeVisible()
-    expect(within(page).getAllByRole('separator')).toHaveLength(1)
+    // The email is the first part, so a rule falls between it and each section.
+    expect(within(page).getAllByRole('separator')).toHaveLength(2)
     expect(within(page).getByTestId('user-email')).toBeVisible()
   })
 
@@ -146,7 +151,7 @@ describe('UserPage', () => {
     stubRoles(undefined, () => json({ ...roles, email: null }))
     const page = await openAnn()
 
-    expect(await within(page).findByTestId('user-email')).toHaveTextContent('Email: Not set')
+    expect(await within(page).findByTestId('user-email')).toHaveTextContent('EmailNot set')
   })
 
   it('gives a role after a confirmation and loads the roles again', async () => {

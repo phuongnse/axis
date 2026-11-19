@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
-import { PageLayout } from './PageLayout'
+import { PageActions, PageLayout } from './PageLayout'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 
@@ -62,5 +62,55 @@ describe('PageLayout', () => {
     expect(within(breadcrumb).queryByRole('link', { name: 'New note' })).not.toBeInTheDocument()
     expect(within(breadcrumb).getByText('New note')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('heading', { name: 'New note' })).toBeInTheDocument()
+  })
+
+  it('draws the tags beside the title and the line under it, and no line when it is empty', () => {
+    const { rerender } = render(
+      <ThemeModeProvider>
+        <PageLayout title="Purchase requests" tags={<span>Live</span>} line="Release" />
+      </ThemeModeProvider>,
+    )
+
+    const heading = screen.getByTestId('page-heading')
+    expect(within(heading).getByRole('heading', { level: 1, name: 'Purchase requests' })).toBeInTheDocument()
+    expect(within(heading).getByText('Live')).toBeInTheDocument()
+    expect(within(heading).getByText('Release')).toBeInTheDocument()
+
+    rerender(
+      <ThemeModeProvider>
+        <PageLayout title="Purchase requests" line="" />
+      </ThemeModeProvider>,
+    )
+    expect(screen.queryByText('Release')).not.toBeInTheDocument()
+  })
+
+  it('draws the actions of a component deep in the page in the slot on the right of the heading', async () => {
+    render(
+      <ThemeModeProvider>
+        <PageLayout title="Purchase requests">
+          <section>
+            <div>
+              <PageActions>
+                <button type="button">Activate…</button>
+              </PageActions>
+            </div>
+          </section>
+        </PageLayout>
+      </ThemeModeProvider>,
+    )
+
+    const actions = await screen.findByTestId('page-actions')
+    expect(await within(actions).findByRole('button', { name: 'Activate…' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-heading')).getByRole('button', { name: 'Activate…' })).toBeInTheDocument()
+  })
+
+  it('draws the actions where they stand outside a page', () => {
+    render(
+      <PageActions>
+        <button type="button">Activate…</button>
+      </PageActions>,
+    )
+
+    expect(screen.getByRole('button', { name: 'Activate…' })).toBeInTheDocument()
   })
 })

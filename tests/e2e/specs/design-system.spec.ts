@@ -99,7 +99,7 @@ const previews: Record<string, (page: Page | FrameLocator) => Locator> = {
     figure(page, "Typical").getByRole("heading", {
       name: "Purchase requests",
       exact: true,
-      level: 4,
+      level: 1,
     }),
   // The page canvas draws the table's columns from the page metadata that the fixtures answer.
   studioPageDesign: (page) =>
@@ -1028,7 +1028,7 @@ test("the studio preview draws no panel on its Settings page or its Entity state
     state.getByRole("heading", {
       name: fixtureMarker,
       exact: true,
-      level: 4,
+      level: 1,
     }),
   ).toBeVisible();
   const settingsEditor = state.getByTestId("studio-editor");
@@ -1075,7 +1075,7 @@ for (const mode of modes) {
     });
     const state = figure(page.frameLocator("iframe"), "Typical");
     const heading = (name: string) =>
-      state.getByRole("heading", { name, exact: true, level: 4 });
+      state.getByRole("heading", { name, exact: true, level: 1 });
     const sidebar = state.getByRole("menu");
 
     await expect(heading("Purchase requests")).toBeVisible();

@@ -1,5 +1,6 @@
 import { apiFetch } from './api'
 import { fileNameOf } from './exports'
+import type { StatusTone } from './statusTones'
 import type { TenantQuotaUse, TenantUsageDay } from './tenantUsage'
 
 /** The signed-in platform operator, as served by `GET /api/cell/session`. */
@@ -43,6 +44,15 @@ export interface CellJob {
 }
 
 export type CellTenantStatus = 'active' | 'readOnly' | 'suspended' | 'provisioning' | 'deleting'
+
+/** The tone of each tenant status, which the tenants list and a tenant's page share, see docs/reference/cell-console.md. */
+export const cellTenantStatusTones: Record<CellTenantStatus, StatusTone> = {
+  active: 'neutral',
+  readOnly: 'attention',
+  suspended: 'attention',
+  provisioning: 'neutral',
+  deleting: 'neutral',
+}
 
 /** The failed work of a tenant, as the worker counted it. */
 export interface CellFailedWork {
