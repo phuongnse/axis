@@ -288,6 +288,17 @@ export const previews: Record<string, readonly PreviewState[]> = {
       entry: '/sample/requests',
       frameHeight: 600,
     },
+    { caption: 'Account page', draw: () => <ShellPreview />, entry: '/account', frameHeight: 640 },
+    {
+      caption: 'Account notifications',
+      draw: () => (
+        <ClickOnMount selector='[data-node-key="notifications"] [role="tab"]'>
+          <ShellPreview />
+        </ClickOnMount>
+      ),
+      entry: '/account',
+      frameHeight: 640,
+    },
   ],
   studio: [
     { caption: 'Typical', fixtures: studioFixtures.typical, entry: `/studio?app=${application}` },

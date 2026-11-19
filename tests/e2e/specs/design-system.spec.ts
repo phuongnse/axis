@@ -142,6 +142,16 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
         .and(state.locator('[aria-current="page"]')),
     "Language and theme": (state) =>
       state.getByRole("menuitemradio", { name: "System", exact: true }),
+    "Account page": (state) =>
+      state.getByRole("button", {
+        name: "End all other sessions",
+        exact: true,
+      }),
+    "Account notifications": (state) =>
+      state.getByRole("switch", {
+        name: "Tasks: In the application",
+        exact: true,
+      }),
   },
   signIn: {
     "Sign-in refused": (state) => state.getByTestId("sign-in-failed"),

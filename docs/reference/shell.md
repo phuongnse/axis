@@ -393,7 +393,7 @@ to the frame shows in every state. How previews work is in
 
   | Preview          | States                                                                                                                                                                                                                                                                                                                                                                                        |
   | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `shell`          | Application site, Navigation collapsed, Form page, Dashboard, Platform site, App switcher, and Language and theme                                                                                                                                                                                                                                                                                        |
+  | `shell`          | Application site, Navigation collapsed, Form page, Dashboard, Platform site, App switcher, Language and theme, Account page, and Account notifications                                                                                                                                                                                                                                                   |
   | `signIn`         | Sign-in refused, Signed out and Session ended, with the organization's heading over the cards                                                                                                                                                                                                                                                                                                 |
   | `identitySignIn` | The sign-in page of [Axis's identity provider](identity-provider.md#theme) in Sign in, Wrong password, Fields left empty, Organization sign-in only, Two-step verification, Forgot password, Set password, Add an authenticator, Choose how to sign in, Update your profile, Terms and privacy, Terms not accepted, Sign out, Notice, Error, and Language and theme with the gear's menu open |
 
@@ -404,7 +404,7 @@ to the frame shows in every state. How previews work is in
   the page scrolls inside it as in a window, so a dialog opens in the middle of what shows.
 - **The State control** _(planned)_. `shell`, `signIn` and `identitySignIn` show one state at a time under a State
   control, as `studio` does, and `&state=<slug>` opens one.
-- **Account states** _(planned for M43)_. The `shell` preview gains Account page, the platform's `/account` on its
+- **Account states.** The `shell` preview gains Account page, the platform's `/account` on its
   Security tab, and Account notifications, the same page on its Notifications tab. Both use fixtures of
   `GET /api/me/authenticators`, `GET /api/me/sessions` and `GET /api/me/notification-preferences`, and `PUT`
   answers `204`.
