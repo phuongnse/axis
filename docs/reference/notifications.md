@@ -243,14 +243,12 @@ A person hears in the application and by email when a task is given to them, mov
 
 ## Notification preferences
 
-_(planned for M43)_
-
 A person chooses on the account page's [Notifications tab](platform-pages.md#notifications). They choose how each kind of notice reaches them, and whether its emails come together in a daily digest. A choice only narrows the channels that a notice would use. It never adds one.
 
 | Route | What it does |
 | --- | --- |
-| `GET /api/me/notification-preferences` _(planned for M43)_ | Reads the signed-in person's preferences |
-| `PUT /api/me/notification-preferences` _(planned for M43)_ | Replaces the signed-in person's preferences |
+| `GET /api/me/notification-preferences` | Reads the signed-in person's preferences |
+| `PUT /api/me/notification-preferences` | Replaces the signed-in person's preferences |
 
 - **Sources.** A source is a kind of notice. `task` is the [task notices](#task-notices), `mention` is the [mentions](comments.md#mentions), `process` is the message of a `notify` step, see [the notify operation](#notify-operation), and `authoringRequest` is the notices of the person's own AI requests, see [tenant notices](#tenant-notices).
 - **Body.** `PUT` takes the four sources, `digestHour` and `timeZone`. Each source has `channels`, with `application` and `email` set to `true` or `false`, and `digest`, set to `true` or `false`. For example:
@@ -268,14 +266,14 @@ A person chooses on the account page's [Notifications tab](platform-pages.md#not
   }
   ```
 
-- **Defaults.** With no saved choice, each source has both channels and no digest.
+- **Defaults.** With no saved choice, each source has both channels and no digest, `digestHour` is 8 and `timeZone` is `UTC`.
 - **Own preferences only.** The routes read and write the signed-in person's preferences. No route names another person.
 - **Digest hour and time zone.** `digestHour` is a whole hour from 0 to 23. `timeZone` is an IANA time zone name. The account page sends the browser's time zone, because a tenant has no time zone of its own, as [absences](user-administration.md#absences) do.
 - **Refusals.** A bad value is a `400` keyed by its path, such as `/digestHour` for an hour outside 0 to 23, or `/timeZone` for a name that is not an IANA time zone.
-- **In-app off.** A source with the `application` channel off does not show in the person's bell or its counts.
-- **Email and digest.** An email for a source with `email` on is sent as [email](#email) says. With `digest` on, the email waits in `axis.email_outbox` for the digest. The worker then sends the waiting emails as one digest, at `digestHour` in `timeZone`. The digest lists the subject and link of each waiting email.
-- **Notices to administrators.** A tenant notice to the administrators always shows in the application, whatever the preferences say, and is never emailed. An AI request notice follows the `authoringRequest` source. See [tenant notices](#tenant-notices).
-- **Storage.** `axis.notification_preferences` holds one row for each person who has saved a choice.
+- **In-app off.** _(planned for M43)_ A source with the `application` channel off does not show in the person's bell or its counts.
+- **Email and digest.** _(planned for M43)_ An email for a source with `email` on is sent as [email](#email) says. With `digest` on, the email waits in `axis.email_outbox` for the digest. The worker then sends the waiting emails as one digest, at `digestHour` in `timeZone`. The digest lists the subject and link of each waiting email.
+- **Notices to administrators.** _(planned for M43)_ A tenant notice to the administrators always shows in the application, whatever the preferences say, and is never emailed. An AI request notice follows the `authoringRequest` source. See [tenant notices](#tenant-notices).
+- **Storage.** `axis.notification_preferences` holds one row for each person who has saved a choice. `user_id` is the primary key, `sources` (`jsonb`) holds the four sources in the shape of the body, and `digest_hour`, `time_zone` and `updated_at` hold the rest. A new source needs no migration.
 
 ## Email
 

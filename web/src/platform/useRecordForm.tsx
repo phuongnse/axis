@@ -1,9 +1,10 @@
 import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
-import { Col, Flex, Form, Input, Row, Space, Typography } from 'antd'
+import { Flex, Form, Input, Space, Typography } from 'antd'
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { ChildCollectionTable } from './ChildCollectionTable'
+import { ColumnGrid, ColumnGridCell } from './ColumnGrid'
 import { NotSet } from './EmptyValue'
 import { FieldInput } from './FieldInput'
 import { FileInput, FileLink } from './FileInput'
@@ -28,7 +29,6 @@ import { ReferencesInput } from './ReferencesInput'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
-import { useNarrowWidth } from './useNarrowWidth'
 import { setOwn } from './ownProperty'
 
 /** The values the form started from, which decide what changed, with the record's labels and version. */
@@ -186,7 +186,6 @@ export function useRecordForm(
   const t = useText()
   const canvas = useContext(FormCanvasContext)
   const { spacing, colour } = useDesignTokens()
-  const narrow = useNarrowWidth()
   const shown = useMemo(() => sections.flatMap((section) => section.fields), [sections])
   const [snapshot, setSnapshot] = useState<Snapshot>(() => emptySnapshot(entity.fields))
   const [values, setValues] = useState<Record<string, FieldValue>>(snapshot.initial)
@@ -567,7 +566,7 @@ export function useRecordForm(
             !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) && (
               <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>
             )}
-          <Row gutter={[spacing.md, spacing.lg]} align="top">
+          <ColumnGrid rowGap={spacing.lg}>
             {visible.map((entry) => {
               const { field } = entry
               const errors = errorsOf(field.name)
@@ -609,12 +608,12 @@ export function useRecordForm(
                 </Form.Item>
               )
               return (
-                <Col key={field.name} xs={24} lg={narrow ? 24 : entry.width * 2}>
+                <ColumnGridCell key={field.name} width={entry.width} data-testid={`field-column-${field.name}`}>
                   {canvas ? canvas.field(field.name, item) : item}
-                </Col>
+                </ColumnGridCell>
               )
             })}
-          </Row>
+          </ColumnGrid>
         </div>
       )
       return <Fragment key={index}>{canvas ? canvas.section(index, content) : content}</Fragment>

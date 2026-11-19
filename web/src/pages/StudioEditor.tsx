@@ -58,7 +58,7 @@ import { StudioNamesContext, textsOf } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { withoutTableView } from '../platform/unsavedChanges'
+import { withoutEditorView } from '../platform/unsavedChanges'
 import { ConnectorEditor } from './ConnectorEditor'
 import { EndpointEvent } from './EndpointEvent'
 import { EndpointValues } from './EndpointValues'
@@ -89,6 +89,7 @@ import { SeedGrid } from './SeedGrid'
 import { SiteSignIn } from './SiteSignIn'
 import { StudioAutoAccept } from './StudioAutoAccept'
 import type { FormUse, OpenResource } from './StudioFormUsedOn'
+import { fieldElement } from './studioFieldElement'
 import { StudioUsedBy } from './StudioUsedBy'
 import { TextTable, type TextColumn } from './TextTable'
 import { triggerSchema } from './triggerSchema'
@@ -158,23 +159,6 @@ function typingStep(key: string): string | null {
       active.getAttribute('role') !== 'combobox') ||
     active.closest('[contenteditable="true"]') !== null
   return text ? key : null
-}
-
-/** The form field of the longest prefix of `path` that the form shows, so a path inside a field lands on that field. */
-function fieldElement(root: HTMLElement, path: string): HTMLElement | undefined {
-  const fields = new Map<string, HTMLElement>()
-  for (const element of root.querySelectorAll<HTMLElement>('[data-testid^="studio-field-"]')) {
-    fields.set(element.getAttribute('data-testid')!.slice('studio-field-'.length), element)
-  }
-  let prefix = path
-  while (prefix !== '') {
-    const element = fields.get(prefix)
-    if (element) {
-      return element
-    }
-    prefix = prefix.slice(0, Math.max(prefix.lastIndexOf('/'), 0))
-  }
-  return undefined
 }
 
 /** Whether the form points to the JSON view for this field, as it does for a `oneOf`, a map or an unknown node. */
@@ -859,12 +843,13 @@ export function StudioEditor({
 
   /**
    * Opens a tab, and clears every table's search, filter, sort, page and page size from the address, so one tab's view
-   * never filters another tab's table, see docs/reference/studio-resource-form.md#used-by. The address changes in place,
-   * so Back does not bring back the view that was cleared.
+   * never filters another tab's table, see docs/reference/studio-resource-form.md#used-by. It also clears the `field`
+   * of an open field drawer, which belongs to the Form tab. The address changes in place, so Back does not bring back
+   * the view that was cleared.
    */
   function openTab(next: typeof tab) {
     setTab(next)
-    const cleared = withoutTableView(searchParams)
+    const cleared = withoutEditorView(searchParams)
     if (cleared.toString() !== searchParams.toString()) {
       setSearchParams(cleared, { replace: true, preventScrollReset: true })
     }
@@ -1119,6 +1104,7 @@ export function StudioEditor({
       value={draft}
       onChange={onChange}
       application={application}
+      path={path}
       origins={origins}
       warnings={entityWarnings}
       onOriginsChange={onOriginsChange}

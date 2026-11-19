@@ -216,6 +216,8 @@ test.describe("invitations", () => {
       .getByRole("searchbox", { name: "Search", exact: true })
       .fill(email);
     await page.keyboard.press("Enter");
+    // The unfiltered rows still hold the person until the search answers, so wait for the header and one row alone.
+    await expect(main.getByRole("row")).toHaveCount(2);
     const row = main.getByRole("row").filter({ hasText: email });
     await expect(row).toHaveCount(1);
     return row;

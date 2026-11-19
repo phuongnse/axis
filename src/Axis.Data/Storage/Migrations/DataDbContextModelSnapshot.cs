@@ -289,6 +289,38 @@ namespace Axis.Data.Storage.Migrations
                     b.ToTable("mcp_clients", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Data.Storage.NotificationPreferenceRow", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.Property<short>("DigestHour")
+                        .HasColumnType("smallint")
+                        .HasColumnName("digest_hour");
+
+                    b.Property<string>("Sources")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("sources");
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("time_zone");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_notification_preferences");
+
+                    b.ToTable("notification_preferences", "axis");
+                });
+
             modelBuilder.Entity("Axis.Data.Storage.PackageRunnerRow", b =>
                 {
                     b.Property<Guid>("Id")

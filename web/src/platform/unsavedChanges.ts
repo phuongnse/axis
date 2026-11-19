@@ -23,13 +23,14 @@ export function leavesWithoutAsking(state: unknown): boolean {
 const viewParameters = ['search', 'filter', 'sort', 'page', 'pageSize']
 
 /**
- * The address without a table's view: its `search`, `filter`, `sort`, `page` and `pageSize`, also under the table's
- * prefix such as `fields.search`, see docs/reference/actions-and-controls.md#tables. The columns a person keeps stay.
+ * The address without an editor's view: a table's `search`, `filter`, `sort`, `page` and `pageSize`, also under the
+ * table's prefix such as `fields.search`, see docs/reference/actions-and-controls.md#tables, and the `field` whose drawer
+ * is open, see docs/reference/studio.md#editor. The columns a person keeps stay.
  */
-export function withoutTableView(params: URLSearchParams): URLSearchParams {
+export function withoutEditorView(params: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(params)
   for (const key of params.keys()) {
-    if (viewParameters.some((name) => key === name || key.endsWith(`.${name}`))) {
+    if (key === 'field' || viewParameters.some((name) => key === name || key.endsWith(`.${name}`))) {
       next.delete(key)
     }
   }
@@ -37,14 +38,14 @@ export function withoutTableView(params: URLSearchParams): URLSearchParams {
 }
 
 /**
- * Whether two addresses differ only in a table's view, see `withoutTableView`. Such a move keeps the editor on screen,
- * so the guard does not ask.
+ * Whether two addresses differ only in an editor's view, see `withoutEditorView`. Such a move keeps the editor on
+ * screen, so the guard does not ask.
  */
-export function onlyTableViewChanged(
+export function onlyEditorViewChanged(
   current: { pathname: string; search: string },
   next: { pathname: string; search: string },
 ): boolean {
-  const withoutView = (search: string) => withoutTableView(new URLSearchParams(search)).toString()
+  const withoutView = (search: string) => withoutEditorView(new URLSearchParams(search)).toString()
   return current.pathname === next.pathname && withoutView(current.search) === withoutView(next.search)
 }
 
