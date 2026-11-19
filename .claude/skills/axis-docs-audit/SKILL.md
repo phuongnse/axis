@@ -23,9 +23,9 @@ it opens issues and edits only the broken links of open issues.
    JSON schema. When a group's answer fails, the step fails after every group has finished. The calls
    run on the fallback Claude subscription, so the audit does not use up the one NexKit runs on.
 3. `file <findings> <run id>`, in a job that runs no model, groups the findings, leaves out those that an
-   open issue or an earlier issue of the run covers, opens at most ten issues and marks each with the run
-   that found it. It opens the `unbuilt` issues first, then the `untested-list` issues, then one docs issue
-   per page. It prints each finding the cap leaves out, and the next run of that finding's page reports it again.
+   open issue or an earlier issue of the run covers, opens at most ten issues, labels each `docs-audit`
+   beside its other labels, and marks each with the run that found it. It opens the `unbuilt` issues
+   first, then the `untested-list` issues, then one docs issue per page. It prints each finding the cap leaves out, and the next run of that finding's page reports it again.
 
 The workflow also points each broken link of an open issue at its new home, as
 [broken links](broken-links.md) says.
@@ -70,7 +70,8 @@ The file step writes them, so this is what to expect, not what to do:
   `standard` finding of that page as an acceptance criterion. It is also labelled `bug` when it holds
   a `wrong` finding, as [how the docs stay correct](../../../docs/writing-docs.md#how-the-docs-stay-correct) says.
 - One `bug` issue per `unbuilt` finding, and one test issue per `untested-list` finding.
-- Each issue is in no milestone, links the page and the code it rests on, and carries a hidden
+- Each issue carries the `docs-audit` label, which is its home, as [how issues run](../../../docs/delivery.md#how-issues-run)
+  says, so it is in no milestone. It links the page and the code it rests on, and carries a hidden
   `docs-audit` marker, so a later run leaves it alone while it is open, and NexKit's marker of the run
   that opened it.
 - A code or test issue's marker holds the page, the kind and the statement with its spaces and case

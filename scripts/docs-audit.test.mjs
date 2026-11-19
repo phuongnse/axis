@@ -195,7 +195,7 @@ describe('issuesFrom', () => {
     const { issues } = issuesFrom([finding('docs/a.md', 3, 'wrong'), finding('docs/a.md', 9, 'built')], [], 42)
     assert.equal(issues.length, 1)
     assert.equal(issues[0].title, 'The docs of docs/a.md match the code')
-    assert.deepEqual(issues[0].labels, ['documentation', 'bug'])
+    assert.deepEqual(issues[0].labels, ['documentation', 'bug', 'docs-audit'])
     assert.match(issues[0].body, /Wrong: .*docs\/a\.md:3/)
     assert.match(issues[0].body, /Built: .*docs\/a\.md:9/)
     assert.match(issues[0].body, /<!-- docs-audit docs docs\/a\.md -->/)
@@ -210,8 +210,8 @@ describe('issuesFrom', () => {
     )
     const labels = Object.fromEntries(issues.map((issue) => [issue.title, issue.labels]))
     assert.deepEqual(labels, {
-      'The docs of docs/a.md match the code': ['documentation', 'bug'],
-      'The docs of docs/b.md match the code': ['documentation'],
+      'The docs of docs/a.md match the code': ['documentation', 'bug', 'docs-audit'],
+      'The docs of docs/b.md match the code': ['documentation', 'docs-audit'],
     })
   })
 
@@ -220,10 +220,27 @@ describe('issuesFrom', () => {
     assert.deepEqual(
       issues.map((i) => [i.title, i.labels]),
       [
-        ['The code follows the rule at docs/a.md:5', ['bug']],
-        ['A test compares the list at docs/b.md:7 with the code', ['documentation', 'enhancement']],
+        ['The code follows the rule at docs/a.md:5', ['bug', 'docs-audit']],
+        ['A test compares the list at docs/b.md:7 with the code', ['documentation', 'enhancement', 'docs-audit']],
       ],
     )
+  })
+
+  test('labels every issue it opens docs-audit, beside its present labels', () => {
+    const { issues } = issuesFrom(
+      [
+        finding('docs/a.md', 3, 'wrong'),
+        finding('docs/b.md', 4, 'missing'),
+        finding('docs/c.md', 5, 'unbuilt'),
+        finding('docs/d.md', 7, 'untested-list'),
+      ],
+      [],
+      1,
+    )
+    assert.equal(issues.length, 4)
+    for (const issue of issues) assert.ok(issue.labels.includes('docs-audit'), issue.title)
+    const unbuilt = issues.find((i) => i.title === 'The code follows the rule at docs/c.md:5')
+    assert.deepEqual(unbuilt.labels, ['bug', 'docs-audit'])
   })
 
   test('leaves out what an open issue already covers', () => {
