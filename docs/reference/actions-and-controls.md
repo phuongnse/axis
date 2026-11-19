@@ -176,7 +176,7 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
   kind takes its own term or line, such as a run's Branch beside Went to, or Started via under Started by. What
   qualifies one thing sits in parentheses, with peers in them joined by a comma, such as "(run 2)" or an
   operation's "(ERP)".
-- **Names and values as a table** _(planned)_. Names and their values, such as a request's headers or a run's input,
+- **Names and values as a table**. Names and their values, such as a request's headers or a run's input,
   are a table of two columns with no header row. A name in `textMuted` takes 5 of 12 columns and its value 7, so the
   tables a view stacks line up at any width. A nested value is a row of its own, named by its path, such as
   `lines[0].description`. A number keeps its source digits. A word written in place of a value, such as `null`, Empty,
@@ -241,7 +241,7 @@ be kept right.
   list has no search. An action on the page as a whole, such as New entity… on a kind's list, sits on the
   [page heading](studio-workspace.md#page-heading), not the toolbar. A `table` widget keeps the toolbar
   actions its author configures.
-- **A title on the toolbar** _(planned)_. A table may have a `title` at the left end of its toolbar, before the view
+- **A title on the toolbar**. A table may have a `title` at the left end of its toolbar, before the view
   controls, such as an editable child collection's label, required mark and help.
 - **Every control in one table.** `AxisTable` has every control below, and each view
   turns on what it needs. Search, filter, sort, page and columns live in the address, except in a dialog's
@@ -324,8 +324,8 @@ be kept right.
 - **Rows.** Every row and the header are of the `tableRow` height, whatever they hold, icon buttons
   included: `spacing-xs` above and below a `smallControl` line. A row of more lines grows and reads
   from the same first line.
-- **Compact tables** _(planned)_. A table in a side panel is `compact`, with `spacing-sm` on each side of a cell.
-- **A table with no header row** _(planned)_. A table of names and values is `headless`, with no header row, see
+- **Compact tables**. A table in a side panel is `compact`, with `spacing-sm` on each side of a cell.
+- **A table with no header row**. A table of names and values is `headless`, with no header row, see
   [text](#text).
 - **Row actions.** An action on one row sits on the row. One whose meaning the platform knows, such as
   open, delete or activate a release, is an icon button, and one an author configured keeps its text.
