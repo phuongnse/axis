@@ -674,6 +674,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("outcome");
 
+                    b.Property<string>("Problem")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("problem");
+
                     b.Property<string>("Response")
                         .HasColumnType("jsonb")
                         .HasColumnName("response");
@@ -900,6 +904,10 @@ namespace Axis.Processes.Storage.Migrations
                     b.Property<string>("Output")
                         .HasColumnType("jsonb")
                         .HasColumnName("output");
+
+                    b.Property<string>("Problem")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("problem");
 
                     b.Property<Guid>("ProcessInstanceId")
                         .HasColumnType("uuid")

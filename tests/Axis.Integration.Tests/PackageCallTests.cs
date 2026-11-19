@@ -209,6 +209,11 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         Assert.Equal(("attempt", 1, "failed", (int?)null, (string?)"System.FormatException"), (failed.Kind, failed.Number, failed.Outcome, failed.HttpStatus, failed.Error));
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("fail", 2L, "System.FormatException"), (row.Step, row.Revision, row.Error));
+
+        // An exception type is the code exception, with no values and no text.
+        var exception = new JsonObject { ["code"] = "exception", ["values"] = new JsonObject() };
+        Assert.True(JsonNode.DeepEquals(exception, JsonNode.Parse(row.Problem!)));
+        Assert.True(JsonNode.DeepEquals(exception, JsonNode.Parse(await AttemptProblemAsync(callId))));
         Assert.True(JsonNode.DeepEquals(
             new JsonObject { ["operationId"] = callId, ["outcome"] = "failed" },
             JsonNode.Parse(row.Output!)));
@@ -484,6 +489,12 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         Assert.Equal(("attempt", 1, "unknown", (int?)null, (string?)PackageCallHandler.TimedOut), (timedOut.Kind, timedOut.Number, timedOut.Outcome, timedOut.HttpStatus, timedOut.Error));
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("slow", 2L, (string?)PackageCallHandler.TimedOut), (row.Step, row.Revision, row.Error));
+
+        // A run past its timeout is the code timeout with the seconds of the step's timeout, on the attempt and the history row.
+        var problem = JsonNode.Parse(row.Problem!)!;
+        Assert.Equal("timeout", (string?)problem["code"]);
+        Assert.True((double)problem["values"]!["seconds"]! > 0);
+        Assert.True(JsonNode.DeepEquals(problem, JsonNode.Parse(await AttemptProblemAsync(callId))));
         Assert.True(JsonNode.DeepEquals(
             new JsonObject { ["operationId"] = callId, ["outcome"] = "unknown" },
             JsonNode.Parse(row.Output!)));
@@ -600,6 +611,12 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
 
         return rows;
     }
+
+    /// <summary>The <c>problem</c> of the call's only attempt row as JSON text.</summary>
+    private async Task<string> AttemptProblemAsync(Guid callId) =>
+        (string)(await fixture.Tenant.ScalarAsync(
+            "SELECT problem::text FROM axis.process_call_attempts WHERE call_id = @id AND call_kind = 'package' AND kind = 'attempt'",
+            ("id", callId)))!;
 
     /// <summary>The details of the instance's system audit record with <paramref name="action"/>.</summary>
     private async Task<string> AuditDetailsAsync(Guid instanceId, string action) =>

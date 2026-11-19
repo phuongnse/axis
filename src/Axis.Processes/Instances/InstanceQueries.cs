@@ -453,7 +453,7 @@ public static class InstanceQueries
 
         await using var command = new NpgsqlCommand(
             """
-            SELECT id, process_instance_id, step, revision, input::text, output::text, decision, error, started_at, finished_at, trace_id
+            SELECT id, process_instance_id, step, revision, input::text, output::text, decision, error, started_at, finished_at, trace_id, problem::text
             FROM axis.process_step_history WHERE process_instance_id = @id ORDER BY finished_at, id
             """,
             connection);
@@ -475,6 +475,7 @@ public static class InstanceQueries
                 StartedAt = reader.GetFieldValue<DateTimeOffset>(8),
                 FinishedAt = reader.GetFieldValue<DateTimeOffset>(9),
                 TraceId = reader.IsDBNull(10) ? null : reader.GetString(10),
+                Problem = reader.IsDBNull(11) ? null : reader.GetString(11),
             });
         }
 

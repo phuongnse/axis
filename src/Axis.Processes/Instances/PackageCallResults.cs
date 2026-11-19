@@ -126,6 +126,7 @@ public static partial class PackageCallResults
                 attempt,
                 processName,
                 $"The package '{call.Package}' {call.Version} is not installed.",
+                null,
                 CallAttempts.Failed,
                 logger,
                 cancellationToken);
@@ -138,7 +139,7 @@ public static partial class PackageCallResults
         }
         catch (InvalidOperationException exception)
         {
-            return await FailAsync(transaction, tenantId, instance, attempt, processName, exception.Message, CallAttempts.Failed, logger, cancellationToken);
+            return await FailAsync(transaction, tenantId, instance, attempt, processName, exception.Message, null, CallAttempts.Failed, logger, cancellationToken);
         }
 
         // The take set the end of the lease to its start plus the step's timeout, which gives the start of the attempt.
@@ -148,7 +149,7 @@ public static partial class PackageCallResults
             case PackageCallResult.Retryable:
                 return await RetryAsync(transaction, tenantId, instance, attempt, processName, logger, cancellationToken);
             case PackageCallResult.Failed failed:
-                return await FailAsync(transaction, tenantId, instance, attempt, processName, failed.Error, CallAttempts.Failed, logger, cancellationToken);
+                return await FailAsync(transaction, tenantId, instance, attempt, processName, failed.Error, StepProblem.Exception, CallAttempts.Failed, logger, cancellationToken);
         }
 
         var output = ((PackageCallResult.Succeeded)result).Output;
@@ -163,13 +164,14 @@ public static partial class PackageCallResults
                 attempt,
                 processName,
                 PackageCallRecords.Misfit(manifest, target.Operation),
+                null,
                 CallAttempts.Failed,
                 logger,
                 cancellationToken);
         }
 
         await transaction.SaveAsync(Savepoint, cancellationToken);
-        string? failure;
+        StepFailure? failure;
         try
         {
             failure = await PackageCallRecords.WriteSuccessAsync(
@@ -191,7 +193,7 @@ public static partial class PackageCallResults
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             // The message can hold record values, so only the type is kept.
-            failure = PackageCallRecords.ErrorOf(exception);
+            failure = new StepFailure(PackageCallRecords.ErrorOf(exception), StepProblem.Exception);
         }
 
         if (failure is null)
@@ -203,7 +205,7 @@ public static partial class PackageCallResults
 
         await transaction.RollbackAsync(Savepoint, cancellationToken);
         await transaction.ReleaseAsync(Savepoint, cancellationToken);
-        return await FailAsync(transaction, tenantId, instance, attempt, processName, failure, CallAttempts.Failed, logger, cancellationToken);
+        return await FailAsync(transaction, tenantId, instance, attempt, processName, failure.Error, failure.Problem, CallAttempts.Failed, logger, cancellationToken);
     }
 
     /// <summary>
@@ -222,12 +224,12 @@ public static partial class PackageCallResults
         var error = typeof(RetryableException).FullName!;
         if (PackageCallRecords.RetryDelay(attempt) is not { } delay)
         {
-            return await FailAsync(transaction, tenantId, instance, attempt, processName, error, CallAttempts.Retryable, logger, cancellationToken);
+            return await FailAsync(transaction, tenantId, instance, attempt, processName, error, StepProblem.Exception, CallAttempts.Retryable, logger, cancellationToken);
         }
 
         var call = attempt.Call;
         await PackageCallRecords.WriteRetryAsync(
-            transaction, tenantId, attempt, error, PackageCallRecords.AttemptRow(attempt, CallAttempts.Retryable, error), cancellationToken);
+            transaction, tenantId, attempt, error, PackageCallRecords.AttemptRow(attempt, CallAttempts.Retryable, error, StepProblem.Exception), cancellationToken);
         await WorkItemQueue.EnqueueAsync(
             transaction.Connection!,
             transaction,
@@ -248,12 +250,13 @@ public static partial class PackageCallResults
         PackageCallAttempt attempt,
         string? processName,
         string error,
+        StepProblem? problem,
         string outcome,
         ILogger logger,
         CancellationToken cancellationToken)
     {
         if (!await PackageCallRecords.WriteFailureAsync(
-                transaction, tenantId, instance, attempt, error, PackageCallRecords.AttemptRow(attempt, outcome, error), cancellationToken))
+                transaction, tenantId, instance, attempt, error, PackageCallRecords.AttemptRow(attempt, outcome, error, problem), cancellationToken))
         {
             return PackageCallResultOutcome.Conflict;
         }

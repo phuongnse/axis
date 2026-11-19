@@ -83,7 +83,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
         catch (Exception exception) when (exception is not ProcessStepException and not OperationCanceledException)
         {
             // Any failure after the load fails the instance at the revision the step loaded.
-            throw Failure(TypeName(exception), instance, input, exception);
+            throw Failure(TypeName(exception), instance, input, StepProblem.Exception, exception);
         }
     }
 
@@ -109,7 +109,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
         await InstanceMetrics.RecordEndedAsync(models, context, instance, ProcessStarts.Failed, cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             context.Transaction,
-            new StepOccurrence(instanceId, step, revision, failure?.Input ?? new JsonObject(), null, null, failure?.Message ?? TypeName(exception), failure?.StartedAt ?? instance.Now),
+            new StepOccurrence(instanceId, step, revision, failure?.Input ?? new JsonObject(), null, null, failure?.Message ?? TypeName(exception), failure?.StartedAt ?? instance.Now, failure is null ? StepProblem.Exception : failure.Problem),
             cancellationToken);
 
         // The same fixed text the history row stores. It holds names and the error kind, never a value.
@@ -591,7 +591,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 LogRefusal(result, entity!.Id, instance.SubjectId);
-                throw Failure($"The record update was rejected: {Describe(result)}", instance, input);
+                throw Failure($"The record update was rejected: {Describe(result)}", instance, input, StepProblem.WriteRefused);
             }
 
             await ComputedBackfill.MarkStaleWriteAsync(context.Connection, context.Transaction, context.Item.TenantId, model, entity!, instance.ReleaseId, cancellationToken);
@@ -620,7 +620,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 LogRefusal(result, created!.Id, null);
-                throw Failure($"The record create was rejected: {Describe(result)}", instance, input);
+                throw Failure($"The record create was rejected: {Describe(result)}", instance, input, StepProblem.WriteRefused);
             }
 
             await ComputedBackfill.MarkStaleWriteAsync(context.Connection, context.Transaction, context.Item.TenantId, model, created!, instance.ReleaseId, cancellationToken);
@@ -1325,12 +1325,12 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
     }
 
     private static ProcessStepException ExpressionFailure(string part, ProcessStepModel step, ExpressionRuntimeError error, LoadedInstance instance, JsonObject input) =>
-        Failure($"The {part} of the step '{step.Name}' failed: {error.Kind}.", instance, input);
+        Failure($"The {part} of the step '{step.Name}' failed: {error.Kind}.", instance, input, StepProblem.ExpressionFailed);
 
     private static string TypeName(Exception exception) => exception.GetType().FullName ?? exception.GetType().Name;
 
-    private static ProcessStepException Failure(string message, LoadedInstance instance, JsonObject input, Exception? innerException = null) =>
-        new(message, instance.Step, instance.Revision, instance.Now, input, innerException);
+    private static ProcessStepException Failure(string message, LoadedInstance instance, JsonObject input, StepProblem? problem = null, Exception? innerException = null) =>
+        new(message, instance.Step, instance.Revision, instance.Now, input, problem, innerException);
 
     /// <summary>Reads the stored rows of a child collection of the subject, by its declared name, as one evaluator for each row.</summary>
     private delegate Task<IReadOnlyList<Func<ExpressionModel, Task<ExpressionEvaluationResult>>>> RowSource(string collection);

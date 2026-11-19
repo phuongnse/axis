@@ -662,7 +662,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     {
         await using var command = DataSource.CreateCommand(
             """
-            SELECT step, revision, input::text, output::text, output->>'next', decision, error, started_at <= finished_at
+            SELECT step, revision, input::text, output::text, output->>'next', decision, error, started_at <= finished_at, problem::text
             FROM axis.process_step_history WHERE process_instance_id = @id ORDER BY started_at, finished_at
             """);
         command.Parameters.AddWithValue("id", instanceId);
@@ -678,7 +678,8 @@ public sealed class ProcessStepFixture : IAsyncLifetime
                 reader.IsDBNull(4) ? null : reader.GetString(4),
                 reader.IsDBNull(5) ? null : reader.GetString(5),
                 reader.IsDBNull(6) ? null : reader.GetString(6),
-                reader.GetBoolean(7)));
+                reader.GetBoolean(7),
+                reader.IsDBNull(8) ? null : reader.GetString(8)));
         }
 
         return rows;
@@ -895,7 +896,7 @@ internal sealed record TriggerScheduleState(
     DateTimeOffset NextOccurrenceAt,
     DateTimeOffset? LastOccurrenceAt);
 
-/// <summary>A row of a process instance's step history. <see cref="Next"/> is the output's <c>next</c>.</summary>
+/// <summary>A row of a process instance's step history. <see cref="Next"/> is the output's <c>next</c>, and <see cref="Problem"/> the code of its error as JSON text.</summary>
 public sealed record HistoryRow(
     string Step,
     long Revision,
@@ -904,7 +905,8 @@ public sealed record HistoryRow(
     string? Next,
     string? Decision,
     string? Error,
-    bool FinishedAfterStart);
+    bool FinishedAfterStart,
+    string? Problem = null);
 
 /// <summary>A row of a process instance's tasks. <see cref="DueIn"/> is its <c>due_at</c> minus its <c>created_at</c>.</summary>
 public sealed record TaskRow(

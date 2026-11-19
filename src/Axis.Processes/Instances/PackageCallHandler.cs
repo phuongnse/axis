@@ -287,7 +287,7 @@ internal sealed partial class PackageCallHandler(
         {
             // A release or a manifest that does not match cannot be fixed by a retry. A call that is
             // found sending or lacks its version is settled by the retry policy.
-            return await SettleAttemptAsync(item, connection, attempt, errorClass, error!, counted, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, errorClass, error!, counted, null, cancellationToken);
         }
 
         if (ReadInput(attempt.Call.Input, target.Operation) is not { } input)
@@ -329,7 +329,7 @@ internal sealed partial class PackageCallHandler(
         // The bindings are resolved before the operation runs, so a missing one leaves nothing run.
         if (!TryResolveBindings(item, target, out var urls, out var secrets, out var bindingError))
         {
-            return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Retryable, bindingError, true, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Retryable, bindingError, true, null, cancellationToken);
         }
 
         // A package that has a runner pool never loads in the worker, see
@@ -359,18 +359,18 @@ internal sealed partial class PackageCallHandler(
         if (run.Timeout)
         {
             // The operation may have acted.
-            return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Unknown, TimedOut, true, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Unknown, TimedOut, true, StepProblem.Timeout(target.Step.Timeout), cancellationToken);
         }
 
         if (run.Exited)
         {
             // The runner may have acted before it exited.
-            return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Unknown, RunnerExited, true, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Unknown, RunnerExited, true, null, cancellationToken);
         }
 
         if (run.Error is { } runError)
         {
-            return await SettleAttemptAsync(item, connection, attempt, run.Retryable ? ErrorClass.Retryable : ErrorClass.Failed, runError, true, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, run.Retryable ? ErrorClass.Retryable : ErrorClass.Failed, runError, true, run.Problem, cancellationToken);
         }
 
         if (PackageCallRecords.Fit(run.Output, target.Operation, target.Step, target.Entity) is not { } values)
@@ -544,7 +544,7 @@ internal sealed partial class PackageCallHandler(
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             // The message can hold input values or secrets, so only the type is kept.
-            return new Run(null, context.Violation, Error: PackageCallRecords.ErrorOf(exception), Retryable: exception is RetryableException);
+            return new Run(null, context.Violation, Error: PackageCallRecords.ErrorOf(exception), Retryable: exception is RetryableException, Problem: StepProblem.Exception);
         }
     }
 
@@ -586,7 +586,7 @@ internal sealed partial class PackageCallHandler(
         }
         catch (InvalidCastException exception)
         {
-            return new Run(null, null, Error: PackageCallRecords.ErrorOf(exception));
+            return new Run(null, null, Error: PackageCallRecords.ErrorOf(exception), Problem: StepProblem.Exception);
         }
 
         RunnerConnection runner;
@@ -671,13 +671,13 @@ internal sealed partial class PackageCallHandler(
                 return new Run(PackageCallRecords.DecodeRunnerOutput(target.Operation, result.Output), null);
 
             case RetryableMessage retryable:
-                return new Run(null, null, Error: retryable.Error, Retryable: true);
+                return new Run(null, null, Error: retryable.Error, Retryable: true, Problem: StepProblem.Exception);
             case FailureMessage { Binding: { } binding }:
                 return new Run(
                     null,
                     PackageOperationContext.BindingRefusedMessage(target.Operation.Name, target.Manifest.Id, binding));
             case FailureMessage failure:
-                return new Run(null, null, Error: failure.Error ?? nameof(FailureMessage));
+                return new Run(null, null, Error: failure.Error ?? nameof(FailureMessage), Problem: StepProblem.Exception);
             default:
                 throw new UnreachableException();
         }
@@ -699,7 +699,7 @@ internal sealed partial class PackageCallHandler(
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
-        string? failure;
+        StepFailure? failure;
         await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
@@ -738,7 +738,7 @@ internal sealed partial class PackageCallHandler(
             catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 // The message can hold record values, so only the type is kept.
-                failure = PackageCallRecords.ErrorOf(exception);
+                failure = new StepFailure(PackageCallRecords.ErrorOf(exception), StepProblem.Exception);
             }
 
             if (failure is null)
@@ -751,7 +751,7 @@ internal sealed partial class PackageCallHandler(
             await transaction.RollbackAsync(cancellationToken);
         }
 
-        return await FailAsync(item, connection, attempt, failure, PackageCallRecords.AttemptRow(attempt, CallAttempts.Failed, failure), cancellationToken);
+        return await FailAsync(item, connection, attempt, failure.Error, PackageCallRecords.AttemptRow(attempt, CallAttempts.Failed, failure.Error, failure.Problem), cancellationToken);
     }
 
     /// <summary>
@@ -759,7 +759,7 @@ internal sealed partial class PackageCallHandler(
     /// A retryable error is retried while attempts are left, and an unknown outcome only when the
     /// operation is also <c>idempotent</c>. An unknown outcome that is not retried leaves the call
     /// <c>unknown</c>. Anything else fails the call. The attempt row records the class of the attempt,
-    /// whatever happens to the call. It is left out when <paramref name="counted"/> is
+    /// whatever happens to the call, with <paramref name="problem"/> as its code. It is left out when <paramref name="counted"/> is
     /// <see langword="false"/>, because no attempt was made.
     /// </summary>
     private Task<WorkItemOutcome> SettleAttemptAsync(
@@ -769,6 +769,7 @@ internal sealed partial class PackageCallHandler(
         ErrorClass errorClass,
         string error,
         bool counted,
+        StepProblem? problem,
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
@@ -782,7 +783,8 @@ internal sealed partial class PackageCallHandler(
                     ErrorClass.Unknown => CallAttempts.Unknown,
                     _ => CallAttempts.Failed,
                 },
-                error)
+                error,
+                problem)
             : null;
         return errorClass switch
         {
@@ -881,7 +883,8 @@ internal sealed partial class PackageCallHandler(
                 new JsonObject { ["operationId"] = call.Id, ["outcome"] = PackageCalls.Unknown },
                 null,
                 error,
-                attempt.StartedAt),
+                attempt.StartedAt,
+                row?.Problem),
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         LogUnknown(call.Id, instance.Id, attempt.Attempts, error);
@@ -1014,7 +1017,7 @@ internal sealed partial class PackageCallHandler(
 
     /// <summary>
     /// The result of a run: the output, the violation of the declared capabilities, the error of an exception and
-    /// whether it is retryable, that it timed out, or that its runner exited.
+    /// whether it is retryable, that it timed out, or that its runner exited, and the code of the error.
     /// </summary>
     private sealed record Run(
         IReadOnlyDictionary<string, object?>? Output,
@@ -1022,7 +1025,8 @@ internal sealed partial class PackageCallHandler(
         string? Error = null,
         bool Retryable = false,
         bool Timeout = false,
-        bool Exited = false);
+        bool Exited = false,
+        StepProblem? Problem = null);
 
     /// <summary>How an attempt that did not succeed is handled.</summary>
     private enum ErrorClass
