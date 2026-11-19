@@ -209,6 +209,7 @@ internal static partial class UserEndpoints
                 studio.AllowsTests(user.Roles),
                 studio.AllowsCreate(user.Roles),
                 studio.AllowsAi(user.Roles),
+                StudioEndpoints.DeveloperRefusal(studio, user.Roles, ApplicationPackages(catalog, tenants)) is null,
                 PreviewHost(studio.Allows(user.Roles), catalog, tenants),
                 console.Allows(user.Roles),
                 users.Allows(user.Roles) && !IsPreview(catalog, tenants),
@@ -224,6 +225,9 @@ internal static partial class UserEndpoints
 
     private static bool IsPreview(ITenantCatalog catalog, ITenantContextAccessor tenants) =>
         tenants.Current is { } tenant && StudioPreview.IsPreview(catalog, tenant.TenantId);
+
+    private static bool ApplicationPackages(ITenantCatalog catalog, ITenantContextAccessor tenants) =>
+        tenants.Current is { } tenant && catalog.Find(tenant.TenantId) is { ApplicationPackages: true };
 
     private static string? PreviewHost(bool studioUser, ITenantCatalog catalog, ITenantContextAccessor tenants) =>
         studioUser && tenants.Current is { } tenant && StudioPreview.Find(catalog, tenant.TenantId)?.Hosts is [var host, ..] ? host : null;
@@ -282,6 +286,7 @@ internal sealed record CurrentUserResponse(string Id, string DisplayName, IReadO
 /// The answer of <c>GET /api/me</c>: the current user, whether they may use Studio, publish from it, see its test controls and create applications in it, and the host of
 /// the tenant's preview tenant. <c>StudioPreviewHost</c> is <c>null</c> when the user may not use Studio or the tenant has
 /// no served preview tenant. <c>StudioAi</c> is true when the user may use Studio and <c>Ai:DefaultBinding</c> has a value on the server.
+/// <c>StudioDeveloper</c> is true when the user may write package files, the check of <c>StudioEndpoints.DeveloperRefusal</c>.
 /// <c>Console</c> is true when the user holds the operator console role.
 /// <c>Users</c> is true when the user holds the administrator role and the tenant is not a preview tenant.
 /// <c>TenantStatus</c> is <c>readOnly</c> while the tenant is read-only, otherwise <c>active</c>. <c>BillingUrl</c> is the
@@ -290,5 +295,5 @@ internal sealed record CurrentUserResponse(string Id, string DisplayName, IReadO
 /// holds the administrator role and the tenant is a cell tenant that is not a preview tenant, the tenants whose export routes answer.
 /// </summary>
 internal sealed record CurrentUserMeResponse(
-    string Id, string DisplayName, IReadOnlyList<string> Roles, bool Studio, bool StudioPublisher, bool StudioTest, bool StudioCreate, bool StudioAi, string? StudioPreviewHost, bool Console, bool Users,
+    string Id, string DisplayName, IReadOnlyList<string> Roles, bool Studio, bool StudioPublisher, bool StudioTest, bool StudioCreate, bool StudioAi, bool StudioDeveloper, string? StudioPreviewHost, bool Console, bool Users,
     string TenantStatus, string? BillingUrl, bool TenantExports);

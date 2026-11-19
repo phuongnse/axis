@@ -94,7 +94,7 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
         using var back = await GetJsonAsync(maria, Notifications);
         Assert.Equal(2, back.RootElement.GetProperty("totalCount").GetInt32());
         Assert.Equal(2, back.RootElement.GetProperty("unreadCount").GetInt32());
-        Assert.Equal([own, shared], Ids(back).Order().ToList());
+        Assert.Equal(new[] { own, shared }.Order().ToList(), Ids(back).Order().ToList());
     }
 
     [Fact]
