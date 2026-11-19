@@ -1,12 +1,15 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Route, Routes } from 'react-router'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { AccountPage } from '../pages/AccountPage'
 import { HomePage } from '../pages/HomePage'
 import { PageRoute } from '../pages/PageRoute'
 import { PlatformContext, type Platform } from '../pages/context'
 import { PlatformShellRoute } from '../pages/PlatformShellRoute'
 import { SiteRoute } from '../pages/SiteRoute'
 import { StudioPage } from '../pages/StudioPage'
+import { UserPage } from '../pages/UserPage'
+import { UsersPage } from '../pages/UsersPage'
 import { locale, platformSite } from './fixtures'
 
 const platform: Platform = {
@@ -17,7 +20,10 @@ const platform: Platform = {
   development: true,
 }
 
-/** The shell's own routes over the fixtures: the platform home page, Studio, and the pages of an application site. */
+/**
+ * The shell's own routes over the fixtures: the platform home page, Studio, the account, users and user pages, and
+ * the pages of an application site.
+ */
 export function ShellPreview() {
   return (
     <PlatformContext.Provider value={platform}>
@@ -38,6 +44,15 @@ export function ShellPreview() {
             </PlatformShellRoute>
           }
         />
+        {(
+          [
+            ['account', <AccountPage key="account" />],
+            ['users', <UsersPage key="users" />],
+            ['users/:id', <UserPage key="user" />],
+          ] as const
+        ).map(([path, page]) => (
+          <Route key={path} path={path} element={<PlatformShellRoute>{page}</PlatformShellRoute>} />
+        ))}
         <Route path=":site" element={<SiteRoute />}>
           <Route path=":page" element={<PageRoute />} />
           <Route path=":page/new" element={<PageRoute form="new" />} />

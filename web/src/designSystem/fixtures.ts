@@ -1239,6 +1239,69 @@ export const signUpDocuments = {
 
 export const signUpRegion = { tenantDomain: 'vn.example.com' }
 
+/** The person's own authenticators on the account page, as `GET /api/me/authenticators` answers them. */
+const ownAuthenticators = {
+  account: true,
+  authenticators: [{ id: 'totp-1', label: 'Phone', createdAt: '2026-02-10T08:15:00Z' }],
+}
+
+/** The person's live sessions on the account page, as `GET /api/me/sessions` answers them. */
+const ownSessions = {
+  endAllowed: true,
+  sessions: [
+    { id: 'session-1', signedInAt: '2026-03-04T08:30:00Z', lastRequestAt: '2026-03-04T09:42:00Z', current: true },
+    { id: 'session-2', signedInAt: '2026-03-02T14:05:00Z', lastRequestAt: '2026-03-03T17:20:00Z', current: false },
+  ],
+}
+
+/** The user whose page the `shell` preview opens. */
+export const userId = '7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f'
+
+/** The tenant's users, as `GET /api/users` answers them. */
+const userList = {
+  items: [
+    {
+      id: currentUser.id,
+      displayName: currentUser.displayName,
+      email: 'alex.morgan@contoso.example',
+      provider: null,
+      status: 'active',
+      lastSignedInAt: '2026-03-04T08:30:00Z',
+    },
+    {
+      id: userId,
+      displayName: 'Jordan Lee',
+      email: 'jordan.lee@contoso.example',
+      provider: null,
+      status: 'active',
+      lastSignedInAt: '2026-03-03T16:10:00Z',
+    },
+    {
+      id: '0a1b2c3d-4e5f-4a6b-8c7d-8e9f0a1b2c3d',
+      displayName: 'Sam Taylor',
+      email: 'sam.taylor@contoso.example',
+      provider: null,
+      status: 'invited',
+      lastSignedInAt: null,
+    },
+  ],
+  page: 1,
+  pageSize: 20,
+  totalCount: 3,
+}
+
+/** Jordan Lee's roles, as `GET /api/users/{id}/roles` answers them. */
+const userRoles = {
+  displayName: 'Jordan Lee',
+  email: 'jordan.lee@contoso.example',
+  given: [
+    { applicationId: null, role: 'author', declared: true },
+    { applicationId: 'purchase-requests', role: 'Approver', declared: true },
+  ],
+  applications: [{ id: 'purchase-requests', name: 'Purchase requests', roles: ['Approver', 'Requester'] }],
+  platformRoles: ['author', 'publisher', 'developer', 'operator', 'administrator'],
+}
+
 /** The API paths that the fixtures answer. A request outside them is not a fixture's to answer. */
 export const fixtureScopes = [
   `${apiPath}/`,
@@ -1248,6 +1311,8 @@ export const fixtureScopes = [
   '/api/me',
   '/api/about',
   '/api/notifications',
+  '/api/users',
+  '/api/tenant/',
 ] as const
 
 /** A person's table choices when nothing is kept. */
@@ -1282,6 +1347,18 @@ export const routes: Record<string, () => unknown> = {
   [notificationsPath]: () => notificationPage,
   '/api/sites': () => ({ sites: listedSites }),
   '/api/me': () => currentUser,
+  '/api/me/authenticators': () => ownAuthenticators,
+  '/api/me/sessions': () => ownSessions,
+  '/api/me/tables/users': () => noTableChoices,
+  '/api/users': () => userList,
+  [`/api/users/${userId}/roles`]: () => userRoles,
+  // The users page's tenant sections are not offered, as a 404 says, so the page shows only its people.
+  ...Object.fromEntries(
+    ['outside-clients', 'usage', 'hosts', 'model-key', 'application-packages'].map((part) => [
+      `/api/tenant/${part}`,
+      () => new Response(null, { status: 404 }),
+    ]),
+  ),
   '/api/about': () => ({ version: '0.1.0' }),
   '/api/notifications': () => tenantNoticePage,
 }

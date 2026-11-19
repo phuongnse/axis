@@ -9,7 +9,6 @@ import { useText } from '../platform/texts'
 import { StatusTag } from '../platform/StatusTag'
 import { useDesignTokens } from '../platform/themeMode'
 import { changeUserRole, fetchUserRoles, type RoleChange, type UserRoles } from '../platform/users'
-import { usePlatform } from './context'
 import { NotFoundPage } from './NotFoundPage'
 
 /** One role of a section: given or not, and declared by the active release or not. */
@@ -46,7 +45,6 @@ type Problem = 'forbidden' | 'conflict' | 'loadFailed' | 'changeFailed'
  */
 export function UserPage() {
   const t = useText()
-  const platform = usePlatform()
   const { size } = useDesignTokens()
   const { id = '' } = useParams()
   const [roles, setRoles] = useState<UserRoles>()
@@ -110,14 +108,7 @@ export function UserPage() {
   const sections = roles ? sectionsOf(roles, t('shell.users.roles.platform')) : []
 
   return (
-    <PageLayout
-      title={roles?.displayName ?? t('shell.users.title')}
-      breadcrumb={[
-        { label: t(platform.site.titleKey), to: '/' },
-        { label: t('shell.users.title'), to: '/users' },
-        { label: roles?.displayName ?? id },
-      ]}
-    >
+    <PageLayout title={roles?.displayName ?? t('shell.users.title')} band>
       {refusal === 'forbidden' && (
         <div data-testid="users-forbidden">
           <Result status="403" title={t('shell.users.forbidden')} />

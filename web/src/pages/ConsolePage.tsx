@@ -83,10 +83,7 @@ export function ConsolePage() {
   }, [])
 
   return (
-    <PageLayout
-      title={t('shell.console.title')}
-      breadcrumb={[{ label: t(platform.site.titleKey), to: '/' }, { label: t('shell.console.title') }]}
-    >
+    <PageLayout title={t('shell.console.title')} band>
       {forbidden && (
         <div data-testid="console-forbidden">
           <Result status="403" title={t('shell.console.forbidden')} />

@@ -64,6 +64,7 @@ import {
   sitePath,
   tableWidget,
   tabsWidget,
+  userId,
   taskInboxWidget,
   wizardFormRoutes,
   wizardRequestForm,
@@ -267,6 +268,9 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 600,
     },
     { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: 600 },
+    { caption: 'Account page', draw: () => <ShellPreview />, entry: '/account', frameHeight: 600 },
+    { caption: 'Users page', draw: () => <ShellPreview />, entry: '/users', frameHeight: 600 },
+    { caption: 'User page', draw: () => <ShellPreview />, entry: `/users/${userId}`, frameHeight: 600 },
     {
       caption: 'App switcher',
       draw: () => (

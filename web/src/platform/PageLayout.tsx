@@ -15,14 +15,19 @@ export interface BreadcrumbStep {
  * the page's sections stacked below it. With a breadcrumb, the title sits under it in a band on the surface colour that spans the page area, and
  * the last step is marked as the current page. It replaces the old page container. Pages add no
  * spacing or styling of their own.
+ *
+ * Proposed (#4662): a platform page's band holds its title alone, with no breadcrumb, as `band` draws it.
  */
 export function PageLayout({
   title,
   breadcrumb,
+  band = false,
   children,
 }: {
   title: string
   breadcrumb?: readonly BreadcrumbStep[]
+  /** Proposed (#4662): draws the band with the title alone, for a platform page. */
+  band?: boolean
   children: ReactNode
 }) {
   const heading = (
@@ -34,13 +39,13 @@ export function PageLayout({
 
   return (
     <Flex vertical gap="middle">
-      {breadcrumb ? <HeaderBand steps={breadcrumb}>{heading}</HeaderBand> : heading}
+      {breadcrumb || band ? <HeaderBand steps={breadcrumb}>{heading}</HeaderBand> : heading}
       {children}
     </Flex>
   )
 }
 
-function HeaderBand({ steps, children }: { steps: readonly BreadcrumbStep[]; children: ReactNode }) {
+function HeaderBand({ steps, children }: { steps?: readonly BreadcrumbStep[]; children: ReactNode }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
 
@@ -55,12 +60,14 @@ function HeaderBand({ steps, children }: { steps: readonly BreadcrumbStep[]; chi
       }}
     >
       <Flex vertical gap={spacing.xs}>
-        <Breadcrumb
-          aria-label={t('shell.breadcrumb.label')}
-          items={steps.map((step) => ({
-            title: step.to ? <Link to={step.to}>{step.label}</Link> : <span aria-current="page">{step.label}</span>,
-          }))}
-        />
+        {steps && (
+          <Breadcrumb
+            aria-label={t('shell.breadcrumb.label')}
+            items={steps.map((step) => ({
+              title: step.to ? <Link to={step.to}>{step.label}</Link> : <span aria-current="page">{step.label}</span>,
+            }))}
+          />
+        )}
         {children}
       </Flex>
     </div>

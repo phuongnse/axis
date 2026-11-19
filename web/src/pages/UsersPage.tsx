@@ -239,10 +239,7 @@ export function UsersPage() {
   }
 
   return (
-    <PageLayout
-      title={t('shell.users.title')}
-      breadcrumb={[{ label: t(platform.site.titleKey), to: '/' }, { label: t('shell.users.title') }]}
-    >
+    <PageLayout title={t('shell.users.title')} band>
       {refusal === 'forbidden' && (
         <div data-testid="users-forbidden">
           <Result status="403" title={t('shell.users.forbidden')} />

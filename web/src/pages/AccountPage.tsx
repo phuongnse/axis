@@ -114,10 +114,7 @@ export function AccountPage() {
   const time = (value: string) => new Date(value).toLocaleString(locale)
 
   return (
-    <PageLayout
-      title={t('shell.account.sessions.title')}
-      breadcrumb={[{ label: t(platform.site.titleKey), to: '/' }, { label: t('shell.account.sessions.title') }]}
-    >
+    <PageLayout title={t('shell.account.sessions.title')} band>
       {authenticatorsFailed && (
         <AxisAlert
           data-testid="authenticators-error"
