@@ -5,7 +5,7 @@ Status: **Agreed**
 ## Context
 
 An author who cannot write JSON must be able to build a process, and a graph is how people think of
-one. [D53](d53-typed-editors-and-the-process-graph-in-studio.md) already draws a process as a graph
+one. [D164](d164-typed-editors-and-one-process-graph-laid-out-by-elk.md) already draws a process as a graph
 with a computed layout, and the page and form designers of
 [D65](d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md) and
 [D66](d66-a-visual-form-designer-for-form-resources.md) set how a Studio designer works.
@@ -13,7 +13,7 @@ with a computed layout, and the page and form designers of
 ## Decision
 
 - **The process graph becomes the designer.** A process opens on a Design tab, next to its Form and
-  JSON tabs, and the three tabs edit one draft on the graph of D53.
+  JSON tabs, and the three tabs edit one draft on the graph of D164.
 - **The layout is always computed.** The designer stores no position, so the process file holds no
   layout.
 - **Steps and transitions are drawn.** The author drags a step type from a palette onto the canvas, or

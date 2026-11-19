@@ -237,7 +237,9 @@ in any state. The body has these parts:
   [routing](frontend.md#routing).
 - **Labels.** _(planned)_ Each `graph` step's `labelKey` is the key of its `label`, or `null`. Each
   transition's `labelKey` is the key of its outcome's or branch's `label`, or `null`. A `waitEvent` step
-  has `event`, the event's name, and `eventLabelKey`, the key of the event's `label`, or `null`.
+  has `event`, the event's name, and `eventLabelKey`, the key of the event's `label`, or `null`. A decision
+  branch's transition has `branch`, the branch's name, and the fallback's and every other transition's is `null`.
+  A `waitEvent` step's `timeout` transition has `after`, the timeout's duration as the process file writes it.
 - **Who started it.** _(planned)_ `startedBy` is `{ "kind", "name", "id", "via" }`. `kind` is `person`,
   `trigger`, `endpoint`, `schedule` or `parent`. `name` is the person's name, the resource's name for a
   trigger, endpoint or schedule, or the parent process's name for `parent`. `id` is the user's id, or the
