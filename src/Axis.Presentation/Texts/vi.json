@@ -51,7 +51,7 @@
   "shell.account.tabs.notifications": "Thông báo",
   "shell.account.notifications.source": "Loại thông báo",
   "shell.account.notifications.application": "Trong ứng dụng",
-  "shell.account.notifications.email": "Email",
+  "shell.account.notifications.email": "Qua email",
   "shell.account.notifications.email.off": "Tắt",
   "shell.account.notifications.email.now": "Gửi ngay",
   "shell.account.notifications.email.digest": "Trong email tổng hợp hằng ngày",
