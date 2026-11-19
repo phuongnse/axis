@@ -227,7 +227,7 @@ purged by the worker.
   object storage's own means, at the time of the archive, and a restore needs a bucket that holds the files of
   its archive.
 - **Audit.** An audit record names the file field that changed, never the file's name or bytes.
-  Step history stores no field values, and a call input can never map a file, because only
+  Step history keeps no file field's value in a run's `read` or `changes`, and a call input can never map a file, because only
   `is null` and `is not null` accept one, so a file's name and id never reach either.
 - **Audit of a file in a call.** _(planned for M40)_ A call input of the type `file` maps a file field by its
   name. Step history, logs and audit hold the file's id and size, never its name or bytes, see

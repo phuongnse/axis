@@ -181,13 +181,14 @@ in any state. The body has these parts:
     set to `null`.
 - `path` is the history rows of the instance, ordered by `finished_at`, then
   by `id`. Each is
-  `{ "step", "startedAt", "finishedAt", "decision", "output", "error", "problem", "traceId" }`.
+  `{ "step", "startedAt", "finishedAt", "decision", "output", "error", "problem", "traceId", "read", "made" }`.
   - `decision` and `output` are the stored values, see
     [Tables](process-tables.md#tables). `output` holds no field values.
   - `error` is the stored error, see
     [Step errors](#step-errors-in-inspection). `problem` is its code, `null` with no error and for an error that
     has none.
   - `traceId` is the trace id of the run that wrote the row, see [Attempts](#attempts).
+  - `read` and `made` are the values of the run, see the Runs bullet below.
   - The history's `input` is not returned. It holds only the subject id and
     version, which the instance already has.
 - `tasks` are the tasks of the instance, ordered by `createdAt`, then by `id`.
@@ -275,10 +276,25 @@ in any state. The body has these parts:
   claimed it, else `null`, and `completedById`, the id of the person who completed it, else `null`.
   `assignee` and `completedBy` hold a person's name, or the user id when that person has no profile,
   and a role assignee keeps its role's name.
-- **Runs.** _(planned)_ Each `path` entry has `read`, the values that a decision's conditions read, as
-  `[{ "name", "value", "hidden" }]`, and `made`, a `RunOutput`:
-  `{ "changes": [{ "field", "before", "after", "hidden" }], "event": { "name", "fields" }, "notified": { "to", "channels", "subject" }, "created": { "entity", "id" } }`.
-  Each part of `made` is `null` when the run did not make it.
+- **Runs.** Each `path` entry has `read` and `made`. The engine stores their values with the run, in the
+  `read` and `changes` columns of the step history, see [process tables](process-tables.md#step-history).
+  - `read` is `[{ "name", "value", "hidden" }]` for a decision run: the subject fields that the conditions of its
+    branches name, in the entity's field order, with the values the run saw. A reference path such as
+    `department.name` gives the `department` entry, whose value is the referenced record's id, and a child
+    collection gives no entry. `read` is `null` for a run that is no decision, for a decision of a process
+    without a subject and for a row stored before the engine kept it.
+  - `made` is always `{ "changes", "event", "notified", "created" }`, and each part is `null` when the run did
+    not make it.
+  - `made.changes` is `[{ "field", "before", "after", "hidden" }]` for an `updateRecord` run: each subject
+    field whose stored value differs between the version the run read and the version it wrote, in the
+    entity's field order, so a computed field that the write recomputed counts. It is `[]` when no field
+    differed, and `null` for a run that updates nothing and for a row stored before the engine kept it.
+- **Runs, event, notification and created record.** _(planned)_ `made.event` is `{ "name", "fields" }` for a
+  `raiseEvent` run, `made.notified` is `{ "to", "channels", "subject" }` for a `notify` run, and `made.created` is
+  `{ "entity", "id" }` for a `createRecord` run. Until then, each is `null`.
+- **Runs, changes of tasks and calls.** _(planned)_ `made.changes` is also filled for a task completion that saves
+  values, for a connector or package call that writes its outputs, and for an operator's resolve of a call as
+  succeeded. Until then, it is `null` for them.
 - **Calls.** A connector call has `request`, `{ "method", "url", "query", "headers", "body", "truncated" }`,
   the request of its last attempt that sent one. `url` is the base URL and the path, with no query string,
   and `query` and `headers` are objects that map each name to its text. `body` is text, or `null` when the
@@ -366,7 +382,9 @@ in any state. The body has these parts:
       "output": { "state": "waiting", "taskId": "0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01" },
       "error": null,
       "problem": null,
-      "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
+      "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+      "read": null,
+      "made": { "changes": null, "event": null, "notified": null, "created": null }
     }
   ],
   "tasks": [
@@ -416,14 +434,14 @@ in any state. The body has these parts:
 }
 ```
 
-The example shortens the lists. The graph, the path, the tasks, `subjectEntity`, `releaseNumber` and `timerDueAt` are the
-same for every user who may inspect the instance. `subjectLabel`, `studio`, a call's `input`, the hidden values of `input`
-and `result`, `commands`, `parent` and `subProcesses`, and each call's `resolvable` and `outputs` differ between users.
+The example shortens the lists. The graph, the steps of the path, the tasks, `subjectEntity`, `releaseNumber` and `timerDueAt` are the
+same for every user who may inspect the instance. `subjectLabel`, `studio`, a call's `input`, the hidden values of `input`,
+`result`, and of the `read` and `made` of each path entry, `commands`, `parent` and `subProcesses`, and each call's `resolvable` and `outputs` differ between users.
 
 **Values by user.** A call's `request`, `response` and `returned` differ between users too, as the masking
 rule hides them.
 
-**Run values by user.** _(planned)_ The values that the masking rule hides in a run differ between users as well.
+**Run values by user.** The values that the masking rule hides in a run differ between users as well, each over its own field.
 
 **Paths and variables.** _(planned for M38)_ The `variables`, and the `commands` of each path and task,
 differ between users too. The rest of `paths` and `tasks` is the same for every user.
@@ -432,7 +450,8 @@ differ between users too. The rest of `paths` and `tasks` is the same for every 
 
 Inspection shows a stored field value only where this section says it does. The history's
 `input` and `output` hold only ids, versions, step names and outcomes, and a
-task row holds none, so they need no masking. A call's `input` is the
+task row holds none, so they need no masking. The history's `read` and `changes` do hold field values, and
+the Kept run values bullet below masks them. A call's `input` is the
 evaluated input that the call sent, so it holds field values.
 
 - **The hiding rule.** A call's `input` is shown only when the user may read
@@ -499,8 +518,14 @@ evaluated input that the call sent, so it holds field values.
   hiding rule of the call's `input`, also when the call no longer stores its input, so a settled package
   call's `returned` is hidden from the readers who may not see what it was called with. A hidden value is
   `null`. No kept value is copied to history, audit records or logs.
-- **Kept run values.** _(planned)_ A run's `read` and `made` follow the hiding rule too, each over the fields
-  it came from. A hidden `read` or `made` value is `null` with `hidden` `true`.
+- **Kept run values.** A run's `read` and `made.changes` follow the hiding rule too, each value over its own
+  field, as `result.values` does. A value is hidden when the user may not read its field on the subject entity,
+  when the field is sensitive in the pinned or the active release, when the active release no longer has the
+  field, and when the instance has no subject. A hidden value is `null` with `hidden` `true`, and the other
+  values of the run stay shown. A field that the pinned release marks sensitive, and a `file` field, is stored with its name and no
+  value, so no row keeps it, see [process tables](process-tables.md#step-history). A field that only a later release
+  marks sensitive was stored in clear, and inspection hides it when the detail is read. No kept run value is
+  copied to history output, audit records or logs.
 - **Variables.** _(planned for M38)_ A variable's `value` is shown only when the user may read every field
   that each expression setting the variable reads. Those expressions are the `set` entries of each
   `setVariables` step that sets it, and the `gather.value` of each repeat that gathers into it, both from

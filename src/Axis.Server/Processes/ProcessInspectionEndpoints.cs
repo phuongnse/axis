@@ -514,7 +514,9 @@ internal static class ProcessInspectionEndpoints
                     entry.Output is null ? null : JsonNode.Parse(entry.Output),
                     entry.Error,
                     Problem(entry.Problem),
-                    entry.TraceId))
+                    entry.TraceId,
+                    RunRead(entry.Read, pinned, active, subject, viewer),
+                    new ProcessRunMade(RunChanges(entry.Changes, pinned, active, subject, viewer), null, null, null)))
                 .ToList(),
             tasks
                 .Select(task => new ProcessInstanceTask(
@@ -663,14 +665,43 @@ internal static class ProcessInspectionEndpoints
         var values = new List<ProcessInstanceValue>();
         foreach (var (name, value) in stored.OrderBy(entry => order is not null && order.TryGetValue(entry.Key, out var index) ? index : int.MaxValue))
         {
-            var hidden = subject is null
-                || !Readable(active, viewer, new HashSet<MappedField> { new(subject.Id, name) })
-                || Sensitive(pinned, active, new HashSet<MappedField> { new(subject.Id, name) });
+            var hidden = FieldHidden(pinned, active, subject, viewer, name);
             values.Add(new ProcessInstanceValue(name, hidden ? null : value, hidden));
         }
 
         return new ProcessInstanceResult(row.Step, values);
     }
+
+    // The one masking check of a stored subject value, over its own field, as "Values and masking" says: it is hidden when the
+    // instance has no subject, the viewer may not read the field, either release marks it sensitive or the active release no longer has it.
+    // The result's values, a run's read and a run's changes all use it.
+    private static bool FieldHidden(ApplicationModel pinned, ApplicationModel active, EntityModel? subject, InspectionViewer viewer, string field) =>
+        subject is null
+        || !Readable(active, viewer, new HashSet<MappedField> { new(subject.Id, field) })
+        || Sensitive(pinned, active, new HashSet<MappedField> { new(subject.Id, field) });
+
+    // The values a decision's conditions read, as the engine kept them, each masked on its own, in the stored order. A value is also hidden
+    // when none is stored, as for a field that was sensitive when the run ran. Null for a run that kept none.
+    private static IReadOnlyList<ProcessInstanceValue>? RunRead(string? json, ApplicationModel pinned, ApplicationModel active, EntityModel? subject, InspectionViewer viewer) =>
+        json is null || JsonNode.Parse(json) is not JsonArray stored
+            ? null
+            : [.. stored.OfType<JsonObject>().Select(entry =>
+            {
+                var name = entry["name"]?.GetValue<string>() ?? string.Empty;
+                var hidden = FieldHidden(pinned, active, subject, viewer, name) || !entry.ContainsKey("value");
+                return new ProcessInstanceValue(name, hidden ? null : entry["value"]?.DeepClone(), hidden);
+            })];
+
+    // The fields an updateRecord run changed, as the engine kept them, each masked on its own, in the stored order. Null for a run that kept none.
+    private static IReadOnlyList<ProcessRunChange>? RunChanges(string? json, ApplicationModel pinned, ApplicationModel active, EntityModel? subject, InspectionViewer viewer) =>
+        json is null || JsonNode.Parse(json) is not JsonArray stored
+            ? null
+            : [.. stored.OfType<JsonObject>().Select(entry =>
+            {
+                var field = entry["field"]?.GetValue<string>() ?? string.Empty;
+                var hidden = FieldHidden(pinned, active, subject, viewer, field) || (!entry.ContainsKey("before") && !entry.ContainsKey("after"));
+                return new ProcessRunChange(field, hidden ? null : entry["before"]?.DeepClone(), hidden ? null : entry["after"]?.DeepClone(), hidden);
+            })];
 
     // A kept request, response or returned value as JSON, or null when the call keeps none or the reader may not see it.
     private static JsonNode? Kept(string? json, bool concealed) => json is null || concealed ? null : JsonNode.Parse(json);
@@ -1001,8 +1032,30 @@ internal sealed record ProcessGraphTransition(string Next, string? On, string? B
 /// One occurrence of a step in the instance's history. A failed step has an error and no output.
 /// <paramref name="Problem"/> is the code of the error, <c>{ code, values }</c>, or null when the entry has none. It holds no field value, so no rule hides it.
 /// <paramref name="TraceId"/> is the trace id of the run that wrote the entry, or null when it stored none.
+/// <paramref name="Read"/> is the subject fields a decision's conditions read, or null for another run, for a process without a subject and for an entry stored before the engine kept them.
+/// <paramref name="Made"/> is what the run made, with each part null when it made none.
 /// </summary>
-internal sealed record ProcessPathEntry(string Step, DateTime StartedAt, DateTime FinishedAt, string? Decision, JsonNode? Output, string? Error, JsonNode? Problem, string? TraceId);
+internal sealed record ProcessPathEntry(
+    string Step,
+    DateTime StartedAt,
+    DateTime FinishedAt,
+    string? Decision,
+    JsonNode? Output,
+    string? Error,
+    JsonNode? Problem,
+    string? TraceId,
+    IReadOnlyList<ProcessInstanceValue>? Read,
+    ProcessRunMade Made);
+
+/// <summary>
+/// What a run made, see "Runs" in docs/reference/process-inspection.md#instance-detail. <paramref name="Changes"/> is the fields an
+/// <c>updateRecord</c> run changed, an empty list when none differed. <paramref name="Event"/>, <paramref name="Notified"/> and
+/// <paramref name="Created"/> are null until a run's event, notification and created record are built.
+/// </summary>
+internal sealed record ProcessRunMade(IReadOnlyList<ProcessRunChange>? Changes, JsonNode? Event, JsonNode? Notified, JsonNode? Created);
+
+/// <summary>One field a run changed, with its value before and after. Both values are null when <paramref name="Hidden"/>.</summary>
+internal sealed record ProcessRunChange(string Field, JsonNode? Before, JsonNode? After, bool Hidden);
 
 /// <summary>
 /// A task of the instance, with who it is assigned to and how it ended. <paramref name="Assignee"/> is a user assignee's name,

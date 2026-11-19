@@ -253,6 +253,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
         Guid? matchedEventId = null;
         PendingChild? child = null;
         List<KeyValuePair<FieldModel, object?>>? assignments = null;
+        JsonArray? read = null;
+        JsonArray? changes = null;
         NewTask? task = null;
         TaskDeadlineModel? taskDeadline = null;
         IReadOnlyList<TaskEscalationModel> taskEscalations = [];
@@ -277,6 +279,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
                     throw Failure($"The process '{process.Name}' has no step '{target}'.", instance, input);
                 }
 
+                // The values the conditions saw are kept on the run's history row only, never in its output or a log.
+                read = entity is null ? null : RunValues.Read(model, entity, decisionStep, record!);
                 state = ProcessStarts.Running;
                 nextStep = next.Name;
                 output = new JsonObject { ["next"] = next.Name };
@@ -596,6 +600,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
 
             await ComputedBackfill.MarkStaleWriteAsync(context.Connection, context.Transaction, context.Item.TenantId, model, entity!, instance.ReleaseId, cancellationToken);
             updated = written;
+            changes = RunValues.Changes(model, entity!, stored!, written);
             effects = result.Effects;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
@@ -737,7 +742,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
 
         await ProcessSteps.InsertHistoryAsync(
             context.Transaction,
-            new StepOccurrence(instance.Id, step.Name, instance.Revision, input, output, decision, null, instance.Now),
+            new StepOccurrence(instance.Id, step.Name, instance.Revision, input, output, decision, null, instance.Now, Read: read, Changes: changes),
             cancellationToken);
         if (recordAudit is not null)
         {
