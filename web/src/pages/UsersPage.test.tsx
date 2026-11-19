@@ -77,14 +77,17 @@ const outsideClientsPath = '/api/tenant/outside-clients'
 const applicationPackagesPath = '/api/tenant/application-packages'
 const hostsPath = '/api/tenant/hosts'
 
-function stubServer(answer: (input: string, init?: RequestInit) => Response) {
+/** Stubs `fetch`. `/api/me` answers `me`, the administrator unless a test says otherwise. */
+function stubServer(answer: (input: string, init?: RequestInit) => Response, me: object = administrator) {
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
     input === '/api/tenant/usage' ||
     input === hostsPath ||
     input === outsideClientsPath ||
     input === applicationPackagesPath
       ? new Response(null, { status: 404 })
-      : answer(input, init),
+      : input === '/api/me'
+        ? json(me)
+        : answer(input, init),
   )
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
@@ -442,6 +445,28 @@ describe('UsersPage', () => {
 
     expect(link).toHaveAttribute('href', '/users/u1')
     expect(screen.queryByRole('button', { name: /edit/i })).toBeNull()
+  })
+
+  it("follows the signed-in administrator's own name with (you) and no other name", async () => {
+    stubServer(() =>
+      json({
+        ...users,
+        items: [{ ...users.items[0], id: 'me', displayName: 'Admin', status: 'active' }, users.items[0]],
+      }),
+    )
+    renderPage()
+
+    const own = await screen.findByRole('link', { name: 'Admin' })
+    expect(own.closest('td')).toHaveTextContent('Admin (you)')
+    expect(screen.getByRole('link', { name: 'Ann Invited' }).closest('td')).not.toHaveTextContent('(you)')
+  })
+
+  it('shows the name as plain text, with no link, to a reader who may not administer users', async () => {
+    stubServer(() => json(users), { ...administrator, users: false })
+    renderPage()
+
+    expect(await screen.findByText('Ann Invited')).toBeVisible()
+    expect(screen.queryByRole('link', { name: 'Ann Invited' })).toBeNull()
   })
 
   it('invites a person with the chosen roles after a confirmation and loads the list again', async () => {

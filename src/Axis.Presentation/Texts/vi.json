@@ -635,6 +635,7 @@
   "shell.table.exportPending": "Có trường đang được tính lại. Hãy xuất lại sau ít phút.",
   "shell.table.exportTimeout": "Xuất quá lâu nên đã dừng. Hãy thu hẹp tìm kiếm hoặc bộ lọc rồi thử lại.",
   "shell.table.exportFailed": "Không xuất được bản ghi.",
+  "shell.person.you": "(bạn)",
   "shell.value.notSet": "Chưa có",
   "shell.value.underSecond": "< 1 giây",
   "shell.copy.copy": "Sao chép",

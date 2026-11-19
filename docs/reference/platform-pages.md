@@ -121,7 +121,7 @@ tab shows only to an administrator of a tenant that has the setting.
 The page lists the tenant's users from `GET /api/users`, 20 to a page. The server searches, filters,
 sorts and pages them, see [the list route](user-administration.md#read-routes).
 
-- **Columns.** Each row has the display name, which links to [the user's page](#a-users-roles), the email, how the person signs in (the provider's alias
+- **Columns.** Each row has the display name, drawn by `PersonName`: a link to [the user's page](#a-users-roles), followed by "(you)" on the administrator's own row, the email, how the person signs in (the provider's alias
   as the [list route](user-administration.md#read-routes) sends it, or "Account"), the status as a
   `StatusTag` (`invited` is `attention`, `active` is `neutral` and `disabled` is `muted`) and the last sign-in. A header sorts by its column. Columns, in the
   toolbar, chooses which columns show.
