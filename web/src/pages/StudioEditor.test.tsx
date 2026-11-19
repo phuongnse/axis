@@ -2,7 +2,7 @@ import { forEachDiagnostic, type Diagnostic } from '@codemirror/lint'
 import { EditorView } from '@codemirror/view'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, useLocation } from 'react-router'
 import type { ComponentProps } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -367,19 +367,21 @@ describe('StudioEditor for a scenario', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
     render(
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioEditor
-          application="Shop"
-          item={scenarioItem}
-          resources={[scenarioItem]}
-          path={null}
-          diagnosticPaths={[]}
-          onOpen={vi.fn()}
-          onSaved={vi.fn()}
-          onTextsWritten={vi.fn()}
-          onDeleted={vi.fn()}
-        />
-      </TextProvider>,
+      <MemoryRouter>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioEditor
+            application="Shop"
+            item={scenarioItem}
+            resources={[scenarioItem]}
+            path={null}
+            diagnosticPaths={[]}
+            onOpen={vi.fn()}
+            onSaved={vi.fn()}
+            onTextsWritten={vi.fn()}
+            onDeleted={vi.fn()}
+          />
+        </TextProvider>
+      </MemoryRouter>,
     )
 
     expect(await screen.findByTestId('studio-scenario-step', {}, slow)).toBeInTheDocument()
@@ -497,6 +499,11 @@ function stubResource(item: StudioResourceItem, content: unknown) {
   })
   vi.stubGlobal('fetch', fetchMock)
   return { fetchMock, url }
+}
+
+/** The search of the address, as the test reads it. */
+function AddressSearch() {
+  return <output data-testid="address">{useLocation().search}</output>
 }
 
 function renderResource(
@@ -2173,6 +2180,42 @@ describe('StudioEditor for an entity', () => {
       () => expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true'),
       slow,
     )
+  })
+
+  it('clears the fields search from the address when the author opens Used by, and leaves its search empty', async () => {
+    const { fetchMock } = stubResource(resources[1], entityContent)
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+      input === `${folder}/resources/${entityId}/references` ? json({ usedBy: [] }) : base(input, init),
+    )
+    render(
+      <MemoryRouter initialEntries={[`/studio?app=Shop&resource=${entityId}&fields.search=code`]}>
+        <ThemeModeProvider>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioEditor
+              application="Shop"
+              item={resources[1]}
+              resources={[resources[1]]}
+              path={null}
+              diagnosticPaths={[]}
+              onOpen={vi.fn()}
+              onSaved={vi.fn()}
+              onTextsWritten={vi.fn()}
+              onDeleted={vi.fn()}
+            />
+            <AddressSearch />
+          </TextProvider>
+        </ThemeModeProvider>
+      </MemoryRouter>,
+    )
+    await screen.findByTestId('studio-field-/fields/0', {}, slow)
+    expect(screen.getByTestId('address')).toHaveTextContent('fields.search=code')
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Used by' }))
+
+    expect(screen.getByTestId('address').textContent).not.toContain('fields.search')
+    const usedBy = await screen.findByTestId('studio-used-by', {}, slow)
+    expect(within(usedBy).getByRole('searchbox', { name: 'Search' })).toHaveValue('')
   })
 
   it('draws no other validation when a key goes into one validation expression, and turns Save on', async () => {

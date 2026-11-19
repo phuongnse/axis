@@ -3,6 +3,7 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import dayjs from 'dayjs'
 import { memo, useCallback, useContext, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router'
 import { AxisCheckboxField } from '../platform/AxisCheckboxField'
 import { AxisChoiceField } from '../platform/AxisChoiceField'
 import { AxisField } from '../platform/AxisField'
@@ -21,6 +22,8 @@ import {
 import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { withoutModulePrefix, type StudioNames } from '../platform/studio'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { labelText, referenceOptions, StudioNamesContext, type ReferenceOption } from '../platform/studioNames'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
@@ -160,8 +163,10 @@ const Picker = memo(function Picker({
  * `validation1`, the first name its list does not use. The designer edits the draft through `onChange`, so a key it
  * does not show, such as `id`, `kind` or an unknown key on a field, stays as it is. Every input has the id
  * `studio-field-<pointer>`, and each row of the table has the id of its field, so a diagnostic opens at its input or
- * at the row of a setting inside a field, which the drawer, drawn outside the form, holds. Clearing an optional value removes its key. With `readOnly`,
- * as for an entity of a module, every input is off, the label is its plain text key, and there are no buttons that
+ * at the row of a setting inside a field, which the drawer, drawn outside the form, holds. Clearing an optional value
+ * removes its key. With `application`, the name of the application, a reference's target is a link to its entity, see
+ * docs/reference/entity-designer.md#fields. With `readOnly`, as for an entity of a module, every input is off, the label
+ * is its plain text key, and there are no buttons that
  * add, remove or move a field or a validation. With `origins`, the loaded name of each row of the fields table or
  * `null` for a row added in this session, Add field, Remove and Move report the origins that follow through
  * `onOriginsChange`, and Remove also reports the origin of the removed row as touched. With `warnings`, the row
@@ -174,6 +179,7 @@ const Picker = memo(function Picker({
 export function EntityDesigner({
   value,
   onChange,
+  application,
   readOnly = false,
   origins,
   warnings,
@@ -182,6 +188,7 @@ export function EntityDesigner({
 }: {
   value: Content
   onChange: ChangeHandler
+  application: string
   readOnly?: boolean
   origins?: FieldOrigin[]
   warnings?: Map<number, FieldWarning>
@@ -229,6 +236,7 @@ export function EntityDesigner({
         </SectionPart>
         <Fields
           fields={fields}
+          application={application}
           readOnly={readOnly}
           origins={origins}
           warnings={warnings}
@@ -333,8 +341,9 @@ const noParameters: string[] = []
  * properties as tags, see docs/reference/entity-designer.md#fields. The name opens the field drawer, which holds the
  * field's inputs, see docs/reference/entity-designer.md#field-drawer. Every cell is a memo component of stable
  * props, so a key in one row draws that row's cells and no other. Only the row has an id in the table, so a diagnostic
- * inside a field opens at its row. The table has a Filter on Name, Label, Type, Required and Unique, kept in the address as
- * `fields.filter`. A filter only hides rows: every row shows on one page, an edit to a hidden row stays in the draft, and
+ * inside a field opens at its row. The table has a search over Name and Label, as the Label cell shows it, kept in the
+ * address as `fields.search`. It also has a Filter on Name, Label, Type, Required and Unique, kept as `fields.filter`.
+ * A filter only hides rows: every row shows on one page, an edit to a hidden row stays in the draft, and
  * a field whose origin is `null`, one added since the last save, stays shown. Add field opens the new field's drawer.
  * Move up and Move down keep the open drawer on its field at the field's new index, and Remove closes the drawer only
  * when it removes that field, see docs/reference/entity-designer.md#field-drawer. A read-only designer has no "…" menu,
@@ -342,6 +351,7 @@ const noParameters: string[] = []
  */
 const Fields = memo(function Fields({
   fields,
+  application,
   readOnly,
   origins,
   warnings,
@@ -350,6 +360,7 @@ const Fields = memo(function Fields({
   onChange,
 }: {
   fields: unknown[] | undefined
+  application: string
   readOnly: boolean
   origins: FieldOrigin[] | undefined
   warnings: Map<number, FieldWarning> | undefined
@@ -364,7 +375,9 @@ const Fields = memo(function Fields({
   const shown = drawer !== null && fields !== undefined && drawer.index < fields.length ? drawer.index : null
   const openDrawer = useCallback((index: number) => setDrawer({ index, open: true }), [])
   const closeDrawer = useCallback(() => setDrawer((current) => current && { ...current, open: false }), [])
-  const { view, setView } = useTableView(fieldTableFields, recordPageSize, noParameters, false, true, false, 'fields.')
+  const names = useContext(StudioNamesContext)
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const { view, setView } = useTableView(fieldTableFields, recordPageSize, noParameters, true, true, false, 'fields.')
   // What the entries of a row's menu read when they are pressed, so they stay the same between draws.
   const latest = useRef({ fields, origins, onOriginsChange, onChange })
   useLayoutEffect(() => {
@@ -452,6 +465,7 @@ const Fields = memo(function Fields({
       kind: 'freeText',
       title: t('shell.studio.entity.fieldName'),
       filter: { kind: 'text', value: ({ field }) => text(isContent(field) ? field.name : undefined) || null },
+      searchText: ({ field }) => text(isContent(field) ? field.name : undefined),
       render: (_, { field, index }) => <NameCell index={index} field={field} layer={layer} onOpen={openDrawer} />,
     },
     {
@@ -466,6 +480,8 @@ const Fields = memo(function Fields({
           return (isContent(label) ? text(label.textKey) : '') || null
         },
       },
+      // The search reads the label as the Label cell shows it, so a person finds what they read in the row.
+      searchText: ({ field }) => fieldLabel(field, names, locale),
       render: (_, { field }) => <LabelCell field={field} />,
     },
     {
@@ -477,7 +493,7 @@ const Fields = memo(function Fields({
         value: ({ field }) => text(isContent(field) ? field.type : undefined) || null,
         options: fieldTypes.map((option) => ({ value: option, label: option })),
       },
-      render: (_, { field }) => <TypeCell field={field} />,
+      render: (_, { field }) => <TypeCell application={application} field={field} />,
     },
     yesNoColumn('required', t('shell.studio.entity.required'), t),
     yesNoColumn('unique', t('shell.studio.entity.unique'), t),
@@ -587,25 +603,32 @@ const NameCell = memo(function NameCell({
   )
 })
 
+/**
+ * A field's label as the Label cell shows it: the text in the author's language, else its text key. It is '' where the
+ * field has no label.
+ */
+function fieldLabel(field: unknown, names: StudioNames | undefined, locale: string): string {
+  const label = isContent(field) ? field.label : undefined
+  const key = (isContent(label) ? text(label.textKey) : '') || undefined
+  return key === undefined ? '' : (names && labelText(names, key, locale)) || key
+}
+
 /** The label of a field's row in the author's language, else its text key, and the dash when it has none. */
 const LabelCell = memo(function LabelCell({ field }: { field: unknown }) {
   const names = useContext(StudioNamesContext)
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const label = isContent(field) ? field.label : undefined
-  const key = (isContent(label) ? text(label.textKey) : '') || undefined
-  if (key === undefined) {
-    return <EmptyDash />
-  }
-  return (names && labelText(names, key, locale)) || key
+  const label = fieldLabel(field, names, locale)
+  return label === '' ? <EmptyDash /> : label
 })
 
 /**
  * The type of a field in words. For a reference, references or child collection, the target's label fills in its
- * place, or the target's name where the entity has no label. The target is matched by name, ignoring letter case, and a
- * name the application does not have reads as written. A type the designer does not know reads as written too, see
- * docs/reference/entity-designer.md#fields.
+ * place, or the target's name where the entity has no label. The target is matched by name, ignoring letter case. A
+ * target that is one of the application's entities is a link to it, at its module view for a module's entity. A name
+ * the application does not have reads as written and is not a link. A type the designer does not know reads as written
+ * too, see docs/reference/entity-designer.md#fields.
  */
-const TypeCell = memo(function TypeCell({ field }: { field: unknown }) {
+const TypeCell = memo(function TypeCell({ field, application }: { field: unknown; application: string }) {
   const t = useText()
   const names = useContext(StudioNamesContext)
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -621,8 +644,16 @@ const TypeCell = memo(function TypeCell({ field }: { field: unknown }) {
     return <FilledText text={t(`shell.studio.entity.typeOf.${type}`)} parts={{ target: <EmptyDash /> }} />
   }
   const entity = names?.entities.find((other) => other.name.toLowerCase() === target.toLowerCase())
-  const label = names && entity ? labelText(names, entity.labelKey, locale) : undefined
-  return <FilledText text={t(`shell.studio.entity.typeOf.${type}`)} parts={{ target: label || target }} />
+  if (names === undefined || entity === undefined) {
+    return <FilledText text={t(`shell.studio.entity.typeOf.${type}`)} parts={{ target }} />
+  }
+  const label = labelText(names, entity.labelKey, locale) || withoutModulePrefix(entity.name, entity.module)
+  return (
+    <FilledText
+      text={t(`shell.studio.entity.typeOf.${type}`)}
+      parts={{ target: <Link to={studioResourceAddress(application, entity.id)}>{label}</Link> }}
+    />
+  )
 })
 
 /** The properties of a field as tags, or the dash when it has none, see docs/reference/entity-designer.md#fields. */

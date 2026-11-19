@@ -493,7 +493,13 @@ export function StudioModuleEditor({
       ) : item.kind === 'policy' ? (
         <StudioModulePolicy value={draft} onChange={change} layer={designerLayer()} />
       ) : (
-        <EntityDesigner value={draft} onChange={change} origins={entityOrigins} layer={designerLayer()} />
+        <EntityDesigner
+          value={draft}
+          onChange={change}
+          application={application}
+          origins={entityOrigins}
+          layer={designerLayer()}
+        />
       )}
       {conflict && (
         <AxisAlert
