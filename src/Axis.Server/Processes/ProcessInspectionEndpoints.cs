@@ -441,10 +441,18 @@ internal static class ProcessInspectionEndpoints
         var pinned = await resolver.GetReleaseModelAsync(row.ReleaseId, cancellationToken);
         var graph = Graph(pinned.Processes.Single(candidate => candidate.Id == process.Id));
         var history = await InstanceQueries.HistoryAsync(connection, row.Id, cancellationToken);
+        var pinnedProcess = pinned.Processes.Single(candidate => candidate.Id == process.Id);
+
+        // The event occurrences the raiseEvent runs name are read in one query, and the recipient user ids of notify runs join the other names below.
+        var eventIds = history
+            .Where(entry => pinnedProcess.TryGetStep(entry.Step, out var step) && step is RaiseEventStepModel)
+            .Select(entry => RunId(entry.Output, "eventId"))
+            .OfType<Guid>()
+            .ToList();
+        var events = await InstanceQueries.EventsAsync(connection, eventIds, cancellationToken);
         var tasks = await TaskQueries.ListByInstanceAsync(connection, row.Id, cancellationToken);
         var calls = await CallQueries.ListByInstanceAsync(connection, row.Id, cancellationToken);
         var mappings = new Dictionary<string, IReadOnlySet<MappedField>?>(StringComparer.Ordinal);
-        var pinnedProcess = pinned.Processes.Single(candidate => candidate.Id == process.Id);
         var pinnedSubject = subject is null ? null : pinned.FindEntity(subject.Id);
 
         // The label and the release number follow the list's rules, so a label the viewer may not read is null. The console
@@ -458,6 +466,7 @@ internal static class ProcessInspectionEndpoints
         var userIds = tasks
             .SelectMany(task => new[] { task.AssigneeKind == ProcessTasks.UserAssignee ? task.Assignee : null, task.ClaimedBy, task.CompletedBy })
             .OfType<string>()
+            .Concat(history.SelectMany(entry => NotifiedUserIds(entry.Notified)))
             .ToList();
         var names = await UserProfiles.FindDisplayNamesAsync(connection, userIds, cancellationToken);
         string Name(string userId) => names.GetValueOrDefault(userId) ?? userId;
@@ -516,7 +525,11 @@ internal static class ProcessInspectionEndpoints
                     Problem(entry.Problem),
                     entry.TraceId,
                     RunRead(entry.Read, pinned, active, subject, viewer),
-                    new ProcessRunMade(RunChanges(entry.Changes, pinned, active, subject, viewer), null, null, null)))
+                    new ProcessRunMade(
+                        RunChanges(entry.Changes, pinned, active, subject, viewer),
+                        RunEvent(entry, pinnedProcess, events, pinned, pinnedSubject, active, subject, viewer),
+                        RunNotified(entry, pinnedProcess, pinned, pinnedSubject, active, subject, viewer, Name),
+                        RunCreated(entry, pinnedProcess, pinned))))
                 .ToList(),
             tasks
                 .Select(task => new ProcessInstanceTask(
@@ -702,6 +715,109 @@ internal static class ProcessInspectionEndpoints
                 var hidden = FieldHidden(pinned, active, subject, viewer, field) || (!entry.ContainsKey("before") && !entry.ContainsKey("after"));
                 return new ProcessRunChange(field, hidden ? null : entry["before"]?.DeepClone(), hidden ? null : entry["after"]?.DeepClone(), hidden);
             })];
+
+    // The event a raiseEvent run raised: its name from the stored occurrence, and each payload field of the pinned step with its value. A value is hidden
+    // over the fields its expression reads, as a call's input is, so the viewer must read every one of them and none may be sensitive. Null for a run that
+    // raised none, or whose occurrence is gone.
+    private static ProcessRunEvent? RunEvent(
+        ProcessStepHistoryRow entry,
+        ProcessModel pinnedProcess,
+        IReadOnlyDictionary<Guid, (string Event, string Payload)> events,
+        ApplicationModel pinned,
+        EntityModel? pinnedSubject,
+        ApplicationModel active,
+        EntityModel? subject,
+        InspectionViewer viewer)
+    {
+        if (!pinnedProcess.TryGetStep(entry.Step, out var found)
+            || found is not RaiseEventStepModel step
+            || RunId(entry.Output, "eventId") is not { } eventId
+            || !events.TryGetValue(eventId, out var stored))
+        {
+            return null;
+        }
+
+        var payload = JsonNode.Parse(stored.Payload) as JsonObject;
+        var fields = step.Fields
+            .Select(field =>
+            {
+                var read = pinnedSubject is null ? null : MappingFields.Collect(pinned, pinnedSubject, field.Value);
+                var hidden = pinnedSubject is null || subject is null || !Readable(active, viewer, read) || Sensitive(pinned, active, read);
+                var value = payload?.FirstOrDefault(candidate => string.Equals(candidate.Key, field.Field, StringComparison.OrdinalIgnoreCase)).Value;
+                return new ProcessInstanceValue(field.Field, hidden ? null : value?.DeepClone(), hidden);
+            })
+            .ToList();
+        return new ProcessRunEvent(stored.Event, fields);
+    }
+
+    // The people a notify run reached, as the engine kept them, in the step's order, with the channels and the subject's text key of the pinned step. A user
+    // is shown by name. An address is hidden over the fields its expression reads, as an event field is, and also when none was stored. Null for a run that
+    // kept none, such as one before the column.
+    private static ProcessRunNotified? RunNotified(
+        ProcessStepHistoryRow entry,
+        ProcessModel pinnedProcess,
+        ApplicationModel pinned,
+        EntityModel? pinnedSubject,
+        ApplicationModel active,
+        EntityModel? subject,
+        InspectionViewer viewer,
+        Func<string, string> name)
+    {
+        if (entry.Notified is null
+            || !pinnedProcess.TryGetStep(entry.Step, out var found)
+            || found is not NotifyStepModel step
+            || JsonNode.Parse(entry.Notified) is not JsonArray stored)
+        {
+            return null;
+        }
+
+        var to = new List<ProcessRunRecipient>();
+        foreach (var recipient in stored.OfType<JsonObject>())
+        {
+            var kind = recipient["kind"]?.GetValue<string>() ?? string.Empty;
+            var value = recipient["value"]?.GetValue<string>();
+            switch (kind)
+            {
+                case "user" when value is not null:
+                    to.Add(new ProcessRunRecipient(kind, name(value), value, false));
+                    break;
+                case "role":
+                    to.Add(new ProcessRunRecipient(kind, value, null, false));
+                    break;
+                default:
+                    var expression = recipient["recipient"]?.GetValue<int>() is { } index && index < step.Recipients.Count ? step.Recipients[index].Email : null;
+                    var read = pinnedSubject is null || expression is null ? null : MappingFields.Collect(pinned, pinnedSubject, expression);
+                    var hidden = value is null || pinnedSubject is null || subject is null || !Readable(active, viewer, read) || Sensitive(pinned, active, read);
+                    to.Add(new ProcessRunRecipient(kind, hidden ? null : value, null, hidden));
+                    break;
+            }
+        }
+
+        return new ProcessRunNotified(to, step.Channels, step.Subject.TextKey);
+    }
+
+    // The record a createRecord run created: the step's entity, as the pinned release names it, and the id the run kept. It holds no field value, so no rule hides it.
+    private static ProcessRunCreated? RunCreated(ProcessStepHistoryRow entry, ProcessModel pinnedProcess, ApplicationModel pinned) =>
+        pinnedProcess.TryGetStep(entry.Step, out var found)
+        && found is CreateRecordStepModel step
+        && RunId(entry.Output, "recordId") is { } recordId
+            ? new ProcessRunCreated(pinned.FindEntity(step.Entity.Id)?.Name ?? step.Entity.Name, recordId)
+            : null;
+
+    // An id that a run's output holds under key, or null when the output has none.
+    private static Guid? RunId(string? output, string key) =>
+        output is not null && JsonNode.Parse(output) is JsonObject stored && stored[key] is JsonValue value && value.TryGetValue(out string? text) && Guid.TryParse(text, out var id)
+            ? id
+            : null;
+
+    // The ids of the user recipients a notify run kept, so the detail reads their names with the tasks' people.
+    private static IEnumerable<string> NotifiedUserIds(string? notified) =>
+        notified is not null && JsonNode.Parse(notified) is JsonArray stored
+            ? stored.OfType<JsonObject>()
+                .Where(recipient => recipient["kind"]?.GetValue<string>() == "user")
+                .Select(recipient => recipient["value"]?.GetValue<string>())
+                .OfType<string>()
+            : [];
 
     // A kept request, response or returned value as JSON, or null when the call keeps none or the reader may not see it.
     private static JsonNode? Kept(string? json, bool concealed) => json is null || concealed ? null : JsonNode.Parse(json);
@@ -1052,7 +1168,30 @@ internal sealed record ProcessPathEntry(
 /// <c>updateRecord</c> run changed, an empty list when none differed. <paramref name="Event"/>, <paramref name="Notified"/> and
 /// <paramref name="Created"/> are null until a run's event, notification and created record are built.
 /// </summary>
-internal sealed record ProcessRunMade(IReadOnlyList<ProcessRunChange>? Changes, JsonNode? Event, JsonNode? Notified, JsonNode? Created);
+internal sealed record ProcessRunMade(IReadOnlyList<ProcessRunChange>? Changes, ProcessRunEvent? Event, ProcessRunNotified? Notified, ProcessRunCreated? Created);
+
+/// <summary>
+/// The event a <c>raiseEvent</c> run raised, see "Runs" in <see href="docs/reference/process-inspection.md#instance-detail">process inspection</see>.
+/// <paramref name="Fields"/> is each payload field with its value, in the event's declaration order, hidden over the fields its expression reads.
+/// </summary>
+internal sealed record ProcessRunEvent(string Name, IReadOnlyList<ProcessInstanceValue> Fields);
+
+/// <summary>
+/// What a <c>notify</c> run sent, see "Runs" in <see href="docs/reference/process-inspection.md#instance-detail">process inspection</see>.
+/// <paramref name="To"/> is every recipient the run reached, in the order the step lists them. <paramref name="Channels"/> and
+/// <paramref name="Subject"/>, the subject's text key, are the pinned step's.
+/// </summary>
+internal sealed record ProcessRunNotified(IReadOnlyList<ProcessRunRecipient> To, IReadOnlyList<string> Channels, string Subject);
+
+/// <summary>
+/// One recipient of a <c>notify</c> run. <paramref name="Kind"/> is <c>user</c>, <c>role</c> or <c>email</c>. <paramref name="Name"/> is
+/// a user's name, or their user id when they have no profile, a role's name, or an address. <paramref name="Id"/> is a user's id. An
+/// address that is <paramref name="Hidden"/> has a null <paramref name="Name"/>.
+/// </summary>
+internal sealed record ProcessRunRecipient(string Kind, string? Name, string? Id, bool Hidden);
+
+/// <summary>The record a <c>createRecord</c> run created, see "Runs" in <see href="docs/reference/process-inspection.md#instance-detail">process inspection</see>.</summary>
+internal sealed record ProcessRunCreated(string Entity, Guid Id);
 
 /// <summary>One field a run changed, with its value before and after. Both values are null when <paramref name="Hidden"/>.</summary>
 internal sealed record ProcessRunChange(string Field, JsonNode? Before, JsonNode? After, bool Hidden);

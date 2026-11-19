@@ -430,6 +430,151 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
     }
 
     [Fact]
+    public async Task A_raise_event_run_gives_the_event_and_each_payload_field_hidden_over_the_fields_its_expression_reads()
+    {
+        var subject = await fixture.InsertRequestAsync(TenantA, null, divisor: 2, amount: 10);
+        var instance = await fixture.StartAsync(TenantA, "Announce", subject);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+
+        using var allowed = await GetOkAsync(TenantA, "Announce", instance);
+        using var denied = await GetOkAsync(TenantA, "Announce", instance, "carl");
+
+        var announce = allowed.RootElement.GetProperty("path").EnumerateArray().Single(entry => entry.GetProperty("step").GetString() == "announce");
+        var made = announce.GetProperty("made");
+        var raised = made.GetProperty("event");
+        Assert.Equal(["name", "fields"], raised.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("RequestNoted", raised.GetProperty("name").GetString());
+        var fields = raised.GetProperty("fields").EnumerateArray().ToList();
+        Assert.Equal(["title", "ratio"], fields.Select(field => field.GetProperty("name").GetString()));
+        Assert.All(fields, field =>
+        {
+            Assert.Equal(["name", "value", "hidden"], field.EnumerateObject().Select(property => property.Name));
+            Assert.False(field.GetProperty("hidden").GetBoolean());
+        });
+        Assert.Equal(RequestTitle(subject), fields[0].GetProperty("value").GetString());
+        Assert.Equal(5m, fields[1].GetProperty("value").GetDecimal());
+        Assert.Equal(JsonValueKind.Null, made.GetProperty("changes").ValueKind);
+        Assert.Equal(JsonValueKind.Null, made.GetProperty("notified").ValueKind);
+        Assert.Equal(JsonValueKind.Null, made.GetProperty("created").ValueKind);
+        var done = allowed.RootElement.GetProperty("path").EnumerateArray().Single(entry => entry.GetProperty("step").GetString() == "done");
+        Assert.Equal(JsonValueKind.Null, done.GetProperty("made").GetProperty("event").ValueKind);
+
+        // The clerk reads the title and the amount, not the divisor, so only the ratio is hidden.
+        var clerkFields = denied.RootElement.GetProperty("path").EnumerateArray()
+            .Single(entry => entry.GetProperty("step").GetString() == "announce")
+            .GetProperty("made").GetProperty("event").GetProperty("fields").EnumerateArray().ToList();
+        Assert.Equal((false, fields[0].GetProperty("value").GetString()), (clerkFields[0].GetProperty("hidden").GetBoolean(), clerkFields[0].GetProperty("value").GetString()));
+        Assert.Equal((true, JsonValueKind.Null), (clerkFields[1].GetProperty("hidden").GetBoolean(), clerkFields[1].GetProperty("value").ValueKind));
+    }
+
+    [Fact]
+    public async Task An_in_app_notify_run_gives_its_user_and_role_recipients_the_channels_and_the_subject()
+    {
+        await fixture.InsertProfileAsync(TenantA, "nora", "Nora Notified");
+        var subject = await fixture.InsertRequestAsync(TenantA, null, title: "nora");
+        var instance = await fixture.StartAsync(TenantA, "Notify", subject);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+
+        using var body = await GetOkAsync(TenantA, "Notify", instance);
+
+        var tell = body.RootElement.GetProperty("path").EnumerateArray().Single(entry => entry.GetProperty("step").GetString() == "tell");
+        var notified = tell.GetProperty("made").GetProperty("notified");
+        Assert.Equal(["to", "channels", "subject"], notified.EnumerateObject().Select(property => property.Name));
+        var to = notified.GetProperty("to").EnumerateArray().ToList();
+        Assert.All(to, recipient => Assert.Equal(["kind", "name", "id", "hidden"], recipient.EnumerateObject().Select(property => property.Name)));
+        Assert.Equal(
+            [("user", "Nora Notified", "nora", false), ("role", "reviewer", null, false)],
+            to.Select(recipient => (recipient.GetProperty("kind").GetString(), recipient.GetProperty("name").GetString(), recipient.GetProperty("id").GetString(), recipient.GetProperty("hidden").GetBoolean())));
+        Assert.Equal(["inApp"], notified.GetProperty("channels").EnumerateArray().Select(channel => channel.GetString()));
+        Assert.Equal("request.notice.subject", notified.GetProperty("subject").GetString());
+        var done = body.RootElement.GetProperty("path").EnumerateArray().Single(entry => entry.GetProperty("step").GetString() == "done");
+        Assert.Equal(JsonValueKind.Null, done.GetProperty("made").GetProperty("notified").ValueKind);
+    }
+
+    [Fact]
+    public async Task An_email_only_notify_run_gives_its_recipients_without_an_in_app_row_and_hides_an_address_the_user_may_not_read()
+    {
+        var (release, model) = await fixture.ActivateEditedWithModelAsync(
+            TenantB,
+            (path, content) => path == Path.Combine("processes", "notify-email.json")
+                ? content.Replace("\"to\": [{ \"user\": \"title\" }]", "\"to\": [{ \"user\": \"title\" }, { \"email\": \"comment\" }]", StringComparison.Ordinal)
+                : content);
+        await fixture.InsertProfileAsync(TenantB, "nora", "Nora Notified");
+        var subject = await fixture.InsertRequestAsync(TenantB, null, title: "nora");
+        Assert.True(fixture.Model.TryGetEntity("Request", out var request));
+        await fixture.ExecuteAsync(
+            TenantB,
+            $"UPDATE {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} SET {EntityNaming.Column("comment")} = 'nora@example.com' WHERE {EntityNaming.IdColumn} = @id",
+            ("id", subject));
+        var instance = await fixture.StartAsync(TenantB, "NotifyByEmail", subject, release, model);
+        await fixture.RunUntilIdleAsync(TenantB, CancellationToken);
+
+        using var allowed = await GetOkAsync(TenantB, "NotifyByEmail", instance);
+        using var denied = await GetOkAsync(TenantB, "NotifyByEmail", instance, "carl");
+
+        var notified = allowed.RootElement.GetProperty("path").EnumerateArray()
+            .Single(entry => entry.GetProperty("step").GetString() == "tell").GetProperty("made").GetProperty("notified");
+        Assert.Equal(["email"], notified.GetProperty("channels").EnumerateArray().Select(channel => channel.GetString()));
+        Assert.Equal(
+            [("user", "Nora Notified", "nora", false), ("email", "nora@example.com", null, false)],
+            notified.GetProperty("to").EnumerateArray().Select(recipient => (recipient.GetProperty("kind").GetString(), recipient.GetProperty("name").GetString(), recipient.GetProperty("id").GetString(), recipient.GetProperty("hidden").GetBoolean())));
+        var clerkTo = denied.RootElement.GetProperty("path").EnumerateArray()
+            .Single(entry => entry.GetProperty("step").GetString() == "tell").GetProperty("made").GetProperty("notified").GetProperty("to").EnumerateArray().ToList();
+        Assert.Equal(("user", "Nora Notified", false), (clerkTo[0].GetProperty("kind").GetString(), clerkTo[0].GetProperty("name").GetString(), clerkTo[0].GetProperty("hidden").GetBoolean()));
+        Assert.Equal(("email", JsonValueKind.Null, true), (clerkTo[1].GetProperty("kind").GetString(), clerkTo[1].GetProperty("name").ValueKind, clerkTo[1].GetProperty("hidden").GetBoolean()));
+
+        // An email-only run stores no in-app row, so the recipients come from the step history.
+        var notificationId = Guid.Parse((string)(await fixture.ScalarAsync(
+            TenantB, "SELECT output->>'notificationId' FROM axis.process_step_history WHERE process_instance_id = @id AND step = 'tell'", ("id", instance)))!);
+        Assert.Equal(0L, await fixture.ScalarAsync(TenantB, "SELECT count(*) FROM axis.notifications WHERE id = @id", ("id", notificationId)));
+    }
+
+    [Fact]
+    public async Task A_create_record_run_gives_the_entity_and_the_id_of_the_record_it_created()
+    {
+        var (release, model) = await fixture.ActivateEditedWithModelAsync(
+            TenantB,
+            (path, content) => path == Path.Combine("policies", "inspector-access.json")
+                ? content.Replace(
+                    "{ \"name\": \"submitInspect\"",
+                    "{ \"name\": \"logDepartmentInspect\", \"process\": \"LogDepartment\", \"actions\": [\"inspect\"] },\n    { \"name\": \"submitInspect\"",
+                    StringComparison.Ordinal)
+                : content,
+            added: new Dictionary<string, string>
+            {
+                ["processes/log-department.json"] =
+                    """
+                    {
+                      "id": "5b0e7f3a-91c4-4d28-a6e5-0c8d2f4b7a19",
+                      "kind": "process",
+                      "name": "LogDepartment",
+                      "formatVersion": 1,
+                      "entity": "Request",
+                      "start": "log",
+                      "steps": [
+                        { "name": "log", "type": "operation", "operation": "createRecord", "entity": "Department", "set": { "name": "title" }, "next": "done" },
+                        { "name": "done", "type": "end" }
+                      ]
+                    }
+                    """,
+            });
+        var subject = await fixture.InsertRequestAsync(TenantB, null);
+        var instance = await fixture.StartAsync(TenantB, "LogDepartment", subject, release, model);
+        await fixture.RunUntilIdleAsync(TenantB, CancellationToken);
+
+        using var body = await GetOkAsync(TenantB, "LogDepartment", instance);
+
+        var path = body.RootElement.GetProperty("path").EnumerateArray().ToList();
+        var log = path.Single(entry => entry.GetProperty("step").GetString() == "log");
+        var created = log.GetProperty("made").GetProperty("created");
+        Assert.Equal(["entity", "id"], created.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("Department", created.GetProperty("entity").GetString());
+        Assert.Equal(log.GetProperty("output").GetProperty("recordId").GetGuid(), created.GetProperty("id").GetGuid());
+        Assert.Equal(JsonValueKind.Null, log.GetProperty("made").GetProperty("event").ValueKind);
+        Assert.Equal(JsonValueKind.Null, path.Single(entry => entry.GetProperty("step").GetString() == "done").GetProperty("made").GetProperty("created").ValueKind);
+    }
+
+    [Fact]
     public async Task A_wait_event_graph_gives_its_event_and_the_timeout_after()
     {
         var instance = await StartAndRunAsync(TenantA, "WaitEvent");

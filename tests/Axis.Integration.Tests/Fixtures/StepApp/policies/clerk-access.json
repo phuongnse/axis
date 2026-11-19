@@ -9,6 +9,8 @@
     { "name": "departmentRead", "entity": "Department", "actions": ["read"], "fields": ["name"] },
     { "name": "departmentOrderInspect", "process": "DepartmentOrder", "actions": ["inspect"] },
     { "name": "submitInspect", "process": "Submit", "actions": ["inspect"] },
-    { "name": "divideInspect", "process": "Divide", "actions": ["inspect"] }
+    { "name": "divideInspect", "process": "Divide", "actions": ["inspect"] },
+    { "name": "announceInspect", "process": "Announce", "actions": ["inspect"] },
+    { "name": "notifyByEmailInspect", "process": "NotifyByEmail", "actions": ["inspect"] }
   ]
 }
