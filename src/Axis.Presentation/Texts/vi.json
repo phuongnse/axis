@@ -1612,7 +1612,7 @@
   "shell.studio.field.entity.fields.group.type.reference.help": "Đối tượng mà tham chiếu trỏ tới.",
   "shell.studio.field.entity.fields.group.type.references": "Cài đặt tham chiếu",
   "shell.studio.field.entity.fields.group.type.references.help": "Đối tượng mà các tham chiếu trỏ tới.",
-  "shell.studio.field.entity.fields.group.type.child-collection": "Cài đặt đối tượng con",
+  "shell.studio.field.entity.fields.group.type.child-collection": "Cài đặt bảng con",
   "shell.studio.field.entity.fields.group.type.child-collection.help": "Đối tượng có các bản ghi thuộc về đối tượng này.",
   "shell.studio.field.entity.fields.group.type.money": "Cài đặt tiền",
   "shell.studio.field.entity.fields.group.type.money.help": "Loại tiền và số chữ số của số tiền.",

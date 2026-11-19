@@ -1701,7 +1701,7 @@ describe('the groups of the field drawer', () => {
 
   it('leaves out the Validation group of a child collection that has no validation to list and none to add', async () => {
     renderDesigner(entity({ fields: [{ type: 'child-collection', target: 'Supplier' }] }))
-    expect(groupTitles(await openEntityField(0))).toEqual(['General', 'Child settings'])
+    expect(groupTitles(await openEntityField(0))).toEqual(['General', 'Child collection settings'])
   })
 
   it('shows precision and scale in one row, and min and max in another', async () => {
