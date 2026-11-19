@@ -38,6 +38,22 @@ public sealed class ProcessStepHistoryRow
     /// </summary>
     public string? Problem { get; init; }
 
+    /// <summary>
+    /// The subject fields a decision's branch conditions read, as JSON text: <c>name</c> and <c>value</c> per field.
+    /// A field that the pinned release marks sensitive holds its name and no value. <see langword="null"/> for other
+    /// steps and for rows written before the column. Inspection shows it only under the masking rule, see
+    /// docs/reference/process-tables.md#step-history. It is never copied to <see cref="Output"/>, audit records or logs.
+    /// </summary>
+    public string? Read { get; init; }
+
+    /// <summary>
+    /// The subject fields an <c>updateRecord</c> step changed, as JSON text: <c>field</c>, <c>before</c> and <c>after</c>.
+    /// A field that the pinned release marks sensitive holds its name and no value. <see langword="null"/> for other
+    /// steps and for rows written before the column. Inspection shows it only under the masking rule, see
+    /// docs/reference/process-tables.md#step-history. It is never copied to <see cref="Output"/>, audit records or logs.
+    /// </summary>
+    public string? Changes { get; init; }
+
     public required DateTimeOffset StartedAt { get; init; }
 
     public required DateTimeOffset FinishedAt { get; init; }

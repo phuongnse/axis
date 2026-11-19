@@ -77,6 +77,33 @@ public sealed class ProcessInstanceSensitiveFieldTests(TaskApiFixture fixture) :
         Assert.Equal(JsonValueKind.Null, storedResult.RootElement.GetProperty("salary").ValueKind);
     }
 
+    [Fact]
+    public async Task A_sensitive_field_that_an_update_record_run_changed_is_hidden_and_its_stored_change_holds_only_its_name()
+    {
+        var release = await fixture.ActivateEditedAsync(TenantA, AddSalary(mapped: false, submits: true));
+        var subject = await fixture.InsertRequestAsync(TenantA, null);
+        var instance = await fixture.StartAsync(TenantA, "Submit", subject, release);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+
+        using var body = await GetOkAsync(TenantA, instance, "Submit");
+
+        var submit = body.RootElement.GetProperty("path").EnumerateArray().Single(entry => entry.GetProperty("step").GetString() == "submit");
+        var changes = submit.GetProperty("made").GetProperty("changes").EnumerateArray().ToList();
+        Assert.Equal(["salary", "status", "submittedAt"], changes.Select(change => change.GetProperty("field").GetString()));
+        Assert.Equal(JsonValueKind.Null, changes[0].GetProperty("before").ValueKind);
+        Assert.Equal(JsonValueKind.Null, changes[0].GetProperty("after").ValueKind);
+        Assert.True(changes[0].GetProperty("hidden").GetBoolean());
+        Assert.Equal("submitted", changes[1].GetProperty("after").GetString());
+        Assert.False(changes[1].GetProperty("hidden").GetBoolean());
+
+        // No plaintext copy exists: the stored change of the field holds its name and no value.
+        var stored = (string?)await fixture.ScalarAsync(
+            TenantA, "SELECT changes::text FROM axis.process_step_history WHERE process_instance_id = @id AND step = 'submit'", ("id", instance));
+        using var storedChanges = JsonDocument.Parse(stored!);
+        var salary = storedChanges.RootElement.EnumerateArray().Single(change => change.GetProperty("field").GetString() == "salary");
+        Assert.Equal(["field"], salary.EnumerateObject().Select(property => property.Name));
+    }
+
     // Edits the Request entity to add the decimal field "salary", sensitive from the release that adds it, and lets the
     // auditor read it. The DepartmentOrder call maps "salary" as its amount when mapped is true.
     private static Func<string, string, string?> AddSalary(bool mapped, bool submits = false) =>

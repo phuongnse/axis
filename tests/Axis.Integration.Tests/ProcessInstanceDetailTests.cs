@@ -36,8 +36,12 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal(DateTimeKind.Utc, root.GetProperty("createdAt").GetDateTime().Kind);
         var path = Assert.Single(root.GetProperty("path").EnumerateArray());
         Assert.Equal(
-            ["step", "startedAt", "finishedAt", "decision", "output", "error", "problem", "traceId"],
+            ["step", "startedAt", "finishedAt", "decision", "output", "error", "problem", "traceId", "read", "made"],
             path.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(JsonValueKind.Null, path.GetProperty("read").ValueKind);
+        var made = path.GetProperty("made");
+        Assert.Equal(["changes", "event", "notified", "created"], made.EnumerateObject().Select(property => property.Name));
+        Assert.All(made.EnumerateObject(), part => Assert.Equal(JsonValueKind.Null, part.Value.ValueKind));
         Assert.Equal("lower", path.GetProperty("step").GetString());
         Assert.Equal("The record update was rejected: /values/amount: request.amountNegative", path.GetProperty("error").GetString());
         Assert.Equal(("writeRefused", 0), (path.GetProperty("problem").GetProperty("code").GetString(), path.GetProperty("problem").GetProperty("values").EnumerateObject().Count()));
@@ -352,6 +356,77 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Empty(steps[1].GetProperty("transitions").EnumerateArray());
         Assert.Empty(root.GetProperty("path").EnumerateArray());
         Assert.Empty(root.GetProperty("tasks").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_decision_run_gives_the_fields_its_condition_read_with_the_values_it_saw()
+    {
+        var subject = await fixture.InsertRequestAsync(TenantA, null, divisor: 2, amount: 10);
+        var instance = await fixture.StartAsync(TenantA, "Divide", subject);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+
+        using var body = await GetOkAsync(TenantA, "Divide", instance);
+
+        var check = body.RootElement.GetProperty("path").EnumerateArray().Single(entry => entry.GetProperty("step").GetString() == "check");
+        var read = check.GetProperty("read").EnumerateArray().ToList();
+        Assert.Equal(["amount", "divisor"], read.Select(value => value.GetProperty("name").GetString()));
+        Assert.All(read, value =>
+        {
+            Assert.Equal(["name", "value", "hidden"], value.EnumerateObject().Select(property => property.Name));
+            Assert.False(value.GetProperty("hidden").GetBoolean());
+        });
+        Assert.Equal(10m, read[0].GetProperty("value").GetDecimal());
+        Assert.Equal(2, read[1].GetProperty("value").GetInt64());
+        Assert.Equal(JsonValueKind.Null, check.GetProperty("made").GetProperty("changes").ValueKind);
+        var done = body.RootElement.GetProperty("path").EnumerateArray().Single(entry => entry.GetProperty("step").GetString() == "done");
+        Assert.Equal(JsonValueKind.Null, done.GetProperty("read").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_decision_run_hides_only_the_value_of_a_field_the_user_may_not_read()
+    {
+        var subject = await fixture.InsertRequestAsync(TenantA, null, divisor: 2, amount: 10);
+        var instance = await fixture.StartAsync(TenantA, "Divide", subject);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+
+        using var body = await GetOkAsync(TenantA, "Divide", instance, "carl");
+
+        var check = body.RootElement.GetProperty("path").EnumerateArray().Single(entry => entry.GetProperty("step").GetString() == "check");
+        var read = check.GetProperty("read").EnumerateArray().ToList();
+        Assert.Equal(["amount", "divisor"], read.Select(value => value.GetProperty("name").GetString()));
+        Assert.Equal((10m, false), (read[0].GetProperty("value").GetDecimal(), read[0].GetProperty("hidden").GetBoolean()));
+        Assert.Equal((JsonValueKind.Null, true), (read[1].GetProperty("value").ValueKind, read[1].GetProperty("hidden").GetBoolean()));
+    }
+
+    [Fact]
+    public async Task An_update_record_run_gives_each_field_it_changed_with_the_value_before_and_after()
+    {
+        var subject = await fixture.InsertRequestAsync(TenantA, null);
+        var instance = await fixture.StartAsync(TenantA, "Submit", subject);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+        using var record = await GetRecordAsync(TenantA, subject);
+        var recorded = record.RootElement.GetProperty("values");
+
+        using var body = await GetOkAsync(TenantA, "Submit", instance);
+
+        var path = body.RootElement.GetProperty("path").EnumerateArray().ToList();
+        var made = path.Single(entry => entry.GetProperty("step").GetString() == "submit").GetProperty("made");
+        Assert.Equal(["changes", "event", "notified", "created"], made.EnumerateObject().Select(property => property.Name));
+        var changes = made.GetProperty("changes").EnumerateArray().ToList();
+        Assert.Equal(["status", "submittedAt"], changes.Select(change => change.GetProperty("field").GetString()));
+        Assert.All(changes, change =>
+        {
+            Assert.Equal(["field", "before", "after", "hidden"], change.EnumerateObject().Select(property => property.Name));
+            Assert.Equal(JsonValueKind.Null, change.GetProperty("before").ValueKind);
+            Assert.False(change.GetProperty("hidden").GetBoolean());
+        });
+        Assert.Equal("submitted", changes[0].GetProperty("after").GetString());
+        Assert.Equal(recorded.GetProperty("submittedAt").GetString(), changes[1].GetProperty("after").GetString());
+        Assert.Equal(JsonValueKind.Null, made.GetProperty("event").ValueKind);
+        Assert.Equal(JsonValueKind.Null, made.GetProperty("notified").ValueKind);
+        Assert.Equal(JsonValueKind.Null, made.GetProperty("created").ValueKind);
+        var done = path.Single(entry => entry.GetProperty("step").GetString() == "done");
+        Assert.Equal(JsonValueKind.Null, done.GetProperty("made").GetProperty("changes").ValueKind);
     }
 
     [Fact]

@@ -45,7 +45,7 @@ internal static class ProcessResults
     }
 
     // A child collection counts when any field of its child entity is sensitive, as in inspection.
-    private static bool IsSensitive(ApplicationModel pinned, FieldModel field) =>
+    internal static bool IsSensitive(ApplicationModel pinned, FieldModel field) =>
         field.Sensitive
         || (field.Type == FieldType.ChildCollection
             && field.Target is { } target

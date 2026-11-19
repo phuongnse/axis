@@ -884,6 +884,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Changes")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("changes");
+
                     b.Property<string>("Decision")
                         .HasColumnType("text")
                         .HasColumnName("decision");
@@ -912,6 +916,10 @@ namespace Axis.Processes.Storage.Migrations
                     b.Property<Guid>("ProcessInstanceId")
                         .HasColumnType("uuid")
                         .HasColumnName("process_instance_id");
+
+                    b.Property<string>("Read")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("read");
 
                     b.Property<long>("Revision")
                         .HasColumnType("bigint")
