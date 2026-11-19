@@ -139,8 +139,16 @@ below it. It says where the person is and what the page is.
 - **Regular band.** The band of a platform page that keeps one, the account and Users pages, holds the breadcrumb,
   then the page title in `heading4`. It has `spacing-lg` padding above and at its sides, `spacing-md` below the title,
   and `spacing-xs` between the breadcrumb and the title.
+- **Title alone in the band** _(planned)_. The band of a platform page that keeps one holds only the page title in
+  `heading4`, as the page's level-one heading: the account, users, user, licences, console and console instance pages.
+  It has `spacing-md` padding above and below the title, so the title sits evenly, and `spacing-lg` at its sides, where
+  the title lines up with the content below.
 - **Breadcrumb.** The breadcrumb starts at the site and ends at the page: "Axis › Users". Every step but the
   last is a link, and the last is marked `aria-current`.
+- **No breadcrumb** _(planned)_. No page of any site draws a breadcrumb. The header's mark leads to the site's first
+  page, and the browser goes back, as **No link back** in [layout](#layout) says. The user page and the console instance
+  page have no step back to their list, because the browser leads back to it. `PageLayout` takes no breadcrumb, and no
+  text names one.
 - **Site pages** _(planned)_. A page of an application site starts with its title in `heading4` as the page's
   level-one heading, with no breadcrumb and no band of its own. The sidebar marks where the person is, and the browser
   goes back, with a table's search, sort and page kept in the address.
@@ -167,6 +175,8 @@ below it. It says where the person is and what the page is.
 - **Platform pages.** The platform home page has no band and no breadcrumb, and has its own headings,
   see the [platform home page](#platform-home-page). The users page has the band "Axis › Users".
 - **The account page's band.** The account page has the band "Axis › Your account".
+- **Bands by title alone** _(planned)_. Each platform page's band names the page by its title alone, such as "Users" or
+  "Your account", with no "Axis ›" before it.
 
 ## App switcher and preferences
 
