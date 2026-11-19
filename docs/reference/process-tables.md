@@ -160,7 +160,7 @@ or `process.timer` item. Items of other kinds name their path through their task
 | `trigger.fanOut` | `trigger_id`, `release_id` and `occurrence_at` | Starts the process for the records of one occurrence. `release_id` is the release that was active at the occurrence. Its `cursor` is the last record id it handled, and is null before its first batch |
 | `task.deadline` | `task_id` and `process_instance_id` | Expires one task at its deadline. Its `due_at` is the task step's time plus the deadline's `after`. See [Escalations and deadline](task-deadlines.md#escalations-and-deadline) |
 | `task.escalate` | `task_id`, `process_instance_id` and `escalation`, the index in file order | Runs one escalation of one task. Its `due_at` is the step's time plus the escalation's `after` |
-| `notification.email` | `email_id` | Sends one email of `axis.email_outbox` |
+| `notification.email` | `email_id` | Sends one email of `axis.email_outbox`, or a person's digest |
 | `webhook.deliver` | `webhook_delivery_id`, without a foreign key | Sends one event occurrence to one webhook, from a row of `axis.webhook_deliveries`. See [Webhook delivery](process-events.md#webhook-delivery) |
 | `computed.backfill` | `entity_id` | Recomputes the out-of-date rows of one entity, one batch of up to 500 rows per claim. See [Recomputing computed fields](migrations.md#recomputing-computed-fields) |
 | `records.importCheck` | None: the import row names the item in its `work_item_id` | Dry-runs one uploaded record import. See [Import](import-export.md#import) |
@@ -362,6 +362,8 @@ filtered index of the same columns without `application_id`,
 | `application_id`, `release_id`, `notification_id`, `step` | `uuid`, `uuid`, `uuid`, `text` | The application, the release the notifying instance is pinned to, which gave the texts, the step run's notification id, which all its emails share, and the name of the `notify` step |
 | `address`, `locale` | `text`, `text` null | The address the email goes to, not validated when staged, and the locale of the texts. The locale is null when the release has none |
 | `subject`, `body`, `message_id`, `values` | `text`, `text`, `text`, `jsonb` | The rendered subject, the plain text body with the page link if any, the `Message-ID` header, which a unique index keeps once, and the raw placeholder values of the step run as in `axis.notifications`, `{}` before the column existed |
+| `link`, `process_instance_id` | `text` null, `uuid` null | The absolute link to the page the email opens, which a digest lists, and the process instance whose step staged the email. Both are null before the columns existed, and `link` when the email opens no page |
+| `digest_user_id` | `text` null | The user id of the person whose [daily digest](notifications.md#notification-preferences) the email waits for, null when it is sent right away. A partial index on (`digest_user_id`, `created_at`) covers the `pending` rows with a digest user. A digest row has no item of its own: the person's one item names the oldest waiting row in `email_id` |
 | `state`, `created_at`, `sent_at` | `text`, `timestamptz`, `timestamptz` null | `pending` or `sent`, `pending` at first. The start of the step's transaction, `now()`. When the email was sent, null while it is pending |
 
 ### Webhook deliveries

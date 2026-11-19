@@ -34,6 +34,18 @@ public sealed class EmailOutboxRow
     /// <summary>The email's <c>Message-ID</c> header, unique among the rows.</summary>
     public required string MessageId { get; init; }
 
+    /// <summary>The absolute link to the page the email opens, or null when it has none. A digest lists it.</summary>
+    public string? Link { get; init; }
+
+    /// <summary>The process instance whose step staged the email, or null.</summary>
+    public Guid? ProcessInstanceId { get; init; }
+
+    /// <summary>
+    /// The user id of the person whose daily digest the email waits for, or null when it is sent right away. A digest
+    /// row queues no work item of its own: the person has one for their next digest.
+    /// </summary>
+    public string? DigestUserId { get; init; }
+
     /// <summary>The raw evaluated placeholder values of the step run, as a JSON object keyed by the placeholders' names.</summary>
     public string Values { get; init; } = "{}";
 

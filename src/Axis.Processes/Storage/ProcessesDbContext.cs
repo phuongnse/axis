@@ -353,11 +353,17 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             email.Property(e => e.Subject).HasColumnName("subject");
             email.Property(e => e.Body).HasColumnName("body");
             email.Property(e => e.MessageId).HasColumnName("message_id");
+            email.Property(e => e.Link).HasColumnName("link");
+            email.Property(e => e.ProcessInstanceId).HasColumnName("process_instance_id");
+            email.Property(e => e.DigestUserId).HasColumnName("digest_user_id");
             email.Property(e => e.Values).HasColumnName("values").HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb");
             email.Property(e => e.State).HasColumnName("state").HasDefaultValue("pending");
             email.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             email.Property(e => e.SentAt).HasColumnName("sent_at");
             email.HasIndex(e => e.MessageId).IsUnique().HasDatabaseName("ux_email_outbox_message_id");
+            email.HasIndex(e => new { e.DigestUserId, e.CreatedAt })
+                .HasDatabaseName("ix_email_outbox_digest_user_id_created_at")
+                .HasFilter("digest_user_id IS NOT NULL AND state = 'pending'");
         });
 
         modelBuilder.Entity<WebhookDeliveryRow>(delivery =>

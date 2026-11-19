@@ -34,9 +34,10 @@ public static class NotificationPreferences
     public const string ApplicationOffSourcesSql =
         """ARRAY(SELECT s.key FROM "axis"."notification_preferences" p CROSS JOIN LATERAL jsonb_each(p."sources") s WHERE p."user_id" = @user AND s.value #>> '{channels,application}' = 'false')""";
 
-    private const string EmailOffSql =
+    private const string EmailChoiceSql =
         """
-        SELECT "user_id" FROM "axis"."notification_preferences" WHERE "user_id" = ANY(@users) AND "sources" #>> ARRAY[@source, 'channels', 'email'] = 'false'
+        SELECT "user_id", "sources" #>> ARRAY[@source, 'channels', 'email'], "sources" #>> ARRAY[@source, 'digest'], "digest_hour", "time_zone"
+        FROM "axis"."notification_preferences" WHERE "user_id" = ANY(@users)
         """;
 
     /// <summary>How one source reaches a person: in the application, by email, and whether the email waits for the daily digest.</summary>
@@ -85,10 +86,17 @@ public static class NotificationPreferences
     }
 
     /// <summary>
-    /// The people among <paramref name="userIds"/> who turned the email channel of <paramref name="source"/> off.
-    /// It is empty, with no query, when no ids are given.
+    /// How the email channel of one source reaches a person: whether it is on, whether it waits for the daily digest, and
+    /// the digest's hour and IANA time zone.
     /// </summary>
-    public static async Task<IReadOnlySet<string>> FindEmailOffAsync(
+    public sealed record EmailChoice(bool Email, bool Digest, int DigestHour, string TimeZone);
+
+    /// <summary>
+    /// The email choice of <paramref name="source"/> for each person among <paramref name="userIds"/> who saved a row.
+    /// A person who saved nothing is not in the answer and has the defaults. A source missing from a row also counts as
+    /// the defaults. It is empty, with no query, when no ids are given.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<string, EmailChoice>> FindEmailChoicesAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
         string source,
@@ -98,22 +106,26 @@ public static class NotificationPreferences
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(userIds);
 
-        var off = new HashSet<string>(StringComparer.Ordinal);
+        var choices = new Dictionary<string, EmailChoice>(StringComparer.Ordinal);
         if (userIds.Count == 0)
         {
-            return off;
+            return choices;
         }
 
-        await using var command = new NpgsqlCommand(EmailOffSql, connection, transaction);
+        await using var command = new NpgsqlCommand(EmailChoiceSql, connection, transaction);
         command.Parameters.Add(new NpgsqlParameter("users", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = userIds.ToArray() });
         command.Parameters.AddWithValue("source", source);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            off.Add(reader.GetString(0));
+            choices[reader.GetString(0)] = new EmailChoice(
+                reader.IsDBNull(1) || reader.GetString(1) != "false",
+                !reader.IsDBNull(2) && reader.GetString(2) == "true",
+                reader.GetInt16(3),
+                reader.GetString(4));
         }
 
-        return off;
+        return choices;
     }
 
     // The stored shape is the API body's: { "task": { "channels": { "application": true, "email": true }, "digest": false }, ... }.

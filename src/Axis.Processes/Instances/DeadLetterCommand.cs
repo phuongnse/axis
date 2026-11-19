@@ -42,7 +42,8 @@ public sealed record DeadLetterResult(DeadLetterOutcome Outcome, DeadLetterRow? 
 /// the fan-out on the active release. A redeliver of a <c>webhook.deliver</c> dead letter needs nothing from the
 /// active release. It clears the failure count and queues an item for the staged delivery of the occurrence and the
 /// webhook, which the handler sends again with the same <c>webhook-id</c>. Any other kind cannot be redelivered. A
-/// discard closes a dead letter of any kind. Both set the state, the reason, the user and the time, and append the audit record
+/// discard closes a dead letter of any kind. A discard of an <c>notification.email</c> dead letter of a digest also queues the
+/// person's next digest item, so their waiting emails are not stranded. Both set the state, the reason, the user and the time, and append the audit record
 /// <c>deadLetter.redelivered</c> or <c>deadLetter.discarded</c>. The command never commits or rolls back.
 /// A result other than <see cref="DeadLetterOutcome.Settled"/> wrote nothing, but the row may be locked.
 /// </summary>
@@ -127,6 +128,11 @@ public static class DeadLetterCommand
             {
                 return new DeadLetterResult(refused);
             }
+        }
+
+        if (!redeliver && letter.Kind == DeliveryFailures.NotificationEmailKind && letter.EmailId is { } discardedEmailId)
+        {
+            await ReleaseDigestAsync(connection, transaction, tenantId, discardedEmailId, cancellationToken);
         }
 
         var settled = await UpdateAsync(
@@ -278,6 +284,38 @@ public static class DeadLetterCommand
             processInstanceId: instanceId,
             emailId: emailId);
         return DeadLetterOutcome.Settled;
+    }
+
+    /// <summary>
+    /// Gives up the digest that a discarded dead letter names. Its row and the person's other waiting rows stay
+    /// <c>pending</c>, so the person's next digest item is queued at their next digest hour, with a fresh failure count.
+    /// Without it nothing would queue an item for them again. A row that is not a waiting digest row changes nothing.
+    /// </summary>
+    private static async Task ReleaseDigestAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        Guid emailId,
+        CancellationToken cancellationToken)
+    {
+        string? userId;
+        await using (var find = new NpgsqlCommand(
+            "SELECT digest_user_id FROM axis.email_outbox WHERE id = @id AND state = 'pending'",
+            connection,
+            transaction))
+        {
+            find.Parameters.AddWithValue("id", emailId);
+            userId = await find.ExecuteScalarAsync(cancellationToken) as string;
+        }
+
+        if (userId is null)
+        {
+            return;
+        }
+
+        await EmailDigests.LockAsync(transaction, userId, cancellationToken);
+        await DeleteFailureAsync(transaction, DeliveryFailures.NotificationEmailKind, emailId.ToString("D"), cancellationToken);
+        await EmailDigests.QueueNextAsync(connection, transaction, tenantId, userId, cancellationToken);
     }
 
     private static async Task<DeadLetterOutcome> RedeliverWebhookAsync(

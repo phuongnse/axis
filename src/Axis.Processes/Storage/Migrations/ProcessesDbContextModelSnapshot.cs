@@ -244,6 +244,14 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<string>("DigestUserId")
+                        .HasColumnType("text")
+                        .HasColumnName("digest_user_id");
+
+                    b.Property<string>("Link")
+                        .HasColumnType("text")
+                        .HasColumnName("link");
+
                     b.Property<string>("Locale")
                         .HasColumnType("text")
                         .HasColumnName("locale");
@@ -256,6 +264,10 @@ namespace Axis.Processes.Storage.Migrations
                     b.Property<Guid>("NotificationId")
                         .HasColumnType("uuid")
                         .HasColumnName("notification_id");
+
+                    b.Property<Guid?>("ProcessInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("process_instance_id");
 
                     b.Property<Guid>("ReleaseId")
                         .HasColumnType("uuid")
@@ -295,6 +307,10 @@ namespace Axis.Processes.Storage.Migrations
                     b.HasIndex("MessageId")
                         .IsUnique()
                         .HasDatabaseName("ux_email_outbox_message_id");
+
+                    b.HasIndex("DigestUserId", "CreatedAt")
+                        .HasDatabaseName("ix_email_outbox_digest_user_id_created_at")
+                        .HasFilter("digest_user_id IS NOT NULL AND state = 'pending'");
 
                     b.ToTable("email_outbox", "axis");
                 });

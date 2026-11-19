@@ -1,6 +1,7 @@
 using Axis.Configuration.Packages;
 using Axis.Data.Records;
 using Axis.Expressions.Sql;
+using Axis.Presentation.Texts;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
 using Axis.Tenancy;
@@ -69,7 +70,7 @@ internal sealed class ScenarioWork : IDisposable
                 .. externalHandlers,
                 new TriggerScheduleHandler(models, loggerFactory.CreateLogger<TriggerScheduleHandler>()),
                 new TriggerFanOutHandler(models, new DeliverySettings(5), sensitive, loggerFactory.CreateLogger<TriggerFanOutHandler>()),
-                new NotificationEmailHandler(new EmailDefaults(null), null, new DeliverySettings(5), new EmailSecuritySettings(false), loggerFactory.CreateLogger<NotificationEmailHandler>()),
+                new NotificationEmailHandler(new EmailDefaults(null), null, new DeliverySettings(5), new EmailSecuritySettings(false), new EmbeddedTextResourceProvider(), loggerFactory.CreateLogger<NotificationEmailHandler>()),
             ],
             loggerFactory);
     }
