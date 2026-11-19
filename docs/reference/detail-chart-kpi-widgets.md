@@ -26,13 +26,12 @@ A `detail` widget shows one record read-only, read through the record API, and w
   ```
 
 - **Record.** The SPA reads the record that the page parameter `record` names, from the entity's `recordsPath`. A
-  missing or malformed parameter, and a record that is missing or unreadable, show the not-found page inside the site
-  shell. A `detail` inside `columns`, `tabs` or a `section` is drawn too, see
-  [container widgets](container-widgets.md).
+  missing or malformed parameter shows the not-found page inside the site shell. A `detail` inside `columns`, `tabs` or
+  a `section` is drawn too, see [container widgets](container-widgets.md).
 - **Record from the address** _(planned)_. On a page that a site names as a record page, the SPA reads `record` from the
   address's `/{id}`, as [routing](frontend.md#routing) says.
-- **A missing record** _(planned)_. A record that the record API answers `404` for, because it is missing or the
-  person cannot open it, keeps the page's heading and shows the missing-record line and its link, see
+- **A missing record.** A record that the record API answers `404` for, because it is missing or the person cannot open
+  it, keeps the page's heading and shows the missing-record line and its link, see
   [routing](frontend.md#routing).
 - **Fields.** With a `form`, the widget shows its sections in order under their titles. Without one, it shows every
   readable field in declaration order. Every value is read-only and formatted as a table cell shows it. A `references`

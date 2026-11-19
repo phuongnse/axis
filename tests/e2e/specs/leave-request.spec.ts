@@ -186,7 +186,7 @@ test("requester submits a sick leave with a reason, manager-2 reads it on the re
   await useSession(page, "employee");
 
   await page.goto(`/leave/leaverequestform/${id}`);
-  await expect(page.getByTestId("not-found")).toBeVisible();
+  await expect(page.getByTestId("record-not-found")).toBeVisible();
   await expect(page.getByLabel(/Reason/i)).toHaveCount(0);
 
   expect((await page.request.get(`${recordsPath}/${id}`)).status()).toBe(404);
@@ -215,7 +215,7 @@ test("an employee cannot open another employee's leave request, by its form or t
   await useSession(page, "employee");
 
   await page.goto(`/leave/leaverequestform/${id}`);
-  await expect(page.getByTestId("not-found")).toBeVisible();
+  await expect(page.getByTestId("record-not-found")).toBeVisible();
   await expect(page.getByLabel(/Reason/i)).toHaveCount(0);
 
   expect((await page.request.get(`${recordsPath}/${id}`)).status()).toBe(404);

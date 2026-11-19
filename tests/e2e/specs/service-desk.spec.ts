@@ -246,7 +246,7 @@ test("an agent cannot open a ticket that is assigned to another agent, by its fo
   await useSession(page, "agent");
 
   await page.goto(`/service-desk/ticketform/${id}`);
-  await expect(page.getByTestId("not-found")).toBeVisible();
+  await expect(page.getByTestId("record-not-found")).toBeVisible();
   await expect(page.getByLabel(/Title/i)).toHaveCount(0);
 
   expect((await page.request.get(`${recordsPath}/${id}`)).status()).toBe(404);
@@ -358,7 +358,7 @@ test("requester presses View on their ticket in My tickets and sees it read-only
   await expect(page.getByRole("textbox")).toHaveCount(0);
 });
 
-test("an agent opening the detail page of a ticket that is not assigned to them gets the not-found page", async ({
+test("an agent opening the detail page of a ticket that is not assigned to them gets the missing-record line", async ({
   page,
   playwright,
   baseURL,
@@ -371,6 +371,6 @@ test("an agent opening the detail page of a ticket that is not assigned to them 
   await useSession(page, "agent");
   await page.goto(`/service-desk/ticketdetail?ticket=${id}`);
 
-  await expect(page.getByTestId("not-found")).toBeVisible();
+  await expect(page.getByTestId("record-not-found")).toBeVisible();
   await expect(page.getByTestId("detail")).toHaveCount(0);
 });
