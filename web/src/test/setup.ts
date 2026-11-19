@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterAll, afterEach, expect, vi } from 'vitest'
+import { resetCurrentUser } from '../platform/currentUserCache'
 import { resetSignInNeeded } from '../platform/signInNeeded'
 import { recordAntdDeprecation, takeAntdDeprecations } from './antdDeprecations'
 import { installStyleSwitch } from './antdStyles'
@@ -17,6 +18,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
   localStorage.clear()
   resetSignInNeeded()
+  resetCurrentUser()
   expect(takeAntdDeprecations(), 'Ant Design deprecation warnings').toEqual([])
 })
 

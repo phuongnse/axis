@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { apiFetch } from './api'
+import { settledCurrentUser, sharedCurrentUser } from './currentUserCache'
 
 /** The signed-in user, as served by `GET /api/me`. */
 export interface CurrentUser {
@@ -44,6 +46,29 @@ export async function fetchCurrentUser(signal?: AbortSignal): Promise<CurrentUse
     throw new Error(`Loading the current user failed with status ${response.status}.`)
   }
   return (await response.json()) as CurrentUser
+}
+
+/**
+ * The signed-in user, `null` when nobody is signed in, and `undefined` while it loads. Every caller shares one
+ * `GET /api/me` for the page, see `docs/reference/shared-widgets.md#which-widget`.
+ */
+export function useCurrentUser(): CurrentUser | null | undefined {
+  const [user, setUser] = useState<CurrentUser | null | undefined>(settledCurrentUser)
+  useEffect(() => {
+    let mounted = true
+    sharedCurrentUser(() => fetchCurrentUser()).then(
+      (loaded) => {
+        if (mounted) {
+          setUser(loaded)
+        }
+      },
+      (error: unknown) => console.warn('Loading the current user failed', error),
+    )
+    return () => {
+      mounted = false
+    }
+  }, [])
+  return user
 }
 
 /** Ends the session and returns the identity provider's sign-out address, for the browser to go to. */
