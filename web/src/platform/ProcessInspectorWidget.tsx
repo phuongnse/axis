@@ -10,10 +10,12 @@ import {
   forbidden,
   instanceStates,
   stateText,
+  stateTone,
   type InstanceListItem,
   type InstancePage,
 } from './inspection'
 import type { WidgetMetadata } from './site'
+import { StatusTag } from './StatusTag'
 import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { useSiteTableKey } from './tableChoices'
 import { useTableView } from './useTableView'
@@ -147,7 +149,9 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
         key: 'state',
         kind: 'fixed',
         title: t('shell.inspector.state'),
-        render: (_value, instance) => stateText(t, instance.state),
+        render: (_value, instance) => (
+          <StatusTag tone={stateTone(instance.state)}>{stateText(t, instance.state)}</StatusTag>
+        ),
         filter: {
           kind: 'enum',
           options: instanceStates.map((value) => ({ value, label: stateText(t, value) })),
