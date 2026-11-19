@@ -392,9 +392,22 @@ describe('ProcessInstancePage', () => {
     const attemptRow = screen.getByRole('row', { name: /retryable/ })
     expect(within(attemptRow).getByText('503')).toBeInTheDocument()
     expect(within(attemptRow).getByText('attempt')).toBeInTheDocument()
-    expect(within(attemptRow).getByText('0af7651916cd43dd8448eb211c80319c')).toBeInTheDocument()
+    expect(within(attemptRow).getByText('0af76519')).toBeInTheDocument()
     const historyRow = screen.getByRole('row', { name: /^Manager approval .*4bf92f/ })
-    expect(within(historyRow).getByText('4bf92f3577b34da6a3ce929d0e0e4736')).toBeInTheDocument()
+    expect(within(historyRow).getByText('4bf92f35')).toBeInTheDocument()
+  })
+
+  it('copies the whole trace ID from the copy button beside its first 8 characters', async () => {
+    stubApi()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    renderPage()
+    await screen.findByTestId('inspector-instance')
+    const attemptRow = screen.getByRole('row', { name: /retryable/ })
+
+    await userEvent.click(within(attemptRow).getByRole('button', { name: 'Copy' }))
+
+    expect(writeText).toHaveBeenCalledExactlyOnceWith('0af7651916cd43dd8448eb211c80319c')
   })
 
   it('shows the em dash in the HTTP status cell of an attempt without one', async () => {

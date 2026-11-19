@@ -203,3 +203,58 @@ export function formatValue(
       return String(value)
   }
 }
+
+const minute = 60_000
+const hour = 60 * minute
+const day = 24 * hour
+
+/**
+ * A time as how long ago it was within a week, in the locale's words, such as "5 minutes ago", and as its date and
+ * time from a week on, see docs/reference/frontend.md#shown-values. Under a minute it reads "now". `now` is the clock
+ * in milliseconds, so a caller that ticks once a minute moves the words on. A time in the future reads as now.
+ */
+export function formatTimeAgo(time: string, now: number, options: FormatOptions): string {
+  const elapsed = Math.max(0, now - new Date(time).getTime())
+  if (elapsed >= 7 * day) {
+    return formatValue({ name: 'time', type: 'date-time' }, time, {}, options)
+  }
+  const words = new Intl.RelativeTimeFormat(options.locale, { numeric: 'auto' })
+  if (elapsed < minute) {
+    return plain(words.format(0, 'second'))
+  }
+  if (elapsed < hour) {
+    return plain(words.format(-Math.floor(elapsed / minute), 'minute'))
+  }
+  if (elapsed < day) {
+    return plain(words.format(-Math.floor(elapsed / hour), 'hour'))
+  }
+  return plain(words.format(-Math.floor(elapsed / day), 'day'))
+}
+
+/**
+ * A length of time in the locale's units, such as "1.2 sec" or "2 min 5 sec", and "< 1 sec" under a second, see
+ * docs/reference/frontend.md#shown-values. Over a minute it keeps the two largest units, and a unit of zero is left out.
+ */
+export function formatDuration(ms: number, locale: string, text: (key: string) => string): string {
+  if (ms < 1000) {
+    return text('shell.value.underSecond')
+  }
+  const unit = (value: number, name: 'second' | 'minute' | 'hour', digits = 0) =>
+    plain(
+      new Intl.NumberFormat(locale, {
+        style: 'unit',
+        unit: name,
+        unitDisplay: 'short',
+        maximumFractionDigits: digits,
+      }).format(value),
+    )
+  if (ms < minute) {
+    // Floored to a tenth, so 59.97 seconds never rounds up to 60 seconds.
+    return unit(Math.floor(ms / 100) / 10, 'second', 1)
+  }
+  const [large, small, largeSize, smallSize] =
+    ms < hour ? (['minute', 'second', minute, 1000] as const) : (['hour', 'minute', hour, minute] as const)
+  const first = Math.floor(ms / largeSize)
+  const second = Math.floor((ms % largeSize) / smallSize)
+  return [unit(first, large), second > 0 ? unit(second, small) : null].filter((part) => part !== null).join(' ')
+}

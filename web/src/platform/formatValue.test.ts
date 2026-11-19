@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { booleanText, datePattern, formatValue, referencesLabels, timePattern, type FormatOptions } from './formatValue'
+import {
+  booleanText,
+  datePattern,
+  formatDuration,
+  formatTimeAgo,
+  formatValue,
+  referencesLabels,
+  timePattern,
+  type FormatOptions,
+} from './formatValue'
 import type { FieldMetadata, FieldType } from './site'
 
 function field(name: string, type: FieldType, valueLabelKeys?: Record<string, string>): FieldMetadata {
@@ -31,6 +40,7 @@ const texts: Record<string, string> = {
   'shell.table.yes': 'Yes',
   'shell.table.no': 'No',
   'request.status.submitted': 'Đã gửi',
+  'shell.value.underSecond': '< 1 sec',
 }
 const options: FormatOptions = { locale: 'en', timeZone: 'UTC', text: (key) => texts[key] ?? key }
 
@@ -217,5 +227,59 @@ describe('referencesLabels', () => {
     expect(referencesLabels([], ['Word'])).toEqual([])
     expect(referencesLabels(undefined, undefined)).toEqual([])
     expect(referencesLabels(null, 'Word')).toEqual([])
+  })
+})
+
+describe('formatTimeAgo', () => {
+  const now = Date.parse('2026-03-20T12:00:00Z')
+  const ago = (ms: number, shown: FormatOptions = options) =>
+    formatTimeAgo(new Date(now - ms).toISOString(), now, shown)
+  const minute = 60_000
+  const hour = 60 * minute
+  const day = 24 * hour
+
+  it('reads a time within a week as how long ago, in whole units', () => {
+    expect(ago(30_000)).toBe('now')
+    expect(ago(5 * minute + 59_000)).toBe('5 minutes ago')
+    expect(ago(minute)).toBe('1 minute ago')
+    expect(ago(3 * hour + minute)).toBe('3 hours ago')
+    expect(ago(day)).toBe('yesterday')
+    expect(ago(6 * day + 23 * hour)).toBe('6 days ago')
+  })
+
+  it('reads a time from a week on as its date and time, as formatValue shows it', () => {
+    expect(ago(7 * day)).toBe('03/13/2026 12:00 PM')
+    expect(ago(8 * day)).toBe(
+      formatValue({ name: 'time', type: 'date-time' }, new Date(now - 8 * day).toISOString(), {}, options),
+    )
+  })
+
+  it('reads a time in the future as now', () => {
+    expect(formatTimeAgo('2026-03-20T12:05:00Z', now, options)).toBe('now')
+  })
+
+  it("uses the locale's own words", () => {
+    const vietnamese: FormatOptions = { ...options, locale: 'vi' }
+    expect(ago(5 * minute, vietnamese)).toBe('5 phút trước')
+    expect(ago(0, vietnamese)).toBe('bây giờ')
+  })
+})
+
+describe('formatDuration', () => {
+  const text = options.text
+  const viText = (key: string) => (key === 'shell.value.underSecond' ? '< 1 giây' : key)
+
+  it('reads under a second as "< 1 sec" in each locale', () => {
+    expect(formatDuration(412, 'en', text)).toBe('< 1 sec')
+    expect(formatDuration(412, 'vi', viText)).toBe('< 1 giây')
+  })
+
+  it("reads a length of time in the locale's units", () => {
+    expect(formatDuration(1234, 'en', text)).toBe('1.2 sec')
+    expect(formatDuration(1234, 'vi', viText)).toBe('1,2 giây')
+    expect(formatDuration(59_990, 'en', text)).toBe('59.9 sec')
+    expect(formatDuration(125_000, 'en', text)).toBe('2 min 5 sec')
+    expect(formatDuration(120_000, 'en', text)).toBe('2 min')
+    expect(formatDuration(3_900_000, 'en', text)).toBe('1 hr 5 min')
   })
 })
