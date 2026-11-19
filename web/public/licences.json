@@ -417,6 +417,10 @@
       "licence": "Apache-2.0"
     },
     {
+      "name": "elkjs",
+      "licence": "EPL-2.0 OR GPL-3.0-or-later"
+    },
+    {
       "name": "is-mobile",
       "licence": "MIT"
     },

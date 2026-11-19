@@ -263,7 +263,7 @@ describe('StudioModuleContract', () => {
 
       expect(await screen.findByRole('note', { name: 'review, added by this application' })).toBeInTheDocument()
       expect(screen.getByTestId('studio-save')).toBeEnabled()
-      expect(screen.getByTestId('studio-contract-state-review')).toHaveTextContent('Deletable')
+      expect(await screen.findByTestId('studio-contract-state-review')).toHaveTextContent('Deletable')
     })
 
     it('draws Initial and Deletable as fields with help, and saves the state with the ticked values', async () => {

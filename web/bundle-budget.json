@@ -4,5 +4,6 @@
   "chartChunk": "ChartDrawing-",
   "designChunk": "StudioPageDesign-",
   "processDesignChunk": "StudioProcessDesign-",
-  "dragChunk": "DragAndDrop-"
+  "dragChunk": "DragAndDrop-",
+  "layoutChunk": "ProcessLayout-"
 }
