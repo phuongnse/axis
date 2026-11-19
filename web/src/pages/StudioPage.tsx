@@ -673,9 +673,10 @@ function StudioWorkspace() {
                         packageId={packageId}
                         file={packageFile}
                         files={packageFiles.filter((item) => item.package === packageId)}
+                        diagnostics={loaded.diagnostics}
                         developer={canDevelop}
                         busy={reconnecting}
-                        onSaved={(diagnostics) => {
+                        onChanged={(diagnostics) => {
                           setFolder({ ...loaded, diagnostics })
                           setFolderRevision((value) => value + 1)
                         }}

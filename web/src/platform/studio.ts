@@ -2258,3 +2258,59 @@ export async function saveStudioPackageFile(
   const body = (await response.json()) as { version: string; diagnostics: StudioDiagnostic[] }
   return { status: 'saved', version: body.version, diagnostics: body.diagnostics }
 }
+
+/**
+ * Creates a package file with `If-None-Match: *`. A 409 means a file of that path exists, and nothing was written. A 400
+ * names a path the server refuses. A quota refusal throws a {@link QuotaRefusedError}. A 401 shows the sign-in prompt and
+ * throws, as any other failure does.
+ */
+export async function createStudioPackageFile(
+  application: string,
+  packageId: string,
+  file: string,
+  content: string,
+): Promise<PatchResult | { status: 'refused' }> {
+  const path = packageFilePath(application, packageId, file)
+  const response = await studioFetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'If-None-Match': '*' },
+    body: JSON.stringify({ content }),
+  })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  if (response.status === 400) {
+    return { status: 'refused' }
+  }
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    throw new QuotaRefusedError(title)
+  }
+  if (!response.ok) {
+    throw new Error(`Creating '${path}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as { version: string; diagnostics: StudioDiagnostic[] }
+  return { status: 'saved', version: body.version, diagnostics: body.diagnostics }
+}
+
+/**
+ * Deletes a package file, with the version the editor loaded in `If-Match`. A 409 means the file changed since, and
+ * nothing was deleted. A 401 shows the sign-in prompt and throws, as any other failure does.
+ */
+export async function deleteStudioPackageFile(
+  application: string,
+  packageId: string,
+  file: string,
+  version: string,
+): Promise<DeleteResult> {
+  const path = packageFilePath(application, packageId, file)
+  const response = await studioFetch(path, { method: 'DELETE', headers: { 'If-Match': `"${version}"` } })
+  if (response.status === 409) {
+    return { status: 'conflict' }
+  }
+  if (!response.ok) {
+    throw new Error(`Deleting '${path}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as { diagnostics: StudioDiagnostic[] }
+  return { status: 'deleted', diagnostics: body.diagnostics }
+}

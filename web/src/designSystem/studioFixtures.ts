@@ -19,6 +19,8 @@ import type {
   StudioResourceItem,
   StudioResourceReferences,
   StudioRevision,
+  StudioLiveDiff,
+  StudioLiveDiffEntry,
   StudioPackageFile,
   StudioPackageFileItem,
   StudioRevisionDiff,
@@ -937,6 +939,26 @@ const withExpressions: Record<string, FixtureRoute> = {
     ({ type: null, fields: [], functions: [] } satisfies ExpressionScope),
 }
 
+/** The files that differ from the live release: the payment-terms adapter, changed by Typical's newest revision. */
+function liveDiff(files: readonly StudioPackageFile[]): StudioLiveDiffEntry[] {
+  const adapter = files.find((file) => file.package === 'payment-terms' && file.path === 'index.ts')
+  return adapter === undefined
+    ? []
+    : [
+        {
+          file: `packages/${adapter.package}/${adapter.path}`,
+          change: 'changed',
+          id: null,
+          kind: null,
+          name: null,
+          before: adapter.content.replace('add(30,', 'add(14,'),
+          after: adapter.content,
+          titles: null,
+          by: [{ ...typicalRevisions.items[0], authoringRequest: null }],
+        },
+      ]
+}
+
 /**
  * The routes of a folder's package files: the list, and a read and a save of each file, see
  * docs/reference/studio-packages.md#the-authoring-api. A save answers the file's own version, because the preview keeps
@@ -948,6 +970,11 @@ function packageRoutes(files: readonly StudioPackageFile[], answers: StateAnswer
       ({ items: files.map(({ package: id, path, version }) => ({ package: id, path, version })) }) satisfies {
         items: StudioPackageFileItem[]
       },
+    // The live release is release 2, and since then a revision changed the payment-terms adapter's term from 14 days to 30.
+    [`${folderPath}/releases/live/diff`]: () =>
+      files.length === 0
+        ? new Response(null, { status: 404 })
+        : ({ release: 2, resources: liveDiff(files), cursor: null } satisfies StudioLiveDiff & { cursor: null }),
     ...Object.fromEntries(
       files.map((file) => [
         `${folderPath}/packages/${file.package}/files/${file.path}`,

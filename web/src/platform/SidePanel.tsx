@@ -1,10 +1,10 @@
 import { CloseOutlined } from '@ant-design/icons'
 import { Flex, Typography } from 'antd'
-import { useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { AxisButton } from './AxisButton'
+import { ResizeHandle } from './ResizeHandle'
 import { ShellAside } from './shellAside'
 import { useSidePanelWidth } from './sidePanelWidth'
-import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
 /** What a panel the person opens has: a close button named by `closeNameKey`. The process designer's step panel has none. */
@@ -37,27 +37,9 @@ export function SidePanel({
   testId: string
   children: ReactNode
 } & Closing) {
-  const t = useText()
-  const { colour, size, spacing } = useDesignTokens()
+  const { size, spacing } = useDesignTokens()
   const { width, min, max, set } = useSidePanelWidth()
   const panel = useRef<HTMLElement>(null)
-
-  const onKeyDown = (event: KeyboardEvent) => {
-    // The handle is on the panel's start edge, so the arrow that moves the edge away from the page widens it.
-    const target = { ArrowLeft: width + spacing.md, ArrowRight: width - spacing.md, Home: min, End: max }[event.key]
-    if (target !== undefined) {
-      event.preventDefault()
-      set(target)
-    }
-  }
-  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.currentTarget.hasPointerCapture(event.pointerId) && panel.current) {
-      set(panel.current.getBoundingClientRect().right - event.clientX)
-    }
-  }
 
   return (
     <ShellAside closable={onClose !== undefined}>
@@ -76,27 +58,13 @@ export function SidePanel({
           padding: spacing.sm,
         }}
       >
-        <style>{`[data-side-panel-handle]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: -2px; }`}</style>
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={t('shell.sidePanel.resize')}
-          aria-valuemin={min}
-          aria-valuemax={max}
-          aria-valuenow={width}
-          tabIndex={0}
-          data-side-panel-handle
-          onKeyDown={onKeyDown}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          style={{
-            position: 'absolute',
-            insetBlock: 0,
-            insetInlineStart: 0,
-            width: spacing.xs,
-            cursor: 'col-resize',
-            touchAction: 'none',
-          }}
+        <ResizeHandle
+          edge="start"
+          size={width}
+          min={min}
+          max={max}
+          measure={(event) => (panel.current ? panel.current.getBoundingClientRect().right - event.clientX : width)}
+          onChange={set}
         />
         <Flex justify="space-between" align="center" gap={spacing.sm} style={{ flex: 'none' }}>
           <Flex align="center" gap={spacing.sm} style={{ minWidth: 0 }}>

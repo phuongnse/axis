@@ -103,7 +103,7 @@ export const typicalPackageFiles: StudioPackageFile[] = [
   },
   {
     package: 'phone-numbers',
-    path: 'test_adapter.py',
+    path: 'tests/test_adapter.py',
     version: 'c8081e98ec5f79f7c16b1c63eed2e2f4e0ce31114e067f1e80cf0ec295072318',
     content:
       'import pytest\nfrom phonenumbers import NumberParseException\n\nfrom adapter import normalize\n\n\ndef test_a_national_number_with_its_region_becomes_e164():\n    assert normalize({"number": "020 7946 0018", "region": "GB"}, None) == {"number": "+442079460018"}\n\n\ndef test_an_international_number_needs_no_region():\n    assert normalize({"number": "+1 206 555 0100"}, None) == {"number": "+12065550100"}\n\n\ndef test_a_number_that_cannot_be_parsed_fails_the_call():\n    with pytest.raises(NumberParseException):\n        normalize({"number": "not a number"}, None)\n',
