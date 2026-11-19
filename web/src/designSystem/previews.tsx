@@ -338,8 +338,10 @@ export const previews: Record<string, readonly PreviewState[]> = {
       caption: 'Package',
       fixtures: studioFixtures.typical,
       entry: `/studio?app=${application}&view=packages&package=payment-terms&file=index.ts`,
+      // Proposed: a package's code editor fills the window down to the footer, so its frame is as tall as a window, see #3978.
+      frameHeight: 900,
     },
-  ].map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 })),
+  ].map((state) => ({ frameHeight: 640, ...state, draw: () => <ShellPreview /> })),
   studioPageDesign: studioDesignerStates(typicalPageId),
   studioFormDesign: studioDesignerStates(typicalFormId),
   studioProcessDesign: studioDesignerStates(typicalProcessId),
