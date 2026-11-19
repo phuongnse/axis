@@ -26,8 +26,8 @@ opens the same view.
 - **A path.** A Used by entry or a diagnostic that opens a resource at a path adds `&path=<path>`.
 - **A view.** `&kind=<kind>` shows that kind's list, `&view=releases` the Releases entry,
   `&view=release&release=<number>` a [release page](studio-workspace.md#release-page) under it,
-  `&view=policies` the [policy matrix](#policy-matrix), `&view=publish` the [publish page](#publishing)
-  and `&view=requests&request=<id>` one [AI request's page](ai-authoring-in-studio.md#a-requests-page).
+  `&view=policies` the [policy matrix](#policy-matrix), `&view=packages` the [Packages entry](studio-packages.md#the-packages-entry), `&view=packages&package=<id>` one package's files,
+  `&view=publish` the [publish page](#publishing) and `&view=requests&request=<id>` one [AI request's page](ai-authoring-in-studio.md#a-requests-page).
 - **The AI requests table** _(planned for M35)_. `&view=requests` shows the [AI requests](ai-authoring-in-studio.md#the-request-panel) table.
 - **A field.** `&field=<name>` opens a field's [drawer](entity-designer.md#field-drawer) on an entity's page. Opening and
   closing add a history entry, a rename replaces the name, and a name no field has opens nothing and is dropped.
