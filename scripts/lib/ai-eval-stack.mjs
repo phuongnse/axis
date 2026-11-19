@@ -265,15 +265,28 @@ export async function keycloakAdmin({ keycloakUrl, adminSecret }) {
  * @returns {Promise<{ username: string, password: string, secret: string }>} The password, and the Base32 secret of the authenticator.
  */
 export async function prepareAuthoringRealm({ admin, realm, redirectUris, roles, username }) {
-  const client = await preparePlatformClient({ admin, realm, redirectUris, roles })
+  await preparePlatformClient({ admin, realm, redirectUris, roles })
   // The agent host's client has no full scope, so the author's roles reach its exchanged token through a roles mapper and a
   // scope mapping of the platform client's roles. The send refuses a token without the author role.
-  const agentList = await admin('GET', `/admin/realms/${realm}/clients?clientId=axis-agent`, undefined, 200)
-  const agentPath = `/admin/realms/${realm}/clients/${JSON.parse(agentList.body)[0].id}`
-  await admin('POST', `${agentPath}/protocol-mappers/models`, rolesMapper(), 201)
-  const platformRoles = await admin('GET', `${client.path}/roles`, undefined, 200)
-  await admin('POST', `${agentPath}/scope-mappings/clients/${client.id}`, JSON.parse(platformRoles.body), 204)
+  await mapPlatformRoles({ admin, realm, clientId: 'axis-agent' })
   return addAuthoringAccount({ admin, realm, roles, username })
+}
+
+/**
+ * Gives the tokens of the client `clientId` the person's roles of the realm's `axis` client: a roles mapper and a scope
+ * mapping of those roles, which a client without full scope needs. It stands in for a realm that puts the roles into every
+ * client's tokens, see docs/reference/authoring-requests.md#acting-for-the-author. `admin` is the admin call of keycloakAdmin.
+ * @param {{ admin: (method: string, path: string, body?: unknown, ...statuses: number[]) => Promise<{ status: number, headers: object, setCookie: string[], body: string }>, realm: string, clientId: string }} options
+ * @returns {Promise<void>}
+ */
+export async function mapPlatformRoles({ admin, realm, clientId }) {
+  const platformList = await admin('GET', `/admin/realms/${realm}/clients?clientId=axis`, undefined, 200)
+  const platform = JSON.parse(platformList.body)[0]
+  const clientList = await admin('GET', `/admin/realms/${realm}/clients?clientId=${encodeURIComponent(clientId)}`, undefined, 200)
+  const clientPath = `/admin/realms/${realm}/clients/${JSON.parse(clientList.body)[0].id}`
+  await admin('POST', `${clientPath}/protocol-mappers/models`, rolesMapper(), 201)
+  const platformRoles = await admin('GET', `/admin/realms/${realm}/clients/${platform.id}/roles`, undefined, 200)
+  await admin('POST', `${clientPath}/scope-mappings/clients/${platform.id}`, JSON.parse(platformRoles.body), 204)
 }
 
 /**

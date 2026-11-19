@@ -264,8 +264,20 @@ publishes one active release. The fourth test lets a requester decide their own 
 `RequestApproval` to `approverUser == null`, the end of the work and a fix round that changes nothing. The contract
 scenario `RequesterCannotDecideOwnRequest` fails in the checks, so the request reads Failed, with its failure and its
 checks, in light and dark mode, and it offers no Accept. The newest revision stays the same, and `RequestApproval` has no
-customization layer in the application. The spec stops each agent host once its request reads Ready or Failed, because
-the scripted answers are used up by then. Both AI authoring specs hold one exclusive lock, `holdAiSpecLock`, for their
+customization layer in the application. The fifth test is an outside MCP client. `tenant create` makes the first
+administrator, `first-admin@ai-journey.test`, and a `developer@` account has the author role, so no other account's code
+is reused. A registration at the realm's `clients-registrations/openid-connect`, as a public client for the code flow and
+the scope `axis:authoring`, answers 403 under the default `Ai:OutsideClients` value `none`. The administrator signs in,
+chooses All in Connected apps and saves, and a reload in dark mode still shows All. The same registration then answers
+201. `mapPlatformRoles` in `scripts/lib/ai-eval-stack.mjs` gives the registered client's tokens the person's roles, as it
+does for the agent client, because a registered client has no full scope. The developer signs in through the client with
+PKCE and clicks Allow on the consent screen, and the client's `initialize` on `/mcp` answers 200. The client then calls
+the MCP tools: `create_draft`, a `write_layer` of `ApprovalStep` that adds the approver kind `generalDirector`, a
+`write_resource` of each of the two texts and of the scenario `GeneralDirectorApprovesLargeRequests`, `validate_draft`
+and `run_scenarios`. `validate_draft` reports no error. The scenario run goes through the spec's publisher and ends
+`succeeded`, with every scenario `passed`, the module's contract scenarios included. Its `accept_draft` is refused,
+because no ready authoring request owns an outside client's draft, and the newest revision stays the same. The spec stops
+each agent host once its request reads Ready or Failed, because the scripted answers are used up by then. Both AI authoring specs hold one exclusive lock, `holdAiSpecLock`, for their
 whole run, because an agent host serves every directory tenant, so the two specs run one after the other in a shard.
 
 **The cell console spec** starts a server of its own in `Testing`, on the next port offset, with the
