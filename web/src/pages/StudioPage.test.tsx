@@ -1880,12 +1880,12 @@ describe('StudioPage publishing', () => {
 
     it('keeps Publish off while the changed files load, and turns it on when the list shows', async () => {
       let answer: (response: Response) => void = () => undefined
-      stubPublishing(
-        publisher,
-        [],
-        { folderContentHash: 'hash-4', active: true },
-        () => new Promise<Response>((resolve) => (answer = resolve)),
-      )
+      let requested: () => void = () => undefined
+      const diffRequested = new Promise<void>((resolve) => (requested = resolve))
+      stubPublishing(publisher, [], { folderContentHash: 'hash-4', active: true }, () => {
+        requested()
+        return new Promise<Response>((resolve) => (answer = resolve))
+      })
       renderPage('/studio?app=PurchaseRequests&view=publish')
 
       expect(
@@ -1893,6 +1893,8 @@ describe('StudioPage publishing', () => {
       ).toBeVisible()
       expect(screen.getByTestId('studio-publish-confirm')).toBeDisabled()
 
+      // The diff request starts after the intro text shows, so wait for it: an answer sent before it is lost.
+      await diffRequested
       answer(
         json({
           release: 3,
