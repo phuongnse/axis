@@ -166,7 +166,7 @@ below it. It says where the person is and what the page is.
   [fields](actions-and-controls.md#fields), above a `borderSubtle` rule. It never sits on the heading's line.
 - **Platform pages.** The platform home page has no band and no breadcrumb, and has its own headings,
   see the [platform home page](#platform-home-page). The users page has the band "Axis › Users".
-- **The account page's band** _(planned for M43)_. The account page has the band "Axis › Your account".
+- **The account page's band.** The account page has the band "Axis › Your account".
 
 ## App switcher and preferences
 
@@ -228,7 +228,7 @@ Sign-in itself is in [sign-in and the session](security.md#sign-in-and-the-sessi
   caret after it. Sign out in its menu ends the session. The server ends
   the identity provider's session itself and the browser goes to `/?signedOut`. Only when that fails
   does the browser go to the identity provider's sign-out page.
-- **Account menu** _(planned for M43)_. Its menu holds Your account (`shell.account.title`), which opens the
+- **Account menu.** Its menu holds Your account (`shell.account.title`), which opens the
   [account page](platform-pages.md#tabs), and Sign out, as [signed in](#account-button) says.
 - **Texts.** The platform texts are `shell.account.signIn`, `shell.account.signOut` and
   `shell.account.label`, the menu's label.

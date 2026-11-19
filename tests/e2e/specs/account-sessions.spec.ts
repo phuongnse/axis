@@ -32,7 +32,7 @@ test('a person ends another session of their own from the sessions screen, and t
     expect(idOfB).toBeTruthy()
 
     await pageA.getByRole('banner').getByRole('button', { name: 'Employee User', exact: true }).click()
-    await pageA.getByRole('menuitem', { name: 'Sessions', exact: true }).click()
+    await pageA.getByRole('menuitem', { name: 'Your account', exact: true }).click()
     await expect(pageA).toHaveURL(`${baseURL}/account`)
 
     const row = pageA.locator(`tr[data-row-key="${idOfB}"]`)
