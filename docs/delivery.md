@@ -345,7 +345,7 @@ A milestone goes from a readiness check to its close in five steps.
    the new milestone's concepts and the models available, and sets the milestone's roadmap status to
    In progress, in a NexKit issue. The milestone exists on GitHub from its first issue, as
    [how issues run](#how-issues-run) says. Profile fixes are hand-made pull requests. The issues of
-   new screens wait for a design issue, see [design changes](#design-changes).
+   new screens wait for their subject's design issue, see [design changes](#design-changes).
 3. **Deliver the issues.** Each one follows the life of an issue above. Autopilot runs every ready
    issue of every milestone at once.
 4. **Docs sweep.** Before the owner closes the milestone, one issue in it checks the docs and fixes
@@ -387,21 +387,28 @@ change, a design review and a sync are in the
   tokens such as `primary` and `spacing-md`, and widgets such as `table`, `form` and `section`. The
   docs stay the source of behaviour.
 - **A new screen is designed first,** as
-  [D140](decisions/d140-a-new-screen-is-designed-first-on-a-short-prototype-with-fixtures.md) agrees. A
-  new screen or a new way of interacting gets a design review before it is built. A screen made of
-  agreed patterns needs none. Each group of new screens has one design issue, in no milestone as
+  [D163](decisions/d163-a-new-screen-is-designed-first-one-subject-to-each-design-issue-on-a-short-prototype-with-fixtures.md)
+  agrees. A new screen or a new way of interacting gets a design review before it is built. A screen
+  made of agreed patterns needs none. Each subject has one design issue, in no milestone as
   [how issues run](#how-issues-run) says, with the `on-hold` label, so NexKit does not start it until
-  the review ends, and the issues that build those screens are *blocked by* it. The open design
-  issues are the queue of reviews.
+  the review ends, and the issues that build that subject are *blocked by* it. The open design issues
+  are the queue of reviews.
+- **A design issue designs one subject.** A subject is one page, one view, one entity or one shared
+  widget, and the issue's title names it. Something belongs to the subject only when it opens from the
+  subject and serves only it, such as a drawer, a dialog or a panel, or when the owner cannot judge the
+  subject without it. A shared widget's review looks at it in the places that use it, because those are
+  one subject. Everything else is its own design issue, with the `design` and `on-hold` labels and no
+  milestone, as [how issues run](#how-issues-run) says. It is *blocked by* the first one only when it
+  builds on what that one agrees.
 - **Several changes are a design review.** When the owner reviews the design in words, one change at
   a time, the session prototypes each change in the real widget code on a
   `design/<yyyy-mm-dd>-<topic>` branch, which holds only what the design needs, and the owner sees it
-  in the [widget previews](reference/widget-previews.md), on fixtures. A review covers one screen
-  or one group of screens, and what it finds outside them becomes an issue. The owner judges each
-  step only on what it designs, so a case the fixtures do not show is not a finding and opens no
-  issue. When the owner needs a case the fixtures lack to see a step, such as a `section` marked
-  `collapsed` on a page in the `shell` preview, the session adds that fixture on the prototype branch
-  in the same step. It names the fixture in the design issue's build notes, so the build adds it to
+  in the [widget previews](reference/widget-previews.md), on fixtures. A review covers its design
+  issue's subject only. At its start the session checks the issue's scope against that rule and
+  proposes any split to the owner. The owner judges each step only on what it designs, so a case the
+  fixtures do not show is not a finding and opens no issue. When the owner needs a case the fixtures
+  lack to see a step, such as a `section` marked `collapsed` on a page in the `shell` preview, the
+  session adds that fixture on the prototype branch in the same step. It names the fixture in the design issue's build notes, so the build adds it to
   the preview as it adds a widget's new state. The branch is pushed, so the review can go on from any
   machine, and is never merged. No push to a branch starts CI, as
   [D146](decisions/d146-ci-runs-on-main-every-few-merges-and-nexkit-checks-every-branch.md)
@@ -425,9 +432,10 @@ change, a design review and a sync are in the
   [checking a card](../.claude/skills/axis-design/checking-a-card.md#the-rules-for-every-screen) lists with
   their reference sections: text, showing what is empty, list order, opening things, and the contrast of
   design tokens and previews in both modes.
-- **A step stays one step.** When a step brings a new screen or a new concept of the platform, the session
-  proposes it to the owner as its own design issue. The issue has the `design` and `on-hold` labels, no
-  milestone, and is *blocked by* the review. The step goes on without it.
+- **A step stays one step.** When a step reaches anything outside the subject, not only a new screen or a
+  new concept of the platform, the session proposes it to the owner as its own design issue. The issue
+  has the `design` and `on-hold` labels and no milestone. It is *blocked by* the review's design issue
+  only when it builds on what that issue agrees. The step goes on without it.
 - **The design runs ahead of the repository only by open issues.** While a design issue is open, the
   artifact holds its change and its last change note names the issue. A review does not change the
   artifact: it is published once the review's issues are merged, so nothing else in the artifact

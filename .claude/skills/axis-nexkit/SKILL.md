@@ -101,10 +101,10 @@ agrees, and write no issue of a later phase unless the owner asks. On *ready*:
 
 - Create the milestone's issues as in [Writing an issue](#writing-an-issue). The first one creates
   the milestone on GitHub, titled exactly as its roadmap row.
-- Find the new screens and new ways of interacting. For each group, open one
-  design issue with the `design` and `on-hold` labels and no milestone, as
-  [how issues run](../../../docs/delivery.md#how-issues-run) says, and mark the issues that build them
-  *blocked by* it, as [Design changes](../../../docs/delivery.md#design-changes) says.
+- Find the new screens and new ways of interacting. For each subject, a page, view, entity or shared
+  widget, open one design issue titled by it, with the `design` and `on-hold` labels and no milestone, as
+  [how issues run](../../../docs/delivery.md#how-issues-run) says. Mark its build issues *blocked by* it, as
+  [Design changes](../../../docs/delivery.md#design-changes) says.
 - Check that each risky concept the **From** column of
   [concepts.md](../../../docs/domain/concepts.md) lists for the new milestone
   falls under `hard` by its consequence, and that work the platform has not

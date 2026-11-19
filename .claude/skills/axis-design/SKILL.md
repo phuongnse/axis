@@ -30,12 +30,18 @@ another. The rules are under "Several changes are a design review" in Design cha
 
 1. Take the review's design issue, or agree a short topic with the owner, such
    as `field-look`, and open a design issue labelled `design` and `on-hold` with no milestone, as
-   [how issues run](../../../docs/delivery.md#how-issues-run) says. Its
-   body states the scope and build notes, and says NexKit writes the docs change
+   [how issues run](../../../docs/delivery.md#how-issues-run) says. Its title names
+   one subject. Its body states the scope and build notes, and says NexKit writes the docs change
    from the rule comments. Set the body with
    `gh issue edit <n> --body-file <file>`. If an earlier review's issues have not
    built what it touches, say so and stop.
-2. Put the prototype branch on the current `origin/main`, named as
+2. Check the issue's scope against the one-subject rule in
+   [Design changes](../../../docs/delivery.md#design-changes). If it holds more than one subject,
+   propose the split to the owner. When the owner agrees, open each other subject with
+   `gh issue create ... --label design,on-hold` and no milestone, and mark it *blocked by* this issue
+   only when it builds on what this one agrees. Then edit this issue's title and body to its own
+   subject with `gh issue edit`.
+3. Put the prototype branch on the current `origin/main`, named as
    [writing on GitHub](../../../docs/delivery.md#writing-on-github) says. Work
    only on that branch. It gets no pull request, no CI and no `/nexkit review`,
    as Design changes says.
@@ -45,7 +51,7 @@ another. The rules are under "Several changes are a design review" in Design cha
    - Otherwise: run `git fetch origin`,
      `git switch -c design/<yyyy-mm-dd>-<topic> origin/main`, then
      `git push -u origin design/<yyyy-mm-dd>-<topic>`.
-3. Post one state comment with `gh issue comment <n> --body-file <file>`. It
+4. Post one state comment with `gh issue comment <n> --body-file <file>`. It
    names the branch, the `main` commit it stands on, each agreed step with a link
    to its rule comment, what waits for the owner, what comes next and the parts
    list of the step in hand. It holds the present only. Its id is the
@@ -56,11 +62,12 @@ another. The rules are under "Several changes are a design review" in Design cha
 
 Take one change at a time. Start the next only after the owner has seen this
 one. What the build must do beyond the docs goes in the design
-issue's body, with `gh issue edit`. What you find outside the review's topic
-becomes an issue. A new screen or platform concept becomes its own design issue,
-held and blocked by the review: `gh issue create ... --label design,on-hold`, with
-the blocked-by mark as [Writing an issue](../axis-nexkit/SKILL.md#writing-an-issue)
-step 4 says. The step goes on without it.
+issue's body, with `gh issue edit`. Anything a step reaches outside the subject,
+not only a new screen or platform concept, becomes its own design issue, held,
+and blocked by this one only when it builds on what this one agrees:
+`gh issue create ... --label design,on-hold`, with the blocked-by mark as
+[Writing an issue](../axis-nexkit/SKILL.md#writing-an-issue) step 4 says. The step
+goes on without it.
 
 1. Follow [merging-main.md](merging-main.md), so the prototype stands on the
    current `main`.
@@ -88,7 +95,7 @@ step 4 says. The step goes on without it.
    verdict: keep, change or drop it. Write the rules agreed in this step as one
    comment, as [Design changes](../../../docs/delivery.md#design-changes) says.
    Post it, or edit the screen's rule comment if it has one, with the commands
-   in Start step 3. When the owner agrees, have an agent audit this step's diff,
+   in Start step 4. When the owner agrees, have an agent audit this step's diff,
    `git diff <step's first commit>^..HEAD -- web/src`, for one concern done by two
    mechanisms. Merge what it finds, then commit and push before the next step.
    Then edit the state comment in place: link this step's rule comment and hold
