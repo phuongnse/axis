@@ -450,10 +450,10 @@ test.describe('Studio on a copy of its own', () => {
 
       await page.goto(`${server.url}/studio?app=PurchaseRequests`)
       const diagnostic = (await openProblems(page))
-        .getByRole('button')
-        .filter({ hasText: 'Path: /input/2/target' })
+        .getByRole('listitem')
+        .filter({ hasText: 'AXC0012' })
       await expect(diagnostic).toContainText('AXC0012')
-      await diagnostic.click()
+      await diagnostic.getByRole('button', { name: 'SubmitPurchaseRequest', exact: true }).click()
 
       await expect(page).toHaveURL(/path=%2Finput%2F2%2Ftarget/)
       // A path inside an item of a list lands on the list that holds the item.

@@ -1238,6 +1238,7 @@ export function StudioEditor({
                                           onChange={onChange}
                                           usedOn={usedOn}
                                           onOpen={onOpen}
+                                          resources={resources}
                                         />
                                       </Suspense>,
                                     )

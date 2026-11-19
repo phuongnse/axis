@@ -70,16 +70,18 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     expect(screen.queryAllByTestId('studio-test-result')).toHaveLength(0)
   })
 
-  it('shows every scenario of a succeeded run as passed, with no button', () => {
-    const { section } = renderResults(request({ status: 'succeeded', scenarios: [finance] }))
+  it('shows every scenario of a succeeded run as passed, with its name as the only link', async () => {
+    const { section, onSelect } = renderResults(request({ status: 'succeeded', scenarios: [finance] }))
 
     expect(section).toHaveAttribute('data-status', 'succeeded')
     const rows = screen.getAllByTestId('studio-test-result')
     expect(rows).toHaveLength(1)
     expect(rows[0]).toHaveAttribute('data-outcome', 'passed')
-    expect(rows[0]).toHaveTextContent('FinanceApproval')
     expect(rows[0]).toHaveTextContent('1234 ms')
-    expect(within(rows[0]).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(rows[0]).getByText('Test scenario')).toBeInTheDocument()
+
+    await userEvent.click(within(rows[0]).getByRole('button', { name: 'FinanceApproval' }))
+    expect(onSelect).toHaveBeenCalledWith('7f1c2d3e-4a5b-4c6d-8e7f-9a0b1c2d3e4f', '')
   })
 
   it('shows a failed scenario with its step and message, and opens it at the step when selected', async () => {
@@ -90,10 +92,12 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     const failed = rows[1]
     expect(failed).toHaveAttribute('data-outcome', 'failed')
     expect(failed).toHaveTextContent('ApprovalBelowThreshold')
+    expect(within(failed).getByText('Test scenario')).toBeInTheDocument()
     expect(within(failed).getByText('Step 6')).toBeInTheDocument()
     expect(failed).toHaveTextContent('The record status is approved, not rejected.')
 
-    await userEvent.click(within(failed).getByRole('button'))
+    expect(within(failed).getAllByRole('button')).toHaveLength(1)
+    await userEvent.click(within(failed).getByRole('button', { name: 'ApprovalBelowThreshold' }))
     expect(onSelect).toHaveBeenCalledWith('09d75317-fd9e-411e-8322-317778fc1b2b', '/steps/5')
   })
 

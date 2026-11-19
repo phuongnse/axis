@@ -190,8 +190,12 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
   shows "Not set", see the [empty values](frontend.md#shown-values). It never shows nothing, which
   cannot tell "not given" from "not loaded", and never N/A, which says "does not apply" and does not
   translate. A No is a value, so it reads No, never a dash.
-- **A reference is a link, and only the reference** _(planned for M35)_. A reference to another resource
-  shows as a link, named as people read it, and no other text in it is a link.
+- **A reference is a link, and only the reference.** A pointer to a resource, a record or a page is a link,
+  and only the pointer is. Its message and any other words are text, and no whole row is a button. The link
+  names the thing as people read it: its title in the reader's language, with its kind muted after it, such
+  as "Purchase requests" then "Entity". It never names a file or a path. It opens the thing at its path. A
+  pointer to nothing a person can open is its file, in muted text. The link is an `AxisButton` with the `link`
+  role, see [buttons](#buttons).
 - **A status is a `StatusTag` with five tones, and any other enum value is text** _(planned for M35)_. A
   status shows as a tag in one of five tones. Any other value of an enum shows as plain text.
 

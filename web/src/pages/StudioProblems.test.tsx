@@ -1,10 +1,10 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { ShellAsideContext } from '../platform/shellAsideContext'
 import { TextProvider } from '../platform/TextProvider'
-import type { StudioDiagnostic } from '../platform/studio'
+import type { StudioDiagnostic, StudioResourceItem } from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
 import { emptyDescription } from '../test/antd'
 import { StudioProblemList, StudioProblems } from './StudioProblems'
@@ -64,33 +64,60 @@ describe('StudioProblems', () => {
 
 describe('StudioProblemList', () => {
   const resourceError: StudioDiagnostic = { ...error, code: 'AXIS-E102', resourceId: 'e1' }
+  const resources: StudioResourceItem[] = [
+    {
+      id: 'e1',
+      kind: 'entity',
+      name: 'PurchaseRequest',
+      file: 'entities/purchase-request.json',
+      version: 'a',
+      usedBy: 0,
+    },
+  ]
 
-  it('lists errors before warnings, and a problem with no onSelect is plain text, not a button', () => {
+  it('lists errors before warnings, and a resource with no onSelect is plain text, not a button', () => {
     const warning: StudioDiagnostic = { ...error, code: 'AXIS-W201', severity: 'warning', resourceId: 'w1' }
     render(
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioProblemList diagnostics={[warning, resourceError]} />
+          <StudioProblemList diagnostics={[warning, resourceError]} resources={resources} />
         </TextProvider>
       </ThemeModeProvider>,
     )
 
     const codes = screen.getAllByRole('listitem').map((item) => item.querySelector('strong')?.textContent)
     expect(codes).toEqual(['AXIS-E102', 'AXIS-W201'])
+    expect(screen.getByText('PurchaseRequest')).toBeInTheDocument()
+    expect(screen.getByText('Entity')).toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('makes a problem that names a resource a button when onSelect is given', async () => {
+  it('makes the resource of a problem a link named by its title when onSelect is given', async () => {
     const onSelect = vi.fn()
     render(
       <ThemeModeProvider>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioProblemList diagnostics={[resourceError]} onSelect={onSelect} />
+          <StudioProblemList diagnostics={[resourceError]} resources={resources} onSelect={onSelect} />
         </TextProvider>
       </ThemeModeProvider>,
     )
 
-    await userEvent.click(screen.getByRole('button', { name: /AXIS-E102/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'PurchaseRequest' }))
     expect(onSelect).toHaveBeenCalledWith('e1', '/fields/0')
+  })
+
+  it('shows the file of a problem with no resource in muted text, and no button', () => {
+    render(
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioProblemList diagnostics={[error]} resources={resources} onSelect={vi.fn()} />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+
+    const item = screen.getByRole('listitem')
+    expect(within(item).getByText('entities/purchase-request.json')).toBeInTheDocument()
+    expect(within(item).queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Path:/)).not.toBeInTheDocument()
   })
 })

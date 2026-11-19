@@ -2029,7 +2029,11 @@ export function filterResources(items: StudioResourceItem[], search: string): St
  * The text a resource shows: a text resource by its language in `locale`, such as "Vietnamese", else its label in
  * `locale`, then in `en`, then the name its author gave, then its kind's singular name. A file name never shows.
  */
-export function resourceTitle(item: StudioResourceItem, locale: string, t: (key: string) => string): string {
+export function resourceTitle(
+  item: Pick<StudioResourceItem, 'kind' | 'name' | 'titles' | 'locale'>,
+  locale: string,
+  t: (key: string) => string,
+): string {
   if (item.kind === 'text' && typeof item.locale === 'string') {
     return languageName(item.locale, locale)
   }

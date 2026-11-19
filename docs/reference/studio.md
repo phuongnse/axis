@@ -288,8 +288,8 @@ Studio runs the application's [test scenarios](test-scenarios.md) through the
   failed, and never a release number.
 - **Test results.** _(planned for M35)_ Each result reads as [a scenario's result](ai-authoring-in-studio.md#scenario-results)
   does. The list shows each scenario of the request's `scenarios` field, with passed or failed, its time and, for a
-  failure, the failing step and its message. Steps count from 1, as the scenario editor's step cards do. Opening a
-  failure opens the scenario at the item's `path`, as a diagnostic does.
+  failure, the failing step and its message. Steps count from 1, as the scenario editor's step cards do. The name is
+  the only link, with its kind muted after it. A failure opens at the item's `path`, and a pass at its top.
 - **No empty pass.** While the request is queued or running, the list shows a note instead of rows, so
   an empty list never reads as a pass. A failed run with no results says that no scenario ran and
   points to the diagnostics: compile errors, a missing setting and an unknown scenario name fail a run

@@ -236,10 +236,12 @@ test.describe("Studio edits a process in the process editor", () => {
     await saveResource(page);
 
     const diagnostic = (await openProblems(page))
-      .getByRole("button")
-      .filter({ hasText: "Path: /steps/2/otherwise" });
+      .getByRole("listitem")
+      .filter({ hasText: "AXC0070" });
     await expect(diagnostic).toContainText("AXC0070");
-    await diagnostic.click();
+    await diagnostic
+      .getByRole("button", { name: "PurchaseRequestApproval", exact: true })
+      .click();
 
     await expect(page).toHaveURL(/path=%2Fsteps%2F2%2Fotherwise/);
     const otherwise = page.getByTestId("studio-field-/steps/2/otherwise");

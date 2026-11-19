@@ -322,8 +322,13 @@ test.describe('Studio creates a resource from a starter', () => {
     // The starter of the page that an earlier journey created has an empty label, so the panel is checked for the two
     // files of this journey and for the codes that only a provider or a sign-in list raises.
     const panel = await openProblemsIfAny(page)
-    for (const file of ['identity-providers/partner.json', 'sites/purchasing.json']) {
-      await expect(panel.getByRole('button').filter({ hasText: file })).toHaveCount(0)
+    for (const [name, kind] of [
+      ['Partner', 'Identity provider'],
+      ['Purchasing', 'Site'],
+    ]) {
+      await expect(
+        panel.getByRole('listitem').filter({ hasText: kind }).getByRole('button', { name, exact: true }),
+      ).toHaveCount(0)
     }
     for (const code of ['AXC0285', 'AXC0288', 'AXC0289']) {
       await expect(panel.filter({ hasText: code })).toHaveCount(0)

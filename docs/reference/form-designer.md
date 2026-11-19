@@ -142,8 +142,9 @@ The selection is kept across the Design, Form and JSON tabs while the resource s
 
 The Used on list above the canvas shows the pages and process steps that use the form, because one edit
 changes every one of them. It is the Used by tab's list filtered to the `widget form` and `task form`
-relations, and shows each entry's relation, name and path. It loads once when the form opens, so it can
-be stale like the `usedBy` counts. An entry opens the resource at its path.
+relations. Each entry shows its resource as a link named by its title, with its kind muted after it, and then
+its relation in the Used by tab's words. It loads once when the form opens, so it can be stale like the `usedBy`
+counts. The link opens the resource at the reference's path.
 
 ## Module forms
 
