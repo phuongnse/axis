@@ -1,8 +1,8 @@
-import { Flex } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { PageLayout } from '../platform/PageLayout'
 import {
   fetchStudioPackageFile,
   fetchStudioPackageFiles,
@@ -13,7 +13,6 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
-import { StudioPageHeading } from './StudioPageHeading'
 
 /** The file that names a package, see docs/reference/studio-packages.md#the-packages-entry. */
 const manifestPath = 'axis-package.json'
@@ -258,8 +257,7 @@ export function StudioPackagePage({
     },
   ]
   return (
-    <Flex vertical gap="middle">
-      <StudioPageHeading title={row.label} />
+    <PageLayout title={row.label}>
       <AxisTable<{ path: string }>
         testId="studio-package-files"
         columns={columns}
@@ -268,6 +266,6 @@ export function StudioPackagePage({
         view={{ query: view, onChange: setView, paging: false }}
         emptyText={t('shell.studio.packages.empty')}
       />
-    </Flex>
+    </PageLayout>
   )
 }

@@ -288,7 +288,7 @@ describe('StudioAuthoringRequestPage', () => {
 
     const name = `${sentence.slice(0, 80).trimEnd()}…`
     expect(name).toHaveLength(81)
-    expect(await screen.findByRole('heading', { level: 4, name })).toBeVisible()
+    expect(await screen.findByRole('heading', { level: 1, name })).toBeVisible()
     expect(screen.getByText(text)).toBeVisible()
     const time = formatValue({ name: 'sentAt', type: 'date-time' }, sentAt, {}, { locale: 'en', text: (key) => key })
     expect(screen.getByText(`Sent by Linh Nguyen on ${time}`)).toBeVisible()

@@ -432,7 +432,7 @@ describe('StudioPage', () => {
     stubServer()
     renderPage()
 
-    expect(await screen.findByRole('heading', { level: 4, name: 'PurchaseRequests' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'PurchaseRequests' })).toBeInTheDocument()
     expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
     expect(screen.queryByTestId(`studio-resource-${entityId}`)).not.toBeInTheDocument()
     expect(screen.queryByTestId('studio-resource-details')).not.toBeInTheDocument()
@@ -442,7 +442,7 @@ describe('StudioPage', () => {
     stubServer()
     renderPage('/studio?app=PurchaseRequests&kind=entity')
 
-    expect(await screen.findByRole('heading', { level: 4, name: 'Entities' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Entities' })).toBeInTheDocument()
     const entities = await screen.findByTestId('studio-group-entity')
     expect((await within(entities).findAllByRole('link')).map((link) => link.textContent)).toEqual([
       'Department',
@@ -500,6 +500,13 @@ describe('StudioPage', () => {
     expect(details).toHaveTextContent('Entity')
     expect(details).toHaveTextContent(entityId)
     expect(details).toHaveTextContent('entities/purchase-request.json')
+    // The kind is the line of the heading, and the id and the file are the page's first part.
+    expect(within(screen.getByTestId('page-heading')).getByText('Entity')).toBeInTheDocument()
+    const facts = within(screen.getByTestId('studio-section-facts'))
+    expect(facts.getByText('ID', { selector: 'dt' })).toBeInTheDocument()
+    expect(facts.getByText(entityId, { selector: 'dd' })).toBeInTheDocument()
+    expect(facts.getByText('entities/purchase-request.json', { selector: 'dd' })).toBeInTheDocument()
+    expect(facts.queryByText('Kind')).not.toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent(`/studio?app=PurchaseRequests&resource=${entityId}`)
     expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
   })
@@ -738,7 +745,7 @@ describe('StudioPage', () => {
 
     await userEvent.click(within(sidebar!).getByRole('link', { name: 'Overview' }))
 
-    expect(await screen.findByRole('heading', { level: 4, name: 'PurchaseRequests' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'PurchaseRequests' })).toBeInTheDocument()
     expect(screen.queryByTestId('studio-group-entity')).not.toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests$/)
   })
@@ -777,7 +784,7 @@ describe('StudioPage', () => {
   describe('the page area', () => {
     /** Checks the table comes straight after its heading, and no element between them draws a border or a background. */
     async function expectTableStraightAfterHeading(name: string, testId: string) {
-      const heading = await screen.findByRole('heading', { level: 4, name })
+      const heading = await screen.findByRole('heading', { level: 1, name })
       const table = within(await screen.findByTestId(testId)).getByRole('table')
       let shared = table.parentElement!
       while (!shared.contains(heading)) shared = shared.parentElement!
@@ -1027,11 +1034,11 @@ describe('StudioPage', () => {
       ['a resource', `/studio?app=PurchaseRequests&resource=${entityId}`],
       ['Releases', '/studio?app=PurchaseRequests&view=releases'],
       ['the policy matrix', '/studio?app=PurchaseRequests&view=policies'],
-    ])('has no breadcrumb and exactly one level-4 heading on %s', async (_, entry) => {
+    ])('has no breadcrumb and exactly one level-one heading on %s', async (_, entry) => {
       stubServer()
       renderPage(entry)
 
-      await screen.findByRole('heading', { level: 4 })
+      await screen.findByRole('heading', { level: 1 })
       if (entry.includes('view=policies')) {
         await screen.findByTestId('studio-matrix')
       } else if (entry.includes('resource=')) {
@@ -1039,7 +1046,7 @@ describe('StudioPage', () => {
       }
 
       expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
-      expect(screen.getAllByRole('heading', { level: 4 })).toHaveLength(1)
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
     })
   })
 
@@ -1126,7 +1133,7 @@ describe('StudioPage', () => {
 
     await userEvent.click(within(sidebar!).getByRole('link', { name: 'Forms' }))
 
-    expect(await screen.findByRole('heading', { level: 4, name: 'Forms' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Forms' })).toBeInTheDocument()
     expect(screen.queryByTestId(`studio-resource-${entityId}`)).not.toBeInTheDocument()
     expect(screen.queryByTestId(`studio-resource-${formId}`)).not.toBeInTheDocument()
     expect(within(screen.getByTestId('studio-group-form')).getByRole('table')).toBeInTheDocument()
@@ -1206,8 +1213,13 @@ describe('StudioPage', () => {
     })
     renderPage(`/studio?app=PurchaseRequests&resource=${employeeId}`, 'vi')
 
-    expect(await screen.findByRole('heading', { level: 4, name: heading })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { level: 4, name: 'organization/Employee' })).toBeNull()
+    expect(await screen.findByRole('heading', { level: 1, name: heading })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 1, name: 'organization/Employee' })).toBeNull()
+    // The module is a fact of the page's first part, not part of the heading.
+    expect(screen.getByTestId('page-heading')).not.toHaveTextContent('organization')
+    expect(
+      within(screen.getByTestId('studio-section-facts')).getByText('organization', { selector: 'dd' }),
+    ).toBeVisible()
   })
 
   it('scrolls the form field of the path in the address into view', async () => {
@@ -2817,7 +2829,7 @@ describe('StudioPage Packages', () => {
 
     await userEvent.click(link)
 
-    expect(await screen.findByRole('heading', { level: 4, name: 'Packages' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Packages' })).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests&view=packages')
     expect(await screen.findByTestId('studio-package-tools')).toHaveTextContent('Purchasing tools')
   })
@@ -2828,7 +2840,7 @@ describe('StudioPage Packages', () => {
 
     await userEvent.click(await screen.findByTestId('studio-package-tools'))
 
-    expect(await screen.findByRole('heading', { level: 4, name: 'Purchasing tools' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Purchasing tools' })).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/studio?app=PurchaseRequests&view=packages&package=tools')
     const files = screen.getByTestId('studio-package-files')
     expect(

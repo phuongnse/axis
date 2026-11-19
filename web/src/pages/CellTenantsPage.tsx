@@ -11,10 +11,11 @@ import {
   type CellTenantPage,
   type CellTenantStatus,
   type CellTenantUsage,
+  cellTenantStatusTones,
 } from '../platform/cell'
 import { EmptyDash } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
-import { StatusTag, type StatusTone } from '../platform/StatusTag'
+import { StatusTag } from '../platform/StatusTag'
 import { useText } from '../platform/texts'
 import { recordPageSize, recordQuery, tablePageSizes } from '../platform/tableQuery'
 import { formatBytes } from '../platform/tenantUsage'
@@ -24,14 +25,6 @@ import { useCellConsole } from './cellConsoleContext'
 import { CreateCellTenantModal } from './CreateCellTenantModal'
 
 const statuses: CellTenantStatus[] = ['active', 'readOnly', 'suspended', 'provisioning', 'deleting']
-
-const statusTones: Record<CellTenantStatus, StatusTone> = {
-  active: 'neutral',
-  readOnly: 'attention',
-  suspended: 'attention',
-  provisioning: 'neutral',
-  deleting: 'neutral',
-}
 
 /** The columns the view's filter and sort can name, in table order, see `docs/reference/tenant-lifecycle.md#routes`. */
 const tenantFields = [
@@ -142,7 +135,9 @@ export function CellTenantsPage() {
         title: t('shell.cell.tenants.status'),
         sorter: true,
         render: (_value, tenant) => (
-          <StatusTag tone={statusTones[tenant.status]}>{t(`shell.cell.tenants.status.${tenant.status}`)}</StatusTag>
+          <StatusTag tone={cellTenantStatusTones[tenant.status]}>
+            {t(`shell.cell.tenants.status.${tenant.status}`)}
+          </StatusTag>
         ),
         filter: { kind: 'enum', options: statusOptions },
       },

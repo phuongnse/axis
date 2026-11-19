@@ -196,7 +196,8 @@ through them. Each view is a part of the page, see [layout](shell.md#layout).
 - **Failed work.** Process instances that are `failed`, and connector and package calls whose
   outcome is `unknown`, across every process of every application. An entry opens the
   [instance detail](process-inspection.md#instance-detail) at `/console/instances/{id}`. The page is outside
-  every site, so it has no release texts and shows step names, not their labels. It offers the commands that the
+  every site, so it has no release texts and shows step names, not their labels. It is headed by its process's name,
+  with Instance as its line, see [page header](shell.md#page-header). It offers the commands that the
   detail lists. The view is paged on the server. Its table has the toolbar of
   [tables](actions-and-controls.md#tables) with Filter, and a pager. Each column filters, and the
   Application and Process columns filter by name, so the view has no Application picker. The

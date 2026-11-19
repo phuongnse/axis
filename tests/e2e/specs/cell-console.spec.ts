@@ -122,7 +122,7 @@ test('a user of a tenant is refused on the console host', async () => {
 test('the platform operator suspends a tenant, follows the job and resumes it', async () => {
   const page = operator
   await page.goto(`https://console.localhost/tenants/${tenant}`)
-  await expect(page.getByTestId('cell-tenant')).toContainText('Active')
+  await expect(page.getByTestId('page-heading')).toContainText('Active')
 
   await page.getByTestId('cell-tenant-suspend').click()
   await expect(await waitForDialog(page)).toContainText(tenant)
@@ -132,18 +132,18 @@ test('the platform operator suspends a tenant, follows the job and resumes it', 
   const newestJob = page.getByTestId('cell-jobs').getByRole('row').nth(1)
   await expect(newestJob).toContainText('suspend', { timeout: 60_000 })
   await expect(newestJob).toContainText('Succeeded', { timeout: 60_000 })
-  await expect(page.getByTestId('cell-tenant')).toContainText('Suspended', { timeout: 60_000 })
+  await expect(page.getByTestId('page-heading')).toContainText('Suspended', { timeout: 60_000 })
 
   await page.getByTestId('cell-tenant-resume').click()
   await confirmDialog(page, 'Resume')
   await expect(page.getByTestId('cell-jobs').getByRole('row').nth(1)).toContainText('resume', { timeout: 60_000 })
-  await expect(page.getByTestId('cell-tenant')).toContainText('Active', { timeout: 60_000 })
+  await expect(page.getByTestId('page-heading')).toContainText('Active', { timeout: 60_000 })
 })
 
 test('the platform operator sets a quota of a tenant', async () => {
   const page = operator
   await page.goto(`https://console.localhost/tenants/${tenant}`)
-  await expect(page.getByTestId('cell-tenant')).toContainText('Active')
+  await expect(page.getByTestId('page-heading')).toContainText('Active')
 
   await page.getByTestId('cell-tenant-set-quotas').click()
   const dialog = await waitForDialog(page)
@@ -162,7 +162,7 @@ test('the platform operator adds a host to a tenant and sees the records to add'
   const page = operator
   const host = `portal.${tenant}.test`
   await page.goto(`https://console.localhost/tenants/${tenant}`)
-  await expect(page.getByTestId('cell-tenant')).toContainText('Active')
+  await expect(page.getByTestId('page-heading')).toContainText('Active')
 
   await page.getByTestId('cell-tenant-add-host').click()
   const dialog = await waitForDialog(page)
@@ -272,7 +272,7 @@ test("the create dialog shows the title of the cell's refusal when a tenant alre
 test('the platform operator deletes a tenant by typing its id and cancels the deletion', async () => {
   const page = operator
   await page.goto(`https://console.localhost/tenants/${tenant}`)
-  await expect(page.getByTestId('cell-tenant')).toContainText('Active')
+  await expect(page.getByTestId('page-heading')).toContainText('Active')
 
   await page.getByTestId('cell-tenant-delete').click()
   const dialog = await waitForDialog(page)
@@ -286,12 +286,12 @@ test('the platform operator deletes a tenant by typing its id and cancels the de
   const jobs = page.getByTestId('cell-jobs')
   await expect(jobs.getByRole('row').nth(1)).toContainText('delete', { timeout: 60_000 })
   await expect(jobs.getByRole('row').nth(1)).toContainText('Succeeded', { timeout: 60_000 })
-  await expect(page.getByTestId('cell-tenant')).toContainText('Deleting', { timeout: 60_000 })
+  await expect(page.getByTestId('page-heading')).toContainText('Deleting', { timeout: 60_000 })
   await expect(page.getByTestId('cell-tenant-suspend')).toHaveCount(0)
 
   await page.getByTestId('cell-tenant-cancel-deletion').click()
   await confirmDialog(page, 'Cancel deletion')
   await expect(jobs.getByRole('row').nth(1)).toContainText('cancel-deletion', { timeout: 60_000 })
   await expect(jobs.getByRole('row').nth(1)).toContainText('Succeeded', { timeout: 60_000 })
-  await expect(page.getByTestId('cell-tenant')).toContainText('Suspended', { timeout: 60_000 })
+  await expect(page.getByTestId('page-heading')).toContainText('Suspended', { timeout: 60_000 })
 })

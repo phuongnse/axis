@@ -5,6 +5,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { fillText } from '../platform/fillText'
+import { PageLayout } from '../platform/PageLayout'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import {
   changeAuthors,
@@ -19,7 +20,6 @@ import {
 import { useText } from '../platform/texts'
 import { requestName } from './studioAuthoringRequest'
 import { StudioChanges } from './StudioChanges'
-import { StudioPageHeading } from './StudioPageHeading'
 
 /** The files that differ from the live release, with the names of the AI requests among the revisions that made them. */
 interface PublishChanges {
@@ -117,8 +117,7 @@ export function StudioPublishPage({
   }
 
   return (
-    <Flex vertical gap="middle">
-      <StudioPageHeading title={t('shell.studio.publish.title')} line={line} />
+    <PageLayout title={t('shell.studio.publish.title')} line={line}>
       <AxisFieldGroup title={t('shell.studio.publish.release')} help="">
         <Flex vertical gap="middle">
           <AxisField label={t('shell.studio.publish.label')} help={t('shell.studio.publish.labelHelp')}>
@@ -181,6 +180,6 @@ export function StudioPublishPage({
           </>
         }
       />
-    </Flex>
+    </PageLayout>
   )
 }
