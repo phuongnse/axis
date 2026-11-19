@@ -11,6 +11,7 @@ import type {
   StudioDiagnostic,
   StudioRequest,
   StudioRequestStatus,
+  StudioResourceItem,
 } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
@@ -138,7 +139,7 @@ function json(body: unknown, status = 200) {
 }
 
 /** The accept's publish request, as the accept route and the request read route answer it. */
-function acceptRequest(status: StudioRequestStatus): StudioRequest {
+function acceptRequest(status: StudioRequestStatus, diagnostics: StudioDiagnostic[] = []): StudioRequest {
   return {
     id: 'p1',
     application,
@@ -148,7 +149,7 @@ function acceptRequest(status: StudioRequestStatus): StudioRequest {
     label: null,
     note: null,
     releaseId: null,
-    diagnostics: [],
+    diagnostics,
     scenarios: null,
   }
 }
@@ -162,6 +163,8 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
     current,
     /** The statuses that reads of the accept's publish request answer in turn, the last one for every read after. */
     accept: ['queued'] as StudioRequestStatus[],
+    /** The diagnostics that the accept's publish request answers once it has failed. */
+    acceptDiagnostics: [] as StudioDiagnostic[],
     calls: [] as { action: string; body: unknown }[],
     fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const action = String(input).split('/').pop() ?? ''
@@ -176,7 +179,7 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
           if (status === 'succeeded') {
             server.current = { ...server.current, state: 'accepted' }
           }
-          return json(acceptRequest(status))
+          return json(acceptRequest(status, status === 'failed' ? server.acceptDiagnostics : []))
         }
         return answer(server.current)
       }
@@ -195,7 +198,7 @@ function serverOf(current: AuthoringRequest, refuse: string[] = []) {
   return server
 }
 
-function renderPage(props: { onAskAi?: () => void; userId?: string } = {}) {
+function renderPage(props: { onAskAi?: () => void; userId?: string; resources?: StudioResourceItem[] } = {}) {
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
@@ -204,6 +207,7 @@ function renderPage(props: { onAskAi?: () => void; userId?: string } = {}) {
           requestId="r1"
           userId={props.userId ?? 'u1'}
           onAskAi={props.onAskAi}
+          resources={props.resources}
         />
       </TextProvider>
     </ThemeModeProvider>,
@@ -578,6 +582,33 @@ describe('accepting a ready request', () => {
       ...overrides,
     })
   const accept = () => screen.findByRole('button', { name: 'Accept' })
+  /** An `AXC0377` of an accept: the resource's id or `null` for a package file, its file, and who changed it and when. */
+  const conflict = (
+    resourceId: string | null,
+    file: string,
+    changedBy: string | null,
+    changedAt: string | null,
+  ): StudioDiagnostic => ({
+    code: 'AXC0377',
+    severity: 'error',
+    message: 'The resource changed on main since the draft read it.',
+    file,
+    path: '',
+    resourceId,
+    changedBy,
+    changedAt,
+  })
+  const employee: StudioResourceItem = {
+    id: 'role-1',
+    kind: 'role',
+    name: 'employee',
+    file: 'roles/employee.json',
+    version: 'v1',
+    usedBy: 0,
+    titles: { en: 'Employee' },
+  }
+  const timeOf = (value: string) =>
+    formatValue({ name: 'changedAt', type: 'date-time' }, value, {}, { locale: 'en', text: (key) => key })
 
   it('gives its author Accept and Drop… with the words "Checks and review passed"', async () => {
     vi.stubGlobal('fetch', serverOf(ready()).fetch)
@@ -628,6 +659,57 @@ describe('accepting a ready request', () => {
     expect(screen.getByTestId('studio-ai-request-state')).toHaveTextContent('Ready')
     expect(await accept()).toBeVisible()
     expect(screen.getByText('Checks and review passed')).toBeVisible()
+  })
+
+  it('shows "Not accepted" with no conflict alert when the failed accept has no conflict', async () => {
+    const server = serverOf(ready())
+    server.accept = ['queued', 'failed']
+    server.acceptDiagnostics = [problem('AXIS-E101')]
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage()
+
+    await userEvent.click(await accept())
+
+    expect(
+      await screen.findByText('Not accepted. Nothing in the application changed.', undefined, { timeout: 4000 }),
+    ).toBeVisible()
+    expect(screen.queryByTestId('studio-ai-request-conflict')).toBeNull()
+    expect(await accept()).toBeVisible()
+  })
+
+  it('shows a conflict alert with a bullet for each changed resource, and Drop… with no Accept', async () => {
+    const server = serverOf(ready())
+    server.accept = ['queued', 'failed']
+    server.acceptDiagnostics = [
+      conflict('role-1', 'roles/employee.json', 'Linh Nguyen', '2026-11-18T10:15:00Z'),
+      conflict(null, 'packages/tax/rates.json', 'Minh Tran', '2026-11-18T11:40:00Z'),
+    ]
+    vi.stubGlobal('fetch', server.fetch)
+    renderPage({ resources: [employee] })
+
+    await userEvent.click(await accept())
+
+    const alert = await screen.findByTestId('studio-ai-request-conflict', undefined, { timeout: 4000 })
+    expect(
+      within(alert).getByText('Someone changed these resources after AI read them, so nothing was accepted:'),
+    ).toBeVisible()
+    const items = within(alert).getAllByTestId('studio-ai-request-conflict-item')
+    expect(items).toHaveLength(2)
+    expect(items[0].textContent).toBe(`Employee, changed by Linh Nguyen on ${timeOf('2026-11-18T10:15:00Z')}`)
+    expect(within(items[0]).getByText(timeOf('2026-11-18T10:15:00Z'), { selector: 'time' })).toHaveAttribute(
+      'datetime',
+      '2026-11-18T10:15:00Z',
+    )
+    expect(items[1].textContent).toBe(
+      `packages/tax/rates.json, changed by Minh Tran on ${timeOf('2026-11-18T11:40:00Z')}`,
+    )
+
+    const guide = screen.getByTestId('studio-ai-request-guide')
+    expect(within(guide).getByText('Resources changed since AI read them')).toBeVisible()
+    expect(within(guide).getByRole('button', { name: 'Drop…' })).toBeVisible()
+    expect(within(guide).queryByRole('button', { name: 'Accept' })).toBeNull()
+    expect(screen.queryByText('Not accepted. Nothing in the application changed.')).toBeNull()
+    expect(screen.queryByTestId('studio-request-status')).toBeNull()
   })
 
   it('shows "Accepted" and the state Accepted when the accept succeeds', async () => {
