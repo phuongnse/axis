@@ -25,7 +25,7 @@ function studioDeveloper(page: Page): Promise<boolean> {
   return page.evaluate(async () => (await (await fetch('/api/me')).json()).studioDeveloper as boolean)
 }
 
-test('a developer creates a package in Studio and opens its file list', async () => {
+test('a developer creates a package in Studio and opens its workspace', async () => {
   const created = await runAdmin([
     'tenant',
     'create',
@@ -121,7 +121,7 @@ test('a developer creates a package in Studio and opens its file list', async ()
     await expect(developerPage).toHaveURL(new RegExp(`[?&]package=${packageId}(&|$)`))
     await expect(developerPage.getByRole('heading', { name: 'Purchasing tools', exact: true })).toBeVisible()
     await expect(
-      developerPage.getByTestId('studio-package-files').getByRole('cell', { name: 'axis-package.json', exact: true }),
+      developerPage.getByTestId('studio-package-tree').getByText('axis-package.json', { exact: true }),
     ).toBeVisible()
   } finally {
     await browser?.close()
