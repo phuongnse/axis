@@ -177,7 +177,7 @@ required one, and each decision branch has an optional Branch label picker.
   them, by the rule above.
 
 The step types and operations below have a panel of their own, beside the operation panels that
-[Studio](studio.md) describes for the Form tab.
+[Studio editors by kind](studio-editors-by-kind.md#process-editor) describes for the Form tab.
 
 ### createRecord
 
