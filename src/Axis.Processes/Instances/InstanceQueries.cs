@@ -355,6 +355,33 @@ public static class InstanceQueries
     }
 
     /// <summary>
+    /// Reads the subject label and the release number of the instance <paramref name="instanceId"/>, as the list does.
+    /// The caller passes <paramref name="labelEntity"/> only when the reader may see the label, so otherwise the label is
+    /// null and no record is read. The label is also null when the subject record no longer exists, and the release number
+    /// is null when the release has no history row.
+    /// </summary>
+    public static async Task<InstanceLabels> LabelsAsync(
+        NpgsqlConnection connection,
+        Guid instanceId,
+        EntityModel? labelEntity,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        var label = labelEntity is null ? "NULL::text" : SubjectLabelSql(labelEntity);
+        await using var command = new NpgsqlCommand(
+            $"SELECT {label}, {ReleaseNumberSql} FROM axis.process_instances AS {InstanceAlias} WHERE i.id = @id",
+            connection);
+        command.Parameters.AddWithValue("id", instanceId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? new InstanceLabels(
+                reader.IsDBNull(0) ? null : reader.GetString(0),
+                reader.IsDBNull(1) ? null : reader.GetInt32(1))
+            : new InstanceLabels(null, null);
+    }
+
+    /// <summary>
     /// Reads the due time of the pending timer item of the instance <paramref name="instanceId"/> that belongs to
     /// <paramref name="revision"/>, the instance's current revision, or returns <see langword="null"/> when there is none.
     /// A timer item of another revision is left over from an earlier wait and no longer resumes the instance.
@@ -378,6 +405,44 @@ public static class InstanceQueries
             : null;
     }
 
+    /// <summary>
+    /// Reads who or what started the instance <paramref name="instanceId"/>, or returns <see langword="null"/> for an instance
+    /// that started before Axis recorded its starter. A person's <c>Name</c> is not stored, so it is <see langword="null"/> here.
+    /// </summary>
+    public static async Task<ProcessStartedBy?> StartedByAsync(
+        NpgsqlConnection connection,
+        Guid instanceId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand("SELECT started_by::text FROM axis.process_instances WHERE id = @id", connection);
+        command.Parameters.AddWithValue("id", instanceId);
+        return await command.ExecuteScalarAsync(cancellationToken) is string json ? ProcessStartedBy.Parse(json) : null;
+    }
+
+    /// <summary>
+    /// Reads the JSON text of the parameter values that the instance <paramref name="instanceId"/> started with and of the
+    /// result it completed with. Either is <see langword="null"/> when it is not stored. They are not in the columns of
+    /// <see cref="ProcessInstanceRow"/>'s other reads, because the list reads its own columns by position.
+    /// </summary>
+    public static async Task<(string? Parameters, string? Result)> ValuesAsync(
+        NpgsqlConnection connection,
+        Guid instanceId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand(
+            "SELECT parameters::text, result::text FROM axis.process_instances WHERE id = @id",
+            connection);
+        command.Parameters.AddWithValue("id", instanceId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? (reader.IsDBNull(0) ? null : reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1))
+            : (null, null);
+    }
+
     /// <summary>Reads the step history rows of the instance <paramref name="instanceId"/>, oldest first.</summary>
     public static async Task<IReadOnlyList<ProcessStepHistoryRow>> HistoryAsync(
         NpgsqlConnection connection,
@@ -388,7 +453,7 @@ public static class InstanceQueries
 
         await using var command = new NpgsqlCommand(
             """
-            SELECT id, process_instance_id, step, revision, input::text, output::text, decision, error, started_at, finished_at, trace_id
+            SELECT id, process_instance_id, step, revision, input::text, output::text, decision, error, started_at, finished_at, trace_id, problem::text, read::text, changes::text
             FROM axis.process_step_history WHERE process_instance_id = @id ORDER BY finished_at, id
             """,
             connection);
@@ -410,6 +475,9 @@ public static class InstanceQueries
                 StartedAt = reader.GetFieldValue<DateTimeOffset>(8),
                 FinishedAt = reader.GetFieldValue<DateTimeOffset>(9),
                 TraceId = reader.IsDBNull(10) ? null : reader.GetString(10),
+                Problem = reader.IsDBNull(11) ? null : reader.GetString(11),
+                Read = reader.IsDBNull(12) ? null : reader.GetString(12),
+                Changes = reader.IsDBNull(13) ? null : reader.GetString(13),
             });
         }
 
@@ -528,6 +596,12 @@ public sealed record InstanceListPage(IReadOnlyList<InstanceListItem> Items, lon
 /// display field. <paramref name="ReleaseNumber"/> is null when the release has no history row.
 /// </summary>
 public sealed record InstanceListItem(ProcessInstanceRow Instance, string? SubjectLabel, int? ReleaseNumber);
+
+/// <summary>
+/// The subject label and the release number of one instance. <paramref name="SubjectLabel"/> is null when the reader
+/// may not see it or the subject record is gone. <paramref name="ReleaseNumber"/> is null when the release has no history row.
+/// </summary>
+public sealed record InstanceLabels(string? SubjectLabel, int? ReleaseNumber);
 
 /// <summary>
 /// An instance related to another through a sub-process step. <paramref name="Step"/> is the sub-process step in the

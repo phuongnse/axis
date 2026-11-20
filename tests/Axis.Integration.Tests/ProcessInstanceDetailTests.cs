@@ -1,7 +1,10 @@
 using System.Net;
 using System.Text.Json;
 using Axis.Configuration.Diagnostics;
+using Axis.Data.Naming;
+using Axis.Processes.Instances;
 using Axis.Server.Tests;
+using Microsoft.AspNetCore.Mvc.Testing;
 using static Axis.Integration.Tests.TaskApiFixture;
 
 namespace Axis.Integration.Tests;
@@ -21,10 +24,11 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
         var root = body.RootElement;
         Assert.Equal(
-            ["id", "process", "subjectId", "releaseId", "state", "step", "createdAt", "endedAt", "timerDueAt", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands"],
+            ["id", "process", "processTitleKey", "subjectEntity", "subjectId", "subjectLabel", "releaseId", "releaseNumber", "state", "step", "createdAt", "endedAt", "timerDueAt", "startedBy", "input", "result", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands", "studio"],
             root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(instance, root.GetProperty("id").GetGuid());
         Assert.Equal("Break", root.GetProperty("process").GetString());
+        Assert.Equal("processes.break.title", root.GetProperty("processTitleKey").GetString());
         Assert.Equal("failed", root.GetProperty("state").GetString());
         Assert.Equal(JsonValueKind.Null, root.GetProperty("timerDueAt").ValueKind);
         Assert.Equal(JsonValueKind.Null, root.GetProperty("parent").ValueKind);
@@ -32,10 +36,15 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal(DateTimeKind.Utc, root.GetProperty("createdAt").GetDateTime().Kind);
         var path = Assert.Single(root.GetProperty("path").EnumerateArray());
         Assert.Equal(
-            ["step", "startedAt", "finishedAt", "decision", "output", "error", "traceId"],
+            ["step", "startedAt", "finishedAt", "decision", "output", "error", "problem", "traceId", "read", "made"],
             path.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(JsonValueKind.Null, path.GetProperty("read").ValueKind);
+        var made = path.GetProperty("made");
+        Assert.Equal(["changes", "event", "notified", "created"], made.EnumerateObject().Select(property => property.Name));
+        Assert.All(made.EnumerateObject(), part => Assert.Equal(JsonValueKind.Null, part.Value.ValueKind));
         Assert.Equal("lower", path.GetProperty("step").GetString());
         Assert.Equal("The record update was rejected: /values/amount: request.amountNegative", path.GetProperty("error").GetString());
+        Assert.Equal(("writeRefused", 0), (path.GetProperty("problem").GetProperty("code").GetString(), path.GetProperty("problem").GetProperty("values").EnumerateObject().Count()));
         Assert.Equal(JsonValueKind.Null, path.GetProperty("output").ValueKind);
         Assert.Equal(JsonValueKind.Null, path.GetProperty("decision").ValueKind);
         Assert.Empty(root.GetProperty("tasks").EnumerateArray());
@@ -47,6 +56,14 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
     {
         var instance = await StartAndRunAsync(TenantA, "RoleApprove");
         var taskId = await fixture.TaskIdAsync(TenantA, instance);
+        // PostgreSQL keeps microseconds.
+        var due = DateTime.UtcNow.AddDays(2);
+        var dueAt = new DateTime(due.Ticks - (due.Ticks % 10), DateTimeKind.Utc);
+        await fixture.ExecuteAsync(
+            TenantA,
+            "UPDATE axis.process_tasks SET due_at = @due, claimed_by = 'lena', claimed_at = now() WHERE id = @id",
+            ("due", dueAt),
+            ("id", taskId));
 
         using var body = await GetOkAsync(TenantA, "RoleApprove", instance);
 
@@ -56,15 +73,19 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal(JsonValueKind.Null, root.GetProperty("timerDueAt").ValueKind);
         var task = Assert.Single(root.GetProperty("tasks").EnumerateArray());
         Assert.Equal(
-            ["id", "step", "assigneeKind", "assignee", "state", "outcome", "completedBy", "createdAt", "completedAt"],
+            ["id", "step", "assigneeKind", "assignee", "assigneeId", "state", "outcome", "completedBy", "completedById", "createdAt", "dueAt", "completedAt"],
             task.EnumerateObject().Select(property => property.Name));
         Assert.Equal(taskId, task.GetProperty("id").GetGuid());
         Assert.Equal("approve", task.GetProperty("step").GetString());
         Assert.Equal("role", task.GetProperty("assigneeKind").GetString());
         Assert.Equal("finance", task.GetProperty("assignee").GetString());
+        Assert.Equal("lena", task.GetProperty("assigneeId").GetString());
+        Assert.Equal(DateTimeKind.Utc, task.GetProperty("dueAt").GetDateTime().Kind);
+        Assert.Equal(dueAt, task.GetProperty("dueAt").GetDateTime());
         Assert.Equal("open", task.GetProperty("state").GetString());
         Assert.Equal(JsonValueKind.Null, task.GetProperty("outcome").ValueKind);
         Assert.Equal(JsonValueKind.Null, task.GetProperty("completedBy").ValueKind);
+        Assert.Equal(JsonValueKind.Null, task.GetProperty("completedById").ValueKind);
         Assert.Equal(JsonValueKind.Null, task.GetProperty("completedAt").ValueKind);
 
         var path = Assert.Single(root.GetProperty("path").EnumerateArray());
@@ -76,13 +97,187 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal("approve", graph.GetProperty("start").GetString());
         var steps = graph.GetProperty("steps").EnumerateArray().ToList();
         Assert.Equal(["approve", "done"], steps.Select(step => step.GetProperty("name").GetString()));
-        Assert.Equal(["name", "type", "labelKey", "transitions"], steps[0].EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["name", "type", "labelKey", "event", "eventLabelKey", "transitions"], steps[0].EnumerateObject().Select(property => property.Name));
         Assert.Equal("task", steps[0].GetProperty("type").GetString());
         Assert.Equal("request.approve", steps[0].GetProperty("labelKey").GetString());
         Assert.Equal([("done", "approve")], Transitions(steps[0]));
+        var outcome = Assert.Single(steps[0].GetProperty("transitions").EnumerateArray());
+        Assert.Equal(["next", "on", "branch", "labelKey", "after"], outcome.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("task.approve", outcome.GetProperty("labelKey").GetString());
+        Assert.Equal(JsonValueKind.Null, outcome.GetProperty("branch").ValueKind);
+        Assert.Equal(JsonValueKind.Null, outcome.GetProperty("after").ValueKind);
+        Assert.Equal(JsonValueKind.Null, steps[0].GetProperty("event").ValueKind);
+        Assert.Equal(JsonValueKind.Null, steps[0].GetProperty("eventLabelKey").ValueKind);
         Assert.Equal("end", steps[1].GetProperty("type").GetString());
         Assert.Equal(JsonValueKind.Null, steps[1].GetProperty("labelKey").ValueKind);
         Assert.Empty(steps[1].GetProperty("transitions").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_completed_instance_gives_its_end_step_and_the_values_its_steps_wrote_and_a_waiting_one_gives_none()
+    {
+        var subject = await fixture.InsertRequestAsync(TenantA, null);
+        var instance = await fixture.StartAsync(TenantA, "Submit", subject);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+        using var record = await GetRecordAsync(TenantA, subject);
+        var recorded = record.RootElement.GetProperty("values");
+
+        using var body = await GetOkAsync(TenantA, "Submit", instance);
+
+        Assert.Equal("completed", body.RootElement.GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("input").ValueKind);
+        Assert.Equal(JsonValueKind.Null, body.RootElement.GetProperty("processTitleKey").ValueKind);
+        var result = body.RootElement.GetProperty("result");
+        Assert.Equal(["step", "values"], result.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("done", result.GetProperty("step").GetString());
+        var values = result.GetProperty("values").EnumerateArray().ToList();
+        Assert.Equal(["status", "submittedAt"], values.Select(value => value.GetProperty("name").GetString()));
+        Assert.All(values, value =>
+        {
+            Assert.Equal(["name", "value", "hidden"], value.EnumerateObject().Select(property => property.Name));
+            Assert.False(value.GetProperty("hidden").GetBoolean());
+        });
+        Assert.Equal("submitted", values[0].GetProperty("value").GetString());
+        Assert.Equal(recorded.GetProperty("submittedAt").GetString(), values[1].GetProperty("value").GetString());
+
+        // The record changes later, but the instance keeps the values it completed with.
+        Assert.True(fixture.Model.TryGetEntity("Request", out var request));
+        await fixture.ExecuteAsync(
+            TenantA,
+            $"UPDATE {EntityNaming.QualifiedTable(EntityNaming.Table(request.Id))} SET {EntityNaming.Column("status")} = 'draft' WHERE {EntityNaming.IdColumn} = @id",
+            ("id", subject));
+        using var later = await GetOkAsync(TenantA, "Submit", instance);
+        Assert.Equal("submitted", later.RootElement.GetProperty("result").GetProperty("values")[0].GetProperty("value").GetString());
+
+        var waiting = await StartAndRunAsync(TenantA, "RoleApprove");
+        using var waitingBody = await GetOkAsync(TenantA, "RoleApprove", waiting);
+        Assert.Equal("waiting", waitingBody.RootElement.GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, waitingBody.RootElement.GetProperty("result").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_user_who_may_not_read_a_written_field_gets_that_value_as_null_and_hidden()
+    {
+        var instance = await StartAndRunAsync(TenantA, "Submit");
+
+        using var body = await GetOkAsync(TenantA, "Submit", instance, "carl");
+
+        var values = body.RootElement.GetProperty("result").GetProperty("values").EnumerateArray().ToList();
+        Assert.Equal(["status", "submittedAt"], values.Select(value => value.GetProperty("name").GetString()));
+        Assert.All(values, value =>
+        {
+            Assert.Equal(JsonValueKind.Null, value.GetProperty("value").ValueKind);
+            Assert.True(value.GetProperty("hidden").GetBoolean());
+        });
+        Assert.DoesNotContain("\"submitted\"", body.RootElement.GetProperty("result").ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_values_of_a_result_follow_the_subjects_field_order_and_a_field_the_entity_no_longer_has_comes_last()
+    {
+        var instance = await StartAndRunAsync(TenantA, "Submit");
+        // jsonb sorts keys by length and then by bytes, which is status, comment, divisor, legacy. Request declares divisor, status, comment.
+        await fixture.ExecuteAsync(
+            TenantA,
+            "UPDATE axis.process_instances SET result = '{\"comment\": \"c\", \"status\": \"submitted\", \"divisor\": 3, \"legacy\": 1}'::jsonb WHERE id = @id",
+            ("id", instance));
+
+        using var body = await GetOkAsync(TenantA, "Submit", instance);
+
+        var values = body.RootElement.GetProperty("result").GetProperty("values").EnumerateArray().ToList();
+        Assert.Equal(["divisor", "status", "comment", "legacy"], values.Select(value => value.GetProperty("name").GetString()));
+        Assert.Equal(3, values[0].GetProperty("value").GetInt32());
+        Assert.False(values[2].GetProperty("hidden").GetBoolean());
+        Assert.True(values[3].GetProperty("hidden").GetBoolean());
+    }
+
+    [Fact]
+    public async Task An_instance_that_completed_before_the_result_was_kept_has_values_null()
+    {
+        var instance = await StartAndRunAsync(TenantA, "Submit");
+        await fixture.ExecuteAsync(TenantA, "UPDATE axis.process_instances SET result = NULL WHERE id = @id", ("id", instance));
+
+        using var body = await GetOkAsync(TenantA, "Submit", instance);
+
+        var result = body.RootElement.GetProperty("result");
+        Assert.Equal("done", result.GetProperty("step").GetString());
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("values").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_completed_task_shows_the_name_and_the_id_of_the_person_who_completed_it()
+    {
+        var instance = await StartAndRunAsync(TenantA, "RoleApprove");
+        var taskId = await fixture.TaskIdAsync(TenantA, instance);
+        await fixture.InsertProfileAsync(TenantA, "maria", "Maria Manager");
+        await fixture.ExecuteAsync(
+            TenantA,
+            "UPDATE axis.process_tasks SET state = 'completed', outcome = 'approve', completed_by = 'maria', completed_at = now() WHERE id = @id",
+            ("id", taskId));
+
+        using var body = await GetOkAsync(TenantA, "RoleApprove", instance);
+
+        var task = Assert.Single(body.RootElement.GetProperty("tasks").EnumerateArray());
+        Assert.Equal("completed", task.GetProperty("state").GetString());
+        Assert.Equal("Maria Manager", task.GetProperty("completedBy").GetString());
+        Assert.Equal("maria", task.GetProperty("completedById").GetString());
+        Assert.Equal("finance", task.GetProperty("assignee").GetString());
+        Assert.Equal(JsonValueKind.Null, task.GetProperty("assigneeId").ValueKind);
+        Assert.Equal(JsonValueKind.Null, task.GetProperty("dueAt").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_user_assignee_shows_by_name_and_a_user_without_a_profile_shows_by_id()
+    {
+        var instance = await StartAndRunAsync(TenantA, "RoleApprove");
+        var taskId = await fixture.TaskIdAsync(TenantA, instance);
+        await fixture.InsertProfileAsync(TenantA, "fiona", "Fiona Finance");
+        await fixture.ExecuteAsync(
+            TenantA,
+            "UPDATE axis.process_tasks SET assignee_kind = 'user', assignee = 'fiona', state = 'completed', outcome = 'approve', completed_by = 'nobody-with-a-profile', completed_at = now() WHERE id = @id",
+            ("id", taskId));
+
+        using var body = await GetOkAsync(TenantA, "RoleApprove", instance);
+
+        var task = Assert.Single(body.RootElement.GetProperty("tasks").EnumerateArray());
+        Assert.Equal("user", task.GetProperty("assigneeKind").GetString());
+        Assert.Equal("Fiona Finance", task.GetProperty("assignee").GetString());
+        Assert.Equal("fiona", task.GetProperty("assigneeId").GetString());
+        Assert.Equal("nobody-with-a-profile", task.GetProperty("completedBy").GetString());
+        Assert.Equal("nobody-with-a-profile", task.GetProperty("completedById").GetString());
+    }
+
+    [Fact]
+    public async Task A_reader_with_the_author_role_gets_the_studio_address_and_one_without_it_gets_null()
+    {
+        var instance = await StartAndRunAsync(TenantA, "RoleApprove");
+        Assert.True(fixture.Model.TryGetProcess("RoleApprove", out var process));
+        var folder = Directory.CreateTempSubdirectory("axis-studio-detail-");
+        try
+        {
+            await using var factory = fixture.Factory.WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("Studio:AuthorRole", "finance");
+                builder.UseSetting("Studio:Folders:0", folder.FullName);
+            });
+
+            using var author = await GetOkAsync(factory, "lena", TenantA, "RoleApprove", instance);
+            using var reader = await GetOkAsync(factory, "ines", TenantA, "RoleApprove", instance);
+
+            var studio = author.RootElement.GetProperty("studio");
+            Assert.Equal(["app", "resource"], studio.EnumerateObject().Select(property => property.Name));
+            Assert.Equal("StepApp", studio.GetProperty("app").GetString());
+            Assert.Equal(process.Id, studio.GetProperty("resource").GetGuid());
+            Assert.Equal(JsonValueKind.Null, reader.RootElement.GetProperty("studio").ValueKind);
+        }
+        finally
+        {
+            folder.Delete(recursive: true);
+        }
+
+        // Studio is off in the default host, so even the user who holds the role has no address.
+        using var off = await GetOkAsync(TenantA, "RoleApprove", instance, "lena");
+        Assert.Equal(JsonValueKind.Null, off.RootElement.GetProperty("studio").ValueKind);
     }
 
     [Fact]
@@ -99,6 +294,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         var root = body.RootElement;
         Assert.Equal("waiting", root.GetProperty("state").GetString());
         Assert.Equal("pause", root.GetProperty("step").GetString());
+        Assert.Equal("Request", root.GetProperty("subjectEntity").GetString());
         var timerDueAt = root.GetProperty("timerDueAt").GetDateTime();
         Assert.Equal(DateTimeKind.Utc, timerDueAt.Kind);
         Assert.Equal(dueAt.ToUniversalTime(), timerDueAt);
@@ -150,10 +346,141 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal("check", root.GetProperty("graph").GetProperty("start").GetString());
         Assert.Equal("decision", steps[0].GetProperty("type").GetString());
         Assert.Equal([("done", "0"), ("done", "otherwise")], Transitions(steps[0]));
+        Assert.Equal("request.check", steps[0].GetProperty("labelKey").GetString());
+        var transitions = steps[0].GetProperty("transitions").EnumerateArray().ToList();
+        Assert.Equal("branch1", transitions[0].GetProperty("branch").GetString());
+        Assert.Equal("request.check.divided", transitions[0].GetProperty("labelKey").GetString());
+        Assert.Equal(JsonValueKind.Null, transitions[1].GetProperty("branch").ValueKind);
+        Assert.Equal(JsonValueKind.Null, transitions[1].GetProperty("labelKey").ValueKind);
         Assert.Equal("end", steps[1].GetProperty("type").GetString());
         Assert.Empty(steps[1].GetProperty("transitions").EnumerateArray());
         Assert.Empty(root.GetProperty("path").EnumerateArray());
         Assert.Empty(root.GetProperty("tasks").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_decision_run_gives_the_fields_its_condition_read_with_the_values_it_saw()
+    {
+        var subject = await fixture.InsertRequestAsync(TenantA, null, divisor: 2, amount: 10);
+        var instance = await fixture.StartAsync(TenantA, "Divide", subject);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+
+        using var body = await GetOkAsync(TenantA, "Divide", instance);
+
+        var check = body.RootElement.GetProperty("path").EnumerateArray().Single(entry => entry.GetProperty("step").GetString() == "check");
+        var read = check.GetProperty("read").EnumerateArray().ToList();
+        Assert.Equal(["amount", "divisor"], read.Select(value => value.GetProperty("name").GetString()));
+        Assert.All(read, value =>
+        {
+            Assert.Equal(["name", "value", "hidden"], value.EnumerateObject().Select(property => property.Name));
+            Assert.False(value.GetProperty("hidden").GetBoolean());
+        });
+        Assert.Equal(10m, read[0].GetProperty("value").GetDecimal());
+        Assert.Equal(2, read[1].GetProperty("value").GetInt64());
+        Assert.Equal(JsonValueKind.Null, check.GetProperty("made").GetProperty("changes").ValueKind);
+        var done = body.RootElement.GetProperty("path").EnumerateArray().Single(entry => entry.GetProperty("step").GetString() == "done");
+        Assert.Equal(JsonValueKind.Null, done.GetProperty("read").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_decision_run_hides_only_the_value_of_a_field_the_user_may_not_read()
+    {
+        var subject = await fixture.InsertRequestAsync(TenantA, null, divisor: 2, amount: 10);
+        var instance = await fixture.StartAsync(TenantA, "Divide", subject);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+
+        using var body = await GetOkAsync(TenantA, "Divide", instance, "carl");
+
+        var check = body.RootElement.GetProperty("path").EnumerateArray().Single(entry => entry.GetProperty("step").GetString() == "check");
+        var read = check.GetProperty("read").EnumerateArray().ToList();
+        Assert.Equal(["amount", "divisor"], read.Select(value => value.GetProperty("name").GetString()));
+        Assert.Equal((10m, false), (read[0].GetProperty("value").GetDecimal(), read[0].GetProperty("hidden").GetBoolean()));
+        Assert.Equal((JsonValueKind.Null, true), (read[1].GetProperty("value").ValueKind, read[1].GetProperty("hidden").GetBoolean()));
+    }
+
+    [Fact]
+    public async Task A_task_completion_that_saves_values_gives_the_field_it_changed_with_the_value_before_and_after()
+    {
+        var department = await fixture.InsertDepartmentAsync(TenantA, "maria");
+        var subject = await fixture.InsertRequestAsync(TenantA, department);
+        var instance = await fixture.StartAsync(TenantA, "Decide", subject);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+        var task = await fixture.TaskIdAsync(TenantA, instance);
+        using (var maria = fixture.CreateClient().SignedInAs("maria"))
+        using (var request = RecordApiFixture.Request(
+            HttpMethod.Post,
+            $"/api/apps/StepApp/tasks/{task:D}/complete",
+            Host(TenantA),
+            """{ "outcome": "approve", "values": { "comment": "Fine" }, "version": 1 }"""))
+        {
+            using var response = await maria.SendAsync(request, CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+        using var body = await GetOkAsync(TenantA, "Decide", instance, "maria");
+
+        var path = body.RootElement.GetProperty("path").EnumerateArray().ToList();
+        var completed = Assert.Single(path, entry => entry.GetProperty("step").GetString() == "decide" && entry.GetProperty("decision").ValueKind == JsonValueKind.String);
+        Assert.Equal("approve", completed.GetProperty("decision").GetString());
+        var change = Assert.Single(completed.GetProperty("made").GetProperty("changes").EnumerateArray());
+        Assert.Equal("comment", change.GetProperty("field").GetString());
+        Assert.Equal(JsonValueKind.Null, change.GetProperty("before").ValueKind);
+        Assert.Equal("Fine", change.GetProperty("after").GetString());
+        Assert.False(change.GetProperty("hidden").GetBoolean());
+        var waiting = Assert.Single(path, entry => entry.GetProperty("step").GetString() == "decide" && entry.GetProperty("decision").ValueKind == JsonValueKind.Null);
+        Assert.Equal(JsonValueKind.Null, waiting.GetProperty("made").GetProperty("changes").ValueKind);
+    }
+
+    [Fact]
+    public async Task An_update_record_run_gives_each_field_it_changed_with_the_value_before_and_after()
+    {
+        var subject = await fixture.InsertRequestAsync(TenantA, null);
+        var instance = await fixture.StartAsync(TenantA, "Submit", subject);
+        await fixture.RunUntilIdleAsync(TenantA, CancellationToken);
+        using var record = await GetRecordAsync(TenantA, subject);
+        var recorded = record.RootElement.GetProperty("values");
+
+        using var body = await GetOkAsync(TenantA, "Submit", instance);
+
+        var path = body.RootElement.GetProperty("path").EnumerateArray().ToList();
+        var made = path.Single(entry => entry.GetProperty("step").GetString() == "submit").GetProperty("made");
+        Assert.Equal(["changes", "event", "notified", "created"], made.EnumerateObject().Select(property => property.Name));
+        var changes = made.GetProperty("changes").EnumerateArray().ToList();
+        Assert.Equal(["status", "submittedAt"], changes.Select(change => change.GetProperty("field").GetString()));
+        Assert.All(changes, change =>
+        {
+            Assert.Equal(["field", "before", "after", "hidden"], change.EnumerateObject().Select(property => property.Name));
+            Assert.Equal(JsonValueKind.Null, change.GetProperty("before").ValueKind);
+            Assert.False(change.GetProperty("hidden").GetBoolean());
+        });
+        Assert.Equal("submitted", changes[0].GetProperty("after").GetString());
+        Assert.Equal(recorded.GetProperty("submittedAt").GetString(), changes[1].GetProperty("after").GetString());
+        Assert.Equal(JsonValueKind.Null, made.GetProperty("event").ValueKind);
+        Assert.Equal(JsonValueKind.Null, made.GetProperty("notified").ValueKind);
+        Assert.Equal(JsonValueKind.Null, made.GetProperty("created").ValueKind);
+        var done = path.Single(entry => entry.GetProperty("step").GetString() == "done");
+        Assert.Equal(JsonValueKind.Null, done.GetProperty("made").GetProperty("changes").ValueKind);
+    }
+
+    [Fact]
+    public async Task A_wait_event_graph_gives_its_event_and_the_timeout_after()
+    {
+        var instance = await StartAndRunAsync(TenantA, "WaitEvent");
+
+        using var body = await GetOkAsync(TenantA, "WaitEvent", instance);
+
+        var steps = body.RootElement.GetProperty("graph").GetProperty("steps").EnumerateArray().ToList();
+        var wait = steps[0];
+        Assert.Equal("waitEvent", wait.GetProperty("type").GetString());
+        Assert.Equal("request.await", wait.GetProperty("labelKey").GetString());
+        Assert.Equal("RequestNoted", wait.GetProperty("event").GetString());
+        Assert.Equal(JsonValueKind.Null, wait.GetProperty("eventLabelKey").ValueKind);
+        Assert.Equal([("done", (string?)null), ("timedOut", "timeout")], Transitions(wait));
+        var transitions = wait.GetProperty("transitions").EnumerateArray().ToList();
+        Assert.Equal(JsonValueKind.Null, transitions[0].GetProperty("after").ValueKind);
+        Assert.Equal("PT1H", transitions[1].GetProperty("after").GetString());
+        Assert.Equal(JsonValueKind.Null, steps[1].GetProperty("event").ValueKind);
     }
 
     [Fact]
@@ -176,9 +503,10 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
             item =>
             {
                 Assert.Equal(
-                    ["id", "process", "step", "state", "createdAt", "endedAt"],
+                    ["id", "process", "processTitleKey", "step", "state", "createdAt", "endedAt"],
                     item.EnumerateObject().Select(property => property.Name));
                 Assert.Equal("Decide", item.GetProperty("process").GetString());
+                Assert.Equal("processes.decide.title", item.GetProperty("processTitleKey").GetString());
                 Assert.Equal("fulfil", item.GetProperty("step").GetString());
                 Assert.Equal(DateTimeKind.Utc, item.GetProperty("createdAt").GetDateTime().Kind);
             });
@@ -188,11 +516,23 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
         using var child = await GetOkAsync(TenantA, "Decide", first);
         var named = child.RootElement.GetProperty("parent");
-        Assert.Equal(["id", "process", "step"], named.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["id", "process", "processTitleKey", "step"], named.EnumerateObject().Select(property => property.Name));
         Assert.Equal(parent, named.GetProperty("id").GetGuid());
         Assert.Equal("RoleApprove", named.GetProperty("process").GetString());
+        Assert.Equal("processes.roleApprove.title", named.GetProperty("processTitleKey").GetString());
         Assert.Equal("fulfil", named.GetProperty("step").GetString());
         Assert.Empty(child.RootElement.GetProperty("subProcesses").EnumerateArray());
+
+        // The child names its parent as its starter, with no action. An instance with no stored starter has none.
+        var startedBy = child.RootElement.GetProperty("startedBy");
+        Assert.Equal(["kind", "name", "id", "via"], startedBy.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("parent", startedBy.GetProperty("kind").GetString());
+        Assert.Equal("RoleApprove", startedBy.GetProperty("name").GetString());
+        Assert.Equal(parent.ToString(), startedBy.GetProperty("id").GetString());
+        Assert.Equal(JsonValueKind.Null, startedBy.GetProperty("via").ValueKind);
+        using var root = await GetOkAsync(TenantA, "RoleApprove", parent);
+        Assert.Equal(JsonValueKind.Null, root.RootElement.GetProperty("startedBy").ValueKind);
+        Assert.Equal("processes.roleApprove.title", root.RootElement.GetProperty("processTitleKey").GetString());
     }
 
     [Fact]
@@ -220,6 +560,13 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         using var shown = await GetOkAsync(TenantA, "Decide", child, "lena");
 
         Assert.Equal(JsonValueKind.Null, hidden.RootElement.GetProperty("parent").ValueKind);
+        var hiddenStartedBy = hidden.RootElement.GetProperty("startedBy");
+        Assert.Equal("parent", hiddenStartedBy.GetProperty("kind").GetString());
+        Assert.Equal(JsonValueKind.Null, hiddenStartedBy.GetProperty("name").ValueKind);
+        Assert.Equal(JsonValueKind.Null, hiddenStartedBy.GetProperty("id").ValueKind);
+        var shownStartedBy = shown.RootElement.GetProperty("startedBy");
+        Assert.Equal("RoleApprove", shownStartedBy.GetProperty("name").GetString()); // the name StartChildAsync stores
+        Assert.Equal(parent.ToString("D"), shownStartedBy.GetProperty("id").GetString());
         Assert.Equal(parent, shown.RootElement.GetProperty("parent").GetProperty("id").GetGuid());
         Assert.Equal("Rework", shown.RootElement.GetProperty("parent").GetProperty("process").GetString());
     }
@@ -281,7 +628,16 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         var (instance, call) = await StartWithCallAsync(TenantA, """{"reference":"Sales","amount":500}""");
         var start = DateTimeOffset.UtcNow.AddMinutes(-5);
         await fixture.InsertCallAttemptAsync(TenantA, call, "attempt", 2, start.AddSeconds(4), "succeeded", 200);
-        await fixture.InsertCallAttemptAsync(TenantA, call, "attempt", 1, start, "retryable", 503);
+        await fixture.InsertCallAttemptAsync(
+            TenantA,
+            call,
+            "attempt",
+            1,
+            start,
+            "retryable",
+            503,
+            "The operation 'createOrder' of the connector 'Purchasing' answered with the status 503.",
+            """{"code":"serverError","values":{}}""");
         await fixture.InsertCallAttemptAsync(TenantA, call, "lookup", 1, start.AddSeconds(2), "notFound", 404);
 
         using var body = await GetOkAsync(TenantA, "DepartmentOrder", instance);
@@ -289,7 +645,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         var calls = body.RootElement.GetProperty("calls").EnumerateArray().ToList();
         var item = Assert.Single(calls);
         Assert.Equal(
-            ["id", "kind", "step", "connector", "operation", "state", "attempts", "input", "inputHidden", "resolvable"],
+            ["id", "kind", "step", "connector", "operation", "state", "attempts", "input", "inputHidden", "request", "returned", "resolvable"],
             item.EnumerateObject().Select(property => property.Name));
         Assert.Equal(call, item.GetProperty("id").GetGuid());
         Assert.Equal("connector", item.GetProperty("kind").GetString());
@@ -306,9 +662,15 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
                 attempt.GetProperty("outcome").GetString()!,
                 attempt.GetProperty("httpStatus").GetInt32())));
         Assert.Equal(
-            ["kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "traceId"],
+            ["kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "problem", "traceId", "response"],
             attempts[0].EnumerateObject().Select(property => property.Name));
-        Assert.Equal(JsonValueKind.Null, attempts[0].GetProperty("error").ValueKind);
+
+        // A failed attempt returns the stored code beside its fixed error, and an attempt with no error has no code.
+        Assert.Equal("The operation 'createOrder' of the connector 'Purchasing' answered with the status 503.", attempts[0].GetProperty("error").GetString());
+        Assert.Equal(("serverError", 0), (attempts[0].GetProperty("problem").GetProperty("code").GetString(), attempts[0].GetProperty("problem").GetProperty("values").EnumerateObject().Count()));
+        Assert.Equal(JsonValueKind.Null, attempts[1].GetProperty("problem").ValueKind);
+        Assert.Equal(JsonValueKind.Null, attempts[2].GetProperty("error").ValueKind);
+        Assert.Equal(JsonValueKind.Null, attempts[2].GetProperty("problem").ValueKind);
         Assert.Equal(JsonValueKind.Null, attempts[0].GetProperty("traceId").ValueKind);
         Assert.Equal(DateTimeKind.Utc, attempts[0].GetProperty("startedAt").GetDateTime().Kind);
         Assert.True(attempts[0].GetProperty("startedAt").GetDateTime() < attempts[1].GetProperty("startedAt").GetDateTime());
@@ -421,11 +783,21 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         var child = await fixture.StartAsync(tenant, process, subject);
         await fixture.ExecuteAsync(
             tenant,
-            "UPDATE axis.process_instances SET parent_instance_id = @parent, parent_step = @step WHERE id = @id",
+            "UPDATE axis.process_instances SET parent_instance_id = @parent, parent_step = @step, started_by = @startedBy::jsonb WHERE id = @id",
             ("parent", parent),
             ("step", step),
+            ("startedBy", ProcessStartedBy.Parent("RoleApprove", parent).ToJson()),
             ("id", child));
         return child;
+    }
+
+    private async Task<JsonDocument> GetRecordAsync(string tenant, Guid id)
+    {
+        using var client = fixture.CreateClient().SignedInAs("ines");
+        using var request = RecordApiFixture.Request($"/api/apps/StepApp/entities/Request/records/{id:D}", Host(tenant));
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
     }
 
     private async Task<Guid> StartAndRunAsync(string tenant, string process)
@@ -439,6 +811,15 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
     private async Task<JsonDocument> GetOkAsync(string tenant, string process, Guid instance, string user = "ines")
     {
         using var response = await GetAsync(user, tenant, process, instance.ToString("D"));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+    }
+
+    private static async Task<JsonDocument> GetOkAsync(WebApplicationFactory<Program> factory, string user, string tenant, string process, Guid instance)
+    {
+        using var client = factory.CreateClient().SignedInAs(user);
+        using var request = RecordApiFixture.Request($"/api/apps/StepApp/processes/{process}/instances/{instance:D}", Host(tenant));
+        using var response = await client.SendAsync(request, CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
     }

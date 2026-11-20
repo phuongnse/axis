@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "WarrantyReminder",
   "formatVersion": 1,
+  "title": { "textKey": "processes.warrantyReminder.title" },
   "entity": "Asset",
   "start": "remind",
   "steps": [

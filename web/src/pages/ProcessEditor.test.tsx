@@ -25,6 +25,7 @@ const help = (path: string) => english[`shell.studio.field.process.${path}.help`
 /** Every path of the process file that the editor draws a field or a group for, see docs/reference/studio-resource-form.md#fields. */
 const drawnPaths = [
   'name',
+  'title',
   'description',
   'startCondition',
   'startCondition.expression',
@@ -44,6 +45,7 @@ const drawnPaths = [
   'steps.branches',
   'steps.branches.when',
   'steps.branches.next',
+  'steps.branches.label',
   'steps.label',
   'steps.assignee',
   'steps.assignee.mode',
@@ -634,7 +636,14 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
 
     await chooseOption('timer', screen.getByTestId('studio-field-/steps/1/type'))
 
-    expect(stepOf(latest, 1)).toEqual({ name: 'managerApproval', type: 'timer', hint: 1, wait: '', next: '' })
+    expect(stepOf(latest, 1)).toEqual({
+      name: 'managerApproval',
+      type: 'timer',
+      hint: 1,
+      label: { textKey: 'purchaseRequest.managerApproval' },
+      wait: '',
+      next: '',
+    })
   })
 
   it('shows the keys of a step type without a panel as markers for the JSON view', async () => {
@@ -1018,8 +1027,11 @@ describe('ProcessEditor fields', () => {
     ['studio-field-/steps/0/outcomes/0/label/textKey', 'combobox', 'steps.outcomes.label'],
     ['studio-field-/steps/0/outcomes/0/next', 'combobox', 'steps.outcomes.next'],
     ['studio-field-/steps/1/branches/0/when', 'textbox', 'steps.branches.when'],
+    ['studio-field-/steps/1/label/textKey', 'combobox', 'steps.label'],
+    ['studio-field-/steps/1/branches/0/label/textKey', 'combobox', 'steps.branches.label'],
     ['studio-field-/steps/1/branches/0/next', 'combobox', 'steps.branches.next'],
     ['studio-field-/steps/1/otherwise', 'combobox', 'steps.otherwise'],
+    ['studio-field-/steps/2/label/textKey', 'combobox', 'steps.label'],
     ['studio-field-/steps/2/wait', 'textbox', 'steps.wait'],
     ['studio-field-/steps/2/next', 'combobox', 'steps.next'],
     ['studio-field-/steps/3/until', 'textbox', 'steps.until'],
@@ -1041,6 +1053,7 @@ describe('ProcessEditor fields', () => {
   })
 
   const groups: [string, string][] = [
+    ['studio-field-/title', 'title'],
     ['studio-field-/description', 'description'],
     ['studio-field-/steps/0/assignee', 'steps.assignee'],
     ['studio-field-/steps/0/deadline', 'steps.deadline'],
@@ -1103,6 +1116,7 @@ describe('ProcessEditor sections', () => {
       expect(within(section).getByText(english[`${key}.line`])).toBeVisible()
     })
     expect(within(sections[0]).getByTestId('studio-field-/name')).toBeVisible()
+    expect(within(sections[0]).getByTestId('studio-field-/title')).toBeVisible()
     expect(within(sections[0]).getByTestId('studio-field-/description')).toBeVisible()
     expect(within(sections[0]).getByTestId('studio-field-/startCondition')).toBeVisible()
     expect(within(sections[1]).getByRole('radio', { name: /^Entity/ })).toBeChecked()

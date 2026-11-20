@@ -114,7 +114,7 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.Equal((ConnectorCalls.Failed, 1, (int?)400), (call.State, call.Attempts, call.LastStatus));
         Assert.Contains("400", call.LastError, StringComparison.Ordinal);
 
-        // A failed call keeps its input too. Its attempt row holds the status and a fixed error, not the body.
+        // A failed call keeps its input too. Its attempt row holds the status and a fixed error, and the body only in its response.
         var stored = Assert.IsType<JsonObject>(JsonNode.Parse(call.Input!));
         Assert.Equal($"Request {subjectId:N}", stored["reference"]!.GetValue<string>());
         var failedAttempt = Assert.Single(await AttemptsAsync(tenant, callId));
@@ -123,6 +123,10 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
 
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("createOrder", 2L, call.LastError), (row.Step, row.Revision, row.Error));
+
+        // Any other status that is not 2xx is refused, with no values.
+        Assert.True(JsonNode.DeepEquals(Problem("refused"), JsonNode.Parse(row.Problem!)));
+        Assert.True(JsonNode.DeepEquals(Problem("refused"), JsonNode.Parse((await AttemptProblemsAsync(tenant, callId)).Single()!)));
         Assert.True(JsonNode.DeepEquals(
             new JsonObject { ["operationId"] = callId, ["outcome"] = "failed" },
             JsonNode.Parse(row.Output!)));
@@ -218,6 +222,9 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.DoesNotContain(fixture.Stub.BaseUrl, call.LastError, StringComparison.Ordinal);
         Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await tenant.InstanceAsync(instanceId));
 
+        // A binding that is not https is unavailable.
+        Assert.True(JsonNode.DeepEquals(Problem("unavailable"), JsonNode.Parse((await AttemptProblemsAsync(tenant, callId)).Single()!)));
+
         // A worker whose host allows the URL sends the retry.
         await fixture.MakeDueAsync("a", callId);
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
@@ -296,6 +303,11 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
 
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("createOrder", 2L, call.LastError), (row.Step, row.Revision, row.Error));
+
+        // A 5xx is serverError, on every attempt row and on the history row, with no values.
+        var serverError = Problem("serverError");
+        Assert.True(JsonNode.DeepEquals(serverError, JsonNode.Parse(row.Problem!)));
+        Assert.All(await AttemptProblemsAsync(tenant, callId), problem => Assert.True(JsonNode.DeepEquals(serverError, JsonNode.Parse(problem!))));
         Assert.True(JsonNode.DeepEquals(
             new JsonObject
             {
@@ -386,6 +398,11 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
 
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("createOrder", 2L, call.LastError), (row.Step, row.Revision, row.Error));
+
+        // The code is the same on the attempt and on the history row. It holds the wait that ran out and no text.
+        var timeout = new JsonObject { ["code"] = "timeout", ["values"] = new JsonObject { ["seconds"] = 1 } };
+        Assert.True(JsonNode.DeepEquals(timeout, JsonNode.Parse(row.Problem!)));
+        Assert.True(JsonNode.DeepEquals(timeout, JsonNode.Parse((await AttemptProblemsAsync(tenant, callId)).Single()!)));
         Assert.True(JsonNode.DeepEquals(
             new JsonObject { ["operationId"] = callId, ["outcome"] = "unknown" },
             JsonNode.Parse(row.Output!)));
@@ -692,6 +709,14 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.Equal(recordFailure, call.LastError);
         Assert.Equal(recordFailure, (await tenant.HistoryAsync(instanceId))[1].Error);
         Assert.Equal(recordFailure, Assert.Single(await AttemptsAsync(tenant, callId)).Error);
+
+        // A success that could not be recorded is notSent, with no values, and neither row holds the exception message.
+        var notSent = Problem("notSent");
+        var historyProblem = (await tenant.HistoryAsync(instanceId))[1].Problem!;
+        var attemptProblem = Assert.Single(await AttemptProblemsAsync(tenant, callId))!;
+        Assert.True(JsonNode.DeepEquals(notSent, JsonNode.Parse(historyProblem)));
+        Assert.True(JsonNode.DeepEquals(notSent, JsonNode.Parse(attemptProblem)));
+        Assert.DoesNotContain("amount", historyProblem + attemptProblem, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -713,6 +738,10 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         Assert.Equal((ProcessStarts.Waiting, 2L, "createOrder", false), await tenant.InstanceAsync(instanceId));
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("createOrder", 2L, call.LastError), (row.Step, row.Revision, row.Error));
+
+        // Another send exception is notSent, and its code holds no exception text.
+        Assert.True(JsonNode.DeepEquals(Problem("notSent"), JsonNode.Parse(row.Problem!)));
+        Assert.True(JsonNode.DeepEquals(Problem("notSent"), JsonNode.Parse((await AttemptProblemsAsync(tenant, callId)).Single()!)));
         Assert.True(JsonNode.DeepEquals(
             new JsonObject { ["operationId"] = callId, ["outcome"] = "unknown" },
             JsonNode.Parse(row.Output!)));
@@ -822,10 +851,29 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
         return rows;
     }
 
-    /// <summary>All text in the call's attempt rows, to check that no body is in it.</summary>
+    /// <summary>The stored <c>problem</c> of a code that has no value.</summary>
+    private static JsonObject Problem(string code) => new() { ["code"] = code, ["values"] = new JsonObject() };
+
+    /// <summary>The <c>problem</c> of each attempt row of the call as JSON text, <see langword="null"/> for a row with none, in order.</summary>
+    private static async Task<List<string?>> AttemptProblemsAsync(ProcessStepFixture tenant, Guid callId)
+    {
+        await using var command = tenant.DataSource.CreateCommand(
+            "SELECT problem::text FROM axis.process_call_attempts WHERE call_id = @id AND call_kind = 'connector' AND kind = 'attempt' ORDER BY number");
+        command.Parameters.AddWithValue("id", callId);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        var rows = new List<string?>();
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            rows.Add(reader.IsDBNull(0) ? null : reader.GetString(0));
+        }
+
+        return rows;
+    }
+
+    /// <summary>All text in the call's attempt rows but their <c>response</c>, which keeps the body of the answer by design, to check that no body is elsewhere in it.</summary>
     private static async Task<string> AttemptTextAsync(ProcessStepFixture tenant, Guid callId) =>
         (string)(await tenant.ScalarAsync(
-            "SELECT string_agg(row_to_json(a)::text, ' ') FROM axis.process_call_attempts a WHERE call_id = @id",
+            "SELECT string_agg((to_jsonb(a) - 'response')::text, ' ') FROM axis.process_call_attempts a WHERE call_id = @id",
             ("id", callId)))!;
 
     /// <summary>The failed lookups of the call since it became <c>unknown</c>.</summary>

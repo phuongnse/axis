@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "NoteNotify",
   "formatVersion": 1,
+  "title": { "textKey": "processes.noteNotify.title" },
   "entity": "Note",
   "start": "tell",
   "steps": [

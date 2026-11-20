@@ -45,8 +45,9 @@ namespace Axis.Processes.Instances;
 /// needs the instance still waiting on the step at the revision the attempt saw. Each outcome
 /// transaction also writes one row to <c>axis.process_call_attempts</c>: the attempt, or the lookup,
 /// with its times, its outcome class, its status and a fixed error text. A call found <c>sending</c>
-/// gets an attempt row with the outcome <c>unknown</c>. No request or response body and no secret
-/// value or token is stored or logged.
+/// gets an attempt row with the outcome <c>unknown</c>. The call keeps the request its last sending attempt
+/// made, and each attempt keeps the response, as <see cref="KeptExchange"/> says. No secret value or token is
+/// stored or logged, and no request or response is copied to history, audit records or logs.
 /// </summary>
 internal sealed partial class ConnectorCallHandler(
     ReleaseModelCache models,
@@ -191,7 +192,7 @@ internal sealed partial class ConnectorCallHandler(
         if (sending)
         {
             // The attempt the crashed worker made is already counted.
-            return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Unknown, null, UnknownOutcome, UnknownOutcome, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Unknown, null, UnknownOutcome, UnknownOutcome, null, null, cancellationToken);
         }
 
         using var attemptSpan = StartCallSpan(AxisTelemetry.ConnectorAttempt, item, target, target.Operation);
@@ -219,19 +220,21 @@ internal sealed partial class ConnectorCallHandler(
         if (endpoint.Error is { } bindingError)
         {
             // The request is never sent.
-            return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Retryable, null, bindingError, bindingError, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Retryable, null, bindingError, bindingError, null, StepProblem.Unavailable, cancellationToken);
         }
 
         var (tokenFailure, answer) = await SendWithTokenAsync(item, target, attempt.Call, endpoint, cancellationToken);
         if (tokenFailure is not null)
         {
             // The operation is never sent, and no body of the token endpoint is kept.
-            return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Retryable, tokenFailure.Status, tokenFailure.Error!, tokenFailure.Error!, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Retryable, tokenFailure.Status, tokenFailure.Error!, tokenFailure.Error!, null, StepProblem.Unavailable, cancellationToken);
         }
 
-        if (answer!.Error is { } sendError)
+        // Only an attempt that sent a request replaces the request the call keeps.
+        attempt = attempt with { Request = answer!.Request };
+        if (answer.Error is { } sendError)
         {
-            return await SettleAttemptAsync(item, connection, attempt, target, answer.Class, answer.Status, sendError, answer.Error!, cancellationToken);
+            return await SettleAttemptAsync(item, connection, attempt, target, answer.Class, answer.Status, sendError, answer.Error!, answer.Response, answer.Problem, cancellationToken);
         }
 
         if (Fit(answer.Body!, target) is not { } values)
@@ -245,7 +248,7 @@ internal sealed partial class ConnectorCallHandler(
                 target,
                 answer.Status,
                 misfit,
-                AttemptRow(attempt, CallAttempts.Unknown, answer.Status, misfit),
+                AttemptRow(attempt, CallAttempts.Unknown, answer.Status, misfit, answer.Response),
                 cancellationToken);
         }
 
@@ -256,7 +259,7 @@ internal sealed partial class ConnectorCallHandler(
             target,
             answer.Status!.Value,
             values,
-            AttemptRow(attempt, CallAttempts.Succeeded, answer.Status, null),
+            AttemptRow(attempt, CallAttempts.Succeeded, answer.Status, null, answer.Response),
             cancellationToken);
     }
 
@@ -297,7 +300,7 @@ internal sealed partial class ConnectorCallHandler(
         var endpoint = ResolveEndpoint(item, connector);
         if (endpoint.Error is { } bindingError)
         {
-            return await KeepUnknownAsync(item, connection, attempt, target, null, bindingError, LookupRow(attempt, CallAttempts.Failed, null, bindingError), cancellationToken);
+            return await KeepUnknownAsync(item, connection, attempt, target, null, bindingError, LookupRow(attempt, CallAttempts.Failed, null, bindingError, StepProblem.Unavailable), cancellationToken);
         }
 
         var (tokenFailure, sent) = await SendWithTokenAsync(item, target with { Operation = lookup }, attempt.Call, endpoint, cancellationToken);
@@ -310,7 +313,7 @@ internal sealed partial class ConnectorCallHandler(
                 target,
                 tokenFailure.Status,
                 tokenFailure.Error!,
-                LookupRow(attempt, CallAttempts.Failed, tokenFailure.Status, tokenFailure.Error),
+                LookupRow(attempt, CallAttempts.Failed, tokenFailure.Status, tokenFailure.Error, StepProblem.Unavailable),
                 cancellationToken);
         }
 
@@ -351,7 +354,7 @@ internal sealed partial class ConnectorCallHandler(
             target,
             answer.Status,
             error,
-            LookupRow(attempt, CallAttempts.Failed, answer.Status, answer.Error ?? error),
+            LookupRow(attempt, CallAttempts.Failed, answer.Status, answer.Error ?? error, answer.Problem),
             cancellationToken);
     }
 
@@ -504,11 +507,12 @@ internal sealed partial class ConnectorCallHandler(
     }
 
     /// <summary>
-    /// Sends the call's request and reads a <c>2xx</c> body. Each <c>path</c> input fills its
+    /// Sends the call's request and reads the body of the answer. Each <c>path</c> input fills its
     /// placeholder, escaped as one segment. The <c>query</c> inputs make the query string and the
     /// <c>header</c> inputs the request headers, and an input with no value is left out. A non-<c>GET</c>
     /// sends a JSON body of the <c>body</c> inputs. Any other status, a timeout or an exception is an
-    /// error, with its class. An error names no header value and no body.
+    /// error, with its class. An error names no header value and no body. The answer also holds the request
+    /// that was sent and the response, as <see cref="KeptExchange"/> builds them.
     /// </summary>
     private async Task<Answer> SendAsync(Target target, LoadedConnectorCall call, string baseUrl, SecretValue? secret, CancellationToken cancellationToken)
     {
@@ -516,11 +520,13 @@ internal sealed partial class ConnectorCallHandler(
         var operation = target.Operation;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(connector.Timeout);
+        JsonObject? kept = null;
         try
         {
             var values = JsonNode.Parse(call.Input ?? "{}") as JsonObject ?? new JsonObject();
             var path = operation.Path.Replace("{idempotencyKey}", call.Id.ToString("D"), StringComparison.Ordinal);
             var query = new List<string>();
+            var queryValues = new List<KeyValuePair<string, string>>();
             var headers = new List<KeyValuePair<string, string>>();
             var body = new JsonObject();
             foreach (var property in values)
@@ -542,6 +548,7 @@ internal sealed partial class ConnectorCallHandler(
                     {
                         case "query":
                             query.Add($"{Uri.EscapeDataString(field.Name)}={Uri.EscapeDataString(text)}");
+                            queryValues.Add(new KeyValuePair<string, string>(field.Name, text));
                             break;
                         case "header":
                             headers.Add(new KeyValuePair<string, string>(field.Name, text));
@@ -573,6 +580,7 @@ internal sealed partial class ConnectorCallHandler(
                 path = path.Replace(placeholder, Uri.EscapeDataString(segment), StringComparison.OrdinalIgnoreCase);
             }
 
+            var keptUrl = baseUrl.TrimEnd('/') + path;
             if (query.Count > 0)
             {
                 path += (path.Contains('?', StringComparison.Ordinal) ? "&" : "?") + string.Join('&', query);
@@ -580,13 +588,15 @@ internal sealed partial class ConnectorCallHandler(
 
             var url = baseUrl.TrimEnd('/') + path;
             using var request = new HttpRequestMessage(new HttpMethod(operation.Method), url);
+            string? bodyText = null;
 
             // The request says which operation it is for. Only scenario stubs read these options.
             request.Options.Set(ConnectorClient.ConnectorOption, connector.Name);
             request.Options.Set(ConnectorClient.OperationOption, operation.Name);
             if (request.Method != HttpMethod.Get)
             {
-                request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+                bodyText = body.ToJsonString();
+                request.Content = new StringContent(bodyText, Encoding.UTF8, "application/json");
             }
 
             foreach (var header in headers)
@@ -617,15 +627,25 @@ internal sealed partial class ConnectorCallHandler(
                 span.SetCustomProperty(AxisTelemetry.UrlTemplateProperty, operation.Path);
             }
 
+            kept = KeptExchange.Request(request, keptUrl, queryValues, bodyText, connector);
             using var response = await client.SendAsync(request, timeout.Token);
             var status = (int)response.StatusCode;
-            return response.IsSuccessStatusCode
-                ? new Answer(status, await response.Content.ReadAsStringAsync(timeout.Token), null, ErrorClass.Failed)
-                : new Answer(
-                    status,
-                    null,
-                    $"The operation '{operation.Name}' of the connector '{connector.Name}' answered with the status {status}.",
-                    Classify(status));
+            if (response.IsSuccessStatusCode)
+            {
+                var text = await response.Content.ReadAsStringAsync(timeout.Token);
+                var (cut, truncated) = KeptExchange.Cut(text);
+                return new Answer(status, text, null, ErrorClass.Failed, kept, KeptExchange.Response(response, cut, truncated, connector));
+            }
+
+            var (errorBody, errorTruncated) = await ReadErrorBodyAsync(response, cancellationToken, timeout.Token);
+            return new Answer(
+                status,
+                null,
+                $"The operation '{operation.Name}' of the connector '{connector.Name}' answered with the status {status}.",
+                Classify(status),
+                kept,
+                KeptExchange.Response(response, errorBody, errorTruncated, connector),
+                StepProblem.ForStatus(status));
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -634,7 +654,9 @@ internal sealed partial class ConnectorCallHandler(
                 null,
                 null,
                 $"The operation '{operation.Name}' of the connector '{connector.Name}' timed out after {connector.Timeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)} seconds.",
-                ErrorClass.Unknown);
+                ErrorClass.Unknown,
+                kept,
+                Problem: StepProblem.Timeout(connector.Timeout));
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -650,7 +672,30 @@ internal sealed partial class ConnectorCallHandler(
                 null,
                 null,
                 $"The operation '{operation.Name}' of the connector '{connector.Name}' could not be called: {exception.GetType().FullName}.",
-                errorClass);
+                errorClass,
+                kept,
+                Problem: errorClass == ErrorClass.Retryable ? StepProblem.Unavailable : StepProblem.NotSent);
+        }
+    }
+
+    /// <summary>
+    /// Reads at most <see cref="KeptExchange.BodyLimit"/> bytes of the body of an answer that is not a
+    /// <c>2xx</c>, for the response the attempt keeps, and cuts it as <see cref="KeptExchange.Cut"/> does.
+    /// A read that fails keeps no body, so the answer is still classed by its status.
+    /// </summary>
+    private static async Task<(string? Body, bool Truncated)> ReadErrorBodyAsync(
+        HttpResponseMessage response, CancellationToken cancellationToken, CancellationToken timeout)
+    {
+        try
+        {
+            await using var stream = await response.Content.ReadAsStreamAsync(timeout);
+            var buffer = new byte[KeptExchange.BodyLimit + 1];
+            var read = await stream.ReadAtLeastAsync(buffer, buffer.Length, false, timeout);
+            return KeptExchange.Cut(Encoding.UTF8.GetString(buffer, 0, read));
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            return (null, false);
         }
     }
 
@@ -823,8 +868,7 @@ internal sealed partial class ConnectorCallHandler(
         CancellationToken cancellationToken)
     {
         var call = attempt.Call;
-        string? failure;
-        string? rowFailure;
+        StepFailure? failure;
         await using (var transaction = await WorkItemQueue.BeginAsync(connection, item, cancellationToken))
         {
             if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
@@ -845,13 +889,11 @@ internal sealed partial class ConnectorCallHandler(
             try
             {
                 failure = await WriteSuccessAsync(item, transaction, instance!, attempt, target, status, values, row, cancellationToken);
-                rowFailure = failure;
             }
             catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
             {
                 // The message can hold record values, so the error names only the type.
-                failure = $"The outcome of the call could not be recorded: {exception.GetType().FullName}.";
-                rowFailure = failure;
+                failure = new StepFailure($"The outcome of the call could not be recorded: {exception.GetType().FullName}.", StepProblem.NotSent);
             }
 
             if (failure is null)
@@ -865,13 +907,13 @@ internal sealed partial class ConnectorCallHandler(
         }
 
         var failedRow = row.Kind == CallAttempts.Lookup
-            ? row with { Error = rowFailure }
-            : row with { Outcome = CallAttempts.Failed, Error = rowFailure };
-        return await FailAsync(item, connection, attempt, status, failure, failedRow, cancellationToken);
+            ? row with { Error = failure.Error, Problem = failure.Problem }
+            : row with { Outcome = CallAttempts.Failed, Error = failure.Error, Problem = failure.Problem };
+        return await FailAsync(item, connection, attempt, status, failure.Error, failedRow, cancellationToken);
     }
 
-    /// <summary>Writes the success in the transaction. Returns the error when the record write is refused, or <see langword="null"/>.</summary>
-    private async Task<string?> WriteSuccessAsync(
+    /// <summary>Writes the success in the transaction. Returns the failure when the record write is refused, or <see langword="null"/>.</summary>
+    private async Task<StepFailure?> WriteSuccessAsync(
         ClaimedWorkItem item,
         NpgsqlTransaction transaction,
         LoadedInstance instance,
@@ -905,12 +947,12 @@ internal sealed partial class ConnectorCallHandler(
             record = await RecordQueries.GetAsync(connection, target.Model, entity, subjectId, cipher, cancellationToken);
             if (record is null && values.Count > 0)
             {
-                return $"No record of '{entity.Name}' has the id '{subjectId}'.";
+                return new StepFailure($"No record of '{entity.Name}' has the id '{subjectId}'.", null);
             }
         }
         else if (values.Count > 0)
         {
-            return "The step has outputs, but the process has no subject to write them to.";
+            return new StepFailure("The step has outputs, but the process has no subject to write them to.", null);
         }
 
         if (!await ProcessSteps.TryResumeCallAsync(transaction, instance.Id, call.Step, attempt.Revision, target.Step.Next, cancellationToken))
@@ -922,6 +964,7 @@ internal sealed partial class ConnectorCallHandler(
         var output = new JsonObject { ["operationId"] = call.Id, ["outcome"] = ConnectorCalls.Succeeded, ["next"] = target.Step.Next };
         AuditEntry? recordAudit = null;
         Record? updated = null;
+        JsonArray? changes = null;
         IReadOnlyList<EffectRecord> effects = [];
         var write = new RecordWriteContext(instance.AccountableUser, instance.DecisionTask);
         if (values.Count > 0)
@@ -930,11 +973,12 @@ internal sealed partial class ConnectorCallHandler(
             var result = await RecordCommands.SetAsync(connection, target.Model, entity!, call.ReleaseId, write, record!, values, now, cipher: cipher, cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
-                return $"The record update was rejected: {ProcessStepHandler.Describe(result)}";
+                return new StepFailure($"The record update was rejected: {ProcessStepHandler.Describe(result)}", StepProblem.WriteRefused);
             }
 
             await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, item.TenantId, target.Model, entity!, call.ReleaseId, cancellationToken);
             updated = written;
+            changes = RunValues.Changes(target.Model, entity!, record!, written);
             effects = result.Effects;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
@@ -951,11 +995,11 @@ internal sealed partial class ConnectorCallHandler(
                 });
         }
 
-        await ConnectorCalls.SettleAsync(transaction, call.Id, ConnectorCalls.Succeeded, status, null, cancellationToken);
+        await ConnectorCalls.SettleAsync(transaction, call.Id, ConnectorCalls.Succeeded, status, null, attempt.Request?.ToJsonString(), cancellationToken);
         await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, Tags(item, attempt), cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
-            new StepOccurrence(instance.Id, call.Step, attempt.Revision, input, output, null, null, attempt.StartedAt),
+            new StepOccurrence(instance.Id, call.Step, attempt.Revision, input, output, null, null, attempt.StartedAt, Changes: changes),
             cancellationToken);
         if (recordAudit is not null)
         {
@@ -1015,7 +1059,7 @@ internal sealed partial class ConnectorCallHandler(
     /// connector also declares <c>idempotency</c>. An unknown outcome that is not retried leaves the
     /// call <c>unknown</c>, to be looked up when the operation declares a lookup. Anything else
     /// fails the call. The attempt row records the class of the attempt, with
-    /// <paramref name="attemptError"/> as its error, whatever happens to the call.
+    /// <paramref name="attemptError"/> as its error and <paramref name="problem"/> as its code, whatever happens to the call.
     /// </summary>
     private Task<WorkItemOutcome> SettleAttemptAsync(
         ClaimedWorkItem item,
@@ -1026,6 +1070,8 @@ internal sealed partial class ConnectorCallHandler(
         int? status,
         string error,
         string attemptError,
+        JsonObject? response,
+        StepProblem? problem,
         CancellationToken cancellationToken)
     {
         var policy = target.Step.Retry;
@@ -1039,7 +1085,9 @@ internal sealed partial class ConnectorCallHandler(
                 _ => CallAttempts.Failed,
             },
             status,
-            attemptError);
+            attemptError,
+            response,
+            problem);
         return errorClass switch
         {
             ErrorClass.Retryable when attemptsLeft =>
@@ -1083,7 +1131,7 @@ internal sealed partial class ConnectorCallHandler(
             return WorkItemOutcome.Completed;
         }
 
-        await ConnectorCalls.RetryAsync(transaction, call.Id, status, error, cancellationToken);
+        await ConnectorCalls.RetryAsync(transaction, call.Id, status, error, attempt.Request?.ToJsonString(), cancellationToken);
         await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, Tags(item, attempt), cancellationToken);
         if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
         {
@@ -1137,7 +1185,7 @@ internal sealed partial class ConnectorCallHandler(
             return WorkItemOutcome.Completed;
         }
 
-        await ConnectorCalls.MarkUnknownAsync(transaction, call.Id, status, error, cancellationToken);
+        await ConnectorCalls.MarkUnknownAsync(transaction, call.Id, status, error, attempt.Request?.ToJsonString(), cancellationToken);
         await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, Tags(item, attempt), cancellationToken);
         if (lookup)
         {
@@ -1156,7 +1204,8 @@ internal sealed partial class ConnectorCallHandler(
                 new JsonObject { ["operationId"] = call.Id, ["outcome"] = ConnectorCalls.Unknown },
                 null,
                 error,
-                attempt.StartedAt),
+                attempt.StartedAt,
+                row.Problem),
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         LogUnknown(call.Id, instance.Id, attempt.Attempts, status, error);
@@ -1245,7 +1294,7 @@ internal sealed partial class ConnectorCallHandler(
         }
 
         await InstanceMetrics.RecordEndedAsync(models, new WorkItemContext(item, connection, transaction), instance, ProcessStarts.Failed, cancellationToken);
-        await ConnectorCalls.SettleAsync(transaction, call.Id, ConnectorCalls.Failed, status, error, cancellationToken);
+        await ConnectorCalls.SettleAsync(transaction, call.Id, ConnectorCalls.Failed, status, error, attempt.Request?.ToJsonString(), cancellationToken);
         if (row is not null)
         {
             await CallAttempts.InsertAsync(transaction, CallAttempts.Connector, call.Id, row, Tags(item, attempt), cancellationToken);
@@ -1261,7 +1310,8 @@ internal sealed partial class ConnectorCallHandler(
                 new JsonObject { ["operationId"] = call.Id, ["outcome"] = ConnectorCalls.Failed },
                 null,
                 error,
-                attempt.StartedAt),
+                attempt.StartedAt,
+                row?.Problem),
             cancellationToken);
         await AuditRecords.AppendAsync(transaction, Called(instance, attempt, ConnectorCalls.Failed, status), cancellationToken);
         await AuditRecords.AppendAsync(
@@ -1284,12 +1334,12 @@ internal sealed partial class ConnectorCallHandler(
         new(item.TenantId, attempt.Application, AxisTelemetry.ConnectorTag, attempt.Call.Connector, attempt.Call.Operation);
 
     /// <summary>The row of the attempt the worker makes. Its number is the next attempt number of the call, which carries on after an operator retry.</summary>
-    private static CallAttempt AttemptRow(Attempt attempt, string outcome, int? status, string? error) =>
-        new(CallAttempts.Attempt, null, attempt.StartedAt, outcome, status, error);
+    private static CallAttempt AttemptRow(Attempt attempt, string outcome, int? status, string? error, JsonObject? response = null, StepProblem? problem = null) =>
+        new(CallAttempts.Attempt, null, attempt.StartedAt, outcome, status, error, response, problem);
 
     /// <summary>The row of a lookup. Its number is the next lookup number of the call.</summary>
-    private static CallAttempt LookupRow(Attempt attempt, string outcome, int? status, string? error) =>
-        new(CallAttempts.Lookup, null, attempt.StartedAt, outcome, status, error);
+    private static CallAttempt LookupRow(Attempt attempt, string outcome, int? status, string? error, StepProblem? problem = null) =>
+        new(CallAttempts.Lookup, null, attempt.StartedAt, outcome, status, error, Problem: problem);
 
     private static bool IsWaitingAt(LoadedInstance? instance, LoadedConnectorCall call, Attempt attempt) =>
         instance is { State: ProcessStarts.Waiting } && instance.Step == call.Step && instance.Revision == attempt.Revision;
@@ -1341,9 +1391,10 @@ internal sealed partial class ConnectorCallHandler(
 
     /// <summary>
     /// The attempt a worker makes: the call, the instance revision it waits at, the attempts made
-    /// with this one, and the time of the mark transaction, which starts the step's history row.
+    /// with this one, and the time of the mark transaction, which starts the step's history row. <c>Request</c>
+    /// is the request the attempt sent, or <see langword="null"/> when it sent none, so the call keeps its earlier one.
     /// </summary>
-    private sealed record Attempt(LoadedConnectorCall Call, long Revision, int Attempts, DateTimeOffset StartedAt, string? Application = null);
+    private sealed record Attempt(LoadedConnectorCall Call, long Revision, int Attempts, DateTimeOffset StartedAt, string? Application = null, JsonObject? Request = null);
 
     /// <summary>
     /// The connector's resolved base URL and auth secret, and for an <c>oauth2</c> auth its token URL
@@ -1361,9 +1412,11 @@ internal sealed partial class ConnectorCallHandler(
 
     /// <summary>
     /// The status of an answered request, the body of a <c>2xx</c>, or the error of any other result
-    /// with its class. An error holds no exception message, because a message can hold a value.
+    /// with its class. An error holds no exception message, because a message can hold a value. <c>Request</c>
+    /// is the kept request of a send that went out, <c>Response</c> the kept response of an answer, and <c>Problem</c>
+    /// the code of the error, which has none for a missing path value.
     /// </summary>
-    private sealed record Answer(int? Status, string? Body, string? Error, ErrorClass Class);
+    private sealed record Answer(int? Status, string? Body, string? Error, ErrorClass Class, JsonObject? Request = null, JsonObject? Response = null, StepProblem? Problem = null);
 
     /// <summary>How an attempt that did not succeed is handled.</summary>
     private enum ErrorClass

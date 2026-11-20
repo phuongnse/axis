@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json.Nodes;
 using Axis.Core.Telemetry;
 using Npgsql;
 using NpgsqlTypes;
@@ -8,7 +9,8 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// Writes the rows of <c>axis.process_call_attempts</c>: one for each attempt and each reconciliation
 /// lookup of a connector call or a package call. The outcome transaction of the attempt or lookup
-/// writes its row, in the same transaction that updates the call.
+/// writes its row, in the same transaction that updates the call. A connector attempt's row also
+/// holds the response it got.
 /// </summary>
 internal static class CallAttempts
 {
@@ -59,11 +61,11 @@ internal static class CallAttempts
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.process_call_attempts
-                (id, call_kind, call_id, kind, number, started_at, finished_at, outcome, http_status, error, trace_id)
+                (id, call_kind, call_id, kind, number, started_at, finished_at, outcome, http_status, error, trace_id, response, problem)
             VALUES (
                 @id, @callKind, @callId, @kind,
                 COALESCE(@number, (SELECT COALESCE(max(number), 0) + 1 FROM axis.process_call_attempts WHERE call_id = @callId AND kind = @kind)),
-                @startedAt, now(), @outcome, @status, @error, @trace)
+                @startedAt, now(), @outcome, @status, @error, @trace, @response, @problem)
             """,
             connection,
             transaction);
@@ -77,6 +79,8 @@ internal static class CallAttempts
         command.Parameters.AddWithValue("outcome", attempt.Outcome);
         command.Parameters.Add(new NpgsqlParameter("status", NpgsqlDbType.Integer) { Value = (object?)attempt.HttpStatus ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)attempt.Error ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("response", NpgsqlDbType.Jsonb) { Value = attempt.Response is null ? DBNull.Value : attempt.Response.ToJsonString() });
+        command.Parameters.Add(new NpgsqlParameter("problem", NpgsqlDbType.Jsonb) { Value = attempt.Problem is null ? DBNull.Value : attempt.Problem.ToJsonString() });
         await command.ExecuteNonQueryAsync(cancellationToken);
         TagOutcome(attempt);
         if (attempt.Kind == Attempt)
@@ -119,7 +123,9 @@ internal static class CallAttempts
 /// <param name="Outcome">The outcome class.</param>
 /// <param name="HttpStatus">The HTTP status, or <see langword="null"/> when none answered.</param>
 /// <param name="Error">A fixed text. It holds no body, no exception message and no secret.</param>
-internal sealed record CallAttempt(string Kind, int? Number, DateTimeOffset StartedAt, string Outcome, int? HttpStatus, string? Error);
+/// <param name="Response">The kept response of the answer, see <see cref="KeptExchange"/>, or <see langword="null"/> for a lookup, a package call and an attempt that got no answer.</param>
+/// <param name="Problem">The code of <paramref name="Error"/>, or <see langword="null"/> when it has none, see <see cref="StepProblem"/>.</param>
+internal sealed record CallAttempt(string Kind, int? Number, DateTimeOffset StartedAt, string Outcome, int? HttpStatus, string? Error, JsonObject? Response = null, StepProblem? Problem = null);
 
 /// <summary>The names that label the call metric of an attempt. They hold no value.</summary>
 /// <param name="TenantId">The tenant of the call.</param>

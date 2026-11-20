@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
 import { PageLayout, type BreadcrumbStep } from '../platform/PageLayout'
 import { PageLeaf, type PageLeafProps } from '../platform/PageLeaf'
 import { detailRecordId, readPageParameters } from '../platform/pageParameters'
 import { ProcessInstancePage } from '../platform/ProcessInstancePage'
-import { fetchPage, type ApplicationSite, type PageMetadata } from '../platform/site'
+import { RecordList, type RecordListValue } from '../platform/recordList'
+import { fetchPage, fetchRecordPage, type ApplicationSite, type PageMetadata } from '../platform/site'
 import { siteAddress } from '../platform/siteLinks'
 import { TaskPage } from '../platform/TaskPage'
 import { useText } from '../platform/texts'
@@ -32,6 +33,60 @@ export function PageRoute({ form }: { form?: FormMode }) {
   const isModulePage = form === 'edit' && module === undefined && !recordIdPattern.test(id)
   const page = module ? `${module}/${segment}` : isModulePage ? `${segment}/${id}` : segment
   const mode = isModulePage ? undefined : form
+  const origin = useOrigin(site)
+  const load = useCallback((signal: AbortSignal) => fetchPage(site.path, page, signal), [site.path, page])
+  // A new page or record starts from a clean state rather than showing the previous one meanwhile.
+  return (
+    <SitePage
+      key={`${site.path}/${page}/${mode ?? ''}/${isModulePage ? '' : id}`}
+      sitePath={site.path}
+      pages={origin.pages}
+      name={page}
+      load={load}
+      locale={locale}
+      fallbackLocale={site.locales.fallback}
+      form={mode}
+      recordId={mode === 'edit' ? id : null}
+      returnTo={origin.returnTo}
+      trail={origin.trail}
+    />
+  )
+}
+
+/**
+ * Shows the default record page of an entity, `/{site}/records/{entity}/{id}`, or `/{site}/records/{module id}/{name}/{id}`
+ * for a module entity: the entity's form over every field, loaded from the record page route. An entity that does not
+ * exist or that the person may not read names no page. See docs/reference/frontend.md#routing.
+ */
+export function RecordPageRoute() {
+  const site = useApplicationSite()
+  const locale = useSiteLocale()
+  const { module, entity = '', id = '' } = useParams()
+  const entityName = module ? `${module}/${entity}` : entity
+  const origin = useOrigin(site)
+  const load = useCallback(
+    (signal: AbortSignal) => fetchRecordPage(site.path, entityName, signal),
+    [site.path, entityName],
+  )
+  return (
+    <SitePage
+      key={`${site.path}/records/${entityName}/${id}`}
+      sitePath={site.path}
+      pages={origin.pages}
+      name={`records/${entityName}`}
+      load={load}
+      locale={locale}
+      fallbackLocale={site.locales.fallback}
+      form="edit"
+      recordId={id}
+      returnTo={origin.returnTo}
+      trail={origin.trail}
+    />
+  )
+}
+
+/** What a site page takes from where the person came from: the address to return to, the breadcrumb's trail and the site's pages. */
+function useOrigin(site: ApplicationSite) {
   const location = useLocation()
   // The table that opened the form passes its address, with paging and sorting, in history state.
   // Without it, such as in a new tab, save and cancel go to the site, which opens its first page.
@@ -39,27 +94,27 @@ export function PageRoute({ form }: { form?: FormMode }) {
   const returnTo =
     typeof from === 'string' && from.startsWith(siteAddress(site.path, '')) ? from : siteAddress(site.path)
   const pages = useMemo(() => site.navigation.map((entry) => entry.page), [site.navigation])
-  // A new page or record starts from a clean state rather than showing the previous one meanwhile.
-  return (
-    <SitePage
-      key={`${site.path}/${page}/${mode ?? ''}/${isModulePage ? '' : id}`}
-      sitePath={site.path}
-      pages={pages}
-      name={page}
-      locale={locale}
-      fallbackLocale={site.locales.fallback}
-      form={mode}
-      recordId={mode === 'edit' ? id : null}
-      returnTo={returnTo}
-      trail={{ site, from: typeof from === 'string' ? from : null }}
-    />
-  )
+  return { returnTo, pages, trail: { site, from: typeof from === 'string' ? from : null } }
 }
 
 /** The site and the address of the navigation page that opened this page, which the breadcrumb is built from. */
 interface Trail {
   site: ApplicationSite
   from: string | null
+}
+
+/** The navigation entry of the page the person came from, when that is another page of the site. */
+function navigationOrigin(trail: Trail, pageName: string) {
+  const { site, from } = trail
+  if (!from?.startsWith(siteAddress(site.path, ''))) {
+    return undefined
+  }
+  const pathname = from.split(/[?#]/, 1)[0].toLowerCase()
+  return site.navigation.find(
+    (entry) =>
+      entry.page.toLowerCase() !== pageName.toLowerCase() &&
+      pathname === siteAddress(site.path, entry.page).toLowerCase(),
+  )
 }
 
 /**
@@ -70,26 +125,36 @@ interface Trail {
 function breadcrumbFor(trail: Trail, pageName: string, titleKey: string, t: (key: string) => string): BreadcrumbStep[] {
   const { site, from } = trail
   const steps: BreadcrumbStep[] = [{ label: t(site.titleKey), to: siteAddress(site.path) }]
-  if (from?.startsWith(siteAddress(site.path, ''))) {
-    const pathname = from.split(/[?#]/, 1)[0].toLowerCase()
-    const origin = site.navigation.find(
-      (entry) =>
-        entry.page.toLowerCase() !== pageName.toLowerCase() &&
-        pathname === siteAddress(site.path, entry.page).toLowerCase(),
-    )
-    if (origin) {
-      steps.push({ label: t(origin.labelKey), to: from })
-    }
+  const origin = navigationOrigin(trail, pageName)
+  if (origin && from) {
+    steps.push({ label: t(origin.labelKey), to: from })
   }
   steps.push({ label: t(titleKey) })
   return steps
+}
+
+/**
+ * The list a record's page links back to: the navigation page the person came from, with its table's search, sort and
+ * page, or else the site, which opens its first page and so is named after the first navigation entry.
+ * See docs/reference/frontend.md#routing.
+ */
+function recordListFor(trail: Trail, pageName: string): RecordListValue {
+  const { site, from } = trail
+  const origin = navigationOrigin(trail, pageName)
+  if (origin && from) {
+    return { labelKey: origin.labelKey, to: from }
+  }
+  return { labelKey: site.navigation[0]?.labelKey ?? site.titleKey, to: siteAddress(site.path) }
 }
 
 interface SitePageProps {
   sitePath: string
   /** The names of the site's navigation pages, in navigation order. */
   pages: readonly string[]
+  /** The page's key, for the log. */
   name: string
+  /** Loads the page's metadata, or answers `null` when it names no page. */
+  load: (signal: AbortSignal) => Promise<PageMetadata | null>
   locale: string
   fallbackLocale: string
   form?: FormMode
@@ -98,14 +163,25 @@ interface SitePageProps {
   trail: Trail
 }
 
-function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordId, returnTo, trail }: SitePageProps) {
+function SitePage({
+  sitePath,
+  pages,
+  name,
+  load,
+  locale,
+  fallbackLocale,
+  form,
+  recordId,
+  returnTo,
+  trail,
+}: SitePageProps) {
   const t = useText()
   const [searchParams] = useSearchParams()
   const [page, setPage] = useState<PageMetadata | null | 'failed'>()
 
   useEffect(() => {
     const controller = new AbortController()
-    fetchPage(sitePath, name, controller.signal)
+    load(controller.signal)
       .then(setPage)
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
@@ -114,7 +190,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
         }
       })
     return () => controller.abort()
-  }, [sitePath, name])
+  }, [load, name])
 
   if (page === undefined) {
     return null
@@ -199,7 +275,9 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
 
   return (
     <PageLayout title={t(page.titleKey)} breadcrumb={breadcrumb}>
-      <WidgetTree widgets={page.widgets} renderLeaf={(widget) => <PageLeaf widget={widget} {...leafProps} />} />
+      <RecordList value={recordListFor(trail, page.name)}>
+        <WidgetTree widgets={page.widgets} renderLeaf={(widget) => <PageLeaf widget={widget} {...leafProps} />} />
+      </RecordList>
     </PageLayout>
   )
 }

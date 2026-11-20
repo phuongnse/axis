@@ -2,6 +2,7 @@ import { Flex, Typography } from 'antd'
 import { useContext, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { EmptyState } from '../platform/EmptyState'
+import { PageLayout } from '../platform/PageLayout'
 import { fetchSites, type SiteListItem } from '../platform/site'
 import { changeRows, type StudioReleases, type StudioResourceItem } from '../platform/studio'
 import { kindName, studioKinds } from '../platform/studioKinds'
@@ -12,7 +13,6 @@ import { PlatformContext } from './context'
 import { SectionPart, SectionParts } from '../platform/SectionParts'
 import { SiteTiles } from './SiteTiles'
 import { StudioChangeList } from './StudioChangeList'
-import { StudioPageHeading } from './StudioPageHeading'
 
 /** The kinds that Get started leads to, which More you can add leaves out while Get started shows. */
 const getStartedKinds = ['entity', 'page', 'site']
@@ -54,9 +54,8 @@ export function StudioOverview({
   const address = (extra: Record<string, string>) => `/studio?${new URLSearchParams({ app: application, ...extra })}`
 
   return (
-    <Flex vertical gap={spacing.lg}>
+    <PageLayout title={title} line={description}>
       <TileFocusStyle />
-      <StudioPageHeading title={title} line={description} />
       <SectionParts>
         {getStarted && (
           <SectionPart testName="get-started" heading={{ title: t('shell.studio.overview.getStarted') }}>
@@ -121,7 +120,7 @@ export function StudioOverview({
           </SectionPart>
         )}
       </SectionParts>
-    </Flex>
+    </PageLayout>
   )
 }
 

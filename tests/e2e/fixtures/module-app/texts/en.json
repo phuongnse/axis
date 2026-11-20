@@ -8,6 +8,7 @@
     "site.title": "Module app",
     "nav.items": "Items",
     "pages.items.title": "Items",
+    "processes.itemReview.title": "Item review",
     "item.review": "Review",
     "role.employee": "Employee"
   }

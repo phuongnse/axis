@@ -55,6 +55,7 @@ const detail = {
       decision: null,
       output: null,
       error: 'System.InvalidOperationException',
+      problem: null,
       traceId: null,
     },
   ],
@@ -118,6 +119,17 @@ describe('ConsoleInstancePage', () => {
     expect(within(screen.getByTestId('inspector-call-c-1')).getByText('Input: Hidden')).toBeVisible()
     expect(screen.queryByTestId('inspector-command-retry')).toBeNull()
     expect(screen.getByRole('link', { name: 'Operator console' })).toHaveAttribute('href', '/console')
+  })
+
+  it('is headed by the name of its process, with Instance as its line', async () => {
+    stubServer(
+      () => new Response(JSON.stringify(detail), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    )
+    renderPage()
+
+    const heading = within(screen.getByTestId('page-heading'))
+    expect(await heading.findByRole('heading', { level: 1, name: 'PurchaseRequestApproval' })).toBeVisible()
+    expect(heading.getByText('Instance')).toBeVisible()
   })
 
   it('shows the instance in parts: details, then each section, with a rule before every part but the first', async () => {

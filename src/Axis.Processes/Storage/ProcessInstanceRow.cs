@@ -38,6 +38,14 @@ public sealed class ProcessInstanceRow
     /// </summary>
     public string? Parameters { get; init; }
 
+    /// <summary>
+    /// The JSON text of the subject fields that the process's steps write, by declared name, as they were when the
+    /// instance completed, or <see langword="null"/> before it completes and for an instance that completed before the
+    /// engine kept them. A sensitive field is stored as <c>null</c>. See
+    /// <see href="docs/reference/process-tables.md#process-instances">process tables</see>.
+    /// </summary>
+    public string? Result { get; init; }
+
     /// <summary>The instance of the process that started this one with a sub-process step, or <see langword="null"/> for any other start.</summary>
     public Guid? ParentInstanceId { get; init; }
 
@@ -49,6 +57,12 @@ public sealed class ProcessInstanceRow
     /// completion. It is <see langword="null"/> when no user stands behind the start, as for a schedule.
     /// </summary>
     public string? AccountableUser { get; init; }
+
+    /// <summary>
+    /// The JSON text of who or what started the instance, as <see cref="Instances.ProcessStartedBy"/> writes it, or
+    /// <see langword="null"/> for an instance that started before Axis recorded its starter.
+    /// </summary>
+    public string? StartedBy { get; init; }
 
     /// <summary>The task whose completion last moved the instance on, or <see langword="null"/> until one completes.</summary>
     public Guid? DecisionTask { get; init; }

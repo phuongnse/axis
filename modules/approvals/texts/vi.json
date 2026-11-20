@@ -77,6 +77,7 @@
     "approvals.pages.allRequests.title": "Tất cả yêu cầu",
     "approvals.pages.requestTypes.title": "Loại yêu cầu",
     "approvals.pages.requestTypeForm.title": "Loại yêu cầu",
+    "approvals.processes.requestApproval.title": "Phê duyệt yêu cầu",
     "approvals.actions.new": "Thêm",
     "approvals.actions.newRequest": "Tạo yêu cầu",
     "approvals.actions.open": "Mở",

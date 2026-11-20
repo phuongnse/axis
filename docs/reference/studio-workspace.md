@@ -112,19 +112,19 @@ end, as [scroll areas](actions-and-controls.md#scroll-areas) say.
 
 ## Page heading
 
-Every Studio page heads its content with one level-4 heading, a page padding below the band, as the
-platform's other pages do. It names what the page is about: the application's title on the Overview,
+Every Studio page heads its content with the page's level-one heading at the `heading4` size, through `PageLayout`, a page
+padding below the band, as the platform's other pages do. It names what the page is about: the application's title on the Overview,
 the entry's name on another sidebar entry, such as Settings or Policy matrix, the resource's
 [name](#names) on an open resource, and Studio on the list of applications.
 
 An optional line under the heading, in `textMuted`, says more: the application's description on the
-Overview, or the module an open resource comes from. It never names a file or a path, which only the
-JSON view shows. The page's own actions, such as a scenario's Run scenario and a kind's New entity…, sit on
-the heading's right, and so does a resource's "…" menu with [Delete…](studio.md#delete).
+Overview. It never names a file or a path, which only the JSON view shows. The page's own actions, such as a
+scenario's Run scenario and a kind's New entity…, sit on the heading's right through `PageActions`, and so does a
+resource's "…" menu with [Delete…](studio.md#delete).
 
-**A page that shows one thing** _(planned)_. An open resource, a release and a revision are headed as
-[a page that shows one thing](shell.md#page-header) says. Their line is the kind alone, and a resource's module, or a
-revision's author and time, is a fact of the page's first part, see [facts as the first part](shell.md#page-header).
+**A page that shows one thing**. An open resource, a release and a revision are headed as
+[a page that shows one thing](shell.md#page-header) says. Their line is the kind alone, such as Release or Revision, and a resource's id and file or module, or a
+revision's author, time and client, are the facts of the page's first part, see [facts as the first part](shell.md#page-header).
 
 ## Names
 
@@ -138,9 +138,10 @@ Studio shows words, never an internal code, see [text](actions-and-controls.md#t
   [label texts](studio.md#label-texts).
 - **A kind** has a name for its list, such as Entities, and one for a single resource, such as Entity,
   in the author's language.
-- **A person**, such as who activated a release, is named by their name. The server's activation at
-  startup reads "System", the platform operator "The platform operator", and an id with no name left
-  "Someone no longer known". The console names people the same way.
+- **A person**, such as who activated a release, is named by their name, drawn by `PersonName`: a link to
+  [the user's page](platform-pages.md#a-users-roles) for an administrator, and followed by "(you)" for the reader's
+  own name. The server's activation at startup reads "System", the platform operator "The platform operator", and an
+  id with no name left "Someone no longer known", all plain words. The console names people the same way.
 
 ## New resource
 
@@ -246,9 +247,10 @@ the history lacks says so in one line, with a link to every release.
 
 The page shows, in order:
 
-1. **The heading** "Release N" with its tags, and Activate… as the page's action on the heading's right.
-2. **Details:** Label; Status, live since or replaced on; Published; Published by; and Note, on a line of
-   its own.
+1. **The heading** "Release N" with its tags and Release as its line, and Activate… as the page's action on the
+   heading's right, through `PageActions`.
+2. **The facts**, the page's first part, with no heading: Label; Status, live since or replaced on; Published;
+   Published by; and Note, one to a row.
 3. **Relaxed points**, for a release that pins a module: the module's label, the point's label with a
    muted line that says what kind of point it is and on which entity, and the reason. With none, one
    line says that the release follows every contract of its modules. Point labels are described in
@@ -268,8 +270,8 @@ Each table holds its rows, so it filters them itself and keeps its filter in the
 [tables](actions-and-controls.md#tables). The Modules and packages table uses the plain name `filter`, and
 Activations the `activations.` prefix, so a link opens the same rows in both.
 
-The parts from Details to Activations each have a `heading5` heading, with a rule between
-them and none before the first, through `SectionParts`. A part that the page leaves out, such as Relaxed
+The parts from Relaxed points to Activations each have a `heading5` heading, and a rule falls between all the parts and
+none before the first, through `SectionParts`. A part that the page leaves out, such as Relaxed
 points without a module, adds no rule.
 
 - **Cannot replace the live one.** An older release that lacks a module that the live

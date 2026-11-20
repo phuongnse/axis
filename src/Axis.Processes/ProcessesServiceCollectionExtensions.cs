@@ -1,4 +1,5 @@
 using Axis.Configuration.Packages;
+using Axis.Presentation.Texts;
 using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Processes.Work;
@@ -69,6 +70,7 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton<IExternalWorkItemHandler, RecordImportCommitHandler>();
         services.AddSingleton(email);
         services.AddSingleton(new EmailSecuritySettings(allowPlainSmtp));
+        services.TryAddSingleton<ITextResourceProvider, EmbeddedTextResourceProvider>();
         services.AddSingleton<IExternalWorkItemHandler, NotificationEmailHandler>();
         services.AddSingleton<IExternalWorkItemHandler, WebhookDeliveryHandler>();
         return services;

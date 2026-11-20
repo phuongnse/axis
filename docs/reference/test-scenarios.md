@@ -16,7 +16,7 @@ time and the answers of the outside systems it calls, then lists its steps.
 - **Callers.** The runner is a library that runs a scenario from a folder or from files held in
   memory, such as a snapshot. The `Axis.Scenarios` command is one caller, as
   [running the scenarios](#running-the-scenarios) says, and Studio runs scenarios through the
-  publisher, as [running tests](studio.md#running-tests) says.
+  publisher, as [running tests](studio-running-tests.md#running-tests) says.
 
 This scenario submits a purchase request above the finance threshold. The manager approves it, the
 finance reviewer takes the finance decision and the request ends `approved`:

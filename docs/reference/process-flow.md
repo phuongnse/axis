@@ -319,4 +319,5 @@ values they started with.
   record.
 - **Inspection.** The instance list and detail return `subjectId: null` and need
   only the `inspect` grant. The detail lists no commands, and a stored call
-  input is hidden. Retrying, cancelling and resolving need only the grant.
+  input is hidden. The detail's `input` follows the
+  [parameter rule](process-inspection.md#values-and-masking). Retrying, cancelling and resolving need only the grant.

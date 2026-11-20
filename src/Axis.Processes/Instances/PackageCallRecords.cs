@@ -135,8 +135,8 @@ internal static class PackageCallRecords
     /// The row of the attempt the call makes. Its number is the next attempt number of the call, which
     /// carries on after an operator retry. A package call has no HTTP status.
     /// </summary>
-    public static CallAttempt AttemptRow(PackageCallAttempt attempt, string outcome, string? error) =>
-        new(CallAttempts.Attempt, null, attempt.StartedAt, outcome, null, error);
+    public static CallAttempt AttemptRow(PackageCallAttempt attempt, string outcome, string? error, StepProblem? problem = null) =>
+        new(CallAttempts.Attempt, null, attempt.StartedAt, outcome, null, error, Problem: problem);
 
     /// <summary>The names that label the call metric of the attempt.</summary>
     public static CallTags Tags(string tenantId, PackageCallAttempt attempt) =>
@@ -167,12 +167,12 @@ internal static class PackageCallRecords
 
     /// <summary>
     /// Writes the success in the transaction: the output fields with the record update rules, the call <c>succeeded</c>, the instance
-    /// <c>running</c> on <c>next</c>, the history row, the audit records, the data change triggers from the active release that
-    /// <paramref name="findActive"/> finds, the attempt row and the next step's work item. Returns the error when the record write is
+    /// <c>running</c> on <c>next</c>, with the values <paramref name="returned"/> that it keeps, the history row, the audit records,
+    /// the data change triggers from the active release that <paramref name="findActive"/> finds, the attempt row and the next step's work item. Returns the failure when the record write is
     /// refused, or <see langword="null"/>. The caller rolls back on an error.
     /// </summary>
     /// <exception cref="InvalidOperationException">The instance is no longer waiting on the call's step.</exception>
-    public static async Task<string?> WriteSuccessAsync(
+    public static async Task<StepFailure?> WriteSuccessAsync(
         NpgsqlTransaction transaction,
         string tenantId,
         LoadedInstance instance,
@@ -181,6 +181,7 @@ internal static class PackageCallRecords
         EntityModel? entity,
         PackageOperationStepModel step,
         List<KeyValuePair<FieldModel, object?>> values,
+        JsonObject returned,
         RecordCipher? cipher,
         Func<Guid, CancellationToken, Task<(Guid ReleaseId, ApplicationModel Model)?>> findActive,
         ILogger logger,
@@ -207,12 +208,12 @@ internal static class PackageCallRecords
             record = await RecordQueries.GetAsync(connection, model, entity, subjectId, cipher, cancellationToken);
             if (record is null && values.Count > 0)
             {
-                return $"No record of '{entity.Name}' has the id '{subjectId}'.";
+                return new StepFailure($"No record of '{entity.Name}' has the id '{subjectId}'.", null);
             }
         }
         else if (values.Count > 0)
         {
-            return "The step has outputs, but the process has no subject to write them to.";
+            return new StepFailure("The step has outputs, but the process has no subject to write them to.", null);
         }
 
         if (!await ProcessSteps.TryResumeCallAsync(transaction, instance.Id, call.Step, attempt.Revision, step.Next, cancellationToken))
@@ -224,6 +225,7 @@ internal static class PackageCallRecords
         var output = new JsonObject { ["operationId"] = call.Id, ["outcome"] = PackageCalls.Succeeded, ["next"] = step.Next };
         AuditEntry? recordAudit = null;
         Record? updated = null;
+        JsonArray? changes = null;
         IReadOnlyList<EffectRecord> effects = [];
         var write = new RecordWriteContext(instance.AccountableUser, instance.DecisionTask);
         if (values.Count > 0)
@@ -232,11 +234,12 @@ internal static class PackageCallRecords
             var result = await RecordCommands.SetAsync(connection, model, entity!, call.ReleaseId, write, record!, values, now, cipher: cipher, cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
-                return $"The record update was rejected: {ProcessStepHandler.Describe(result)}";
+                return new StepFailure($"The record update was rejected: {ProcessStepHandler.Describe(result)}", StepProblem.WriteRefused);
             }
 
             await ComputedBackfill.MarkStaleWriteAsync(connection, transaction, tenantId, model, entity!, call.ReleaseId, cancellationToken);
             updated = written;
+            changes = RunValues.Changes(model, entity!, record!, written);
             effects = result.Effects;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
@@ -253,11 +256,11 @@ internal static class PackageCallRecords
                 });
         }
 
-        await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Succeeded, null, cancellationToken);
+        await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Succeeded, null, returned.ToJsonString(), cancellationToken);
         await CallAttempts.InsertAsync(transaction, CallAttempts.Package, call.Id, AttemptRow(attempt, CallAttempts.Succeeded, null), Tags(tenantId, attempt), cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
-            new StepOccurrence(instance.Id, call.Step, attempt.Revision, input, output, null, null, attempt.StartedAt),
+            new StepOccurrence(instance.Id, call.Step, attempt.Revision, input, output, null, null, attempt.StartedAt, Changes: changes),
             cancellationToken);
         if (recordAudit is not null)
         {
@@ -351,7 +354,7 @@ internal static class PackageCallRecords
             return false;
         }
 
-        await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Failed, error, cancellationToken);
+        await PackageCalls.SettleAsync(transaction, call.Id, PackageCalls.Failed, error, null, cancellationToken);
         await InsertAttemptAsync(transaction, Tags(tenantId, attempt), call, row, cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             transaction,
@@ -363,7 +366,8 @@ internal static class PackageCallRecords
                 new JsonObject { ["operationId"] = call.Id, ["outcome"] = PackageCalls.Failed },
                 null,
                 error,
-                attempt.StartedAt),
+                attempt.StartedAt,
+                row?.Problem),
             cancellationToken);
         await AuditRecords.AppendAsync(transaction, Called(instance, attempt, PackageCalls.Failed), cancellationToken);
         await AuditRecords.AppendAsync(

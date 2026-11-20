@@ -2,7 +2,6 @@ import { ConfigProvider, Flex, Form } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { NotFoundPage } from '../pages/NotFoundPage'
 import { antLocaleFor } from './antLocale'
 import { AxisActionRow, AxisButton } from './AxisButton'
 import { useCanvasActions } from './canvasActions'
@@ -12,6 +11,7 @@ import { buildRecordBody } from './recordBody'
 import { RecordHistory } from './RecordHistory'
 import { newIdempotencyKey, startProcess } from './processes'
 import { requiredMark } from './requiredMark'
+import { RecordNotFound } from './RecordNotFound'
 import { fetchRecord, saveRecord, type RecordItem, type RecordProblem } from './records'
 import type { EntityWidgetMetadata, NavigateAction, StartProcessAction } from './site'
 import { useText } from './texts'
@@ -241,7 +241,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
       startKeys.current.set(action.instancesPath, key)
       let result
       try {
-        result = await startProcess(action.instancesPath, recordId, key)
+        result = await startProcess(action.instancesPath, recordId, key, action.labelKey)
       } catch (error) {
         console.warn(`Starting the process '${action.process}' for '${recordId}' failed`, error)
         setFormErrors([t('shell.form.startFailed')])
@@ -283,7 +283,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     return null
   }
   if (load === 'missing') {
-    return <NotFoundPage />
+    return <RecordNotFound />
   }
   if (load === 'failed') {
     return <AxisAlert data-testid="form-load-error" kind="error" message={t('shell.form.loadFailed')} />

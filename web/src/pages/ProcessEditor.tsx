@@ -74,9 +74,9 @@ function stepNames(steps: unknown[]): string[] {
 /**
  * The editor of a process. It shows the process's name, entity and start condition with the generic form, the start
  * step, and the steps as cards in file order. A decision shows its branches and its `otherwise`, an end shows only
- * its name and type, and every transition is a picker over the step names of the draft. A task shows its full panel:
- * label, assignee, form, due time, deadline, escalations and outcomes. An operation shows its operation panel and its
- * `next`. The editor edits the draft through `onChange`, so a key it does not show stays as it is, and removing a step leaves the transitions that name it for
+ * its name, type and label, and every transition is a picker over the step names of the draft. A task shows its full panel:
+ * label, assignee, form, due time, deadline, escalations and outcomes. Every other step has an optional label.
+ * An operation shows its operation panel and its `next`. The editor edits the draft through `onChange`, so a key it does not show stays as it is, and removing a step leaves the transitions that name it for
  * the compiler to report.
  */
 export function ProcessEditor({
@@ -100,7 +100,7 @@ export function ProcessEditor({
   return (
     <div data-testid="studio-process-editor">
       <SectionParts>
-        {/* The form draws the General section: the name, the description and the start condition. */}
+        {/* The form draws the General section: the name, the title, the description and the start condition. */}
         <SchemaForm schema={withoutSubject(schema)} value={value} onChange={onChange} />
         <SectionPart testName="subject" heading={heading('subject')}>
           <Subject value={value} onChange={onChange} />
@@ -363,6 +363,9 @@ function Step({
               />
             </AxisField>
           </div>
+          {type !== undefined && type !== 'task' && panelTypes.has(type) && (
+            <StepLabel pointer={pointer} step={step} onChange={onChange} />
+          )}
           {type === 'decision' && <Decision pointer={pointer} step={step} names={names} onChange={onChange} />}
           {type === 'operation' && (
             <>
@@ -504,6 +507,22 @@ function AssigneeEditor({
     <div data-testid={`studio-field-${pointer}`}>
       {titled ? <AxisFieldGroup {...group(path)}>{choice}</AxisFieldGroup> : choice}
     </div>
+  )
+}
+
+/** The optional label of a step that is no task. A task shows its required label in its own panel. */
+function StepLabel({ pointer, step, onChange }: { pointer: string; step: Content; onChange: ChangeHandler }) {
+  const { field } = useFieldTexts('process')
+  const label = isContent(step.label) ? step.label : {}
+
+  return (
+    <NamePicker
+      pointer={`${pointer}/label/textKey`}
+      {...field('steps.label')}
+      kind="text"
+      value={label.textKey}
+      onPick={(next) => onChange(`${pointer}/label/textKey`, next)}
+    />
   )
 }
 
@@ -1053,6 +1072,13 @@ function Decision({
                       />
                     </AxisField>
                   </div>
+                  <NamePicker
+                    pointer={`${branchPointer}/label/textKey`}
+                    {...field('steps.branches.label')}
+                    kind="text"
+                    value={isContent(branch) && isContent(branch.label) ? branch.label.textKey : undefined}
+                    onPick={(next) => onChange(`${branchPointer}/label/textKey`, next)}
+                  />
                   <Transition
                     pointer={`${branchPointer}/next`}
                     path="steps.branches.next"

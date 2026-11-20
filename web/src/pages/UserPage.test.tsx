@@ -38,12 +38,15 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-/** Answers the roles by their address, a GET with `answer`, and any POST with `change`. */
+/** Answers the roles by their address, a GET with `answer`, any POST with `change` and `/api/me` with `me`. */
 function stubRoles(
   change: () => Response = () => new Response(null, { status: 204 }),
   answer: () => Response = () => json(roles),
+  me: { studio: boolean } = { studio: false },
 ) {
-  const fetchMock = vi.fn(async (_input: string, init?: RequestInit) => (init?.method === 'POST' ? change() : answer()))
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
+    input === '/api/me' ? json({ id: 'admin', ...me }) : init?.method === 'POST' ? change() : answer(),
+  )
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
 }
@@ -89,8 +92,12 @@ describe('UserPage', () => {
     const page = await openAnn()
 
     expect(await within(page).findByText('Purchasing')).toBeVisible()
-    expect(screen.getByRole('heading', { name: 'Ann Invited' })).toBeVisible()
-    expect(within(page).getByTestId('user-email')).toHaveTextContent('Email: ann@axis.local')
+    const heading = within(screen.getByTestId('page-heading'))
+    expect(heading.getByRole('heading', { level: 1, name: 'Ann Invited' })).toBeVisible()
+    expect(heading.getByText('User')).toBeVisible()
+    const email = within(within(page).getByTestId('user-email'))
+    expect(email.getByText('Email', { selector: 'dt' })).toBeVisible()
+    expect(email.getByText('ann@axis.local', { selector: 'dd' })).toBeVisible()
     expect(fetchMock.mock.calls.map(([input]) => input)).toContain('/api/users/u1/roles')
     expect(within(roleRow(page, 'buyer')).getByText('Given')).toBeVisible()
     expect(within(roleRow(page, 'buyer')).getByText('Given').closest('[data-tone]')).toHaveAttribute(
@@ -119,7 +126,8 @@ describe('UserPage', () => {
       expect(within(region).getByRole('heading', { level: 2, name })).toBeVisible()
     }
     expect(within(within(page).getByRole('region', { name: 'Purchasing' })).getByText('buyer')).toBeVisible()
-    expect(within(page).getAllByRole('separator')).toHaveLength(1)
+    // The email is the first part, so a rule falls between it and each section.
+    expect(within(page).getAllByRole('separator')).toHaveLength(2)
     expect(within(page).getByTestId('user-email')).toBeVisible()
   })
 
@@ -146,7 +154,7 @@ describe('UserPage', () => {
     stubRoles(undefined, () => json({ ...roles, email: null }))
     const page = await openAnn()
 
-    expect(await within(page).findByTestId('user-email')).toHaveTextContent('Email: Not set')
+    expect(await within(page).findByTestId('user-email')).toHaveTextContent('EmailNot set')
   })
 
   it('gives a role after a confirmation and loads the roles again', async () => {
@@ -211,5 +219,34 @@ describe('UserPage', () => {
     renderPage()
 
     expect(await screen.findByTestId('not-found')).toBeVisible()
+  })
+
+  it("links an active application's section title to it in Studio for a reader who may use Studio", async () => {
+    stubRoles(undefined, undefined, { studio: true })
+    const page = await openAnn()
+
+    const link = await within(page).findByRole('link', { name: 'Purchasing' })
+    expect(link).toHaveAttribute('href', '/studio?app=Purchasing')
+    expect(within(page).queryByRole('link', { name: 'Platform' })).not.toBeInTheDocument()
+  })
+
+  it('leaves the section titles plain text for a reader who may not use Studio', async () => {
+    const fetchMock = stubRoles(undefined, undefined, { studio: false })
+    const page = await openAnn()
+
+    expect(await within(page).findByRole('heading', { name: 'Purchasing' })).toBeVisible()
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/me', expect.anything()))
+    expect(within(page).queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('leaves the section of an application that is not active plain text, even for a reader who may use Studio', async () => {
+    const gone = 'gone-application'
+    stubRoles(undefined, () => json({ ...roles, given: [{ applicationId: gone, role: 'buyer', declared: false }] }), {
+      studio: true,
+    })
+    const page = await openAnn()
+
+    expect(await within(page).findByRole('heading', { name: gone })).toBeVisible()
+    expect(within(page).queryByRole('link', { name: gone })).not.toBeInTheDocument()
   })
 })

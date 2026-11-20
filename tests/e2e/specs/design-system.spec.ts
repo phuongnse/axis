@@ -13,6 +13,7 @@ import {
   harnessUrl,
   openHarness,
   origin,
+  pickState,
   repositoryRoot,
 } from "../design-system";
 import { contrast } from "../../../web/src/test/contrast";
@@ -98,7 +99,7 @@ const previews: Record<string, (page: Page | FrameLocator) => Locator> = {
     figure(page, "Typical").getByRole("heading", {
       name: "Purchase requests",
       exact: true,
-      level: 4,
+      level: 1,
     }),
   // The page canvas draws the table's columns from the page metadata that the fixtures answer.
   studioPageDesign: (page) =>
@@ -520,6 +521,7 @@ for (const [name, keys] of Object.entries(stateKeys)) {
       const frame = page.frameLocator("iframe");
 
       for (const [caption, key] of Object.entries(keys)) {
+        await pickState(frame, caption);
         await expect(key(figure(frame, caption))).toBeVisible();
       }
       expect(recording.errors).toEqual([]);
@@ -544,6 +546,7 @@ for (const [name, keys] of Object.entries(stateKeys)) {
       const captions = Object.keys(keys);
 
       for (const [caption, key] of Object.entries(keys)) {
+        await pickState(frame, caption);
         await expect(key(figure(frame, caption))).toBeVisible();
       }
       const boxOf = async (locator: Locator) => {
@@ -555,7 +558,9 @@ for (const [name, keys] of Object.entries(stateKeys)) {
       };
       const bottom = (box: { y: number; height: number }) => box.y + box.height;
 
-      for (const [index, caption] of captions.entries()) {
+      for (const caption of captions) {
+        await pickState(frame, caption);
+        await expect(frame.getByRole("figure")).toHaveCount(1);
         const state = figure(frame, caption);
         await expect(state.locator("figcaption")).toBeVisible();
         const captionBox = await boxOf(state.locator("figcaption"));
@@ -569,12 +574,6 @@ for (const [name, keys] of Object.entries(stateKeys)) {
         expect(bottom(frameBox)).toBeLessThanOrEqual(bottom(figureBox));
         expect(pageBox.y).toBeGreaterThanOrEqual(frameBox.y);
         expect(bottom(pageBox)).toBeLessThanOrEqual(bottom(frameBox));
-        if (index < captions.length - 1) {
-          const nextCaptionBox = await boxOf(
-            figure(frame, captions[index + 1]).locator("figcaption"),
-          );
-          expect(bottom(frameBox)).toBeLessThanOrEqual(nextCaptionBox.y);
-        }
       }
       expect(recording.errors).toEqual([]);
     });
@@ -612,10 +611,8 @@ for (const mode of modes) {
         frameWidth: 992,
       },
     );
-    const state = figure(
-      page.frameLocator("iframe"),
-      "Choose how to sign in",
-    );
+    await pickState(page.frameLocator("iframe"), "Choose how to sign in");
+    const state = figure(page.frameLocator("iframe"), "Choose how to sign in");
     const insets: number[] = [];
 
     for (const label of ["Authenticator app", "Password"]) {
@@ -646,6 +643,7 @@ for (const mode of modes) {
     });
     const frame = page.frameLocator("iframe");
 
+    await pickState(frame, "Fields left empty");
     const empty = figure(frame, "Fields left empty");
     await expect(
       empty.getByText("Enter your email or username.", { exact: true }),
@@ -654,6 +652,7 @@ for (const mode of modes) {
       empty.getByText("Enter your password.", { exact: true }),
     ).toBeVisible();
 
+    await pickState(frame, "Terms and privacy");
     const terms = figure(frame, "Terms and privacy");
     await expect(
       terms.getByRole("link", { name: "Terms of service", exact: true }),
@@ -665,6 +664,7 @@ for (const mode of modes) {
       terms.getByText("Accept the terms to continue.", { exact: true }),
     ).toHaveCount(0);
 
+    await pickState(frame, "Terms not accepted");
     await expect(
       figure(frame, "Terms not accepted").getByText(
         "Accept the terms to continue.",
@@ -688,6 +688,7 @@ for (const mode of modes) {
     const frame = page.frameLocator("iframe");
 
     for (const caption of ["Sign-in refused", "Signed out"]) {
+      await pickState(frame, caption);
       const state = figure(frame, caption);
       const heading = state.getByTestId("organization-heading");
       await expect(heading).toContainText("Axis");
@@ -710,6 +711,7 @@ for (const mode of modes) {
       sandboxed: true,
       frameWidth: 992,
     });
+    await pickState(page.frameLocator("iframe"), "Form page");
     const breadcrumb = figure(
       page.frameLocator("iframe"),
       "Form page",
@@ -733,6 +735,7 @@ for (const mode of modes) {
       sandboxed: true,
       frameWidth: 992,
     });
+    await pickState(page.frameLocator("iframe"), "Platform site");
     const state = figure(page.frameLocator("iframe"), "Platform site");
     const boxOf = async (locator: Locator) => {
       const box = await locator.boundingBox();
@@ -760,6 +763,9 @@ for (const mode of modes) {
     expect(siteBox.width).toBeGreaterThan(gridBox.width - 2);
 
     const tile = state.getByRole("link", { name: /^Purchase requests/ });
+    // The click that picked the state left the browser in pointer mode, where a focus shows no outline. A key press
+    // first puts it back in keyboard mode, as a keyboard user's focus is.
+    await page.keyboard.press("Shift");
     await tile.focus();
     const outline = await tile.evaluate((element) => {
       const style = getComputedStyle(element);
@@ -785,6 +791,7 @@ for (const mode of modes) {
     const frame = page.frameLocator("iframe");
 
     for (const caption of Object.keys(stateKeys.shell)) {
+      await pickState(frame, caption);
       // The harness wraps the previews in a main landmark, which takes the footer out of the contentinfo role.
       const footer = figure(frame, caption).locator("footer");
       await expect(footer).toBeVisible();
@@ -804,19 +811,19 @@ for (const mode of modes) {
   });
 }
 
-// The captions of each framed preview's states. A preview with a Fixtures control draws one state at a time, so its
+// The captions of each framed preview's states. A preview with a State control draws one state at a time, so its
 // states are picked there.
 const framedPreviews: Record<
   string,
-  { captions: readonly string[]; pickedInFixtures: boolean }
+  { captions: readonly string[]; pickedInState: boolean }
 > = {
-  shell: { captions: Object.keys(stateKeys.shell), pickedInFixtures: false },
-  signIn: { captions: Object.keys(stateKeys.signIn), pickedInFixtures: false },
+  shell: { captions: Object.keys(stateKeys.shell), pickedInState: true },
+  signIn: { captions: Object.keys(stateKeys.signIn), pickedInState: true },
   identitySignIn: {
     captions: Object.keys(stateKeys.identitySignIn),
-    pickedInFixtures: false,
+    pickedInState: true,
   },
-  signUp: { captions: ["Typical"], pickedInFixtures: false },
+  signUp: { captions: ["Typical"], pickedInState: false },
   studio: {
     captions: [
       "Typical",
@@ -836,14 +843,14 @@ const framedPreviews: Record<
       "Revision",
       "Release page",
     ],
-    pickedInFixtures: true,
+    pickedInState: true,
   },
-  studioPageDesign: { captions: ["Typical"], pickedInFixtures: true },
-  studioFormDesign: { captions: ["Typical"], pickedInFixtures: true },
-  studioProcessDesign: { captions: ["Typical"], pickedInFixtures: true },
+  studioPageDesign: { captions: ["Typical"], pickedInState: true },
+  studioFormDesign: { captions: ["Typical"], pickedInState: true },
+  studioProcessDesign: { captions: ["Typical"], pickedInState: true },
 };
 
-for (const [name, { captions, pickedInFixtures }] of Object.entries(
+for (const [name, { captions, pickedInState }] of Object.entries(
   framedPreviews,
 )) {
   test(`the ${name} preview draws each state in a frame exactly as tall as its height, with the page scrolling inside it, in light mode`, async ({
@@ -854,14 +861,14 @@ for (const [name, { captions, pickedInFixtures }] of Object.entries(
       frameWidth: 992,
     });
     const frame = page.frameLocator("iframe");
-    const fixtures = frame.getByRole("radiogroup", {
-      name: "Fixtures",
+    const stateControl = frame.getByRole("radiogroup", {
+      name: "State",
       exact: true,
     });
 
     for (const caption of captions) {
-      if (pickedInFixtures) {
-        await fixtures.getByText(caption, { exact: true }).click();
+      if (pickedInState) {
+        await stateControl.getByText(caption, { exact: true }).click();
       }
       const state = figure(frame, caption);
       const screen = state.locator(":scope > div > :first-child");
@@ -1021,7 +1028,7 @@ test("the studio preview draws no panel on its Settings page or its Entity state
     state.getByRole("heading", {
       name: fixtureMarker,
       exact: true,
-      level: 4,
+      level: 1,
     }),
   ).toBeVisible();
   const settingsEditor = state.getByTestId("studio-editor");
@@ -1068,7 +1075,7 @@ for (const mode of modes) {
     });
     const state = figure(page.frameLocator("iframe"), "Typical");
     const heading = (name: string) =>
-      state.getByRole("heading", { name, exact: true, level: 4 });
+      state.getByRole("heading", { name, exact: true, level: 1 });
     const sidebar = state.getByRole("menu");
 
     await expect(heading("Purchase requests")).toBeVisible();
@@ -1210,42 +1217,42 @@ test("the studio preview's entity state loads each field's default editor with n
   expect(recording.errors).toEqual([]);
 });
 
-test("the studio preview replaces the entity designer with the policy matrix picked in the Fixtures control", async ({
+test("the studio preview replaces the entity designer with the policy matrix picked in the State control", async ({
   page,
 }) => {
   const recording = await openHarness(page, "?preview=studio&mode=light");
-  const fixtures = page.getByRole("radiogroup", {
-    name: "Fixtures",
+  const stateControl = page.getByRole("radiogroup", {
+    name: "State",
     exact: true,
   });
 
-  await fixtures.getByText("Entity", { exact: true }).click();
+  await stateControl.getByText("Entity", { exact: true }).click();
   await expect(page.getByTestId("studio-entity-designer")).toBeVisible();
-  await fixtures.getByText("Policy matrix", { exact: true }).click();
+  await stateControl.getByText("Policy matrix", { exact: true }).click();
   await expect(page.getByTestId("studio-matrix")).toBeVisible();
   await expect(page.getByTestId("studio-entity-designer")).toHaveCount(0);
   expect(recording.errors).toEqual([]);
 });
 
-test("the studio preview replaces one state's page with the next one picked in the Fixtures control", async ({
+test("the studio preview replaces one state's page with the next one picked in the State control", async ({
   page,
 }) => {
   const recording = await openHarness(page, "?preview=studio&mode=light");
-  const fixtures = page.getByRole("radiogroup", {
-    name: "Fixtures",
+  const stateControl = page.getByRole("radiogroup", {
+    name: "State",
     exact: true,
   });
   await expect(page.getByTestId("studio-apps")).toHaveCount(0);
 
-  await fixtures.getByText("Failed", { exact: true }).click();
+  await stateControl.getByText("Failed", { exact: true }).click();
   await expect(page.getByTestId("studio-load-error")).toBeVisible();
-  await fixtures.getByText("Access denied", { exact: true }).click();
+  await stateControl.getByText("Access denied", { exact: true }).click();
   await expect(page.getByTestId("studio-forbidden")).toBeVisible();
   await expect(page.getByTestId("studio-load-error")).toHaveCount(0);
   expect(recording.errors).toEqual([]);
 });
 
-test("the Fixtures control wraps its captions onto more lines in a narrow frame", async ({
+test("the State control wraps its captions onto more lines in a narrow frame", async ({
   page,
 }) => {
   const recording = await openHarness(page, "?preview=studio&mode=light", {
@@ -1253,17 +1260,17 @@ test("the Fixtures control wraps its captions onto more lines in a narrow frame"
     frameWidth: 360,
   });
   const frame = page.frameLocator("iframe");
-  const fixtures = frame.getByRole("radiogroup", {
-    name: "Fixtures",
+  const stateControl = frame.getByRole("radiogroup", {
+    name: "State",
     exact: true,
   });
-  const first = (await fixtures
+  const first = (await stateControl
     .getByText("Typical", { exact: true })
     .boundingBox())!;
-  const last = (await fixtures
+  const last = (await stateControl
     .getByText("Policy matrix", { exact: true })
     .boundingBox())!;
-  const group = (await fixtures.boundingBox())!;
+  const group = (await stateControl.boundingBox())!;
   const framed = (await page.locator("iframe").boundingBox())!;
   expect(last.y).toBeGreaterThan(first.y);
   expect(group.x + group.width).toBeLessThanOrEqual(framed.x + framed.width);

@@ -37,6 +37,11 @@
       "uniqueItems": true,
       "items": { "$ref": "#/$defs/name" }
     },
+    "recordPages": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/qualifiedName" },
+      "additionalProperties": { "$ref": "#/$defs/pageName" }
+    },
     "navigation": {
       "type": "array",
       "minItems": 1,
@@ -71,6 +76,11 @@
     "pageName": {
       "type": "string",
       "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$"
+    },
+    "qualifiedName": {
+      "type": "string",
+      "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$",
+      "maxLength": 121
     },
     "textReference": {
       "type": "object",

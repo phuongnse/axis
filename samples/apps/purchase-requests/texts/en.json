@@ -24,6 +24,7 @@
     "pages.suppliers.title": "Suppliers",
     "pages.myTasks.title": "My tasks",
     "pages.approvals.title": "Purchase request approvals",
+    "processes.purchaseRequestApproval.title": "Purchase request approval",
     "actions.open": "Open",
     "actions.new": "New",
     "supplier.label": "Supplier",

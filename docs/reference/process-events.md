@@ -552,9 +552,10 @@ Four kinds of work item deliver something, and each failure is counted for its o
 - **Fan-outs.** The occurrence in the target is in UTC as the receipts write it, such as
   `2026-01-01T05:00:00Z`. The count belongs to the occurrence, so a failure in any batch adds to it,
   and the stored cursor is kept while the item backs off.
-- **Emails.** The target is the id of the email's row in `axis.email_outbox`. Nothing more is sent
-  until an operator redelivers. The process is read through the item's instance, since the outbox row
-  does not record it.
+- **Emails.** The target is the id of the email's row in `axis.email_outbox`. For a digest it is the row
+  the item names, and the dead letter holds the person's later digest emails until an operator redelivers or discards it. A discard queues the person's next digest item, so the waiting rows are not left without one.
+  Nothing more is sent until an operator redelivers, and a discarded email is never sent on its own. The process is read through the item's instance,
+  since the outbox row records the instance but not the process.
 - **Webhooks.** The target is the id of the delivery's row in `axis.webhook_deliveries`, see
   [Webhook delivery](#webhook-delivery). Nothing more is sent until an operator redelivers, and other
   webhooks of the occurrence have their own rows and items, so they still deliver. The process is read

@@ -56,7 +56,7 @@ step, release and times.
 - **Release.** The Release column shows `releaseNumber`, the release's number such as 3, never its
   id. A `null` `releaseNumber`, for a release with no history row, shows the muted dash.
 - **Ended.** An instance still running shows a muted "—" under Ended.
-- **States as tags** _(planned)_. The State column shows each state as a `StatusTag` in its tone, see [which widget](shared-widgets.md#which-widget).
+- **States as tags.** The State column shows each state as a `StatusTag` in its tone, see [which widget](shared-widgets.md#which-widget).
 
 ## Instance page
 
@@ -324,7 +324,8 @@ The widget shows a failure where it happens, and its words come from the platfor
   one link, "Go to {page}" ("Đi tới {page}", `shell.record.goToList`), as a missing record's line does, see
   [routing](frontend.md#routing). No save bar and no action shows.
 - **Texts.** The platform texts `shell.inspector.*` hold the column headers, the section titles, the
-  instance states, the call states (`shell.inspector.callStates.*`), the "hidden" text, the "No subject" text, the Due, Parent, Process and Sub-processes
+  instance states, the call states (`shell.inspector.callStates.*`), the run states (`shell.inspector.runStates.*`), the attempt
+  outcomes (`shell.inspector.attemptOutcomes.*`), the step types (`shell.inspector.stepTypes.*`), the "hidden" text, the "No subject" text, the Due, Parent, Process and Sub-processes
   labels, the empty texts and the messages. `shell.inspector.deadLetters.*` hold the dead letter
   section's title, column headers, empty text and load error. `shell.inspector.commands.*` hold the
   command buttons, the dialog's labels, the reason errors, the retry warning and the resolve labels and
@@ -332,5 +333,4 @@ The widget shows a failure where it happens, and its words come from the platfor
 - **New texts.** _(planned for M38)_ The Current mark, the Paths and Variables labels and the Path column are platform
   texts under `shell.inspector.*`. The three cancel buttons and their dialog titles are under `shell.inspector.commands.*`.
 - **Page texts** _(planned)_. The tabs, the facts, the Data texts, the timeline's columns and sentences, and the step
-  run panel's tabs and terms are platform texts under `shell.inspector.*`, as are the graph's control names, the
-  state icons' tooltips, a card's run duration and the timeout's label.
+  run panel's tabs and terms are platform texts under `shell.inspector.*`, as are the graph's control names, a card's run duration and the timeout's label.

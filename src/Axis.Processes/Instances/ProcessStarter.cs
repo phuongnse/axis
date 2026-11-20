@@ -28,6 +28,7 @@ public static class ProcessStarter
 
     /// <param name="subject">The subject record as read in this transaction, or null to read it here.</param>
     /// <param name="accountableUser">The user who answers for the instance's writes, or null when no user stands behind the start.</param>
+    /// <param name="startedBy">Who or what starts the instance, which the start stores in its row.</param>
     /// <param name="details">More audit details, such as the endpoint's name, added after <c>processId</c> and <c>releaseId</c>.</param>
     public static Task<ProcessStartResult> StartAsync(
         NpgsqlConnection connection,
@@ -42,10 +43,11 @@ public static class ProcessStarter
         Guid instanceId,
         string actorId,
         string? accountableUser,
+        ProcessStartedBy startedBy,
         JsonObject? details,
         CancellationToken cancellationToken) =>
         StartOnSubjectAsync(
-            connection, transaction, tenantId, application, releaseId, process, entity, subjectId, subject, instanceId, actorId, accountableUser, null, details, null, cancellationToken);
+            connection, transaction, tenantId, application, releaseId, process, entity, subjectId, subject, instanceId, actorId, accountableUser, startedBy, null, details, null, cancellationToken);
 
     /// <summary>
     /// Starts the instance of a child process for a <c>subProcess</c> step, as <c>system</c> and
@@ -57,6 +59,7 @@ public static class ProcessStarter
     /// </summary>
     /// <param name="parentInstanceId">The instance of the step that starts the child.</param>
     /// <param name="parentStep">The declared name of that step.</param>
+    /// <param name="parentProcess">The name of the parent's process, which the child stores as its starter with <paramref name="parentInstanceId"/>.</param>
     /// <param name="accountableUser">The parent's accountable user, which the child takes over.</param>
     /// <param name="decisionTask">The parent's deciding task, which the child takes over.</param>
     internal static Task<ProcessStartResult> StartChildAsync(
@@ -73,17 +76,19 @@ public static class ProcessStarter
         Guid instanceId,
         Guid parentInstanceId,
         string parentStep,
+        string parentProcess,
         string? accountableUser,
         Guid? decisionTask,
         CancellationToken cancellationToken)
     {
         var details = new JsonObject { ["parentInstanceId"] = parentInstanceId };
         var parent = (parentInstanceId, parentStep);
+        var startedBy = ProcessStartedBy.Parent(parentProcess, parentInstanceId);
         return entity is not null
             ? StartOnSubjectAsync(
-                connection, transaction, tenantId, application, releaseId, process, entity, subjectId!.Value, subject, instanceId, AuditActors.System, accountableUser, decisionTask, details, parent, cancellationToken)
+                connection, transaction, tenantId, application, releaseId, process, entity, subjectId!.Value, subject, instanceId, AuditActors.System, accountableUser, startedBy, decisionTask, details, parent, cancellationToken)
             : StartOnParametersAsync(
-                connection, transaction, tenantId, application, releaseId, process, parameters!, instanceId, AuditActors.System, accountableUser, decisionTask, details, parent, cancellationToken);
+                connection, transaction, tenantId, application, releaseId, process, parameters!, instanceId, AuditActors.System, accountableUser, startedBy, decisionTask, details, parent, cancellationToken);
     }
 
     private static async Task<ProcessStartResult> StartOnSubjectAsync(
@@ -99,6 +104,7 @@ public static class ProcessStarter
         Guid instanceId,
         string actorId,
         string? accountableUser,
+        ProcessStartedBy startedBy,
         Guid? decisionTask,
         JsonObject? details,
         (Guid InstanceId, string Step)? parent,
@@ -133,6 +139,7 @@ public static class ProcessStarter
             ParentInstanceId = parent?.InstanceId,
             ParentStep = parent?.Step,
             AccountableUser = accountableUser,
+            StartedBy = startedBy.ToJson(),
             DecisionTask = decisionTask,
         };
         return await InsertAsync(connection, transaction, tenantId, application, releaseId, process, instance, actorId, details, cancellationToken);
@@ -146,6 +153,7 @@ public static class ProcessStarter
     /// or waiting instance, so a start while one is open is <see cref="ProcessStartOutcome.AlreadyRunning"/>.
     /// </summary>
     /// <param name="accountableUser">The user who answers for the instance's writes, or null when no user stands behind the start.</param>
+    /// <param name="startedBy">Who or what starts the instance, which the start stores in its row.</param>
     /// <param name="details">More audit details, added after <c>processId</c> and <c>releaseId</c>.</param>
     /// <exception cref="ArgumentException">The process has a subject entity.</exception>
     public static Task<ProcessStartResult> StartWithParametersAsync(
@@ -159,10 +167,11 @@ public static class ProcessStarter
         Guid instanceId,
         string actorId,
         string? accountableUser,
+        ProcessStartedBy startedBy,
         JsonObject? details,
         CancellationToken cancellationToken) =>
         StartOnParametersAsync(
-            connection, transaction, tenantId, application, releaseId, process, parameters, instanceId, actorId, accountableUser, null, details, null, cancellationToken);
+            connection, transaction, tenantId, application, releaseId, process, parameters, instanceId, actorId, accountableUser, startedBy, null, details, null, cancellationToken);
 
     private static async Task<ProcessStartResult> StartOnParametersAsync(
         NpgsqlConnection connection,
@@ -175,6 +184,7 @@ public static class ProcessStarter
         Guid instanceId,
         string actorId,
         string? accountableUser,
+        ProcessStartedBy startedBy,
         Guid? decisionTask,
         JsonObject? details,
         (Guid InstanceId, string Step)? parent,
@@ -212,6 +222,7 @@ public static class ProcessStarter
             ParentInstanceId = parent?.InstanceId,
             ParentStep = parent?.Step,
             AccountableUser = accountableUser,
+            StartedBy = startedBy.ToJson(),
             DecisionTask = decisionTask,
         };
         return await InsertAsync(connection, transaction, tenantId, application, releaseId, process, instance, actorId, details, cancellationToken);

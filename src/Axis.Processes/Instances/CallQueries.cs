@@ -22,10 +22,12 @@ public static class CallQueries
         var calls = new List<ProcessCallDetail>();
         await using (var command = new NpgsqlCommand(
             """
-            SELECT id, 'connector' AS kind, step, connector AS name, NULL::text AS version, operation, state, input::text, NULL::boolean AS idempotent, created_at
+            SELECT id, 'connector' AS kind, step, connector AS name, NULL::text AS version, operation, state, input::text, NULL::boolean AS idempotent, created_at,
+                   request::text AS request, NULL::text AS returned
             FROM axis.connector_calls WHERE process_instance_id = @id
             UNION ALL
-            SELECT id, 'package' AS kind, step, package AS name, version, operation, state, input::text, idempotent, created_at
+            SELECT id, 'package' AS kind, step, package AS name, version, operation, state, input::text, idempotent, created_at,
+                   NULL::text, returned::text
             FROM axis.package_calls WHERE process_instance_id = @id
             ORDER BY created_at, id
             """,
@@ -47,6 +49,8 @@ public static class CallQueries
                     Input = reader.IsDBNull(7) ? null : reader.GetString(7),
                     Idempotent = reader.IsDBNull(8) ? null : reader.GetBoolean(8),
                     CreatedAt = reader.GetFieldValue<DateTimeOffset>(9),
+                    Request = reader.IsDBNull(10) ? null : reader.GetString(10),
+                    Returned = reader.IsDBNull(11) ? null : reader.GetString(11),
                 });
             }
         }
@@ -59,7 +63,7 @@ public static class CallQueries
         var attempts = new Dictionary<Guid, List<ProcessCallAttemptDetail>>();
         await using (var command = new NpgsqlCommand(
             """
-            SELECT call_id, kind, number, started_at, finished_at, outcome, http_status, error, trace_id
+            SELECT call_id, kind, number, started_at, finished_at, outcome, http_status, error, trace_id, response::text, problem::text
             FROM axis.process_call_attempts WHERE call_id = ANY(@ids)
             ORDER BY started_at, id
             """,
@@ -85,6 +89,8 @@ public static class CallQueries
                     HttpStatus = reader.IsDBNull(6) ? null : reader.GetInt32(6),
                     Error = reader.IsDBNull(7) ? null : reader.GetString(7),
                     TraceId = reader.IsDBNull(8) ? null : reader.GetString(8),
+                    Response = reader.IsDBNull(9) ? null : reader.GetString(9),
+                    Problem = reader.IsDBNull(10) ? null : reader.GetString(10),
                 });
             }
         }
@@ -102,6 +108,7 @@ public static class CallQueries
 /// A connector call or package call of an instance. <see cref="Name"/> is the connector of a
 /// connector call and the package of a package call, which also has a <see cref="Version"/>.
 /// <see cref="Input"/> is the stored evaluated input as JSON text, or null when none is stored.
+/// <see cref="Request"/> and <see cref="Returned"/> are the values the call keeps, as JSON text.
 /// </summary>
 public sealed class ProcessCallDetail
 {
@@ -133,6 +140,12 @@ public sealed class ProcessCallDetail
 
     public required DateTimeOffset CreatedAt { get; init; }
 
+    /// <summary>The request the last attempt that sent one made, as JSON text, or null for a package call and before a send.</summary>
+    public string? Request { get; init; }
+
+    /// <summary>The values a package call's operation returned, as JSON text, or null for a connector call and before it succeeds.</summary>
+    public string? Returned { get; init; }
+
     /// <summary>The attempts and lookups, ordered by start time and then by id.</summary>
     public IReadOnlyList<ProcessCallAttemptDetail> Attempts { get; set; } = [];
 }
@@ -157,4 +170,10 @@ public sealed class ProcessCallAttemptDetail
 
     /// <summary>The trace id of the run that wrote the row, or null when the row stored none.</summary>
     public string? TraceId { get; init; }
+
+    /// <summary>The response the outside system answered, as JSON text, or null for a lookup, a package call and an attempt that got no answer.</summary>
+    public string? Response { get; init; }
+
+    /// <summary>The error as a code with its values, as JSON text, or null when the row has no code.</summary>
+    public string? Problem { get; init; }
 }

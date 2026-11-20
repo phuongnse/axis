@@ -51,6 +51,7 @@ public sealed class PackageRunnerResultTests(PostgreSqlFixture database, Keycloa
             Assert.Equal("5", await TotalOfAsync(tenantDatabase, orderId));
             Assert.Equal("succeeded", await CallAsync(tenantDatabase, callId, "state"));
             Assert.Equal("1", await CallAsync(tenantDatabase, callId, "attempts"));
+            Assert.Equal("""{"total": "5"}""", await CallAsync(tenantDatabase, callId, "returned"));
             Assert.Equal(1L, await CountAsync(tenantDatabase, $"SELECT count(*) FROM axis.audit_records WHERE process_instance_id = '{instanceId}' AND action = 'operation.called' AND details->>'outcome' = 'succeeded'"));
             Assert.Equal("running/done", await InstanceAsync(tenantDatabase, instanceId, "state || '/' || step"));
             Assert.Equal(1L, await CountAsync(tenantDatabase, $"SELECT count(*) FROM axis.process_work_items WHERE process_instance_id = '{instanceId}' AND kind = 'process.step'"));

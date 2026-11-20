@@ -1,4 +1,6 @@
+using Axis.Configuration.Model;
 using Axis.Core.Tenancy;
+using Axis.Policy;
 using Axis.Presentation.Sites;
 using Axis.Server.Applications;
 using Axis.Server.Authentication;
@@ -14,7 +16,7 @@ namespace Axis.Server.Presentation;
 /// their pages to the SPA. A site is found by its path. The endpoints need a session: without one
 /// they answer 401 before any 404, so a signed-out caller cannot learn which sites or pages exist.
 /// A site's navigation leaves out the pages the user cannot read, such a page answers 403, and page
-/// metadata lists only the fields, actions and access the user's grants allow. A session that came through a provider the
+/// metadata lists only the fields, actions and access the user's grants allow. Its record pages leave out the entities the user cannot read. A session that came through a provider the
 /// site does not allow answers 401 on the site, its texts and its pages, after the 401 for no session and before any 404.
 /// A tenant without site clients checks nothing. The list of sites holds only the sites that allow that provider, and gives each
 /// its privacy and terms links as <c>legal</c>: the site's own, else the tenant's, else null. A single site gives the same <c>legal</c>. The texts endpoint
@@ -22,6 +24,8 @@ namespace Axis.Server.Presentation;
 /// it is given a <c>release</c> id, so a task page can show the texts of the release it started on.
 /// A page of a module is written <c>{module id}/{page name}</c>, as two path segments, for example
 /// <c>/api/sites/{path}/pages/departments/Departments</c>. It has the same checks as any other page.
+/// The record page route <c>/api/sites/{path}/records/{entity}</c>, or <c>/records/{module}/{entity}</c> for a module entity, describes
+/// the default record page of an entity: it answers 404 for an unknown or a child entity and 403 when the user may not read the entity.
 /// </summary>
 internal static class SiteEndpoints
 {
@@ -74,9 +78,14 @@ internal static class SiteEndpoints
                 .Where(entry => PageAccess.CanRead(active.Application, user.RolesIn(active.Application), active.Application.Pages.First(page => page.Id == entry.Page.Id)))
                 .Select(entry => entry.Page.Name)
                 .ToHashSet(StringComparer.Ordinal);
+            var roles = user.RolesIn(active.Application);
+            var recordPages = site.RecordPages
+                .Where(entry => active.Application.TryGetEntity(entry.Key, out var entity)
+                    && PolicyEvaluator.Access(active.Application, roles, entity, PolicyAction.Read).Granted)
+                .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
             var tenant = tenants.Current ?? throw new InvalidOperationException("No tenant context is set.");
             var legal = catalog.Find(tenant.TenantId)?.Legal?.ForSite(site.Path) is { } links ? new SiteListLegal(links.PrivacyUrl, links.TermsUrl) : null;
-            return Results.Ok(site with { Navigation = [.. site.Navigation.Where(item => readable.Contains(item.Page))], Legal = legal });
+            return Results.Ok(site with { Navigation = [.. site.Navigation.Where(item => readable.Contains(item.Page))], RecordPages = recordPages, Legal = legal });
         });
 
         sites.MapGet("/{path}/texts/{locale}", async (HttpContext context, string path, string locale, string? release, ActiveApplicationResolver resolver, SiteSignIn signIn, ITenantContextAccessor tenants, CancellationToken cancellationToken) =>
@@ -120,6 +129,11 @@ internal static class SiteEndpoints
         {
             sites.MapGet(pattern, PageAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
         }
+
+        foreach (var pattern in new[] { "/{path}/records/{entity}", "/{path}/records/{module}/{entity}" })
+        {
+            sites.MapGet(pattern, RecordPageAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
+        }
     }
 
     private static async Task<IResult> PageAsync(
@@ -156,6 +170,42 @@ internal static class SiteEndpoints
         var model = active.Application.Pages.First(candidate => candidate.Name == metadata.Name);
         return PageAccess.CanRead(active.Application, user.RolesIn(active.Application), model)
             ? Results.Ok(PageAccess.Shape(active.Application, user.RolesIn(active.Application), model, metadata))
+            : Grants.Forbidden();
+    }
+
+    private static async Task<IResult> RecordPageAsync(
+        HttpContext context,
+        string path,
+        string entity,
+        ActiveApplicationResolver resolver,
+        SiteSignIn signIn,
+        ITenantContextAccessor tenants,
+        CancellationToken cancellationToken)
+    {
+        var name = context.GetRouteValue("module") is string module ? $"{module}/{entity}" : entity;
+        if (await CurrentUsers.FindAsync(context) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
+        if (!await ServesSessionAsync(context, signIn, tenants, path, cancellationToken))
+        {
+            return Grants.SignInRequired();
+        }
+
+        if (await resolver.ResolveBySitePathAsync(path, cancellationToken) is not { } active)
+        {
+            return SiteNotFound();
+        }
+
+        if (ApplicationSites.RecordPage(active.Application, name) is not { } page)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The site's application has no entity with this name.");
+        }
+
+        var roles = user.RolesIn(active.Application);
+        return PageAccess.CanRead(active.Application, roles, page)
+            ? Results.Ok(PageAccess.Shape(active.Application, roles, page, ApplicationSites.DescribePage(active.Application, page)))
             : Grants.Forbidden();
     }
 

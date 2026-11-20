@@ -28,13 +28,21 @@ function answer(items: StudioRevision[], totalCount: number, start: string | nul
   })
 }
 
-function stubRevisions(reply: (url: string) => Response) {
+/** Answers the history with `reply`, and `/api/me` with what `me` says: whether the reader may administer users. */
+function stubRevisions(reply: (url: string) => Response, users = false) {
   const fetchMock = vi.fn(async (input: string) =>
-    input.startsWith(path) ? reply(input) : new Response(null, { status: 404 }),
+    input.startsWith(path)
+      ? reply(input)
+      : input === '/api/me'
+        ? new Response(JSON.stringify({ id: 'admin', users }), { headers: { 'Content-Type': 'application/json' } })
+        : new Response(null, { status: 404 }),
   )
   vi.stubGlobal('fetch', fetchMock)
-  // The table's own choices of columns are not a request for its rows.
-  return () => fetchMock.mock.calls.map(([input]) => input).filter((input) => !input.startsWith('/api/me/tables/'))
+  // The table's own choices of columns and the signed-in person are not a request for its rows.
+  return () =>
+    fetchMock.mock.calls
+      .map(([input]) => input)
+      .filter((input) => input !== '/api/me' && !input.startsWith('/api/me/tables/'))
 }
 
 const Location = () => <output data-testid="location">{useLocation().search}</output>
@@ -130,6 +138,38 @@ describe('StudioHistory', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Refresh' }))
 
     await vi.waitFor(() => expect(requested()).toHaveLength(2))
+  })
+
+  it('links an author to the user page in the Who column for a reader who may administer users', async () => {
+    stubRevisions(() => answer([revision('r2', 'Second'), revision('r1', 'First')], 2, 'r1'), true)
+    renderHistory()
+
+    const links = await screen.findAllByRole('link', { name: 'Linh Nguyen' })
+    expect(links).toHaveLength(2)
+    expect(links[0]).toHaveAttribute('href', '/users/u1')
+  })
+
+  it('shows an author as plain text in the Who column for a reader who may not administer users', async () => {
+    const requested = stubRevisions(() => answer([revision('r2', 'Second')], 1, 'r1'), false)
+    renderHistory()
+
+    expect(await screen.findByText('Linh Nguyen')).toBeVisible()
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/me', expect.anything()))
+    expect(screen.queryByRole('link', { name: 'Linh Nguyen' })).not.toBeInTheDocument()
+    expect(requested()).toEqual([path])
+  })
+
+  it('names the signed-in author with "(you)" and a revision the server made as System, with no link', async () => {
+    stubRevisions(
+      () => answer([revision('r2', 'Second'), { ...revision('r1', 'First', 'Axis'), userId: null }], 2, null),
+      true,
+    )
+    renderHistory()
+
+    await screen.findByText('Second')
+    await vi.waitFor(() => expect(screen.getAllByRole('link', { name: 'Linh Nguyen' })).toHaveLength(1))
+    expect(screen.getByText('System')).toBeVisible()
+    expect(screen.queryByRole('link', { name: 'System' })).not.toBeInTheDocument()
   })
 
   it('gives every revision an Undo button except the one the server names as the start of history', async () => {

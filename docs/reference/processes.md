@@ -67,6 +67,7 @@ payment reference from the sample extension package, see
   "kind": "process",
   "name": "PurchaseRequestApproval",
   "formatVersion": 1,
+  "title": { "textKey": "processes.purchaseRequestApproval.title" },
   "entity": "PurchaseRequest",
   "startCondition": {
     "expression": "status in ('draft', 'returned') and totalAmount is not null",
@@ -220,7 +221,7 @@ and operations, and where each is described:
 | `repeat`                                                | _(planned for M38)_ Runs its body for each item, a number of times, while or until a condition | [Repeat step](process-blocks.md#repeat-step) |
 | `end`                                                   | Completes the instance                                               | Below                                                            |
 
-- **Labels.** _(planned)_ Every step may have an optional `label`, a text resource, and so may each
+- **Labels.** Every step may have an optional `label`, a text resource, and so may each
   `branches[]` entry of a decision. A task's `label` and each outcome's `label` stay required.
 - **`decision`.** `branches` is an ordered list, and each branch has a `name`, a `when` expression
   and a `next` step. A branch name is unique in its decision, ignoring letter case. The branches are
@@ -399,8 +400,8 @@ Each code is in the [diagnostic code table](diagnostic-codes.md).
   [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
 - A step has the properties of its type and no others, as the table below says (`AXC0004`). `to`,
   `channels`, `message` and `open` are on a `notify` step only, `process`, `subject` and `parameters`
-  on a `subProcess` step only, and the task properties are `label`, `assignee`, `form`, `dueIn` and
-  `outcomes`.
+  on a `subProcess` step only, the task properties are `assignee`, `form`, `dueIn` and
+  `outcomes`, and `label` is a property of every step.
 - A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at `/steps/{i}/assignee`). A
   `role` is a non-empty name (`AXC0004`) that names a declared [role](roles-and-policies.md),
   compared exactly, otherwise it is `AXC0089` at `/steps/{i}/assignee/role`. A name whose role file
@@ -422,10 +423,10 @@ Each code is in the [diagnostic code table](diagnostic-codes.md).
 - **SLAs** _(planned for M39)_. A process may declare `slas`, see [SLAs](working-time.md#slas).
 - Outcome names are unique within the step, ignoring letter case (`AXC0085` at
   `/steps/{i}/outcomes/{j}/name`).
-- The `startCondition` message's text key, each task `label`'s and each outcome `label`'s exist,
-  checked like other labels (`AXC0028`).
-- **Labels.** _(planned)_ `label` is a property of every step type and of a decision branch, not of a
-  task only. Each key joins the `AXC0028` check.
+- The `startCondition` message's text key, each step `label`'s, each decision branch `label`'s and
+  each outcome `label`'s exist, checked like other labels (`AXC0028` at
+  `/steps/{i}/label/textKey`, `/steps/{i}/branches/{j}/label/textKey` and
+  `/steps/{i}/outcomes/{j}/label/textKey`).
 - Every expression gets the usual syntax, type and cost diagnostics, see
   [Diagnostics](expressions.md#diagnostics).
 - **Blocks.** _(planned for M38)_ A `parallel` or `repeat` step is checked as
@@ -458,12 +459,12 @@ Each code is in the [diagnostic code table](diagnostic-codes.md).
 | `task`                      | `label`, `assignee`, `form` and at least one outcome | `branches`, `otherwise`, `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields`, `next`                |
 | `end`                       | Nothing more                                     | `next`, `branches`, `otherwise`, `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields`, `wait`, `until` and the task properties |
 | `timer`                     | `next`                                           | `branches`, `otherwise`, `operation`, `set`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields` and the task properties |
-| `waitEvent`                 | `event` and `next`                               | Any property but `when` and `timeout`                                                                                                    |
+| `waitEvent`                 | `event` and `next`                               | Any property but `label`, `when` and `timeout`                                                                                           |
 | _(planned for M38)_ `parallel`                 | `branches` and `next`                            | Any property but `branches`, `completion` and `next`                                                                                     |
 | _(planned for M38)_ `repeat`                   | Exactly one of `forEach`, `times`, `while` and `until`, with `start`, `steps` and `next` | Any property not listed in [Repeat step](process-blocks.md#repeat-step)                  |
 | _(planned for M38)_ `operation` with `setVariables` | `set` with at least one variable and `next`  | `branches`, `otherwise`, `connector`, `input`, `output`, `retry`, `event`, `entity`, `fields` and the task properties |
 | _(planned for M38)_ `waitEvent` with `events`  | `events`                                         | Any property but `events` and `timeout`                                                                                                  |
-| `subProcess`                | `process` and `next`                             | Any property but `subject` and `parameters`                                                                                              |
+| `subProcess`                | `process` and `next`                             | Any property but `label`, `subject` and `parameters`                                                                                     |
 
 - **Error paths and skip.** _(planned for M38)_ Every step but `end` may have `onError`, see
   [Error paths](#error-paths). An `end` in a repeat body may have `skip`, see
@@ -484,8 +485,16 @@ POST /api/apps/{app}/processes/{process}/instances
 Content-Type: application/json
 Idempotency-Key: 3f0c…
 
-{ "subjectId": "0192f4a7-…" }
+{ "subjectId": "0192f4a7-…", "via": "purchaseRequest.submit" }
 ```
+
+`via` is optional. It is the text key of the label of the `startProcess` action that the person started
+from, which the SPA sends from a form, a detail or a table. The instance keeps it as
+[who started it](process-inspection.md#instance-detail). A start through the API with no action sends
+no `via`, and the instance keeps `null`. The server accepts a `via` that is the label text key of a
+`startProcess` action of this process, in the `actions` or `rowActions` of a widget on any page of the
+application, because every site of the application serves every page. A process without a subject
+takes no `via`.
 
 The content type follows the same rules as the record API, see
 [Create, update and delete](record-api.md#create-update-and-delete), and errors are problem details,
@@ -497,7 +506,8 @@ as in the [record API](record-api.md#errors).
 | `401`                                | Nobody is signed in. The title is the record API's "Sign in to read or write this data.".                                                                                                                                                                                                                                                     |
 | `404`                                | An unknown application, an application with no active release, or an unknown process.                                                                                                                                                                                                                                                         |
 | `403`                                | The user has no `start` grant on the process. The title is the record API's "You have no grant for this action.".                                                                                                                                                                                                                             |
-| `400` for a body                     | A body that is not `{ "subjectId": "<uuid>" }`, or a `subjectId` that names no record of the subject entity the user may read. The error is keyed `/subjectId`.                                                                                                                                                                              |
+| `400` for a body                     | A body that is not `{ "subjectId": "<uuid>" }` with an optional `via` that is a non-empty string, or a `subjectId` that names no record of the subject entity the user may read. The error is keyed `/subjectId`.                                                                                                                            |
+| `400` for a `via`                    | A well-formed `via` that is the label text key of no `startProcess` action of this process on a page of the application. The error is keyed `/via`. Nothing is written.                                                                                                                                                                      |
 | `400` for a start condition          | The subject record fails the `startCondition`. The error is keyed `/subjectId` and holds the condition's message text key.                                                                                                                                                                                                                   |
 | `409`                                | A `running` or `waiting` instance already exists for this process and subject record.                                                                                                                                                                                                                                                         |
 | `409` for a policy that reads a pending field | A `read` filter of the user's grants on the subject entity reads a [pending field](migrations.md#recomputing-computed-fields). The title is the record API's "Your access to this entity cannot be checked while a field is being recomputed.", with no `errors`, see [the record API](record-api.md#errors). It comes before the subject record is looked up, so it is the same for a record that does not exist. |
@@ -525,7 +535,7 @@ A request is checked in this order, and the first failure is the response:
 2. The application and the process, `404`.
 3. The `start` grant on the process, `403`.
 4. The content type, `415`.
-5. The body, `400`.
+5. The body, `400`, and then its `via`, `400`.
 6. The `Idempotency-Key` header, `400`.
 
 A start by a session without the CSRF header is a `403` before any of these checks. Read access to

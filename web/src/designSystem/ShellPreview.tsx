@@ -3,7 +3,7 @@ import { Route, Routes } from 'react-router'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { AccountPage } from '../pages/AccountPage'
 import { HomePage } from '../pages/HomePage'
-import { PageRoute } from '../pages/PageRoute'
+import { PageRoute, RecordPageRoute } from '../pages/PageRoute'
 import { PlatformContext, type Platform } from '../pages/context'
 import { PlatformShellRoute } from '../pages/PlatformShellRoute'
 import { SiteRoute } from '../pages/SiteRoute'
@@ -48,8 +48,11 @@ export function ShellPreview() {
           }
         />
         <Route path=":site" element={<SiteRoute />}>
+          <Route path="records/:entity/:id" element={<RecordPageRoute />} />
+          <Route path="records/:module/:entity/:id" element={<RecordPageRoute />} />
           <Route path=":page" element={<PageRoute />} />
           <Route path=":page/new" element={<PageRoute form="new" />} />
+          <Route path=":page/:id" element={<PageRoute form="edit" />} />
           <Route path=":module/:page/new" element={<PageRoute form="new" />} />
           <Route path=":module/:page/:id" element={<PageRoute form="edit" />} />
         </Route>

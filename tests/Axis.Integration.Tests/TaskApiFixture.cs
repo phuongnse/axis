@@ -20,6 +20,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting.Internal;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -32,7 +33,10 @@ namespace Axis.Integration.Tests;
 /// <c>maria</c> and <c>fiona</c>, who hold the role <c>finance</c>, <c>rita</c>, who holds
 /// <c>reviewer</c>, <c>ines</c>, who holds <c>inspector</c>, <c>lena</c>, who holds <c>finance</c> and <c>inspector</c>, <c>ada</c>, who holds <c>auditor</c>, <c>carl</c>, who holds <c>clerk</c>, <c>otto</c>, who holds <c>employee</c>, which StepApp does not declare, and <c>pia</c>, who holds <c>platform-operator</c>, the console's operator role.
 /// The fixture also holds the worker's services for both tenants, with the host never started, so
-/// a test runs the work items that create tasks itself.
+/// a test runs the work items that create tasks itself. A second worker in Development sends connector calls to a
+/// <see cref="ConnectorStub"/>: each tenant's <c>PurchasingUrl</c> binding points at its path <c>/tenant-a</c> or
+/// <c>/tenant-b</c> on the stub, and its <c>PurchasingToken</c> secret holds its own token. Its log entries are in
+/// <see cref="CallLogs"/>.
 /// </summary>
 public sealed class TaskApiFixture : IAsyncLifetime
 {
@@ -48,7 +52,10 @@ public sealed class TaskApiFixture : IAsyncLifetime
     private readonly string _dataKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
     private readonly Dictionary<string, Tenant> _tenants = new(StringComparer.Ordinal);
     private WebApplicationFactory<Program>? _factory;
+    private readonly Dictionary<string, string> _tokens = new(StringComparer.Ordinal);
     private ServiceProvider? _services;
+    private ServiceProvider? _callWorker;
+    private ConnectorStub? _stub;
     private ApplicationModel? _model;
 
     /// <summary>The compiled model of the StepApp fixture.</summary>
@@ -65,6 +72,15 @@ public sealed class TaskApiFixture : IAsyncLifetime
 
     /// <summary>The title <see cref="InsertRequestAsync"/> gives the request <paramref name="id"/>.</summary>
     public static string RequestTitle(Guid id) => $"Request {id:N}";
+
+    /// <summary>The external system that the connector calls of <see cref="RunCallAsync"/> go to.</summary>
+    internal ConnectorStub Stub => _stub ?? throw new InvalidOperationException("The fixture is not initialized.");
+
+    /// <summary>Every log entry of the worker that <see cref="RunCallAsync"/> runs on.</summary>
+    internal LogCollector CallLogs { get; } = new();
+
+    /// <summary>The value of the <c>PurchasingToken</c> secret of <paramref name="tenant"/>.</summary>
+    public string Token(string tenant) => _tokens[tenant];
 
     /// <summary>The factory of the test host, for a test that adds settings with <c>WithWebHostBuilder</c>.</summary>
     internal WebApplicationFactory<Program> Factory => _factory ?? throw new InvalidOperationException("The test host is not started.");
@@ -121,6 +137,25 @@ public sealed class TaskApiFixture : IAsyncLifetime
             })
             .Build();
         _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" }).BuildServiceProvider();
+
+        _stub = await ConnectorStub.StartAsync();
+        var callValues = new Dictionary<string, string?>();
+        foreach (var (tenant, row) in _tenants)
+        {
+            _tokens[tenant] = $"token-{tenant}-{Guid.NewGuid():N}";
+            callValues[$"Tenants:{tenant}:Hosts:0"] = Host(tenant);
+            callValues[$"Tenants:{tenant}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(row.ConnectionString);
+            callValues[$"Tenants:{tenant}:DataKeys:1"] = _dataKey;
+            callValues[$"Tenants:{tenant}:Bindings:PurchasingUrl:Kind"] = "url";
+            callValues[$"Tenants:{tenant}:Bindings:PurchasingUrl:Value"] = $"{_stub.BaseUrl}/tenant-{tenant}";
+            callValues[$"Tenants:{tenant}:Bindings:PurchasingToken:Kind"] = "secret";
+            callValues[$"Tenants:{tenant}:Bindings:PurchasingToken:Value"] = _tokens[tenant];
+        }
+
+        _callWorker = new ServiceCollection()
+            .AddLogging(logging => logging.AddProvider(CallLogs).SetMinimumLevel(LogLevel.Trace))
+            .AddAxisWorker(new ConfigurationBuilder().AddInMemoryCollection(callValues).Build(), new HostingEnvironment { EnvironmentName = "Development" })
+            .BuildServiceProvider();
     }
 
     public async ValueTask DisposeAsync()
@@ -133,6 +168,16 @@ public sealed class TaskApiFixture : IAsyncLifetime
         if (_services is not null)
         {
             await _services.DisposeAsync();
+        }
+
+        if (_callWorker is not null)
+        {
+            await _callWorker.DisposeAsync();
+        }
+
+        if (_stub is not null)
+        {
+            await _stub.DisposeAsync();
         }
 
         foreach (var tenant in _tenants.Values)
@@ -295,6 +340,40 @@ public sealed class TaskApiFixture : IAsyncLifetime
     }
 
     /// <summary>
+    /// Claims the next due connector call item of <paramref name="tenant"/> and runs it on the worker that sends to
+    /// <see cref="Stub"/>. Returns its outcome, or <see langword="null"/> when there is none.
+    /// </summary>
+    internal async Task<WorkItemOutcome?> RunCallAsync(string tenant, CancellationToken cancellationToken)
+    {
+        var runner = (_callWorker ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>();
+        await using var connection = await DataSource(tenant).OpenConnectionAsync(cancellationToken);
+        var item = await WorkItemQueue.ClaimAsync(connection, tenant, [ProcessStarts.ConnectorCallWorkItemKind], _lease, cancellationToken);
+        return item is null ? null : await runner.ExecuteAsync(item, cancellationToken);
+    }
+
+    /// <summary>
+    /// Inserts a <c>succeeded</c> package call of the step <paramref name="step"/> of the instance
+    /// <paramref name="instanceId"/> in <paramref name="tenant"/> that kept the values <paramref name="returnedJson"/>.
+    /// Returns the call's id.
+    /// </summary>
+    public async Task<Guid> InsertPackageCallAsync(string tenant, Guid instanceId, string step, string returnedJson)
+    {
+        var id = Guid.CreateVersion7();
+        await using var command = DataSource(tenant).CreateCommand(
+            """
+            INSERT INTO axis.package_calls (id, process_instance_id, step, staged_revision, release_id, package, version, operation, state, attempts, returned, settled_at)
+            VALUES (@id, @instance, @step, 1, @release, 'Payments', '1.0.0', 'reserve', 'succeeded', 1, @returned::jsonb, now())
+            """);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("instance", instanceId);
+        command.Parameters.AddWithValue("step", step);
+        command.Parameters.AddWithValue("release", _tenants[tenant].ReleaseId);
+        command.Parameters.AddWithValue("returned", returnedJson);
+        await command.ExecuteNonQueryAsync();
+        return id;
+    }
+
+    /// <summary>
     /// Inserts a <c>pending</c> connector call of the step <paramref name="step"/> of the instance
     /// <paramref name="instanceId"/> in <paramref name="tenant"/>, to <c>Purchasing</c>
     /// <c>createOrder</c> on the tenant's first release, with the stored input
@@ -323,12 +402,12 @@ public sealed class TaskApiFixture : IAsyncLifetime
     /// and finished a second later.
     /// </summary>
     public async Task InsertCallAttemptAsync(
-        string tenant, Guid callId, string kind, int number, DateTimeOffset startedAt, string outcome, int? httpStatus, string? error = null)
+        string tenant, Guid callId, string kind, int number, DateTimeOffset startedAt, string outcome, int? httpStatus, string? error = null, string? problem = null)
     {
         await using var command = DataSource(tenant).CreateCommand(
             """
-            INSERT INTO axis.process_call_attempts (id, call_kind, call_id, kind, number, started_at, finished_at, outcome, http_status, error)
-            VALUES (@id, 'connector', @call, @kind, @number, @startedAt, @finishedAt, @outcome, @status, @error)
+            INSERT INTO axis.process_call_attempts (id, call_kind, call_id, kind, number, started_at, finished_at, outcome, http_status, error, problem)
+            VALUES (@id, 'connector', @call, @kind, @number, @startedAt, @finishedAt, @outcome, @status, @error, @problem)
             """);
         command.Parameters.AddWithValue("id", Guid.CreateVersion7());
         command.Parameters.AddWithValue("call", callId);
@@ -339,6 +418,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
         command.Parameters.AddWithValue("outcome", outcome);
         command.Parameters.Add(new NpgsqlParameter("status", NpgsqlDbType.Integer) { Value = (object?)httpStatus ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("error", NpgsqlDbType.Text) { Value = (object?)error ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("problem", NpgsqlDbType.Jsonb) { Value = (object?)problem ?? DBNull.Value });
         await command.ExecuteNonQueryAsync();
     }
 

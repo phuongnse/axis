@@ -73,7 +73,7 @@ A request's page shows one request: its heading, [the feed](#the-feed) and [the 
   [the states](#the-states).
 - Under the name, `spacing-xs` apart, come the request's words in full. Then, in `textMuted`, comes the
   sender's line.
-- **The sender's line** _(planned)_. It reads "Sent by <name> on <time>", the name read as
+- **The sender's line**. It reads "Sent by <name> on <time>", the name read as
   [a person's name](actions-and-controls.md#text) is, so the reader's own is followed by "(you)".
 - **Co-authors** _(planned for M35)_. The line ends with ", co-authored with <AIs>". The co-authors are the AIs
   that made the change, in the order they first worked. Axis's agent is named by the model its author's AI
@@ -366,7 +366,7 @@ muted, each `spacing-xs` from the last.
 - The time is a length of time in the same words as [the History's Duration](#the-history), such as "40 s".
 - A failure adds one sentence under the name, in the same column and in the text colour. It says where and why, such as
   "Failed at step 2: The purchasing system did not answer at its test address."
-- The band's Run tests draws its results the same way, see [Studio](studio.md#running-tests).
+- The band's Run tests draws its results the same way, see [running tests](studio-running-tests.md#running-tests).
 
 ### Preview the draft
 

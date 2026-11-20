@@ -2,7 +2,6 @@ import { Flex, Tag, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
-import { NotFoundPage } from '../pages/NotFoundPage'
 import { AxisButton } from './AxisButton'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { useCanvasActions } from './canvasActions'
@@ -20,6 +19,7 @@ import {
   type RecordValue,
   type RowLabels,
 } from './records'
+import { RecordNotFound } from './RecordNotFound'
 import type { EntityWidgetMetadata, FieldMetadata, NavigateAction, StartProcessAction } from './site'
 import { TermList } from './TermList'
 import { useText } from './texts'
@@ -49,7 +49,7 @@ const rowLabelsOf = (label: FieldLabel | undefined) => (Array.isArray(label) ? (
  * section without a title. Each section's fields form a description list in the sections' column widths.
  * A value looks as it does in a table cell, and a child collection shows its
  * rows in a read-only table. The server leaves out the fields the user may not read. A record that is
- * missing or unreadable shows the not-found page.
+ * missing or unreadable shows the missing-record line, see `RecordNotFound`.
  *
  * A button for each `startProcess` action starts its process for the record straight away, with
  * nothing to save first, and then loads the record again. A button for each `navigate` action opens
@@ -113,7 +113,7 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
       startKeys.current.set(action.instancesPath, key)
       let result
       try {
-        result = await startProcess(action.instancesPath, recordId, key)
+        result = await startProcess(action.instancesPath, recordId, key, action.labelKey)
       } catch (error) {
         console.warn(`Starting the process '${action.process}' for '${recordId}' failed`, error)
         setErrors([t('shell.form.startFailed')])
@@ -147,7 +147,7 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
     return <AxisAlert data-testid="detail-load-error" kind="error" message={t('shell.form.loadFailed')} />
   }
   if (load === 'missing' || record === null) {
-    return <NotFoundPage />
+    return <RecordNotFound />
   }
 
   // A refused read on the path of an expression opens nothing and shows a message.

@@ -1,5 +1,8 @@
 import { apiFetch } from './api'
+import { fillText } from './fillText'
+import { formatDuration } from './formatValue'
 import { parseRecordJson, type RecordProblem } from './records'
+import type { StatusTone } from './statusTones'
 
 /** The states of a process instance, as the inspection API's `state` filter takes them. */
 export const instanceStates = ['running', 'waiting', 'completed', 'failed', 'cancelled'] as const
@@ -13,17 +16,145 @@ export const attemptKinds = ['attempt', 'lookup'] as const
 /** The outcomes of an attempt or a lookup, see docs/reference/process-inspection.md#attempts. */
 export const attemptOutcomes = ['succeeded', 'retryable', 'unknown', 'failed', 'found', 'notFound'] as const
 
+/** The tone of a known state, or `neutral` for a state this build does not know. */
+function toneOf(tones: Record<string, StatusTone>, state: string): StatusTone {
+  return Object.hasOwn(tones, state) ? tones[state] : 'neutral'
+}
+
+/** The text of a known state under `prefix`, or the state as the API sends it when this build does not know it. */
+function textOf(t: (key: string) => string, prefix: string, known: readonly string[], state: string): string {
+  return known.includes(state) ? t(`${prefix}${state}`) : state
+}
+
+const instanceTones: Record<(typeof instanceStates)[number], StatusTone> = {
+  running: 'neutral',
+  waiting: 'neutral',
+  completed: 'success',
+  failed: 'danger',
+  cancelled: 'muted',
+}
+
+/** The tone of an instance state, see docs/reference/shared-widgets.md#which-widget. An unknown state is `neutral`. */
+export function stateTone(state: string): StatusTone {
+  return toneOf(instanceTones, state)
+}
+
 /** The platform text of an instance state. A state this build does not know shows as the API sends it. */
 export function stateText(t: (key: string) => string, state: string): string {
-  return (instanceStates as readonly string[]).includes(state) ? t(`shell.inspector.states.${state}`) : state
+  return textOf(t, 'shell.inspector.states.', instanceStates, state)
+}
+
+/**
+ * The run states of a step, the vocabulary of its state on the graph, see
+ * docs/reference/process-inspector-widget.md#process-graph. A step not reached has none.
+ */
+export const runStates = ['done', 'running', 'waitingForEvent', 'waitingForPerson', 'failed', 'cancelled'] as const
+
+/** The run state of a step. */
+export type RunState = (typeof runStates)[number]
+
+const runTones: Record<RunState, StatusTone> = {
+  done: 'success',
+  running: 'neutral',
+  waitingForEvent: 'neutral',
+  waitingForPerson: 'attention',
+  failed: 'danger',
+  cancelled: 'muted',
+}
+
+/** The tone of a run state. An unknown state is `neutral`. */
+export function runStateTone(state: string): StatusTone {
+  return toneOf(runTones, state)
+}
+
+/** The platform text of a run state. A state this build does not know shows as sent. */
+export function runStateText(t: (key: string) => string, state: string): string {
+  return textOf(t, 'shell.inspector.runStates.', runStates, state)
+}
+
+const attemptTones: Record<(typeof attemptOutcomes)[number], StatusTone> = {
+  succeeded: 'success',
+  found: 'success',
+  failed: 'danger',
+  retryable: 'muted',
+  notFound: 'muted',
+  unknown: 'attention',
+}
+
+/** The tone of an attempt's outcome. An unknown outcome is `neutral`. */
+export function attemptOutcomeTone(outcome: string): StatusTone {
+  return toneOf(attemptTones, outcome)
+}
+
+/** The platform text of an attempt's outcome. An outcome this build does not know shows as sent. */
+export function attemptOutcomeText(t: (key: string) => string, outcome: string): string {
+  return textOf(t, 'shell.inspector.attemptOutcomes.', attemptOutcomes, outcome)
+}
+
+/** The types of a step, see docs/reference/process-inspection.md#instance-detail. */
+export const stepTypes = ['decision', 'task', 'operation', 'subProcess', 'timer', 'waitEvent', 'end'] as const
+
+/** The platform text of a step's type. A type this build does not know shows as sent. */
+export function stepTypeText(t: (key: string) => string, type: string): string {
+  return textOf(t, 'shell.inspector.stepTypes.', stepTypes, type)
 }
 
 /** The states of a process call, see docs/reference/process-inspection.md#instance-detail. */
 export const callStates = ['pending', 'sending', 'unknown', 'succeeded', 'failed', 'cancelled'] as const
 
+const callTones: Record<(typeof callStates)[number], StatusTone> = {
+  pending: 'neutral',
+  sending: 'neutral',
+  unknown: 'attention',
+  succeeded: 'success',
+  failed: 'danger',
+  cancelled: 'muted',
+}
+
+/** The tone of a call state. An unknown state is `neutral`. */
+export function callStateTone(state: string): StatusTone {
+  return toneOf(callTones, state)
+}
+
 /** The platform text of a call state. A state this build does not know shows as the API sends it. */
 export function callStateText(t: (key: string) => string, state: string): string {
-  return (callStates as readonly string[]).includes(state) ? t(`shell.inspector.callStates.${state}`) : state
+  return textOf(t, 'shell.inspector.callStates.', callStates, state)
+}
+
+/** The code of a failed step or attempt with its values, see docs/reference/process-inspection.md#step-errors-in-inspection. */
+export interface StepProblem {
+  code: string
+  values: Record<string, number>
+}
+
+/** The codes of a step problem, see docs/reference/process-inspection.md#step-errors-in-inspection. */
+export const stepProblems = [
+  'unavailable',
+  'serverError',
+  'refused',
+  'timeout',
+  'notSent',
+  'exception',
+  'expressionFailed',
+  'writeRefused',
+] as const
+
+/**
+ * The words of a row's error in the reader's language: the platform text of its `problem`, with `timeout`'s `seconds` as a length of time,
+ * or the stored `error` for a row with no `problem` and for a code this build does not know.
+ */
+export function problemText(
+  t: (key: string) => string,
+  locale: string,
+  problem: StepProblem | null | undefined,
+  error: string | null,
+): string | null {
+  if (!problem || !(stepProblems as readonly string[]).includes(problem.code)) {
+    return error
+  }
+  return fillText(t(`shell.stepProblem.${problem.code}`), {
+    seconds: formatDuration((problem.values.seconds ?? 0) * 1000, locale, t),
+  })
 }
 
 /**
@@ -85,6 +216,8 @@ export interface PathEntry {
   decision: string | null
   output: unknown
   error: string | null
+  /** The code of `error`, or `null` when the entry has none. */
+  problem: StepProblem | null
   /** The trace id of the run that wrote the entry, or `null` when it stored none. */
   traceId: string | null
 }
@@ -111,6 +244,8 @@ export interface CallAttempt {
   outcome: string
   httpStatus: number | null
   error: string | null
+  /** The code of `error`, or `null` when the row has none. */
+  problem: StepProblem | null
   /** The trace id of the run that wrote the row, or `null` when it stored none. */
   traceId: string | null
 }

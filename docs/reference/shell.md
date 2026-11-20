@@ -139,8 +139,16 @@ below it. It says where the person is and what the page is.
 - **Regular band.** The band of a platform page that keeps one, the account and Users pages, holds the breadcrumb,
   then the page title in `heading4`. It has `spacing-lg` padding above and at its sides, `spacing-md` below the title,
   and `spacing-xs` between the breadcrumb and the title.
+- **Title alone in the band** _(planned)_. The band of a platform page that keeps one holds only the page title in
+  `heading4`, as the page's level-one heading: the account, users, user, licences, console and console instance pages.
+  It has `spacing-md` padding above and below the title, so the title sits evenly, and `spacing-lg` at its sides, where
+  the title lines up with the content below.
 - **Breadcrumb.** The breadcrumb starts at the site and ends at the page: "Axis › Users". Every step but the
   last is a link, and the last is marked `aria-current`.
+- **No breadcrumb** _(planned)_. No page of any site draws a breadcrumb. The header's mark leads to the site's first
+  page, and the browser goes back, as **No link back** in [layout](#layout) says. The user page and the console instance
+  page have no step back to their list, because the browser leads back to it. `PageLayout` takes no breadcrumb, and no
+  text names one.
 - **Site pages** _(planned)_. A page of an application site starts with its title in `heading4` as the page's
   level-one heading, with no breadcrumb and no band of its own. The sidebar marks where the person is, and the browser
   goes back, with a table's search, sort and page kept in the address.
@@ -167,6 +175,8 @@ below it. It says where the person is and what the page is.
 - **Platform pages.** The platform home page has no band and no breadcrumb, and has its own headings,
   see the [platform home page](#platform-home-page). The users page has the band "Axis › Users".
 - **The account page's band.** The account page has the band "Axis › Your account".
+- **Bands by title alone** _(planned)_. Each platform page's band names the page by its title alone, such as "Users" or
+  "Your account", with no "Axis ›" before it.
 
 ## App switcher and preferences
 
@@ -393,7 +403,7 @@ to the frame shows in every state. How previews work is in
 
   | Preview          | States                                                                                                                                                                                                                                                                                                                                                                                        |
   | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `shell`          | Application site, Navigation collapsed, Form page, Dashboard, Platform site, App switcher, Language and theme, Account page, and Account notifications                                                                                                                                                                                                                                                   |
+  | `shell`          | Application site, Navigation collapsed, Form page, Default record page, Dashboard, Platform site, App switcher, Language and theme, Account page, and Account notifications                                                                                                                                                                                                                                                   |
   | `signIn`         | Sign-in refused, Signed out and Session ended, with the organization's heading over the cards                                                                                                                                                                                                                                                                                                 |
   | `identitySignIn` | The sign-in page of [Axis's identity provider](identity-provider.md#theme) in Sign in, Wrong password, Fields left empty, Organization sign-in only, Two-step verification, Forgot password, Set password, Add an authenticator, Choose how to sign in, Update your profile, Terms and privacy, Terms not accepted, Sign out, Notice, Error, and Language and theme with the gear's menu open |
 
@@ -402,7 +412,7 @@ to the frame shows in every state. How previews work is in
   verification to Error are the same components that the theme draws.
 - **A frame is a screen.** A shell preview draws the shell in a frame exactly as tall as its height, and
   the page scrolls inside it as in a window, so a dialog opens in the middle of what shows.
-- **The State control** _(planned)_. `shell`, `signIn` and `identitySignIn` show one state at a time under a State
+- **The State control.** `shell`, `signIn` and `identitySignIn` show one state at a time under a State
   control, as `studio` does, and `&state=<slug>` opens one.
 - **Account states.** The `shell` preview gains Account page, the platform's `/account` on its
   Security tab, and Account notifications, the same page on its Notifications tab. Both use fixtures of

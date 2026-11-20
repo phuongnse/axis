@@ -2,8 +2,8 @@ namespace Axis.Processes.Storage;
 
 /// <summary>
 /// A row of <c>axis.process_call_attempts</c>: one attempt, or one reconciliation lookup, of a
-/// connector call or a package call. Times use the database clock. No request or response body, no
-/// exception message and no secret is stored.
+/// connector call or a package call. Times use the database clock. No exception message and no
+/// secret is stored. An attempt of a connector call keeps the response it got, as <see cref="Response"/> says.
 /// </summary>
 public sealed class ProcessCallAttemptRow
 {
@@ -39,6 +39,22 @@ public sealed class ProcessCallAttemptRow
 
     /// <summary>A fixed text, such as a timeout. It holds no body, no exception message and no secret.</summary>
     public string? Error { get; init; }
+
+    /// <summary>
+    /// The response the outside system answered, as JSON text: <c>status</c>, <c>headers</c>, <c>body</c>
+    /// and <c>truncated</c>. <c>Set-Cookie</c> and the connector's auth header are <c>[secret]</c> and a
+    /// body is cut at 64 KiB. It is never copied to history, audit records or logs, and the inspection API
+    /// hides it as it hides the call's input. <see langword="null"/> for a lookup, a package call and an
+    /// attempt that got no answer.
+    /// </summary>
+    public string? Response { get; init; }
+
+    /// <summary>
+    /// The error as a code with its values, as JSON text: <c>code</c> and <c>values</c>, see
+    /// docs/reference/process-inspection.md#step-errors-in-inspection. It holds no exception message.
+    /// <see langword="null"/> with no error and for a fixed text that has no code.
+    /// </summary>
+    public string? Problem { get; init; }
 
     /// <summary>The trace id of the run that made the attempt or lookup, or <see langword="null"/> when no span was current.</summary>
     public string? TraceId { get; init; }

@@ -73,6 +73,8 @@ const texts: Record<string, Record<string, string>> = {
     'shell.notFound.title': 'Page not found',
     'shell.notFound.message': 'There is nothing at this address.',
     'shell.notFound.home': 'Go to the home page',
+    'shell.record.notFound': 'This record does not exist, or you cannot open it.',
+    'shell.record.goToList': 'Go to {page}',
     'shell.form.save': 'Save',
     'shell.form.cancel': 'Cancel',
     'shell.table.empty': 'No records yet.',
@@ -207,6 +209,37 @@ const noteAccess: WidgetAccess = {
   actions: ['read', 'create', 'update', 'delete'],
   createFields: noteFields,
   updateFields: noteFields,
+}
+
+const knownNoteId = '0a1b2c3d-4e5f-4a60-8b71-92c3d4e5f607'
+const missingNoteId = '6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7'
+
+/** The default record page of Note: one form over the entity, as the record page route answers it. */
+const noteRecordPage: PageMetadata = {
+  name: 'records/Note',
+  titleKey: 'pages.noteForm.title',
+  parameters: [],
+  widgets: [
+    {
+      type: 'form',
+      entity: noteEntity,
+      dataSource: null,
+      form: null,
+      tasksPath: null,
+      process: null,
+      instancesPath: null,
+      deadLettersPath: null,
+      actions: [],
+      rowActions: [],
+      toolbarActions: [],
+      parameters: {},
+      priorities: {},
+      access: noteAccess,
+      detail: null,
+      kpi: null,
+      chart: null,
+    },
+  ],
 }
 
 const pages: Record<string, PageMetadata> = {
@@ -420,7 +453,13 @@ function stubServer({
       if (recordsStatus !== 200) {
         return json({ title: 'Sign in to read or write this data.', status: recordsStatus }, recordsStatus)
       }
-      // A list of records has no id segment. No record exists, so a record by id is not found.
+      if (input === `${noteEntity.recordsPath}/${knownNoteId}`) {
+        return json({ id: knownNoteId, version: 1, values: { title: 'First note' }, labels: {} })
+      }
+      if (input.startsWith(`${noteEntity.recordsPath}/${knownNoteId}/history`)) {
+        return json({ items: [], page: 1, pageSize: 20, totalCount: 0 })
+      }
+      // A list of records has no id segment. Any other record by id is not found.
       return input.startsWith(`${noteEntity.recordsPath}/`)
         ? json({ title: 'Not found', status: 404 }, 404)
         : json({ items: [], page: 1, pageSize: 20, totalCount: 0 })
@@ -439,7 +478,7 @@ function siteRoute(path: string, failingLocale: string) {
   const notFound = json({ title: 'Not found', status: 404 }, 404)
   const [sitePath, kind, ...segments] = path.split('/')
   const name = segments.length > 0 ? segments.join('/') : undefined
-  if (sitePath !== 'e2e' || (kind !== 'pages' && segments.length > 1)) {
+  if (sitePath !== 'e2e' || (kind !== 'pages' && kind !== 'records' && segments.length > 1)) {
     return notFound
   }
   if (kind === undefined) {
@@ -450,6 +489,13 @@ function siteRoute(path: string, failingLocale: string) {
   }
   if (kind === 'pages' && name !== undefined && name.toLowerCase() in pages) {
     return json(pages[name.toLowerCase()])
+  }
+  // The default record page of Note, and of a module's entity, which the stub also serves as Note. The person may not read Locked.
+  if (kind === 'records' && (name === 'note' || name === 'mod/thing')) {
+    return json(noteRecordPage)
+  }
+  if (kind === 'records' && name === 'locked') {
+    return json({ title: 'You have no grant for this action.', status: 403 }, 403)
   }
   return notFound
 }
@@ -467,9 +513,9 @@ function CurrentPathLayout() {
   )
 }
 
-function renderApp(path = '/') {
+function renderApp(entry: string | { pathname: string; search?: string; state?: unknown } = '/') {
   const router = createMemoryRouter([{ element: <CurrentPathLayout />, children: appRoutes(false) }], {
-    initialEntries: [path],
+    initialEntries: [entry],
   })
   return render(
     <ThemeModeProvider>
@@ -664,7 +710,7 @@ describe('App', () => {
     const tools = await screen.findByRole('heading', { name: 'Tools' })
     const main = screen.getByRole('main')
     expect(screen.queryByText('Open an application below to start working.')).not.toBeInTheDocument()
-    expect(within(main).queryByRole('heading', { level: 4 })).not.toBeInTheDocument()
+    expect(within(main).queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
     // Nothing sits beside a heading: the next element is the first tile or the grid, not a count.
     expect(applications.textContent).toBe('Applications')
     expect(applications.nextElementSibling).toBe(screen.getAllByRole('region')[0])
@@ -1311,19 +1357,101 @@ describe('App', () => {
     expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
   })
 
-  it('shows the not-found page for a record id the form page has no record for, or that is not an id', async () => {
+  it('shows the missing-record line under the heading for a form page whose well-formed id the API answers 404 for', async () => {
     stubServer()
+    const from = '/e2e/notes?search=a&sort=title&page=2'
 
-    for (const path of ['/e2e/noteform/6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7', '/e2e/noteform/42']) {
-      const { unmount } = renderApp(path)
+    renderApp({ pathname: '/e2e/noteform/6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7', state: { from } })
 
-      expect(await screen.findByTestId('not-found')).toBeInTheDocument()
-      unmount()
-    }
+    expect(await screen.findByTestId('record-not-found')).toHaveTextContent(
+      'This record does not exist, or you cannot open it. Go to Notes',
+    )
+    expect(screen.getByRole('link', { name: 'Go to Notes' })).toHaveAttribute('href', from)
+    expect(screen.getByRole('heading', { name: 'Note' })).toBeInTheDocument()
+    expect(screen.queryByTestId('not-found')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
       `${noteEntity.recordsPath}/6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7`,
       expect.anything(),
     )
+  })
+
+  it('opens the default record page of an entity on its form, filled with the record, under the heading and the breadcrumb', async () => {
+    stubServer()
+
+    renderApp({ pathname: `/e2e/records/note/${knownNoteId}`, state: { from: '/e2e/notes' } })
+
+    expect(await screen.findByRole('heading', { name: 'Note' })).toBeInTheDocument()
+    expect(await screen.findByRole('textbox', { name: 'title' })).toHaveValue('First note')
+    const breadcrumb = within(screen.getByRole('navigation', { name: 'Breadcrumb' }))
+    expect(breadcrumb.getByRole('link', { name: 'Notes' })).toHaveAttribute('href', '/e2e/notes')
+    expect(fetch).toHaveBeenCalledWith('/api/sites/e2e/records/note', expect.anything())
+    expect(fetch).toHaveBeenCalledWith(`${noteEntity.recordsPath}/${knownNoteId}`, expect.anything())
+  })
+
+  it('shows the missing-record line on the default record page for a well-formed id the record API answers 404 for', async () => {
+    stubServer()
+
+    renderApp({ pathname: `/e2e/records/note/${missingNoteId}`, state: { from: '/e2e/notes' } })
+
+    expect(await screen.findByTestId('record-not-found')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to Notes' })).toHaveAttribute('href', '/e2e/notes')
+    expect(screen.getByRole('heading', { name: 'Note' })).toBeInTheDocument()
+    expect(screen.queryByTestId('not-found')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+  })
+
+  it('shows the not-found page on the default record page for an id that is not an id, and requests no record', async () => {
+    stubServer()
+
+    renderApp('/e2e/records/note/42')
+
+    expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+    expect(screen.queryByTestId('record-not-found')).not.toBeInTheDocument()
+    expect(fetch).not.toHaveBeenCalledWith(`${noteEntity.recordsPath}/42`, expect.anything())
+  })
+
+  it('shows the not-found page inside the site shell for an unknown entity and for one the person may not read', async () => {
+    stubServer()
+
+    for (const entity of ['unknown', 'locked']) {
+      const { unmount } = renderApp(`/e2e/records/${entity}/${knownNoteId}`)
+
+      expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+      expect(screen.getByRole('navigation', { name: 'shell.navigation.menu' })).toBeInTheDocument()
+      expect(screen.queryByTestId('shell-error')).not.toBeInTheDocument()
+      unmount()
+    }
+    const requested = vi.mocked(fetch).mock.calls.map(([url]) => String(url))
+    expect(requested.filter((url) => url.startsWith(`${noteEntity.recordsPath}/`))).toEqual([])
+  })
+
+  it("requests a module entity's record page by its module id and name", async () => {
+    stubServer()
+
+    renderApp(`/e2e/records/mod/thing/${knownNoteId}`)
+
+    expect(await screen.findByRole('textbox', { name: 'title' })).toHaveValue('First note')
+    expect(fetch).toHaveBeenCalledWith('/api/sites/e2e/records/mod/thing', expect.anything())
+  })
+
+  it('opens the default record page on a site’s own host without the site prefix', async () => {
+    stubServer({ hostSite: 'e2e' })
+
+    renderApp(`/records/note/${knownNoteId}`)
+
+    expect(await screen.findByRole('textbox', { name: 'title' })).toHaveValue('First note')
+    expect(fetch).toHaveBeenCalledWith('/api/sites/e2e/records/note', expect.anything())
+  })
+
+  it('shows the not-found page for a form page whose record id is not an id, and requests no record', async () => {
+    stubServer()
+
+    renderApp('/e2e/noteform/42')
+
+    expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+    expect(screen.queryByTestId('record-not-found')).not.toBeInTheDocument()
     expect(fetch).not.toHaveBeenCalledWith(`${noteEntity.recordsPath}/42`, expect.anything())
   })
 
@@ -1344,12 +1472,15 @@ describe('App', () => {
     expect(requested.filter((url) => url.startsWith(`${noteEntity.recordsPath}/`))).toEqual([])
   })
 
-  it('requests the record a detail page names and shows the not-found page when there is none', async () => {
+  it('requests the record a detail page names and shows the missing-record line, linking to the site, when there is none', async () => {
     stubServer()
 
     renderApp('/e2e/notedetail?note=6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7')
 
-    expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+    expect(await screen.findByTestId('record-not-found')).toBeInTheDocument()
+    // Without a `from`, the link opens the site, which opens its first page, so it is named after that page.
+    expect(screen.getByRole('link', { name: 'Go to Notes' })).toHaveAttribute('href', '/e2e')
+    expect(screen.queryByTestId('not-found')).not.toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
       `${noteEntity.recordsPath}/6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7`,
       expect.anything(),

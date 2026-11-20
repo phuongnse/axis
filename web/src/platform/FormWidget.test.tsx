@@ -10,6 +10,7 @@ import { chooseOption, formItem, hasFieldError, isRequiredLabel, tabTo } from '.
 import { filterTexts } from '../test/tableFilter'
 import { designTokensFor } from './designTokens'
 import { FormWidget } from './FormWidget'
+import { RecordList, type RecordListValue } from './recordList'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
@@ -363,6 +364,9 @@ const texts = {
   'shell.table.no': 'No',
   'shell.table.loadFailed': 'The records could not be loaded.',
   'shell.notFound.title': 'Page not found',
+  'shell.record.notFound': 'This record does not exist, or you cannot open it.',
+  'shell.record.goToList': 'Go to {page}',
+  'notes.nav': 'Notes',
   'shell.history.title': 'History',
   'shell.history.empty': 'No history yet.',
   'shell.history.fields': 'Changed',
@@ -492,6 +496,7 @@ function renderForm(
   widget: EntityWidgetMetadata = noteWidget,
   mode?: ThemeMode,
   narrow?: boolean,
+  list: RecordListValue | null = null,
 ) {
   const path = `/e2e/noteform/${recordId ?? 'new'}`
   const form = (
@@ -500,14 +505,16 @@ function renderForm(
         {/* Without motion the lookup dialog leaves the document at once, as jsdom runs no animations. */}
         <ConfigProvider theme={{ token: { motion: false } }}>
           <TextProvider catalogs={catalogs} development={false}>
-            <FormWidget
-              widget={widget}
-              sitePath="e2e"
-              pages={['Notes', 'NoteForm']}
-              recordId={recordId}
-              returnTo="/e2e/notes?pageSize=10"
-              locale="en"
-            />
+            <RecordList value={list}>
+              <FormWidget
+                widget={widget}
+                sitePath="e2e"
+                pages={['Notes', 'NoteForm']}
+                recordId={recordId}
+                returnTo="/e2e/notes?pageSize=10"
+                locale="en"
+              />
+            </RecordList>
           </TextProvider>
         </ConfigProvider>
         <CurrentLocation />
@@ -1964,12 +1971,58 @@ describe('FormWidget', () => {
     expect(requests()).toEqual([])
   })
 
-  it('shows the not-found page for an unknown record', async () => {
+  it('shows the missing-record line with a link to its list for a record the API answers 404 for', async () => {
+    stubFetch({ status: 404, body: '{}' })
+
+    renderForm(noteId, noteWidget, undefined, undefined, { labelKey: 'notes.nav', to: '/e2e/notes?pageSize=10' })
+
+    expect(await screen.findByTestId('record-not-found')).toHaveTextContent(
+      'This record does not exist, or you cannot open it. Go to Notes',
+    )
+    expect(screen.getByRole('link', { name: 'Go to Notes' })).toHaveAttribute('href', '/e2e/notes?pageSize=10')
+    expect(screen.queryByTestId('not-found')).toBeNull()
+  })
+
+  it('shows no save, cancel or record action for a record the API answers 404 for', async () => {
+    stubFetch({ status: 404, body: '{}' })
+
+    renderForm(
+      noteId,
+      {
+        ...actionWidget,
+        actions: [
+          {
+            type: 'navigate',
+            page: 'Notes',
+            labelKey: 'note.open',
+            parameters: {},
+            record: null,
+            opensForm: false,
+            paths: {},
+            visibleWhen: null,
+          },
+          ...actionWidget.actions,
+        ],
+      },
+      undefined,
+      undefined,
+      { labelKey: 'notes.nav', to: '/e2e/notes' },
+    )
+
+    await screen.findByTestId('record-not-found')
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(screen.queryByRole('textbox')).toBeNull()
+  })
+
+  it('shows the missing-record line without a link when the page gives no list', async () => {
     stubFetch({ status: 404, body: '{}' })
 
     renderForm(noteId)
 
-    expect(await screen.findByTestId('not-found')).toHaveTextContent('Page not found')
+    expect(await screen.findByTestId('record-not-found')).toHaveTextContent(
+      'This record does not exist, or you cannot open it.',
+    )
+    expect(screen.queryByRole('link')).toBeNull()
   })
 
   it('shows an error when the record cannot be loaded or saved', async () => {
@@ -2293,7 +2346,7 @@ describe('FormWidget', () => {
       await waitFor(() => expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Closed by the process'))
       expect(requests()).toEqual([
         { url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined },
-        { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}"}` },
+        { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}","via":"noteClose.action"}` },
         { url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined },
       ])
       expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/noteform/${noteId}`)
@@ -2317,7 +2370,7 @@ describe('FormWidget', () => {
       await waitFor(() => expect(requests()).toHaveLength(4))
       expect(requests().slice(1, 3)).toEqual([
         { url: `${recordsPath}/${noteId}`, method: 'PATCH', body: '{"version":1,"values":{"title":"New"}}' },
-        { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}"}` },
+        { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}","via":"noteClose.action"}` },
       ])
     })
 

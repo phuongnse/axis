@@ -121,7 +121,7 @@ tab shows only to an administrator of a tenant that has the setting.
 The page lists the tenant's users from `GET /api/users`, 20 to a page. The server searches, filters,
 sorts and pages them, see [the list route](user-administration.md#read-routes).
 
-- **Columns.** Each row has the display name, which links to [the user's page](#a-users-roles), the email, how the person signs in (the provider's alias
+- **Columns.** Each row has the display name, drawn by `PersonName`: a link to [the user's page](#a-users-roles), followed by "(you)" on the administrator's own row, the email, how the person signs in (the provider's alias
   as the [list route](user-administration.md#read-routes) sends it, or "Account"), the status as a
   `StatusTag` (`invited` is `attention`, `active` is `neutral` and `disabled` is `muted`) and the last sign-in. A header sorts by its column. Columns, in the
   toolbar, chooses which columns show.
@@ -182,9 +182,12 @@ one for the platform, where the administrator gives and removes them. Their text
 
 - **A page of its own.** The platform route `/users/{id}` is the user's page, as
   [opening things](actions-and-controls.md#opening-things) says, and holds these sections. Its title is the
-  display name, with the email under it, or "Not set" when the person has none. It loads the name, the email and
+  display name, with User as its line, and its first part is the email as a fact, or "Not set" when the person has none. It loads the name, the email and
   the roles from the roles route, so a reload or a shared link shows it. A `403` shows that the page is for
   administrators, and a `404` shows the not-found page.
+- **Applications.** The title of an application's section opens that application in Studio for a reader who may use
+  Studio, through `StudioLink`. The platform's section, and the section of an application that is not active, stay
+  plain text.
 - **Tags.** Each role shows the "Given" `StatusTag` in `neutral` when the person has it. A given role that is not
   declared any more has a "Not declared" `StatusTag` in `attention`, and its section lists it even when its
   application is not active.

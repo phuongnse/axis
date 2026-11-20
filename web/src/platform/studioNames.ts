@@ -5,8 +5,14 @@ import type { ReferenceMark } from './studioSchemas'
 /** The names the application defines, or `undefined` until they load. */
 export const StudioNamesContext = createContext<StudioNames | undefined>(undefined)
 
-/** A choice of a name: the name the file keeps and the key of its label, or no key when its format has no label. */
-export type ReferenceOption = { name: string; labelKey?: string | null }
+/** The manifest name of the application Studio has open, or `undefined` outside Studio's editor. */
+export const StudioApplicationContext = createContext<string | undefined>(undefined)
+
+/**
+ * A choice of a name: the name the file keeps and the key of its label, or no key when its format has no label. `id` is
+ * the id of the resource the name is, absent for a name that is no resource.
+ */
+export type ReferenceOption = { name: string; labelKey?: string | null; id?: string }
 
 /**
  * The label for `labelKey` in the author's language, else in `en`, or `undefined` when there is no key or no text,
@@ -113,7 +119,7 @@ export function parameterType(
 }
 
 function kindNames(names: StudioNames, kind: string): ReferenceOption[] {
-  const of = (items: ReferenceOption[]) => items.map(({ name, labelKey }) => ({ name, labelKey }))
+  const of = (items: ReferenceOption[]) => items.map(({ name, labelKey, id }) => ({ name, labelKey, id }))
   switch (kind) {
     case 'entity':
       return of(names.entities)

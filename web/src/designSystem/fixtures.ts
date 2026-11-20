@@ -74,7 +74,7 @@ const notificationsPath = `${apiPath}/notifications`
 export const noRowsPath = `${apiPath}/data-sources/NoRequests/rows`
 
 export const requestId = '6f1c2a3b-4d5e-4f60-8a71-92b3c4d5e6f7'
-const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
+export const categoryId = '0b9e8d7c-6a5f-4e3d-9c2b-1a0f9e8d7c6b'
 const releaseId = '3d2c1b0a-9f8e-4d7c-8b6a-5f4e3d2c1b0a'
 
 function field(name: string, type: FieldType, labelKey: string): FieldMetadata {
@@ -136,6 +136,15 @@ export const entity: EntityMetadata = {
   displayField: 'title',
   recordsPath: requestsPath,
   fields: Object.values(fields),
+}
+
+/** The entity of a category, which the fixture site names no page for, so its records open on the default record page. */
+const categoryEntity: EntityMetadata = {
+  name: 'Category',
+  labelKey: 'category.label',
+  displayField: 'name',
+  recordsPath: categoriesPath,
+  fields: [{ ...field('name', 'text', 'category.name'), maxLength: 200 }],
 }
 
 /** The entity cut down to one field, so a preview shows only that field's input. */
@@ -810,6 +819,33 @@ const requestPage: PageMetadata = {
   widgets: [formWidget],
 }
 
+/** The default record page of a category: one form over every field, as the record page route answers it. */
+const categoryRecordPage: PageMetadata = {
+  name: 'records/Category',
+  titleKey: 'category.label',
+  parameters: [],
+  widgets: [
+    {
+      ...formWidget,
+      entity: categoryEntity,
+      form: null,
+      actions: [],
+      access: {
+        actions: ['read', 'create', 'update', 'delete'],
+        createFields: ['name'],
+        updateFields: ['name'],
+      },
+    },
+  ],
+}
+
+const categoryRecord: RecordItem = {
+  id: categoryId,
+  version: 1,
+  values: { name: 'Office furniture' },
+  labels: {},
+}
+
 const currentUser: CurrentUser = {
   id: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
   displayName: 'Alex Morgan',
@@ -1250,6 +1286,8 @@ export const identityFrontChannelSignOutContext: FrontChannelSignOutContext = {
 
 /** The site texts, in English. */
 export const siteTexts: Record<string, string> = {
+  'category.label': 'Category',
+  'category.name': 'Name',
   'request.label': 'Request',
   'request.title': 'Title',
   'request.quantity': 'Quantity',
@@ -1347,6 +1385,8 @@ export const routes: Record<string, FixtureRoute> = {
   [`${requestsPath}/${requestId}`]: () => savedRecord,
   [`${requestsPath}/${requestId}/history`]: () => history,
   [categoriesPath]: () => categoryPage,
+  [`${categoriesPath}/${categoryId}`]: () => categoryRecord,
+  [`${categoriesPath}/${categoryId}/history`]: () => history,
   [tasksPath]: () => taskPage,
   [instancesPath]: () => instancePage,
   [deadLettersPath]: () => deadLetterPage,
@@ -1364,6 +1404,7 @@ export const routes: Record<string, FixtureRoute> = {
   [`/api/sites/${sitePath}/pages/requests`]: () => requestsPage,
   [`/api/sites/${sitePath}/pages/request`]: () => requestPage,
   [`/api/sites/${sitePath}/pages/dashboard`]: () => dashboardPage,
+  [`/api/sites/${sitePath}/records/category`]: () => categoryRecordPage,
   [formStatePath('RequestForm')]: noStateAnswer,
   [notificationsPath]: () => notificationPage,
   '/api/sites': () => ({ sites: listedSites }),

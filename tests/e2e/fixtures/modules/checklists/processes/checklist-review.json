@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "ChecklistReview",
   "formatVersion": 1,
+  "title": { "textKey": "checklists.processes.checklistReview.title" },
   "entity": "Checklist",
   "start": "check",
   "steps": [

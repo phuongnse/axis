@@ -140,6 +140,8 @@ export function StudioNewPackage({
             >
               <Select
                 aria-label={t('shell.studio.newPackage.language')}
+                // All languages render, so each one can be reached without scrolling the list.
+                virtual={false}
                 options={packageLanguages.map((language) => ({
                   value: language,
                   label: t(`shell.studio.packages.language.${language}`),

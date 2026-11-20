@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "NoteClose",
   "formatVersion": 1,
+  "title": { "textKey": "processes.noteClose.title" },
   "entity": "Note",
   "startCondition": {
     "expression": "status is null or status == 'open'",

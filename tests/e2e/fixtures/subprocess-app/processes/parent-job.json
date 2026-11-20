@@ -3,6 +3,7 @@
   "kind": "process",
   "name": "ParentJob",
   "formatVersion": 1,
+  "title": { "textKey": "processes.parentJob.title" },
   "parameters": [{ "name": "label", "type": "text" }],
   "start": "runChild",
   "steps": [

@@ -51,7 +51,7 @@ export function SectionPart({
   children,
 }: SectionPartName & {
   /** The heading, and its line when it has one. None for the last section of unnamed properties. */
-  heading?: { title: string; line?: string }
+  heading?: { title: ReactNode; line?: string }
   /** On the right of the heading, such as a list's Add. A function child draws the slot in its place. */
   action?: ReactNode
   /** A function child gets a slot on the right of the heading, for a list that draws its own Add… into it. */

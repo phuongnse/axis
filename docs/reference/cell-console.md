@@ -92,6 +92,8 @@ tenant button of the Tenants view and the actions of the Tenant view.
   of Created, Kind, Tenant and State, and a pager with a page size. The server searches, filters, sorts and pages the
   list, 20 jobs to a page by default, see [the job list](tenant-lifecycle.md#routes). The search, the filter, the
   columns, the sort, the page and the page size live in the address, see [tables](actions-and-controls.md#tables).
+  The tenant of a job links to that tenant's Tenant view. On a tenant's own page and in the Create tenant
+  dialog it is plain text, because there the link would lead back to the same page or to a tenant that may not exist yet.
   A row shows the time, the kind, the tenant and the state, a `StatusTag` in `neutral` for `queued` and `running`, in
   `success` for `succeeded` and in `danger` for `failed`, each
   step with its state, or one line when no step has run yet, and the error of a failed job or step. A failed job other than a `purge` job has a Run
@@ -112,8 +114,9 @@ tenant button of the Tenants view and the actions of the Tenant view.
     26 hours old, with a dash for a tenant that has no archive.
 - **Tenant.** One tenant's status and hosts, its quotas with the rows that override the cell's
   defaults, its usage and its 50 newest jobs in the same table as the Jobs view, without its toolbar. An id that is neither a tenant nor a purged tenant shows the not-found page.
-  The view shows its parts in this order: Details, with the status, the application, the hosts and the actions,
-  then Host verification, Quotas, Usage and Jobs.
+  The view is headed by the tenant's id, with its status as a `StatusTag` in the tones of the Tenants view and Tenant as
+  its line, and with its actions on the heading's right, see [page header](shell.md#page-header). It shows its parts in
+  this order: the facts, the application and the hosts, with no heading, then Host verification, Quotas, Usage and Jobs.
   - **Usage.** The tenant's usage of the last 13 months by day, in the same table as the users page's "Usage"
     section, read from [the usage days route](tenant-lifecycle.md#routes) and newest first until the table is sorted.
     The table has Filter on every column, Columns, a sort on every header and a pager with a page size, 20 days by
@@ -128,8 +131,9 @@ tenant button of the Tenants view and the actions of the Tenant view.
     every column, which filters its own rows. The filter lives in the address under `quotas.`, see
     [tables](actions-and-controls.md#tables).
   - **Dates of a deletion.** A `deleting` tenant shows its purge date, `deleteAfter` of the
-    [tenant read](tenant-lifecycle.md#routes), after its status. An id that was a tenant and is purged shows the status
-    Deleted, the date it was purged, the date its deletion is complete and its jobs, read from
+    [tenant read](tenant-lifecycle.md#routes), as the first fact, beside its status tag. An id that was a tenant and is
+    purged shows the status Deleted as a `muted` tag, the date it was purged and the date its deletion is complete as
+    facts, and its jobs, read from
     [the deleted-tenant read](tenant-lifecycle.md#routes). The purge removed the rest, so that view shows no hosts,
     host verification, quotas, usage or action. Both dates show with the time, in the operator's locale.
   - **Actions.** A Suspend, a Resume, an Export, a Delete and a Cancel deletion button, each with a confirmation

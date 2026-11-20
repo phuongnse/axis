@@ -11,9 +11,10 @@ export interface ColourValue {
  * Colours with Axis names. Primary, success, warning, danger and info are seed colours for fills, icons and tints:
  * Ant Design derives their dark shade from the light value, so antTheme.ts passes the light value as the seed. The
  * dark value is the shade that results, which components read through useDesignTokens. The tokens that end in Text
- * colour text in that state colour, and focusRing colours every control's keyboard focus. Each text colour, and
- * focusRing, reaches WCAG contrast on surface and canvas in both modes. onPrimary colours text and icons on a `primary`
- * fill and reaches 4.5:1 on it in both modes.
+ * colour text in that state colour, and focusRing colours every control's keyboard focus. fillSubtle is a shade off
+ * surface, under a process graph and a step's icon tile. Each text colour, and focusRing, reaches WCAG contrast on
+ * surface and canvas in both modes. onPrimary colours text and icons on a `primary` fill and reaches 4.5:1 on it in
+ * both modes.
  */
 export const colourTokens = {
   primary: { light: '#5b3fd9', dark: '#5039bb' },
@@ -28,6 +29,7 @@ export const colourTokens = {
   infoText: { light: '#0969da', dark: '#54a3e7' },
   canvas: { light: '#f5f5f5', dark: '#000000' },
   surface: { light: '#ffffff', dark: '#141414' },
+  fillSubtle: { light: '#fafafa', dark: '#1f1f1f' },
   text: { light: 'rgba(0,0,0,0.88)', dark: 'rgba(255,255,255,0.85)' },
   textMuted: { light: 'rgba(0,0,0,0.58)', dark: 'rgba(255,255,255,0.55)' },
   border: { light: '#8c8c8c', dark: '#6e6e6e' },

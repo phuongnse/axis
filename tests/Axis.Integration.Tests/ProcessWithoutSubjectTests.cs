@@ -69,6 +69,11 @@ public sealed class ProcessWithoutSubjectTests(ProcessStepFixture fixture) : ICl
         Assert.Equal(1, await fixture.CountAsync(
             "SELECT count(*) FROM axis.process_instances WHERE id = @id AND subject_id IS NULL AND subject_entity_id IS NULL AND parameters->>'days' = '7'",
             ("id", instanceId)));
+
+        // The instance writes no record, so it ends with no values.
+        Assert.Equal(1, await fixture.CountAsync(
+            "SELECT count(*) FROM axis.process_instances WHERE id = @id AND result = '{}'::jsonb",
+            ("id", instanceId)));
         var history = await fixture.HistoryAsync(instanceId);
         Assert.Equal(["check", "late"], history.Select(row => row.Step));
         Assert.All(history, row => Assert.Null(row.Error));
@@ -157,6 +162,7 @@ public sealed class ProcessWithoutSubjectTests(ProcessStepFixture fixture) : ICl
             instanceId,
             "requester",
             "requester",
+            ProcessStartedBy.Person("requester", null),
             null,
             CancellationToken);
         await transaction.CommitAsync(CancellationToken);

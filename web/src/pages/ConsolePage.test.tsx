@@ -263,6 +263,33 @@ describe('ConsolePage', () => {
     expect(screen.queryByTestId('console-forbidden')).toBeNull()
   })
 
+  it("opens an application and its release in Studio from the tenant's table for a reader who may use Studio", async () => {
+    stubServer((url) => (url === '/api/me' ? json({ id: 'op', studio: true }) : tenantAndFailedWork(url)))
+    renderPage()
+
+    const view = await screen.findByTestId('console-tenant')
+    expect(await within(view).findByRole('link', { name: 'Leave' })).toHaveAttribute('href', '/studio?app=Leave')
+    expect(within(view).getByRole('link', { name: '#3 Spring' })).toHaveAttribute(
+      'href',
+      '/studio?app=Leave&view=release&release=3',
+    )
+    expect(within(view).getByRole('link', { name: 'Purchasing' })).toHaveAttribute('href', '/studio?app=Purchasing')
+    // An application with no release has no release page to open.
+    expect(within(within(view).getByText('Purchasing').closest('tr')!).getAllByRole('link')).toHaveLength(1)
+  })
+
+  it("shows the tenant's application and release as plain text for a reader who may not use Studio", async () => {
+    const fetchMock = stubServer((url) =>
+      url === '/api/me' ? json({ id: 'op', studio: false }) : tenantAndFailedWork(url),
+    )
+    renderPage()
+
+    const view = await screen.findByTestId('console-tenant')
+    expect(await within(view).findByText('#3 Spring')).toBeVisible()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/me', expect.anything()))
+    expect(within(view).queryByRole('link')).toBeNull()
+  })
+
   it('narrows the tenant applications by a filter in the address, and hides the others', async () => {
     const filter = encodeURIComponent(JSON.stringify({ all: [{ field: 'application', op: 'eq', value: 'Leave' }] }))
     stubServer(tenantAndFailedWork)

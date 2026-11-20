@@ -7,6 +7,7 @@
   "grants": [
     { "name": "requestRead", "entity": "Request", "actions": ["read"], "filter": "startsWith(title, 'Request')" },
     { "name": "submitStart", "process": "Submit", "actions": ["start", "inspect"] },
-    { "name": "nightlyJobStart", "process": "NightlyJob", "actions": ["start", "inspect"] }
+    { "name": "nightlyJobStart", "process": "NightlyJob", "actions": ["start", "inspect"] },
+    { "name": "titledJobStart", "process": "TitledJob", "actions": ["start", "inspect"] }
   ]
 }

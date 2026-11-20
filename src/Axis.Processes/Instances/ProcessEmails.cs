@@ -12,8 +12,10 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// Writes the emails that <c>notify</c> steps and task escalations with the <c>email</c> channel stage over a
-/// connection to a tenant database: one <c>pending</c> outbox row for each address. It also builds the page link of
-/// an email and the <c>Message-ID</c> of a row.
+/// connection to a tenant database: one <c>pending</c> outbox row for each address. A row for a person whose
+/// <c>process</c> source has <c>email</c> and <c>digest</c> on names that person as its digest user and waits for their
+/// daily digest, which <see cref="NotificationEmailHandler"/> sends. It also builds the page link of an email and the
+/// <c>Message-ID</c> of a row.
 /// </summary>
 internal static class ProcessEmails
 {
@@ -26,11 +28,12 @@ internal static class ProcessEmails
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.email_outbox
-                (id, application_id, release_id, notification_id, step, address, locale, subject, body, message_id, "values", state, created_at)
+                (id, application_id, release_id, notification_id, step, address, locale, subject, body, message_id, link, process_instance_id, digest_user_id, "values", state, created_at)
             SELECT email.id, email.application_id, email.release_id, email.notification_id, email.step, email.address,
-                   email.locale, email.subject, email.body, email.message_id, email.raw_values::jsonb, 'pending', now()
-            FROM unnest(@ids, @applications, @releases, @notifications, @steps, @addresses, @locales, @subjects, @bodies, @messageIds, @values)
-                AS email(id, application_id, release_id, notification_id, step, address, locale, subject, body, message_id, raw_values)
+                   email.locale, email.subject, email.body, email.message_id, email.link, email.process_instance_id, email.digest_user_id,
+                   email.raw_values::jsonb, 'pending', now()
+            FROM unnest(@ids, @applications, @releases, @notifications, @steps, @addresses, @locales, @subjects, @bodies, @messageIds, @links, @instances, @digestUsers, @values)
+                AS email(id, application_id, release_id, notification_id, step, address, locale, subject, body, message_id, link, process_instance_id, digest_user_id, raw_values)
             """,
             transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
             transaction);
@@ -44,6 +47,9 @@ internal static class ProcessEmails
         command.Parameters.Add(new NpgsqlParameter("subjects", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = emails.Select(e => e.Subject).ToArray() });
         command.Parameters.Add(new NpgsqlParameter("bodies", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = emails.Select(e => e.Body).ToArray() });
         command.Parameters.Add(new NpgsqlParameter("messageIds", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = emails.Select(e => e.MessageId).ToArray() });
+        command.Parameters.Add(new NpgsqlParameter("links", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = emails.Select(e => e.Link).ToArray() });
+        command.Parameters.Add(new NpgsqlParameter("instances", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = emails.Select(e => e.ProcessInstanceId).ToArray() });
+        command.Parameters.Add(new NpgsqlParameter("digestUsers", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = emails.Select(e => e.DigestUserId).ToArray() });
         command.Parameters.Add(new NpgsqlParameter("values", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = emails.Select(e => e.Values).ToArray() });
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -55,7 +61,9 @@ internal static class ProcessEmails
     /// is used once, ignoring letter case, with the locale of its first recipient. A <c>user</c> recipient with no profile
     /// or no email gets none, and <paramref name="noAddress"/> is called with the user id, never the address. A <c>user</c>
     /// recipient who turned the <c>process</c> source's email off gets none, and <paramref name="noAddress"/> is not called for them. An
-    /// <c>email</c> recipient gets the release's first locale. <paramref name="step"/> is the name of the <c>notify</c>
+    /// <c>email</c> recipient gets the release's first locale. A <c>user</c> recipient with the <c>digest</c> on gets a
+    /// row that waits for their digest and queues no item of its own. The person has one item, due at their next
+    /// digest hour, and it is queued only when no row of theirs is waiting yet. <paramref name="step"/> is the name of the <c>notify</c>
     /// step, or of the task step whose escalation notified.
     /// </summary>
     internal static async Task StageAsync(
@@ -72,16 +80,16 @@ internal static class ProcessEmails
             .Where(recipient => recipient.Kind == ProcessNotifications.UserRecipient)
             .Select(recipient => recipient.Recipient)
             .ToArray();
-        var emailOff = await NotificationPreferences.FindEmailOffAsync(
+        var choices = await NotificationPreferences.FindEmailChoicesAsync(
             context.Connection, context.Transaction, ProcessNotifications.ProcessSource, userIds, cancellationToken);
-        userIds = [.. userIds.Where(userId => !emailOff.Contains(userId))];
+        userIds = [.. userIds.Where(userId => !choices.TryGetValue(userId, out var choice) || choice.Email)];
         var contacts = await UserProfiles.FindContactsAsync(context.Connection, context.Transaction, userIds, cancellationToken);
-        var targets = new List<(string Address, string? Locale)>();
+        var targets = new List<(string Address, string? Locale, string? DigestUserId)>();
         foreach (var userId in userIds)
         {
             if (contacts.TryGetValue(userId, out var contact) && !string.IsNullOrWhiteSpace(contact.Email))
             {
-                targets.Add((contact.Email, contact.Locale));
+                targets.Add((contact.Email, contact.Locale, choices.TryGetValue(userId, out var choice) && choice.Digest ? userId : null));
             }
             else
             {
@@ -89,7 +97,7 @@ internal static class ProcessEmails
             }
         }
 
-        targets.AddRange(notification.EmailAddresses.Select(address => (address, (string?)null)));
+        targets.AddRange(notification.EmailAddresses.Select(address => (address, (string?)null, (string?)null)));
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         targets = [.. targets.Where(target => seen.Add(target.Address))];
         if (targets.Count == 0)
@@ -102,7 +110,7 @@ internal static class ProcessEmails
         var link = PageLink(model, host, notification.OpenPage, notification.OpenParameters);
         var values = NotificationTexts.RawValues(notification.Values);
         var emails = new List<NewEmail>(targets.Count);
-        foreach (var (address, locale) in targets)
+        foreach (var (address, locale, digestUserId) in targets)
         {
             var texts = NotificationTexts.ChooseTexts(model, locale);
             var body = NotificationTexts.Render(texts, notification.BodyKey, values);
@@ -118,11 +126,25 @@ internal static class ProcessEmails
                 NotificationTexts.Render(texts, notification.SubjectKey, values),
                 link is null ? body : $"{body}\n\n{link}",
                 MessageId(id, host),
-                notification.Values.ToJsonString()));
+                notification.Values.ToJsonString(),
+                link,
+                processInstanceId,
+                digestUserId));
+        }
+
+        // Each digest user is locked in ordinal order, so two steps for the same people never wait on each other in a cycle.
+        var itemsNeeded = new Dictionary<string, Guid>(StringComparer.Ordinal);
+        foreach (var userId in emails.Select(email => email.DigestUserId).OfType<string>().Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal))
+        {
+            await EmailDigests.LockAsync(context.Transaction, userId, cancellationToken);
+            if (!await HasWaitingAsync(context.Transaction, userId, cancellationToken))
+            {
+                itemsNeeded[userId] = emails.First(email => email.DigestUserId == userId).Id;
+            }
         }
 
         await InsertAsync(context.Transaction, emails, cancellationToken);
-        foreach (var email in emails)
+        foreach (var email in emails.Where(email => email.DigestUserId is null))
         {
             await WorkItemQueue.EnqueueAsync(
                 context.Connection,
@@ -134,6 +156,31 @@ internal static class ProcessEmails
                 processInstanceId: processInstanceId,
                 emailId: email.Id);
         }
+
+        foreach (var (userId, emailId) in itemsNeeded)
+        {
+            var choice = choices[userId];
+            await WorkItemQueue.EnqueueAsync(
+                context.Connection,
+                context.Transaction,
+                context.Item.TenantId,
+                ProcessStarts.NotificationEmailWorkItemKind,
+                EmailDigests.NextAt(DateTimeOffset.UtcNow, choice.DigestHour, choice.TimeZone),
+                cancellationToken,
+                processInstanceId: processInstanceId,
+                emailId: emailId);
+        }
+    }
+
+    /// <summary>Whether a <c>pending</c> row waits for the digest of <paramref name="userId"/>.</summary>
+    internal static async Task<bool> HasWaitingAsync(NpgsqlTransaction transaction, string userId, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT EXISTS (SELECT 1 FROM axis.email_outbox WHERE digest_user_id = @user AND state = 'pending')",
+            transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
+            transaction);
+        command.Parameters.AddWithValue("user", userId);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
     }
 
     /// <summary>The <c>Message-ID</c> of the row <paramref name="id"/>: its id at the tenant's host, or at a reserved name when the tenant has none.</summary>
@@ -182,6 +229,9 @@ internal static class ProcessEmails
 /// <param name="Locale">The locale of the texts the email is rendered in, or null when the release has no texts.</param>
 /// <param name="MessageId">The email's <c>Message-ID</c> header.</param>
 /// <param name="Values">The raw placeholder values of the step run, as JSON text.</param>
+/// <param name="Link">The absolute link to the page the email opens, or null.</param>
+/// <param name="ProcessInstanceId">The process instance whose step staged the email, or null.</param>
+/// <param name="DigestUserId">The person whose daily digest the email waits for, or null when it is sent right away.</param>
 internal sealed record NewEmail(
     Guid Id,
     Guid ApplicationId,
@@ -193,4 +243,7 @@ internal sealed record NewEmail(
     string Subject,
     string Body,
     string MessageId,
-    string Values);
+    string Values,
+    string? Link = null,
+    Guid? ProcessInstanceId = null,
+    string? DigestUserId = null);

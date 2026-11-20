@@ -644,6 +644,8 @@ internal static class ProcessChecker
 
     private static void CheckTextKeys(ProcessResource process, ReferenceIndexBuilder references, List<Diagnostic> diagnostics)
     {
+        ApplicationCompiler.CheckTextKey(process.Title, process, "/title", references, diagnostics);
+
         if (process.StartCondition is { } startCondition)
         {
             ApplicationCompiler.CheckTextKey(startCondition.Message, process, "/startCondition/message", references, diagnostics);
@@ -653,6 +655,12 @@ internal static class ProcessChecker
         {
             var step = process.Steps[index];
             ApplicationCompiler.CheckTextKey(step.Label, process, $"/steps/{index}/label", references, diagnostics);
+            var branches = step.Branches ?? [];
+            for (var branch = 0; branch < branches.Count; branch++)
+            {
+                ApplicationCompiler.CheckTextKey(branches[branch].Label, process, $"/steps/{index}/branches/{branch}/label", references, diagnostics);
+            }
+
             var outcomes = step.Outcomes ?? [];
             for (var outcome = 0; outcome < outcomes.Count; outcome++)
             {
@@ -739,7 +747,7 @@ internal static class ProcessChecker
                 @event.Name,
                 step.When is { } when ? ExpressionModel.Compile(when, ExpressionScopes.ForEventPayload(@event.Fields), ExpressionType.Boolean) : null,
                 step.Timeout is { } timeout && IsoDuration.TryParse(timeout.After, out var after)
-                    ? new WaitTimeoutModel(after, Resolve(timeout.Next))
+                    ? new WaitTimeoutModel(after, timeout.After, Resolve(timeout.Next))
                     : null,
                 Resolve(step.Next!));
         }
@@ -816,7 +824,6 @@ internal static class ProcessChecker
             TimeSpan? dueIn = step.DueIn is { } text && IsoDuration.TryParse(text, out var duration) ? duration : null;
             return new TaskStepModel(
                 step.Name,
-                step.Label!,
                 BuildAssignee(step.Assignee!),
                 new FormReference(form.Id, form.Name),
                 dueIn,
@@ -824,7 +831,10 @@ internal static class ProcessChecker
                 step.Deadline is { } deadline && IsoDuration.TryParse(deadline.After, out var after)
                     ? new TaskDeadlineModel(after, Resolve(deadline.Next))
                     : null,
-                [.. (step.Escalations ?? []).Select(BuildEscalation)]);
+                [.. (step.Escalations ?? []).Select(BuildEscalation)])
+            {
+                Label = step.Label!,
+            };
         }
 
         // A checked mapping names each input once and fits its shape. Its inputs are in the operation's
@@ -981,6 +991,7 @@ internal static class ProcessChecker
         {
             Id = process.Id,
             Name = process.Name,
+            Title = process.Title,
             File = process.File,
             Entity = entity is null ? null : new EntityReference(entity.Id, entity.Name),
             Parameters = [.. process.Parameters?.Select(parameter => new ProcessParameterModel(parameter.Name, FieldTypes.Parse(parameter.Type))) ?? []],
@@ -989,31 +1000,34 @@ internal static class ProcessChecker
                 : null,
             Start = Resolve(process.Start),
             Steps = process.Steps
-                .Select<ProcessStepDefinition, ProcessStepModel>(step => step.Type switch
-                {
-                    ProcessStepDefinition.Decision => new DecisionStepModel(
-                        step.Name,
-                        step.Branches!.Select(branch => new DecisionBranchModel(Compile(branch.When), Resolve(branch.Next))).ToList(),
-                        Resolve(step.Otherwise!)),
-                    ProcessStepDefinition.TaskStep => BuildTask(step),
-                    ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.CallConnector => BuildConnectorCall(step),
-                    ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.RaiseEvent => BuildRaiseEvent(step),
-                    ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.Notify => BuildNotify(step),
-                    ProcessStepDefinition.OperationStep when step.Operation!.Contains('/', StringComparison.Ordinal) => BuildPackageCall(step),
-                    ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.CreateRecord => BuildCreateRecord(step),
-                    ProcessStepDefinition.OperationStep => new OperationStepModel(
-                        step.Name,
-                        step.Operation!,
-                        Assign(entity!, step.Set!),
-                        Resolve(step.Next!)),
-                    ProcessStepDefinition.Timer => BuildTimer(step),
-                    ProcessStepDefinition.WaitEvent => BuildWaitEvent(step),
-                    ProcessStepDefinition.SubProcess => BuildSubProcess(step),
-                    ProcessStepDefinition.End => new EndStepModel(step.Name),
-                    _ => throw new ArgumentOutOfRangeException(nameof(process), step.Type, "The JSON Schema allows only decision, task, operation, subProcess, end, timer and waitEvent steps."),
-                })
+                .Select<ProcessStepDefinition, ProcessStepModel>(step => BuildStep(step) with { Label = step.Label })
                 .ToList(),
         };
+
+        ProcessStepModel BuildStep(ProcessStepDefinition step) =>
+            step.Type switch
+            {
+                ProcessStepDefinition.Decision => new DecisionStepModel(
+                    step.Name,
+                    step.Branches!.Select(branch => new DecisionBranchModel(branch.Name, Compile(branch.When), Resolve(branch.Next)) { Label = branch.Label }).ToList(),
+                    Resolve(step.Otherwise!)),
+                ProcessStepDefinition.TaskStep => BuildTask(step),
+                ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.CallConnector => BuildConnectorCall(step),
+                ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.RaiseEvent => BuildRaiseEvent(step),
+                ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.Notify => BuildNotify(step),
+                ProcessStepDefinition.OperationStep when step.Operation!.Contains('/', StringComparison.Ordinal) => BuildPackageCall(step),
+                ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.CreateRecord => BuildCreateRecord(step),
+                ProcessStepDefinition.OperationStep => new OperationStepModel(
+                    step.Name,
+                    step.Operation!,
+                    Assign(entity!, step.Set!),
+                    Resolve(step.Next!)),
+                ProcessStepDefinition.Timer => BuildTimer(step),
+                ProcessStepDefinition.WaitEvent => BuildWaitEvent(step),
+                ProcessStepDefinition.SubProcess => BuildSubProcess(step),
+                ProcessStepDefinition.End => new EndStepModel(step.Name),
+                _ => throw new ArgumentOutOfRangeException(nameof(process), step.Type, "The JSON Schema allows only decision, task, operation, subProcess, end, timer and waitEvent steps."),
+            };
     }
 
     /// <summary>

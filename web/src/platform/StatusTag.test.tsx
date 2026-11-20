@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { colourTokens } from './designTokens'
 import { StatusTag, type StatusTone } from './StatusTag'
+import { toneIconColours } from './statusTones'
 import { ThemeModeProvider } from './theme'
 import type { ThemeMode } from './themeMode'
 
@@ -54,5 +55,15 @@ describe('StatusTag', () => {
 
     expect(tag.style.marginInlineEnd).toBe('0px')
     expect(tag).toHaveTextContent('Word')
+  })
+
+  it('gives each tone its icon colour', () => {
+    expect(toneIconColours).toEqual({
+      neutral: 'infoText',
+      attention: 'warningText',
+      success: 'successText',
+      danger: 'dangerText',
+      muted: 'textMuted',
+    })
   })
 })

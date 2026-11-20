@@ -75,6 +75,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("release_id");
 
+                    b.Property<string>("Request")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("request");
+
                     b.Property<DateTimeOffset?>("SettledAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("settled_at");
@@ -244,6 +248,14 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<string>("DigestUserId")
+                        .HasColumnType("text")
+                        .HasColumnName("digest_user_id");
+
+                    b.Property<string>("Link")
+                        .HasColumnType("text")
+                        .HasColumnName("link");
+
                     b.Property<string>("Locale")
                         .HasColumnType("text")
                         .HasColumnName("locale");
@@ -256,6 +268,10 @@ namespace Axis.Processes.Storage.Migrations
                     b.Property<Guid>("NotificationId")
                         .HasColumnType("uuid")
                         .HasColumnName("notification_id");
+
+                    b.Property<Guid?>("ProcessInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("process_instance_id");
 
                     b.Property<Guid>("ReleaseId")
                         .HasColumnType("uuid")
@@ -295,6 +311,10 @@ namespace Axis.Processes.Storage.Migrations
                     b.HasIndex("MessageId")
                         .IsUnique()
                         .HasDatabaseName("ux_email_outbox_message_id");
+
+                    b.HasIndex("DigestUserId", "CreatedAt")
+                        .HasDatabaseName("ix_email_outbox_digest_user_id_created_at")
+                        .HasFilter("digest_user_id IS NOT NULL AND state = 'pending'");
 
                     b.ToTable("email_outbox", "axis");
                 });
@@ -568,6 +588,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnName("retry_backoff")
                         .HasDefaultValueSql("'30 seconds'::interval");
 
+                    b.Property<string>("Returned")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("returned");
+
                     b.Property<Guid?>("RunnerId")
                         .HasColumnType("uuid")
                         .HasColumnName("runner_id");
@@ -649,6 +673,14 @@ namespace Axis.Processes.Storage.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("outcome");
+
+                    b.Property<string>("Problem")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("problem");
+
+                    b.Property<string>("Response")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("response");
 
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("timestamp with time zone")
@@ -746,9 +778,17 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("release_id");
 
+                    b.Property<string>("Result")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("result");
+
                     b.Property<long>("Revision")
                         .HasColumnType("bigint")
                         .HasColumnName("revision");
+
+                    b.Property<string>("StartedBy")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("started_by");
 
                     b.Property<string>("State")
                         .IsRequired()
@@ -844,6 +884,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Changes")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("changes");
+
                     b.Property<string>("Decision")
                         .HasColumnType("text")
                         .HasColumnName("decision");
@@ -865,9 +909,17 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("output");
 
+                    b.Property<string>("Problem")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("problem");
+
                     b.Property<Guid>("ProcessInstanceId")
                         .HasColumnType("uuid")
                         .HasColumnName("process_instance_id");
+
+                    b.Property<string>("Read")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("read");
 
                     b.Property<long>("Revision")
                         .HasColumnType("bigint")

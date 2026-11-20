@@ -1,8 +1,11 @@
-import { Button, Descriptions, Flex, Result, Typography } from 'antd'
+import { Button, Flex, Result, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { AxisActionRow } from '../platform/AxisButton'
+import { PageActions, PageLayout } from '../platform/PageLayout'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { TermList } from '../platform/TermList'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
 import { ShellSidebar } from '../platform/shellSidebar'
@@ -34,7 +37,7 @@ import { StudioConnectionContext, useStudioConnection } from '../platform/studio
 import { kindName, kindSingular } from '../platform/studioKinds'
 import { studioResourceAddress } from '../platform/studioAddress'
 import { starterKinds } from '../platform/studioStarters'
-import { StudioNamesContext } from '../platform/studioNames'
+import { StudioApplicationContext, StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { Tile, TileFocusStyle } from '../platform/Tile'
 import { leaveWithoutAsking } from '../platform/unsavedChanges'
@@ -51,7 +54,6 @@ import { StudioNewPackage } from './StudioNewPackage'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioOverview } from './StudioOverview'
 import { StudioPackages } from './StudioPackages'
-import { StudioPageHeading } from './StudioPageHeading'
 import { StudioReleasePage } from './StudioReleasePage'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioAskAi } from './StudioAskAi'
@@ -138,8 +140,8 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * With no application open, it lists the applications as tiles in up to three columns, each with its mark, its title
  * and its description in the UI locale (`en` as the fallback, then the name), under the page heading "Studio", with a
  * solid New application… button on its right. A tile opens its application, and a single application is not opened by itself.
- * Every page of an open application heads its content with one level-4 `StudioPageHeading`, and no page has a
- * breadcrumb. The Overview's heading is the application's title, with its description under it, then the blocks of
+ * Every page of an open application heads its content with one `PageLayout` heading, and no page has a
+ * breadcrumb, see docs/reference/studio-workspace.md#page-heading. The Overview's heading is the application's title, with its description under it, then the blocks of
  * `StudioOverview`. A kind's sidebar entry, as `&kind=<kind>`, shows that kind's list as one table under a heading with its name.
  * A resource opens alone in the content, under a heading with its name and, for a scenario, Run scenario on its right:
  * its details, its editor, and its Uses and Used by lists. The band under the header holds the application's state and
@@ -570,18 +572,19 @@ function StudioWorkspace() {
   }
   if (application === null) {
     return (
-      <Flex vertical gap="middle">
+      <PageLayout title={t('shell.studio.title')}>
         <TileFocusStyle />
-        <StudioPageHeading
-          title={t('shell.studio.title')}
-          actions={canCreate && <StudioNewApplication primary onCreated={onApplicationCreated} />}
-        />
+        {canCreate && (
+          <PageActions>
+            <StudioNewApplication primary onCreated={onApplicationCreated} />
+          </PageActions>
+        )}
         {apps.length === 0 ? (
           <AxisAlert data-testid="studio-no-applications" kind="info" message={t('shell.studio.noApplications')} />
         ) : (
           <StudioApplicationTiles apps={apps} />
         )}
-      </Flex>
+      </PageLayout>
     )
   }
   if (apps.length === 0) {
@@ -669,7 +672,7 @@ function StudioWorkspace() {
                     onActivate={(releaseId) => publishing.current?.activate(releaseId)}
                   />
                 ) : releasesView ? (
-                  <StudioPageHeading title={t('shell.studio.releases')} />
+                  <PageLayout title={t('shell.studio.releases')} />
                 ) : requestsView && requestId !== null ? (
                   <StudioAuthoringRequestPage
                     application={application!}
@@ -681,10 +684,9 @@ function StudioWorkspace() {
                   revisionId !== null ? (
                     <StudioRevisionPage application={application!} revisionId={revisionId} resources={resources} />
                   ) : (
-                    <Flex vertical gap="middle">
-                      <StudioPageHeading title={t('shell.studio.history')} />
+                    <PageLayout title={t('shell.studio.history')}>
                       <StudioHistory application={application!} folderRevision={folderRevision} onUndone={onUndone} />
-                    </Flex>
+                    </PageLayout>
                   )
                 ) : packagesView ? (
                   packageId !== null ? (
@@ -706,19 +708,17 @@ function StudioWorkspace() {
                       />
                     </Suspense>
                   ) : (
-                    <Flex vertical gap="small">
-                      <StudioPageHeading
-                        title={t('shell.studio.nav.packages')}
-                        actions={
-                          canDevelop ? <StudioNewPackage application={application!} onCreated={onWritten} /> : undefined
-                        }
-                      />
+                    <PageLayout title={t('shell.studio.nav.packages')}>
+                      {canDevelop && (
+                        <PageActions>
+                          <StudioNewPackage application={application!} onCreated={onWritten} />
+                        </PageActions>
+                      )}
                       <StudioPackages application={application!} folderRevision={folderRevision} />
-                    </Flex>
+                    </PageLayout>
                   )
                 ) : policiesView ? (
-                  <Flex vertical gap="middle">
-                    <StudioPageHeading title={t('shell.studio.view.policies')} />
+                  <PageLayout title={t('shell.studio.view.policies')}>
                     <StudioPolicyMatrix
                       application={application!}
                       folderRevision={folderRevision}
@@ -726,141 +726,141 @@ function StudioWorkspace() {
                       onOpenPolicy={(id) => navigate(studioResourceAddress(application!, id))}
                       onWritten={onWritten}
                     />
-                  </Flex>
+                  </PageLayout>
                 ) : selected ? (
                   <div data-testid="studio-resource-details" style={{ minWidth: 0 }}>
-                    <Flex vertical gap="middle">
-                      <StudioPageHeading
-                        title={resourceTitle(selected, locale, t)}
-                        actions={
-                          (canTest && selected.kind === 'scenario' && selected.name) ||
-                          selected.kind !== 'application' ? (
-                            <AxisActionRow align="center">
-                              {canTest && selected.kind === 'scenario' && selected.name && (
-                                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                                <Button
-                                  data-testid="studio-run-scenario"
-                                  disabled={requestBusy || reconnecting}
-                                  onClick={() => publishing.current?.runTests([selected.name!])}
-                                >
-                                  {t('shell.studio.runScenario')}
-                                </Button>
-                              )}
-                              {selected.kind !== 'application' && (
-                                <StudioResourceMenu
-                                  disabled={reconnecting}
-                                  onDelete={() => editor.current?.askDelete()}
-                                />
-                              )}
-                            </AxisActionRow>
-                          ) : undefined
-                        }
-                      />
-                      <Descriptions
-                        column={1}
-                        items={[
-                          { key: 'kind', label: t('shell.studio.kind'), children: kindSingular(selected.kind, t) },
-                          { key: 'id', label: t('shell.studio.id'), children: selected.id },
-                          { key: 'file', label: t('shell.studio.file'), children: selected.file },
-                        ]}
-                      />
-                      <StudioNamesContext.Provider value={names ?? undefined}>
-                        <StudioEditor
-                          key={`editor-${selected.id}`}
-                          ref={editor}
-                          application={application!}
-                          item={selected}
-                          publisher={canPublish}
-                          resources={loaded.resources}
-                          path={path}
-                          diagnosticPaths={diagnosticPaths}
-                          onOpen={openReference}
-                          onSaved={(diagnostics, created) => {
-                            setFolder({
-                              ...loaded,
-                              resources: created ? [...loaded.resources, ...created] : loaded.resources,
-                              diagnostics,
-                            })
-                            setFolderRevision((value) => value + 1)
-                          }}
-                          onTextsWritten={(diagnostics) => {
-                            setFolder({ ...loaded, diagnostics })
-                            setFolderRevision((value) => value + 1)
-                          }}
-                          onDeleted={(diagnostics) => {
-                            setFolder({
-                              ...loaded,
-                              resources: loaded.resources.filter((item) => item.id !== selected.id),
-                              diagnostics,
-                            })
-                            setFolderRevision((value) => value + 1)
-                            navigate(`/studio?${new URLSearchParams({ app: application! })}`, {
-                              state: leaveWithoutAsking,
-                            })
-                          }}
-                        />
-                      </StudioNamesContext.Provider>
-                    </Flex>
+                    <PageLayout title={resourceTitle(selected, locale, t)} line={kindSingular(selected.kind, t)}>
+                      {((canTest && selected.kind === 'scenario' && selected.name) ||
+                        selected.kind !== 'application') && (
+                        <PageActions>
+                          <AxisActionRow align="center">
+                            {canTest && selected.kind === 'scenario' && selected.name && (
+                              // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
+                              <Button
+                                data-testid="studio-run-scenario"
+                                disabled={requestBusy || reconnecting}
+                                onClick={() => publishing.current?.runTests([selected.name!])}
+                              >
+                                {t('shell.studio.runScenario')}
+                              </Button>
+                            )}
+                            {selected.kind !== 'application' && (
+                              <StudioResourceMenu
+                                disabled={reconnecting}
+                                onDelete={() => editor.current?.askDelete()}
+                              />
+                            )}
+                          </AxisActionRow>
+                        </PageActions>
+                      )}
+                      <SectionParts>
+                        <SectionPart testName="facts">
+                          <TermList
+                            terms={[
+                              { key: 'id', term: t('shell.studio.id'), value: selected.id },
+                              { key: 'file', term: t('shell.studio.file'), value: selected.file },
+                            ]}
+                          />
+                        </SectionPart>
+                        <SectionPart testName="editor">
+                          <StudioApplicationContext.Provider value={application!}>
+                            <StudioNamesContext.Provider value={names ?? undefined}>
+                              <StudioEditor
+                                key={`editor-${selected.id}`}
+                                ref={editor}
+                                application={application!}
+                                item={selected}
+                                publisher={canPublish}
+                                resources={loaded.resources}
+                                path={path}
+                                diagnosticPaths={diagnosticPaths}
+                                onOpen={openReference}
+                                onSaved={(diagnostics, created) => {
+                                  setFolder({
+                                    ...loaded,
+                                    resources: created ? [...loaded.resources, ...created] : loaded.resources,
+                                    diagnostics,
+                                  })
+                                  setFolderRevision((value) => value + 1)
+                                }}
+                                onTextsWritten={(diagnostics) => {
+                                  setFolder({ ...loaded, diagnostics })
+                                  setFolderRevision((value) => value + 1)
+                                }}
+                                onDeleted={(diagnostics) => {
+                                  setFolder({
+                                    ...loaded,
+                                    resources: loaded.resources.filter((item) => item.id !== selected.id),
+                                    diagnostics,
+                                  })
+                                  setFolderRevision((value) => value + 1)
+                                  navigate(`/studio?${new URLSearchParams({ app: application! })}`, {
+                                    state: leaveWithoutAsking,
+                                  })
+                                }}
+                              />
+                            </StudioNamesContext.Provider>
+                          </StudioApplicationContext.Provider>
+                        </SectionPart>
+                      </SectionParts>
+                    </PageLayout>
                   </div>
                 ) : selectedModuleItem ? (
                   <div data-testid="studio-resource-details" style={{ minWidth: 0 }}>
-                    <Flex vertical gap="middle">
-                      <StudioPageHeading
-                        title={moduleResourceTitle(
-                          selectedModuleItem,
-                          activity?.find((item) => item.id.toLowerCase() === selectedModuleItem.id.toLowerCase())
-                            ?.titles,
-                          locale,
-                        )}
-                        line={selectedModuleItem.module}
-                      />
-                      <Descriptions
-                        column={1}
-                        items={[
-                          {
-                            key: 'kind',
-                            label: t('shell.studio.kind'),
-                            children: kindSingular(selectedModuleItem.kind, t),
-                          },
-                          { key: 'id', label: t('shell.studio.id'), children: selectedModuleItem.id },
-                          { key: 'module', label: t('shell.studio.module'), children: selectedModuleItem.module },
-                        ]}
-                      />
-                      <StudioNamesContext.Provider value={names ?? undefined}>
-                        <ModuleResourceView
-                          key={`module-${selectedModuleItem.kind}-${selectedModuleItem.id}`}
-                          application={application!}
-                          item={selectedModuleItem}
-                          manifest={manifest}
-                          diagnostics={loaded.diagnostics}
-                          onModuleWritten={onModuleWritten}
-                          onManifestSaved={onManifestSaved}
-                          onManifestStale={() => setManifestReload((value) => value + 1)}
-                        />
-                      </StudioNamesContext.Provider>
-                    </Flex>
+                    <PageLayout
+                      title={moduleResourceTitle(
+                        selectedModuleItem,
+                        activity?.find((item) => item.id.toLowerCase() === selectedModuleItem.id.toLowerCase())?.titles,
+                        locale,
+                      )}
+                      line={kindSingular(selectedModuleItem.kind, t)}
+                    >
+                      <SectionParts>
+                        <SectionPart testName="facts">
+                          <TermList
+                            terms={[
+                              { key: 'id', term: t('shell.studio.id'), value: selectedModuleItem.id },
+                              { key: 'module', term: t('shell.studio.module'), value: selectedModuleItem.module },
+                            ]}
+                          />
+                        </SectionPart>
+                        <SectionPart testName="view">
+                          <StudioApplicationContext.Provider value={application!}>
+                            <StudioNamesContext.Provider value={names ?? undefined}>
+                              <ModuleResourceView
+                                key={`module-${selectedModuleItem.kind}-${selectedModuleItem.id}`}
+                                application={application!}
+                                item={selectedModuleItem}
+                                manifest={manifest}
+                                diagnostics={loaded.diagnostics}
+                                onModuleWritten={onModuleWritten}
+                                onManifestSaved={onManifestSaved}
+                                onManifestStale={() => setManifestReload((value) => value + 1)}
+                              />
+                            </StudioNamesContext.Provider>
+                          </StudioApplicationContext.Provider>
+                        </SectionPart>
+                      </SectionParts>
+                    </PageLayout>
                   </div>
                 ) : resourceId !== null ? (
                   <div data-testid="studio-resource-details">
                     <Typography.Text type="secondary">{t('shell.studio.selectResource')}</Typography.Text>
                   </div>
                 ) : kind !== null ? (
-                  <Flex vertical gap="small">
-                    <StudioPageHeading
-                      title={kindName(kind, t)}
-                      actions={
-                        starterKinds.includes(kind) ? (
-                          <StudioNewResource
-                            kind={kind}
-                            application={application!}
-                            resources={resources}
-                            onCreated={onCreated}
-                          />
-                        ) : undefined
-                      }
-                    />
+                  <PageLayout title={kindName(kind, t)}>
+                    {starterKinds.includes(kind) && (
+                      <PageActions>
+                        <StudioNewResource
+                          kind={kind}
+                          application={application!}
+                          resources={resources}
+                          onCreated={onCreated}
+                        />
+                      </PageActions>
+                    )}
                     <StudioKindList key={kind} application={application!} kind={kind} folderRevision={folderRevision} />
-                  </Flex>
+                  </PageLayout>
                 ) : (
                   <StudioOverview
                     application={application}

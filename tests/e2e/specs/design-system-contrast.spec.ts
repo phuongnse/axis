@@ -276,7 +276,7 @@ function findingsOf(
   return [...findings.values()];
 }
 
-/** Sweeps every state of a card: each Fixtures option in turn, or else each figure in the order it draws. */
+/** Sweeps every state of a card: each State option in turn, or else each figure in the order it draws. */
 async function sweepCard(
   page: Page,
   card: Locator,
@@ -285,7 +285,7 @@ async function sweepCard(
 ): Promise<Finding[]> {
   await expect(card.getByRole("figure").first()).toBeVisible();
   const chooser = card.getByRole("radiogroup", {
-    name: "Fixtures",
+    name: "State",
     exact: true,
   });
   const findings: Finding[] = [];

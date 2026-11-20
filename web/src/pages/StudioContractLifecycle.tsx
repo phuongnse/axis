@@ -1,9 +1,9 @@
-import dagre from '@dagrejs/dagre'
 import { type Edge, Handle, MarkerType, type Node, type NodeProps, Position, ReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { useMemo } from 'react'
 import { fillText } from '../platform/fillText'
-import { ReactFlowAttributionStyle } from '../platform/ReactFlowAttributionStyle'
+import { ProcessRouteEdge } from '../platform/ProcessGraph'
+import { type GraphPoint, routeBetween, useGraphLayout } from '../platform/processLayout'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import type { ContractEdge, ContractState } from './contractView'
@@ -15,24 +15,7 @@ type StateNodeData = { state: ContractState }
 
 type StateNode = Node<StateNodeData, 'state'>
 
-function placeStates(states: ContractState[], edges: ContractEdge[]): (name: string) => { x: number; y: number } {
-  const layout = new dagre.graphlib.Graph()
-  layout.setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 80 })
-  layout.setDefaultEdgeLabel(() => ({}))
-  for (const state of states) {
-    layout.setNode(state.name, { width: nodeWidth, height: nodeHeight })
-  }
-  for (const edge of edges) {
-    if (layout.hasNode(edge.from) && layout.hasNode(edge.to)) {
-      layout.setEdge(edge.from, edge.to)
-    }
-  }
-  dagre.layout(layout)
-  return (name) => {
-    const placed = layout.node(name)
-    return { x: placed.x - nodeWidth / 2, y: placed.y - nodeHeight / 2 }
-  }
-}
+type RouteEdge = Edge<{ route?: GraphPoint[] }, 'route'>
 
 function StateNodeView({ data }: NodeProps<StateNode>) {
   const t = useText()
@@ -41,7 +24,7 @@ function StateNodeView({ data }: NodeProps<StateNode>) {
   const mark = { padding: '0 6px', border: `1px solid ${colour.border}`, borderRadius: radius.base, fontSize: 12 }
   return (
     <>
-      <Handle type="target" position={Position.Top} isConnectable={false} style={{ display: 'none' }} aria-hidden />
+      <Handle type="target" position={Position.Left} isConnectable={false} style={{ display: 'none' }} aria-hidden />
       <div
         data-testid={`studio-contract-state-${state.name}`}
         style={{
@@ -66,15 +49,17 @@ function StateNodeView({ data }: NodeProps<StateNode>) {
           {state.deletable && <span style={mark}>{t('shell.studio.contract.deletable')}</span>}
         </div>
       </div>
-      <Handle type="source" position={Position.Bottom} isConnectable={false} style={{ display: 'none' }} aria-hidden />
+      <Handle type="source" position={Position.Right} isConnectable={false} style={{ display: 'none' }} aria-hidden />
     </>
   )
 }
 
 const nodeTypes = { state: StateNodeView }
+const edgeTypes = { route: ProcessRouteEdge }
 
 /**
- * The lifecycle of a module contract as a state diagram. Each state is a node, with a thick border and an "Initial"
+ * The lifecycle of a module contract as a state diagram, laid out from left to right by the process graph's layout, see
+ * docs/reference/process-inspector-widget.md#process-graph. Each state is a node, with a thick border and an "Initial"
  * mark when a record may be created in it and a "Deletable" mark when a record may be deleted in it. Each arrow is a
  * transition from one of its `from` states, labelled with the transition's name and "Guard" or "No guard". The diagram
  * only shows: no node moves, connects or takes focus.
@@ -88,31 +73,40 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
   const guard = t('shell.studio.contract.guard')
   const noGuard = t('shell.studio.contract.noGuard')
 
+  const layout = useGraphLayout({
+    nodes: states.map((state) => ({ id: state.name, width: nodeWidth, height: nodeHeight })),
+    edges: edges.map((edge) => ({ id: edge.id, source: edge.from, target: edge.to })),
+  })
+
   const flow = useMemo(() => {
-    const place = placeStates(states, edges)
+    if (layout === null) {
+      return null
+    }
     return {
-      nodes: states.map((state): StateNode => ({
-        id: state.name,
-        type: 'state',
-        position: place(state.name),
-        width: nodeWidth,
-        height: nodeHeight,
-        handles: [
-          { type: 'target', position: Position.Top, x: nodeWidth / 2, y: 0, width: 1, height: 1 },
-          { type: 'source', position: Position.Bottom, x: nodeWidth / 2, y: nodeHeight, width: 1, height: 1 },
-        ],
-        data: { state },
-      })),
+      nodes: states
+        .filter((state) => layout.positions.has(state.name))
+        .map((state): StateNode => ({
+          id: state.name,
+          type: 'state',
+          position: layout.positions.get(state.name)!,
+          width: nodeWidth,
+          height: nodeHeight,
+          handles: [
+            { type: 'target', position: Position.Left, x: 0, y: nodeHeight / 2, width: 1, height: 1 },
+            { type: 'source', position: Position.Right, x: nodeWidth, y: nodeHeight / 2, width: 1, height: 1 },
+          ],
+          data: { state },
+        })),
       edges: edges
-        .filter(
-          (edge) => states.some((state) => state.name === edge.from) && states.some((state) => state.name === edge.to),
-        )
-        .map((edge): Edge => {
+        .filter((edge) => layout.positions.has(edge.from) && layout.positions.has(edge.to))
+        .map((edge): RouteEdge => {
           const label = fillText(edgeLabelText, { name: edge.name, guard: edge.guard ? guard : noGuard })
           return {
             id: edge.id,
             source: edge.from,
             target: edge.to,
+            type: 'route',
+            data: { route: routeBetween(layout, edge.id, edge.from, edge.to) },
             label,
             ariaLabel: fillText(edgeNameText, { source: edge.from, target: edge.to, label }),
             style: { stroke: colour.textMuted },
@@ -122,7 +116,7 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
           }
         }),
     }
-  }, [states, edges, colour, edgeLabelText, edgeNameText, guard, noGuard])
+  }, [layout, states, edges, colour, edgeLabelText, edgeNameText, guard, noGuard])
 
   return (
     <section
@@ -131,20 +125,23 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
       aria-label={t('shell.studio.contract.lifecycle')}
       style={{ height: 360 }}
     >
-      <ReactFlowAttributionStyle scope="studio-contract-lifecycle" />
-      <ReactFlow
-        nodes={flow.nodes}
-        edges={flow.edges}
-        nodeTypes={nodeTypes}
-        colorMode={mode}
-        fitView
-        nodesDraggable={false}
-        nodesConnectable={false}
-        nodesFocusable={false}
-        elementsSelectable={false}
-        edgesFocusable={false}
-        zoomOnScroll={false}
-      />
+      {flow && (
+        <ReactFlow
+          nodes={flow.nodes}
+          edges={flow.edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          colorMode={mode}
+          fitView
+          proOptions={{ hideAttribution: true }}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          nodesFocusable={false}
+          elementsSelectable={false}
+          edgesFocusable={false}
+          zoomOnScroll={false}
+        />
+      )}
     </section>
   )
 }

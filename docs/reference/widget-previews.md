@@ -18,13 +18,14 @@ The bundle carries its own React and never uses one that the page provides, beca
 UMD build.
 
 - **Mounting.** The bundle sets `window.Axis`. `window.Axis.<name>(element)` mounts one preview into an
-  element. It draws every state of the preview in one card, each under its caption, and returns a
-  function that unmounts them all. A preview whose states answer the same fixture paths draws one
-  state at a time, see
-  [D142](../decisions/d142-widget-previews-show-the-states-a-design-change-touches-one-at-a-time-where-they-share-fixtures.md).
-- **The State control** _(planned)_. `shell`, `signIn` and `identitySignIn`, whose states are screens in frames, draw one
-  state at a time under a State control instead of in one card. The control picks the state and wraps its captions onto
-  more lines when they do not fit, and `&state=<slug>` opens one. `studio`'s Fixtures control is named State too.
+  element and returns a function that unmounts it. A preview draws each of its states under its caption
+  in one card, except a preview whose states answer the same fixture paths, or whose several states
+  are each a screen in a frame. That preview draws one state at a time under the State control, see
+  [D142](../decisions/d142-widget-previews-show-the-states-a-design-change-touches-one-at-a-time-where-they-share-fixtures.md)
+  for the states that share fixtures.
+- **The State control.** A preview that draws one state at a time has a State control above the state.
+  The control picks the state, and it wraps its captions onto more lines when they do not fit.
+  `&state=<slug>` opens one state. `shell`, `signIn`, `identitySignIn` and `studio` use the control.
 - **Style sheets.** The bundle is one file, so the style sheet of a library it imports, such as React
   Flow's, becomes a style element that the script adds to the page.
 - **Theme.** A mounted widget follows `data-theme` on the root element of the page: `dark` is dark
@@ -70,7 +71,7 @@ change that adds a state to a widget adds that state to the widget's preview in 
 | Process widgets | `taskInbox`: With data, with an overdue and a claimed task, and Empty. `processInspector`: one state with a failed instance and an open dead letter                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Containers      | `columns`, `tabs`, `section`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Shared states   | `states`: drawn once, the states every widget shares, a table while it loads and a table whose request fails                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Shell           | `shell`, `signIn` and `identitySignIn`, see [shell](shell.md#design-system-previews). Each draws its states in a frame exactly as tall as the state's height. The page scrolls inside the frame, as it does in a window, so the state's menus and dialogs open in the middle of what shows                                                                                                                                                                                                                                                                                                      |
+| Shell           | `shell`, `signIn` and `identitySignIn`, see [shell](shell.md#design-system-previews). Each draws its states in a frame exactly as tall as the state's height, one state at a time under the State control. The page scrolls inside the frame, as it does in a window, so the state's menus and dialogs open in the middle of what shows                                                                                                                                                                                                                                                                                                      |
 | Studio          | `studio`, see [shell](shell.md#design-system-previews). It draws Studio in the shell, in sixteen states that share the `/api/studio/apps` path, so it shows one state at a time: Typical, Empty, Loading, Failed, Many rows, Long names, Access denied, Overview with errors and changes not live, Overview of a new application, Entity, Entity with expressions, Policy matrix, Releases, History, Revision and Release page. Entity with expressions opens an entity whose computed field and validation read their expressions back in words, over Typical's fixtures. Revision opens one revision's page over Typical's fixtures, and Release page opens release 2 over them. `studioPageDesign`, `studioFormDesign` and `studioProcessDesign` each have one state, Typical, which opens a page, a form or a process in its designer over the fixtures of `studio`'s Typical state. |
 | Sign-up | `signUp`: the [sign-up page](sign-up.md#the-page) over fixtures, in one state |
 
@@ -82,8 +83,8 @@ console error, on a request other than the page that holds the frame, the harnes
 on sideways scroll. It also proves that each card's states show, that the cards are named in order,
 that a mounted widget follows `data-theme` and `--primary` and a validation message `--dangerText`,
 that a form submits inside the sandbox, and that no fixture reaches the server's web root. It clicks
-through Studio's sidebar in the `studio` preview, opens a state with `&state=` and picks one in the
-control that picks a state. It also checks that this control wraps its captions onto more lines in a 360 px frame.
+through Studio's sidebar in the `studio` preview, opens a state with `&state=` and picks each framed state in the
+State control. It also checks that this control wraps its captions onto more lines in a 360 px frame.
 It proves that each framed state's frame is its height with the page scrolling inside it, and that a dialog
 opened in the scrolled Entity state of `studio` shows inside the frame. It also proves that the `studio` preview's
 Settings page and its Entity state draw no panel, and that each part of them has no background, border, padding or

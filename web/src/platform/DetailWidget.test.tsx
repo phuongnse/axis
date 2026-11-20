@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DetailWidget } from './DetailWidget'
+import { RecordList, type RecordListValue } from './recordList'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
 import { hostileMarkup } from '../test/hostile'
@@ -133,6 +134,9 @@ const texts = {
   'shell.table.no': 'No',
   'shell.value.notSet': 'Not set',
   'shell.notFound.title': 'Page not found',
+  'shell.record.notFound': 'This record does not exist, or you cannot open it.',
+  'shell.record.goToList': 'Go to {page}',
+  'notes.nav': 'Notes',
   'shell.form.loadFailed': 'The record could not be loaded.',
   'shell.form.processStarted': 'The process has started.',
   'shell.form.processRunning': 'This record is already in a running process.',
@@ -178,11 +182,13 @@ function CurrentLocation() {
   )
 }
 
-function renderDetail(widget: EntityWidgetMetadata = noteWidget) {
+function renderDetail(widget: EntityWidgetMetadata = noteWidget, list: RecordListValue | null = null) {
   return render(
     <MemoryRouter initialEntries={[`/e2e/notedetail?note=${noteId}`]}>
       <TextProvider catalogs={catalogs} development={false}>
-        <DetailWidget widget={widget} sitePath="e2e" recordId={noteId} locale="en" />
+        <RecordList value={list}>
+          <DetailWidget widget={widget} sitePath="e2e" recordId={noteId} locale="en" />
+        </RecordList>
       </TextProvider>
       <CurrentLocation />
     </MemoryRouter>,
@@ -434,13 +440,26 @@ describe('DetailWidget', () => {
     expect(screen.getByTestId('cell-lines-1-product')).toHaveTextContent('—')
   })
 
-  it('shows the not-found page when the record API answers 404', async () => {
+  it('shows the missing-record line with a link to its list when the record API answers 404', async () => {
     stubFetch({ status: 404, body: '{}' })
 
-    renderDetail()
+    renderDetail(noteWidget, { labelKey: 'notes.nav', to: '/e2e' })
 
-    expect(await screen.findByText('Page not found')).toBeInTheDocument()
+    expect(await screen.findByTestId('record-not-found')).toHaveTextContent(
+      'This record does not exist, or you cannot open it. Go to Notes',
+    )
+    expect(screen.getByRole('link', { name: 'Go to Notes' })).toHaveAttribute('href', '/e2e')
     expect(screen.queryByTestId('detail')).toBeNull()
+    expect(screen.queryByTestId('not-found')).toBeNull()
+  })
+
+  it('shows no record action when the record API answers 404', async () => {
+    stubFetch({ status: 404, body: '{}' })
+
+    renderDetail({ ...noteWidget, actions: [closeAction, openAction] }, { labelKey: 'notes.nav', to: '/e2e' })
+
+    await screen.findByTestId('record-not-found')
+    expect(screen.queryByRole('button')).toBeNull()
   })
 
   it('shows a load error when the record cannot be loaded', async () => {
@@ -482,7 +501,7 @@ describe('DetailWidget', () => {
     expect(await screen.findByText('Closed by the process')).toBeInTheDocument()
     expect(requests()).toEqual([
       { url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined },
-      { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}"}` },
+      { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}","via":"noteClose.action"}` },
       { url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined },
     ])
   })

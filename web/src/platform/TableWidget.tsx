@@ -281,7 +281,7 @@ export function TableWidget({ sitePath, pageName, widget, locale, pageValues }: 
         startKeys.current.set(keyName, key)
         let result
         try {
-          result = await startProcess(action.instancesPath, rowId, key)
+          result = await startProcess(action.instancesPath, rowId, key, action.labelKey)
         } catch (error) {
           console.warn(`Starting the process '${action.process}' for '${rowId}' failed`, error)
           setActionError(t('shell.form.startFailed'))

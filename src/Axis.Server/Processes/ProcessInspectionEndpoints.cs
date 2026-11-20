@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
+using Axis.Data.Profiles;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
@@ -15,6 +16,7 @@ using Axis.Server.Http;
 using Axis.Server.Records;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Axis.Studio;
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
 
@@ -44,7 +46,8 @@ namespace Axis.Server.Processes;
 /// The detail at <c>GET /api/apps/{app}/processes/{process}/instances/{id}</c> shows one instance:
 /// its properties, the graph of the release it is pinned to, its path (the history rows in order),
 /// its tasks, its calls and the operator <c>commands</c> the user may take on it. While the instance waits on a timer step, the
-/// detail also has <c>timerDueAt</c>, the due time of the timer's work item. A call lists its attempts and lookups, and its stored input only when
+/// detail also has <c>timerDueAt</c>, the due time of the timer's work item, and <c>startedBy</c>, who or what started the instance, with a person's
+/// current name read from their profile, or null for an instance that started before Axis recorded it. A call lists its attempts and lookups, and its stored input only when
 /// the user may read every field that the step's input and output mapping reads or writes, on any
 /// entity, and none of them is sensitive in the pinned or the active release. Otherwise the input is
 /// null and marked hidden. The commands come from the user's <c>retry</c> and <c>cancel</c> grants and the states, and a call is
@@ -54,7 +57,10 @@ namespace Axis.Server.Processes;
 /// as in the list, before any instance is looked up. A malformed id, an unknown id, an instance of another process, and an instance whose
 /// subject record the user may not read or that no longer exists are one 404. A read filter that
 /// fails at run time for the subject record does not match, so it is a 404 too. The detail writes
-/// no audit record.
+/// no audit record. The detail also names the subject entity (<c>subjectEntity</c>), the label (<c>subjectLabel</c>, under the list's rules) and
+/// the pinned release's number (<c>releaseNumber</c>), and gives <c>studio</c>, <c>{ app, resource }</c>, to a user who holds the author role of
+/// <c>Studio:AuthorRole</c> and null to anyone else. A task gives <c>dueAt</c>, <c>assigneeId</c> and <c>completedById</c>, and its <c>assignee</c>
+/// and <c>completedBy</c> are a person's name, or the user id when there is no profile, and a role assignee keeps its role's name.
 /// </para>
 /// <para>
 /// A process without a subject has no record to read. Its instances are listed and read with the
@@ -289,6 +295,7 @@ internal static class ProcessInspectionEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         PackageCatalog packages,
+        StudioOptions studio,
         SensitiveValues sensitive,
         ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
@@ -365,14 +372,15 @@ internal static class ProcessInspectionEndpoints
         }
 
         return Results.Ok(await DetailAsync(
-            connection, resolver, packages, application, model, entity, row, InspectionViewer.ForUser(user.RolesIn(application)), cancellationToken));
+            connection, resolver, packages, application, model, entity, row, InspectionViewer.ForUser(user.RolesIn(application)), studio.Allows(user.Roles), cancellationToken));
     }
 
     /// <summary>
     /// Builds the detail of <paramref name="row"/> for <paramref name="viewer"/>. <paramref name="active"/> is the active release
     /// of the instance's application, or its pinned release when the application has none. <paramref name="process"/> and
     /// <paramref name="subject"/> are the process and the subject entity in that release. The caller has checked that the viewer
-    /// may read the instance, so this applies no read grant, filter or subject check of its own.
+    /// may read the instance, so this applies no read grant, filter or subject check of its own. <paramref name="author"/> says
+    /// whether the viewer holds the author role, which gives the detail its <c>studio</c> address.
     /// </summary>
     internal static async Task<ProcessInstanceDetailResponse> DetailAsync(
         NpgsqlConnection connection,
@@ -383,6 +391,7 @@ internal static class ProcessInspectionEndpoints
         EntityModel? subject,
         ProcessInstanceRow row,
         InspectionViewer viewer,
+        bool author,
         CancellationToken cancellationToken)
     {
         // The due time shows only while the instance waits, from the timer item of its current revision.
@@ -390,13 +399,28 @@ internal static class ProcessInspectionEndpoints
             ? await InstanceQueries.TimerDueAtAsync(connection, row.Id, row.Revision, cancellationToken)
             : null;
 
+        // A person's name is read from their profile now, so it shows their current name. No profile gives a null name.
+        var startedBy = await InstanceQueries.StartedByAsync(connection, row.Id, cancellationToken) is { } stored
+            ? new ProcessInstanceStartedBy(stored.Kind, stored.Name, stored.Id, stored.Via)
+            : null;
+        if (startedBy is { Kind: ProcessStartedBy.PersonKind, Id: { } personId })
+        {
+            var starterNames = await UserProfiles.FindDisplayNamesAsync(connection, [personId], cancellationToken);
+            startedBy = startedBy with { Name = starterNames.GetValueOrDefault(personId) };
+        }
+
         // A parent or sub-process is named only when the user may inspect its process in the active release.
         // The subject record's read filters do not apply, and no subject id is shown.
         var relatives = await InstanceQueries.RelativesAsync(connection, row.ApplicationId, row.Id, cancellationToken);
         var parentProcess = relatives.Parent is { } relatedParent ? InspectableProcess(active, viewer, relatedParent.ProcessId) : null;
         var parent = relatives.Parent is { } parentRow && parentProcess is not null
-            ? new ProcessInstanceParent(parentRow.Id, parentProcess.Name, parentRow.Step)
+            ? new ProcessInstanceParent(parentRow.Id, parentProcess.Name, parentProcess.Title?.TextKey, parentRow.Step)
             : null;
+        // A starting parent is named only under the same rule as parent, so a parent the user may not inspect keeps its name and id hidden.
+        if (startedBy is { Kind: ProcessStartedBy.ParentKind } && parent is null)
+        {
+            startedBy = startedBy with { Name = null, Id = null };
+        }
         var subProcesses = new List<ProcessSubProcess>();
         foreach (var child in relatives.Children)
         {
@@ -405,6 +429,7 @@ internal static class ProcessInspectionEndpoints
                 subProcesses.Add(new ProcessSubProcess(
                     child.Id,
                     childProcess.Name,
+                    childProcess.Title?.TextKey,
                     child.Step,
                     child.State,
                     child.CreatedAt.UtcDateTime,
@@ -421,6 +446,27 @@ internal static class ProcessInspectionEndpoints
         var mappings = new Dictionary<string, IReadOnlySet<MappedField>?>(StringComparer.Ordinal);
         var pinnedProcess = pinned.Processes.Single(candidate => candidate.Id == process.Id);
         var pinnedSubject = subject is null ? null : pinned.FindEntity(subject.Id);
+
+        // The label and the release number follow the list's rules, so a label the viewer may not read is null. The console
+        // falls back to the pinned entity when the active release dropped it, and then the label is not read.
+        var showsLabel = subject is not null
+            && active.FindEntity(subject.Id) is not null
+            && ShowsSubjectLabel(subject, pinnedSubject, viewer.ReadableFields(active, subject));
+        var labels = await InstanceQueries.LabelsAsync(connection, row.Id, showsLabel ? subject : null, cancellationToken);
+
+        // A user assignee, the one who claimed a role task and the one who completed a task are shown by name.
+        var userIds = tasks
+            .SelectMany(task => new[] { task.AssigneeKind == ProcessTasks.UserAssignee ? task.Assignee : null, task.ClaimedBy, task.CompletedBy })
+            .OfType<string>()
+            .ToList();
+        var names = await UserProfiles.FindDisplayNamesAsync(connection, userIds, cancellationToken);
+        string Name(string userId) => names.GetValueOrDefault(userId) ?? userId;
+
+        // The values the instance started with and ended with, each masked on its own.
+        var input = subject is null ? await InputAsync(connection, pinned, pinnedProcess, active, viewer, row, cancellationToken) : null;
+        var result = row.State == ProcessStarts.Completed
+            ? await ResultAsync(connection, pinned, active, subject, viewer, row, cancellationToken)
+            : null;
 
         // The operator commands do not serve an instance without a subject yet, so the detail
         // offers none of them and no call is resolvable.
@@ -442,13 +488,20 @@ internal static class ProcessInspectionEndpoints
         return new ProcessInstanceDetailResponse(
             row.Id,
             process.Name,
+            process.Title?.TextKey,
+            subject?.Name,
             row.SubjectId,
+            labels.SubjectLabel,
             row.ReleaseId,
+            labels.ReleaseNumber,
             row.State,
             row.Step,
             row.CreatedAt.UtcDateTime,
             row.EndedAt?.UtcDateTime,
             timerDueAt?.UtcDateTime,
+            startedBy,
+            input,
+            result,
             parent,
             subProcesses,
             graph,
@@ -460,18 +513,24 @@ internal static class ProcessInspectionEndpoints
                     entry.Decision,
                     entry.Output is null ? null : JsonNode.Parse(entry.Output),
                     entry.Error,
-                    entry.TraceId))
+                    Problem(entry.Problem),
+                    entry.TraceId,
+                    RunRead(entry.Read, pinned, active, subject, viewer),
+                    new ProcessRunMade(RunChanges(entry.Changes, pinned, active, subject, viewer), null, null, null)))
                 .ToList(),
             tasks
                 .Select(task => new ProcessInstanceTask(
                     task.Id,
                     task.Step,
                     task.AssigneeKind,
-                    task.Assignee,
+                    task.AssigneeKind == ProcessTasks.UserAssignee ? Name(task.Assignee) : task.Assignee,
+                    task.AssigneeKind == ProcessTasks.UserAssignee ? task.Assignee : task.ClaimedBy,
                     task.State,
                     task.Outcome,
+                    task.CompletedBy is { } completedBy ? Name(completedBy) : null,
                     task.CompletedBy,
                     task.CreatedAt.UtcDateTime,
+                    task.DueAt?.UtcDateTime,
                     task.CompletedAt?.UtcDateTime))
                 .ToList(),
             calls
@@ -482,8 +541,10 @@ internal static class ProcessInspectionEndpoints
                         mappings[call.Step] = fields = MappedFields(pinned, pinnedProcess, pinnedSubject, call.Step);
                     }
 
-                    var hidden = call.Input is not null
-                        && (!Readable(active, viewer, fields) || Sensitive(pinned, active, fields));
+                    // The kept request, responses and returned values follow the rule of the input, also when the
+                    // call no longer stores its input, so they use the rule itself and not InputHidden.
+                    var concealed = !Readable(active, viewer, fields) || Sensitive(pinned, active, fields);
+                    var hidden = call.Input is not null && concealed;
                     var outputs = allowsResolve && call.State == ConnectorCalls.Unknown && row.State == ProcessStarts.Waiting && row.Step == call.Step
                         ? DeclaredOutputs(pinned, call, packages)
                         : null;
@@ -506,16 +567,147 @@ internal static class ProcessInspectionEndpoints
                                 attempt.Outcome,
                                 attempt.HttpStatus,
                                 attempt.Error,
-                                attempt.TraceId))
+                                Problem(attempt.Problem),
+                                attempt.TraceId,
+                                Kept(attempt.Response, concealed)))
                             .ToList(),
                         call.Input is null || hidden ? null : JsonNode.Parse(call.Input),
                         hidden,
+                        Kept(call.Request, concealed),
+                        Kept(call.Returned, concealed),
                         outputs is not null,
                         outputs);
                 })
                 .ToList(),
-            commands);
+            commands,
+            author ? new ProcessStudioAddress(active.Manifest.Name, process.Id) : null);
     }
+
+    // The parameters the instance started with, in declared order, each hidden on its own. A value that a delete trigger or a
+    // sub-process step of the pinned release fills from record fields is hidden unless the viewer may read all of those fields
+    // and none is sensitive. A parameter that only a person or a schedule fills is a literal and is shown.
+    private static async Task<IReadOnlyList<ProcessInstanceValue>> InputAsync(
+        NpgsqlConnection connection,
+        ApplicationModel pinned,
+        ProcessModel pinnedProcess,
+        ApplicationModel active,
+        InspectionViewer viewer,
+        ProcessInstanceRow row,
+        CancellationToken cancellationToken)
+    {
+        var stored = (await InstanceQueries.ValuesAsync(connection, row.Id, cancellationToken)).Parameters is { } text
+            ? JsonNode.Parse(text) as JsonObject
+            : null;
+        return pinnedProcess.Parameters
+            .Select(parameter =>
+            {
+                var hidden = ParameterSources(pinned, pinnedProcess, parameter.Name)
+                    .Any(fields => !Readable(active, viewer, fields) || Sensitive(pinned, active, fields));
+                var value = stored?.FirstOrDefault(entry => string.Equals(entry.Key, parameter.Name, StringComparison.OrdinalIgnoreCase)).Value;
+                return new ProcessInstanceValue(parameter.Name, hidden ? null : value, hidden);
+            })
+            .ToList();
+    }
+
+    // For each delete trigger and each sub-process step of the pinned release that fills the parameter, the record fields its
+    // expression reads. A null set is a source whose fields the walker cannot tell, such as a parent's own parameter, so it hides.
+    private static List<IReadOnlySet<MappedField>?> ParameterSources(ApplicationModel pinned, ProcessModel process, string parameter)
+    {
+        var sources = new List<IReadOnlySet<MappedField>?>();
+        foreach (var trigger in pinned.Triggers.Where(candidate => candidate.Process.Id == process.Id))
+        {
+            if (trigger.ParameterExpressions?.FirstOrDefault(entry => string.Equals(entry.Key, parameter, StringComparison.OrdinalIgnoreCase)).Value is { } expression)
+            {
+                sources.Add(trigger.Entity is { } watched && pinned.FindEntity(watched.Id) is { } entity
+                    ? MappingFields.Collect(pinned, entity, expression)
+                    : null);
+            }
+        }
+
+        foreach (var parent in pinned.Processes)
+        {
+            foreach (var step in parent.Steps.OfType<SubProcessStepModel>().Where(candidate => candidate.ProcessId == process.Id))
+            {
+                if (step.Parameters.FirstOrDefault(entry => string.Equals(entry.Parameter, parameter, StringComparison.OrdinalIgnoreCase)) is { } given)
+                {
+                    sources.Add(parent.Entity is { } subject && pinned.FindEntity(subject.Id) is { } entity
+                        ? MappingFields.Collect(pinned, entity, given.Value)
+                        : null);
+                }
+            }
+        }
+
+        return sources;
+    }
+
+    // The end step and the values the instance completed with, as the engine kept them, in the subject's field order. Each value is hidden when its field is
+    // unreadable for the viewer, sensitive in either release, or gone from the active release. Values are null for an instance that
+    // completed before the engine kept them.
+    private static async Task<ProcessInstanceResult> ResultAsync(
+        NpgsqlConnection connection,
+        ApplicationModel pinned,
+        ApplicationModel active,
+        EntityModel? subject,
+        InspectionViewer viewer,
+        ProcessInstanceRow row,
+        CancellationToken cancellationToken)
+    {
+        if ((await InstanceQueries.ValuesAsync(connection, row.Id, cancellationToken)).Result is not { } text
+            || JsonNode.Parse(text) is not JsonObject stored)
+        {
+            return new ProcessInstanceResult(row.Step, null);
+        }
+
+        // PostgreSQL's jsonb does not keep key order, so the values follow the subject's field order, and a stored key that
+        // the entity no longer has comes after them.
+        var order = subject?.Fields.Select((field, index) => (field.Name, index))
+            .ToDictionary(entry => entry.Name, entry => entry.index, StringComparer.OrdinalIgnoreCase);
+        var values = new List<ProcessInstanceValue>();
+        foreach (var (name, value) in stored.OrderBy(entry => order is not null && order.TryGetValue(entry.Key, out var index) ? index : int.MaxValue))
+        {
+            var hidden = FieldHidden(pinned, active, subject, viewer, name);
+            values.Add(new ProcessInstanceValue(name, hidden ? null : value, hidden));
+        }
+
+        return new ProcessInstanceResult(row.Step, values);
+    }
+
+    // The one masking check of a stored subject value, over its own field, as "Values and masking" says: it is hidden when the
+    // instance has no subject, the viewer may not read the field, either release marks it sensitive or the active release no longer has it.
+    // The result's values, a run's read and a run's changes all use it.
+    private static bool FieldHidden(ApplicationModel pinned, ApplicationModel active, EntityModel? subject, InspectionViewer viewer, string field) =>
+        subject is null
+        || !Readable(active, viewer, new HashSet<MappedField> { new(subject.Id, field) })
+        || Sensitive(pinned, active, new HashSet<MappedField> { new(subject.Id, field) });
+
+    // The values a decision's conditions read, as the engine kept them, each masked on its own, in the stored order. A value is also hidden
+    // when none is stored, as for a field that was sensitive when the run ran. Null for a run that kept none.
+    private static IReadOnlyList<ProcessInstanceValue>? RunRead(string? json, ApplicationModel pinned, ApplicationModel active, EntityModel? subject, InspectionViewer viewer) =>
+        json is null || JsonNode.Parse(json) is not JsonArray stored
+            ? null
+            : [.. stored.OfType<JsonObject>().Select(entry =>
+            {
+                var name = entry["name"]?.GetValue<string>() ?? string.Empty;
+                var hidden = FieldHidden(pinned, active, subject, viewer, name) || !entry.ContainsKey("value");
+                return new ProcessInstanceValue(name, hidden ? null : entry["value"]?.DeepClone(), hidden);
+            })];
+
+    // The fields a run that wrote the subject record changed (an updateRecord step, a task completion with values, a call's outputs or a resolve as succeeded), as the engine kept them, each masked on its own, in the stored order. Null for a run that kept none.
+    private static IReadOnlyList<ProcessRunChange>? RunChanges(string? json, ApplicationModel pinned, ApplicationModel active, EntityModel? subject, InspectionViewer viewer) =>
+        json is null || JsonNode.Parse(json) is not JsonArray stored
+            ? null
+            : [.. stored.OfType<JsonObject>().Select(entry =>
+            {
+                var field = entry["field"]?.GetValue<string>() ?? string.Empty;
+                var hidden = FieldHidden(pinned, active, subject, viewer, field) || (!entry.ContainsKey("before") && !entry.ContainsKey("after"));
+                return new ProcessRunChange(field, hidden ? null : entry["before"]?.DeepClone(), hidden ? null : entry["after"]?.DeepClone(), hidden);
+            })];
+
+    // A kept request, response or returned value as JSON, or null when the call keeps none or the reader may not see it.
+    private static JsonNode? Kept(string? json, bool concealed) => json is null || concealed ? null : JsonNode.Parse(json);
+
+    // The code of a step's or an attempt's error as JSON, or null when the row has none. It holds no field value, so the masking rule does not apply.
+    private static JsonNode? Problem(string? json) => json is null ? null : JsonNode.Parse(json);
 
     // The process in the active release when it exists and the viewer may inspect it, otherwise null.
     private static ProcessModel? InspectableProcess(ApplicationModel application, InspectionViewer viewer, Guid processId) =>
@@ -620,44 +812,55 @@ internal static class ProcessInspectionEndpoints
     internal static ProcessGraph Graph(ProcessModel model) =>
         new(model.Start, model.Steps.Select(GraphStep).ToList());
 
-    // A transition's On is text: a decision branch gives its index and the fallback gives "otherwise".
+    // A transition's On is text: a decision branch gives its index and the fallback gives "otherwise". A step's label key is its own
+    // for every type. A decision branch's and a task outcome's transition gives the label's key, and a decision branch also its name.
     private static ProcessGraphStep GraphStep(ProcessStepModel step) =>
         step switch
         {
             DecisionStepModel decision => new(
                 decision.Name,
                 "decision",
+                step.Label?.TextKey,
+                null,
                 null,
                 decision.Branches
-                    .Select((branch, index) => new ProcessGraphTransition(branch.Next, index.ToString(CultureInfo.InvariantCulture)))
-                    .Append(new ProcessGraphTransition(decision.Otherwise, "otherwise"))
+                    .Select((branch, index) => new ProcessGraphTransition(branch.Next, index.ToString(CultureInfo.InvariantCulture), branch.Name, branch.Label?.TextKey, null))
+                    .Append(new ProcessGraphTransition(decision.Otherwise, "otherwise", null, null, null))
                     .ToList()),
             TaskStepModel task => new(
                 task.Name,
                 "task",
                 task.Label.TextKey,
-                task.Outcomes.Select(outcome => new ProcessGraphTransition(outcome.Next, outcome.Name)).ToList()),
-            OperationStepModel operation => Operation(operation.Name, operation.Next),
-            CallConnectorStepModel call => Operation(call.Name, call.Next),
-            PackageOperationStepModel package => Operation(package.Name, package.Next),
-            RaiseEventStepModel raise => Operation(raise.Name, raise.Next),
-            TimerStepModel timer => new(timer.Name, "timer", null, [new ProcessGraphTransition(timer.Next, null)]),
+                null,
+                null,
+                task.Outcomes.Select(outcome => new ProcessGraphTransition(outcome.Next, outcome.Name, null, outcome.Label.TextKey, null)).ToList()),
+            OperationStepModel operation => Operation(step, operation.Name, operation.Next),
+            CallConnectorStepModel call => Operation(step, call.Name, call.Next),
+            PackageOperationStepModel package => Operation(step, package.Name, package.Next),
+            RaiseEventStepModel raise => Operation(step, raise.Name, raise.Next),
+            TimerStepModel timer => new(timer.Name, "timer", step.Label?.TextKey, null, null, [Next(timer.Next)]),
+            // An event has no label, so EventLabelKey is null.
             WaitEventStepModel wait => new(
                 wait.Name,
                 "waitEvent",
+                step.Label?.TextKey,
+                wait.Event,
                 null,
                 wait.Timeout is { } timeout
-                    ? [new ProcessGraphTransition(wait.Next, null), new ProcessGraphTransition(timeout.Next, "timeout")]
-                    : [new ProcessGraphTransition(wait.Next, null)]),
-            CreateRecordStepModel create => Operation(create.Name, create.Next),
-            NotifyStepModel notify => Operation(notify.Name, notify.Next),
-            SubProcessStepModel sub => Operation(sub.Name, sub.Next),
-            EndStepModel end => new(end.Name, "end", null, []),
+                    ? [Next(wait.Next), new ProcessGraphTransition(timeout.Next, "timeout", null, null, timeout.AfterText)]
+                    : [Next(wait.Next)]),
+            CreateRecordStepModel create => Operation(step, create.Name, create.Next),
+            NotifyStepModel notify => Operation(step, notify.Name, notify.Next),
+            SubProcessStepModel sub => Operation(step, sub.Name, sub.Next),
+            EndStepModel end => new(end.Name, "end", step.Label?.TextKey, null, null, []),
             _ => throw new InvalidOperationException($"Unexpected step type {step.GetType().Name}."),
         };
 
-    private static ProcessGraphStep Operation(string name, string next) =>
-        new(name, "operation", null, [new ProcessGraphTransition(next, null)]);
+    private static ProcessGraphStep Operation(ProcessStepModel step, string name, string next) =>
+        new(name, "operation", step.Label?.TextKey, null, null, [Next(next)]);
+
+    private static ProcessGraphTransition Next(string next) =>
+        new(next, null, null, null, null);
 
     private static IResult InstanceNotFound() =>
         NotFound("No instance of this process exists with this id.");
@@ -732,60 +935,146 @@ internal sealed record ProcessInstanceListItem(
 
 /// <summary>
 /// One instance of a process, the graph of the release it is pinned to, its path, its tasks and its calls.
+/// <paramref name="ProcessTitleKey"/> is the text key of the process's title in the active release, or null when the process has none, see
+/// <see href="docs/reference/process-inspection.md#instance-detail">instance detail</see>.
+/// <paramref name="SubjectEntity"/>, <paramref name="SubjectLabel"/> and <paramref name="ReleaseNumber"/> are as the list gives them.
+/// <paramref name="Studio"/> is the address to open the process in Studio for a user who holds the author role, and null for anyone else.
 /// <paramref name="Commands"/> lists the operator commands (<c>retry</c>, <c>cancel</c>) that the user holds the grant for and
 /// that the instance's state and calls allow. <paramref name="TimerDueAt"/> is the time the timer step that the instance waits on
 /// fires, or null when the instance is not waiting on a timer. The detail names the parent and the sub-processes whose process the user may
-/// inspect in the active release, with no subject id.
+/// inspect in the active release, with no subject id. <paramref name="Input"/> lists the parameters of an instance of a process without a subject,
+/// and is null for a process with one. <paramref name="Result"/> is the end step and the values of a completed instance, and null before.
 /// </summary>
 internal sealed record ProcessInstanceDetailResponse(
     Guid Id,
     string Process,
+    string? ProcessTitleKey,
+    string? SubjectEntity,
     Guid? SubjectId,
+    string? SubjectLabel,
     Guid ReleaseId,
+    int? ReleaseNumber,
     string State,
     string Step,
     DateTime CreatedAt,
     DateTime? EndedAt,
     DateTime? TimerDueAt,
+    ProcessInstanceStartedBy? StartedBy,
+    IReadOnlyList<ProcessInstanceValue>? Input,
+    ProcessInstanceResult? Result,
     ProcessInstanceParent? Parent,
     IReadOnlyList<ProcessSubProcess> SubProcesses,
     ProcessGraph Graph,
     IReadOnlyList<ProcessPathEntry> Path,
     IReadOnlyList<ProcessInstanceTask> Tasks,
     IReadOnlyList<ProcessInstanceCall> Calls,
-    IReadOnlyList<string> Commands);
+    IReadOnlyList<string> Commands,
+    ProcessStudioAddress? Studio);
 
-/// <summary>The instance that started this one, with the sub-process step in the parent that did so.</summary>
-internal sealed record ProcessInstanceParent(Guid Id, string Process, string Step);
+/// <summary>
+/// A value of an instance's <c>input</c> or <c>result</c>, by name. It is null with <paramref name="Hidden"/> true when the viewer may not
+/// see it, under <see href="docs/reference/process-inspection.md#values-and-masking">values and masking</see>.
+/// </summary>
+internal sealed record ProcessInstanceValue(string Name, JsonNode? Value, bool Hidden);
 
-/// <summary>An instance that this one started, with the sub-process step in this instance that did so.</summary>
-internal sealed record ProcessSubProcess(Guid Id, string Process, string Step, string State, DateTime CreatedAt, DateTime? EndedAt);
+/// <summary>
+/// What a completed instance ended with: the end <paramref name="Step"/> it reached and the subject fields its steps write.
+/// <paramref name="Values"/> is null for an instance that completed before the engine kept them.
+/// </summary>
+internal sealed record ProcessInstanceResult(string Step, IReadOnlyList<ProcessInstanceValue>? Values);
+
+/// <summary>The application and the process resource that open in Studio, for a viewer who holds the author role.</summary>
+internal sealed record ProcessStudioAddress(string App, Guid Resource);
+
+/// <summary>
+/// Who or what started the instance, as "Who started it" in <c>docs/reference/process-inspection.md#instance-detail</c> says.
+/// <paramref name="Kind"/> is <c>person</c>, <c>trigger</c>, <c>endpoint</c>, <c>schedule</c> or <c>parent</c>.
+/// <paramref name="Name"/> is a person's current name, or the trigger's, endpoint's or parent process's name.
+/// </summary>
+internal sealed record ProcessInstanceStartedBy(string Kind, string? Name, string? Id, string? Via);
+
+/// <summary>
+/// The instance that started this one, with the sub-process step in the parent that did so. <paramref name="ProcessTitleKey"/> is null
+/// for a process with no title, see <c>docs/reference/process-inspection.md#instance-detail</c>.
+/// </summary>
+internal sealed record ProcessInstanceParent(Guid Id, string Process, string? ProcessTitleKey, string Step);
+
+/// <summary>
+/// An instance that this one started, with the sub-process step in this instance that did so. <paramref name="ProcessTitleKey"/> is null
+/// for a process with no title, see <c>docs/reference/process-inspection.md#instance-detail</c>.
+/// </summary>
+internal sealed record ProcessSubProcess(Guid Id, string Process, string? ProcessTitleKey, string Step, string State, DateTime CreatedAt, DateTime? EndedAt);
 
 /// <summary>The steps of a process, in declaration order, and the name of the first.</summary>
 internal sealed record ProcessGraph(string Start, IReadOnlyList<ProcessGraphStep> Steps);
 
-/// <summary>A step of the graph: its type (<c>decision</c>, <c>task</c>, <c>operation</c> or <c>end</c>), its label for a task, and where it leads.</summary>
-internal sealed record ProcessGraphStep(string Name, string Type, string? LabelKey, IReadOnlyList<ProcessGraphTransition> Transitions);
+/// <summary>
+/// A step of the graph: its type (<c>decision</c>, <c>task</c>, <c>operation</c>, <c>timer</c>, <c>waitEvent</c>, <c>end</c>), the text key of its
+/// label or null, where it leads, and for a <c>waitEvent</c> step the name of the event it waits for. <paramref name="EventLabelKey"/>
+/// is always null, since an event has no label. <paramref name="Event"/> and <paramref name="EventLabelKey"/> are null for any other step.
+/// </summary>
+internal sealed record ProcessGraphStep(
+    string Name,
+    string Type,
+    string? LabelKey,
+    string? Event,
+    string? EventLabelKey,
+    IReadOnlyList<ProcessGraphTransition> Transitions);
 
-/// <summary>A transition to the step <paramref name="Next"/>, taken on a decision branch or a task outcome, or null for an operation.</summary>
-internal sealed record ProcessGraphTransition(string Next, string? On);
+/// <summary>
+/// A transition to the step <paramref name="Next"/>, taken on a decision branch or a task outcome, or null for any other transition.
+/// <paramref name="Branch"/> is a decision branch's name, and <paramref name="LabelKey"/> the text key of the label of the branch or the task outcome.
+/// <paramref name="After"/> is the timeout's duration as the process file writes it, on a <c>waitEvent</c> step's timeout transition. Each is null where it does not apply.
+/// </summary>
+internal sealed record ProcessGraphTransition(string Next, string? On, string? Branch, string? LabelKey, string? After);
 
 /// <summary>
 /// One occurrence of a step in the instance's history. A failed step has an error and no output.
+/// <paramref name="Problem"/> is the code of the error, <c>{ code, values }</c>, or null when the entry has none. It holds no field value, so no rule hides it.
 /// <paramref name="TraceId"/> is the trace id of the run that wrote the entry, or null when it stored none.
+/// <paramref name="Read"/> is the subject fields a decision's conditions read, or null for another run, for a process without a subject and for an entry stored before the engine kept them.
+/// <paramref name="Made"/> is what the run made, with each part null when it made none.
 /// </summary>
-internal sealed record ProcessPathEntry(string Step, DateTime StartedAt, DateTime FinishedAt, string? Decision, JsonNode? Output, string? Error, string? TraceId);
+internal sealed record ProcessPathEntry(
+    string Step,
+    DateTime StartedAt,
+    DateTime FinishedAt,
+    string? Decision,
+    JsonNode? Output,
+    string? Error,
+    JsonNode? Problem,
+    string? TraceId,
+    IReadOnlyList<ProcessInstanceValue>? Read,
+    ProcessRunMade Made);
 
-/// <summary>A task of the instance, with who it is assigned to and how it ended.</summary>
+/// <summary>
+/// What a run made, see "Runs" in docs/reference/process-inspection.md#instance-detail. <paramref name="Changes"/> is the fields a run that wrote the
+/// subject record changed (an <c>updateRecord</c> step, a task completion with values, a call's outputs or a resolve as succeeded), an empty list when none differed. <paramref name="Event"/>, <paramref name="Notified"/> and
+/// <paramref name="Created"/> are null until a run's event, notification and created record are built.
+/// </summary>
+internal sealed record ProcessRunMade(IReadOnlyList<ProcessRunChange>? Changes, JsonNode? Event, JsonNode? Notified, JsonNode? Created);
+
+/// <summary>One field a run changed, with its value before and after. Both values are null when <paramref name="Hidden"/>.</summary>
+internal sealed record ProcessRunChange(string Field, JsonNode? Before, JsonNode? After, bool Hidden);
+
+/// <summary>
+/// A task of the instance, with who it is assigned to and how it ended. <paramref name="Assignee"/> is a user assignee's name,
+/// or its user id when the user has no profile, and a role assignee's role name. <paramref name="AssigneeId"/> is the user
+/// assignee's id, or the id of the person who claimed a role task, and null while no one holds it. <paramref name="CompletedBy"/>
+/// is the name of the person who completed the task, or their user id when they have no profile.
+/// </summary>
 internal sealed record ProcessInstanceTask(
     Guid Id,
     string Step,
     string AssigneeKind,
     string Assignee,
+    string? AssigneeId,
     string State,
     string? Outcome,
     string? CompletedBy,
+    string? CompletedById,
     DateTime CreatedAt,
+    DateTime? DueAt,
     DateTime? CompletedAt);
 
 /// <summary>
@@ -793,7 +1082,10 @@ internal sealed record ProcessInstanceTask(
 /// call has <paramref name="Connector"/> and a package call has <paramref name="Package"/> and
 /// <paramref name="Version"/>. <paramref name="Input"/> is null, and <paramref name="InputHidden"/> true,
 /// when the user may not read every field the step's mapping uses, or when one of them is sensitive
-/// in the pinned or the active release. A package call has <paramref name="Idempotent"/>, as stored when the call was staged.
+/// in the pinned or the active release. <paramref name="Request"/> is the request of a connector call's last sending attempt and
+/// <paramref name="Returned"/> the values a package call's operation returned. Each is null when the call keeps none, and
+/// when the same rule hides it, also for a call that no longer stores its input, so it is not tied to <paramref name="InputHidden"/>.
+/// A package call has <paramref name="Idempotent"/>, as stored when the call was staged.
 /// <paramref name="Resolvable"/> is true when the user holds <c>resolve</c>, the call is <c>unknown</c>, the instance
 /// is <c>waiting</c> on the call's step, and the pinned release or the installed package version declares the
 /// operation. Only then are its declared <paramref name="Outputs"/> listed.
@@ -811,6 +1103,8 @@ internal sealed record ProcessInstanceCall(
     IReadOnlyList<ProcessCallAttemptEntry> Attempts,
     JsonNode? Input,
     bool InputHidden,
+    JsonNode? Request,
+    JsonNode? Returned,
     bool Resolvable,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<ProcessCallOutput>? Outputs);
 
@@ -819,7 +1113,10 @@ internal sealed record ProcessCallOutput(string Name, string Type, bool Required
 
 /// <summary>
 /// An attempt or reconciliation lookup of a call. <c>Kind</c> is <c>attempt</c> or <c>lookup</c>.
+/// <paramref name="Problem"/> is the code of the error, <c>{ code, values }</c>, or null when the row has none. It holds no field value, so no rule hides it.
 /// <paramref name="TraceId"/> is the trace id of the run that wrote the row, or null when it stored none.
+/// <paramref name="Response"/> is the response of the outside system, or null when the attempt got none, for a
+/// lookup and a package call, and when the rule that hides the call's input hides it.
 /// </summary>
 internal sealed record ProcessCallAttemptEntry(
     string Kind,
@@ -829,4 +1126,6 @@ internal sealed record ProcessCallAttemptEntry(
     string Outcome,
     int? HttpStatus,
     string? Error,
-    string? TraceId);
+    JsonNode? Problem,
+    string? TraceId,
+    JsonNode? Response);

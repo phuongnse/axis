@@ -31,6 +31,29 @@ public sealed class ProcessStepHistoryRow
     /// <summary>Why the step failed, or <see langword="null"/> when it succeeded.</summary>
     public string? Error { get; init; }
 
+    /// <summary>
+    /// The error as a code with its values, as JSON text: <c>code</c> and <c>values</c>, see
+    /// docs/reference/process-inspection.md#step-errors-in-inspection. <see langword="null"/> when the
+    /// step succeeded and for a fixed text that has no code.
+    /// </summary>
+    public string? Problem { get; init; }
+
+    /// <summary>
+    /// The subject fields a decision's branch conditions read, as JSON text: <c>name</c> and <c>value</c> per field.
+    /// A field that the pinned release marks sensitive holds its name and no value. <see langword="null"/> for other
+    /// steps and for rows written before the column. Inspection shows it only under the masking rule, see
+    /// docs/reference/process-tables.md#step-history. It is never copied to <see cref="Output"/>, audit records or logs.
+    /// </summary>
+    public string? Read { get; init; }
+
+    /// <summary>
+    /// The subject fields an <c>updateRecord</c> step changed, as JSON text: <c>field</c>, <c>before</c> and <c>after</c>.
+    /// A field that the pinned release marks sensitive holds its name and no value. <see langword="null"/> for other
+    /// steps and for rows written before the column. Inspection shows it only under the masking rule, see
+    /// docs/reference/process-tables.md#step-history. It is never copied to <see cref="Output"/>, audit records or logs.
+    /// </summary>
+    public string? Changes { get; init; }
+
     public required DateTimeOffset StartedAt { get; init; }
 
     public required DateTimeOffset FinishedAt { get; init; }

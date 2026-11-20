@@ -4,6 +4,9 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { useContext, useEffect, useState, type HTMLAttributes } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { EventTime } from '../platform/EventTime'
+import { PageLayout } from '../platform/PageLayout'
+import { PersonName } from '../platform/PersonName'
 import { QuotaRefusedError } from '../platform/quota'
 import {
   fetchStudioRevision,
@@ -20,14 +23,25 @@ import {
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { recordPageSize, recordQuery, tablePageSizes } from '../platform/tableQuery'
+import { SectionPart, SectionParts } from '../platform/SectionParts'
+import { TermList } from '../platform/TermList'
 import { useText } from '../platform/texts'
 import { useTableView } from '../platform/useTableView'
 import { PlatformContext } from './context'
 import { StudioChanges } from './StudioChanges'
-import { StudioPageHeading } from './StudioPageHeading'
 
 /** What an undo left on the page: the later revisions that block it, or why it failed. */
 type UndoOutcome = { kind: 'blocked'; revisions: StudioRevision[] } | { kind: 'failed'; message: string }
+
+/** Who made a revision: a person by name through `PersonName`, or "System" for a revision the server made. */
+function RevisionAuthor({ revision }: { revision: StudioRevision }) {
+  const t = useText()
+  return revision.userId === null ? (
+    <>{revisionAuthor(revision, t)}</>
+  ) : (
+    <PersonName id={revision.userId} name={revision.author} />
+  )
+}
 
 /** The address of the History view, or of one revision's page. */
 function historyAddress(application: string, revision?: string): string {
@@ -149,7 +163,7 @@ export function StudioHistory({
       title: t('shell.studio.history.who'),
       filter: { kind: 'text' },
       sorter: true,
-      render: (_, row) => revisionAuthor(row, t),
+      render: (_, row) => <RevisionAuthor revision={row} />,
     },
     {
       key: 'time',
@@ -204,7 +218,9 @@ export function StudioHistory({
                   {outcome.revisions.map((blocker) => (
                     <Flex key={blocker.id} vertical data-testid="studio-history-blocker" data-id={blocker.id}>
                       <Typography.Text>{blocker.summary}</Typography.Text>
-                      <Typography.Text>{revisionAuthor(blocker, t)}</Typography.Text>
+                      <Typography.Text>
+                        <RevisionAuthor revision={blocker} />
+                      </Typography.Text>
                       <Typography.Text>{time(blocker.time)}</Typography.Text>
                     </Flex>
                   ))}
@@ -255,7 +271,6 @@ export function StudioRevisionPage({
   resources: StudioResourceItem[]
 }) {
   const t = useText()
-  const time = useRevisionTime()
   const { generation, lost } = useStudioConnection()
   const [diff, setDiff] = useState<{ revisionId: string; value: StudioRevisionDiff | null }>()
 
@@ -293,13 +308,28 @@ export function StudioRevisionPage({
   }
 
   const { revision } = loaded
-  const line = [revisionAuthor(revision, t), time(revision.time), revisionClient(revision, t)].filter(
-    (part): part is string => part !== null,
-  )
+  const client = revisionClient(revision, t)
+  const facts = [
+    {
+      key: 'who',
+      term: t('shell.studio.history.who'),
+      value: <RevisionAuthor revision={revision} />,
+    },
+    { key: 'when', term: t('shell.studio.history.when'), value: <EventTime value={revision.time} /> },
+    ...(client === null ? [] : [{ key: 'through', term: t('shell.studio.history.through'), value: client }]),
+  ]
   return (
-    <Flex vertical gap="middle" data-testid="studio-revision">
-      <StudioPageHeading title={revision.summary} line={line} />
-      <StudioChanges files={loaded.resources} resources={resources} />
-    </Flex>
+    <div data-testid="studio-revision">
+      <PageLayout title={revision.summary} line={t('shell.studio.revision.kind')}>
+        <SectionParts>
+          <SectionPart testName="facts">
+            <TermList terms={facts} />
+          </SectionPart>
+          <SectionPart testName="changes">
+            <StudioChanges files={loaded.resources} resources={resources} />
+          </SectionPart>
+        </SectionParts>
+      </PageLayout>
+    </div>
   )
 }

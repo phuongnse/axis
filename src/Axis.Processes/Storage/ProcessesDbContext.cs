@@ -74,12 +74,14 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             instance.Property(i => i.SubjectId).HasColumnName("subject_id");
             instance.Property(i => i.ReleaseId).HasColumnName("release_id");
             instance.Property(i => i.Parameters).HasColumnName("parameters").HasColumnType("jsonb");
+            instance.Property(i => i.Result).HasColumnName("result").HasColumnType("jsonb");
             instance.Property(i => i.State).HasColumnName("state");
             instance.Property(i => i.Revision).HasColumnName("revision");
             instance.Property(i => i.Step).HasColumnName("step");
             instance.Property(i => i.ParentInstanceId).HasColumnName("parent_instance_id");
             instance.Property(i => i.ParentStep).HasColumnName("parent_step");
             instance.Property(i => i.AccountableUser).HasColumnName("accountable_user");
+            instance.Property(i => i.StartedBy).HasColumnName("started_by").HasColumnType("jsonb");
             instance.Property(i => i.DecisionTask).HasColumnName("decision_task");
             instance.Property(i => i.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             instance.Property(i => i.EndedAt).HasColumnName("ended_at");
@@ -116,6 +118,9 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             history.Property(h => h.Output).HasColumnName("output").HasColumnType("jsonb");
             history.Property(h => h.Decision).HasColumnName("decision");
             history.Property(h => h.Error).HasColumnName("error");
+            history.Property(h => h.Problem).HasColumnName("problem").HasColumnType("jsonb");
+            history.Property(h => h.Read).HasColumnName("read").HasColumnType("jsonb");
+            history.Property(h => h.Changes).HasColumnName("changes").HasColumnType("jsonb");
             history.Property(h => h.StartedAt).HasColumnName("started_at");
             history.Property(h => h.FinishedAt).HasColumnName("finished_at");
             history.Property(h => h.TraceId).HasColumnName("trace_id");
@@ -178,6 +183,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.Attempts).HasColumnName("attempts");
             call.Property(c => c.Lookups).HasColumnName("lookups").HasDefaultValue(0);
             call.Property(c => c.Input).HasColumnName("input").HasColumnType("jsonb");
+            call.Property(c => c.Request).HasColumnName("request").HasColumnType("jsonb");
             call.Property(c => c.LastStatus).HasColumnName("last_status");
             call.Property(c => c.LastError).HasColumnName("last_error");
             call.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
@@ -214,6 +220,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             call.Property(c => c.RetryBackoff).HasColumnName("retry_backoff").HasColumnType("interval").HasDefaultValueSql("'30 seconds'::interval");
             call.Property(c => c.Idempotent).HasColumnName("idempotent").HasDefaultValue(false);
             call.Property(c => c.Input).HasColumnName("input").HasColumnType("jsonb");
+            call.Property(c => c.Returned).HasColumnName("returned").HasColumnType("jsonb");
             call.Property(c => c.LastError).HasColumnName("last_error");
             call.Property(c => c.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             call.Property(c => c.SettledAt).HasColumnName("settled_at");
@@ -249,6 +256,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             attempt.Property(a => a.Outcome).HasColumnName("outcome");
             attempt.Property(a => a.HttpStatus).HasColumnName("http_status");
             attempt.Property(a => a.Error).HasColumnName("error");
+            attempt.Property(a => a.Response).HasColumnName("response").HasColumnType("jsonb");
+            attempt.Property(a => a.Problem).HasColumnName("problem").HasColumnType("jsonb");
             attempt.Property(a => a.TraceId).HasColumnName("trace_id");
 
             // The call is in one of two tables, so there is no foreign key. Each attempt and lookup has its own number.
@@ -353,11 +362,17 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             email.Property(e => e.Subject).HasColumnName("subject");
             email.Property(e => e.Body).HasColumnName("body");
             email.Property(e => e.MessageId).HasColumnName("message_id");
+            email.Property(e => e.Link).HasColumnName("link");
+            email.Property(e => e.ProcessInstanceId).HasColumnName("process_instance_id");
+            email.Property(e => e.DigestUserId).HasColumnName("digest_user_id");
             email.Property(e => e.Values).HasColumnName("values").HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb");
             email.Property(e => e.State).HasColumnName("state").HasDefaultValue("pending");
             email.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             email.Property(e => e.SentAt).HasColumnName("sent_at");
             email.HasIndex(e => e.MessageId).IsUnique().HasDatabaseName("ux_email_outbox_message_id");
+            email.HasIndex(e => new { e.DigestUserId, e.CreatedAt })
+                .HasDatabaseName("ix_email_outbox_digest_user_id_created_at")
+                .HasFilter("digest_user_id IS NOT NULL AND state = 'pending'");
         });
 
         modelBuilder.Entity<WebhookDeliveryRow>(delivery =>

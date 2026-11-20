@@ -83,7 +83,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
         catch (Exception exception) when (exception is not ProcessStepException and not OperationCanceledException)
         {
             // Any failure after the load fails the instance at the revision the step loaded.
-            throw Failure(TypeName(exception), instance, input, exception);
+            throw Failure(TypeName(exception), instance, input, StepProblem.Exception, exception);
         }
     }
 
@@ -109,7 +109,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
         await InstanceMetrics.RecordEndedAsync(models, context, instance, ProcessStarts.Failed, cancellationToken);
         await ProcessSteps.InsertHistoryAsync(
             context.Transaction,
-            new StepOccurrence(instanceId, step, revision, failure?.Input ?? new JsonObject(), null, null, failure?.Message ?? TypeName(exception), failure?.StartedAt ?? instance.Now),
+            new StepOccurrence(instanceId, step, revision, failure?.Input ?? new JsonObject(), null, null, failure?.Message ?? TypeName(exception), failure?.StartedAt ?? instance.Now, failure is null ? StepProblem.Exception : failure.Problem),
             cancellationToken);
 
         // The same fixed text the history row stores. It holds names and the error kind, never a value.
@@ -248,10 +248,13 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
         JsonObject output;
         JsonObject details;
         string? action;
+        string? endResult = null;
         DateTimeOffset? timerDueAt = null;
         Guid? matchedEventId = null;
         PendingChild? child = null;
         List<KeyValuePair<FieldModel, object?>>? assignments = null;
+        JsonArray? read = null;
+        JsonArray? changes = null;
         NewTask? task = null;
         TaskDeadlineModel? taskDeadline = null;
         IReadOnlyList<TaskEscalationModel> taskEscalations = [];
@@ -276,6 +279,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
                     throw Failure($"The process '{process.Name}' has no step '{target}'.", instance, input);
                 }
 
+                // The values the conditions saw are kept on the run's history row only, never in its output or a log.
+                read = entity is null ? null : RunValues.Read(model, entity, decisionStep, record!);
                 state = ProcessStarts.Running;
                 nextStep = next.Name;
                 output = new JsonObject { ["next"] = next.Name };
@@ -313,6 +318,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
                 action = AuditActions.ProcessStepCompleted;
                 break;
             case EndStepModel:
+                // The record may change or go later, so the written fields are kept on the instance now.
+                endResult = ProcessResults.Values(model, process, entity, stored).ToJsonString();
                 state = ProcessStarts.Completed;
                 nextStep = step.Name;
                 decision = null;
@@ -552,7 +559,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
                 throw Failure($"The engine cannot run the step '{step.Name}' of type '{step.GetType().Name}'.", instance, input);
         }
 
-        if (!await ProcessSteps.TryAdvanceAsync(context.Transaction, instance.Id, instance.Revision, state, nextStep, cancellationToken))
+        if (!await ProcessSteps.TryAdvanceAsync(context.Transaction, instance.Id, instance.Revision, state, nextStep, endResult, cancellationToken))
         {
             // The newer revision owns the instance now, so this item is discarded with no other write.
             LogStaleRevision(instance.Id, step.Name, instance.Revision);
@@ -588,11 +595,12 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 LogRefusal(result, entity!.Id, instance.SubjectId);
-                throw Failure($"The record update was rejected: {Describe(result)}", instance, input);
+                throw Failure($"The record update was rejected: {Describe(result)}", instance, input, StepProblem.WriteRefused);
             }
 
             await ComputedBackfill.MarkStaleWriteAsync(context.Connection, context.Transaction, context.Item.TenantId, model, entity!, instance.ReleaseId, cancellationToken);
             updated = written;
+            changes = RunValues.Changes(model, entity!, stored!, written);
             effects = result.Effects;
             output["subjectVersion"] = written.Version;
             recordAudit = new AuditEntry(
@@ -617,7 +625,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 LogRefusal(result, created!.Id, null);
-                throw Failure($"The record create was rejected: {Describe(result)}", instance, input);
+                throw Failure($"The record create was rejected: {Describe(result)}", instance, input, StepProblem.WriteRefused);
             }
 
             await ComputedBackfill.MarkStaleWriteAsync(context.Connection, context.Transaction, context.Item.TenantId, model, created!, instance.ReleaseId, cancellationToken);
@@ -734,7 +742,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
 
         await ProcessSteps.InsertHistoryAsync(
             context.Transaction,
-            new StepOccurrence(instance.Id, step.Name, instance.Revision, input, output, decision, null, instance.Now),
+            new StepOccurrence(instance.Id, step.Name, instance.Revision, input, output, decision, null, instance.Now, Read: read, Changes: changes),
             cancellationToken);
         if (recordAudit is not null)
         {
@@ -975,6 +983,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
             child.Id,
             instance.Id,
             stepName,
+            model.Processes.First(parent => parent.Id == instance.ProcessId).Name,
             instance.AccountableUser,
             instance.DecisionTask,
             cancellationToken);
@@ -1321,12 +1330,12 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, ITena
     }
 
     private static ProcessStepException ExpressionFailure(string part, ProcessStepModel step, ExpressionRuntimeError error, LoadedInstance instance, JsonObject input) =>
-        Failure($"The {part} of the step '{step.Name}' failed: {error.Kind}.", instance, input);
+        Failure($"The {part} of the step '{step.Name}' failed: {error.Kind}.", instance, input, StepProblem.ExpressionFailed);
 
     private static string TypeName(Exception exception) => exception.GetType().FullName ?? exception.GetType().Name;
 
-    private static ProcessStepException Failure(string message, LoadedInstance instance, JsonObject input, Exception? innerException = null) =>
-        new(message, instance.Step, instance.Revision, instance.Now, input, innerException);
+    private static ProcessStepException Failure(string message, LoadedInstance instance, JsonObject input, StepProblem? problem = null, Exception? innerException = null) =>
+        new(message, instance.Step, instance.Revision, instance.Now, input, problem, innerException);
 
     /// <summary>Reads the stored rows of a child collection of the subject, by its declared name, as one evaluator for each row.</summary>
     private delegate Task<IReadOnlyList<Func<ExpressionModel, Task<ExpressionEvaluationResult>>>> RowSource(string collection);

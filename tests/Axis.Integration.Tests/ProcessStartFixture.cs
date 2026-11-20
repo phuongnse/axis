@@ -171,6 +171,15 @@ public sealed class ProcessStartFixture : IAsyncLifetime
         Assert.Equal(1, await command.ExecuteNonQueryAsync());
     }
 
+    /// <summary>Stores <paramref name="json"/> as the values the instance <paramref name="id"/> completed with, as the engine does.</summary>
+    public async Task SetInstanceResultAsync(Guid id, string json)
+    {
+        await using var command = DataSource.CreateCommand("UPDATE axis.process_instances SET result = @result::jsonb WHERE id = @id");
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("result", json);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
     /// <summary>Completes every running or waiting instance of the process <paramref name="processId"/>, so that it can be started again.</summary>
     public async Task EndInstancesAsync(Guid processId)
     {

@@ -122,6 +122,7 @@ export function CellJobsPage() {
       <CellJobTable
         jobs={page?.items ?? []}
         locale={locale}
+        linkTenants
         loading={jobs === undefined}
         view={{
           query: view,

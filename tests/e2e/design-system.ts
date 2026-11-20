@@ -1,4 +1,4 @@
-import type { FrameLocator, Page } from "@playwright/test";
+import { expect, type FrameLocator, type Page } from "@playwright/test";
 import path from "node:path";
 
 // The design-system bundle is a separate build, which scripts/e2e.sh makes with scripts/design-system.sh. The page
@@ -23,6 +23,15 @@ export const bundleUrl = `${origin}/artifacts/design-system/axis-design-system.j
 /** The figure of one state of a preview, found by its caption. */
 export const figure = (page: Page | FrameLocator, caption: string) =>
   page.getByRole("figure", { name: caption, exact: true });
+
+/** Picks a state in the State control of a preview, and waits until its figure draws. */
+export async function pickState(page: Page | FrameLocator, caption: string) {
+  await page
+    .getByRole("radiogroup", { name: "State", exact: true })
+    .getByText(caption, { exact: true })
+    .click();
+  await expect(figure(page, caption)).toBeVisible();
+}
 
 /** What a page records while it loads the harness: console errors, page errors and every request. */
 export interface Recording {

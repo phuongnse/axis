@@ -86,17 +86,18 @@ The bundle budget keeps the SPA's first load small. The main bundle is the entry
 `index.html` and the scripts it preloads, gzipped. It may grow by 50 KB over the baseline that
 `web/bundle-budget.json` holds. These parts load in chunks of their own, apart from the main bundle:
 
-| Chunk                             | What it holds                                                            |
-| --------------------------------- | ------------------------------------------------------------------------ |
-| `assets/ChartDrawing-*.js`        | The chart library, loaded lazily                                         |
-| `assets/StudioPageDesign-*.js`    | The page designer's canvas and palette, loaded when the Design tab opens |
-| `assets/StudioFormDesign-*.js`    | The form designer's Design tab, loaded when it first opens               |
-| `assets/StudioProcessDesign-*.js` | The process designer's Design tab, loaded when it first opens            |
-| `assets/DragAndDrop-*.js`         | The drag and drop library `@dnd-kit`, which the three designers share    |
+| Chunk                             | What it holds                                                                             |
+| --------------------------------- | ----------------------------------------------------------------------------------------- |
+| `assets/ChartDrawing-*.js`        | The chart library, loaded lazily                                                          |
+| `assets/StudioPageDesign-*.js`    | The page designer's canvas and palette, loaded when the Design tab opens                  |
+| `assets/StudioFormDesign-*.js`    | The form designer's Design tab, loaded when it first opens                                |
+| `assets/StudioProcessDesign-*.js` | The process designer's Design tab, loaded when it first opens                             |
+| `assets/DragAndDrop-*.js`         | The drag and drop library `@dnd-kit`, which the three designers share                     |
+| `assets/ProcessLayout-*.js`       | The graph layout library `elkjs`, loaded when a page first draws a process or a lifecycle |
 
 [`scripts/check-bundle.mjs`](../scripts/check-bundle.mjs) runs after the SPA build. It prints the
-sizes and fails when the main bundle is over budget, when the chart, page design, process design or
-drag and drop chunk is missing, or when any of them is among the main bundle files. Do not raise the
+sizes and fails when the main bundle is over budget, when the chart, page design, process design, drag
+and drop or process layout chunk is missing, or when any of them is among the main bundle files. Do not raise the
 budget to make the check pass: find what grew.
 
 #### Fonts and the Keycloak theme

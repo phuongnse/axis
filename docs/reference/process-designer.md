@@ -55,7 +55,7 @@ shows a panel edit within 2 s, and
 [`studio-process-redraw.spec.ts`](../../tests/e2e/specs/studio-process-redraw.spec.ts) fails at 2 s or
 more.
 
-- **Layout chunk** _(planned)_. `elkjs` loads in a chunk of its own, only on a page that draws a process, see
+- **Layout chunk**. `elkjs` loads in a chunk of its own, only on a page that draws a process, see
   [design tokens and previews](frontend.md#design-tokens-and-previews).
 
 ## Palette
@@ -147,7 +147,8 @@ The type picker in the panel and the Add step choice list every type in
 `$defs.step.properties.type.enum` of the process schema. Changing a step's type removes the keys that the
 schema's conditional for the new type forbids and adds its required keys, empty, while keys that the
 schema allows stay. The conditionals that also test the operation are left to the operation panel. A
-type with no panel shows its keys as "Edit in JSON" markers.
+type with no panel shows its keys as "Edit in JSON" markers. Every step panel except a task's has an optional Label picker, which writes `label`. A task's panel has the
+required one, and each decision branch has an optional Branch label picker.
 
 - **Within its list.** _(planned for M38)_ Move up and Move down move a step within its own list: `steps`, a lane's
   `steps` or a repeat's body. A step never moves to another list, and every picker of a panel lists only the steps

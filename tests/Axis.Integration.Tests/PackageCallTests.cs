@@ -73,6 +73,11 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         Assert.Equal(2L, record.Version);
         Assert.Equal((PackageCalls.Succeeded, 1, (string?)null, (string?)null), await CallAsync(callId));
 
+        // The call keeps the values its operation returned, though its input is cleared.
+        Assert.True(JsonNode.DeepEquals(
+            JsonNode.Parse("""{"total":"5"}"""),
+            JsonNode.Parse((string)(await tenant.ScalarAsync("SELECT returned::text FROM axis.package_calls WHERE id = @id", ("id", callId)))!)));
+
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("sum", 2L, (string?)null), (row.Step, row.Revision, row.Error));
         Assert.True(JsonNode.DeepEquals(
@@ -82,6 +87,23 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         // The next step's item was queued, and it completes the instance.
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync(CancellationToken));
         Assert.Equal((ProcessStarts.Completed, 4L, "done", true), await tenant.InstanceAsync(instanceId));
+    }
+
+    [Fact]
+    public async Task A_sum_call_keeps_the_total_it_changed_with_the_value_before_and_after()
+    {
+        var tenant = fixture.Tenant;
+        var (_, instanceId) = await fixture.StageAsync("PackageSum", CancellationToken);
+
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync(CancellationToken));
+
+        var stored = (string)(await tenant.ScalarAsync(
+            "SELECT changes::text FROM axis.process_step_history WHERE process_instance_id = @id AND output->>'outcome' = 'succeeded'",
+            ("id", instanceId)))!;
+        var change = Assert.Single(JsonNode.Parse(stored)!.AsArray())!;
+        Assert.Equal("total", change["field"]!.GetValue<string>());
+        Assert.Null(change["before"]);
+        Assert.Equal(5L, change["after"]!.GetValue<long>());
     }
 
     [Fact]
@@ -204,6 +226,11 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         Assert.Equal(("attempt", 1, "failed", (int?)null, (string?)"System.FormatException"), (failed.Kind, failed.Number, failed.Outcome, failed.HttpStatus, failed.Error));
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("fail", 2L, "System.FormatException"), (row.Step, row.Revision, row.Error));
+
+        // An exception type is the code exception, with no values and no text.
+        var exception = new JsonObject { ["code"] = "exception", ["values"] = new JsonObject() };
+        Assert.True(JsonNode.DeepEquals(exception, JsonNode.Parse(row.Problem!)));
+        Assert.True(JsonNode.DeepEquals(exception, JsonNode.Parse(await AttemptProblemAsync(callId))));
         Assert.True(JsonNode.DeepEquals(
             new JsonObject { ["operationId"] = callId, ["outcome"] = "failed" },
             JsonNode.Parse(row.Output!)));
@@ -479,6 +506,12 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
         Assert.Equal(("attempt", 1, "unknown", (int?)null, (string?)PackageCallHandler.TimedOut), (timedOut.Kind, timedOut.Number, timedOut.Outcome, timedOut.HttpStatus, timedOut.Error));
         var row = (await tenant.HistoryAsync(instanceId))[1];
         Assert.Equal(("slow", 2L, (string?)PackageCallHandler.TimedOut), (row.Step, row.Revision, row.Error));
+
+        // A run past its timeout is the code timeout with the seconds of the step's timeout, on the attempt and the history row.
+        var problem = JsonNode.Parse(row.Problem!)!;
+        Assert.Equal("timeout", (string?)problem["code"]);
+        Assert.True((double)problem["values"]!["seconds"]! > 0);
+        Assert.True(JsonNode.DeepEquals(problem, JsonNode.Parse(await AttemptProblemAsync(callId))));
         Assert.True(JsonNode.DeepEquals(
             new JsonObject { ["operationId"] = callId, ["outcome"] = "unknown" },
             JsonNode.Parse(row.Output!)));
@@ -595,6 +628,12 @@ public sealed class PackageCallTests(PackageCallFixture fixture) : IClassFixture
 
         return rows;
     }
+
+    /// <summary>The <c>problem</c> of the call's only attempt row as JSON text.</summary>
+    private async Task<string> AttemptProblemAsync(Guid callId) =>
+        (string)(await fixture.Tenant.ScalarAsync(
+            "SELECT problem::text FROM axis.process_call_attempts WHERE call_id = @id AND call_kind = 'package' AND kind = 'attempt'",
+            ("id", callId)))!;
 
     /// <summary>The details of the instance's system audit record with <paramref name="action"/>.</summary>
     private async Task<string> AuditDetailsAsync(Guid instanceId, string action) =>

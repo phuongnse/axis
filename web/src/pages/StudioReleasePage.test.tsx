@@ -105,11 +105,16 @@ const release: StudioRelease = {
   blockers: [],
 }
 
-function answer(body: StudioRelease | number) {
+/** Answers the release with `body`, and `/api/me` with a reader who may administer users or not. */
+function answer(body: StudioRelease | number, users = false) {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () =>
-      typeof body === 'number' ? new Response(null, { status: body }) : new Response(JSON.stringify(body)),
+    vi.fn(async (input: string) =>
+      input === '/api/me'
+        ? new Response(JSON.stringify({ id: 'admin', users }))
+        : typeof body === 'number'
+          ? new Response(null, { status: body })
+          : new Response(JSON.stringify(body)),
     ),
   )
 }
@@ -157,9 +162,10 @@ afterEach(() => {
   localStorage.clear()
 })
 
+/** The fact of the page's first part, a term over its value. */
 function fact(name: string) {
-  const label = screen.getByText(name, { selector: '.ant-descriptions-item-label' })
-  return within(label.closest('.ant-descriptions-item') as HTMLElement)
+  const term = within(screen.getByTestId('studio-section-facts')).getByText(name, { selector: 'dt' })
+  return within(term.parentElement as HTMLElement)
 }
 
 describe('StudioReleasePage', () => {
@@ -167,13 +173,13 @@ describe('StudioReleasePage', () => {
     answer(release)
     renderPage()
 
-    expect(await screen.findByRole('heading', { name: 'Release 3' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Release 3' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-heading')).getByText('Release', { exact: true })).toBeInTheDocument()
     expect(screen.getByTestId('release-off-standard')).toHaveTextContent('Off-standard')
     expect(screen.queryByText('Live')).not.toBeInTheDocument()
     expect(screen.queryByTestId('release-relaxed-point')).not.toBeInTheDocument()
 
     for (const name of [
-      'Details',
       'Relaxed points',
       'If you activate it, compared with live release 4',
       'Modules and packages',
@@ -181,7 +187,8 @@ describe('StudioReleasePage', () => {
     ]) {
       expect(screen.getByRole('region', { name })).toBeInTheDocument()
     }
-    expect(section('Details').getByText('Label')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Details' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('studio-section-facts')).toBeInTheDocument()
     expect(fact('Label').getByText('Third')).toBeInTheDocument()
     expect(fact('Status').getByText(`Replaced on ${time('2026-05-05T10:00:00Z')}`)).toBeInTheDocument()
     expect(fact('Published').getByText(time('2026-05-02T10:00:00Z'))).toBeInTheDocument()
@@ -282,12 +289,47 @@ describe('StudioReleasePage', () => {
     expect(section('Modules and packages').getByText('PDF export')).toBeInTheDocument()
   })
 
+  it('links Published by and the By column to the user page for a reader who may administer users', async () => {
+    answer(release, true)
+    renderPage()
+    await screen.findByRole('heading', { name: 'Release 3' })
+
+    await waitFor(() =>
+      expect(fact('Published by').getByRole('link', { name: 'Author User' })).toHaveAttribute('href', '/users/user-1'),
+    )
+    const activations = section('Activations').getAllByTestId('studio-release-activation')
+    expect(within(activations[1]).getByRole('link', { name: 'Author User' })).toHaveAttribute('href', '/users/user-1')
+    // The operator's activation stays plain words.
+    expect(within(activations[0]).getByText('The platform operator')).toBeInTheDocument()
+    expect(within(activations[0]).queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('shows Published by as plain text for a reader who may not administer users', async () => {
+    answer(release, false)
+    renderPage()
+    await screen.findByRole('heading', { name: 'Release 3' })
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/me', expect.anything()))
+    expect(fact('Published by').getByText('Author User')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Author User' })).not.toBeInTheDocument()
+  })
+
+  it('names a startup activation System, with no link, even for an administrator', async () => {
+    answer({ ...release, number: 2, previous: 1, previousIsLive: false }, true)
+    renderPage({ number: '2' })
+    await screen.findByRole('heading', { name: 'Release 2' })
+
+    expect(fact('Published by').getByText('System')).toBeInTheDocument()
+    expect(within(screen.getByTestId('studio-release-activation')).getByText('System')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'System' })).not.toBeInTheDocument()
+  })
+
   it('titles the changes of a live release by the release below it and says it is live since its last activation', async () => {
     answer({ ...release, number: 4, previous: 3, previousIsLive: false, live: true })
     renderPage({ number: '4' })
 
     expect(await screen.findByRole('heading', { name: 'Release 4' })).toBeInTheDocument()
-    expect(screen.getByText('Live')).toBeInTheDocument()
+    expect(within(screen.getByTestId('page-heading')).getByText('Live')).toBeInTheDocument()
     expect(screen.queryByTestId('release-off-standard')).not.toBeInTheDocument()
     expect(fact('Status').getByText(`Live since ${time('2026-05-05T10:00:00Z')}`)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Changes from release 3' })).toBeInTheDocument()
@@ -474,6 +516,14 @@ describe('StudioReleasePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Activate' }))
 
     await waitFor(() => expect(onActivate).toHaveBeenCalledWith('r3'))
+  })
+
+  it('puts Activate… in the page actions on the right of the heading', async () => {
+    answer(release)
+    renderPage()
+
+    const actions = within(await screen.findByTestId('page-actions'))
+    expect(await actions.findByRole('button', { name: 'Activate…' })).toBeInTheDocument()
   })
 
   it('turns Activate… off while a request runs', async () => {

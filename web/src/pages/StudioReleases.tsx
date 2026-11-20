@@ -6,17 +6,18 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { ReleaseOffStandard } from '../platform/ReleaseOffStandard'
+import { ReleasePublisher } from '../platform/ReleasePublisher'
 import { StatusTag } from '../platform/StatusTag'
 import {
   fetchStudioRelease,
   fetchStudioReleaseList,
-  releasePublisher,
   ServerUnreachableError,
   type StudioReleaseBlocker,
   type StudioReleaseListRow,
   type StudioReleasePage,
   type StudioReleases,
 } from '../platform/studio'
+import { studioReleaseAddress } from '../platform/studioAddress'
 import { useStudioConnection } from '../platform/studioConnection'
 import { recordPageSize, recordQuery, tablePageSizes } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
@@ -265,11 +266,7 @@ export function StudioReleasesList({
       sorter: true,
       render: (_, row) => (
         <Flex wrap align="flex-start" gap="small">
-          <Link
-            to={`/studio?${new URLSearchParams({ app: application, view: 'release', release: String(row.number) })}`}
-          >
-            {row.number}
-          </Link>
+          <Link to={studioReleaseAddress(application, row.number)}>{row.number}</Link>
           {row.live && <StudioLiveTag />}
           <ReleaseOffStandard relaxed={row.relaxed} locale={locale ?? 'en'} />
         </Flex>
@@ -297,7 +294,7 @@ export function StudioReleasesList({
       title: t('shell.studio.releases.publishedBy'),
       filter: { kind: 'text' },
       sorter: true,
-      render: (_, row) => releasePublisher(row, t),
+      render: (_, row) => <ReleasePublisher row={row} />,
     },
     {
       key: 'note',
