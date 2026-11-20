@@ -5,7 +5,7 @@ using Axis.Data.Audit;
 namespace Axis.Server.Tests;
 
 /// <summary>
-/// The audit actions that docs/reference/storage.md#audit-actions lists are exactly the <see cref="AuditActions"/> of the code
+/// The audit actions that docs/reference/audit-records-and-sequence-counters.md#audit-actions lists are exactly the <see cref="AuditActions"/> of the code
 /// that the reference docs name: every action of the code is named in backticks under docs/reference, and every action name
 /// that the section lists is an action of the code.
 /// </summary>
@@ -23,11 +23,11 @@ public sealed partial class AuditActionsDocumentationTests
     }
 
     [Fact]
-    public void Every_audit_action_that_the_storage_doc_lists_is_an_action_of_the_code()
+    public void Every_audit_action_that_the_docs_list_is_an_action_of_the_code()
     {
-        var lines = File.ReadAllLines(Path.Combine(RepositoryRoot(), "docs", "reference", "storage.md"));
+        var page = AuditActionsPage();
+        var lines = File.ReadAllLines(page);
         var start = Array.FindIndex(lines, line => line == "### Audit actions");
-        Assert.True(start >= 0, "docs/reference/storage.md has no '### Audit actions' section.");
         var end = Array.FindIndex(lines, start + 1, line => line.StartsWith('#'));
         var section = lines[start..(end < 0 ? lines.Length : end)];
 
@@ -39,7 +39,18 @@ public sealed partial class AuditActionsDocumentationTests
         var unknown = listed.Except(Actions()).ToList();
 
         Assert.NotEmpty(listed);
-        Assert.True(unknown.Count == 0, $"Named in the audit actions section of docs/reference/storage.md but not an AuditActions value: {string.Join(", ", unknown)}.");
+        Assert.True(unknown.Count == 0, $"Named in the audit actions section of {Path.GetRelativePath(RepositoryRoot(), page)} but not an AuditActions value: {string.Join(", ", unknown)}.");
+    }
+
+    // The one page under docs/reference with a '### Audit actions' section, wherever that section sits.
+    private static string AuditActionsPage()
+    {
+        var pages = Directory.EnumerateFiles(Path.Combine(RepositoryRoot(), "docs", "reference"), "*.md")
+            .Where(page => File.ReadAllLines(page).Contains("### Audit actions"))
+            .ToList();
+
+        Assert.True(pages.Count == 1, $"Expected one page under docs/reference with a '### Audit actions' section, found {pages.Count}.");
+        return pages[0];
     }
 
     private static List<string> Actions() =>

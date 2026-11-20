@@ -688,7 +688,7 @@ the release.
   the changed column. A `fill` makes a field that was `null` in some rows `NOT NULL` when the release
   requires it.
 - **Additive changes.** Then additive changes are planned and applied, and other incompatible
-  changes are rejected with a diagnostic, see [schema planning](storage.md#schema-planning). The
+  changes are rejected with a diagnostic, see [schema planning](entity-tables.md#schema-planning). The
   release becomes active for new work only after that has completed successfully.
 - **Active release.** Each application `id` has at most one active release, stored with the manifest
   `name` as written. The name is unique across the active applications, ignoring letter case. Names

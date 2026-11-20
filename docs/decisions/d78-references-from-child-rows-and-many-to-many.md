@@ -22,7 +22,7 @@ me", which the SQL subset of [D16](d16-expression-language.md) could not say.
   or a `count(*)` subquery. The other aggregates stay out of the subset.
 
 The detail is in [entity field types](../reference/resource-files.md#entity-field-types-and-constraints),
-[schema planning](../reference/storage.md#schema-planning),
+[schema planning](../reference/entity-tables.md#schema-planning),
 [reading values](../reference/record-api.md#reading-values) and the
 [SQL subset](../reference/expressions.md#sql-subset).
 

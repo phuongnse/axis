@@ -22,7 +22,7 @@ and never skip.
   create's transaction, and clients cannot write it. The counter restarts each year only when the
   format holds the year.
 
-The detail is in [audit records](../reference/storage.md#audit-records-and-sequence-counters),
+The detail is in [audit records](../reference/audit-records-and-sequence-counters.md#audit-records-and-sequence-counters),
 [history](../reference/record-audit.md#audit-records-and-history) and
 [sequences](../reference/entity-logic-and-sequences.md#sequences).
 

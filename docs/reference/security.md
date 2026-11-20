@@ -217,7 +217,7 @@ These routes start and end a sign-in, and let a person see and end their own ses
 
 ### Sign-in audit
 
-Sign-in and sign-out write [audit records](storage.md#audit-records-and-sequence-counters) in the
+Sign-in and sign-out write [audit records](audit-records-and-sequence-counters.md#audit-records-and-sequence-counters) in the
 database of the tenant that the host resolves to, so a tenant can see who signed in and who was
 refused.
 
@@ -228,7 +228,7 @@ refused.
 - **Nothing to write.** An expired session writes nothing. A host that resolves to no tenant writes
   nothing, because there is no tenant database.
 - **No secrets.** Each record holds the
-  [shortened client address](storage.md#audit-records-and-sequence-counters), never a token, a cookie
+  [shortened client address](audit-records-and-sequence-counters.md#audit-records-and-sequence-counters), never a token, a cookie
   or the user agent. The address follows the [forwarded headers](host-settings.md#forwarded-headers)
   rules.
 

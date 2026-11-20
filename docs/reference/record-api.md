@@ -151,7 +151,7 @@ read filters, and `totalCount` counts only those. A grant without a `filter` mat
 record. Each reference step of a read filter finds the target record through its
 primary key. Every reference column and every child table's `owner_id` has an
 index, and so does each index an entity declares, see
-[schema planning](storage.md#schema-planning). A filter on a field no index
+[schema planning](entity-tables.md#schema-planning). A filter on a field no index
 covers reads the whole entity table.
 
 ### System fields
@@ -392,7 +392,7 @@ HTTP also call. The record API maps its outcome to the responses below.
   uses no number, so the next create gets it. A body that sets it on create
   or update, even to `null`, is a `400` at its pointer with the message
   "Cannot be set.", as for a computed field. See
-  [Audit records and sequence counters](storage.md#audit-records-and-sequence-counters).
+  [Audit records and sequence counters](audit-records-and-sequence-counters.md#audit-records-and-sequence-counters).
 - **Creator fields.** A create by a signed-in user sets each `text` field that
   declares [`creator`](roles-and-policies.md#record-creator) to the user id from
   the session, in the write's transaction. It is set before the computed

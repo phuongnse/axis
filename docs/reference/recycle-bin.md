@@ -28,7 +28,7 @@ A `DELETE` of the record API keeps the record. It marks the record deleted and l
 child rows, files and references where they are, so a restore needs no copy.
 
 - **Marks.** The record gets `deleted_at` and `deleted_by`, see
-  [physical names](storage.md#physical-names). The response is `204`, as before, and the audit record
+  [physical names](entity-tables.md#physical-names). The response is `204`, as before, and the audit record
   is `record.deleted`.
 - **Shows nowhere else.** A record in the bin is not in a list, a read, a count, a label, a search, a
   data source, an export or an exact lookup, and it is not a target for a new reference. A read of it by
@@ -38,7 +38,7 @@ child rows, files and references where they are, so a restore needs no copy.
   another record refers to. Only a record outside the bin counts as another record, so a record in the
   bin never blocks the delete of the record it refers to.
 - **Unique values.** A unique value of a record in the bin is free, so a new record may take it, see
-  [unique values and the bin](storage.md#indexes).
+  [unique values and the bin](entity-tables.md#indexes).
 - **Triggers.** A delete starts the matching
   [delete triggers](process-events.md#delete-triggers) as before. A purge starts none.
 

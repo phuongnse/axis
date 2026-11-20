@@ -143,7 +143,7 @@ in one tenant never share module data.
   a UUID v5 of the application `id` and the id written in the module file, so two applications get
   separate tables and counters, and the id does not change with the module version. The compiler builds
   the derived id into the model, and a diagnostic in a module file keeps the id written in that file.
-  See [the physical names in storage](storage.md). The compiler keeps each module rule as
+  See [the physical names of entity tables](entity-tables.md#physical-names). The compiler keeps each module rule as
   `<module id>/<name>`, and the record API runs its body in each application that uses the module.
 - **Order.** Module entities come before the application's own entities in the model, in the order of
   the pins and then by path. The pins list the application's `modules` entries as written, then each

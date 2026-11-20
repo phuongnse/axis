@@ -236,13 +236,15 @@ Read by people who change sign-in, authorization, keys, headers or the threat mo
 
 Read by people who change how Axis stores data.
 
-| Doc                                                                            | What it holds                                                                               | Read it when                                                     |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| [Storage](reference/storage.md)                                                | Physical names, column types, database roles, schema planning, audit                        | You change physical names, column types or database roles        |
-| [Child collections in storage](reference/child-tables-and-computed-columns.md) | How child tables and computed columns are stored                                            | You change how child tables or computed columns are stored       |
-| [Process tables](reference/process-tables.md)                                  | The tables that `Axis.Processes` owns                                                       | You change the tables that Axis.Processes owns                   |
-| [Authoring request storage](reference/authoring-request-storage.md)            | The tables of authoring requests and their steps                                            | You change the tables of authoring requests and their steps      |
-| [Publish request storage](reference/publish-request-storage.md)                | The tables of publish requests and the release history, and the audit records of publishing | You change the tables of publish requests or the release history |
+| Doc                                                                                                | What it holds                                                                               | Read it when                                                     |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [Storage](reference/storage.md)                                                                    | System tables, the platform database and database roles                                     | You change system tables, the platform database or roles         |
+| [Entity tables and schema planning](reference/entity-tables.md)                                    | Entity tables, their physical names and column types, and schema planning                   | You change physical names, column types or schema planning       |
+| [Audit records and sequence counters in storage](reference/audit-records-and-sequence-counters.md) | Audit records, audit actions and sequence counters                                          | You change audit records, audit actions or sequence counters     |
+| [Child collections in storage](reference/child-tables-and-computed-columns.md)                     | How child tables and computed columns are stored                                            | You change how child tables or computed columns are stored       |
+| [Process tables](reference/process-tables.md)                                                      | The tables that `Axis.Processes` owns                                                       | You change the tables that Axis.Processes owns                   |
+| [Authoring request storage](reference/authoring-request-storage.md)                                | The tables of authoring requests and their steps                                            | You change the tables of authoring requests and their steps      |
+| [Publish request storage](reference/publish-request-storage.md)                                    | The tables of publish requests and the release history, and the audit records of publishing | You change the tables of publish requests or the release history |
 
 ## Working on Axis
 

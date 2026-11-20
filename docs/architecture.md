@@ -118,8 +118,10 @@ The [repository layout](repository-layout.md#repository-layout) and the
 
 ### Storage
 
-Physical names, column types, database roles, schema planning and audit are in
-[storage](reference/storage.md).
+Physical names, column types and schema planning are in
+[entity tables and schema planning](reference/entity-tables.md). Database roles are in
+[storage](reference/storage.md), and audit records in
+[audit records and sequence counters in storage](reference/audit-records-and-sequence-counters.md).
 
 ### Record API
 

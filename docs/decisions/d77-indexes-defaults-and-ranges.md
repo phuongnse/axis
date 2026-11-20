@@ -26,7 +26,7 @@ record is created.
 
 The detail is in [indexes](../reference/resource-files.md#indexes),
 [entity field types](../reference/resource-files.md#entity-field-types-and-constraints),
-[schema planning](../reference/storage.md#schema-planning) and
+[schema planning](../reference/entity-tables.md#schema-planning) and
 [create, update and delete](../reference/record-api.md#create-update-and-delete).
 
 ## Consequences

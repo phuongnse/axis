@@ -597,7 +597,7 @@ diagnostic.
   cannot map it (`AXC0121`) and a process `updateRecord` cannot set it. The record API writes it as
   an array of record ids and reads it with its labels, see
   [reading values](record-api.md#reading-values). Its links live in a junction table, see
-  [storage](storage.md#schema-planning). A plain set of records needs no link entity. A link that
+  [storage](entity-tables.md#schema-planning). A plain set of records needs no link entity. A link that
   carries data of its own, such as a role on an assignment, is still a link entity with two
   `reference` fields: that is a pattern for authors, not platform code.
 - **`valueLabels`.** On an `enum` field, a map from every value to a `{ "textKey" }` label:
@@ -620,7 +620,7 @@ diagnostic.
   and the form widget shows them on a new form.
 - **`searchable`.** On a `text` field. `searchable` on any other type is `AXC0013` at
   `/fields/{i}/searchable`, even when it is `false`. A searchable field and the display field get a
-  trigram index, see [schema planning](storage.md#schema-planning). `search` reads every searchable
+  trigram index, see [schema planning](entity-tables.md#schema-planning). `search` reads every searchable
   field that the user may read, and the display field, which is always searched, see
   [paging and sorting](record-api.md#paging-and-sorting).
 - **`multiline`** _(planned for M42)_. A boolean on a `text` field, `false` by default, that makes the field
@@ -680,7 +680,7 @@ written:
 
 An entity's `indexes` declare the database indexes that its queries need, as a list of
 `{ "name": ..., "fields": [ ... ] }` with an optional `"unique": true`, see
-[schema planning](storage.md#schema-planning).
+[schema planning](entity-tables.md#schema-planning).
 
 - **`name`.** Required, so a [customization layer](customization-layers.md#list-keys) can find the
   index. It is a name like a field's, and it is unique in the entity's indexes, ignoring letter case.
