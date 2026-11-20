@@ -1,4 +1,4 @@
-import { Flex, Segmented, Select, Typography } from 'antd'
+import { Flex, Select, Tabs, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { ActionBar } from '../platform/ActionBar'
 import { AxisAlert } from '../platform/AxisAlert'
@@ -259,106 +259,109 @@ export function PackageRun({
               />
             </AxisField>
           </div>
+          {/* Proposed, see #3978: the title row holds the input's own actions, Save and its menu, and the Form and JSON
+              tabs sit right above the values they show, as a tool apart from the actions that manage the saved input. */}
           <PaneHeader
             title={t('shell.studio.package.run.input')}
             height={rowHeight}
             actions={
-              <Segmented<'form' | 'json'>
-                aria-label={t('shell.studio.package.run.inputAs')}
-                size="small"
-                value={shown}
-                onChange={switchTo}
-                options={[
-                  { value: 'form', label: t('shell.studio.package.run.form') },
-                  { value: 'json', label: t('shell.value.json') },
-                ]}
-              />
+              developer && (
+                <AxisSplitButton
+                  data-testid="package-run-save"
+                  disabled={input === null}
+                  onClick={() =>
+                    chosen === null
+                      ? setSaveAsOpen(true)
+                      : void store(
+                          saved.items.map((item) =>
+                            item.name === chosen ? { ...item, operation: operation!, input: input! } : item,
+                          ),
+                        )
+                  }
+                  menuNameKey="shell.studio.package.run.inputActions"
+                  items={[
+                    {
+                      key: 'saveAs',
+                      label: t('shell.studio.package.run.saveInputAs'),
+                      disabled: input === null,
+                      onClick: () => setSaveAsOpen(true),
+                    },
+                    {
+                      key: 'delete',
+                      label: t('shell.studio.package.run.deleteInput'),
+                      destructive: true,
+                      disabled: chosen === null,
+                      onClick: () =>
+                        void store(saved.items.filter((item) => item.name !== chosen)).then(
+                          (done) => done && choose(null),
+                        ),
+                    },
+                  ]}
+                >
+                  {t('shell.studio.package.run.saveInput')}
+                </AxisSplitButton>
+              )
             }
           />
           <div style={{ flex: 'none', padding: pad }}>
             <Flex vertical gap={spacing.sm}>
-              <Flex gap="small" align="end">
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <AxisField label={t('shell.studio.package.run.savedInput')} help="">
-                    <Select
-                      placeholder={t('shell.studio.package.run.newInput')}
-                      value={chosen ?? undefined}
-                      onChange={(next: string) => choose(next)}
-                      allowClear
-                      onClear={() => choose(null)}
-                      options={saved.items
-                        .filter((item) => item.operation === operation)
-                        .map((item) => ({ value: item.name, label: item.name }))}
-                      style={{ width: '100%' }}
-                    />
-                  </AxisField>
-                </div>
-                {developer && (
-                  // Proposed, see #3978: three actions of the saved input are one split button, Save with the others in its menu.
-                  <AxisSplitButton
-                    data-testid="package-run-save"
-                    disabled={input === null}
-                    onClick={() =>
-                      chosen === null
-                        ? setSaveAsOpen(true)
-                        : void store(
-                            saved.items.map((item) =>
-                              item.name === chosen ? { ...item, operation: operation!, input: input! } : item,
-                            ),
-                          )
-                    }
-                    menuNameKey="shell.studio.package.run.inputActions"
-                    items={[
-                      {
-                        key: 'saveAs',
-                        label: t('shell.studio.package.run.saveInputAs'),
-                        disabled: input === null,
-                        onClick: () => setSaveAsOpen(true),
-                      },
-                      {
-                        key: 'delete',
-                        label: t('shell.studio.package.run.deleteInput'),
-                        destructive: true,
-                        disabled: chosen === null,
-                        onClick: () =>
-                          void store(saved.items.filter((item) => item.name !== chosen)).then(
-                            (done) => done && choose(null),
-                          ),
-                      },
-                    ]}
-                  >
-                    {t('shell.studio.package.run.saveInput')}
-                  </AxisSplitButton>
-                )}
-              </Flex>
+              <AxisField label={t('shell.studio.package.run.savedInput')} help="">
+                <Select
+                  placeholder={t('shell.studio.package.run.newInput')}
+                  value={chosen ?? undefined}
+                  onChange={(next: string) => choose(next)}
+                  allowClear
+                  onClear={() => choose(null)}
+                  options={saved.items
+                    .filter((item) => item.operation === operation)
+                    .map((item) => ({ value: item.name, label: item.name }))}
+                  style={{ width: '100%' }}
+                />
+              </AxisField>
               {saveError !== null && <AxisAlert kind="error" message={saveError} />}
-              {jsonError && <AxisAlert kind="error" message={t('shell.studio.package.run.jsonInvalid')} />}
-              {shown === 'form' &&
-                (fields.length === 0 ? (
-                  <Typography.Text type="secondary">{t('shell.studio.package.run.noInput')}</Typography.Text>
-                ) : (
-                  <Flex vertical gap={spacing.sm}>
-                    {fields.map((field) => (
-                      <AxisField
-                        key={field.name}
-                        label={field.name}
-                        help={t(`shell.studio.package.run.type.${field.type}`)}
-                        required={field.required}
-                      >
-                        <FieldInput
-                          field={inputField(field)}
-                          value={(values[field.name] ?? null) as RecordValue}
-                          onChange={(next) => setValues((all) => ({ ...all, [field.name]: next }))}
-                          locale={locale}
-                        />
-                      </AxisField>
-                    ))}
-                  </Flex>
-                ))}
             </Flex>
           </div>
+          <Tabs
+            className="axis-workspace-tabs axis-file-tabs"
+            aria-label={t('shell.studio.package.run.inputAs')}
+            activeKey={shown}
+            onChange={(key) => switchTo(key as 'form' | 'json')}
+            items={[
+              { key: 'form', label: t('shell.studio.package.run.form') },
+              { key: 'json', label: t('shell.value.json') },
+            ]}
+          />
+          {(jsonError || shown === 'form') && (
+            <div style={{ flex: 'none', padding: pad }}>
+              <Flex vertical gap={spacing.sm}>
+                {jsonError && <AxisAlert kind="error" message={t('shell.studio.package.run.jsonInvalid')} />}
+                {shown === 'form' &&
+                  (fields.length === 0 ? (
+                    <Typography.Text type="secondary">{t('shell.studio.package.run.noInput')}</Typography.Text>
+                  ) : (
+                    <Flex vertical gap={spacing.sm}>
+                      {fields.map((field) => (
+                        <AxisField
+                          key={field.name}
+                          label={field.name}
+                          help={t(`shell.studio.package.run.type.${field.type}`)}
+                          required={field.required}
+                        >
+                          <FieldInput
+                            field={inputField(field)}
+                            value={(values[field.name] ?? null) as RecordValue}
+                            onChange={(next) => setValues((all) => ({ ...all, [field.name]: next }))}
+                            locale={locale}
+                          />
+                        </AxisField>
+                      ))}
+                    </Flex>
+                  ))}
+              </Flex>
+            </div>
+          )}
           {shown === 'json' && (
-            <div style={{ flex: '1 0 160px', borderTop: rule }}>
+            <div style={{ flex: '1 0 160px' }}>
               <CodeEditor
                 label={t('shell.studio.package.run.inputJson')}
                 value={jsonText}
