@@ -652,7 +652,6 @@
   "shell.value.items": "{count} items",
   "shell.value.table": "Table",
   "shell.value.json": "JSON",
-  "shell.value.showAs": "Show as",
   "shell.empty.noData": "No data yet.",
   "shell.kpi.empty": "No value",
   "shell.kpi.loading": "Loading…",
