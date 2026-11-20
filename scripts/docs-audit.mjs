@@ -3,6 +3,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readList } from './check-issue-links.mjs'
+import { docWordCounts } from './lib/docs/helpers.mjs'
+import { splitIssueWords, splitTargetWords } from './lib/docs/sizes.mjs'
 
 // The docs audit of D145, in four commands that the docs-audit workflow runs:
 //
@@ -11,7 +13,8 @@ import { readList } from './check-issue-links.mjs'
 //                                                  four at a time, with read-only tools, and prints the findings
 //   node scripts/docs-audit.mjs file <findings> <run id>
 //                                                  opens a NexKit issue for each group of findings that no open
-//                                                  issue covers: code and test fixes first, at most ten, the rest printed
+//                                                  issue covers: code and test fixes first, then a split issue for
+//                                                  each doc past the size mark, at most ten, the rest printed
 //   node scripts/docs-audit.mjs homes <links>     asks Claude Code once, with read-only tools, for the new home of
 //                                                  each broken link that scripts/check-issue-links.mjs listed
 //
@@ -154,10 +157,11 @@ const codeKinds = ['unbuilt', 'untested-list']
 const homeLabel = 'docs-audit'
 
 /**
- * Groups the findings into issues: code and test fixes first, then docs pages. Leaves out what an open issue
- * or an earlier issue of this run covers, keeps at most ten, and returns the findings past the cap as leftOut.
+ * Groups the findings into issues: code and test fixes first, then docs pages, then a split issue for each doc
+ * past splitIssueWords. Leaves out what an open issue or an earlier issue of this run covers, keeps at most ten,
+ * and returns the findings past the cap as leftOut. docWords lists { page, words } for each doc.
  */
-export function issuesFrom(findings, openBodies, runId) {
+export function issuesFrom(findings, openBodies, runId, docWords = []) {
   const built = new Set()
   const covered = (group, key) =>
     built.has(`${group} ${key}`) || openBodies.some((b) => b.includes(marker(group, key)))
@@ -215,6 +219,28 @@ export function issuesFrom(findings, openBodies, runId) {
               `${kindNames[f.kind]}. ${link(f.page, f.line)}: ${f.statement} Evidence: ${evidence(f)}.` +
               (f.recommendation ? ` Recommended: ${f.recommendation}` : ''),
           ),
+          '`node scripts/check-docs.mjs` and `node scripts/check-links.mjs` pass.',
+        ],
+      ),
+    })
+  }
+  for (const d of docWords.filter((d) => d.words > splitIssueWords)) {
+    add('split', d.page, [{ page: d.page, line: 1, kind: 'split', statement: `${d.words} words, past ${splitIssueWords}` }], {
+      title: `${d.page} splits by topic before it meets the size limit`,
+      labels: ['documentation'],
+      body: body(
+        `${link(d.page)} holds ${d.words.toLocaleString('en-US')} words, past the ` +
+          `${splitIssueWords.toLocaleString('en-US')} at which the docs audit asks for a split, as ` +
+          `[how the docs stay correct](${repository}/blob/main/docs/writing-docs.md#how-the-docs-stay-correct) says. ` +
+          `Split it by topic, as [structure](${repository}/blob/main/docs/writing-docs.md#structure) says, ` +
+          'so that a feature change does not split it in passing.\n\nConcepts: none. This changes how the docs are kept.',
+        'split',
+        d.page,
+        runId,
+        [
+          `\`${d.page}\` and each new page hold at most ${splitTargetWords.toLocaleString('en-US')} words, and the ` +
+            'moved `##` sections read the same in their new files.',
+          'Each new page has its row in `docs/README.md`, in the group of the page it came from.',
           '`node scripts/check-docs.mjs` and `node scripts/check-links.mjs` pass.',
         ],
       ),
@@ -360,7 +386,7 @@ function file(findingsFile, runId) {
   const findings = readFindings(findingsFile)
   const gh = process.env.GH ?? 'gh'
   const open = JSON.parse(run(gh, ['issue', 'list', '--state', 'open', '--limit', '1000', '--json', 'body']))
-  const { issues, leftOut } = issuesFrom(findings, open.map((i) => i.body ?? ''), runId)
+  const { issues, leftOut } = issuesFrom(findings, open.map((i) => i.body ?? ''), runId, docWordCounts(root))
   for (const issue of issues) {
     const args = ['issue', 'create', '--title', issue.title, '--body', issue.body]
     for (const label of issue.labels) args.push('--label', label)

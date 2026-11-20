@@ -303,10 +303,14 @@ agrees.
    quarter of the pages each run, in turn. The pages are every Markdown page under `docs/`, every Markdown file of a
    skill under `.claude/skills/` and AGENTS.md. It reads them as the
    [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md) says. Its model only reads; a
-   job with no model opens at most ten NexKit issues a run, code and test fixes before docs fixes, and a
-   finding that the cap leaves out is reported again by its page's next run. A docs fix that holds a
-   *wrong* finding is labelled `bug`, so it runs before the milestones' features: a wrong page misleads
-   every agent that reads it. The skill gives the details.
+   job with no model opens at most ten NexKit issues a run, code and test fixes before docs fixes and split
+   issues last, and a finding that the cap leaves out is reported again by its page's next run. A docs fix
+   that holds a *wrong* finding is labelled `bug`, so it runs before the milestones' features: a wrong page
+   misleads every agent that reads it. The same job counts the words of every doc under `docs/` each run,
+   with the size check's word count. It opens one issue to split each doc past 9,000 words by topic, as
+   [structure](#structure) says, unless an open issue already asks for that split. These split issues count
+   toward the ten, so a page splits as work of its own, before a feature change meets the limit. The skill
+   gives the details.
 10. **Checks catch what a machine can.** `scripts/lint.sh` runs them on every change. A docs check is
     added only once the whole tree passes it: there are no baselines and no lists of exceptions.
     - [`scripts/check-links.mjs`](../scripts/check-links.mjs) checks every relative link and anchor in

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
@@ -18,6 +18,8 @@ import {
   readGroups,
   shares,
 } from './docs-audit.mjs'
+import { docWordCounts } from './lib/docs/helpers.mjs'
+import { splitIssueWords } from './lib/docs/sizes.mjs'
 
 const finding = (page, line, kind, extra = {}) => ({
   page,
@@ -335,5 +337,78 @@ describe('readFindings', () => {
     withFile('[]', (file) => assert.deepEqual(readFindings(file), []))
     const one = [finding('docs/a.md', 3, 'wrong')]
     withFile(JSON.stringify(one), (file) => assert.deepEqual(readFindings(file), one))
+  })
+})
+
+describe('split issues', () => {
+  const doc = (words) => '# Doc\n' + 'word\n'.repeat(words - 1)
+  const splitTitle = (page) => `${page} splits by topic before it meets the size limit`
+
+  // Writes each doc under docs/ of a temporary root, and passes the word count of each doc to check.
+  const withDocs = (docs, check) => {
+    const root = mkdtempSync(path.join(tmpdir(), 'docs-audit-'))
+    try {
+      mkdirSync(path.join(root, 'docs'))
+      for (const [name, text] of Object.entries(docs)) writeFileSync(path.join(root, 'docs', name), text)
+      check(docWordCounts(root))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }
+
+  test('opens one split issue for a doc past splitIssueWords, with its word count and the docs-audit label', () => {
+    withDocs({ 'big.md': doc(splitIssueWords + 1) }, (docWords) => {
+      const { issues } = issuesFrom([], [], 1, docWords)
+      assert.equal(issues.length, 1)
+      assert.equal(issues[0].title, splitTitle('docs/big.md'))
+      assert.deepEqual(issues[0].labels, ['documentation', 'docs-audit'])
+      assert.match(issues[0].body, /9,001 words/)
+      assert.match(issues[0].body, /<!-- docs-audit split docs\/big\.md -->/)
+    })
+  })
+
+  test('opens no split issue for a doc of splitIssueWords words', () => {
+    withDocs({ 'edge.md': doc(splitIssueWords) }, (docWords) => {
+      assert.deepEqual(issuesFrom([], [], 1, docWords), { issues: [], leftOut: [] })
+    })
+  })
+
+  test('opens no split issue for a doc that an open issue already asks to split', () => {
+    withDocs({ 'big.md': doc(splitIssueWords + 1) }, (docWords) => {
+      const open = ['text\n<!-- docs-audit split docs/big.md -->']
+      assert.deepEqual(issuesFrom([], open, 1, docWords), { issues: [], leftOut: [] })
+    })
+  })
+
+  test('still opens a split issue when an open docs fix names the same page', () => {
+    withDocs({ 'big.md': doc(splitIssueWords + 1) }, (docWords) => {
+      const open = ['text\n<!-- docs-audit docs docs/big.md -->']
+      assert.deepEqual(
+        issuesFrom([], open, 1, docWords).issues.map((i) => i.title),
+        [splitTitle('docs/big.md')],
+      )
+    })
+  })
+
+  test('opens a split issue after the docs issues of the run', () => {
+    withDocs({ 'big.md': doc(splitIssueWords + 1) }, (docWords) => {
+      const { issues } = issuesFrom([finding('docs/a.md', 3, 'wrong')], [], 1, docWords)
+      assert.deepEqual(
+        issues.map((i) => i.title),
+        ['The docs of docs/a.md match the code', splitTitle('docs/big.md')],
+      )
+    })
+  })
+
+  test('counts a split issue toward the cap of ten, and returns a split past the cap as leftOut', () => {
+    const found = Array.from({ length: maxIssues }, (_, i) => finding(`docs/p${i}.md`, 1, 'wrong'))
+    const docWords = [{ page: 'docs/big.md', words: splitIssueWords + 1 }]
+    const { issues, leftOut } = issuesFrom(found, [], 1, docWords)
+    assert.equal(issues.length, maxIssues)
+    assert.ok(issues.every((i) => i.title !== splitTitle('docs/big.md')))
+    assert.deepEqual(
+      leftOut.map((f) => [f.page, f.kind, f.statement]),
+      [['docs/big.md', 'split', `${splitIssueWords + 1} words, past ${splitIssueWords}`]],
+    )
   })
 })
