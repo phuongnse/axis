@@ -332,7 +332,7 @@ export interface SplitButtonItem {
 
 /**
  * Proposed, see #3978: the main of three or more actions that manage one thing as a button, with the others in a menu on
- * a joined caret button, or in a region's title row as a text button with a More actions text menu, such as a saved input's Save with Save as… and Delete, see
+ * a joined caret button, or in a region's title row as a text button with a "…" menu, such as a saved input's Save with Save as… and Delete, see
  * docs/reference/actions-and-controls.md#buttons. `menuNameKey` names the caret button.
  */
 export function AxisSplitButton({
@@ -354,13 +354,12 @@ export function AxisSplitButton({
   items: readonly SplitButtonItem[]
   /**
    * Proposed, see #3978: the button sits in a region's title row, so the main action is a borderless text button and the
-   * others are the entries of a borderless More actions text menu beside it, ending in a caret. A group of actions is
-   * all text or all icons, never both.
+   * others are the entries of a "…" menu beside it. A group of actions is all text or all icons, and the "…" that opens
+   * a menu is no action, so it stays an icon beside either.
    */
   titleRow?: boolean
   'data-testid'?: string
 }) {
-  const t = useText()
   const menu = {
     items: items.map((item) => ({
       key: item.key,
@@ -377,9 +376,7 @@ export function AxisSplitButton({
           {children}
         </AxisButton>
         <Dropdown trigger={['click']} menu={menu}>
-          <AxisButton role="plain" caret aria-label={t(menuNameKey)}>
-            {t('shell.actionRow.more')}
-          </AxisButton>
+          <AxisButton role="icon" nameKey={menuNameKey} icon={<EllipsisOutlined />} />
         </Dropdown>
       </Flex>
     )
